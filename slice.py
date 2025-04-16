@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
-from math import atan2, degrees, sqrt
+from math import atan2, degrees, sqrt, cos, radians
 
 def get_y_from_intersection(geom):
     if isinstance(geom, Point):
@@ -15,7 +15,7 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_polyline=None, num_slices=20):
+def generate_slices(profile_lines, materials, circle, surface_polyline, num_slices=20, gamma_w=62.4, piezo_line=None):
     Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
     R = Yo - depth
 
@@ -30,27 +30,65 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_p
 
     intersections = arc_line.intersection(surface_polyline)
 
+    intersections = arc_line.intersection(surface_polyline)
+
+    x_min = x_max = None
+    y_left = y_right = None
+
     if isinstance(intersections, MultiPoint):
-        x_coords = sorted(pt.x for pt in intersections.geoms)
-        x_min, x_max = x_coords[0], x_coords[-1]
+        points = sorted(intersections.geoms, key=lambda p: p.x)
+        x_min, x_max = points[0].x, points[-1].x
+        y_left, y_right = points[0].y, points[-1].y
+
     elif isinstance(intersections, Point):
         x_min = x_max = intersections.x
+        y_left = y_right = intersections.y
+
     elif isinstance(intersections, GeometryCollection):
-        pts = [g for g in intersections.geoms if isinstance(g, Point)]
-        if pts:
-            x_coords = sorted(pt.x for pt in pts)
-            x_min, x_max = x_coords[0], x_coords[-1]
+        points = [g for g in intersections.geoms if isinstance(g, Point)]
+        if points:
+            points = sorted(points, key=lambda p: p.x)
+            x_min, x_max = points[0].x, points[-1].x
+            y_left, y_right = points[0].y, points[-1].y
         else:
             return pd.DataFrame(), LineString([])
     else:
         return pd.DataFrame(), LineString([])
 
+    if y_left > y_right:
+        right_facing = True
+    else:
+        right_facing = False
+
     clipped_arc = LineString([pt for pt in arc if x_min <= pt[0] <= x_max])
-    uniform_xs = np.linspace(x_min, x_max, num_slices + 1)
+
+    # DETERMINE SLICE LOCATIONS
+    # Start with all profile x-points that intersect the arc
+    fixed_xs = set(
+        x for line in profile_lines for x, _ in line
+        if x_min <= x <= x_max
+    )
+    # Explicitly include x_min and x_max
+    fixed_xs.update([x_min, x_max])
+    fixed_xs = sorted(fixed_xs)
+    # Compute total arc span and how to divide num_slices proportionally
+    segment_lengths = [fixed_xs[i + 1] - fixed_xs[i] for i in range(len(fixed_xs) - 1)]
+    total_length = sum(segment_lengths)
+    all_xs = [fixed_xs[0]]
+    for i in range(len(fixed_xs) - 1):
+        x_start = fixed_xs[i]
+        x_end = fixed_xs[i + 1]
+        segment_length = x_end - x_start
+
+        # Proportional allocation
+        n_subdiv = max(1, int(round((segment_length / total_length) * num_slices)))
+        xs = np.linspace(x_start, x_end, n_subdiv + 1).tolist()
+        all_xs.extend(xs[1:])  # skip duplicate start
+
     slices = []
 
-    for i in range(len(uniform_xs) - 1):
-        x_l, x_r = uniform_xs[i], uniform_xs[i + 1]
+    for i in range(len(all_xs) - 1):
+        x_l, x_r = all_xs[i], all_xs[i + 1]
         x_c = (x_l + x_r) / 2
         dx = x_r - x_l
 
@@ -94,7 +132,7 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_p
                 h = max(0, overlap_top - overlap_bot)
 
             heights.append(h)
-            total_weight += h * materials[mat_index]['gamma']
+            total_weight += h * materials[mat_index]['gamma'] * dx
             if base_material_idx is None and h > 0:
                 base_material_idx = mat_index
 
@@ -106,12 +144,13 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_p
             piezo_y = get_y_from_intersection(piezo_geom.intersection(piezo_vertical))
             if piezo_y is not None and piezo_y > y_cb:
                 hw = piezo_y - y_cb
-
         delta = 0.01
         p1 = Point(x_c - delta, Yo - sqrt(R**2 - (x_c - delta - Xo)**2))
         p2 = Point(x_c + delta, Yo - sqrt(R**2 - (x_c + delta - Xo)**2))
         alpha = degrees(atan2(p2.y - p1.y, p2.x - p1.x))
-
+        if right_facing:
+            alpha = -alpha
+        dl = dx / cos(radians(alpha))
         phi = materials[base_material_idx]['phi'] if base_material_idx is not None else 0
         c = materials[base_material_idx]['c'] if base_material_idx is not None else 0
 
@@ -127,15 +166,20 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_p
             'y_cb': y_cb,
             'y_ct': y_ct,
             'dx': dx,
+            'alpha': alpha,
+            'dl': dl,
             **{f'h{j+1}': h for j, h in enumerate(heights)},
             'w': total_weight,
             'piezo_y': piezo_y,
             'hw': hw,
-            'alpha': alpha,
+            'u': hw * gamma_w if piezo_y is not None else 0,
             'phi': phi,
             'c': c
         }
         slices.append(slice_data)
 
     df = pd.DataFrame(slices)
+
+
+
     return df, clipped_arc

@@ -3,48 +3,52 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 from math import atan2, degrees, sqrt
 
-def generate_slices(profile_lines, materials, circle, piezo_line=None, num_slices=20):
+def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_polyline=None, num_slices=20):
     Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
     R = Yo - depth
 
     theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
-    arc = [(Xo + R * np.cos(t), Yo - R * np.sin(t)) for t in theta_range]
-    arc_line = LineString(arc)
+    arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
+    arc_line = LineString([(x, y) for x, y in arc])  # force 2D
 
-    # Step 1: Collect all points and map highest y for each x
-    all_points = sorted(set(pt for line in profile_lines for pt in line))
-    top_candidates = {}
-    for x, y in all_points:
-        if x not in top_candidates or y > top_candidates[x]:
-            top_candidates[x] = y
+    for pt in arc:
+      print(pt)
 
-    # Step 2: Validate each top candidate
-    top_surface_points = []
-    for x, y in sorted(top_candidates.items()):
-        keep = True
-        for other_line in profile_lines:
-            line = LineString(other_line)
-            if line.length == 0:
-                continue
-            proj = line.project(Point(x, 0))
-            if proj == 0 or proj == line.length:
-                continue  # avoid edge extrapolation
-            ipt = line.interpolate(proj)
-            if ipt.y > y + 1e-6:
-                keep = False
-                break
-        if keep:
-            top_surface_points.append((x, y))
-
-    if len(top_surface_points) < 2:
+    if surface_polyline is None or surface_polyline.is_empty:
         return pd.DataFrame(), LineString([])
 
-    surface_polyline = LineString(top_surface_points)
+    # Ensure surface is 2D
+    surface_polyline = LineString([(x, y) for x, y in surface_polyline.coords])
 
-    # Intersect arc with surface
+    # Additional diagnostics
+    print("arc type:", type(arc_line))
+    print("arc has_z:", arc_line.has_z)
+    print("surface type:", type(surface_polyline))
+    print("surface has_z:", surface_polyline.has_z)
+
+    # Debug: bounds and intersections
     intersections = arc_line.intersection(surface_polyline)
+    print("arc bounds:", arc_line.bounds)
+    print("surface bounds:", surface_polyline.bounds)
+    print("intersection type:", type(intersections))
+    print("intersection result:", intersections)
+
+    # Diagnostic plot of arc and surface
+    import matplotlib.pyplot as plt
+    arc_x, arc_y = zip(*arc)
+    surf_x, surf_y = zip(*surface_polyline.coords)
+    plt.figure(figsize=(10, 5))
+    plt.plot(arc_x, arc_y, label='Arc')
+    plt.plot(surf_x, surf_y, label='Surface')
+    plt.title("Arc and Surface Intersection Diagnostic")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
     if isinstance(intersections, MultiPoint):
-        x_coords = sorted(pt.x for pt in intersections)
+        x_coords = sorted(pt.x for pt in intersections.geoms)
         x_min, x_max = x_coords[0], x_coords[-1]
     elif isinstance(intersections, Point):
         x_min = x_max = intersections.x
@@ -74,9 +78,17 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, num_slice
         except ValueError:
             continue
 
-        y_lt = surface_polyline.interpolate(surface_polyline.project(Point(x_l, 0))).y
-        y_rt = surface_polyline.interpolate(surface_polyline.project(Point(x_r, 0))).y
-        y_ct = surface_polyline.interpolate(surface_polyline.project(Point(x_c, 0))).y
+        vertical_l = LineString([(x_l, surface_polyline.bounds[1] - 10), (x_l, surface_polyline.bounds[3] + 10)])
+        vertical_r = LineString([(x_r, surface_polyline.bounds[1] - 10), (x_r, surface_polyline.bounds[3] + 10)])
+        vertical_c = LineString([(x_c, surface_polyline.bounds[1] - 10), (x_c, surface_polyline.bounds[3] + 10)])
+
+        inter_l = surface_polyline.intersection(vertical_l)
+        inter_r = surface_polyline.intersection(vertical_r)
+        inter_c = surface_polyline.intersection(vertical_c)
+
+        y_lt = inter_l.y if isinstance(inter_l, Point) else inter_l.geoms[0].y
+        y_rt = inter_r.y if isinstance(inter_r, Point) else inter_r.geoms[0].y
+        y_ct = inter_c.y if isinstance(inter_c, Point) else inter_c.geoms[0].y
 
         slice_line = LineString([(x_c, y_ct), (x_c, y_cb)])
 
@@ -86,16 +98,35 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, num_slice
 
         for mat_index, line in enumerate(profile_lines):
             layer_line = LineString(line)
-            layer_top_y = layer_line.interpolate(layer_line.project(Point(x_c, 0))).y
+            proj_pt = Point(x_c, 0)
+            layer_top_y = layer_line.interpolate(layer_line.project(proj_pt)).y
+
             if mat_index + 1 < len(profile_lines):
                 next_line = LineString(profile_lines[mat_index + 1])
-                layer_bot_y = next_line.interpolate(next_line.project(Point(x_c, 0))).y
+                layer_bot_y = next_line.interpolate(next_line.project(proj_pt)).y
             else:
                 layer_bot_y = y_cb
-            top = min(y_ct, layer_top_y)
-            bot = max(y_cb, layer_bot_y)
-            h = max(0, top - bot)
+
+            overlap_top = min(y_ct, layer_top_y)
+            overlap_bot = max(y_cb, layer_bot_y)
+            h = max(0, overlap_top - overlap_bot)
+
             heights.append(h)
+        if i in [5, 6]:
+            print(f"Slice {i+1}: x_c = {x_c:.2f}, y_ct = {y_ct:.2f}, y_cb = {y_cb:.2f}")
+            print(f"  Material {mat_index+1}: h = {h:.2f}")
+            total_weight += h * materials[mat_index]['gamma']
+            if base_material_idx is None and h > 0:
+                base_material_idx = mat_index
+            total_weight += h * materials[mat_index]['gamma']
+            if base_material_idx is None and h > 0:
+                base_material_idx = mat_index
+            total_weight += h * materials[mat_index]['gamma']
+            if base_material_idx is None and h > 0:
+                base_material_idx = mat_index
+            total_weight += h * materials[mat_index]['gamma']
+            if base_material_idx is None and h > 0:
+                base_material_idx = mat_index
             total_weight += h * materials[mat_index]['gamma']
             if base_material_idx is None and h > 0:
                 base_material_idx = mat_index

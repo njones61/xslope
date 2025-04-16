@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None):
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -8,14 +9,6 @@ def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None
     for i, line in enumerate(profile_lines):
         xs, ys = zip(*line)
         ax.plot(xs, ys, label=f'Material {i+1}')
-
-    # Plot slip circle (bottom half only)
-    Xo, Yo, D = circle['Xo'], circle['Yo'], circle['Depth']
-    R = Yo - D
-    theta = np.linspace(np.pi, 2 * np.pi, 500)
-    circle_x = Xo + R * np.cos(theta)
-    circle_y = Yo - R * np.sin(theta)
-    ax.plot(circle_x, circle_y, 'k--', label="Full Slip Circle")
 
     # Plot the clipped failure surface if provided
     if failure_surface:

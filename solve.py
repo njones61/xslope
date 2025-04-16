@@ -94,3 +94,116 @@ def spencer(df, tol=1e-6, max_iter=100):
         beta = beta_new
 
     return F, degrees(beta)
+
+
+def janbu_simple(df, tol=1e-6, max_iter=100):
+    alpha_rad = np.radians(df['alpha'])
+    phi_rad = np.radians(df['phi'])
+    tan_phi = np.tan(phi_rad)
+
+    W = df['w'].values
+    c = df['c'].values
+    dl = df['dl'].values
+    u = df['u'].values
+
+    sin_alpha = np.sin(alpha_rad)
+    cos_alpha = np.cos(alpha_rad)
+
+    F = 1.0  # initial guess
+
+    for _ in range(max_iter):
+        N = W * cos_alpha
+        S = c * dl + (N - u * dl) * tan_phi / F
+        T = W * sin_alpha
+
+        F_new = S.sum() / T.sum()
+
+        if abs(F_new - F) < tol:
+            return F_new
+
+        F = F_new
+
+    return F
+
+
+def janbu_corrected(df, tol=1e-6, max_iter=100):
+    alpha_rad = np.radians(df['alpha'])
+    phi_rad = np.radians(df['phi'])
+    tan_phi = np.tan(phi_rad)
+
+    W = df['w'].values
+    c = df['c'].values
+    dl = df['dl'].values
+    u = df['u'].values
+
+    sin_alpha = np.sin(alpha_rad)
+    cos_alpha = np.cos(alpha_rad)
+
+    F = 1.0
+    lambda_ = 0.0
+    converged = False
+
+    for _ in range(max_iter):
+        m = 1 + lambda_ * tan_phi / F
+
+        N = W * cos_alpha
+        S = c * dl + (N - u * dl) * tan_phi / F
+        R = S / m
+        T = W * sin_alpha
+
+        F_new = R.sum() / T.sum()
+        lambda_new = (R * sin_alpha).sum() / (R * cos_alpha).sum()
+
+        if abs(F_new - F) < tol and abs(lambda_new - lambda_) < tol:
+            converged = True
+            break
+
+        F = F_new
+        lambda_ = lambda_new
+
+    return F, lambda_, converged
+
+
+def morgenstern_price(df, function=lambda x: 1.0, tol=1e-6, max_iter=100):
+    alpha_rad = np.radians(df['alpha'])
+    phi_rad = np.radians(df['phi'])
+    tan_phi = np.tan(phi_rad)
+
+    W = df['w'].values
+    c = df['c'].values
+    dl = df['dl'].values
+    u = df['u'].values
+
+    sin_alpha = np.sin(alpha_rad)
+    cos_alpha = np.cos(alpha_rad)
+
+    # Inter-slice function shape (normalized to [0, 1])
+    n = len(df)
+    x_norm = np.linspace(0, 1, n)
+    psi = np.array([function(xi) for xi in x_norm])
+
+    F = 1.0
+    lam = 0.0
+    converged = False
+
+    for _ in range(max_iter):
+        m = 1 + lam * psi * tan_phi / F
+
+        N = W * cos_alpha
+        S = c * dl + (N - u * dl) * tan_phi / F
+        R = S / m
+        T = W * sin_alpha
+
+        F_new = R.sum() / T.sum()
+        num = (R * psi * sin_alpha).sum()
+        den = (R * psi * cos_alpha).sum()
+        lam_new = num / den if den != 0 else 0.0
+
+        if abs(F_new - F) < tol and abs(lam_new - lam) < tol:
+            converged = True
+            break
+
+        F = F_new
+        lam = lam_new
+
+    return F, lam, converged

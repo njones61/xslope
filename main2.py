@@ -15,7 +15,7 @@ print(top_surface)
 
 df, arc = generate_slices(profile_lines, materials, circle, piezo_line, num_slices=20, surface_polyline=top_surface)
 
-print(df)
 
+print(df[df.columns[:15]])  # Adjust the slicing as needed
 
 plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=arc)

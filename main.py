@@ -21,8 +21,8 @@ df.to_excel("slices.xlsx", index=False)
 
 #print(df[df.columns[0,]])  # Adjust the slicing as needed
 
-FS, N = oms(df)
-print(f"Factor of Safety = {FS:.3f}")
+# FS, N = oms(df)
+# print(f"Factor of Safety = {FS:.3f}")
 
 
 # FS, N, converge = bishops(df)
@@ -30,7 +30,7 @@ print(f"Factor of Safety = {FS:.3f}")
 #     print("Bishop's method did not converge.")
 # print(f"Factor of Safety = {FS:.3f}")
 
-# FS, beta_deg = spencer(df)
-# print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
+FS, beta_deg = spencer(df)
+print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
 
 plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=arc, FS=FS)

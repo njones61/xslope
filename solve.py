@@ -59,6 +59,7 @@ def bishops(df, tol=1e-6, max_iter=100):
 def spencer(df, tol=1e-6, max_iter=100):
     alpha_rad = np.radians(df['alpha'])
     phi_rad = np.radians(df['phi'])
+    tan_phi = np.tan(phi_rad)
 
     W = df['w'].values
     c = df['c'].values
@@ -69,36 +70,22 @@ def spencer(df, tol=1e-6, max_iter=100):
     cos_alpha = np.cos(alpha_rad)
     cos2_alpha = cos_alpha ** 2
 
-    F = 1.0       # initial FS guess
-    beta = 0.0    # initial interslice force angle (radians)
+    # Initial guesses
+    F = 1.0
+    beta = 0.0  # in radians
 
     for _ in range(max_iter):
         sin_beta = np.sin(beta)
         cos_beta = np.cos(beta)
 
-        # Interslice force correction factor for each slice
-        numerator = c * dl + (W * cos_alpha - u * dl * cos2_alpha) * np.tan(phi_rad)
-        denominator = (cos_alpha + (sin_alpha * np.tan(phi_rad)) / F)
-        R = numerator / denominator
+        # Compute resisting force per slice
+        denom = cos_alpha * cos_beta + sin_alpha * sin_beta * np.tan(phi_rad)
+        num = c * dl * cos_beta + (W - u * dl) * (cos_alpha * cos_beta - sin_alpha * sin_beta) * np.tan(phi_rad)
+        F_new = num.sum() / (W * sin_alpha).sum()
 
-        # Horizontal force equilibrium: H = sum(R * sin(alpha + beta))
-        # Vertical force equilibrium: V = sum(R * cos(alpha + beta))
-        alpha_plus_beta = alpha_rad + beta
-        sin_apb = np.sin(alpha_plus_beta)
-        cos_apb = np.cos(alpha_plus_beta)
-
-        H = np.sum(R * sin_apb)
-        V = np.sum(R * cos_apb)
-
-        beta_new = atan2(H, V)
-
-        # Recompute FS with updated beta
-        sin_beta = np.sin(beta_new)
-        cos_beta = np.cos(beta_new)
-
-        denom_new = cos_alpha * cos_beta + sin_alpha * sin_beta * np.tan(phi_rad)
-        numerator = c * dl * cos_beta + (W - u * dl) * (cos_alpha * cos_beta - sin_alpha * sin_beta) * np.tan(phi_rad)
-        F_new = numerator.sum() / (W * sin_alpha).sum()
+        # Update beta using ratio of residual horizontal and vertical forces
+        sin_beta_new = (W * sin_alpha - num / F_new * sin_alpha * tan_phi) / W
+        beta_new = np.arcsin(np.clip(sin_beta_new.mean(), -1.0, 1.0))  # averaged beta
 
         if abs(F_new - F) < tol and abs(beta_new - beta) < tol:
             return F_new, degrees(beta_new)

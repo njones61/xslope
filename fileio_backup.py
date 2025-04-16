@@ -1,3 +1,4 @@
+
 import pandas as pd
 
 def load_globals(filepath):
@@ -36,23 +37,23 @@ def load_globals(filepath):
     materials = []
     for _, row in mat_df.iloc[2:].iterrows():
         try:
-            gamma, c, phi = float(row.iloc[1]), float(row.iloc[2]), float(row.iloc[3])
+            gamma, c, phi = float(row[1]), float(row[2]), float(row[3])
         except:
             continue
         materials.append({
             "gamma": gamma,
             "c": c,
             "phi": phi,
-            "piezo": float(row.iloc[4]),
-            "sigma_gamma": float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0,
-            "sigma_c": float(row.iloc[7]) if pd.notna(row.iloc[7]) else 0,
-            "sigma_phi": float(row.iloc[8]) if pd.notna(row.iloc[8]) else 0,
+            "piezo": float(row[4]),
+            "sigma_gamma": float(row[6]) if pd.notna(row[6]) else 0,
+            "sigma_c": float(row[7]) if pd.notna(row[7]) else 0,
+            "sigma_phi": float(row[8]) if pd.notna(row[8]) else 0,
         })
     globals_data["materials"] = materials
 
     # === PIEZOMETRIC LINE ===
     piezo_df = xls.parse('piezo')
-    piezo_line = list(piezo_df.iloc[2:].dropna().apply(lambda row: (float(row.iloc[0]), float(row.iloc[1])), axis=1))
+    piezo_line = list(piezo_df.iloc[2:].dropna().apply(lambda row: (float(row[0]), float(row[1])), axis=1))
     globals_data["piezo_line"] = piezo_line
 
     # === CIRCLES ===
@@ -63,12 +64,12 @@ def load_globals(filepath):
     circles = []
     for _, row in circles_rows.iterrows():
         circles.append({
-            "Xo": float(row.iloc[1]),
-            "Yo": float(row.iloc[2]),
-            "Option": row.iloc[3],
-            "Depth": float(row.iloc[4]) if pd.notna(row.iloc[4]) else None,
-            "Xi": float(row.iloc[5]) if pd.notna(row.iloc[5]) else None,
-            "Yi": float(row.iloc[6]) if pd.notna(row.iloc[6]) else None,
+            "Xo": float(row[1]),
+            "Yo": float(row[2]),
+            "Option": row[3],
+            "Depth": float(row[4]) if pd.notna(row[4]) else None,
+            "Xi": float(row[5]) if pd.notna(row[5]) else None,
+            "Yi": float(row[6]) if pd.notna(row[6]) else None,
         })
     globals_data["circles"] = circles
 
@@ -82,6 +83,7 @@ def load_globals(filepath):
         }, axis=1))
     globals_data["non_circ"] = non_circ
 
+    # === DISTRIBUTED LOADS ===
     # === DISTRIBUTED LOADS ===
     dload_df = xls.parse('dloads', header=None)
     dloads = []

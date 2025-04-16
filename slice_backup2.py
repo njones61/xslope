@@ -3,30 +3,18 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 from math import atan2, degrees, sqrt
 
-def get_y_from_intersection(geom):
-    if isinstance(geom, Point):
-        return geom.y
-    elif isinstance(geom, MultiPoint):
-        return max(pt.y for pt in geom.geoms)
-    elif isinstance(geom, LineString):
-        return max(y for _, y in geom.coords) if geom.coords else None
-    elif isinstance(geom, GeometryCollection):
-        pts = [g for g in geom.geoms if isinstance(g, Point)]
-        return max(pt.y for pt in pts) if pts else None
-    return None
-
 def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_polyline=None, num_slices=20):
     Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
     R = Yo - depth
 
     theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
     arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-    arc_line = LineString([(x, y) for x, y in arc])
+    arc_line = LineString([(x, y) for x, y in arc])  # ensure 2D
 
     if surface_polyline is None or surface_polyline.is_empty:
         return pd.DataFrame(), LineString([])
 
-    surface_polyline = LineString([(x, y) for x, y in surface_polyline.coords])
+    surface_polyline = LineString([(x, y) for x, y in surface_polyline.coords])  # ensure 2D
 
     intersections = arc_line.intersection(surface_polyline)
 
@@ -61,37 +49,42 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_p
         except ValueError:
             continue
 
-        # Use vertical intersection for top of slice
+        # Accurate surface intersections using vertical lines
         vertical_l = LineString([(x_l, surface_polyline.bounds[1] - 10), (x_l, surface_polyline.bounds[3] + 10)])
         vertical_r = LineString([(x_r, surface_polyline.bounds[1] - 10), (x_r, surface_polyline.bounds[3] + 10)])
         vertical_c = LineString([(x_c, surface_polyline.bounds[1] - 10), (x_c, surface_polyline.bounds[3] + 10)])
 
-        y_lt = get_y_from_intersection(surface_polyline.intersection(vertical_l))
-        y_rt = get_y_from_intersection(surface_polyline.intersection(vertical_r))
-        y_ct = get_y_from_intersection(surface_polyline.intersection(vertical_c))
+        inter_l = surface_polyline.intersection(vertical_l)
+        inter_r = surface_polyline.intersection(vertical_r)
+        inter_c = surface_polyline.intersection(vertical_c)
+
+        y_lt = inter_l.y if isinstance(inter_l, Point) else inter_l.geoms[0].y
+        y_rt = inter_r.y if isinstance(inter_r, Point) else inter_r.geoms[0].y
+        y_ct = inter_c.y if isinstance(inter_c, Point) else inter_c.geoms[0].y
+
+        slice_line = LineString([(x_c, y_ct), (x_c, y_cb)])
 
         heights = []
         total_weight = 0
         base_material_idx = None
 
-        vertical = LineString([(x_c, surface_polyline.bounds[1] - 10), (x_c, surface_polyline.bounds[3] + 10)])
-
         for mat_index, line in enumerate(profile_lines):
+            vertical = LineString([(x_c, surface_polyline.bounds[1] - 10), (x_c, surface_polyline.bounds[3] + 10)])
+
             layer_line = LineString(line)
-            layer_top_y = get_y_from_intersection(layer_line.intersection(vertical))
+            inter_top = layer_line.intersection(vertical)
+            layer_top_y = inter_top.y if isinstance(inter_top, Point) else inter_top.geoms[0].y
 
             if mat_index + 1 < len(profile_lines):
                 next_line = LineString(profile_lines[mat_index + 1])
-                layer_bot_y = get_y_from_intersection(next_line.intersection(vertical))
+                inter_bot = next_line.intersection(vertical)
+                layer_bot_y = inter_bot.y if isinstance(inter_bot, Point) else inter_bot.geoms[0].y
             else:
                 layer_bot_y = y_cb
 
-            if layer_top_y is None or layer_bot_y is None:
-                h = 0
-            else:
-                overlap_top = min(y_ct, layer_top_y)
-                overlap_bot = max(y_cb, layer_bot_y)
-                h = max(0, overlap_top - overlap_bot)
+            overlap_top = min(y_ct, layer_top_y)
+            overlap_bot = max(y_cb, layer_bot_y)
+            h = max(0, overlap_top - overlap_bot)
 
             heights.append(h)
             total_weight += h * materials[mat_index]['gamma']
@@ -102,8 +95,14 @@ def generate_slices(profile_lines, materials, circle, piezo_line=None, surface_p
         piezo_y = None
         if piezo_line:
             piezo_geom = LineString(piezo_line)
-            piezo_vertical = LineString([(x_c, y_cb - 2 * R), (x_c, y_ct + 2 * R)])
-            piezo_y = get_y_from_intersection(piezo_geom.intersection(piezo_vertical))
+            vert_line = LineString([(x_c, y_cb - 2 * R), (x_c, y_ct + 2 * R)])
+            intersection = piezo_geom.intersection(vert_line)
+            if isinstance(intersection, Point):
+                piezo_y = intersection.y
+            elif isinstance(intersection, MultiPoint):
+                piezo_y = max(pt.y for pt in intersection.geoms)
+            elif isinstance(intersection, LineString) and intersection.coords:
+                piezo_y = max(y for _, y in intersection.coords)
             if piezo_y is not None and piezo_y > y_cb:
                 hw = piezo_y - y_cb
 

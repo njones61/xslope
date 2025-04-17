@@ -11,7 +11,7 @@ profile_lines = []    # List to store profile lines. Each line is a list of XY c
 # Example: profile_lines = [[(x1, y1), (x2, y2)], [(x3, y3), (x4, y4)]]
 
 materials = []    # List to store material properties. Each material is a dictionary with keys:
-# gamma, c, phi, piezo, sigma_gamma, sigma_c, sigma_phi.
+# gamma, option, c, phi, cp, r_elev piezo, sigma_gamma, sigma_c, sigma_phi, sigma_cp.
 # Example: materials = [{'gamma': 120, 'c': 30, 'phi': 20, 'piezo': 0.5, 'sigma_gamma': 0.1, 'sigma_c': 0.1, 'sigma_phi': 0.1},
 
 piezo_line = []    # List to store piezometric line defined by a list of XY coordinates (tuples).

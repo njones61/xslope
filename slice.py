@@ -151,8 +151,16 @@ def generate_slices(profile_lines, materials, circle, surface_polyline, num_slic
         if right_facing:
             alpha = -alpha
         dl = dx / cos(radians(alpha))
-        phi = materials[base_material_idx]['phi'] if base_material_idx is not None else 0
-        c = materials[base_material_idx]['c'] if base_material_idx is not None else 0
+        if base_material_idx is None:
+            phi = 0
+            c = 0
+        else:
+            if materials[base_material_idx]['option'] == 'mc':
+                c = materials[base_material_idx]['c']
+                phi = materials[base_material_idx]['phi']
+            else:
+                c = (materials[base_material_idx]['r_elev'] - y_cb) * materials[base_material_idx]['cp']
+                phi = 0
 
         slice_data = {
             'slice #': i + 1,

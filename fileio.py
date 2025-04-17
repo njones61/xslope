@@ -32,22 +32,35 @@ def load_globals(filepath):
     globals_data["profile_lines"] = profile_lines
 
     # === MATERIALS ===
-    mat_df = xls.parse('mat')
+    mat_df = xls.parse('mat', header=2)
+
     materials = []
-    for _, row in mat_df.iloc[2:].iterrows():
+    for _, row in mat_df.iterrows():
+        if row.iloc[1:12].dropna().empty:
+            continue  # Skip row if columns B–L are all empty
         try:
-            gamma, c, phi = float(row.iloc[1]), float(row.iloc[2]), float(row.iloc[3])
+            gamma = float(row['g'])
+            option = row['option']
+            c = float(row['c'])
+            phi = float(row['f'])
+            cp = float(row['c/p'])
+            r_elev = float(row['r-elev'])
         except:
-            continue
+            continue  # Skip rows with missing or invalid data
         materials.append({
             "gamma": gamma,
+            "option": option,
             "c": c,
             "phi": phi,
-            "piezo": float(row.iloc[4]),
-            "sigma_gamma": float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0,
-            "sigma_c": float(row.iloc[7]) if pd.notna(row.iloc[7]) else 0,
-            "sigma_phi": float(row.iloc[8]) if pd.notna(row.iloc[8]) else 0,
+            "cp": cp,
+            "r_elev": r_elev,
+            "piezo": float(row['Piezo']),
+            "sigma_gamma": float(row['s(g)']) if pd.notna(row['s(g)']) else 0,
+            "sigma_c": float(row['s(c)']) if pd.notna(row['s(c)']) else 0,
+            "sigma_phi": float(row['s(f)']) if pd.notna(row['s(f)']) else 0,
+            "sigma_cp": float(row['s(c/p)']) if pd.notna(row['s(c/p)']) else 0,
         })
+
     globals_data["materials"] = materials
 
     # === PIEZOMETRIC LINE ===

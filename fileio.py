@@ -39,12 +39,12 @@ def load_globals(filepath):
         if row.iloc[1:12].dropna().empty:
             continue  # Skip row if columns B–L are all empty
         try:
-            gamma = float(row['g'])
-            option = row['option']
-            c = float(row['c'])
-            phi = float(row['f'])
-            cp = float(row['c/p'])
-            r_elev = float(row['r-elev'])
+            gamma = float(row.iloc[1])
+            option = row.iloc[2]
+            c = float(row.iloc[3])
+            phi = float(row.iloc[4])
+            cp = float(row.iloc[5])
+            r_elev = float(row.iloc[6])
         except:
             continue  # Skip rows with missing or invalid data
         materials.append({
@@ -55,10 +55,10 @@ def load_globals(filepath):
             "cp": cp,
             "r_elev": r_elev,
             "piezo": float(row['Piezo']),
-            "sigma_gamma": float(row['s(g)']) if pd.notna(row['s(g)']) else 0,
-            "sigma_c": float(row['s(c)']) if pd.notna(row['s(c)']) else 0,
-            "sigma_phi": float(row['s(f)']) if pd.notna(row['s(f)']) else 0,
-            "sigma_cp": float(row['s(c/p)']) if pd.notna(row['s(c/p)']) else 0,
+            "sigma_gamma": float(row.iloc[7]) if pd.notna(row.iloc[7]) else 0,
+            "sigma_c": float(row.iloc[8]) if pd.notna(row.iloc[8]) else 0,
+            "sigma_phi": float(row.iloc[9]) if pd.notna(row.iloc[9]) else 0,
+            "sigma_cp": float(row.iloc[10]) if pd.notna(row.iloc[10]) else 0,
         })
 
     globals_data["materials"] = materials

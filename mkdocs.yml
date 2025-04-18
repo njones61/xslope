@@ -1,0 +1,56 @@
+site_name: Slope Tools
+site_url: https://slopetools.readthedocs.io/en/latest/
+site_description: Documentation for the SlopeTools Python Package
+site_author: Norm Jones
+repo_url: https://github.com/njones61/slopetools/
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js
+  - js/mathjax-config.js
+markdown_extensions:
+    - attr_list
+    - sane_lists
+    - md_in_html
+    - admonition
+    - pymdownx.arithmatex:
+        generic: true
+theme: readthedocs
+extra_css:
+  - css/custom.css
+nav:
+  - Home: index.md
+  - Usage Guide:
+    - Overview: overview.md
+    - Installation: installation.md
+    - Input File: inputfile.md
+  - General Features:
+    - Profile Lines: features/profile.md
+    - Material Properties: features/materials.md
+    - Piezometric Lines: features/piezo.md
+    - Circular Surfaces: features/circles.md
+    - Non-Circular Surfaces: features/noncirc.md
+    - Distributed Loads: features/dloads.md
+    - Reinforcement: features/reinforce.md
+    - Tension Cracks: features/tcracks.md
+  - Solution Techniques:
+    - Ord. Method of Slices: methods/oms.md
+    - Bishop's Simplified Method: methods/bishop.md
+    - Spencer's Method: methods/spencer.md
+    - Janbu Force Equilibrium: methods/janbu.md
+    - Morgenstern & Price: methods/mp.md
+  - Search Algorithms:
+    - Circular Search: search/circular.md
+    - Non-Circular Search: search/noncirc.md
+  - Advanced Techniques:
+    - Rapid Drawdown Analysis: advanced/rapid.md
+    - Reliability Analysis: advanced/reliability.md
+    - Tension Crack Optimization: advanced/tcrackopt.md
+  - Sample Problems:
+    - Simple Slopes: samples/simple.md
+    - Distributed Loads: samples/dloads.md
+    - Submerged Slopes: samples/submerged.md
+    - Non-Circular Surfaces: samples/non_circ.md
+    - Reinforcement: samples/reinforce.md
+    - Rapid Drawdown: samples/rapid.md
+    - Reliability Analysis: samples/reliability.md
+    - Tension Cracks: samples/tcracks.md
+    - Slope Design: samples/design.md

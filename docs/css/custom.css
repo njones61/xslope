@@ -1,0 +1,12 @@
+.limited-width-table {
+    width: 50%;
+    overflow-x: auto;
+}
+
+.wy-nav-content {
+    max-width: 100% !important;
+}
+
+.math {
+  font-size: large;
+}

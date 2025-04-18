@@ -5,6 +5,7 @@ from math import sin, cos, tan, radians, atan2, degrees
 def oms(df):
     """
     Computes the Factor of Safety (FS) using the Ordinary Method of Slices (OMS).
+    This method works on circular failure surfaces only.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing slice data with columns:
@@ -41,9 +42,11 @@ def oms(df):
     return FS, N
 
 
-def bishops(df, tol=1e-6, max_iter=100):
+def bishop(df, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using Bishop's Simplified Method.
+    This method works on circular failure surfaces only.
+    It iterates on the factor of safety until convergence is achieved.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing slice data with necessary columns.
@@ -92,6 +95,8 @@ def bishops(df, tol=1e-6, max_iter=100):
 def spencer(df, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using Spencer's Method.
+    This version works on circular failure surfaces only. For non-circular surfaces, use
+    `spencer_moment` instead.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing slice data.
@@ -142,10 +147,79 @@ def spencer(df, tol=1e-6, max_iter=100):
 
     return F, degrees(beta)
 
+def spencer_moment(df, tol=1e-6, max_iter=100):
+    """
+    Computes the Factor of Safety (FS) using Spencer's Method with full moment equilibrium.
+
+    This version is valid for both circular and non-circular failure surfaces.
+    It iterates on both the factor of safety and the interslice force inclination angle (beta),
+    while summing moments about the origin (0, 0) to ensure complete equilibrium.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice information. Must include:
+            - 'alpha': base angle of slice (degrees)
+            - 'phi': friction angle (degrees)
+            - 'c': cohesion
+            - 'w': slice weight
+            - 'u': pore pressure
+            - 'dl': length of base
+            - 'x_c': x-coordinate of slice center
+            - 'y_cb': y-coordinate of slice base
+
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
+
+    Returns:
+        tuple:
+            - float: Computed factor of safety (FS)
+            - float: Interslice force inclination angle beta (degrees)
+    """
+    alpha_rad = np.radians(df['alpha'])
+    phi_rad = np.radians(df['phi'])
+    tan_phi = np.tan(phi_rad)
+
+    W = df['w'].values
+    c = df['c'].values
+    dl = df['dl'].values
+    u = df['u'].values
+    x_c = df['x_c'].values
+    y_cb = df['y_cb'].values
+
+    sin_alpha = np.sin(alpha_rad)
+    cos_alpha = np.cos(alpha_rad)
+
+    # Initial guesses
+    F = 1.0
+    beta = 0.0  # in radians
+
+    for _ in range(max_iter):
+        sin_beta = np.sin(beta)
+        cos_beta = np.cos(beta)
+
+        # Force equilibrium terms
+        denom = cos_alpha * cos_beta + sin_alpha * sin_beta * tan_phi
+        num = c * dl * cos_beta + (W - u * dl) * (cos_alpha * cos_beta - sin_alpha * sin_beta) * tan_phi
+
+        F_new = num.sum() / (W * sin_alpha).sum()
+
+        # Moment equilibrium about the origin (0, 0)
+        moment_resisting = ((c * dl + (W - u * dl) * tan_phi / F_new) * y_cb).sum()
+        moment_driving = (W * x_c * sin_alpha).sum()
+
+        beta_new = atan2(moment_driving, moment_resisting)
+
+        if abs(F_new - F) < tol and abs(beta_new - beta) < tol:
+            return F_new, degrees(beta_new)
+
+        F = F_new
+        beta = beta_new
+
+    return F, degrees(beta)
 
 def janbu_simple(df, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using Janbu's Simplified Method.
+    This method is based on force equilibrium and is valid for both circular and non-circular failure surfaces.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing slice data.
@@ -188,6 +262,7 @@ def janbu_simple(df, tol=1e-6, max_iter=100):
 def janbu_corrected(df, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using Janbu's Corrected Method.
+    This method is based on force equilibrium and is valid for both circular and non-circular failure surfaces.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing slice data.
@@ -241,6 +316,7 @@ def janbu_corrected(df, tol=1e-6, max_iter=100):
 def morgenstern_price(df, function=lambda x: 1.0, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using the Morgenstern-Price Method.
+    This method is valid for both circular and non-circular failure surfaces.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing slice data.

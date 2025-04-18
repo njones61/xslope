@@ -32,7 +32,7 @@ nav:
     - Reinforcement: features/reinforce.md
     - Tension Cracks: features/tcracks.md
   - Solution Techniques:
-    - Ord. Method of Slices: methods/oms.md
+    - Ordinary Method of Slices: methods/oms.md
     - Bishop's Simplified Method: methods/bishop.md
     - Spencer's Method: methods/spencer.md
     - Janbu Force Equilibrium: methods/janbu.md

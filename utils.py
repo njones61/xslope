@@ -1,6 +1,6 @@
 from shapely.geometry import LineString, Point
 
-def ground_surface(profile_lines):
+def build_ground_surface(profile_lines):
     # Step 1: Gather all points and sort by x, then by descending y
     all_points = sorted(set(pt for line in profile_lines for pt in line), key=lambda p: (p[0], -p[1]))
 

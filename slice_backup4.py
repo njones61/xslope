@@ -15,28 +15,22 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def generate_slices(profile_lines, materials, ground_surface, *,
-                    circle=None, non_circ=None, num_slices=20,
-                    gamma_w=62.4, piezo_line=None, dloads=None):
+def generate_slices(profile_lines, materials, circle, surface_polyline, num_slices=20, gamma_w=62.4, piezo_line=None, dloads=None):
+    Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
+    R = Yo - depth
 
-    if ground_surface is None or ground_surface.is_empty:
+    theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
+    arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
+    arc_line = LineString([(x, y) for x, y in arc])
+
+    if surface_polyline is None or surface_polyline.is_empty:
         return pd.DataFrame(), LineString([])
 
-    ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
+    surface_polyline = LineString([(x, y) for x, y in surface_polyline.coords])
 
-    # Generate failure surface (either circular or non-circular)
-    if non_circ:
-        failure_coords = [(pt['X'], pt['Y']) for pt in non_circ]
-        failure_surface = LineString(failure_coords)
-    else:
-        Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
-        R = Yo - depth
-        theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
-        arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-        failure_coords = arc
-        failure_surface = LineString(arc)
+    intersections = arc_line.intersection(surface_polyline)
 
-    intersections = failure_surface.intersection(ground_surface)
+    intersections = arc_line.intersection(surface_polyline)
 
     x_min = x_max = None
     y_left = y_right = None
@@ -45,9 +39,11 @@ def generate_slices(profile_lines, materials, ground_surface, *,
         points = sorted(intersections.geoms, key=lambda p: p.x)
         x_min, x_max = points[0].x, points[-1].x
         y_left, y_right = points[0].y, points[-1].y
+
     elif isinstance(intersections, Point):
         x_min = x_max = intersections.x
         y_left = y_right = intersections.y
+
     elif isinstance(intersections, GeometryCollection):
         points = [g for g in intersections.geoms if isinstance(g, Point)]
         if points:
@@ -59,31 +55,32 @@ def generate_slices(profile_lines, materials, ground_surface, *,
     else:
         return pd.DataFrame(), LineString([])
 
-    right_facing = y_left > y_right
+    if y_left > y_right:
+        right_facing = True
+    else:
+        right_facing = False
 
-    clipped_surface = LineString([pt for pt in failure_coords if x_min <= pt[0] <= x_max])
+    clipped_arc = LineString([pt for pt in arc if x_min <= pt[0] <= x_max])
 
-    # Build fixed_xs set
+    # DETERMINE SLICE LOCATIONS
+    # Start with all profile x-points that intersect the arc
     fixed_xs = set(
         x for line in profile_lines for x, _ in line
         if x_min <= x <= x_max
     )
+    # Explicitly include x_min and x_max
     fixed_xs.update([x_min, x_max])
 
-    if dloads:
-        fixed_xs.update(
-            pt['X'] for line in dloads for pt in line
-            if x_min <= pt['X'] <= x_max
-        )
+    # Add the points on the distributed loads lines
+    fixed_xs.update(
+        pt['X'] for line in dloads for pt in line
+        if x_min <= pt['X'] <= x_max
+    )
 
-    if non_circ:
-        fixed_xs.update(
-            pt['X'] for pt in non_circ
-            if x_min <= pt['X'] <= x_max
-        )
-
+    # Convert to a sorted list
     fixed_xs = sorted(fixed_xs)
 
+    # Compute total arc span and how to divide num_slices proportionally
     segment_lengths = [fixed_xs[i + 1] - fixed_xs[i] for i in range(len(fixed_xs) - 1)]
     total_length = sum(segment_lengths)
     all_xs = [fixed_xs[0]]
@@ -91,11 +88,13 @@ def generate_slices(profile_lines, materials, ground_surface, *,
         x_start = fixed_xs[i]
         x_end = fixed_xs[i + 1]
         segment_length = x_end - x_start
+
+        # Proportional allocation
         n_subdiv = max(1, int(round((segment_length / total_length) * num_slices)))
         xs = np.linspace(x_start, x_end, n_subdiv + 1).tolist()
-        all_xs.extend(xs[1:])
+        all_xs.extend(xs[1:])  # skip duplicate start
 
-    # Interpolation functions for distributed loads
+    # Preprocess distributed loads for center-line interpolation
     dload_interp_funcs = []
     if dloads:
         for line in dloads:
@@ -109,32 +108,27 @@ def generate_slices(profile_lines, materials, ground_surface, *,
         x_c = (x_l + x_r) / 2
         dx = x_r - x_l
 
-        if non_circ:
-            failure_line = failure_surface
-            y_cb = get_y_from_intersection(failure_line.intersection(LineString([(x_c, -1e6), (x_c, 1e6)])))
-            y_lb = get_y_from_intersection(failure_line.intersection(LineString([(x_l, -1e6), (x_l, 1e6)])))
-            y_rb = get_y_from_intersection(failure_line.intersection(LineString([(x_r, -1e6), (x_r, 1e6)])))
-        else:
-            try:
-                y_cb = Yo - sqrt(R**2 - (x_c - Xo)**2)
-                y_lb = Yo - sqrt(R**2 - (x_l - Xo)**2)
-                y_rb = Yo - sqrt(R**2 - (x_r - Xo)**2)
-            except ValueError:
-                continue
+        try:
+            y_cb = Yo - sqrt(R**2 - (x_c - Xo)**2)
+            y_lb = Yo - sqrt(R**2 - (x_l - Xo)**2)
+            y_rb = Yo - sqrt(R**2 - (x_r - Xo)**2)
+        except ValueError:
+            continue
 
-        vertical_l = LineString([(x_l, ground_surface.bounds[1] - 10), (x_l, ground_surface.bounds[3] + 10)])
-        vertical_r = LineString([(x_r, ground_surface.bounds[1] - 10), (x_r, ground_surface.bounds[3] + 10)])
-        vertical_c = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        # Use vertical intersection for top of slice
+        vertical_l = LineString([(x_l, surface_polyline.bounds[1] - 10), (x_l, surface_polyline.bounds[3] + 10)])
+        vertical_r = LineString([(x_r, surface_polyline.bounds[1] - 10), (x_r, surface_polyline.bounds[3] + 10)])
+        vertical_c = LineString([(x_c, surface_polyline.bounds[1] - 10), (x_c, surface_polyline.bounds[3] + 10)])
 
-        y_lt = get_y_from_intersection(ground_surface.intersection(vertical_l))
-        y_rt = get_y_from_intersection(ground_surface.intersection(vertical_r))
-        y_ct = get_y_from_intersection(ground_surface.intersection(vertical_c))
+        y_lt = get_y_from_intersection(surface_polyline.intersection(vertical_l))
+        y_rt = get_y_from_intersection(surface_polyline.intersection(vertical_r))
+        y_ct = get_y_from_intersection(surface_polyline.intersection(vertical_c))
 
         heights = []
         total_weight = 0
         base_material_idx = None
 
-        vertical = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        vertical = LineString([(x_c, surface_polyline.bounds[1] - 10), (x_c, surface_polyline.bounds[3] + 10)])
 
         for mat_index, line in enumerate(profile_lines):
             layer_line = LineString(line)
@@ -158,8 +152,12 @@ def generate_slices(profile_lines, materials, ground_surface, *,
             if base_material_idx is None and h > 0:
                 base_material_idx = mat_index
 
-        # Distributed load
-        dload_normal = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0
+        # Interpolate distributed load at x_c and compute total dload
+        dload_normal = 0
+        if dload_interp_funcs:
+            for func in dload_interp_funcs:
+                dload_normal += func(x_c)
+
         dload = dload_normal * dx
         total_weight += dload
 
@@ -167,33 +165,17 @@ def generate_slices(profile_lines, materials, ground_surface, *,
         piezo_y = None
         if piezo_line:
             piezo_geom = LineString(piezo_line)
-            if circle:
-                piezo_vertical = LineString([(x_c, y_cb - 2 * R), (x_c, y_ct + 2 * R)])
-            else: # non-circular
-                span = abs(y_ct - y_cb)
-                piezo_vertical = LineString([(x_c, y_cb - 0.5 * span), (x_c, y_ct + 0.5 * span)])
+            piezo_vertical = LineString([(x_c, y_cb - 2 * R), (x_c, y_ct + 2 * R)])
             piezo_y = get_y_from_intersection(piezo_geom.intersection(piezo_vertical))
             if piezo_y is not None and piezo_y > y_cb:
                 hw = piezo_y - y_cb
-
         delta = 0.01
-        if not non_circ:
-            p1 = Point(x_c - delta, Yo - sqrt(R ** 2 - (x_c - delta - Xo) ** 2))
-            p2 = Point(x_c + delta, Yo - sqrt(R ** 2 - (x_c + delta - Xo) ** 2))
-        else:
-            failure_line = failure_surface
-            y1 = get_y_from_intersection(
-                failure_line.intersection(LineString([(x_c - delta, -1e6), (x_c - delta, 1e6)])))
-            y2 = get_y_from_intersection(
-                failure_line.intersection(LineString([(x_c + delta, -1e6), (x_c + delta, 1e6)])))
-            p1 = Point(x_c - delta, y1)
-            p2 = Point(x_c + delta, y2)
-
+        p1 = Point(x_c - delta, Yo - sqrt(R**2 - (x_c - delta - Xo)**2))
+        p2 = Point(x_c + delta, Yo - sqrt(R**2 - (x_c + delta - Xo)**2))
         alpha = degrees(atan2(p2.y - p1.y, p2.x - p1.x))
         if right_facing:
             alpha = -alpha
         dl = dx / cos(radians(alpha))
-
         if base_material_idx is None:
             phi = 0
             c = 0
@@ -225,11 +207,14 @@ def generate_slices(profile_lines, materials, ground_surface, *,
             'piezo_y': piezo_y,
             'hw': hw,
             'u': hw * gamma_w if piezo_y is not None else 0,
-            'mat': base_material_idx + 1 if base_material_idx is not None else None,
+            'mat': base_material_idx + 1,
             'phi': phi,
             'c': c
         }
         slices.append(slice_data)
 
     df = pd.DataFrame(slices)
-    return df, clipped_surface
+
+
+
+    return df, clipped_arc

@@ -1,7 +1,8 @@
+from globals import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_slices
-from utils import ground_surface
+from utils import build_ground_surface
 from solve import oms, bishops, spencer, janbu_simple, janbu_corrected, morgenstern_price
 
 data = load_globals("input_template.xlsx")
@@ -10,11 +11,24 @@ materials = data["materials"]
 piezo_line = data["piezo_line"]
 gamma_w = data["gamma_water"]
 circle = data["circles"][0]  # or whichever one you want
+non_circ = data["non_circ"]
 dload = data["dloads"]
 max_depth = data["max_depth"]
 
-top_surface = ground_surface(profile_lines)
-df, arc = generate_slices(profile_lines, materials, circle,  top_surface, num_slices=20, gamma_w=gamma_w, piezo_line=piezo_line, dloads=dload)
+ground_surface = build_ground_surface(profile_lines)
+
+df, failure_surface = generate_slices(
+    profile_lines,
+    materials,
+    ground_surface,
+    # circle = circle,
+    non_circ=non_circ,
+    num_slices=20,
+    gamma_w=gamma_w,
+    piezo_line=piezo_line,
+    dloads=dload
+)
+
 
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
@@ -23,8 +37,8 @@ df.to_excel("slices.xlsx", index=False)
 
 #print(df[df.columns[0,]])  # Adjust the slicing as needed
 
-FS, N = oms(df)
-print(f"Factor of Safety = {FS:.3f}")
+# FS, N = oms(df)
+# print(f"Factor of Safety = {FS:.3f}")
 
 
 # FS, N, converge = bishops(df)
@@ -32,8 +46,8 @@ print(f"Factor of Safety = {FS:.3f}")
 #     print("Bishop's method did not converge.")
 # print(f"Factor of Safety = {FS:.3f}")
 
-# FS, beta_deg = spencer(df)
-# print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
+FS, beta_deg = spencer(df)
+print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
 
 # FS = janbu_simple(df)
 # print(f"Janbu FS = {FS:.4f}")
@@ -58,4 +72,4 @@ print(f"Factor of Safety = {FS:.3f}")
 # else:
 #     print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
 
-plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=arc, FS=FS, dloads=dload, max_depth=max_depth)
+plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=failure_surface, FS=FS, dloads=dload, max_depth=max_depth)

@@ -3,7 +3,7 @@ from slice import generate_slices
 from fileio import load_globals
 from plot import plot_slices
 from utils import build_ground_surface
-from solve import oms, bishops, spencer, janbu_simple, janbu_corrected, morgenstern_price
+from solve import oms, bishop, spencer, spencer_moment, janbu_simple, janbu_corrected, morgenstern_price
 
 data = load_globals("input_template.xlsx")
 profile_lines = data["profile_lines"]
@@ -46,8 +46,8 @@ df.to_excel("slices.xlsx", index=False)
 #     print("Bishop's method did not converge.")
 # print(f"Factor of Safety = {FS:.3f}")
 
-FS, beta_deg = spencer(df)
-print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
+# FS, beta_deg = spencer(df)
+# print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
 
 # FS = janbu_simple(df)
 # print(f"Janbu FS = {FS:.4f}")
@@ -58,8 +58,8 @@ print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
 # else:
 #     print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
 
-
-
+FS, beta = spencer_moment(df)
+print(f"Spencer (full moment): FS = {FS:.4f}, β = {beta:.2f}°")
 
 # Default constant interslice force function (Janbu)
 # FS, lam, converged = morgenstern_price(df)

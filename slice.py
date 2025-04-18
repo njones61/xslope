@@ -4,6 +4,20 @@ from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 from math import atan2, degrees, sqrt, cos, radians
 
 def get_y_from_intersection(geom):
+    """
+    Extracts the maximum Y-coordinate from a geometric intersection result.
+
+    This function handles different geometric types resulting from intersections,
+    including Point, MultiPoint, LineString, and GeometryCollection. If the input
+    geometry is not one of these or is empty, the function returns None.
+
+    Parameters:
+        geom (shapely.geometry.base.BaseGeometry): The geometry object from which
+            to extract the Y-coordinate(s).
+
+    Returns:
+        float or None: The maximum Y-coordinate found in the geometry, or None if not found.
+    """
     if isinstance(geom, Point):
         return geom.y
     elif isinstance(geom, MultiPoint):
@@ -18,6 +32,36 @@ def get_y_from_intersection(geom):
 def generate_slices(profile_lines, materials, ground_surface, *,
                     circle=None, non_circ=None, num_slices=20,
                     gamma_w=62.4, piezo_line=None, dloads=None):
+    """
+    Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
+
+    This function supports both circular and non-circular failure surfaces and computes
+    various slice properties needed for limit equilibrium analysis, including geometry,
+    weight, water pressure, and shear strength parameters.
+
+    Parameters:
+        profile_lines (list): List of profile layers, each a list of (x, y) tuples.
+        materials (list): List of material property dictionaries corresponding to each layer.
+        ground_surface (shapely.geometry.LineString): LineString representing the ground surface.
+        circle (dict, optional): Dictionary defining the circular failure surface
+            with keys 'Xo', 'Yo', and 'Depth'.
+        non_circ (list, optional): List of dictionaries for non-circular failure surface points.
+        num_slices (int, optional): Desired number of slices to generate (default is 20).
+        gamma_w (float, optional): Unit weight of water (default is 62.4).
+        piezo_line (list, optional): List of (x, y) tuples defining the piezometric line.
+        dloads (list, optional): List of distributed load blocks, each a list of
+            dictionaries with 'X', 'Y', and 'Normal'.
+
+    Returns:
+        tuple:
+            - pd.DataFrame: A DataFrame where each row represents a slice with geometry and material properties.
+            - shapely.geometry.LineString: The portion of the failure surface clipped between the intersection points.
+
+    Notes:
+        - Fallback behavior is in place for incomplete geometry or non-intersecting surfaces.
+        - Handles distributed loads and water pressure using interpolation.
+        - Calculates mobilized cohesion and friction angle based on the material at the slice base.
+    """
 
     if ground_surface is None or ground_surface.is_empty:
         return pd.DataFrame(), LineString([])

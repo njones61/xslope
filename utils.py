@@ -1,6 +1,28 @@
 from shapely.geometry import LineString, Point
 
 def build_ground_surface(profile_lines):
+    """
+    Constructs the topmost ground surface LineString from a set of profile lines.
+
+    The function:
+    1. Collects all (x, y) points from the input profile lines.
+    2. Keeps the highest y-value for each unique x-coordinate.
+    3. Filters these points by ensuring they are not exceeded in elevation by any other profile line at the same x.
+    4. Returns a LineString representing the visible ground surface.
+
+    Parameters:
+        profile_lines (list of list of tuple): A list of profile lines, each represented
+            as a list of (x, y) coordinate tuples.
+
+    Returns:
+        shapely.geometry.LineString: A LineString of the top surface, or an empty LineString
+        if fewer than two valid points are found.
+
+    Notes:
+        - Excludes points that would result in extrapolation during line intersection checks.
+        - Ensures the result reflects the outermost (visible) surface in multi-layered profiles.
+    """
+
     # Step 1: Gather all points and sort by x, then by descending y
     all_points = sorted(set(pt for line in profile_lines for pt in line), key=lambda p: (p[0], -p[1]))
 

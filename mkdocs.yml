@@ -16,34 +16,35 @@ markdown_extensions:
 theme: readthedocs
 extra_css:
   - css/custom.css
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
 nav:
   - Home: index.md
   - Usage Guide:
-    - Overview: overview.md
-    - Installation: installation.md
-    - Input File: inputfile.md
-  - General Features:
-    - Profile Lines: features/profile.md
-    - Material Properties: features/materials.md
-    - Piezometric Lines: features/piezo.md
-    - Circular Surfaces: features/circles.md
-    - Non-Circular Surfaces: features/noncirc.md
-    - Distributed Loads: features/dloads.md
-    - Reinforcement: features/reinforce.md
-    - Tension Cracks: features/tcracks.md
+    - Input File: usage/inputfile.md
+    - General Features: usage/features.md
+    - Code Structure: usage/codestructure.md
   - Solution Techniques:
     - Ordinary Method of Slices: methods/oms.md
     - Bishop's Simplified Method: methods/bishop.md
     - Spencer's Method: methods/spencer.md
     - Janbu Force Equilibrium: methods/janbu.md
     - Morgenstern & Price: methods/mp.md
-  - Search Algorithms:
-    - Circular Search: search/circular.md
-    - Non-Circular Search: search/noncirc.md
   - Advanced Techniques:
     - Rapid Drawdown Analysis: advanced/rapid.md
     - Reliability Analysis: advanced/reliability.md
     - Tension Crack Optimization: advanced/tcrackopt.md
+  - API:
+      - File I/O: api/fileio.md
+      - Slice: api/slice.md
+      - Solve: api/solve.md
+      - Plot: api/plot.md
+      - Utils: api/utils.md
   - Sample Problems:
     - Simple Slopes: samples/simple.md
     - Distributed Loads: samples/dloads.md

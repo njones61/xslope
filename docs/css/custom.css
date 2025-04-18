@@ -10,3 +10,9 @@
 .math {
   font-size: large;
 }
+
+/* Add vertical spacing between documented functions */
+.doc.doc-object.doc-function {
+  margin-top: 1.5em;
+}
+

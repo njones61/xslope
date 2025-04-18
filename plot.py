@@ -3,6 +3,33 @@ import numpy as np
 import pandas as pd
 
 def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None, FS=None, dloads=None, max_depth=None):
+    """
+    Plots a slopetools cross-section with profile lines, slices, piezometric line, failure surface,
+    distributed loads, and optional max depth and factor of safety.
+
+    Parameters:
+        profile_lines (list): A list of profile segments, each a list of (x, y) tuples.
+        circle (dict): Dictionary representing the failure circle (not directly used in this function,
+                       but likely passed in for future use or consistency).
+        df (pd.DataFrame): DataFrame containing slice geometry with required columns:
+                           ['x_l', 'x_r', 'y_lb', 'y_lt', 'y_rt', 'y_rb'].
+        piezo_line (list, optional): A list of (x, y) tuples representing the piezometric line.
+        failure_surface (shapely.geometry.LineString, optional): Failure surface to plot, assumed to have `.coords`.
+        FS (float, optional): Factor of Safety to display in the plot title.
+        dloads (list, optional): List of distributed load blocks, each a list of dictionaries with 'X', 'Y', and 'Normal'.
+        max_depth (float, optional): Horizontal line to indicate the analysis depth limit.
+
+    Notes:
+        - Profile lines are labeled by material index.
+        - Slices are drawn as filled red quadrilaterals based on the geometry in `df`.
+        - Piezometric line is marked with a blue line and a downward triangle for water level.
+        - Distributed loads are shown as downward-pointing purple arrows with a connecting top line.
+        - The function uses matplotlib for plotting and shows the plot immediately.
+
+    Returns:
+        None
+    """
+
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Plot profile lines

@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None, FS=None):
+import matplotlib.pyplot as plt
+
+def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None, FS=None, dloads=None):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Plot profile lines
@@ -27,12 +29,43 @@ def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None
         piezo_xs, piezo_ys = zip(*piezo_line)
         ax.plot(piezo_xs, piezo_ys, 'b-', label="Piezometric Line")
 
-    ax.set_aspect('equal')
+    # Plot distributed loads as vertical arrows
+    for line in dloads:
+        xs = [pt['X'] for pt in line]
+        ys = [pt['Y'] for pt in line]
+        ns = [pt['Normal'] for pt in line]
 
+        # Interpolation functions
+        interp_y = lambda x: np.interp(x, xs, ys)
+        interp_n = lambda x: np.interp(x, xs, ns)
+
+        # Create a smooth sequence of x-values for arrows
+        x_arrows = np.linspace(min(xs), max(xs), 15)
+
+        # Track arrow tops for connection line
+        top_xs = []
+        top_ys = []
+
+        for x in x_arrows:
+            y = interp_y(x)
+            n = interp_n(x)
+            arrow_height = min(n / 100, 10)
+            y_top = y + arrow_height + 2
+
+            ax.arrow(x, y_top, 0, -arrow_height,
+                     head_width=2, head_length=2, fc='purple', ec='purple')
+
+            top_xs.append(x)
+            top_ys.append(y_top)
+
+        ax.plot(top_xs, top_ys, color='purple', linewidth=1.5)
+
+
+    ax.set_aspect('equal')
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.legend()
-    ax.grid(True)
+    ax.grid(False) # change to True if you want grid lines
 
     if FS is not None:
         ax.set_title(f"Factor of Safety = {FS:.3f}")

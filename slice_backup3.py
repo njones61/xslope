@@ -15,7 +15,7 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def generate_slices(profile_lines, materials, circle, surface_polyline, num_slices=20, gamma_w=62.4, piezo_line=None, dloads=None):
+def generate_slices(profile_lines, materials, circle, surface_polyline, num_slices=20, gamma_w=62.4, piezo_line=None):
     Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
     R = Yo - depth
 
@@ -70,16 +70,7 @@ def generate_slices(profile_lines, materials, circle, surface_polyline, num_slic
     )
     # Explicitly include x_min and x_max
     fixed_xs.update([x_min, x_max])
-
-    # Add the points on the distributed loads lines
-    fixed_xs.update(
-        pt['X'] for line in dloads for pt in line
-        if x_min <= pt['X'] <= x_max
-    )
-
-    # Convert to a sorted list
     fixed_xs = sorted(fixed_xs)
-
     # Compute total arc span and how to divide num_slices proportionally
     segment_lengths = [fixed_xs[i + 1] - fixed_xs[i] for i in range(len(fixed_xs) - 1)]
     total_length = sum(segment_lengths)
@@ -94,15 +85,8 @@ def generate_slices(profile_lines, materials, circle, surface_polyline, num_slic
         xs = np.linspace(x_start, x_end, n_subdiv + 1).tolist()
         all_xs.extend(xs[1:])  # skip duplicate start
 
-    # Preprocess distributed loads for center-line interpolation
-    dload_interp_funcs = []
-    if dloads:
-        for line in dloads:
-            xs = [pt['X'] for pt in line]
-            normals = [pt['Normal'] for pt in line]
-            dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
-
     slices = []
+
     for i in range(len(all_xs) - 1):
         x_l, x_r = all_xs[i], all_xs[i + 1]
         x_c = (x_l + x_r) / 2
@@ -152,15 +136,6 @@ def generate_slices(profile_lines, materials, circle, surface_polyline, num_slic
             if base_material_idx is None and h > 0:
                 base_material_idx = mat_index
 
-        # Interpolate distributed load at x_c and compute total dload
-        dload_normal = 0
-        if dload_interp_funcs:
-            for func in dload_interp_funcs:
-                dload_normal += func(x_c)
-
-        dload = dload_normal * dx
-        total_weight += dload
-
         hw = 0
         piezo_y = None
         if piezo_line:
@@ -202,7 +177,6 @@ def generate_slices(profile_lines, materials, circle, surface_polyline, num_slic
             'alpha': alpha,
             'dl': dl,
             **{f'h{j+1}': h for j, h in enumerate(heights)},
-            'dload': dload,
             'w': total_weight,
             'piezo_y': piezo_y,
             'hw': hw,

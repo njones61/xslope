@@ -207,6 +207,7 @@ def generate_slices(profile_lines, materials, circle, surface_polyline, num_slic
             'piezo_y': piezo_y,
             'hw': hw,
             'u': hw * gamma_w if piezo_y is not None else 0,
+            'mat': base_material_idx + 1,
             'phi': phi,
             'c': c
         }

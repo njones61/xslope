@@ -10,9 +10,10 @@ materials = data["materials"]
 piezo_line = data["piezo_line"]
 gamma_w = data["gamma_water"]
 circle = data["circles"][0]  # or whichever one you want
+dload = data["dloads"]
 
 top_surface = ground_surface(profile_lines)
-df, arc = generate_slices(profile_lines, materials, circle,  top_surface, num_slices=20, gamma_w=gamma_w, piezo_line=piezo_line)
+df, arc = generate_slices(profile_lines, materials, circle,  top_surface, num_slices=20, gamma_w=gamma_w, piezo_line=piezo_line, dloads=dload)
 
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
@@ -57,4 +58,4 @@ if converged:
 else:
     print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
 
-plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=arc, FS=FS)
+plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=arc, FS=FS, dloads=dload)

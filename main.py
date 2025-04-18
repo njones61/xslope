@@ -37,39 +37,47 @@ df.to_excel("slices.xlsx", index=False)
 
 #print(df[df.columns[0,]])  # Adjust the slicing as needed
 
-# FS, N = oms(df)
-# print(f"Factor of Safety = {FS:.3f}")
+# Options: 'oms', 'bishop', 'spencer', spencer_moment, 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)'
+method = 'morgenstern_price (half-sine)'  # Change this to the desired method
 
+if method == 'oms':
+    FS, N = oms(df)
+    print(f"Factor of Safety = {FS:.3f}")
+elif method == 'bishop':
+    FS, N, converge = bishop(df)
+    if not converge:
+        print("Bishop's method did not converge.")
+    print(f"Factor of Safety = {FS:.3f}")
+elif method == 'spencer':
+    FS, beta_deg = spencer(df)
+    print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
+elif method == 'spencer_moment':
+    FS, beta_deg = spencer_moment(df)
+    print(f"Spencer's Method (full moment): FS = {FS:.4f}, β = {beta_deg:.2f}°")
+elif method == 'janbu_simple':
+    FS = janbu_simple(df)
+    print(f"Janbu's Method: FS = {FS:.4f}")
+elif method == 'janbu_corrected':
+    FS, lam, converged = janbu_corrected(df)
+    if converged:
+        print(f"Janbu's Corrected Method: FS = {FS:.4f}, λ = {lam:.4f}")
+    else:
+        print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
+elif method == 'morgenstern_price (janbu)':
+    # Default constant interslice force function (Janbu)
+    FS, lam, converged = morgenstern_price(df)
+    if converged:
+        print(f"Morgenstern-Price Method: FS = {FS:.4f}, λ = {lam:.4f}")
+    else:
+        print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
+elif method == 'morgenstern_price (half-sine)':
+    # With a half-sine function:
+    import math
+    FS, lam, converged = morgenstern_price(df, function=lambda x: math.sin(math.pi * x))
+    if converged:
+        print(f"Morgenstern-Price Method (half-sine): FS = {FS:.4f}, λ = {lam:.4f}")
+    else:
+        print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
 
-# FS, N, converge = bishops(df)
-# if not converge:
-#     print("Bishop's method did not converge.")
-# print(f"Factor of Safety = {FS:.3f}")
-
-# FS, beta_deg = spencer(df)
-# print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
-
-# FS = janbu_simple(df)
-# print(f"Janbu FS = {FS:.4f}")
-
-# FS, lam, converged = janbu_corrected(df)
-# if converged:
-#     print(f"Janbu Corrected FS = {FS:.4f}, λ = {lam:.4f}")
-# else:
-#     print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
-
-FS, beta = spencer_moment(df)
-print(f"Spencer (full moment): FS = {FS:.4f}, β = {beta:.2f}°")
-
-# Default constant interslice force function (Janbu)
-# FS, lam, converged = morgenstern_price(df)
-
-# With a half-sine function:
-# import math
-# FS, lam, converged = morgenstern_price(df, function=lambda x: math.sin(math.pi * x))
-# if converged:
-#     print(f"Morgenstern-Price FS = {FS:.4f}, λ = {lam:.4f}")
-# else:
-#     print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
 
 plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=failure_surface, FS=FS, dloads=dload, max_depth=max_depth)

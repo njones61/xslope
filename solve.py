@@ -3,6 +3,24 @@ import numpy as np
 from math import sin, cos, tan, radians, atan2, degrees
 
 def oms(df):
+    """
+    Computes the Factor of Safety (FS) using the Ordinary Method of Slices (OMS).
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice data with columns:
+            - 'alpha': base angle (degrees)
+            - 'w': total slice weight
+            - 'c': cohesion
+            - 'phi': friction angle (degrees)
+            - 'u': pore pressure
+            - 'dl': base length
+
+    Returns:
+        tuple:
+            - float: Computed Factor of Safety (FS)
+            - np.ndarray: Normal force on the base of each slice
+    """
+
     alpha_rad = np.radians(df['alpha'])
 
     cos_alpha = np.cos(alpha_rad)
@@ -24,6 +42,21 @@ def oms(df):
 
 
 def bishops(df, tol=1e-6, max_iter=100):
+    """
+    Computes the Factor of Safety (FS) using Bishop's Simplified Method.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice data with necessary columns.
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
+
+    Returns:
+        tuple:
+            - float: Computed Factor of Safety (FS)
+            - np.ndarray: Normal force on the base of each slice
+            - bool: Whether the solution converged
+    """
+
     alpha_rad = np.radians(df['alpha'])
     cos_alpha = np.cos(alpha_rad)
     sin_alpha = np.sin(alpha_rad)
@@ -57,6 +90,20 @@ def bishops(df, tol=1e-6, max_iter=100):
 
 
 def spencer(df, tol=1e-6, max_iter=100):
+    """
+    Computes the Factor of Safety (FS) using Spencer's Method.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice data.
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
+
+    Returns:
+        tuple:
+            - float: Computed Factor of Safety (FS)
+            - float: Inter-slice force inclination angle (degrees)
+    """
+
     alpha_rad = np.radians(df['alpha'])
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)
@@ -97,6 +144,18 @@ def spencer(df, tol=1e-6, max_iter=100):
 
 
 def janbu_simple(df, tol=1e-6, max_iter=100):
+    """
+    Computes the Factor of Safety (FS) using Janbu's Simplified Method.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice data.
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
+
+    Returns:
+        float: Computed Factor of Safety (FS)
+    """
+
     alpha_rad = np.radians(df['alpha'])
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)
@@ -127,6 +186,21 @@ def janbu_simple(df, tol=1e-6, max_iter=100):
 
 
 def janbu_corrected(df, tol=1e-6, max_iter=100):
+    """
+    Computes the Factor of Safety (FS) using Janbu's Corrected Method.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice data.
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
+
+    Returns:
+        tuple:
+            - float: Computed Factor of Safety (FS)
+            - float: Horizontal force ratio (lambda)
+            - bool: Whether the solution converged
+    """
+
     alpha_rad = np.radians(df['alpha'])
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)
@@ -165,6 +239,22 @@ def janbu_corrected(df, tol=1e-6, max_iter=100):
 
 
 def morgenstern_price(df, function=lambda x: 1.0, tol=1e-6, max_iter=100):
+    """
+    Computes the Factor of Safety (FS) using the Morgenstern-Price Method.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing slice data.
+        function (callable, optional): A callable defining the inter-slice force function ψ(x),
+            where x is normalized from 0 to 1 across slices. Default is constant function (1.0).
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
+
+    Returns:
+        tuple:
+            - float: Computed Factor of Safety (FS)
+            - float: Inter-slice force ratio (lambda)
+            - bool: Whether the solution converged
+    """
     alpha_rad = np.radians(df['alpha'])
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)

@@ -1,6 +1,45 @@
 import pandas as pd
 
 def load_globals(filepath):
+    """
+    Parses an Excel file containing slopetools input and returns a structured dictionary.
+
+    The Excel file is expected to contain several sheets with specific formats:
+    - 'profile': Contains coordinate data for profile lines in multiple blocks.
+    - 'mat': Contains material properties including strength parameters, pore pressure info, and uncertainty values.
+    - 'piezo': Contains coordinates for the piezometric line.
+    - 'circles': Contains slip circle definitions and maximum depth.
+    - 'non-circ': Contains coordinates and movement options for non-circular failure surfaces.
+    - 'dloads': Contains distributed load definitions in multiple blocks.
+    - 'reinforce': Contains reinforcement line definitions in multiple blocks.
+
+    Parameters:
+        filepath (str): Path to the Excel file.
+
+    Returns:
+        dict: A dictionary containing the parsed global data with the following keys:
+            - "profile_lines": List of profile line segments (list of (x, y) tuples).
+            - "materials": List of material property dictionaries.
+            - "piezo_line": List of (x, y) tuples representing the piezometric line.
+            - "max_depth": Maximum analysis depth from the 'circles' sheet.
+            - "circles": List of dictionaries defining circular slip surfaces.
+            - "non_circ": List of dictionaries defining non-circular surface points.
+            - "dloads": List of distributed load blocks, each a list of (x, y, normal) dicts.
+            - "reinforce_lines": List of reinforcement lines, each a list of (x, y, FL, FT) dicts.
+            - "gamma_water": Static water unit weight (default: 62.4).
+            - "tcrack_depth": Top crack depth (default: 0.0).
+            - "tcrack_water": Top crack water depth (default: 0.0).
+
+    Notes:
+        - The function assumes fixed layouts for rows and columns in each sheet.
+        - Malformed or incomplete rows are skipped.
+        - Sheet names must match exactly as described above.
+
+    Raises:
+        KeyError: If required columns or sheets are missing.
+        ValueError: If critical data cannot be parsed into the expected format.
+    """
+
     xls = pd.ExcelFile(filepath)
     globals_data = {}
 

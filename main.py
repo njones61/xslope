@@ -80,4 +80,4 @@ elif method == 'morgenstern_price (half-sine)':
         print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
 
 
-plot_slices(profile_lines, circle, df, piezo_line=piezo_line, failure_surface=failure_surface, FS=FS, dloads=dload, max_depth=max_depth)
+plot_slices(profile_lines, df, piezo_line=piezo_line, failure_surface=failure_surface, fs=FS, dloads=dload, max_depth=max_depth)

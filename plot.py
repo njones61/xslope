@@ -2,20 +2,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None, FS=None, dloads=None, max_depth=None):
+def plot_slices(profile_lines, df, piezo_line=None, failure_surface=None, fs=None, dloads=None, max_depth=None):
     """
     Plots a slopetools cross-section with profile lines, slices, piezometric line, failure surface,
     distributed loads, and optional max depth and factor of safety.
 
     Parameters:
         profile_lines (list): A list of profile segments, each a list of (x, y) tuples.
-        circle (dict): Dictionary representing the failure circle (not directly used in this function,
-                       but likely passed in for future use or consistency).
         df (pd.DataFrame): DataFrame containing slice geometry with required columns:
                            ['x_l', 'x_r', 'y_lb', 'y_lt', 'y_rt', 'y_rb'].
         piezo_line (list, optional): A list of (x, y) tuples representing the piezometric line.
         failure_surface (shapely.geometry.LineString, optional): Failure surface to plot, assumed to have `.coords`.
-        FS (float, optional): Factor of Safety to display in the plot title.
+        fs (float, optional): Factor of Safety to display in the plot title.
         dloads (list, optional): List of distributed load blocks, each a list of dictionaries with 'X', 'Y', and 'Normal'.
         max_depth (float, optional): Horizontal line to indicate the analysis depth limit.
 
@@ -118,8 +116,8 @@ def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None
     ax.legend()
     ax.grid(False) # change to True if you want grid lines
 
-    if FS is not None:
-        ax.set_title(f"Factor of Safety = {FS:.3f}")
+    if fs is not None:
+        ax.set_title(f"Factor of Safety = {fs:.3f}")
 
     plt.tight_layout()
     plt.show()

@@ -2,15 +2,34 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import matplotlib.pyplot as plt
-
-def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None, FS=None, dloads=None):
+def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None, FS=None, dloads=None, max_depth=None):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Plot profile lines
     for i, line in enumerate(profile_lines):
         xs, ys = zip(*line)
         ax.plot(xs, ys, label=f'Material {i+1}')
+
+    # Plot max depth line
+    if max_depth is not None:
+        x_vals = [x for line in profile_lines for x, _ in line]
+        x_min = min(x_vals)
+        x_max = max(x_vals)
+
+        # Solid line
+        ax.hlines(max_depth, x_min, x_max, colors='black', linewidth=1.5, label='Max Depth')
+
+        # Down-left diagonal hash marks
+        spacing = 5
+        length = 4
+        angle_rad = np.radians(60)
+
+        dx = length * np.cos(angle_rad)
+        dy = length * np.sin(angle_rad)
+
+        x_hashes = np.arange(x_min, x_max, spacing)[1:]  # skip first hash
+        for x in x_hashes:
+            ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1)
 
     # Plot the clipped failure surface if provided
     if failure_surface:
@@ -28,6 +47,11 @@ def plot_slices(profile_lines, circle, df, piezo_line=None, failure_surface=None
     if piezo_line:
         piezo_xs, piezo_ys = zip(*piezo_line)
         ax.plot(piezo_xs, piezo_ys, 'b-', label="Piezometric Line")
+        # Add inverted triangle marker to indicate water level
+        mid_index = len(piezo_xs) // 2  # use middle of piezo line
+        marker_offset = 2  # adjust this for triangle size
+        ax.plot(piezo_xs[mid_index], piezo_ys[mid_index] + marker_offset,
+                marker='v', color='b', markersize=8)
 
     # Plot distributed loads as vertical arrows
     for line in dloads:

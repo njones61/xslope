@@ -31,37 +31,36 @@ def get_y_from_intersection(geom):
 
 def generate_slices(profile_lines, materials, ground_surface, *,
                     circle=None, non_circ=None, num_slices=20,
-                    gamma_w=62.4, piezo_line=None, dloads=None,
-                    reinforce_lines=None):
+                    gamma_w=62.4, piezo_line=None, dloads=None):
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
 
     This function supports both circular and non-circular failure surfaces and computes
-    geometric and mechanical properties for each slice, including weight, base geometry,
-    water pressures, distributed loads, and reinforcement effects.
+    various slice properties needed for limit equilibrium analysis, including geometry,
+    weight, water pressure, and shear strength parameters.
 
     Parameters:
         profile_lines (list): List of profile layers, each a list of (x, y) tuples.
         materials (list): List of material property dictionaries corresponding to each layer.
-        ground_surface (shapely.geometry.LineString): LineString representing the top surface of the slope.
-        circle (dict, optional): Dictionary with keys 'Xo', 'Yo', and 'Depth' defining the circular failure surface.
-        non_circ (list, optional): List of dicts defining a non-circular failure surface with keys 'X', 'Y', and 'Movement'.
+        ground_surface (shapely.geometry.LineString): LineString representing the ground surface.
+        circle (dict, optional): Dictionary defining the circular failure surface
+            with keys 'Xo', 'Yo', and 'Depth'.
+        non_circ (list, optional): List of dictionaries for non-circular failure surface points.
         num_slices (int, optional): Desired number of slices to generate (default is 20).
         gamma_w (float, optional): Unit weight of water (default is 62.4).
-        piezo_line (list, optional): List of (x, y) tuples defining the piezometric surface.
-        dloads (list, optional): List of distributed load lines, each a list of dicts with 'X', 'Y', and 'Normal'.
-        reinforce_lines (list, optional): List of reinforcement lines, each a list of dicts with 'X', 'Y', 'FL', and 'FT'.
+        piezo_line (list, optional): List of (x, y) tuples defining the piezometric line.
+        dloads (list, optional): List of distributed load blocks, each a list of
+            dictionaries with 'X', 'Y', and 'Normal'.
 
     Returns:
         tuple:
-            - pd.DataFrame: Slice table where each row includes geometry, strength, and external force values.
-            - shapely.geometry.LineString: The clipped failure surface between the ground surface intersections.
+            - pd.DataFrame: A DataFrame where each row represents a slice with geometry and material properties.
+            - shapely.geometry.LineString: The portion of the failure surface clipped between the intersection points.
 
     Notes:
-        - Supports Method A interpretation of reinforcement: FL reduces driving forces, FT adds to normal force.
-        - Handles pore pressure and distributed loads using linear interpolation at slice centers.
-        - Automatically includes all geometry breakpoints in slice generation.
-        - Must specify exactly one of 'circle' or 'non_circ'.
+        - Fallback behavior is in place for incomplete geometry or non-intersecting surfaces.
+        - Handles distributed loads and water pressure using interpolation.
+        - Calculates mobilized cohesion and friction angle based on the material at the slice base.
     """
 
     if ground_surface is None or ground_surface.is_empty:
@@ -148,17 +147,6 @@ def generate_slices(profile_lines, materials, ground_surface, *,
             normals = [pt['Normal'] for pt in line]
             dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
 
-    # Interpolation functions for reinforcement
-    reinforce_interp_FL = []
-    reinforce_interp_FT = []
-    if reinforce_lines:
-        for line in reinforce_lines:
-            xs = [pt['X'] for pt in line]
-            fls = [pt['FL'] for pt in line]
-            fts = [pt['FT'] for pt in line]
-            reinforce_interp_FL.append(lambda x, xs=xs, fls=fls: np.interp(x, xs, fls, left=0, right=0))
-            reinforce_interp_FT.append(lambda x, xs=xs, fts=fts: np.interp(x, xs, fts, left=0, right=0))
-
     slices = []
     for i in range(len(all_xs) - 1):
         x_l, x_r = all_xs[i], all_xs[i + 1]
@@ -219,10 +207,6 @@ def generate_slices(profile_lines, materials, ground_surface, *,
         dload = dload_normal * dx
         total_weight += dload
 
-        # Interpolate reinforcement at x_c
-        shear_reinf = sum(func(x_c) for func in reinforce_interp_FL) if reinforce_interp_FL else 0
-        normal_reinf = sum(func(x_c) for func in reinforce_interp_FT) if reinforce_interp_FT else 0
-
         hw = 0
         piezo_y = None
         if piezo_line:
@@ -282,8 +266,6 @@ def generate_slices(profile_lines, materials, ground_surface, *,
             **{f'h{j+1}': h for j, h in enumerate(heights)},
             'dload': dload,
             'w': total_weight,
-            'shear_reinf': shear_reinf,
-            'normal_reinf': normal_reinf,
             'piezo_y': piezo_y,
             'hw': hw,
             'u': hw * gamma_w if piezo_y is not None else 0,

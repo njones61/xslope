@@ -1,7 +1,6 @@
 
 import numpy as np
 from math import sin, cos, tan, radians, atan2, degrees
-from scipy.optimize import root, minimize_scalar
 
 def oms(df):
     """
@@ -16,8 +15,6 @@ def oms(df):
             - 'phi': friction angle (degrees)
             - 'u': pore pressure
             - 'dl': base length
-            - 'shear_reinf' (optional): reinforcement force opposing sliding (FL)
-            - 'normal_reinf' (optional): reinforcement force contributing to base normal force (FT)
 
     Returns:
         tuple:
@@ -31,17 +28,15 @@ def oms(df):
     sin_alpha = np.sin(alpha_rad)
     cos2_alpha = cos_alpha ** 2
 
-    W = df['w'].values
-    shear_reinf = df.get('shear_reinf', 0).values
-    normal_reinf = df.get('normal_reinf', 0).values
-    c = df['c'].values
-    phi = np.radians(df['phi']).values
-    u = df['u'].values
-    dl = df['dl'].values
+    W = df['w']
+    c = df['c']
+    phi = np.radians(df['phi'])
+    u = df['u']
+    dl = df['dl']
 
-    N = W * cos_alpha - u * dl * cos2_alpha + normal_reinf
+    N = W * cos_alpha - u * dl * cos2_alpha
     numerator = c * dl + N * np.tan(phi)
-    denominator = W * sin_alpha - shear_reinf
+    denominator = W * sin_alpha
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
 
     return FS, N
@@ -72,19 +67,17 @@ def bishop(df, tol=1e-6, max_iter=100):
     tan_phi = np.tan(np.radians(df['phi']))
 
     W = df['w']
-    shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
     c = df['c']
     dl = df['dl']
     u = df['u']
 
     # Right-hand side: sum of W * sin(alpha)
-    denominator = (W * sin_alpha - shear_reinf).sum()
+    denominator = (W * sin_alpha).sum()
 
     # Start iteration with an initial guess
     converge = False
     F_guess = 1.0
-    N = W * cos_alpha - u * dl * cos2_alpha + normal_reinf
+    N = W * cos_alpha - u * dl * cos2_alpha
     num = c * dl + N * tan_phi
     for _ in range(max_iter):
         denom = cos_alpha + (sin_alpha * tan_phi) / F_guess
@@ -121,8 +114,6 @@ def spencer(df, tol=1e-6, max_iter=100):
     tan_phi = np.tan(phi_rad)
 
     W = df['w'].values
-    shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
     c = df['c'].values
     dl = df['dl'].values
     u = df['u'].values
@@ -141,10 +132,8 @@ def spencer(df, tol=1e-6, max_iter=100):
 
         # Compute resisting force per slice
         denom = cos_alpha * cos_beta + sin_alpha * sin_beta * np.tan(phi_rad)
-        effective_W = W + normal_reinf / cos_alpha  # distribute normal reinforcement as an equivalent weight
-        num = c * dl * cos_beta + (effective_W - u * dl) * (cos_alpha * cos_beta - sin_alpha * sin_beta) * tan_phi
         num = c * dl * cos_beta + (W - u * dl) * (cos_alpha * cos_beta - sin_alpha * sin_beta) * np.tan(phi_rad)
-        F_new = num.sum() / (W * sin_alpha - shear_reinf).sum()
+        F_new = num.sum() / (W * sin_alpha).sum()
 
         # Update beta using ratio of residual horizontal and vertical forces
         sin_beta_new = (W * sin_alpha - num / F_new * sin_alpha * tan_phi) / W
@@ -158,78 +147,74 @@ def spencer(df, tol=1e-6, max_iter=100):
 
     return F, degrees(beta)
 
-def spencer_from_slides(df, tol=1e-6, max_iter=100):
+def spencer_moment(df, tol=1e-6, max_iter=100):
     """
-    Computes FS using Spencer's Method with global force equilibrium.
+    Computes the Factor of Safety (FS) using Spencer's Method with full moment equilibrium.
 
-    Resolves all forces along interslice force angle beta, and finds the beta
-    that minimizes the residual between resisting and driving forces.
+    This version is valid for both circular and non-circular failure surfaces.
+    It iterates on both the factor of safety and the interslice force inclination angle (beta),
+    while summing moments about the origin (0, 0) to ensure complete equilibrium.
 
     Parameters:
-        df (pd.DataFrame): Must include:
-            - 'alpha', 'phi', 'c', 'w', 'u', 'dl'
-            - Optional: 'shear_reinf', 'normal_reinf'
-        tol (float): Convergence tolerance
-        max_iter (int): Not used (retained for compatibility)
+        df (pd.DataFrame): DataFrame containing slice information. Must include:
+            - 'alpha': base angle of slice (degrees)
+            - 'phi': friction angle (degrees)
+            - 'c': cohesion
+            - 'w': slice weight
+            - 'u': pore pressure
+            - 'dl': length of base
+            - 'x_c': x-coordinate of slice center
+            - 'y_cb': y-coordinate of slice base
+
+        tol (float, optional): Convergence tolerance. Default is 1e-6.
+        max_iter (int, optional): Maximum number of iterations. Default is 100.
 
     Returns:
-        float: FS
-        float: beta (degrees)
+        tuple:
+            - float: Computed factor of safety (FS)
+            - float: Interslice force inclination angle beta (degrees)
     """
-    alpha = np.radians(df['alpha'])
-    phi = np.radians(df['phi'])
-    tan_phi = np.tan(phi)
+    alpha_rad = np.radians(df['alpha'])
+    phi_rad = np.radians(df['phi'])
+    tan_phi = np.tan(phi_rad)
 
+    W = df['w'].values
     c = df['c'].values
     dl = df['dl'].values
-    w = df['w'].values
     u = df['u'].values
-    alpha_rad = alpha
-
-    shear_reinf = df.get('shear_reinf', 0).values
-    normal_reinf = df.get('normal_reinf', 0).values
+    x_c = df['x_c'].values
+    y_cb = df['y_cb'].values
 
     sin_alpha = np.sin(alpha_rad)
     cos_alpha = np.cos(alpha_rad)
 
-    def force_residual(beta_deg):
-        beta = radians(beta_deg)
+    # Initial guesses
+    F = 1.0
+    beta = 0.0  # in radians
+
+    for _ in range(max_iter):
         sin_beta = np.sin(beta)
         cos_beta = np.cos(beta)
 
-        # Base shear
-        N = w * cos_alpha + normal_reinf
-        S = c * dl + (N - u * dl) * tan_phi
+        # Force equilibrium terms
+        denom = cos_alpha * cos_beta + sin_alpha * sin_beta * tan_phi
+        num = c * dl * cos_beta + (W - u * dl) * (cos_alpha * cos_beta - sin_alpha * sin_beta) * tan_phi
 
-        # Projected components
-        T_resist = S * (cos_alpha * cos_beta + sin_alpha * sin_beta)
-        T_drive = -w * sin_beta + shear_reinf * cos_beta
+        F_new = num.sum() / (W * sin_alpha).sum()
 
-        R = T_resist.sum()
-        D = T_drive.sum()
+        # Moment equilibrium about the origin (0, 0)
+        moment_resisting = ((c * dl + (W - u * dl) * tan_phi / F_new) * y_cb).sum()
+        moment_driving = (W * x_c * sin_alpha).sum()
 
-        if abs(D) < 1e-6:
-            return 1e8  # prevent divide-by-zero blowup
+        beta_new = atan2(moment_driving, moment_resisting)
 
-        FS = R / D
-        residual = abs(R - FS * D)
-        return residual
+        if abs(F_new - F) < tol and abs(beta_new - beta) < tol:
+            return F_new, degrees(beta_new)
 
-    result = minimize_scalar(force_residual, bounds=(1, 15), method='bounded', options={'xatol': tol})
-    beta_opt = result.x
+        F = F_new
+        beta = beta_new
 
-    # Recalculate FS with best beta
-    beta = radians(beta_opt)
-    sin_beta = sin(beta)
-    cos_beta = cos(beta)
-    N = w * cos_alpha + normal_reinf
-    S = c * dl + (N - u * dl) * tan_phi
-    T_resist = S * (cos_alpha * cos_beta + sin_alpha * sin_beta)
-    T_drive = w * sin_alpha * cos_beta - w * cos_alpha * sin_beta - shear_reinf * cos_beta
-    FS_opt = T_resist.sum() / T_drive.sum()
-
-    return FS_opt, beta_opt
-
+    return F, degrees(beta)
 
 def janbu_simple(df, tol=1e-6, max_iter=100):
     """
@@ -249,9 +234,7 @@ def janbu_simple(df, tol=1e-6, max_iter=100):
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)
 
-    W = df['w']
-    shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
+    W = df['w'].values
     c = df['c'].values
     dl = df['dl'].values
     u = df['u'].values
@@ -262,9 +245,9 @@ def janbu_simple(df, tol=1e-6, max_iter=100):
     F = 1.0  # initial guess
 
     for _ in range(max_iter):
-        N = W * cos_alpha + normal_reinf
+        N = W * cos_alpha
         S = c * dl + (N - u * dl) * tan_phi / F
-        T = W * sin_alpha - shear_reinf
+        T = W * sin_alpha
 
         F_new = S.sum() / T.sum()
 
@@ -297,9 +280,7 @@ def janbu_corrected(df, tol=1e-6, max_iter=100):
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)
 
-    W = df['w']
-    shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
+    W = df['w'].values
     c = df['c'].values
     dl = df['dl'].values
     u = df['u'].values
@@ -314,10 +295,10 @@ def janbu_corrected(df, tol=1e-6, max_iter=100):
     for _ in range(max_iter):
         m = 1 + lambda_ * tan_phi / F
 
-        N = W * cos_alpha + normal_reinf
+        N = W * cos_alpha
         S = c * dl + (N - u * dl) * tan_phi / F
         R = S / m
-        T = W * sin_alpha - shear_reinf
+        T = W * sin_alpha
 
         F_new = R.sum() / T.sum()
         lambda_new = (R * sin_alpha).sum() / (R * cos_alpha).sum()
@@ -354,9 +335,7 @@ def morgenstern_price(df, function=lambda x: 1.0, tol=1e-6, max_iter=100):
     phi_rad = np.radians(df['phi'])
     tan_phi = np.tan(phi_rad)
 
-    W = df['w']
-    shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
+    W = df['w'].values
     c = df['c'].values
     dl = df['dl'].values
     u = df['u'].values
@@ -376,10 +355,10 @@ def morgenstern_price(df, function=lambda x: 1.0, tol=1e-6, max_iter=100):
     for _ in range(max_iter):
         m = 1 + lam * psi * tan_phi / F
 
-        N = W * cos_alpha + normal_reinf
+        N = W * cos_alpha
         S = c * dl + (N - u * dl) * tan_phi / F
         R = S / m
-        T = W * sin_alpha - shear_reinf
+        T = W * sin_alpha
 
         F_new = R.sum() / T.sum()
         num = (R * psi * sin_alpha).sum()

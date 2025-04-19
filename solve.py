@@ -1,7 +1,7 @@
 
 import numpy as np
 from math import sin, cos, tan, radians, atan2, degrees
-from scipy.optimize import root, minimize_scalar
+from scipy.optimize import minimize_scalar
 
 def oms(df):
     """
@@ -158,23 +158,23 @@ def spencer(df, tol=1e-6, max_iter=100):
 
     return F, degrees(beta)
 
-def spencer_from_slides(df, tol=1e-6, max_iter=100):
+def spencer_moment(df, beta_bounds=(-60, 60), tol=1e-6, max_iter=100):
     """
-    Computes FS using Spencer's Method with global force equilibrium.
-
-    Resolves all forces along interslice force angle beta, and finds the beta
-    that minimizes the residual between resisting and driving forces.
+    Implements Spencer's Method (UTEXASED-style):
+    - Sweeps beta
+    - Solves FS from force equilibrium and FS from moment equilibrium independently
+    - Returns beta where FS_force = FS_moment
 
     Parameters:
-        df (pd.DataFrame): Must include:
-            - 'alpha', 'phi', 'c', 'w', 'u', 'dl'
-            - Optional: 'shear_reinf', 'normal_reinf'
+        df (pd.DataFrame): Slice data with keys:
+            'alpha', 'phi', 'c', 'w', 'u', 'dl', 'x_c', 'y_cb'
+        beta_bounds (tuple): Beta search range in degrees
         tol (float): Convergence tolerance
-        max_iter (int): Not used (retained for compatibility)
+        max_iter (int): Max iterations per FS solve
 
     Returns:
-        float: FS
-        float: beta (degrees)
+        float: Factor of Safety
+        float: Beta (degrees)
     """
     alpha = np.radians(df['alpha'])
     phi = np.radians(df['phi'])
@@ -184,52 +184,53 @@ def spencer_from_slides(df, tol=1e-6, max_iter=100):
     dl = df['dl'].values
     w = df['w'].values
     u = df['u'].values
-    alpha_rad = alpha
+    x_c = df['x_c'].values
+    y_cb = df['y_cb'].values
 
     shear_reinf = df.get('shear_reinf', 0).values
     normal_reinf = df.get('normal_reinf', 0).values
 
-    sin_alpha = np.sin(alpha_rad)
-    cos_alpha = np.cos(alpha_rad)
+    sin_alpha = np.sin(alpha)
+    cos_alpha = np.cos(alpha)
+    cos2_alpha = cos_alpha ** 2
 
-    def force_residual(beta_deg):
-        beta = radians(beta_deg)
-        sin_beta = np.sin(beta)
-        cos_beta = np.cos(beta)
+    def fs_force(beta_rad):
+        sin_beta = np.sin(beta_rad)
+        cos_beta = np.cos(beta_rad)
+        F = 1.0
+        for _ in range(max_iter):
+            N = w * cos_alpha - u * dl * cos2_alpha + normal_reinf
+            denom = cos_alpha * cos_beta + sin_alpha * sin_beta * tan_phi
+            num = c * dl * cos_beta + N * (cos_alpha * cos_beta - sin_alpha * sin_beta) * tan_phi
+            T = w * sin_alpha - shear_reinf
+            F_new = num.sum() / T.sum()
+            if abs(F_new - F) < tol:
+                break
+            F = F_new
+        return F
 
-        # Base shear
-        N = w * cos_alpha + normal_reinf
-        S = c * dl + (N - u * dl) * tan_phi
+    def fs_moment(beta_rad):
+        F = 1.0
+        for _ in range(max_iter):
+            N = w * cos_alpha - u * dl * cos2_alpha + normal_reinf
+            S = c * dl + N * tan_phi / F
+            M_resist = (S * y_cb).sum()
+            M_drive = (w * x_c).sum()
+            F_new = M_resist / M_drive
+            if abs(F_new - F) < tol:
+                break
+            F = F_new
+        return F
 
-        # Projected components
-        T_resist = S * (cos_alpha * cos_beta + sin_alpha * sin_beta)
-        T_drive = -w * sin_beta + shear_reinf * cos_beta
+    def fs_difference(beta_deg):
+        beta_rad = radians(beta_deg)
+        return abs(fs_force(beta_rad) - fs_moment(beta_rad))
 
-        R = T_resist.sum()
-        D = T_drive.sum()
-
-        if abs(D) < 1e-6:
-            return 1e8  # prevent divide-by-zero blowup
-
-        FS = R / D
-        residual = abs(R - FS * D)
-        return residual
-
-    result = minimize_scalar(force_residual, bounds=(1, 15), method='bounded', options={'xatol': tol})
-    beta_opt = result.x
-
-    # Recalculate FS with best beta
-    beta = radians(beta_opt)
-    sin_beta = sin(beta)
-    cos_beta = cos(beta)
-    N = w * cos_alpha + normal_reinf
-    S = c * dl + (N - u * dl) * tan_phi
-    T_resist = S * (cos_alpha * cos_beta + sin_alpha * sin_beta)
-    T_drive = w * sin_alpha * cos_beta - w * cos_alpha * sin_beta - shear_reinf * cos_beta
-    FS_opt = T_resist.sum() / T_drive.sum()
-
-    return FS_opt, beta_opt
-
+    result = minimize_scalar(fs_difference, bounds=beta_bounds, method='bounded', options={'xatol': tol})
+    beta_deg = result.x
+    beta_rad = radians(beta_deg)
+    FS_final = fs_force(beta_rad)
+    return FS_final, beta_deg
 
 def janbu_simple(df, tol=1e-6, max_iter=100):
     """

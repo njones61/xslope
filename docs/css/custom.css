@@ -31,8 +31,9 @@
   vertical-align: middle;
 }
 
-.wrapped-table td,
-.wrapped-table th {
+/* Wrap the 2nd column */
+.wrapped-table td:nth-child(2),
+.wrapped-table th:nth-child(2) {
   white-space: normal !important;
   word-wrap: break-word !important;
   overflow-wrap: break-word !important;

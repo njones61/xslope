@@ -158,79 +158,157 @@ def spencer(df, tol=1e-6, max_iter=100):
 
     return F, degrees(beta)
 
-def spencer_moment(df, beta_bounds=(-60, 60), tol=1e-6, max_iter=100):
+
+
+def spencer_exact(df):
     """
-    Implements Spencer's Method (UTEXASED-style):
-    - Sweeps beta
-    - Solves FS from force equilibrium and FS from moment equilibrium independently
-    - Returns beta where FS_force = FS_moment
+    Spencer's Method using Geoengineer.org Equations [5]–[9] and [12].
+    Solves for FS_force (Eq. 12) and FS_moment (Eq. 9) independently.
 
     Parameters:
-        df (pd.DataFrame): Slice data with keys:
+        df (pd.DataFrame): Must include:
             'alpha', 'phi', 'c', 'w', 'u', 'dl', 'x_c', 'y_cb'
-        beta_bounds (tuple): Beta search range in degrees
-        tol (float): Convergence tolerance
-        max_iter (int): Max iterations per FS solve
 
     Returns:
-        float: Factor of Safety
-        float: Beta (degrees)
+        float: FS where FS_force = FS_moment
+        float: beta (degrees)
+        bool: converged flag (FS_force ≈ FS_moment)
     """
-    alpha = np.radians(df['alpha'])
-    phi = np.radians(df['phi'])
-    tan_phi = np.tan(phi)
 
+    beta_bounds = (-60, 60)
+    tol = 1e-6
+    max_iter = 100
+
+    alpha = np.radians(df['alpha'].values)
+    phi = np.radians(df['phi'].values)
     c = df['c'].values
-    dl = df['dl'].values
+    l = df['dl'].values
     w = df['w'].values
     u = df['u'].values
     x_c = df['x_c'].values
     y_cb = df['y_cb'].values
 
-    shear_reinf = df.get('shear_reinf', 0).values
-    normal_reinf = df.get('normal_reinf', 0).values
+    # Compute distance from origin for each slice base center
+    #R = np.sqrt(x_c ** 2 + y_cb ** 2)
+    R = y_cb # to get an array
+    R = 120  # for circle case
 
-    sin_alpha = np.sin(alpha)
-    cos_alpha = np.cos(alpha)
-    cos2_alpha = cos_alpha ** 2
+    def compute_Q(F, theta_rad):
+        theta_diff = alpha - theta_rad
+        S1 = c * l + w * np.cos(alpha) - u * l                   # Eq [6], corrected
+        S2 = -w * np.sin(alpha)                                  # Eq [7]
+        S3 = np.tan(phi) * np.tan(theta_diff)                    # Eq [8]
+        numerator = S1 / F + S2
+        denominator = (1 + S3 / F) * np.cos(theta_diff)
+        Q = numerator / denominator                              # Eq [5]
+        return Q
 
-    def fs_force(beta_rad):
-        sin_beta = np.sin(beta_rad)
-        cos_beta = np.cos(beta_rad)
-        F = 1.0
-        for _ in range(max_iter):
-            N = w * cos_alpha - u * dl * cos2_alpha + normal_reinf
-            denom = cos_alpha * cos_beta + sin_alpha * sin_beta * tan_phi
-            num = c * dl * cos_beta + N * (cos_alpha * cos_beta - sin_alpha * sin_beta) * tan_phi
-            T = w * sin_alpha - shear_reinf
-            F_new = num.sum() / T.sum()
-            if abs(F_new - F) < tol:
-                break
-            F = F_new
-        return F
+    fs_min = 0.01
+    fs_max = 20.0
 
-    def fs_moment(beta_rad):
-        F = 1.0
-        for _ in range(max_iter):
-            N = w * cos_alpha - u * dl * cos2_alpha + normal_reinf
-            S = c * dl + N * tan_phi / F
-            M_resist = (S * y_cb).sum()
-            M_drive = (w * x_c).sum()
-            F_new = M_resist / M_drive
-            if abs(F_new - F) < tol:
-                break
-            F = F_new
-        return F
+    def fs_force(theta_rad):
+        def residual(F):
+            Q = compute_Q(F, theta_rad)
+            return Q.sum()  # Equation [12]
+        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
+        return result.x
 
-    def fs_difference(beta_deg):
-        beta_rad = radians(beta_deg)
-        return abs(fs_force(beta_rad) - fs_moment(beta_rad))
+    def fs_moment(theta_rad):
+        def residual(F):
+            Q = compute_Q(F, theta_rad)
+            theta_diff = alpha - theta_rad
+            return np.sum(Q * R * np.cos(theta_diff))  # Equation [9]
+        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
+        return result.x
+
+    def fs_difference(theta_deg):
+        theta_rad = radians(theta_deg)
+        Ff = fs_force(theta_rad)
+        Fm = fs_moment(theta_rad)
+        return abs(Ff - Fm)
 
     result = minimize_scalar(fs_difference, bounds=beta_bounds, method='bounded', options={'xatol': tol})
-    beta_deg = result.x
-    beta_rad = radians(beta_deg)
-    FS_final = fs_force(beta_rad)
-    return FS_final, beta_deg
+    theta_opt = result.x
+    theta_rad = radians(theta_opt)
+    FS_force = fs_force(theta_rad)
+    FS_moment = fs_moment(theta_rad)
+
+    converged = abs(FS_force - FS_moment) < tol
+    return FS_force, theta_opt, converged
+
+def spencer_sgw(df):
+    """
+    Spencer's Method using Steve G. Wright's formulation.
+    Solves for FS_force and FS_moment independently using the Wright Q equation.
+
+    Parameters:
+        df (pd.DataFrame): Must include:
+            'alpha', 'phi', 'c', 'w', 'u', 'dl', 'x_c', 'y_cb'
+
+    Returns:
+        float: FS where FS_force = FS_moment
+        float: beta (degrees)
+        bool: converged flag
+    """
+
+    beta_bounds = (-60, 60)
+    tol = 1e-6
+    max_iter = 100
+
+    alpha = np.radians(df['alpha'].values)
+    phi = np.radians(df['phi'].values)
+    c = df['c'].values
+    l = df['dl'].values
+    w = df['w'].values
+    u = df['u'].values
+    x_c = df['x_c'].values
+    y_cb = df['y_cb'].values
+
+    R = 120  # For circular case
+
+    def compute_Q(F, theta_rad):
+        theta_diff = alpha - theta_rad
+        sec_alpha = 1 / np.cos(alpha)
+        term1 = w * np.sin(alpha)
+        term2 = (c / F) * l * sec_alpha
+        term3 = (w * np.cos(alpha) - u * l * sec_alpha) * (np.tan(phi) / F)
+        numerator = term1 - term2 - term3
+        denominator = np.cos(theta_diff) * (1 + (np.tan(theta_diff) * np.tan(phi)) / F)
+        Q = numerator / denominator
+        return Q
+
+    fs_min = 0.01
+    fs_max = 20.0
+
+    def fs_force(theta_rad):
+        def residual(F):
+            Q = compute_Q(F, theta_rad)
+            return Q.sum()
+        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
+        return result.x
+
+    def fs_moment(theta_rad):
+        def residual(F):
+            Q = compute_Q(F, theta_rad)
+            theta_diff = alpha - theta_rad
+            return np.sum(Q * np.cos(theta_diff))
+        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
+        return result.x
+
+    def fs_difference(theta_deg):
+        theta_rad = radians(theta_deg)
+        Ff = fs_force(theta_rad)
+        Fm = fs_moment(theta_rad)
+        return abs(Ff - Fm)
+
+    result = minimize_scalar(fs_difference, bounds=beta_bounds, method='bounded', options={'xatol': tol})
+    theta_opt = result.x
+    theta_rad = radians(theta_opt)
+    FS_force = fs_force(theta_rad)
+    FS_moment = fs_moment(theta_rad)
+
+    converged = abs(FS_force - FS_moment) < tol
+    return FS_force, theta_opt, converged
 
 def janbu_simple(df, tol=1e-6, max_iter=100):
     """

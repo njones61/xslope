@@ -11,8 +11,6 @@ markdown_extensions:
     - sane_lists
     - md_in_html
     - admonition
-    - pymdownx.snippets:
-        base_path: ".."
     - pymdownx.arithmatex:
         generic: true
 theme: readthedocs
@@ -26,7 +24,6 @@ plugins:
           paths: ["."]
           options:
             docstring_style: google
-  - include-markdown
 nav:
   - Home: index.md
   - Usage Guide:

@@ -49,7 +49,7 @@ def solve_selected(method):
             print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
     return FS
 
-data = load_globals("input_template.xlsx")
+data = load_globals("docs/input_template.xlsx")
 profile_lines = data["profile_lines"]
 materials = data["materials"]
 piezo_line = data["piezo_line"]

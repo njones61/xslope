@@ -3,11 +3,11 @@ from slice import generate_slices
 from fileio import load_globals
 from plot import plot_slices
 from utils import build_ground_surface
-from solve import oms, bishop, spencer, spencer_moment, janbu_simple, janbu_corrected, morgenstern_price
+from solve import oms, bishop, spencer, spencer_exact, spencer_sgw, janbu_simple, janbu_corrected, morgenstern_price
 
 
 def solve_selected(method):
-    # Options: 'oms', 'bishop', 'spencer',  spencer_moment, 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)'
+    # Options: 'oms', 'bishop', 'spencer',  spencer_exact, spencer_sgw 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)'
 
     if method == 'oms':
         FS, N = oms(df)
@@ -20,9 +20,16 @@ def solve_selected(method):
     elif method == 'spencer':
         FS, beta_deg = spencer(df)
         print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
-    elif method == 'spencer_moment':
-        FS, beta_deg = spencer_moment(df)
+    elif method == 'spencer_exact':
+        FS, beta_deg, converged = spencer_exact(df)
+        if not converged:
+            print("Spencer's method did not converge.")
         print(f"Spencer's Method (moment): FS = {FS:.4f}, β = {beta_deg:.2f}°")
+    elif method == 'spencer_sgw':
+        FS, beta_deg, converged = spencer_sgw(df)
+        if not converged:
+            print("Spencer's method did not converge.")
+        print(f"Spencer's Method (SGW): FS = {FS:.4f}, β = {beta_deg:.2f}°")
     elif method == 'janbu_simple':
         FS = janbu_simple(df)
         print(f"Janbu's Method: FS = {FS:.4f}")
@@ -83,8 +90,8 @@ df.to_excel("slices.xlsx", index=False)
 
 #print(df[df.columns[0,]])  # Adjust the slicing as needed
 
-# options = ['oms', 'bishop', 'spencer',  'spencer_moment', 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)']
-method = 'spencer'  # Change this to the desired method
+# options = ['oms', 'bishop', 'spencer',  'spencer_exact', 'spencer_sgw' 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)']
+method = 'oms'  # Change this to the desired method
 FS = solve_selected(method)
 
 

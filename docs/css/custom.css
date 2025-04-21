@@ -38,9 +38,9 @@
   overflow-wrap: break-word !important;
 }
 
-/* Set the width of the second column to 600px */
+/* Set the width of the second column to 600px
 .wrapped-table td:nth-child(2),
 .wrapped-table th:nth-child(2) {
   width: 600px !important;
   max-width: 600px !important;
-}
+}*/

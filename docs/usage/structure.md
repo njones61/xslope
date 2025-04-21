@@ -21,39 +21,39 @@ The input file is designed to be easy to use and can be modified using any sprea
     <tbody>
       <tr>
         <td>main</td>
-        <td>Contains a brief set of instructions and global variables including the unit weight of water, and tension crack parameters.</td>
+        <td>A brief set of instructions and global variables including the unit weight of water, and tension crack parameters.</td>
       </tr>
       <tr>
         <td>plot</td>
-        <td>Contains a plot of the slope geometry based on the inputs in profile, piezo, and other sheets. This is intended to provide a quick visual check of the inputs.</td>
+        <td>A plot of the slope geometry based on the inputs in profile, piezo, and other sheets. This is intended to provide a quick visual check of the inputs.</td>
       </tr>
       <tr>
         <td>profile</td>
-        <td>Contains a set of tables for inputing the XY coordinates of up to 10 profile lines.</td>
+        <td>A set of tables for inputing the XY coordinates of up to 10 profile lines.</td>
       </tr>
       <tr>
         <td>mat</td>
-        <td>Contains a set of tables for inputting the material properties of up to 10 materials. This includes unit weight and shear strength properties.</td>
+        <td>A set of tables for inputting the material properties of up to 10 materials. This includes unit weight and shear strength properties.</td>
       </tr>
       <tr>
         <td>piezo</td>
-        <td>Contains a table for inputting the XY coordinates of piezometric line used to calculate pore pressures.</td>
+        <td>A table for inputting the XY coordinates of piezometric line used to calculate pore pressures.</td>
       </tr>
       <tr>
         <td>circles</td>
-        <td>Contains a table for inputting the geometry of up to ten candidate circular failure surfaces.</td>
+        <td>A table for inputting the geometry of up to ten candidate circular failure surfaces.</td>
       </tr>
       <tr>
         <td>non-circ</td>
-        <td>Contains a table for inputting the XY coordinates of a non-circular slip surface.</td>
+        <td>A table for inputting the XY coordinates of a non-circular slip surface.</td>
       </tr>
       <tr>
         <td>dloads</td>
-        <td>Contains a set of tables for inputting up to 8 distributed loads.</td>
+        <td>A set of tables for inputting up to 8 distributed loads.</td>
       </tr>
       <tr>
         <td>reinforce</td>
-        <td>Contains a set of tables for inputting up to 12 soil reinforcement lines.</td>
+        <td>A set of tables for inputting up to 12 soil reinforcement lines.</td>
       </tr>
     </tbody>
   </table>

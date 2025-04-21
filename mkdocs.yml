@@ -11,6 +11,8 @@ markdown_extensions:
     - sane_lists
     - md_in_html
     - admonition
+    - pymdownx.snippets:
+        base_path: ".."
     - pymdownx.arithmatex:
         generic: true
 theme: readthedocs
@@ -21,14 +23,15 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          paths: ["."]
           options:
             docstring_style: google
+  - include-markdown
 nav:
   - Home: index.md
   - Usage Guide:
-    - Input File: usage/inputfile.md
     - General Features: usage/features.md
-    - Code Structure: usage/codestructure.md
+    - Code Structure: usage/structure.md
   - Solution Techniques:
     - Ordinary Method of Slices: methods/oms.md
     - Bishop's Simplified Method: methods/bishop.md

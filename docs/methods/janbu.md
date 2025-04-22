@@ -82,6 +82,7 @@ This correction attempts to mimic the effects of moment balance and interslice f
 - Fast and easy to compute
 - Conservative (safe) results
 - Effective for preliminary design and parametric studies
+- Can be applied to circular and non-circular failure surfaces
 
 ### Limitations
 - May significantly underestimate FS for complex geometries

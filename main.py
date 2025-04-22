@@ -3,11 +3,11 @@ from slice import generate_slices
 from fileio import load_globals
 from plot import plot_slices
 from utils import build_ground_surface
-from solve import oms, bishop, spencer, spencer_exact, spencer_sgw, janbu_simple, janbu_corrected, morgenstern_price
+import math
+from solve import oms, bishop, spencer, janbu_corrected
 
 
-def solve_selected(method):
-    # Options: 'oms', 'bishop', 'spencer',  spencer_exact, spencer_sgw 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)'
+def solve_selected(method, circular=False):
 
     if method == 'oms':
         FS, N = oms(df)
@@ -18,42 +18,16 @@ def solve_selected(method):
             print("Bishop's method did not converge.")
         print(f"Bishop: FS = {FS:.3f}")
     elif method == 'spencer':
-        FS, beta_deg = spencer(df)
-        print(f"Spencer's Method: FS = {FS:.4f}, β = {beta_deg:.2f}°")
-    elif method == 'spencer_exact':
-        FS, beta_deg, converged = spencer_exact(df)
-        if not converged:
-            print("Spencer's method did not converge.")
-        print(f"Spencer's Method (moment): FS = {FS:.4f}, β = {beta_deg:.2f}°")
-    elif method == 'spencer_sgw':
-        FS, beta_deg, converged = spencer_sgw(df)
+        FS, beta_deg, converged = spencer(df, circular=circular)
         if not converged:
             print("Spencer's method did not converge.")
         print(f"Spencer's Method (SGW): FS = {FS:.4f}, β = {beta_deg:.2f}°")
-    elif method == 'janbu_simple':
-        FS = janbu_simple(df)
-        print(f"Janbu's Method: FS = {FS:.4f}")
     elif method == 'janbu_corrected':
-        FS, lam, converged = janbu_corrected(df)
-        if converged:
-            print(f"Janbu's Corrected Method: FS = {FS:.4f}, λ = {lam:.4f}")
+        FS, fo, converged = janbu_corrected(df)
+        if not converged:
+            print("Janbu's corrected method did not converge.")
         else:
-            print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
-    elif method == 'morgenstern_price (janbu)':
-        # Default constant interslice force function (Janbu)
-        FS, lam, converged = morgenstern_price(df)
-        if converged:
-            print(f"Morgenstern-Price Method: FS = {FS:.4f}, λ = {lam:.4f}")
-        else:
-            print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
-    elif method == 'morgenstern_price (half-sine)':
-        # With a half-sine function:
-        import math
-        FS, lam, converged = morgenstern_price(df, function=lambda x: math.sin(math.pi * x))
-        if converged:
-            print(f"Morgenstern-Price Method (half-sine): FS = {FS:.4f}, λ = {lam:.4f}")
-        else:
-            print(f"Did not converge. Last FS = {FS:.4f}, λ = {lam:.4f}")
+            print(f"Janbu's Corrected Method: FS = {FS:.4f}, fo = {fo:.4f}")
     return FS
 
 data = load_globals("docs/input_template.xlsx")
@@ -73,15 +47,14 @@ df, failure_surface = generate_slices(
     profile_lines=profile_lines,
     materials=materials,
     ground_surface=ground_surface,
-    circle=circle,
-    #non_circ=non_circ,
+    #circle=circle,
+    non_circ=non_circ,
     num_slices=20,
     gamma_w=62.4,
     piezo_line=piezo_line,
     dloads=dloads,
     #reinforce_lines=reinforce_lines
 )
-
 
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
@@ -90,9 +63,9 @@ df.to_excel("slices.xlsx", index=False)
 
 #print(df[df.columns[0,]])  # Adjust the slicing as needed
 
-# options = ['oms', 'bishop', 'spencer',  'spencer_exact', 'spencer_sgw' 'janbu_simple', 'janbu_corrected', 'morgenstern_price (janbu)', 'morgenstern_price (half-sine)']
-method = 'oms'  # Change this to the desired method
-FS = solve_selected(method)
+# options = ['oms', 'bishop', 'spencer', 'janbu_corrected']
+method = 'janbu_corrected'  # Change this to the desired method
+FS = solve_selected(method, circular=False)
 
 
 plot_slices(profile_lines, df, piezo_line=piezo_line, failure_surface=failure_surface, fs=FS, dloads=dloads, max_depth=max_depth)

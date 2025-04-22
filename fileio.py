@@ -43,6 +43,14 @@ def load_globals(filepath):
     xls = pd.ExcelFile(filepath)
     globals_data = {}
 
+    # === STATIC GLOBALS ===
+    main_df = xls.parse('main', header=None)
+
+    globals_data["gamma_water"] = float(main_df.iloc[15, 3]) # Excel row 16, column D
+    globals_data["tcrack_depth"] = float(main_df.iloc[16, 3]) # Excel row 17, column D
+    globals_data["tcrack_water"] = float(main_df.iloc[17, 3]) # Excel row 18, column D
+    globals_data["k_seismic"] = float(main_df.iloc[18, 3])    # Excel row 19, column D
+
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
     profile_lines = []
@@ -182,9 +190,5 @@ def load_globals(filepath):
                 reinforce_lines.append(line_points)
     globals_data["reinforce_lines"] = reinforce_lines
 
-    # === STATIC GLOBALS ===
-    globals_data["gamma_water"] = 62.4
-    globals_data["tcrack_depth"] = 0.0
-    globals_data["tcrack_water"] = 0.0
 
     return globals_data

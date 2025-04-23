@@ -3,8 +3,7 @@ import numpy as np
 from math import sin, cos, tan, radians, atan2, degrees
 from scipy.optimize import minimize_scalar, root_scalar
 
-
-def oms(df):
+def oms(df, circular=True):
     """
     Computes the Factor of Safety (FS) using the Ordinary Method of Slices (OMS).
     This method works on circular failure surfaces only.
@@ -21,10 +20,18 @@ def oms(df):
             - 'normal_reinf' (optional): reinforcement force contributing to base normal force (FT)
 
     Returns:
-        tuple:
+        dict:
             - float: Computed Factor of Safety (FS)
             - np.ndarray: Normal force on the base of each slice
     """
+
+    results = {}
+    if not circular:
+        results['success'] = False
+        results['message'] = 'OMS method is only applicable for circular failure surfaces.'
+        results['base'] = None
+        results['FS'] = None
+        return results
 
     alpha_rad = np.radians(df['alpha'])
 
@@ -45,10 +52,13 @@ def oms(df):
     denominator = W * sin_alpha - shear_reinf
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
 
-    return FS, N
+    results['success'] = True
+    results['message'] = ''
+    results['base'] = numerator
+    results['FS'] = FS
+    return results
 
-
-def bishop(df, tol=1e-6, max_iter=100):
+def bishop(df, circular=True, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using Bishop's Simplified Method.
     This method works on circular failure surfaces only.
@@ -65,6 +75,13 @@ def bishop(df, tol=1e-6, max_iter=100):
             - np.ndarray: Normal force on the base of each slice
             - bool: Whether the solution converged
     """
+    results = {}
+    if not circular:
+        results['success'] = False
+        results['message'] = "Bishop method is only applicable for circular failure surfaces."
+        results['base'] = None
+        results['FS'] = None
+        return results
 
     alpha_rad = np.radians(df['alpha'])
     cos_alpha = np.cos(alpha_rad)
@@ -96,7 +113,16 @@ def bishop(df, tol=1e-6, max_iter=100):
             break
         F_guess = F_calc
 
-    return F_calc, N, converge
+    results['base'] = num
+    results['FS'] = F_calc
+    if not converge:
+        results['success'] = False
+        results['message'] = 'Bishop method did not converge within the maximum number of iterations.'
+    else:
+        results['success'] = True
+        results['message'] = ''
+
+    return results
 
 
 def spencer(df, circular=True):
@@ -173,11 +199,23 @@ def spencer(df, circular=True):
     FS_force = fs_force(theta_rad)
     FS_moment = fs_moment(theta_rad)
 
+    results = {}
+    Q = compute_Q(FS_force, theta_opt)
+    results['base'] = Q * np.cos(alpha - theta_opt)
+    results['FS'] = FS_force
+    results['theta_opt'] = theta_opt
     converged = abs(FS_force - FS_moment) < tol
-    return FS_force, theta_opt, converged
+    if not converged:
+        results['success'] = False
+        results['message'] = "Spencer's method did not converge within the maximum number of iterations."
+    else:
+        results['success'] = True
+        results['message'] = ''
+
+    return results
 
 
-def janbu_corrected(df, tol=1e-6, max_iter=100):
+def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
     """
     Computes the Factor of Safety (FS) using Janbu's Simplified Method with correction factor.
     Applies the Janbu correction based on d/L ratio and soil type.
@@ -249,10 +287,17 @@ def janbu_corrected(df, tol=1e-6, max_iter=100):
 
     # === Return solution ===
     FS = F * fo
-    print(f'Janbu correction factor: {fo:.4f}')
-    print(f'Janbu d/L ratio: {dL_ratio:.4f}')
-    print(f'Janbu b1: {b1:.4f}')
 
-    return FS, fo, converged
+    results = {}
+    results['FS'] = FS
+    results['fo'] = fo
+    results['base'] = S
+    if not converged:
+        results['success'] = False
+        results['message'] = "Janbu method did not converge within the maximum number of iterations."
+    else:
+        results['success'] = True
+        results['message'] = ''
 
+    return results
 

@@ -29,60 +29,10 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None):
-    """
-    Generates a failure surface based on either a circular or non-circular definition.
-
-    Parameters:
-        ground_surface (LineString): The ground surface geometry.
-        circular (bool): Whether to use circular failure surface.
-        circle (dict, optional): Dictionary with keys 'Xo', 'Yo', 'Depth', and 'R'.
-        non_circ (list, optional): List of dicts with keys 'X', 'Y', and 'Movement'.
-
-    Returns:
-        tuple: (success, result)
-            - If success is True:
-                result = (x_min, x_max, y_left, y_right, clipped_surface)
-            - If success is False:
-                result = error message string
-    """
-
-    if circular and circle:
-        Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
-        theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
-        arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-        failure_coords = arc
-        failure_surface = LineString(arc)
-    elif non_circ:
-        failure_coords = [(pt['X'], pt['Y']) for pt in non_circ]
-        failure_surface = LineString(failure_coords)
-    else:
-        return False, "Either a circular or non-circular failure surface must be provided."
-
-    intersections = failure_surface.intersection(ground_surface)
-
-    points = []
-    if isinstance(intersections, MultiPoint):
-        points = list(intersections.geoms)
-    elif isinstance(intersections, Point):
-        points = [intersections]
-    elif isinstance(intersections, GeometryCollection):
-        points = [g for g in intersections.geoms if isinstance(g, Point)]
-
-    if len(points) != 2:
-        return False, f"Expected 2 intersection points, but got {len(points)}."
-
-    points = sorted(points, key=lambda p: p.x)
-    x_min, x_max = points[0].x, points[1].x
-    y_left, y_right = points[0].y, points[1].y
-
-    clipped_surface = LineString([pt for pt in failure_coords if x_min <= pt[0] <= x_max])
-
-    return True, (x_min, x_max, y_left, y_right, clipped_surface)
-
-
-def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
-
+def generate_slices(profile_lines, materials, ground_surface, *,
+                    circle=None, non_circ=None, num_slices=20,
+                    gamma_w=62.4, piezo_line=None, dloads=None,
+                    reinforce_lines=None):
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
 
@@ -114,33 +64,48 @@ def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
         - Must specify exactly one of 'circle' or 'non_circ'.
     """
 
-    # Unpack data
-    profile_lines = data["profile_lines"]
-    materials = data["materials"]
-    piezo_line = data["piezo_line"]
-    gamma_w = data["gamma_water"]
-    circular = data["circular"]  # True if circles are present
-    if circular:
-        circle = data["circles"][circle_index]
-        Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
-    non_circ = data["non_circ"]
-    dloads = data["dloads"]
-    max_depth = data["max_depth"]
-    reinforce_lines = data["reinforce_lines"]
-
     if ground_surface is None or ground_surface.is_empty:
-        return False, "Ground surface is empty or not provided."
+        return pd.DataFrame(), LineString([])
+
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
-    # Generate failure surface
-    success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ)
-    if success:
-        x_min, x_max, y_left, y_right, clipped_surface = result
+    # Generate failure surface (either circular or non-circular)
+    if non_circ:
+        failure_coords = [(pt['X'], pt['Y']) for pt in non_circ]
+        failure_surface = LineString(failure_coords)
     else:
-        return False, "Failed to generate surface:" & result
+        Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
+        theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
+        arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
+        failure_coords = arc
+        failure_surface = LineString(arc)
 
-    # Determine if the failure surface is right-facing
+    intersections = failure_surface.intersection(ground_surface)
+
+    x_min = x_max = None
+    y_left = y_right = None
+
+    if isinstance(intersections, MultiPoint):
+        points = sorted(intersections.geoms, key=lambda p: p.x)
+        x_min, x_max = points[0].x, points[-1].x
+        y_left, y_right = points[0].y, points[-1].y
+    elif isinstance(intersections, Point):
+        x_min = x_max = intersections.x
+        y_left = y_right = intersections.y
+    elif isinstance(intersections, GeometryCollection):
+        points = [g for g in intersections.geoms if isinstance(g, Point)]
+        if points:
+            points = sorted(points, key=lambda p: p.x)
+            x_min, x_max = points[0].x, points[-1].x
+            y_left, y_right = points[0].y, points[-1].y
+        else:
+            return pd.DataFrame(), LineString([])
+    else:
+        return pd.DataFrame(), LineString([])
+
     right_facing = y_left > y_right
+
+    clipped_surface = LineString([pt for pt in failure_coords if x_min <= pt[0] <= x_max])
 
     # Build fixed_xs set
     fixed_xs = set(
@@ -200,7 +165,7 @@ def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
         dx = x_r - x_l
 
         if non_circ:
-            failure_line = clipped_surface
+            failure_line = failure_surface
             y_cb = get_y_from_intersection(failure_line.intersection(LineString([(x_c, -1e6), (x_c, 1e6)])))
             y_lb = get_y_from_intersection(failure_line.intersection(LineString([(x_l, -1e6), (x_l, 1e6)])))
             y_rb = get_y_from_intersection(failure_line.intersection(LineString([(x_r, -1e6), (x_r, 1e6)])))
@@ -275,7 +240,7 @@ def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
             p1 = Point(x_c - delta, Yo - sqrt(R ** 2 - (x_c - delta - Xo) ** 2))
             p2 = Point(x_c + delta, Yo - sqrt(R ** 2 - (x_c + delta - Xo) ** 2))
         else:
-            failure_line = clipped_surface
+            failure_line = failure_surface
             y1 = get_y_from_intersection(
                 failure_line.intersection(LineString([(x_c - delta, -1e6), (x_c - delta, 1e6)])))
             y2 = get_y_from_intersection(
@@ -328,4 +293,4 @@ def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
         slices.append(slice_data)
 
     df = pd.DataFrame(slices)
-    return True, (df, clipped_surface)
+    return df, clipped_surface

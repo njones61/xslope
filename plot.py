@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-def plot_slices(profile_lines, df, piezo_line=None, failure_surface=None, fs=None, dloads=None, max_depth=None):
+
+
+def plot_slope(data, df=None, failure_surface=None, fs=None):
     """
     Plots a slopetools cross-section with profile lines, slices, piezometric line, failure surface,
     distributed loads, and optional max depth and factor of safety.
@@ -27,6 +29,15 @@ def plot_slices(profile_lines, df, piezo_line=None, failure_surface=None, fs=Non
     Returns:
         None
     """
+
+    # Unpack data
+    profile_lines = data['profile_lines']
+    piezo_line = data['piezo_line']
+    dloads = data['dloads']
+    max_depth = data['max_depth']
+    circular = data['circular']
+    circles = data['circles']
+    non_circ = data['non_circ']
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -62,11 +73,38 @@ def plot_slices(profile_lines, df, piezo_line=None, failure_surface=None, fs=Non
         ax.plot(x_clip, y_clip, 'k-', linewidth=2, label="Failure Surface")
 
     # Plot slices using left/right geometry
-    for _, row in df.iterrows():
-        xs = [row['x_l'], row['x_l'], row['x_r'], row['x_r'], row['x_l']]
-        ys = [row['y_lb'], row['y_lt'], row['y_rt'], row['y_rb'], row['y_lb']]
-        ax.plot(xs, ys, 'r-')
-        ax.fill(xs, ys, color='red', alpha=0.1)
+    if df is not None:
+        for _, row in df.iterrows():
+            xs = [row['x_l'], row['x_l'], row['x_r'], row['x_r'], row['x_l']]
+            ys = [row['y_lb'], row['y_lt'], row['y_rt'], row['y_rb'], row['y_lb']]
+            ax.plot(xs, ys, 'r-')
+            ax.fill(xs, ys, color='red', alpha=0.1)
+
+    if df is None:
+        # Plot slices using circle geometry
+        for circle in circles:
+            Xo = circle['Xo']
+            Yo = circle['Yo']
+            R = circle['R']
+            theta = np.linspace(0, 2 * np.pi, 100)
+            x_circle = Xo + R * np.cos(theta)
+            y_circle = Yo + R * np.sin(theta)
+            ax.plot(x_circle, y_circle, 'r--', label='Circle')
+
+            # Center marker
+            ax.plot(Xo, Yo, 'r+', markersize=10)
+
+            # Arrow direction (choose a fixed angle — e.g., 0 radians = rightward)
+            angle = -np.pi/2  # you can change this angle if desired
+            dx = np.cos(angle)
+            dy = np.sin(angle)
+
+            # Shorten the arrow shaft slightly so the arrowhead lands on the circle's edge
+            shaft_length = R - 5  # 5 units shorter to account for arrowhead size
+
+            ax.arrow(Xo, Yo, dx * shaft_length, dy * shaft_length,
+                     head_width=5, head_length=5, fc='red', ec='red')
+
 
     # Plot piezometric line
     if piezo_line:
@@ -121,3 +159,5 @@ def plot_slices(profile_lines, df, piezo_line=None, failure_surface=None, fs=Non
 
     plt.tight_layout()
     plt.show()
+
+

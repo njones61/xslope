@@ -80,9 +80,10 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
 
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
 
-
-def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
-
+def generate_slices(profile_lines, materials, ground_surface, *,
+                    circle=None, non_circ=None, num_slices=20,
+                    gamma_w=62.4, piezo_line=None, dloads=None,
+                    reinforce_lines=None):
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
 
@@ -114,32 +115,23 @@ def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
         - Must specify exactly one of 'circle' or 'non_circ'.
     """
 
-    # Unpack data
-    profile_lines = data["profile_lines"]
-    materials = data["materials"]
-    piezo_line = data["piezo_line"]
-    gamma_w = data["gamma_water"]
-    circular = data["circular"]  # True if circles are present
-    if circular:
-        circle = data["circles"][circle_index]
-        Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
-    non_circ = data["non_circ"]
-    dloads = data["dloads"]
-    max_depth = data["max_depth"]
-    reinforce_lines = data["reinforce_lines"]
-
     if ground_surface is None or ground_surface.is_empty:
-        return False, "Ground surface is empty or not provided."
+        return pd.DataFrame(), LineString([])
+
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
-    # Generate failure surface
+    if circle is not None:
+        Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
+        circular = True
+    else:
+        circular = False
+
     success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ)
     if success:
         x_min, x_max, y_left, y_right, clipped_surface = result
     else:
         return False, "Failed to generate surface:" & result
 
-    # Determine if the failure surface is right-facing
     right_facing = y_left > y_right
 
     # Build fixed_xs set

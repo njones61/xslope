@@ -60,7 +60,9 @@ df.to_excel("slices.xlsx", index=False)
 
 
 # options = [oms, bishop, spencer, janbu_corrected]
-# results = solve_selected(janbu_corrected, df, circular=True)
+# results = solve_selected(oms, df, circular=True)
 # plot_slices(profile_lines, df, piezo_line=piezo_line, failure_surface=failure_surface, fs=results['FS'], dloads=dloads, max_depth=max_depth)
+
+print(circle)
 
 solve_all(df, circular=True)

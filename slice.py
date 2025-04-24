@@ -74,8 +74,7 @@ def generate_slices(profile_lines, materials, ground_surface, *,
         failure_coords = [(pt['X'], pt['Y']) for pt in non_circ]
         failure_surface = LineString(failure_coords)
     else:
-        Xo, Yo, depth = circle['Xo'], circle['Yo'], circle['Depth']
-        R = Yo - depth
+        Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
         theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
         arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
         failure_coords = arc

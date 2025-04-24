@@ -203,7 +203,7 @@ def spencer(df, circular=True):
     Q = compute_Q(FS_force, theta_opt)
     results['base'] = Q * np.cos(alpha - theta_opt)
     results['FS'] = FS_force
-    results['theta_opt'] = theta_opt
+    results['theta'] = theta_opt
     converged = abs(FS_force - FS_moment) < tol
     if not converged:
         results['success'] = False

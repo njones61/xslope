@@ -132,6 +132,27 @@ def load_globals(filepath):
         })
     globals_data["circles"] = circles
 
+    # For each circle, fill in the radius and depth values depending on the circle option
+    for circle in circles:
+        if circle["Option"] == "Depth":
+            yo = circle["Yo"]
+            depth = circle["Depth"]
+            circle["R"] = yo - depth
+        elif circle["Option"] == "Intercept":
+            xi = circle["Xi"]
+            yi = circle["Yi"]
+            xo = circle["Xo"]
+            yo = circle["Yo"]
+            r = ((xi - xo) ** 2 + (yi - yo) ** 2) ** 0.5
+            circle["R"] = r
+            circle["Depth"] = yo - r
+        elif circle["Option"] == "Radius":
+            yo = circle["Yo"]
+            r = circle["R"]
+            circle["Depth"] = yo - r
+        else:
+            raise ValueError(f"Unknown option '{circle['Option']}' for circles.")
+
     # === NON-CIRC SHAPES ===
     noncirc_df = xls.parse('non-circ')
     non_circ = list(noncirc_df.iloc[1:].dropna(subset=['Unnamed: 0']).apply(

@@ -9,9 +9,25 @@ from solve import oms, bishop, spencer, janbu_corrected
 
 def solve_selected(func, df, circular=True):
     results = func(df, circular=circular)
-    for key, value in results.items():
-        print(f"{key} = {value}")
+    if func == oms:
+        print(f'OMS: FS={results["FS"]:.3f}')
+    elif func == bishop:
+        print(f'Bishop: FS={results["FS"]:.3f}')
+    elif func == spencer:
+        print(f'Spencer: FS={results["FS"]:.3f}, theta={results["theta"]:.2f}')
+    elif func == janbu_corrected:
+        print(f'Janbu Corrected FS={results["FS"]:.3f}, fo={results["fo"]:.2f}')
+    if not results['success']:
+        print(f'Error: {results["message"]}')
     return results
+
+def solve_all(df, circular=True):
+    solve_selected(oms, df, circular=circular)
+    solve_selected(bishop, df, circular=circular)
+    solve_selected(oms, df, circular=circular)
+    solve_selected(spencer, df, circular=circular)
+    solve_selected(janbu_corrected, df, circular=circular)
+
 
 data = load_globals("docs/input_template.xlsx")
 profile_lines = data["profile_lines"]
@@ -42,11 +58,9 @@ df, failure_surface = generate_slices(
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
 
-#print(df[df.columns[10:]])
-
-#print(df[df.columns[0,]])  # Adjust the slicing as needed
 
 # options = [oms, bishop, spencer, janbu_corrected]
-results = solve_selected(spencer, df, circular=True)
+# results = solve_selected(janbu_corrected, df, circular=True)
+# plot_slices(profile_lines, df, piezo_line=piezo_line, failure_surface=failure_surface, fs=results['FS'], dloads=dloads, max_depth=max_depth)
 
-plot_slices(profile_lines, df, piezo_line=piezo_line, failure_surface=failure_surface, fs=results['FS'], dloads=dloads, max_depth=max_depth)
+solve_all(df, circular=True)

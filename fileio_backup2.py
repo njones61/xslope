@@ -69,51 +69,39 @@ def load_globals(filepath):
             if coords:
                 profile_lines.append(coords)
 
-
-    # === MATERIALS (Optimized Parsing) ===
+    # === MATERIALS ===
     mat_df = xls.parse('mat', header=2)
     materials = []
 
     for _, row in mat_df.iterrows():
-        gamma = row.get('g')
-        option = str(row.get('option', '')).strip().lower()
-        piezo = row.get('Piezo', 1.0)
-
-        if pd.isna(gamma) or option not in ('mc', 'cp'):
-            continue
-
         try:
-            gamma = float(gamma)
-            piezo = float(piezo) if pd.notna(piezo) else 1.0
+            gamma = float(row.iloc[1])  # Column B
+            option = str(row.iloc[2]).strip().lower()  # Column C
+            piezo = float(row.iloc[7]) if pd.notna(row.iloc[7]) else 1.0  # Column H
+
+            if option == 'mc':
+                if pd.isna(row.iloc[3]) or pd.isna(row.iloc[4]):  # D or E
+                    continue  # missing c or phi
+                c = float(row.iloc[3])
+                phi = float(row.iloc[4])
+                cp = 0
+                r_elev = 0
+
+            elif option == 'cp':
+                if pd.isna(row.iloc[5]) or pd.isna(row.iloc[6]):  # F or G
+                    continue  # missing cp or r_elev
+                c = 0
+                phi = 0
+                cp = float(row.iloc[5])
+                r_elev = float(row.iloc[6])
+
+            else:
+                continue  # unrecognized option
+
         except:
-            continue
+            continue  # skip if gamma, option, or piezo are invalid
 
-        if option == 'mc':
-            c = row.get('c')
-            phi = row.get('f')
-            if pd.isna(c) or pd.isna(phi):
-                continue
-            try:
-                c = float(c)
-                phi = float(phi)
-            except:
-                continue
-            cp = 0
-            r_elev = 0
-
-        elif option == 'cp':
-            cp = row.get('cp')
-            r_elev = row.get('r-elev')
-            if pd.isna(cp) or pd.isna(r_elev):
-                continue
-            try:
-                cp = float(cp)
-                r_elev = float(r_elev)
-            except:
-                continue
-            c = 0
-            phi = 0
-
+        # Append parsed row
         materials.append({
             "gamma": gamma,
             "option": option,
@@ -122,27 +110,20 @@ def load_globals(filepath):
             "cp": cp,
             "r_elev": r_elev,
             "piezo": piezo,
-            "sigma_gamma": float(row.get('s(g)', 0) or 0),
-            "sigma_c": float(row.get('s(c)', 0) or 0),
-            "sigma_phi": float(row.get('s(f)', 0) or 0),
-            "sigma_cp": float(row.get('s(cp)', 0) or 0),
+            "sigma_gamma": float(row.iloc[8]) if pd.notna(row.iloc[8]) else 0,
+            "sigma_c": float(row.iloc[9]) if pd.notna(row.iloc[9]) else 0,
+            "sigma_phi": float(row.iloc[10]) if pd.notna(row.iloc[10]) else 0,
+            "sigma_cp": float(row.iloc[11]) if pd.notna(row.iloc[11]) else 0,
         })
 
     # === PIEZOMETRIC LINE ===
     piezo_df = xls.parse('piezo')
     piezo_data = piezo_df.iloc[2:].dropna(how='all')
     piezo_line = []
-
-    if len(piezo_data) >= 2:
-        try:
-            piezo_data = piezo_data.dropna(subset=[piezo_data.columns[0], piezo_data.columns[1]], how='any')
-            if len(piezo_data) < 2:
-                raise ValueError("Piezometric line must contain at least two points.")
-            piezo_line = piezo_data.apply(lambda row: (float(row[0]), float(row[1])), axis=1).tolist()
-        except Exception:
-            raise ValueError("Invalid piezometric line format.")
-    elif len(piezo_data) == 1:
-        raise ValueError("Piezometric line must contain at least two points.")
+    if len(piezo_data.dropna()) >= 2:
+        if len(piezo_data.dropna()) == 1:
+            raise ValueError("Piezometric line must contain at least two points.")
+        piezo_line = piezo_data.apply(lambda row: (float(row[0]), float(row[1])), axis=1).tolist()
 
     # === DISTRIBUTED LOADS ===
     dload_df = xls.parse('dloads', header=None)
@@ -152,25 +133,20 @@ def load_globals(filepath):
         {"start_row": 16, "end_row": 26}
     ]
     dload_block_starts = [1, 5, 9, 13]
-
     for block in dload_data_blocks:
         for col in dload_block_starts:
-            section = dload_df.iloc[block["start_row"]:block["end_row"], col:col + 3]
-            section = section.dropna(how='all')
-            section = section.dropna(subset=[col, col + 1], how='any')
-            if len(section) >= 2:
-                try:
-                    block_points = section.apply(
-                        lambda row: {
-                            "X": float(row.iloc[0]),
-                            "Y": float(row.iloc[1]),
-                            "Normal": float(row.iloc[2])
-                        }, axis=1).tolist()
+            section = dload_df.iloc[block["start_row"]:block["end_row"], col:col+3].dropna(how='all')
+            if len(section.dropna()) >= 2:
+                rows = section.dropna().apply(lambda row: {
+                    "X": float(row.iloc[0]),
+                    "Y": float(row.iloc[1]),
+                    "Normal": float(row.iloc[2])
+                }, axis=1)
+                block_points = list(rows)
+                if len(block_points) == 1:
+                    raise ValueError("Each distributed load must contain at least two points.")
+                if block_points:
                     dloads.append(block_points)
-                except:
-                    raise ValueError("Invalid data format in distributed load block.")
-            elif len(section) == 1:
-                raise ValueError("Each distributed load block must contain at least two points.")
 
     # === CIRCLES ===
 
@@ -232,30 +208,25 @@ def load_globals(filepath):
         {"start_row": 29, "end_row": 39}
     ]
     reinforce_block_starts = [1, 6, 11, 16]
-
     for block in reinforce_data_blocks:
         for col in reinforce_block_starts:
-            section = reinforce_df.iloc[block["start_row"]:block["end_row"], col:col + 4]
-            section = section.dropna(how='all')
-            section = section.dropna(subset=[col, col + 1], how='any')
-            if len(section) >= 2:
-                try:
-                    line_points = section.apply(
-                        lambda row: {
-                            "X": float(row.iloc[0]),
-                            "Y": float(row.iloc[1]),
-                            "FL": float(row.iloc[2]),
-                            "FT": float(row.iloc[3])
-                        }, axis=1).tolist()
+            section = reinforce_df.iloc[block["start_row"]:block["end_row"], col:col+4].dropna(how='all')
+            if len(section.dropna()) >= 2:
+                rows = section.dropna().apply(lambda row: {
+                    "X": float(row.iloc[0]),
+                    "Y": float(row.iloc[1]),
+                    "FL": float(row.iloc[2]),
+                    "FT": float(row.iloc[3])
+                }, axis=1)
+                line_points = list(rows)
+                if len(line_points) == 1:
+                    raise ValueError("Each reinforcement line must contain at least two points.")
+                if line_points:
                     reinforce_lines.append(line_points)
-                except:
-                    raise ValueError("Invalid data format in reinforcement block.")
-            elif len(section) == 1:
-                raise ValueError("Each reinforcement line must contain at least two points.")
 
     # === VALIDATION ===
     circular = len(circles) > 0
-    if not circular and len(non_circ) == 0:
+    if not circular and len(globals_data.get('non_circ', [])) == 0:
         raise ValueError("Input must include either circular or non-circular surface data.")
     if not profile_lines:
         raise ValueError("Profile lines sheet is empty or invalid.")

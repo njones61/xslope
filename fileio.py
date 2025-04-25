@@ -183,36 +183,30 @@ def load_globals(filepath):
     raw = circles_df.dropna(subset=['Xo', 'Yo'], how='any')
     circles = []
     for _, row in raw.iterrows():
+        Xo = row['Xo']
+        Yo = row['Yo']
+        Option = row.get('Option', None)
+        Depth = row.get('Depth', None)
+        Xi = row.get('Xi', None)
+        Yi = row.get('Yi', None)
+        R = row.get('R', None)
+        # For each circle, fill in the radius and depth values depending on the circle option
+        if Option == 'Depth':
+            R = Yo - Depth
+        elif Option == 'Intercept':
+            R = ((Xi - Xo) ** 2 + (Yi - Yo) ** 2) ** 0.5
+            Depth = Yo - R
+        elif Option == 'Radius':
+            Depth = Yo - R
+        else:
+            raise ValueError(f"Unknown option '{Option}' for circles.")
         circle = {
-            "Xo": row['Xo'],
-            "Yo": row['Yo'],
-            "Option": row.get('Option', None),
-            "Depth": row.get('Depth', None),
-            "Xi": row.get('Xi', None),
-            "Yi": row.get('Yi', None),
+            "Xo": Xo,
+            "Yo": Yo,
+            "Depth": Depth,
+            "R": R,
         }
         circles.append(circle)
-
-    # For each circle, fill in the radius and depth values depending on the circle option
-    for circle in circles:
-        if circle["Option"] == "Depth":
-            yo = circle["Yo"]
-            depth = circle["Depth"]
-            circle["R"] = yo - depth
-        elif circle["Option"] == "Intercept":
-            xi = circle["Xi"]
-            yi = circle["Yi"]
-            xo = circle["Xo"]
-            yo = circle["Yo"]
-            r = ((xi - xo) ** 2 + (yi - yo) ** 2) ** 0.5
-            circle["R"] = r
-            circle["Depth"] = yo - r
-        elif circle["Option"] == "Radius":
-            yo = circle["Yo"]
-            r = circle["R"]
-            circle["Depth"] = yo - r
-        else:
-            raise ValueError(f"Unknown option '{circle['Option']}' for circles.")
 
     # === NON-CIRCULAR SURFACES ===
     noncirc_df = xls.parse('non-circ')

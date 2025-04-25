@@ -81,7 +81,7 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
 
 
-def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
+def generate_slices(data, ground_surface, circle=None, non_circ=None, num_slices=20):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -119,11 +119,11 @@ def generate_slices(data, ground_surface, circle_index=0, num_slices=20):
     materials = data["materials"]
     piezo_line = data["piezo_line"]
     gamma_w = data["gamma_water"]
-    circular = data["circular"]  # True if circles are present
-    if circular:
-        circle = data["circles"][circle_index]
+    if circle is not None:
+        circular = True
         Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
-    non_circ = data["non_circ"]
+    else:
+        circular = False
     dloads = data["dloads"]
     max_depth = data["max_depth"]
     reinforce_lines = data["reinforce_lines"]

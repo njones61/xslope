@@ -1,8 +1,8 @@
 import numpy as np
 
-def circular_search(df, solver, x0, y0, r0, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_fail=9999):
+def circular_search(df, solver, x0, y0, r0, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_fail=9999, depth_tol_frac=0.01):
     """
-    Adaptive 9-point circular search algorithm with FS caching and failure handling.
+    Adaptive 9-point circular search with local depth optimization at each grid point.
 
     Parameters:
         df (pd.DataFrame): Slice geometry
@@ -13,6 +13,7 @@ def circular_search(df, solver, x0, y0, r0, tol=1e-2, max_iter=50, shrink_factor
         max_iter (int): Maximum search iterations
         shrink_factor (float): Factor to shrink grid if center is minimum
         fs_fail (float): FS value to assign if solver fails
+        depth_tol_frac (float): Fraction of r0 used to determine convergence in depth
 
     Returns:
         dict: Circle parameters with lowest FS
@@ -24,6 +25,29 @@ def circular_search(df, solver, x0, y0, r0, tol=1e-2, max_iter=50, shrink_factor
     best_circle = None
     fs_cache = {}
     converged = False
+    depth_tol = r0 * depth_tol_frac
+
+    def optimize_depth(x, y, r0):
+        depth_step = r0 * 0.25
+        best_depth = y - r0
+        best_fs = fs_fail
+
+        while depth_step > depth_tol:
+            depths = [best_depth - depth_step, best_depth, best_depth + depth_step]
+            fs_results = []
+            for d in depths:
+                circle = {'Xo': x, 'Yo': y, 'Depth': d}
+                try:
+                    FS, *_ = solver(df, circle)
+                except:
+                    FS = fs_fail
+                fs_results.append((FS, d))
+
+            fs_results.sort(key=lambda t: t[0])
+            best_fs, best_depth = fs_results[0]
+            depth_step *= shrink_factor
+
+        return best_depth, best_fs
 
     for iteration in range(max_iter):
         Xs = [x0 - grid_size, x0, x0 + grid_size]
@@ -31,22 +55,16 @@ def circular_search(df, solver, x0, y0, r0, tol=1e-2, max_iter=50, shrink_factor
         points = [(x, y) for y in Ys for x in Xs]
 
         results = {}
-
         for x, y in points:
             key = (x, y)
             if key in fs_cache:
                 results[key] = fs_cache[key]
             else:
-                depth = y - r0
-                circle = {'Xo': x, 'Yo': y, 'Depth': depth}
-                try:
-                    FS, *_ = solver(df, circle)
-                except:
-                    FS = fs_fail
-                results[key] = {"Xo": x, "Yo": y, "Depth": depth, "FS": FS}
-                fs_cache[key] = results[key]
+                depth, FS = optimize_depth(x, y, r0)
+                result = {"Xo": x, "Yo": y, "Depth": depth, "FS": FS}
+                results[key] = result
+                fs_cache[key] = result
 
-        # Find the minimum FS and corresponding point
         sorted_results = sorted(results.items(), key=lambda item: item[1]['FS'])
         (min_x, min_y), min_data = sorted_results[0]
         min_index = points.index((min_x, min_y))

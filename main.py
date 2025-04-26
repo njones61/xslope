@@ -8,18 +8,20 @@ from solve import oms, bishop, spencer, janbu_corrected
 
 
 def solve_selected(func, df, circular=True):
-    results = func(df, circular=circular)
+    success, result = func(df, circular=circular)
+    if not success:
+        print(f'Error: {result}')
+        return result
+
     if func == oms:
-        print(f'OMS: FS={results["FS"]:.3f}')
+        print(f'OMS: FS={result["FS"]:.3f}')
     elif func == bishop:
-        print(f'Bishop: FS={results["FS"]:.3f}')
+        print(f'Bishop: FS={result["FS"]:.3f}')
     elif func == spencer:
-        print(f'Spencer: FS={results["FS"]:.3f}, theta={results["theta"]:.2f}')
+        print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
     elif func == janbu_corrected:
-        print(f'Janbu Corrected FS={results["FS"]:.3f}, fo={results["fo"]:.2f}')
-    if not results['success']:
-        print(f'Error: {results["message"]}')
-    return results
+        print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
+    return result
 
 def solve_all(df, circular=True):
     solve_selected(oms, df, circular=circular)

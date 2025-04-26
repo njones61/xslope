@@ -25,8 +25,13 @@ def oms(df, circular=True):
             - np.ndarray: Normal force on the base of each slice
     """
 
+    results = {}
     if not circular:
-        return False, 'OMS method is only applicable for circular failure surfaces.'
+        results['success'] = False
+        results['message'] = 'OMS method is only applicable for circular failure surfaces.'
+        results['base'] = None
+        results['FS'] = None
+        return results
 
     alpha_rad = np.radians(df['alpha'])
 
@@ -47,10 +52,11 @@ def oms(df, circular=True):
     denominator = W * sin_alpha - shear_reinf
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
 
-    results = {}
+    results['success'] = True
+    results['message'] = ''
     results['base'] = numerator
     results['FS'] = FS
-    return True, results
+    return results
 
 def bishop(df, circular=True, tol=1e-6, max_iter=100):
     """
@@ -69,9 +75,13 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
             - np.ndarray: Normal force on the base of each slice
             - bool: Whether the solution converged
     """
-
+    results = {}
     if not circular:
-        return False, 'Bishop method is only applicable for circular failure surfaces.'
+        results['success'] = False
+        results['message'] = "Bishop method is only applicable for circular failure surfaces."
+        results['base'] = None
+        results['FS'] = None
+        return results
 
     alpha_rad = np.radians(df['alpha'])
     cos_alpha = np.cos(alpha_rad)
@@ -103,14 +113,17 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
             break
         F_guess = F_calc
 
-
+    results['base'] = num
+    results['FS'] = F_calc
     if not converge:
-        return False, 'Bishop method did not converge within the maximum number of iterations.'
+        results['success'] = False
+        results['message'] = 'Bishop method did not converge within the maximum number of iterations.'
     else:
-        results = {}
-        results['base'] = num
-        results['FS'] = F_calc
-        return True, results
+        results['success'] = True
+        results['message'] = ''
+
+    return results
+
 
 def spencer(df, circular=True):
     """
@@ -186,17 +199,20 @@ def spencer(df, circular=True):
     FS_force = fs_force(theta_rad)
     FS_moment = fs_moment(theta_rad)
 
-    # Check convergence
+    results = {}
+    Q = compute_Q(FS_force, theta_opt)
+    results['base'] = Q * np.cos(alpha - theta_opt)
+    results['FS'] = FS_force
+    results['theta'] = theta_opt
     converged = abs(FS_force - FS_moment) < tol
     if not converged:
-        return False, "Spencer's method did not converge within the maximum number of iterations."
+        results['success'] = False
+        results['message'] = "Spencer's method did not converge within the maximum number of iterations."
     else:
-        results = {}
-        Q = compute_Q(FS_force, theta_opt)
-        results['base'] = Q * np.cos(alpha - theta_opt)
-        results['FS'] = FS_force
-        results['theta'] = theta_opt
-        return True, results
+        results['success'] = True
+        results['message'] = ''
+
+    return results
 
 
 def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
@@ -272,14 +288,16 @@ def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
     # === Return solution ===
     FS = F * fo
 
+    results = {}
+    results['FS'] = FS
+    results['fo'] = fo
+    results['base'] = S
     if not converged:
-        return False, 'Janbu-Corrected method did not converge within the maximum number of iterations.'
+        results['success'] = False
+        results['message'] = "Janbu method did not converge within the maximum number of iterations."
     else:
-        results = {}
-        results['FS'] = FS
-        results['fo'] = fo
-        results['base'] = S
-        return True, results
+        results['success'] = True
+        results['message'] = ''
 
     return results
 

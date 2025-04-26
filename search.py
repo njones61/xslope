@@ -1,29 +1,32 @@
 import numpy as np
 
-def circular_search(df, solver, circle, max_depth, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_fail=9999, depth_tol_frac=0.01):
+def circular_search(data, solver, circle, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_fail=9999, depth_tol_frac=0.01):
     """
-    Adaptive 9-point circular search with depth optimization and max depth limit.
+    Adaptive 9-point circular search with dynamic slicing, depth optimization, and convergence tracking.
 
     Parameters:
-        df (pd.DataFrame): Slice geometry
-        solver (callable): Function that takes a circle dict {'Xo', 'Yo', 'Depth'} and returns FS
-        circle (dict): Starting circle with keys 'Xo', 'Yo', 'Depth'
-        max_depth (float): Minimum allowable circle base depth (Yo - R)
-        tol (float): Grid tolerance for convergence
-        max_iter (int): Maximum iterations
-        shrink_factor (float): Shrinks grid size when center point is min
-        fs_fail (float): FS value to assign on solver failure
-        depth_tol_frac (float): Depth optimization convergence fraction
+        data (dict): Global data structure from load_globals()
+        solver (callable): Solver function (e.g., oms, bishop, spencer, janbu_corrected)
+        circle (dict): Starting circle {'Xo', 'Yo', 'Depth'}
+        tol (float): Convergence tolerance
+        max_iter (int): Maximum number of iterations
+        shrink_factor (float): Grid shrink factor when center is minimum
+        fs_fail (float): FS assigned if solver fails
+        depth_tol_frac (float): Depth search convergence fraction
 
     Returns:
-        dict: Best circle found
-        list of dict: Grid points with FS values
-        bool: Converged
-        list of dict: Search path with min FS progression
+        list of dict: fs_cache sorted by ascending FS
+        bool: convergence status
     """
+    from slice import generate_slices, build_ground_surface
+
     x0 = circle['Xo']
     y0 = circle['Yo']
     r0 = y0 - circle['Depth']
+
+    max_depth = data["max_depth"]
+
+    ground_surface = build_ground_surface(data['profile_lines'])
 
     grid_size = r0 * 0.25
     best_fs = np.inf
@@ -38,6 +41,7 @@ def circular_search(df, solver, circle, max_depth, tol=1e-2, max_iter=50, shrink
         depth_step = r0 * 0.25
         best_depth = max(depth_guess, max_depth)
         best_fs = fs_fail
+        best_result = None
 
         while depth_step > depth_tol:
             depths = [
@@ -48,17 +52,30 @@ def circular_search(df, solver, circle, max_depth, tol=1e-2, max_iter=50, shrink
             fs_results = []
             for d in depths:
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d}
-                try:
-                    FS, *_ = solver(df, test_circle)
-                except:
+                success, result = generate_slices(data, ground_surface=ground_surface, circle=test_circle)
+                if not success:
                     FS = fs_fail
-                fs_results.append((FS, d))
+                    df_slices = None
+                    failure_surface = None
+                else:
+                    df_slices, failure_surface = result
+                    try:
+                        solver_success, solver_result = solver(df_slices)
+                        if not solver_success:
+                            FS = fs_fail
+                        else:
+                            FS = solver_result['FS']
+                    except:
+                        FS = fs_fail
+
+                fs_results.append((FS, d, df_slices, failure_surface))
 
             fs_results.sort(key=lambda t: t[0])
-            best_fs, best_depth = fs_results[0]
+            best_fs, best_depth, best_df, best_surface = fs_results[0]
+            best_result = (best_depth, best_fs, best_df, best_surface)
             depth_step *= shrink_factor
 
-        return best_depth, best_fs
+        return best_result
 
     for iteration in range(max_iter):
         Xs = [x0 - grid_size, x0, x0 + grid_size]
@@ -72,8 +89,15 @@ def circular_search(df, solver, circle, max_depth, tol=1e-2, max_iter=50, shrink
                 results[key] = fs_cache[key]
             else:
                 depth_guess = prev_depths.get((x, y), y - r0)
-                depth, FS = optimize_depth(x, y, r0, depth_guess)
-                result = {"Xo": x, "Yo": y, "Depth": depth, "FS": FS}
+                depth, FS, df_slices, failure_surface = optimize_depth(x, y, r0, depth_guess)
+                result = {
+                    "Xo": x,
+                    "Yo": y,
+                    "Depth": depth,
+                    "FS": FS,
+                    "slices": df_slices,
+                    "failure_surface": failure_surface
+                }
                 results[key] = result
                 fs_cache[key] = result
 
@@ -97,5 +121,5 @@ def circular_search(df, solver, circle, max_depth, tol=1e-2, max_iter=50, shrink
             converged = True
             break
 
-    grid_points = [{"x": x, "y": y, "FS": data["FS"]} for (x, y), data in fs_cache.items()]
-    return best_circle, grid_points, converged, search_path
+    sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
+    return sorted_fs_cache, converged

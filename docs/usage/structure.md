@@ -131,7 +131,7 @@ ground surface geometry. The ground surface is defined as the uppermost surface 
 line data. This is done using the `build_ground_surface` function in the `utils` module. This is how you call the function:
 
 ```python
-from utils import build_ground_surface
+from slice import build_ground_surface
 
 ground_surface = build_ground_surface(profile_lines)
 ```

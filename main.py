@@ -1,9 +1,7 @@
 from global_config import non_circ
-from slice import generate_slices
+from slice import build_ground_surface, generate_slices
 from fileio import load_globals
 from plot import plot_slope
-from utils import build_ground_surface
-import math
 from solve import oms, bishop, spencer, janbu_corrected
 
 

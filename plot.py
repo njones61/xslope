@@ -103,6 +103,11 @@ def plot_circles(ax, circles):
         ax.arrow(Xo, Yo, dx * shaft_length, dy * shaft_length,
                  head_width=5, head_length=5, fc='red', ec='red')
 
+
+
+
+# ========== Main Plotting Function =========
+
 def plot_slope(data, df=None, failure_surface=None, fs=None):
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -123,6 +128,83 @@ def plot_slope(data, df=None, failure_surface=None, fs=None):
 
     if fs is not None:
         ax.set_title(f"Factor of Safety = {fs:.3f}")
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ========== Functions for Search Results =========
+
+def plot_failure_surfaces(ax, fs_cache):
+    """
+    Plots all failure surfaces.
+    Critical surface (lowest FS) is plotted in red, others in gray.
+    """
+    for i, result in enumerate(fs_cache):
+        surface = result['failure_surface']
+        if surface is None or surface.is_empty:
+            continue
+        x, y = zip(*surface.coords)
+        color = 'red' if i == 0 else 'gray'
+        lw = 2 if i == 0 else 1
+        ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6)
+
+
+def plot_circle_centers(ax, fs_cache):
+    """
+    Plots a dot at each circle center tried during the search.
+    """
+    for result in fs_cache:
+        ax.plot(result['Xo'], result['Yo'], 'ko', markersize=3, alpha=0.6)
+
+
+def plot_search_path(ax, search_path):
+    """
+    Plots small arrows showing the search refinement path.
+    """
+    if len(search_path) < 2:
+        return  # need at least two points to draw an arrow
+
+    for i in range(len(search_path) - 1):
+        start = search_path[i]
+        end = search_path[i + 1]
+        dx = end['x'] - start['x']
+        dy = end['y'] - start['y']
+        ax.arrow(start['x'], start['y'], dx, dy,
+                 head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
+
+
+def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=True):
+    """
+    Main function to plot slope geometry and circular search results.
+
+    Parameters:
+        data (dict): Global data dictionary
+        fs_cache (list of dict): Search results sorted by FS
+        search_path (list of dict, optional): Path of search refinements
+        highlight_fs (bool): Whether to label critical FS on plot
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    plot_profile_lines(ax, data['profile_lines'])
+    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
+    plot_piezo_line(ax, data['piezo_line'])
+    plot_dloads(ax, data['dloads'])
+
+    plot_failure_surfaces(ax, fs_cache)
+    plot_circle_centers(ax, fs_cache)
+    if search_path:
+        plot_search_path(ax, search_path)
+
+    ax.set_aspect('equal')
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.grid(True)
+    ax.legend()
+
+    if highlight_fs and fs_cache:
+        critical_fs = fs_cache[0]['FS']
+        ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     plt.tight_layout()
     plt.show()

@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from slice import generate_failure_surface
+
 
 def plot_profile_lines(ax, profile_lines):
     for i, line in enumerate(profile_lines):
@@ -70,7 +72,7 @@ def plot_dloads(ax, dloads):
 
         ax.plot(top_xs, top_ys, color='purple', linewidth=1.5)
 
-def plot_circles(ax, circles):
+def plot_circles(ax, data):
     """
     Plots starting circles with center markers and arrows.
 
@@ -81,30 +83,142 @@ def plot_circles(ax, circles):
     Returns:
         None
     """
+    circles = data['circles']
     for circle in circles:
         Xo = circle['Xo']
         Yo = circle['Yo']
         R = circle['R']
-        theta = np.linspace(0, 2 * np.pi, 100)
-        x_circle = Xo + R * np.cos(theta)
-        y_circle = Yo + R * np.sin(theta)
-        ax.plot(x_circle, y_circle, 'r--', label='Circle')
+        # theta = np.linspace(0, 2 * np.pi, 100)
+        # x_circle = Xo + R * np.cos(theta)
+        # y_circle = Yo + R * np.sin(theta)
+        # ax.plot(x_circle, y_circle, 'r--', label='Circle')
+
+        # Plot the portion of the circle in the slope
+        ground_surface = data['ground_surface']
+        success, result = generate_failure_surface(ground_surface, circular=True, circle=circle)
+        if not success:
+            continue  # or handle error
+        # result = (x_min, x_max, y_left, y_right, clipped_surface)
+        x_min, x_max, y_left, y_right, clipped_surface = result
+        x_clip, y_clip = zip(*clipped_surface.coords)
+        ax.plot(x_clip, y_clip, 'r--', label="Circle")
 
         # Center marker
         ax.plot(Xo, Yo, 'r+', markersize=10)
 
-        # Arrow direction (fixed downward, angle = -90 degrees)
-        angle = -np.pi / 2
-        dx = np.cos(angle)
-        dy = np.sin(angle)
+        # Arrow direction: point from center to midpoint of failure surface
+        mid_idx = len(x_clip) // 2
+        x_mid = x_clip[mid_idx]
+        y_mid = y_clip[mid_idx]
 
-        # Shorten arrow shaft slightly
+        dx = x_mid - Xo
+        dy = y_mid - Yo
+
+        # Normalize direction vector
+        length = np.hypot(dx, dy)
+        if length != 0:
+            dx /= length
+            dy /= length
+
+        # Shorten shaft length slightly
         shaft_length = R - 5
+
         ax.arrow(Xo, Yo, dx * shaft_length, dy * shaft_length,
                  head_width=5, head_length=5, fc='red', ec='red')
 
+def plot_non_circ(ax, non_circ):
+    xs, ys = zip(*non_circ)
+    ax.plot(xs, ys, 'r--', label='Non-Circular Surface')
+
+def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
+    """
+    Adds a material properties table to the plot.
+    """
+    if not materials:
+        return
+
+    # Check material options
+    options = set(mat['option'] for mat in materials)
+
+    # Decide column headers
+    if options == {'mc'}:
+        col_labels = ["Mat", "γ", "c", "φ"]
+    elif options == {'cp'}:
+        col_labels = ["Mat", "γ", "cp", "rₑ"]
+    else:
+        col_labels = ["Mat", "γ", "c / cp", "φ / rₑ"]
+
+    # Build table rows
+    table_data = []
+    for idx, mat in enumerate(materials):
+        gamma = mat['gamma']
+        option = mat['option']
+        if option == 'mc':
+            c = mat['c']
+            phi = mat['phi']
+            row = [idx+1, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}"]
+        elif option == 'cp':
+            cp = mat['cp']
+            r_elev = mat['r_elev']
+            row = [idx+1, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}"]
+        else:
+            row = [idx+1, f"{gamma:.1f}", "-", "-"]
+        table_data.append(row)
+
+    # Add the table
+    table = ax.table(cellText=table_data,
+                     colLabels=col_labels,
+                     loc='upper right',
+                     colLoc='center',
+                     cellLoc='center',
+                     bbox=[xloc, yloc, 0.2, 0.25])
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+
+# ========== FOR PLOTTING INPUT DATA  =========
 
 
+def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
+    """
+    Simple clean slope plot with equal aspect ratio and normal legend.
+    """
+    fig, ax = plt.subplots(figsize=(width, height))
+
+    # Plot contents
+    plot_profile_lines(ax, data['profile_lines'])
+    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
+    plot_piezo_line(ax, data['piezo_line'])
+    plot_dloads(ax, data['dloads'])
+
+    if data['circular']:
+        plot_circles(ax, data)
+    else:
+        plot_non_circ(ax, data['non_circ'])
+
+    plot_material_table(ax, data['materials'], xloc=0.62) # Adjust this so that it fits with the legend
+
+    ax.set_aspect('equal')  # ✅ Equal aspect
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.grid(False)
+
+    # Normal legend inside plot
+    ax.legend()
+
+    # # Adjust dynamic height based on geometry
+    # x_min, x_max = ax.get_xlim()
+    # y_min, y_max = ax.get_ylim()
+    # x_span = x_max - x_min
+    # y_span = y_max - y_min
+    #
+    # aspect = y_span / x_span
+    # dynamic_height = width * aspect + 1
+    # fig.set_size_inches(width, dynamic_height)
+
+    ax.set_title(title)
+
+    plt.tight_layout()
+    plt.show()
 
 # ========== Main Plotting Function =========
 
@@ -131,7 +245,6 @@ def plot_slope(data, df=None, failure_surface=None, fs=None):
 
     plt.tight_layout()
     plt.show()
-
 
 # ========== Functions for Search Results =========
 

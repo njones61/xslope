@@ -83,10 +83,10 @@ def load_globals(filepath):
     main_df = xls.parse('main', header=None)
 
     try:
-        globals_data["gamma_water"] = float(main_df.iloc[15, 3])  # Excel row 16, column D
-        globals_data["tcrack_depth"] = float(main_df.iloc[16, 3])  # Excel row 17, column D
-        globals_data["tcrack_water"] = float(main_df.iloc[17, 3])  # Excel row 18, column D
-        globals_data["k_seismic"] = float(main_df.iloc[18, 3])  # Excel row 19, column D
+        gamma_water = float(main_df.iloc[15, 3])  # Excel row 16, column D
+        tcrack_depth = float(main_df.iloc[16, 3])  # Excel row 17, column D
+        tcrack_water = float(main_df.iloc[17, 3])  # Excel row 18, column D
+        k_seismic = float(main_df.iloc[18, 3])  # Excel row 19, column D
     except Exception as e:
         raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
@@ -233,7 +233,7 @@ def load_globals(filepath):
 
     # Read the first 3 rows to get the max depth
     raw_df = xls.parse('circles', header=None)  # No header, get full sheet
-    globals_data["max_depth"] = float(raw_df.iloc[0, 2])  # Excel C1 = row 0, column 2
+    max_depth = float(raw_df.iloc[0, 2])  # Excel C1 = row 0, column 2
 
     # Read the circles data starting from row 4 (index 3)
     circles_df = xls.parse('circles', header=3)
@@ -316,10 +316,16 @@ def load_globals(filepath):
         raise ValueError("Each profile line must have a corresponding material.")
 
     # Add everything to globals_data
+    globals_data["gamma_water"] = gamma_water
+    globals_data["tcrack_depth"] = tcrack_depth
+    globals_data["tcrack_water"] = tcrack_water
+    globals_data["k_seismic"] = k_seismic
     globals_data["profile_lines"] = profile_lines
+    globals_data["ground_surface"] = ground_surface
     globals_data["materials"] = materials
     globals_data["piezo_line"] = piezo_line
     globals_data["circular"] = circular # True if circles are present
+    globals_data["max_depth"] = max_depth
     globals_data["circles"] = circles
     globals_data["non_circ"] = non_circ
     globals_data["dloads"] = dloads

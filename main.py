@@ -33,11 +33,10 @@ data = load_globals("docs/input_template.xlsx")
 
 # plot_slope(data)
 
-ground_surface = build_ground_surface(data['profile_lines'])
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if not data['circular'] else None
 
-success, result = generate_slices(data, ground_surface, circle, non_circ, num_slices=20)
+success, result = generate_slices(data, circle, non_circ, num_slices=20)
 if success:
     df, failure_surface = result
 else:

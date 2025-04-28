@@ -48,6 +48,7 @@ def oms(df, circular=True):
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
 
     results = {}
+    results['method'] = 'oms'
     results['base'] = numerator
     results['FS'] = FS
     return True, results
@@ -108,6 +109,7 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
         return False, 'Bishop method did not converge within the maximum number of iterations.'
     else:
         results = {}
+        results['method'] = 'bishop'
         results['base'] = num
         results['FS'] = F_calc
         return True, results
@@ -192,6 +194,7 @@ def spencer(df, circular=True):
         return False, "Spencer's method did not converge within the maximum number of iterations."
     else:
         results = {}
+        results['method'] = 'spencer'
         Q = compute_Q(FS_force, theta_opt)
         results['base'] = Q * np.cos(alpha - theta_opt)
         results['FS'] = FS_force
@@ -276,6 +279,7 @@ def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
         return False, 'Janbu-Corrected method did not converge within the maximum number of iterations.'
     else:
         results = {}
+        results['method'] = 'janbu_corrected'
         results['FS'] = FS
         results['fo'] = fo
         results['base'] = S

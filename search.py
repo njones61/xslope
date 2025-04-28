@@ -9,9 +9,9 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_f
         bool: convergence status
         list of dict: search path points (x, y, FS)
     """
-    from slice import generate_slices, build_ground_surface
+    from slice import generate_slices
 
-    ground_surface = build_ground_surface(data['profile_lines'])
+    ground_surface = data['ground_surface']
     circles = data['circles']
     max_depth = data['max_depth']
 
@@ -39,16 +39,13 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_f
                     failure_surface = None
                 else:
                     df_slices, failure_surface = result
-                    try:
-                        solver_success, solver_result = solver(df_slices)
-                        if not solver_success:
-                            FS = fs_fail
-                        else:
-                            FS = solver_result['FS']
-                    except:
+                    solver_success, solver_result = solver(df_slices)
+                    if not solver_success:
                         FS = fs_fail
-
-                fs_results.append((FS, d, df_slices, failure_surface))
+                        solver_result = None
+                    else:
+                        FS = solver_result['FS']
+                fs_results.append((FS, d, df_slices, failure_surface, solver_result))
 
             fs_results.sort(key=lambda t: t[0])
             best_fs, best_depth, best_df, best_surface = fs_results[0]
@@ -65,14 +62,15 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5, fs_f
         fs_cache = {}
         for x, y in points:
             depth_guess = prev_depths.get((x, y), y - r0)
-            depth, FS, df_slices, failure_surface = optimize_depth(x, y, r0, depth_guess)
+            depth, FS, df_slices, failure_surface, solver_result = optimize_depth(x, y, r0, depth_guess)
             fs_cache[(x, y)] = {
                 "Xo": x,
                 "Yo": y,
                 "Depth": depth,
                 "FS": FS,
                 "slices": df_slices,
-                "failure_surface": failure_surface
+                "failure_surface": failure_surface,
+                "solver_result": solver_result
             }
 
         sorted_fs = sorted(fs_cache.items(), key=lambda item: item[1]['FS'])

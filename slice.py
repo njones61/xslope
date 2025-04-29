@@ -136,7 +136,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
     if success:
         x_min, x_max, y_left, y_right, clipped_surface = result
     else:
-        return False, "Failed to generate surface:" & result
+        return False, "Failed to generate surface:" + result
 
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right

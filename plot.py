@@ -312,7 +312,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     ax.set_aspect('equal')
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.grid(True)
+    ax.grid(False)
     ax.legend()
 
     if highlight_fs and fs_cache:

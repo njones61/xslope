@@ -220,7 +220,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
         y_ct = get_y_from_intersection(ground_surface.intersection(vertical_c))
 
         heights = []
-        total_weight = 0
+        soil_weight = 0
         base_material_idx = None
 
         vertical = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
@@ -243,14 +243,14 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
                 h = max(0, overlap_top - overlap_bot)
 
             heights.append(h)
-            total_weight += h * materials[mat_index]['gamma'] * dx
+            soil_weight += h * materials[mat_index]['gamma'] * dx
             if base_material_idx is None and h > 0:
                 base_material_idx = mat_index
 
         # Distributed load
         dload_normal = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0
         dload = dload_normal * dx
-        total_weight += dload
+        total_weight = soil_weight + dload
 
         # Interpolate reinforcement at x_c
         shear_reinf = sum(func(x_c) for func in reinforce_interp_FL) if reinforce_interp_FL else 0
@@ -313,6 +313,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
             'alpha': alpha,
             'dl': dl,
             **{f'h{j+1}': h for j, h in enumerate(heights)},
+            'w_s': soil_weight,
             'dload': dload,
             'w': total_weight,
             'shear_reinf': shear_reinf,

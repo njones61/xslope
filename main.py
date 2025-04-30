@@ -47,7 +47,10 @@ else:
 
 
 # options = [oms, bishop, spencer, janbu_corrected]
-results = solve_selected(spencer, df, circular=True)
-plot_solution(data, df, failure_surface, results)
+success, results = solve_selected(spencer, df, circular=True)
+if not success:
+    print(results)
+else:
+    plot_solution(data, df, failure_surface, results)
 
 # solve_all(df, circular=True)

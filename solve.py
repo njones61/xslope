@@ -1,7 +1,8 @@
 
 import numpy as np
-from math import sin, cos, tan, radians, atan2, degrees
+from math import sin, cos, tan, radians, atan, atan2, degrees
 from scipy.optimize import minimize_scalar, root_scalar
+
 
 def oms(df, circular=True):
     """
@@ -36,20 +37,18 @@ def oms(df, circular=True):
 
     W = df['w'].values
     shear_reinf = df.get('shear_reinf', 0).values
-    normal_reinf = df.get('normal_reinf', 0).values
     c = df['c'].values
     phi = np.radians(df['phi']).values
     u = df['u'].values
     dl = df['dl'].values
 
-    N = W * cos_alpha - u * dl * cos2_alpha + normal_reinf
+    N = W * cos_alpha - u * dl * cos2_alpha
     numerator = c * dl + N * np.tan(phi)
     denominator = W * sin_alpha - shear_reinf
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
 
     results = {}
     results['method'] = 'oms'
-    results['base'] = numerator
     results['FS'] = FS
     return True, results
 
@@ -82,7 +81,6 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
 
     W = df['w']
     shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
     c = df['c']
     dl = df['dl']
     u = df['u']
@@ -93,7 +91,7 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
     # Start iteration with an initial guess
     converge = False
     F_guess = 1.0
-    N = W * cos_alpha - u * dl * cos2_alpha + normal_reinf
+    N = W * cos_alpha - u * dl * cos2_alpha
     num = c * dl + N * tan_phi
     for _ in range(max_iter):
         denom = cos_alpha + (sin_alpha * tan_phi) / F_guess
@@ -110,7 +108,6 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
     else:
         results = {}
         results['method'] = 'bishop'
-        results['base'] = num
         results['FS'] = F_calc
         return True, results
 
@@ -195,8 +192,6 @@ def spencer(df, circular=True):
     else:
         results = {}
         results['method'] = 'spencer'
-        Q = compute_Q(FS_force, theta_opt)
-        results['base'] = Q * np.cos(alpha - theta_opt)
         results['FS'] = FS_force
         results['theta'] = theta_opt
         return True, results
@@ -282,7 +277,6 @@ def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
         results['method'] = 'janbu_corrected'
         results['FS'] = FS
         results['fo'] = fo
-        results['base'] = S
         return True, results
 
     return results

@@ -36,7 +36,7 @@ data = load_globals("docs/input_template.xlsx")
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if not data['circular'] else None
 
-success, result = generate_slices(data, circle, non_circ, num_slices=20)
+success, result = generate_slices(data, circle, non_circ, num_slices=40)
 if success:
     df, failure_surface = result
 else:
@@ -47,10 +47,8 @@ else:
 
 
 # options = [oms, bishop, spencer, janbu_corrected]
-success, results = solve_selected(spencer, df, circular=True)
-if not success:
-    print(results)
-else:
-    plot_solution(data, df, failure_surface, results)
+results = solve_selected(spencer, df, circular=True)
+
+plot_solution(data, df, failure_surface, results)
 
 # solve_all(df, circular=True)

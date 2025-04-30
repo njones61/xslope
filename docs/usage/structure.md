@@ -141,16 +141,11 @@ The slice data are then constructed using the `generate_slices` function in the 
 ```python
 from slice import generate_slices
 
-df, failure_surface = generate_slices(
-    profile_lines=profile_lines,
-    materials=materials,
-    ground_surface=ground_surface,
-    circle=circle,
-    num_slices=20,
-    gamma_w=gamma_w,
-    piezo_line=piezo_line,
-    dloads=dloads,
-)
+success, result = generate_slices(data, circle, num_slices=20)
+if success:
+    df, failure_surface = result
+else:
+    print(result)
 ```
 
 The function returns a dataframe containing the slice data and the failure surface object. The slice data is a 
@@ -164,26 +159,27 @@ Once the slice data are generated, the next step is to solve for the factor of s
 solution methods available in the `solve` module. The `solve` module includes several different methods for solving 
 for the factor of safety, including the following:
 
-| Method Name | Description                                      |
-| ----------- |--------------------------------------------------|
-| oms       | Ordinary Method of Slices                        |
-| bishop    | Bishop's Simplified Procedure                    |
-| spencer  | Spencer's Method  (complete equilibrium)         |
-| janbu     | Janbu's Method    (force equilibrium)            |
-| morgenstern_price | Morgenstern-Price Method  (complete equilibrium) |
+| Method Name     | Description                                     |
+|-----------------|-------------------------------------------------|
+| oms             | Ordinary Method of Slices                       |
+| bishop          | Bishop's Simplified Procedure                   |
+| spencer         | Spencer's Method  (complete equilibrium)        |
+| janbu_corrected | Janbu's Corrected Method    (force equilibrium) |
+
 
 Each of these methods is described in more detail in the [Solution Techniques](../methods) section of this documentation.
 
 Here is an example of how to call the bishop method:
 
 ```python
-FS, N, converge = bishop(df)
-if not converge:
-    print("Bishop's method did not converge.")
+success, result = spencer(df, circular=True)
+if not success:
+    print(f'Error: {result}')
+else:
+    print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f} degrees')
 ```
 
-The `bishop` function takes the slice data dataframe as input and returns the factor of safety, the normal forces on 
-the bottom each slice, and a convergence flag. The convergence flag indicates whether the method converged to a solution. 
+Each solver function has the same set of inputs and outputs. The inputs are the slice df and a flag to indicate whether is it is circular surface or non-circular. Each function returns two arguments. The first is a success flag. It success=False, the results argument contains a message describing how the method failed. If success=True, results is a dictionary containing the factor of safety, and values specific to the method. For example, with Spencer's method, the dictionary contains the side force inclincation, theta as shown in the example above. 
 
 ## Automated Search
 
@@ -193,14 +189,28 @@ the bottom each slice, and a convergence flag. The convergence flag indicates wh
 
 After finding a solution, the results can be plotted using the `plot` module. The `plot` module includes several 
 functions for rendering the slope geometry, failure surface, and slice data using matplotlib. Here is an example of 
-how to call the `plot_slices` function:
+how to call the `plot_inputs` function after loading the input file. 
 
 ```python
-from plot import plot_slices
+from fileio import load_globals
+from plot import plot_inputs
 
-plot_slices(profile_lines, df, piezo_line=piezo_line, failure_surface=failure_surface, fs=FS, dloads=dloads, max_depth=max_depth)
+data = load_globals("docs/input_template.xlsx")
+
+plot_inputs(data)
 ```
 
+To plot the solution for a specific method, you can use the `plot_solution` function. Here is an example:
+
+```python
+from plot import plot_solution
+
+success, result = spencer(df, circular=True)
+if not success:
+    print(f'Error: {result}')
+else:
+    plot_solution(data, df, failure_surface, result)
+```
 
 The `plot` module includes several functions for plotting the results of the slope stability analysis. The
 

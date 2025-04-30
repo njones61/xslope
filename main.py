@@ -1,7 +1,7 @@
 from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
-from plot import plot_slope, plot_inputs
+from plot import plot_solution, plot_inputs
 from solve import oms, bishop, spencer, janbu_corrected
 
 
@@ -31,23 +31,23 @@ def solve_all(df, circular=True):
 
 data = load_globals("docs/input_template.xlsx")
 
-plot_inputs(data)
+# plot_inputs(data)
 
-# circle = data['circles'][0] if data['circular'] else None
-# non_circ = data['non_circ'] if not data['circular'] else None
-#
-# success, result = generate_slices(data, circle, non_circ, num_slices=20)
-# if success:
-#     df, failure_surface = result
-# else:
-#     print(result)
+circle = data['circles'][0] if data['circular'] else None
+non_circ = data['non_circ'] if not data['circular'] else None
+
+success, result = generate_slices(data, circle, non_circ, num_slices=20)
+if success:
+    df, failure_surface = result
+else:
+    print(result)
 
 # export df to excel
 #df.to_excel("slices.xlsx", index=False)
 
 
 # options = [oms, bishop, spencer, janbu_corrected]
-# results = solve_selected(oms, df, circular=True)
-# plot_slope(data, df=df, failure_surface=failure_surface, fs=results['FS'])
+results = solve_selected(spencer, df, circular=True)
+plot_solution(data, df, failure_surface, results)
 
 # solve_all(df, circular=True)

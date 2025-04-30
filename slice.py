@@ -49,7 +49,7 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
 
     if circular and circle:
         Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
-        theta_range = np.linspace(np.pi, 2 * np.pi, 1000)
+        theta_range = np.linspace(np.pi, 2 * np.pi, 100)
         arc = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
         failure_coords = arc
         failure_surface = LineString(arc)

@@ -30,13 +30,17 @@ def plot_failure_surface(ax, failure_surface):
         x_clip, y_clip = zip(*failure_surface.coords)
         ax.plot(x_clip, y_clip, 'k-', linewidth=2, label="Failure Surface")
 
-def plot_slices(ax, df):
+def plot_slices(ax, df, fill=True):
     if df is not None:
         for _, row in df.iterrows():
-            xs = [row['x_l'], row['x_l'], row['x_r'], row['x_r'], row['x_l']]
-            ys = [row['y_lb'], row['y_lt'], row['y_rt'], row['y_rb'], row['y_lb']]
-            ax.plot(xs, ys, 'r-')
-            ax.fill(xs, ys, color='red', alpha=0.1)
+            if fill:
+                xs = [row['x_l'], row['x_l'], row['x_r'], row['x_r'], row['x_l']]
+                ys = [row['y_lb'], row['y_lt'], row['y_rt'], row['y_rb'], row['y_lb']]
+                ax.plot(xs, ys, 'r-')
+                ax.fill(xs, ys, color='red', alpha=0.1)
+            else:
+                ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'r-')
+                ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'r-')
 
 def plot_piezo_line(ax, piezo_line):
     if piezo_line:
@@ -222,17 +226,15 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_slope(data, df=None, failure_surface=None, fs=None):
+def plot_solution(data, df, failure_surface, results):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
+    plot_slices(ax, df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    plot_slices(ax, df)
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
-    if df is None and data['circular']:
-        plot_circles(ax, data['circles'])
 
     ax.set_aspect('equal')
     ax.set_xlabel("x")
@@ -240,8 +242,19 @@ def plot_slope(data, df=None, failure_surface=None, fs=None):
     ax.legend()
     ax.grid(False)
 
-    if fs is not None:
-        ax.set_title(f"Factor of Safety = {fs:.3f}")
+    fs = results['FS']
+    method = results['method']
+    if method == 'oms':
+        title = f'OMS: FS = {fs:.3f}'
+    elif method == 'bishop':
+        title = f'Bishop: FS = {fs:.3f}'
+    elif method == 'spencer':
+        theta = results['theta']
+        title = f'Spencer: FS = {fs:.3f}, θ = {theta:.2f}°'
+    elif method == 'janbu_corrected':
+        fo = results['fo']
+        title = f'Janbu-Corrected: FS = {fs:.3f}, fo = {fo:.2f}'
+    ax.set_title(title)
 
     plt.tight_layout()
     plt.show()
@@ -252,8 +265,9 @@ def plot_failure_surfaces(ax, fs_cache):
     """
     Plots all failure surfaces.
     Critical surface (lowest FS) is plotted in red, others in gray.
+    Drawing order is reversed so the critical surface is on top.
     """
-    for i, result in enumerate(fs_cache):
+    for i, result in reversed(list(enumerate(fs_cache))):
         surface = result['failure_surface']
         if surface is None or surface.is_empty:
             continue

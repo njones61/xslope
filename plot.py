@@ -196,21 +196,22 @@ def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
 
     N = calculate_normal_stresses(df, FS)
     u = df['u'].values
+    N_eff = N - u
 
     heights = df['y_ct'] - df['y_cb']
     max_ht = heights.max() if not heights.empty else 1.0
     max_bar_len = max_ht * scale_frac
 
-    max_stress = np.max(np.abs(N)) if len(N) > 0 else 1.0
+    max_stress = np.max(np.abs(N_eff)) if len(N_eff) > 0 else 1.0
     max_u = np.max(u) if len(u) > 0 else 1.0
 
     for i, (index, row) in enumerate(df.iterrows()):
-        if i >= len(N):
+        if i >= len(N_eff):
             break
 
         x1, y1 = row['x_l'], row['y_lb']
         x2, y2 = row['x_r'], row['y_rb']
-        stress = N[i]
+        stress = N_eff[i]
         pore = u[i]
 
         dx = x2 - x1
@@ -303,7 +304,7 @@ def plot_solution(data, df, failure_surface, results):
     plot_base_stresses(ax, df, results['FS'], alpha=alpha)
 
     import matplotlib.patches as mpatches
-    normal_patch = mpatches.Patch(color='green', alpha=alpha, label='Normal Stress (σ)')
+    normal_patch = mpatches.Patch(color='green', alpha=alpha, label="Eff Normal Stress (σ')")
     pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
 
     # Add these to the legend

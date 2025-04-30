@@ -1,33 +1,21 @@
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
-from math import atan2, degrees, sqrt, cos, radians
+from math import sin, tan, atan, atan2, degrees, sqrt, cos, radians
 
-def get_y_from_intersection(geom):
-    """
-    Extracts the maximum Y-coordinate from a geometric intersection result.
+def calculate_normal_stresses(df, FS):
+    # Mobilized parameters
+    phi_mob = np.arctan(np.tan(np.radians(df['phi'].values)) / FS)
+    c_mob = df['c'].values / FS
 
-    This function handles different geometric types resulting from intersections,
-    including Point, MultiPoint, LineString, and GeometryCollection. If the input
-    geometry is not one of these or is empty, the function returns None.
+    # Earth pressure coefficient (Ko), computed from mobilized phi
+    Ko = (1 - np.sin(phi_mob)) / (1 + np.sin(phi_mob))
 
-    Parameters:
-        geom (shapely.geometry.base.BaseGeometry): The geometry object from which
-            to extract the Y-coordinate(s).
+    sigma_1 = df['w'].values / df['dx']  # Major principal stress (weight)
+    sigma_3 = Ko * sigma_1 - 2 * c_mob * np.sqrt(Ko)  # Minor principal stress
+    sigma = (sigma_1 + sigma_3) / 2 + (sigma_1 - sigma_3) / 2 * np.cos(np.radians(2 * df['alpha']))
 
-    Returns:
-        float or None: The maximum Y-coordinate found in the geometry, or None if not found.
-    """
-    if isinstance(geom, Point):
-        return geom.y
-    elif isinstance(geom, MultiPoint):
-        return max(pt.y for pt in geom.geoms)
-    elif isinstance(geom, LineString):
-        return max(y for _, y in geom.coords) if geom.coords else None
-    elif isinstance(geom, GeometryCollection):
-        pts = [g for g in geom.geoms if isinstance(g, Point)]
-        return max(pt.y for pt in pts) if pts else None
-    return None
+    return sigma
 
 def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None):
     """
@@ -80,6 +68,31 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
 
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
 
+def get_y_from_intersection(geom):
+    """
+    Extracts the maximum Y-coordinate from a geometric intersection result.
+
+    This function handles different geometric types resulting from intersections,
+    including Point, MultiPoint, LineString, and GeometryCollection. If the input
+    geometry is not one of these or is empty, the function returns None.
+
+    Parameters:
+        geom (shapely.geometry.base.BaseGeometry): The geometry object from which
+            to extract the Y-coordinate(s).
+
+    Returns:
+        float or None: The maximum Y-coordinate found in the geometry, or None if not found.
+    """
+    if isinstance(geom, Point):
+        return geom.y
+    elif isinstance(geom, MultiPoint):
+        return max(pt.y for pt in geom.geoms)
+    elif isinstance(geom, LineString):
+        return max(y for _, y in geom.coords) if geom.coords else None
+    elif isinstance(geom, GeometryCollection):
+        pts = [g for g in geom.geoms if isinstance(g, Point)]
+        return max(pt.y for pt in pts) if pts else None
+    return None
 
 def generate_slices(data, circle=None, non_circ=None, num_slices=20):
 
@@ -268,6 +281,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
             piezo_y = get_y_from_intersection(piezo_geom.intersection(piezo_vertical))
             if piezo_y is not None and piezo_y > y_cb:
                 hw = piezo_y - y_cb
+        u = hw * gamma_w if piezo_y is not None else 0
 
         delta = 0.01
         if not non_circ:
@@ -298,6 +312,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
                 c = (materials[base_material_idx]['r_elev'] - y_cb) * materials[base_material_idx]['cp']
                 phi = 0
 
+
         slice_data = {
             'slice #': i + 1,
             'x_l': x_l,
@@ -320,10 +335,10 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
             'normal_reinf': normal_reinf,
             'piezo_y': piezo_y,
             'hw': hw,
-            'u': hw * gamma_w if piezo_y is not None else 0,
+            'u': u,
             'mat': base_material_idx + 1 if base_material_idx is not None else None,
             'phi': phi,
-            'c': c
+            'c': c,
         }
         slices.append(slice_data)
 

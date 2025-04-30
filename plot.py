@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from slice import generate_failure_surface
+from slice import generate_failure_surface, calculate_normal_stresses
 
 
 def plot_profile_lines(ax, profile_lines):
@@ -39,8 +39,8 @@ def plot_slices(ax, df, fill=True):
                 ax.plot(xs, ys, 'r-')
                 ax.fill(xs, ys, color='red', alpha=0.1)
             else:
-                ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'r-')
-                ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'r-')
+                ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5)
+                ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5)
 
 def plot_piezo_line(ax, piezo_line):
     if piezo_line:
@@ -179,6 +179,77 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
+def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
+    """
+    Plots trapezoidal bars at the base of each slice representing normal stresses and pore pressures.
+
+    Parameters:
+        ax: matplotlib axis
+        df: DataFrame with slice geometry (must contain x_l, y_lb, x_r, y_rb, y_ct, y_cb, u)
+        FS: Factor of Safety (used for stress calculation)
+        scale_frac: fraction of max slice height used to scale stress bar length
+
+    Returns:
+        None
+    """
+    import numpy as np
+
+    N = calculate_normal_stresses(df, FS)
+    u = df['u'].values
+
+    heights = df['y_ct'] - df['y_cb']
+    max_ht = heights.max() if not heights.empty else 1.0
+    max_bar_len = max_ht * scale_frac
+
+    max_stress = np.max(np.abs(N)) if len(N) > 0 else 1.0
+    max_u = np.max(u) if len(u) > 0 else 1.0
+
+    for i, (index, row) in enumerate(df.iterrows()):
+        if i >= len(N):
+            break
+
+        x1, y1 = row['x_l'], row['y_lb']
+        x2, y2 = row['x_r'], row['y_rb']
+        stress = N[i]
+        pore = u[i]
+
+        dx = x2 - x1
+        dy = y2 - y1
+        length = np.hypot(dx, dy)
+        if length == 0:
+            continue
+
+        nx = -dy / length
+        ny = dx / length
+
+        # --- Normal stress trapezoid ---
+        bar_len = (abs(stress) / max_stress) * max_bar_len
+        direction = -np.sign(stress)
+
+        x1_top = x1 + direction * bar_len * nx
+        y1_top = y1 + direction * bar_len * ny
+        x2_top = x2 + direction * bar_len * nx
+        y2_top = y2 + direction * bar_len * ny
+
+        poly_x = [x1, x2, x2_top, x1_top]
+        poly_y = [y1, y2, y2_top, y1_top]
+
+        ax.fill(poly_x, poly_y, color='red' if stress <= 0 else 'green', alpha=alpha, edgecolor='k', linewidth=0.5)
+
+        # --- Pore pressure trapezoid ---
+        u_len = (pore / max_stress) * max_bar_len
+        u_dir = -1  # always into the base
+
+        ux1_top = x1 + u_dir * u_len * nx
+        uy1_top = y1 + u_dir * u_len * ny
+        ux2_top = x2 + u_dir * u_len * nx
+        uy2_top = y2 + u_dir * u_len * ny
+
+        poly_ux = [x1, x2, ux2_top, ux1_top]
+        poly_uy = [y1, y2, uy2_top, uy1_top]
+
+        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=0.5)
+
 # ========== FOR PLOTTING INPUT DATA  =========
 
 
@@ -209,16 +280,6 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     # Normal legend inside plot
     ax.legend()
 
-    # # Adjust dynamic height based on geometry
-    # x_min, x_max = ax.get_xlim()
-    # y_min, y_max = ax.get_ylim()
-    # x_span = x_max - x_min
-    # y_span = y_max - y_min
-    #
-    # aspect = y_span / x_span
-    # dynamic_height = width * aspect + 1
-    # fig.set_size_inches(width, dynamic_height)
-
     ax.set_title(title)
 
     plt.tight_layout()
@@ -228,6 +289,9 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 def plot_solution(data, df, failure_surface, results):
     fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.grid(False)
 
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
@@ -235,12 +299,26 @@ def plot_solution(data, df, failure_surface, results):
     plot_failure_surface(ax, failure_surface)
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
+    alpha = 0.3
+    plot_base_stresses(ax, df, results['FS'], alpha=alpha)
 
+    import matplotlib.patches as mpatches
+    normal_patch = mpatches.Patch(color='green', alpha=alpha, label='Normal Stress (σ)')
+    pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
+
+    # Add these to the legend
+    # ax.legend(handles=ax.get_legend_handles_labels()[0] + [normal_patch, pore_patch])
+    # Add legend below the plot
+    ax.legend(
+        handles=ax.get_legend_handles_labels()[0] + [normal_patch, pore_patch],
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.12),  # x=centered, y=slightly below axes
+        ncol=2
+    )
+
+    # Add vertical space below for the legend
+    plt.subplots_adjust(bottom=0.2)  # Increase if needed
     ax.set_aspect('equal')
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.legend()
-    ax.grid(False)
 
     fs = results['FS']
     method = results['method']

@@ -195,7 +195,7 @@ def load_globals(filepath):
             piezo_data = piezo_data.dropna(subset=[piezo_data.columns[0], piezo_data.columns[1]], how='any')
             if len(piezo_data) < 2:
                 raise ValueError("Piezometric line must contain at least two points.")
-            piezo_line = piezo_data.apply(lambda row: (float(row[0]), float(row[1])), axis=1).tolist()
+            piezo_line = piezo_data.apply(lambda row: (float(row.iloc[0]), float(row.iloc[1])), axis=1).tolist()
         except Exception:
             raise ValueError("Invalid piezometric line format.")
     elif len(piezo_data) == 1:
@@ -233,7 +233,7 @@ def load_globals(filepath):
 
     # Read the first 3 rows to get the max depth
     raw_df = xls.parse('circles', header=None)  # No header, get full sheet
-    max_depth = float(raw_df.iloc[0, 2])  # Excel C1 = row 0, column 2
+    max_depth = float(raw_df.iloc[1, 2])  # Excel C2 = row 1, column 2
 
     # Read the circles data starting from row 4 (index 3)
     circles_df = xls.parse('circles', header=3)

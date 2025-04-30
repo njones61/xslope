@@ -1,8 +1,10 @@
 import numpy as np
 from slice import generate_slices
+from shapely.geometry import LineString
+import time
 
 def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
-                    fs_fail=9999, depth_tol_frac=0.01, diagnostic=False):
+                    fs_fail=9999, depth_tol_frac=0.03, diagnostic=False):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -11,11 +13,20 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
         bool: convergence flag
         list of dict: search path
     """
+
+    start_time = time.time()  # Start timing
+
     ground_surface = data['ground_surface']
+    ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
+    y_max = max(y for _, y in ground_surface.coords)
+    y_min = data['max_depth']
+    delta_y = y_max - y_min
+    tol = delta_y * depth_tol_frac
+
     circles = data['circles']
     max_depth = data['max_depth']
 
-    def optimize_depth(x, y, depth_guess, depth_step_init, shrink_factor, tol_frac, fs_fail, diagnostic=False):
+    def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
         best_depth = max(depth_guess, max_depth)
         best_fs = fs_fail
@@ -55,7 +66,7 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
             if diagnostic:
                 print(f"[✓ depth-opt] x={x:.2f}, y={y:.2f}, depth={best_depth:.2f}, FS={best_fs:.4f}, step={depth_step:.2f}")
 
-            depth_step *= shrink_factor
+            depth_step *= depth_shrink_factor
             iterations += 1
             if iterations > 50:
                 if diagnostic:
@@ -64,25 +75,31 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
 
         return best_depth, best_fs, best_df, best_surface, best_solver_result
 
-    def evaluate_grid(x0, y0, grid_size, prev_depths, data, diagnostic=False):
+    def evaluate_grid(x0, y0, grid_size, depth_guess, data, diagnostic=False, fs_cache=None):
+        if fs_cache is None:
+            fs_cache = {}
+
         Xs = [x0 - grid_size, x0, x0 + grid_size]
         Ys = [y0 - grid_size, y0, y0 + grid_size]
         points = [(x, y) for y in Ys for x in Xs]
 
-        fs_cache = {}
         for i, (x, y) in enumerate(points):
-            depth_guess = prev_depths.get((x, y), y - (data['circles'][0]['R']))
-            depth_step_init = grid_size * 0.75
+            if (x, y) in fs_cache:
+                result = fs_cache[(x, y)]
+                if diagnostic:
+                    print(f"[cache hit] grid pt {i + 1}/9 at (x={x:.2f}, y={y:.2f}) → FS={result['FS']:.4f}")
+                continue
 
-            depth, FS, df_slices, failure_surface, solver_result = optimize_depth(
-                x, y, depth_guess, depth_step_init, shrink_factor, tol_frac=0.01, fs_fail=fs_fail,
+            depth_step_init = grid_size * 0.75
+            d, FS, df_slices, failure_surface, solver_result = optimize_depth(
+                x, y, depth_guess, depth_step_init, depth_shrink_factor=0.25, tol_frac=0.01, fs_fail=fs_fail,
                 diagnostic=diagnostic
             )
 
             fs_cache[(x, y)] = {
                 "Xo": x,
                 "Yo": y,
-                "Depth": depth,
+                "Depth": d,
                 "FS": FS,
                 "slices": df_slices,
                 "failure_surface": failure_surface,
@@ -90,14 +107,14 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
             }
 
             if diagnostic:
-                print(f"[grid pt {i+1}/9] x={x:.2f}, y={y:.2f} → FS={FS:.4f} at d={depth:.2f}")
+                print(f"[grid pt {i + 1}/9] x={x:.2f}, y={y:.2f} → FS={FS:.4f} at d={d:.2f}")
 
         sorted_fs = sorted(fs_cache.items(), key=lambda item: item[1]['FS'])
         best_point = sorted_fs[0][1]
         best_index = list(fs_cache.keys()).index((best_point['Xo'], best_point['Yo']))
 
         if diagnostic:
-            print(f"[★ grid best {best_index+1}/9] FS={best_point['FS']:.4f} at (x={best_point['Xo']:.2f}, y={best_point['Yo']:.2f})")
+            print(f"[★ grid best {best_index + 1}/9] FS={best_point['FS']:.4f} at (x={best_point['Xo']:.2f}, y={best_point['Yo']:.2f})")
 
         return fs_cache, best_point
 
@@ -110,43 +127,46 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
         if diagnostic:
             print(f"\n[⏱ starting circle {i+1}] x={x0:.2f}, y={y0:.2f}, r={r0:.2f}")
         grid_size = r0 * 0.15
-        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, prev_depths={}, data=data, diagnostic=diagnostic)
-        all_starts.append((best_point, fs_cache))
+        depth_guess = start_circle['Depth']
+        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, data, diagnostic=diagnostic)
+        all_starts.append((start_circle, best_point, fs_cache))
 
-    all_starts.sort(key=lambda t: t[0]['FS'])
-    best_start, initial_cache = all_starts[0]
+    all_starts.sort(key=lambda t: t[1]['FS'])
+    start_circle, best_start, fs_cache = all_starts[0]
     x0 = best_start['Xo']
     y0 = best_start['Yo']
-    r0 = y0 - best_start['Depth']
-    grid_size = r0 * 0.15
+    depth_guess = best_start['Depth']
+    grid_size = (y0 - depth_guess) * 0.15
     best_fs = best_start['FS']
-    fs_cache = initial_cache
-    prev_depths = {(x, y): d['Depth'] for (x, y), d in initial_cache.items()}
-    search_path = [{"x": x0, "y": y0, "FS": best_fs}]
+
+    # Include initial jump from user-defined circle to best point on its grid
+    search_path = [
+        {"x": start_circle['Xo'], "y": start_circle['Yo'], "FS": None},
+        {"x": x0, "y": y0, "FS": best_fs}
+    ]
     converged = False
 
     if diagnostic:
         print(f"\n[✅ launch grid] Starting refinement from FS={best_fs:.4f} at ({x0:.2f}, {y0:.2f})")
 
     for iteration in range(max_iter):
-        print(f"\n[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
-        new_cache, best_point = evaluate_grid(x0, y0, grid_size, prev_depths, data, diagnostic=diagnostic)
-
-        fs_cache.update(new_cache)
+        print(f"[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
+        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, data, diagnostic=diagnostic, fs_cache=fs_cache)
 
         if best_point['FS'] < best_fs:
             best_fs = best_point['FS']
             x0 = best_point['Xo']
             y0 = best_point['Yo']
+            depth_guess = best_point['Depth']
             search_path.append({"x": x0, "y": y0, "FS": best_fs})
-            prev_depths = {(p['Xo'], p['Yo']): p['Depth'] for p in new_cache.values()}
         else:
             grid_size *= shrink_factor
 
         if grid_size < tol:
             converged = True
-            if diagnostic:
-                print(f"\n[✅ converged] FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f})")
+            end_time = time.time()
+            elapsed = end_time - start_time
+            print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}), elapsed time={elapsed:.2f} seconds")
             break
 
     if not converged and diagnostic:

@@ -51,6 +51,23 @@ def plot_piezo_line(ax, piezo_line):
         ax.plot(piezo_xs[mid_index], piezo_ys[mid_index] + marker_offset,
                 marker='v', color='b', markersize=8)
 
+def plot_tcrack_surface(ax, tcrack_surface):
+    """
+    Plots the tension crack surface as a thin dashed red line.
+
+    Parameters:
+        ax: matplotlib Axes object
+        tcrack_surface: Shapely LineString
+
+    Returns:
+        None
+    """
+    if tcrack_surface is None:
+        return
+
+    x_vals, y_vals = tcrack_surface.xy
+    ax.plot(x_vals, y_vals, linestyle='--', color='red', linewidth=1.0, label='Tension Crack Depth')
+
 def plot_dloads(ax, dloads):
     for line in dloads:
         xs = [pt['X'] for pt in line]
@@ -267,6 +284,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
+    plot_tcrack_surface(ax, data['tcrack_surface'])
 
     if data['circular']:
         plot_circles(ax, data)
@@ -302,6 +320,8 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     plot_failure_surface(ax, failure_surface)
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
+    plot_tcrack_surface(ax, data['tcrack_surface'])
+
     alpha = 0.3
     plot_base_stresses(ax, df, results['FS'], alpha=alpha)
 
@@ -398,6 +418,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
+    plot_tcrack_surface(ax, data['tcrack_surface'])
 
     plot_failure_surfaces(ax, fs_cache)
     plot_circle_centers(ax, fs_cache)

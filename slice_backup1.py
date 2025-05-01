@@ -17,40 +17,7 @@ def calculate_normal_stresses(df, FS):
 
     return sigma
 
-def get_sorted_intersections(failure_surface, ground_surface):
-    # Helper function for generating failure surface
-    intersections = failure_surface.intersection(ground_surface)
-    if isinstance(intersections, MultiPoint):
-        points = list(intersections.geoms)
-    elif isinstance(intersections, Point):
-        points = [intersections]
-    elif isinstance(intersections, GeometryCollection):
-        points = [g for g in intersections.geoms if isinstance(g, Point)]
-    else:
-        points = []
-
-    if len(points) != 2:
-        return False, f"Expected 2 intersection points, but got {len(points)}.", None
-
-    points = sorted(points, key=lambda p: p.x)
-    return True, "", points
-
-def adjust_ground_for_tcrack(ground_surface, x_center, tcrack_depth, right_facing):
-    # helper function to adjust the ground surface for tension crack
-    if tcrack_depth <= 0:
-        return ground_surface
-
-    new_coords = []
-    for x, y in ground_surface.coords:
-        if right_facing and x < x_center:
-            new_coords.append((x, y - tcrack_depth))
-        elif not right_facing and x > x_center:
-            new_coords.append((x, y - tcrack_depth))
-        else:
-            new_coords.append((x, y))
-    return LineString(new_coords)
-
-def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None, tcrack_depth=0):
+def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None):
     """
     Generates a failure surface based on either a circular or non-circular definition.
 
@@ -59,7 +26,6 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
         circular (bool): Whether to use circular failure surface.
         circle (dict, optional): Dictionary with keys 'Xo', 'Yo', 'Depth', and 'R'.
         non_circ (list, optional): List of dicts with keys 'X', 'Y', and 'Movement'.
-        tcrack_depth (float, optional): Tension crack depth.
 
     Returns:
         tuple: (success, result)
@@ -68,7 +34,7 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
             - If success is False:
                 result = error message string
     """
-    # --- Step 1: Build failure surface ---
+
     if circular and circle:
         Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
         theta_range = np.linspace(np.pi, 2 * np.pi, 100)
@@ -81,26 +47,23 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     else:
         return False, "Either a circular or non-circular failure surface must be provided."
 
-    # --- Step 2: Intersect with original ground surface to determine slope facing ---
-    success, msg, points = get_sorted_intersections(failure_surface, ground_surface)
-    if not success:
-        return False, msg
+    intersections = failure_surface.intersection(ground_surface)
 
+    points = []
+    if isinstance(intersections, MultiPoint):
+        points = list(intersections.geoms)
+    elif isinstance(intersections, Point):
+        points = [intersections]
+    elif isinstance(intersections, GeometryCollection):
+        points = [g for g in intersections.geoms if isinstance(g, Point)]
+
+    if len(points) != 2:
+        return False, f"Expected 2 intersection points, but got {len(points)}."
+
+    points = sorted(points, key=lambda p: p.x)
     x_min, x_max = points[0].x, points[1].x
     y_left, y_right = points[0].y, points[1].y
-    right_facing = y_left > y_right
-    x_center = 0.5 * (x_min + x_max)
 
-    # --- Step 3: If tension crack exists, adjust surface and re-intersect ---
-    if tcrack_depth > 0:
-        modified_surface = adjust_ground_for_tcrack(ground_surface, x_center, tcrack_depth, right_facing)
-        success, msg, points = get_sorted_intersections(failure_surface, modified_surface)
-        if not success:
-            return False, msg
-        x_min, x_max = points[0].x, points[1].x
-        y_left, y_right = points[0].y, points[1].y
-
-    # --- Step 4: Clip the failure surface between intersection x-range ---
     clipped_surface = LineString([pt for pt in failure_coords if x_min <= pt[0] <= x_max])
 
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
@@ -170,7 +133,6 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
     materials = data["materials"]
     piezo_line = data["piezo_line"]
     gamma_w = data["gamma_water"]
-    tcrack_depth = data["tcrack_depth"]
     if circle is not None:
         circular = True
         Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
@@ -183,7 +145,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
     # Generate failure surface
-    success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ, tcrack_depth=tcrack_depth)
+    success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ)
     if success:
         x_min, x_max, y_left, y_right, clipped_surface = result
     else:

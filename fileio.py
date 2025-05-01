@@ -54,6 +54,7 @@ def build_ground_surface(profile_lines):
     return LineString(top_surface_points) if len(top_surface_points) >= 2 else LineString([])
 
 
+
 def load_globals(filepath):
     """
     This function reads input data from various Excel sheets and parses it into
@@ -126,6 +127,12 @@ def load_globals(filepath):
     # === BUILD GROUND SURFACE FROM PROFILE LINES ===
 
     ground_surface = build_ground_surface(profile_lines)
+
+    # === BUILD TENSILE CRACK LINE ===
+
+    tcrack_surface = None
+    if tcrack_depth > 0:
+        tcrack_surface = LineString([(x, y - tcrack_depth) for (x, y) in ground_surface.coords])
 
     # === MATERIALS (Optimized Parsing) ===
     mat_df = xls.parse('mat', header=2)
@@ -322,6 +329,7 @@ def load_globals(filepath):
     globals_data["k_seismic"] = k_seismic
     globals_data["profile_lines"] = profile_lines
     globals_data["ground_surface"] = ground_surface
+    globals_data["tcrack_surface"] = tcrack_surface
     globals_data["materials"] = materials
     globals_data["piezo_line"] = piezo_line
     globals_data["circular"] = circular # True if circles are present

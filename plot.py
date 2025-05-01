@@ -235,7 +235,8 @@ def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
         poly_x = [x1, x2, x2_top, x1_top]
         poly_y = [y1, y2, y2_top, y1_top]
 
-        ax.fill(poly_x, poly_y, color='red' if stress <= 0 else 'green', alpha=alpha, edgecolor='k', linewidth=0.5)
+        # ax.fill(poly_x, poly_y, color='red' if stress <= 0 else 'green', alpha=alpha, edgecolor='k', linewidth=0.5)
+        ax.fill(poly_x, poly_y, facecolor='none', edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....', linewidth=1)
 
         # --- Pore pressure trapezoid ---
         u_len = (pore / max_stress) * max_bar_len
@@ -249,7 +250,8 @@ def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
         poly_ux = [x1, x2, ux2_top, ux1_top]
         poly_uy = [y1, y2, uy2_top, uy1_top]
 
-        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=0.5)
+        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
+        #ax.fill(poly_ux, poly_uy, facecolor='none', edgecolor='blue', hatch='.....', linewidth=1)
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
@@ -288,8 +290,8 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_solution(data, df, failure_surface, results):
-    fig, ax = plt.subplots(figsize=(10, 6))
+def plot_solution(data, df, failure_surface, results, width=12, height=7):
+    fig, ax = plt.subplots(figsize=(width, height))
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
@@ -304,7 +306,7 @@ def plot_solution(data, df, failure_surface, results):
     plot_base_stresses(ax, df, results['FS'], alpha=alpha)
 
     import matplotlib.patches as mpatches
-    normal_patch = mpatches.Patch(color='green', alpha=alpha, label="Eff Normal Stress (σ')")
+    normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....',  label="Eff Normal Stress (σ')")
     pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
 
     # Add these to the legend
@@ -380,7 +382,7 @@ def plot_search_path(ax, search_path):
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
 
 
-def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=True):
+def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
     """
     Main function to plot slope geometry and circular search results.
 
@@ -390,7 +392,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
         search_path (list of dict, optional): Path of search refinements
         highlight_fs (bool): Whether to label critical FS on plot
     """
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(width, height))
 
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])

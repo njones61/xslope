@@ -276,6 +276,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
 
         vertical = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
 
+        sum_gam_h_y = 0 # for calculating center of gravity of slice
+        sum_gam_h = 0   # ditto
         for mat_index, line in enumerate(profile_lines):
             layer_line = LineString(line)
             layer_top_y = get_y_from_intersection(layer_line.intersection(vertical))
@@ -293,6 +295,9 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
                 overlap_bot = max(y_cb, layer_bot_y)
                 h = max(0, overlap_top - overlap_bot)
 
+            sum_gam_h_y += h * materials[mat_index]['gamma'] * (overlap_top + overlap_bot) / 2
+            sum_gam_h += h * materials[mat_index]['gamma']
+
             heights.append(h)
             soil_weight += h * materials[mat_index]['gamma'] * dx
             if base_material_idx is None and h > 0:
@@ -302,6 +307,9 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
         dload_normal = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0
         dload = dload_normal * dx
         total_weight = soil_weight + dload
+
+        # Center of gravity
+        y_cg = (sum_gam_h_y + dload_normal * y_ct) / sum_gam_h if sum_gam_h > 0 else None
 
         # Interpolate reinforcement at x_c
         shear_reinf = sum(func(x_c) for func in reinforce_interp_FL) if reinforce_interp_FL else 0
@@ -362,6 +370,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
             'x_c': x_c,
             'y_cb': y_cb,
             'y_ct': y_ct,
+            'y_cg': y_cg,
             'dx': dx,
             'alpha': alpha,
             'dl': dl,

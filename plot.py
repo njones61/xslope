@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from slice import generate_failure_surface, calculate_normal_stresses
+from solve import extract_spencer_Q, compute_thrust_line_spencer, compute_thrust_line_by_resultant, compute_thrust_line_projected_to_base, compute_thrust_line_by_intersection, compute_thrust_line_stabl5
 
 
 def plot_profile_lines(ax, profile_lines):
@@ -270,6 +271,8 @@ def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
         ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
         #ax.fill(poly_ux, poly_uy, facecolor='none', edgecolor='blue', hatch='.....', linewidth=1)
 
+
+
 # ========== FOR PLOTTING INPUT DATA  =========
 
 
@@ -308,6 +311,21 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
+def plot_thrust_line(ax, df, y_thrust):
+    """
+    Plots the thrust line as a smooth curve through the thrust y-locations.
+
+    Parameters:
+        ax (matplotlib.axes.Axes): Axes object to plot on
+        df (pd.DataFrame): Slice data with 'x_c' column
+        y_thrust (list): One y-value per slice
+        color (str): Line color
+        label (str): Label for the legend
+        kwargs: Additional arguments to pass to ax.plot()
+    """
+    x_vals = list(df['x_l']) + [df['x_r'].iloc[-1]]
+    ax.plot(x_vals, y_thrust, color='purple', label='Thrust Line')
+
 def plot_solution(data, df, failure_surface, results, width=12, height=7):
     fig, ax = plt.subplots(figsize=(width, height))
     ax.set_xlabel("x")
@@ -321,6 +339,14 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
     plot_tcrack_surface(ax, data['tcrack_surface'])
+
+
+    if results['method'] == 'spencer':
+        FS = results['FS']
+        theta = results['theta']
+        Q = extract_spencer_Q(df, FS, theta, debug=True)
+        y_thrust = compute_thrust_line_stabl5(df, Q, theta)
+        plot_thrust_line(ax, df, y_thrust)
 
     alpha = 0.3
     plot_base_stresses(ax, df, results['FS'], alpha=alpha)

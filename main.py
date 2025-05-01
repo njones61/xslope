@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, spencer, janbu_corrected
+from solve import oms, bishop, janbu_corrected, spencer
 
 
 def solve_selected(func, df, circular=True):
@@ -45,9 +45,10 @@ else:
 # export df to excel
 #df.to_excel("slices.xlsx", index=False)
 
-
 # options = [oms, bishop, spencer, janbu_corrected]
 results = solve_selected(spencer, df, circular=True)
+
+# For spencer method, compute line of thrust
 
 plot_solution(data, df, failure_surface, results)
 

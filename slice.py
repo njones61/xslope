@@ -294,9 +294,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
                 overlap_top = min(y_ct, layer_top_y)
                 overlap_bot = max(y_cb, layer_bot_y)
                 h = max(0, overlap_top - overlap_bot)
-
-            sum_gam_h_y += h * materials[mat_index]['gamma'] * (overlap_top + overlap_bot) / 2
-            sum_gam_h += h * materials[mat_index]['gamma']
+                sum_gam_h_y += h * materials[mat_index]['gamma'] * (overlap_top + overlap_bot) / 2
+                sum_gam_h += h * materials[mat_index]['gamma']
 
             heights.append(h)
             soil_weight += h * materials[mat_index]['gamma'] * dx

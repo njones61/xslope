@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from slice import generate_failure_surface, calculate_normal_stresses
-from solve import extract_spencer_Q, compute_thrust_line_spencer, compute_thrust_line_by_resultant, compute_thrust_line_projected_to_base, compute_thrust_line_by_intersection, compute_thrust_line_stabl5
-
+from solve import extract_spencer_Q, compute_line_of_thrust_sweep
 
 def plot_profile_lines(ax, profile_lines):
     for i, line in enumerate(profile_lines):
@@ -311,20 +310,69 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_thrust_line(ax, df, y_thrust):
+def plot_thrust_line(ax, df, y_thrust, color='magenta', label='Line of Thrust', **kwargs):
     """
-    Plots the thrust line as a smooth curve through the thrust y-locations.
+    Plots the line of thrust over the slice cross section using interslice boundary locations.
+    Assumes y_thrust is the distance above the base of the slice at each boundary.
 
     Parameters:
-        ax (matplotlib.axes.Axes): Axes object to plot on
-        df (pd.DataFrame): Slice data with 'x_c' column
-        y_thrust (list): One y-value per slice
+        ax (matplotlib.axes.Axes): Axis to draw the plot on
+        df (pd.DataFrame): Slice data with 'x_l', 'x_r', 'y_lb', and 'y_rb' columns
+        y_thrust (list or array): Distance above base (length = n+1)
         color (str): Line color
-        label (str): Label for the legend
-        kwargs: Additional arguments to pass to ax.plot()
+        label (str): Legend label for the line
+        kwargs: Additional arguments passed to ax.plot()
+
+    Returns:
+        None
     """
+    import numpy as np
+
+    # X coordinates of slice boundaries
     x_vals = list(df['x_l']) + [df['x_r'].iloc[-1]]
-    ax.plot(x_vals, y_thrust, color='purple', label='Thrust Line')
+
+    # Corresponding y base elevations at those boundaries
+    y_base = list(df['y_lb']) + [df['y_rb'].iloc[-1]]
+
+    # Convert to numpy arrays
+    x_vals = np.array(x_vals)
+    y_base = np.array(y_base)
+    y_thrust = np.array(y_thrust)
+
+    # Add base elevation to thrust height
+    y_plot = y_base + y_thrust
+
+    # Mask invalid values
+    mask = np.isfinite(y_plot)
+    ax.plot(x_vals[mask], y_plot[mask], color=color, label=label, **kwargs)
+
+def print_thrust_line_debug(df, y_left, y_right, y_avg, digits=2):
+    """
+    Prints a formatted comparison table of left/right/average thrust line values.
+
+    Parameters:
+        df (pd.DataFrame): For determining slice count
+        y_left (list): y-values from left-to-right sweep (length = n+1)
+        y_right (list): y-values from right-to-left sweep (length = n+1)
+        y_avg (list): averaged y-values (length = n+1)
+        digits (int): Decimal precision for printing
+    """
+    fmt = f"{{:>{digits+5}.{digits}f}}"
+    n = len(df)
+
+    print(f"{'Slice':>5} | {'y_left':>{digits+7}} | {'y_right':>{digits+7}} | {'y_avg':>{digits+7}} | {'Δ = y_L - y_R':>{digits+9}}")
+    print("-" * (6 + 4*(digits+7) + 1))
+
+    for i in range(n + 1):
+        yl = y_left[i]
+        yr = y_right[i]
+        ya = y_avg[i]
+
+        if all(v is not None and np.isfinite(v) for v in [yl, yr, ya]):
+            delta = yl - yr
+            print(f"{i:5d} | {fmt.format(yl)} | {fmt.format(yr)} | {fmt.format(ya)} | {fmt.format(delta)}")
+        else:
+            print(f"{i:5d} | {'None':>{digits+7}} | {'None':>{digits+7}} | {'None':>{digits+7}} | {'':>{digits+9}}")
 
 def plot_solution(data, df, failure_surface, results, width=12, height=7):
     fig, ax = plt.subplots(figsize=(width, height))
@@ -345,8 +393,9 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
         FS = results['FS']
         theta = results['theta']
         Q = extract_spencer_Q(df, FS, theta, debug=True)
-        y_thrust = compute_thrust_line_stabl5(df, Q, theta)
-        plot_thrust_line(ax, df, y_thrust)
+        y_left, y_right, y_avg = compute_line_of_thrust_sweep(df, Q, theta)
+        plot_thrust_line(ax, df, y_avg, color='magenta', linestyle='-', linewidth=2)
+        print_thrust_line_debug(df, y_left, y_right, y_avg)
 
     alpha = 0.3
     plot_base_stresses(ax, df, results['FS'], alpha=alpha)

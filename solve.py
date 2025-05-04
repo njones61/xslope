@@ -509,6 +509,8 @@ def sweep_thrust_right(df, Q, theta_deg):
 
     return y_thrust
 
+
+
 def compute_line_of_thrust_sweep(df, Q, theta_deg):
     """
     Wrapper function that runs both left-to-right and right-to-left thrust sweeps,
@@ -525,6 +527,7 @@ def compute_line_of_thrust_sweep(df, Q, theta_deg):
             y_right: thrust line from right-to-left sweep (length = n+1)
             y_avg: element-wise average of y_left and y_right
     """
+
     y_left = sweep_thrust_left(df, Q, theta_deg, debug=True)
     y_right = sweep_thrust_right(df, Q, theta_deg)
     y_avg = [
@@ -532,3 +535,154 @@ def compute_line_of_thrust_sweep(df, Q, theta_deg):
         for yl, yr in zip(y_left, y_right)
     ]
     return y_left, y_right, y_avg
+
+
+### THIS IS THE DEEPSEEK SOLUTION ###
+
+def compute_line_of_thrust(df, spencer_results, debug=False, output_file=None):
+    """
+    Computes the line of thrust and normal forces using Spencer's method with optional debugging output.
+
+    Parameters:
+        df (pd.DataFrame): Slice data
+        spencer_results (dict): Results from Spencer's method
+        debug (bool): If True, generates detailed validation output
+        output_file (str): Optional path to save debug Excel file
+
+    Returns:
+        tuple: (success, result)
+            success (bool): True if calculation succeeded
+            result: If success is True:
+                {
+                    'thrust_line': LineString,
+                    'normal_forces': array,
+                    'interslice_forces': array,
+                    'debug_df': pd.DataFrame (if debug=True)
+                }
+                If success is False: error message string
+    """
+    try:
+        FS = spencer_results['FS']
+        theta = np.radians(spencer_results['theta'])
+        n_slices = len(df)
+
+        # Initialize arrays
+        Z = np.zeros(n_slices + 1)
+        N = np.zeros(n_slices)
+        y_thrust = np.zeros(n_slices + 1)
+        thrust_points = []
+
+        # Boundary conditions
+        Z[0] = 0
+        y_thrust[0] = df.iloc[0]['y_ct']
+        y_thrust[-1] = df.iloc[-1]['y_ct']
+
+        # Get slice properties
+        alpha = np.radians(df['alpha'].values)
+        phi = np.radians(df['phi'].values)
+        c = df['c'].values
+        w = df['w'].values
+        u = df['u'].values
+        dl = df['dl'].values
+        x_c = df['x_c'].values
+        y_cb = df['y_cb'].values
+        y_ct = df['y_ct'].values
+        x_l = df['x_l'].values
+        x_r = df['x_r'].values
+
+        # Forward pass
+        for i in range(n_slices):
+            E_left = Z[i] * np.cos(theta)
+            X_left = Z[i] * np.sin(theta)
+
+            numerator = (w[i] - X_left) * np.cos(alpha[i]) + E_left * np.sin(alpha[i]) - u[i] * dl[i]
+            denominator = 1 + np.tan(phi[i]) * np.tan(alpha[i]) / FS
+            N[i] = numerator / denominator
+
+            S = (c[i] * dl[i] + N[i] * np.tan(phi[i])) / FS
+            Z[i + 1] = (w[i] * np.sin(alpha[i]) - S + E_left * np.cos(alpha[i]) - X_left * np.sin(alpha[i])) / \
+                       (np.cos(theta - alpha[i]))
+
+        # Backward pass
+        for i in range(n_slices - 1, -1, -1):
+            y_base = y_cb[i]
+            E_left = Z[i] * np.cos(theta)
+            E_right = Z[i + 1] * np.cos(theta)
+            X_left = Z[i] * np.sin(theta)
+            X_right = Z[i + 1] * np.sin(theta)
+
+            arm_E_right = y_thrust[i + 1] - y_base
+            arm_X_right = x_r[i] - x_c[i]
+            arm_X_left = x_l[i] - x_c[i]
+
+            numerator = E_right * arm_E_right - X_right * arm_X_right + X_left * arm_X_left
+            y_thrust[i] = y_base + numerator / E_left if abs(E_left) > 1e-6 else (y_base + y_ct[i]) / 2
+
+        # Build results
+        thrust_points = [(x_l[0], y_thrust[0])] + \
+                        [((x_r[i] + x_l[i + 1]) / 2 if i < n_slices - 1 else x_r[i], y_thrust[i + 1])
+                         for i in range(n_slices)]
+
+        result = {
+            'thrust_line': LineString(thrust_points),
+            'normal_forces': N,
+            'interslice_forces': Z
+        }
+
+        # Debug output
+        if debug:
+            debug_data = []
+            for i in range(n_slices):
+                E_left = Z[i] * np.cos(theta)
+                X_left = Z[i] * np.sin(theta)
+                E_right = Z[i + 1] * np.cos(theta)
+                X_right = Z[i + 1] * np.sin(theta)
+
+                # Validation checks
+                S = (c[i] * dl[i] + N[i] * np.tan(phi[i])) / FS
+                sum_Fx = E_right - E_left + w[i] * np.sin(alpha[i]) - S * np.cos(alpha[i])
+                sum_Fy = X_right - X_left + w[i] - S * np.sin(alpha[i])
+
+                debug_data.append({
+                    'Slice': i + 1,
+                    'Z_left': Z[i],
+                    'Z_right': Z[i + 1],
+                    'N': N[i],
+                    'E_left': E_left,
+                    'X_left': X_left,
+                    'E_right': E_right,
+                    'X_right': X_right,
+                    'S': S,
+                    'Sum_Fx': sum_Fx,
+                    'Sum_Fy': sum_Fy,
+                    'Thrust_y': y_thrust[i + 1],
+                    'Moment_arm': y_thrust[i + 1] - y_cb[i],
+                    'Residual_Fx': abs(sum_Fx),
+                    'Residual_Fy': abs(sum_Fy)
+                })
+
+            debug_df = pd.DataFrame(debug_data)
+            result['debug_df'] = debug_df
+
+            if output_file:
+                with pd.ExcelWriter(output_file) as writer:
+                    debug_df.to_excel(writer, sheet_name='Validation', index=False)
+
+                    # Add summary sheet
+                    summary = pd.DataFrame({
+                        'Parameter': ['FS', 'Theta (deg)', 'Max Fx Residual', 'Max Fy Residual'],
+                        'Value': [FS, np.degrees(theta), debug_df['Residual_Fx'].max(), debug_df['Residual_Fy'].max()]
+                    })
+                    summary.to_excel(writer, sheet_name='Summary', index=False)
+
+                    print(f"Debug output saved to {output_file}")
+            else:
+                print("Debug Results:")
+                print(tabulate(debug_df, headers='keys', tablefmt='psql', showindex=False))
+                print(
+                    f"\nMaximum force residuals: Fx={debug_df['Residual_Fx'].max():.2e}, Fy={debug_df['Residual_Fy'].max():.2e}")
+
+        return True, result
+
+    except Exception as e:
+        return False, f"Error in calculation: {str(e)}"

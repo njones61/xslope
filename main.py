@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu_corrected, spencer
+from solve import oms, bishop, janbu_corrected, spencer, compute_line_of_thrust
 
 
 def solve_selected(func, df, circular=True):
@@ -50,6 +50,24 @@ results = solve_selected(spencer, df, circular=True)
 
 # For spencer method, compute line of thrust
 
-plot_solution(data, df, failure_surface, results)
+
+# With debug output to Excel
+success, results = compute_line_of_thrust(df, results, debug=True, excel_path="thrust_calculation.xlsx")
+
+# Accessing results
+if success:
+    print("Line of thrust calculation successful.")
+    thrust_line = results['thrust_line']
+    normal_forces = results['normal_forces']
+
+    if 'debug_df' in results:
+        debug_data = results['debug_df']
+        # Analyze or plot debug data
+
+else:
+    print("Line of thrust calculation failed.")
+    print(results)
+
+# plot_solution(data, df, failure_surface, results)
 
 # solve_all(df, circular=True)

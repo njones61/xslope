@@ -1,8 +1,10 @@
 
 import numpy as np
 import pandas as pd
+from shapely.geometry import LineString, Point
 from math import sin, cos, tan, radians, atan, atan2, degrees
 from scipy.optimize import minimize_scalar, root_scalar
+from tabulate import tabulate
 
 
 def oms(df, circular=True):
@@ -539,148 +541,211 @@ def compute_line_of_thrust_sweep(df, Q, theta_deg):
 
 ### THIS IS THE DEEPSEEK SOLUTION ###
 
-def compute_line_of_thrust(df, spencer_results, debug=False, output_file=None):
-    """
-    Computes the line of thrust and normal forces using Spencer's method with optional debugging output.
+import numpy as np
+import pandas as pd
+from shapely.geometry import LineString
+from math import sin, cos, tan, radians, degrees
+import matplotlib.pyplot as plt  # For optional plotting
 
-    Parameters:
-        df (pd.DataFrame): Slice data
-        spencer_results (dict): Results from Spencer's method
-        debug (bool): If True, generates detailed validation output
-        output_file (str): Optional path to save debug Excel file
+import numpy as np
+import pandas as pd
+from shapely.geometry import LineString
+from math import sin, cos, tan, radians, degrees
+
+import numpy as np
+import pandas as pd
+from shapely.geometry import LineString
+from math import sin, cos, tan, radians, degrees
+
+
+def compute_line_of_thrust(df, spencer_results, debug=False, excel_path=None):
+    """
+    Computes the line of thrust using Spencer's method with proper force equilibrium.
+
+    Args:
+        df: DataFrame containing slice data (alpha, phi, c, w, u, dl, x_c, y_cb, y_ct, x_l, x_r)
+        spencer_results: Dictionary with 'FS' (factor of safety) and 'theta' (interslice angle in degrees)
+        debug: If True, returns detailed debug information
+        excel_path: Optional path to save debug Excel file
 
     Returns:
-        tuple: (success, result)
-            success (bool): True if calculation succeeded
-            result: If success is True:
-                {
-                    'thrust_line': LineString,
-                    'normal_forces': array,
-                    'interslice_forces': array,
-                    'debug_df': pd.DataFrame (if debug=True)
-                }
-                If success is False: error message string
+        tuple: (success, result_dict)
+            success: Boolean indicating if calculation succeeded
+            result_dict: Dictionary containing:
+                - 'thrust_line': LineString geometry
+                - 'normal_forces': Array of normal forces
+                - 'interslice_forces': Array of interslice forces
+                - 'residuals': Dictionary of max residuals
+                - 'debug_df': DataFrame with detailed calculations (if debug=True)
     """
     try:
-        FS = spencer_results['FS']
-        theta = np.radians(spencer_results['theta'])
+
+        # Initialize variables
+        FS = float(spencer_results['FS'])
+        theta = radians(float(spencer_results['theta']))
         n_slices = len(df)
 
-        # Initialize arrays
-        Z = np.zeros(n_slices + 1)
-        N = np.zeros(n_slices)
-        y_thrust = np.zeros(n_slices + 1)
-        thrust_points = []
+        Z = np.zeros(n_slices + 1)  # Interslice forces (Z[0] and Z[-1] are boundaries)
+        N = np.zeros(n_slices)  # Normal forces
+        y_thrust = np.zeros(n_slices + 1)  # Thrust line y-coordinates
 
         # Boundary conditions
-        Z[0] = 0
-        y_thrust[0] = df.iloc[0]['y_ct']
-        y_thrust[-1] = df.iloc[-1]['y_ct']
+        Z[0] = 0.0  # No force on left boundary
+        Z[-1] = 0.0  # No force on right boundary
+        y_thrust[0] = float(df.iloc[0]['y_ct'])  # Left boundary starts at ground surface
+        y_thrust[-1] = float(df.iloc[-1]['y_ct'])  # Right boundary ends at ground surface
 
-        # Get slice properties
+        # Precompute trigonometric terms
         alpha = np.radians(df['alpha'].values)
         phi = np.radians(df['phi'].values)
-        c = df['c'].values
-        w = df['w'].values
-        u = df['u'].values
-        dl = df['dl'].values
-        x_c = df['x_c'].values
-        y_cb = df['y_cb'].values
-        y_ct = df['y_ct'].values
-        x_l = df['x_l'].values
-        x_r = df['x_r'].values
+        cos_a = np.cos(alpha)
+        sin_a = np.sin(alpha)
+        tan_phi = np.tan(phi)
+        sin_theta_a = np.sin(theta - alpha)
+        cos_theta_a = np.cos(theta - alpha)
 
-        # Forward pass
+        # Debug storage
+        debug_data = []
+
+        # Forward pass: Solve for interslice forces (Z) and normal forces (N)
         for i in range(n_slices):
-            E_left = Z[i] * np.cos(theta)
-            X_left = Z[i] * np.sin(theta)
+            W = df.iloc[i]['w']
+            U = df.iloc[i]['u'] * df.iloc[i]['dl']
+            c_dl = df.iloc[i]['c'] * df.iloc[i]['dl']
 
-            numerator = (w[i] - X_left) * np.cos(alpha[i]) + E_left * np.sin(alpha[i]) - u[i] * dl[i]
-            denominator = 1 + np.tan(phi[i]) * np.tan(alpha[i]) / FS
-            N[i] = numerator / denominator
+            # Build and solve the 2x2 system for N and Z[i+1]
+            A = np.array([
+                [tan_phi[i] / FS, -sin_theta_a[i]],  # F_parallel equation
+                [1.0, -cos_theta_a[i]]  # F_perpendicular equation
+            ])
+            B = np.array([
+                W * sin_a[i] - Z[i] * sin_theta_a[i] - c_dl / FS,  # F_parallel
+                W * cos_a[i] - U - Z[i] * cos_theta_a[i]  # F_perpendicular
+            ])
 
-            S = (c[i] * dl[i] + N[i] * np.tan(phi[i])) / FS
-            Z[i + 1] = (w[i] * np.sin(alpha[i]) - S + E_left * np.cos(alpha[i]) - X_left * np.sin(alpha[i])) / \
-                       (np.cos(theta - alpha[i]))
+            try:
+                N[i], Z[i + 1] = np.linalg.solve(A, B)
+            except np.linalg.LinAlgError:
+                return False, f"Singular matrix in slice {i + 1}, cannot solve equilibrium"
 
-        # Backward pass
+            if debug:
+                # PROPER force equilibrium verification in x-y coordinates
+                S = (c_dl + N[i] * tan_phi[i]) / FS
+                S_x = S * cos_a[i]  # Shear force x-component
+                S_y = S * sin_a[i]  # Shear force y-component
+                N_x = N[i] * sin_a[i]  # Normal force x-component
+                N_y = N[i] * cos_a[i]  # Normal force y-component
+
+                # Interslice force components
+                E_left = Z[i] * cos(theta)
+                X_left = Z[i] * sin(theta)
+                E_right = -Z[i + 1] * cos(theta)  # Negative because acting on opposite face
+                X_right = -Z[i + 1] * sin(theta)
+
+                # Sum of forces in x-direction
+                Fx_residual = E_left + E_right + N_x + S_x
+
+                # Sum of forces in y-direction
+                Fy_residual = X_left + X_right + N_y + S_y - W[i] + U * sin_a[i]  # U acts normal to base
+
+                debug_data.append({
+                    'Slice': i + 1,
+                    'N': N[i],
+                    'Z_left': Z[i],
+                    'Z_right': Z[i + 1],
+                    'S': S,
+                    'Fx_Residual': Fx_residual,
+                    'Fy_Residual': Fy_residual,
+                    'Z_ratio': Z[i] / Z[i + 1] if Z[i + 1] != 0 else np.inf
+                })
+
+        # Backward pass: Compute thrust line positions
         for i in range(n_slices - 1, -1, -1):
-            y_base = y_cb[i]
-            E_left = Z[i] * np.cos(theta)
-            E_right = Z[i + 1] * np.cos(theta)
-            X_left = Z[i] * np.sin(theta)
-            X_right = Z[i + 1] * np.sin(theta)
+            y_base = df.iloc[i]['y_cb']
+            x_center = df.iloc[i]['x_c']
 
+            # Moment arms (relative to base center)
             arm_E_right = y_thrust[i + 1] - y_base
-            arm_X_right = x_r[i] - x_c[i]
-            arm_X_left = x_l[i] - x_c[i]
+            arm_X_right = df.iloc[i]['x_r'] - x_center
+            arm_X_left = df.iloc[i]['x_l'] - x_center
 
-            numerator = E_right * arm_E_right - X_right * arm_X_right + X_left * arm_X_left
-            y_thrust[i] = y_base + numerator / E_left if abs(E_left) > 1e-6 else (y_base + y_ct[i]) / 2
+            # Moment equilibrium equation (sum M = 0)
+            numerator = (Z[i + 1] * cos(theta) * arm_E_right -
+                         Z[i + 1] * sin(theta) * arm_X_right +
+                         Z[i] * sin(theta) * arm_X_left)
 
-        # Build results
-        thrust_points = [(x_l[0], y_thrust[0])] + \
-                        [((x_r[i] + x_l[i + 1]) / 2 if i < n_slices - 1 else x_r[i], y_thrust[i + 1])
-                         for i in range(n_slices)]
+            if abs(Z[i] * cos(theta)) > 1e-10:
+                y_thrust[i] = y_base + numerator / (Z[i] * cos(theta))
+            else:
+                y_thrust[i] = y_base + (df.iloc[i]['y_ct'] - y_base) / 2
 
+        # Build thrust line coordinates
+        thrust_points = []
+
+        # Left boundary
+        thrust_points.append((df.iloc[0]['x_l'], y_thrust[0]))
+
+        # Points between slices
+        for i in range(n_slices):
+            if i < n_slices - 1:
+                x_pos = (df.iloc[i]['x_r'] + df.iloc[i + 1]['x_l']) / 2
+            else:
+                x_pos = df.iloc[i]['x_r']  # Right boundary
+            thrust_points.append((x_pos, y_thrust[i + 1]))
+
+        # Right boundary
+        thrust_points.append((df.iloc[-1]['x_r'], y_thrust[-1]))
+
+        # Prepare results
         result = {
             'thrust_line': LineString(thrust_points),
             'normal_forces': N,
-            'interslice_forces': Z
+            'interslice_forces': Z,
+            'residuals': {
+                'max_Fx': max(abs(d['Fx_Residual']) for d in debug_data) if debug else None,
+                'max_Fy': max(abs(d['Fy_Residual']) for d in debug_data) if debug else None,
+                'max_Z_ratio': max(abs(d['Z_ratio']) for d in debug_data) if debug else None
+            }
         }
 
         # Debug output
         if debug:
-            debug_data = []
-            for i in range(n_slices):
-                E_left = Z[i] * np.cos(theta)
-                X_left = Z[i] * np.sin(theta)
-                E_right = Z[i + 1] * np.cos(theta)
-                X_right = Z[i + 1] * np.sin(theta)
-
-                # Validation checks
-                S = (c[i] * dl[i] + N[i] * np.tan(phi[i])) / FS
-                sum_Fx = E_right - E_left + w[i] * np.sin(alpha[i]) - S * np.cos(alpha[i])
-                sum_Fy = X_right - X_left + w[i] - S * np.sin(alpha[i])
-
-                debug_data.append({
-                    'Slice': i + 1,
-                    'Z_left': Z[i],
-                    'Z_right': Z[i + 1],
-                    'N': N[i],
-                    'E_left': E_left,
-                    'X_left': X_left,
-                    'E_right': E_right,
-                    'X_right': X_right,
-                    'S': S,
-                    'Sum_Fx': sum_Fx,
-                    'Sum_Fy': sum_Fy,
-                    'Thrust_y': y_thrust[i + 1],
-                    'Moment_arm': y_thrust[i + 1] - y_cb[i],
-                    'Residual_Fx': abs(sum_Fx),
-                    'Residual_Fy': abs(sum_Fy)
-                })
-
             debug_df = pd.DataFrame(debug_data)
             result['debug_df'] = debug_df
 
-            if output_file:
-                with pd.ExcelWriter(output_file) as writer:
-                    debug_df.to_excel(writer, sheet_name='Validation', index=False)
+            print("\n=== EQUILIBRIUM VERIFICATION ===")
+            print(f"Max Fx residual: {result['residuals']['max_Fx']:.2e}")
+            print(f"Max Fy residual: {result['residuals']['max_Fy']:.2e}")
+            print(f"Max Z left/right ratio: {result['residuals']['max_Z_ratio']:.2f}")
 
-                    # Add summary sheet
+            if excel_path:
+                with pd.ExcelWriter(excel_path) as writer:
+                    # Slice calculations
+                    debug_df.to_excel(writer, sheet_name='Slice_Calculations', index=False)
+
+                    # Summary
                     summary = pd.DataFrame({
-                        'Parameter': ['FS', 'Theta (deg)', 'Max Fx Residual', 'Max Fy Residual'],
-                        'Value': [FS, np.degrees(theta), debug_df['Residual_Fx'].max(), debug_df['Residual_Fy'].max()]
+                        'Parameter': ['FS', 'Theta (deg)', 'Max Fx Error', 'Max Fy Error', 'Mean N', 'Mean |Z|'],
+                        'Value': [
+                            FS,
+                            degrees(theta),
+                            result['residuals']['max_Fx'],
+                            result['residuals']['max_Fy'],
+                            np.mean(N),
+                            np.mean(np.abs(Z[1:-1]))  # Exclude boundaries
+                        ]
                     })
                     summary.to_excel(writer, sheet_name='Summary', index=False)
 
-                    print(f"Debug output saved to {output_file}")
-            else:
-                print("Debug Results:")
-                print(tabulate(debug_df, headers='keys', tablefmt='psql', showindex=False))
-                print(
-                    f"\nMaximum force residuals: Fx={debug_df['Residual_Fx'].max():.2e}, Fy={debug_df['Residual_Fy'].max():.2e}")
+                    # Thrust line coordinates
+                    thrust_df = pd.DataFrame({
+                        'x': [p[0] for p in thrust_points],
+                        'y': [p[1] for p in thrust_points],
+                        'Location': ['Left Boundary'] +
+                                    [f'Between {i + 1}-{i + 2}' for i in range(n_slices)] +
+                                    ['Right Boundary']
+                    })
+                    thrust_df.to_excel(writer, sheet_name='Thrust_Line', index=False)
 
         return True, result
 

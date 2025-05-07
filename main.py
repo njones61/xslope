@@ -5,6 +5,7 @@ from plot import plot_solution, plot_inputs
 from solve import oms, bishop, janbu_corrected, spencer, compute_line_of_thrust
 
 
+
 def solve_selected(func, df, circular=True):
     success, result = func(df, circular=circular)
     if not success:
@@ -29,7 +30,7 @@ def solve_all(df, circular=True):
     solve_selected(janbu_corrected, df, circular=circular)
 
 
-data = load_globals("docs/input_template.xlsx")
+data = load_globals("docs/input_template_lface.xlsx")
 
 # plot_inputs(data)
 
@@ -48,26 +49,7 @@ else:
 # options = [oms, bishop, spencer, janbu_corrected]
 results = solve_selected(spencer, df, circular=True)
 
-# For spencer method, compute line of thrust
 
-
-# With debug output to Excel
-success, results = compute_line_of_thrust(df, results, debug=True, excel_path="thrust_calculation.xlsx")
-
-# Accessing results
-if success:
-    print("Line of thrust calculation successful.")
-    thrust_line = results['thrust_line']
-    normal_forces = results['normal_forces']
-
-    if 'debug_df' in results:
-        debug_data = results['debug_df']
-        # Analyze or plot debug data
-
-else:
-    print("Line of thrust calculation failed.")
-    print(results)
-
-# plot_solution(data, df, failure_surface, results)
+plot_solution(data, df, failure_surface, results)
 
 # solve_all(df, circular=True)

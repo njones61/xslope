@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from slice import generate_failure_surface, calculate_normal_stresses
-from solve import extract_spencer_Q, compute_line_of_thrust_sweep
+from solve import compute_line_of_thrust
+from shapely.geometry import LineString
 
 def plot_profile_lines(ax, profile_lines):
     for i, line in enumerate(profile_lines):
@@ -270,7 +271,36 @@ def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
         ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
         #ax.fill(poly_ux, poly_uy, facecolor='none', edgecolor='blue', hatch='.....', linewidth=1)
 
+def plot_thrust_line(ax, thrust_line: LineString,
+                    color: str = 'red',
+                    linestyle: str = '--',
+                    linewidth: float = 2,
+                    label: str = 'Line of Thrust'):
+    """
+    Plot a Shapely LineString of the line of thrust on the given Axes.
 
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot onto.
+    thrust_line : LineString
+        The Shapely LineString returned by compute_line_of_thrust.
+    color : str, optional
+        Line color (default 'red').
+    linestyle : str, optional
+        Matplotlib linestyle (default '--').
+    linewidth : float, optional
+        Line width (default 2).
+    label : str, optional
+        Legend label for the thrust line.
+    """
+    # extract x,y coords
+    xs, ys = zip(*list(thrust_line.coords))
+    ax.plot(xs, ys,
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            label=label)
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
@@ -310,69 +340,6 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_thrust_line(ax, df, y_thrust, color='magenta', label='Line of Thrust', **kwargs):
-    """
-    Plots the line of thrust over the slice cross section using interslice boundary locations.
-    Assumes y_thrust is the distance above the base of the slice at each boundary.
-
-    Parameters:
-        ax (matplotlib.axes.Axes): Axis to draw the plot on
-        df (pd.DataFrame): Slice data with 'x_l', 'x_r', 'y_lb', and 'y_rb' columns
-        y_thrust (list or array): Distance above base (length = n+1)
-        color (str): Line color
-        label (str): Legend label for the line
-        kwargs: Additional arguments passed to ax.plot()
-
-    Returns:
-        None
-    """
-    import numpy as np
-
-    # X coordinates of slice boundaries
-    x_vals = list(df['x_l']) + [df['x_r'].iloc[-1]]
-
-    # Corresponding y base elevations at those boundaries
-    y_base = list(df['y_lb']) + [df['y_rb'].iloc[-1]]
-
-    # Convert to numpy arrays
-    x_vals = np.array(x_vals)
-    y_base = np.array(y_base)
-    y_thrust = np.array(y_thrust)
-
-    # Add base elevation to thrust height
-    y_plot = y_base + y_thrust
-
-    # Mask invalid values
-    mask = np.isfinite(y_plot)
-    ax.plot(x_vals[mask], y_plot[mask], color=color, label=label, **kwargs)
-
-def print_thrust_line_debug(df, y_left, y_right, y_avg, digits=2):
-    """
-    Prints a formatted comparison table of left/right/average thrust line values.
-
-    Parameters:
-        df (pd.DataFrame): For determining slice count
-        y_left (list): y-values from left-to-right sweep (length = n+1)
-        y_right (list): y-values from right-to-left sweep (length = n+1)
-        y_avg (list): averaged y-values (length = n+1)
-        digits (int): Decimal precision for printing
-    """
-    fmt = f"{{:>{digits+5}.{digits}f}}"
-    n = len(df)
-
-    print(f"{'Slice':>5} | {'y_left':>{digits+7}} | {'y_right':>{digits+7}} | {'y_avg':>{digits+7}} | {'Δ = y_L - y_R':>{digits+9}}")
-    print("-" * (6 + 4*(digits+7) + 1))
-
-    for i in range(n + 1):
-        yl = y_left[i]
-        yr = y_right[i]
-        ya = y_avg[i]
-
-        if all(v is not None and np.isfinite(v) for v in [yl, yr, ya]):
-            delta = yl - yr
-            print(f"{i:5d} | {fmt.format(yl)} | {fmt.format(yr)} | {fmt.format(ya)} | {fmt.format(delta)}")
-        else:
-            print(f"{i:5d} | {'None':>{digits+7}} | {'None':>{digits+7}} | {'None':>{digits+7}} | {'':>{digits+9}}")
 
 def plot_solution(data, df, failure_surface, results, width=12, height=7):
     fig, ax = plt.subplots(figsize=(width, height))
@@ -389,13 +356,11 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
 
-    if results['method'] == 'spencer':
-        FS = results['FS']
-        theta = results['theta']
-        Q = extract_spencer_Q(df, FS, theta, debug=True)
-        y_left, y_right, y_avg = compute_line_of_thrust_sweep(df, Q, theta)
-        plot_thrust_line(ax, df, y_avg, color='magenta', linestyle='-', linewidth=2)
-        print_thrust_line_debug(df, y_left, y_right, y_avg)
+    # if results['method'] == 'spencer':
+    #     FS = results['FS']
+    #     theta = results['theta']
+    #     thrust = compute_line_of_thrust(df, FS, theta, debug=True)
+    #     plot_thrust_line(ax, thrust['thrust_line'])
 
     alpha = 0.3
     plot_base_stresses(ax, df, results['FS'], alpha=alpha)

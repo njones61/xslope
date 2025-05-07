@@ -35,6 +35,7 @@ nav:
     - Spencer's Method: methods/spencer.md
     - Janbu Force Equilibrium: methods/janbu.md
     - Morgenstern & Price: methods/mp.md
+    - Line of Thrust: methods/line_of_thrust.md
   - Advanced Techniques:
     - Rapid Drawdown Analysis: advanced/rapid.md
     - Reliability Analysis: advanced/reliability.md
@@ -44,7 +45,6 @@ nav:
       - Slice: api/slice.md
       - Solve: api/solve.md
       - Plot: api/plot.md
-      - Utils: api/utils.md
   - Sample Problems:
     - Simple Slopes: samples/simple.md
     - Distributed Loads: samples/dloads.md

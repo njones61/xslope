@@ -77,31 +77,31 @@ At this point, there is no side force on the right side, so we have two equation
 
 As shown in the previous section, we need to solve for two unknowns at each slice. For the general case, we can set up equations to solve for the unknowns as follows. First, we sum forces in the x-direction:
 
->>$\sum F_x = 0 \Rightarrow S*cos(\alpha) - N*sin(\alpha) + Z_{i-1}*cos(\theta) - Z_{i+1}*cos(\theta) = 0$
+>>$\sum F_x = 0 \Rightarrow S*cos(\alpha) - N*sin(\alpha) + Z_{i}*cos(\theta) - Z_{i+1}*cos(\theta) = 0$
 
->>$\left[c_m + (N - u*\Delta l)*tan(\phi_m)\right]*cos(\alpha) - N*sin(\alpha) + Z_{i-1}*cos(\theta) - Z_{i+1}*cos(\theta) = 0$
+>>$\left[c_m + (N - u*\Delta l)*tan(\phi_m)\right]*cos(\alpha) - N*sin(\alpha) + Z_{i}*cos(\theta) - Z_{i+1}*cos(\theta) = 0$
 
->>$c_m*cos(\alpha) + N*tan(\phi_m)*cos(\alpha) - u*\Delta l*tan(\phi_m)*cos(\alpha) - N*sin(\alpha) + Z_{i-1}*cos(\theta) - Z_{i+1}*cos(\theta) = 0$
+>>$c_m*cos(\alpha) + N*tan(\phi_m)*cos(\alpha) - u*\Delta l*tan(\phi_m)*cos(\alpha) - N*sin(\alpha) + Z_{i}*cos(\theta) - Z_{i+1}*cos(\theta) = 0$
 
 Rearranging in terms of our two unknows ($N$ and $Z_{i+1}$) gives:
 
->>$N*tan(\phi_m)*cos(\alpha) - N*sin(\alpha) - Z_{i+1}*cos(\theta) = - c_m*cos(\alpha) + u*\Delta l*tan(\phi_m)*cos(\alpha) - Z_{i-1}*cos(\theta)$
+>>$N*tan(\phi_m)*cos(\alpha) - N*sin(\alpha) - Z_{i+1}*cos(\theta) = - c_m*cos(\alpha) + u*\Delta l*tan(\phi_m)*cos(\alpha) - Z_{i}*cos(\theta)$
 
->>$N*\left[tan(\phi_m)*cos(\alpha) - sin(\alpha)\right] - Z_{i+1}*cos(\theta) = - c_m*cos(\alpha) + u*\Delta l*tan(\phi_m)*cos(\alpha) - Z_{i-1}*cos(\theta)$
+>>$N*\left[tan(\phi_m)*cos(\alpha) - sin(\alpha)\right] - Z_{i+1}*cos(\theta) = - c_m*cos(\alpha) + u*\Delta l*tan(\phi_m)*cos(\alpha) - Z_{i}*cos(\theta)$
 
 Likewise, we can sum forces in the y-direction:
 
->>$\sum F_y = 0 \Rightarrow S*sin(\alpha) + N*cos(\alpha) - W + Z_{i-1}*sin(\theta) - Z_{i+1}*sin(\theta) = 0$
+>>$\sum F_y = 0 \Rightarrow S*sin(\alpha) + N*cos(\alpha) - W + Z_{i}*sin(\theta) - Z_{i+1}*sin(\theta) = 0$
 
->>$\left[c_m + (N - u*\Delta l)*tan(\phi_m)\right]*sin(\alpha) + N*cos(\alpha) - W + Z_{i-1}*sin(\theta) - Z_{i+1}*sin(\theta) = 0$
+>>$\left[c_m + (N - u*\Delta l)*tan(\phi_m)\right]*sin(\alpha) + N*cos(\alpha) - W + Z_{i}*sin(\theta) - Z_{i+1}*sin(\theta) = 0$
 
->>$c_m*sin(\alpha) + N*tan(\phi_m)*sin(\alpha) - u*\Delta l*tan(\phi_m)*sin(\alpha) + N*cos(\alpha) - W + Z_{i-1}*sin(\theta) - Z_{i+1}*sin(\theta) = 0$
+>>$c_m*sin(\alpha) + N*tan(\phi_m)*sin(\alpha) - u*\Delta l*tan(\phi_m)*sin(\alpha) + N*cos(\alpha) - W + Z_{i}*sin(\theta) - Z_{i+1}*sin(\theta) = 0$
 
 Rearranging in terms of our two unknows ($N$ and $Z_{i+1}$) gives:
 
->>$N*tan(\phi_m)*sin(\alpha) + N*cos(\alpha) - Z_{i+1}*sin(\theta) = - c_m*sin(\alpha) + u*\Delta l*tan(\phi_m)*sin(\alpha) + W - Z_{i-1}*sin(\theta)$
+>>$N*tan(\phi_m)*sin(\alpha) + N*cos(\alpha) - Z_{i+1}*sin(\theta) = - c_m*sin(\alpha) + u*\Delta l*tan(\phi_m)*sin(\alpha) + W - Z_{i}*sin(\theta)$
 
->>$N*\left[tan(\phi_m)*sin(\alpha) + cos(\alpha)\right] - Z_{i+1}*sin(\theta) = - c_m*sin(\alpha) + u*\Delta l*tan(\phi_m)*sin(\alpha) + W - Z_{i-1}*sin(\theta)$
+>>$N*\left[tan(\phi_m)*sin(\alpha) + cos(\alpha)\right] - Z_{i+1}*sin(\theta) = - c_m*sin(\alpha) + u*\Delta l*tan(\phi_m)*sin(\alpha) + W - Z_{i}*sin(\theta)$
 
 Now we can take these two equations and rearrange them into a matrix form. We can write the two equations as:
 
@@ -123,7 +123,7 @@ The vector $x$ is given by:
 
 The vector $b$ is given by:
 
->>$b = \begin{bmatrix}- c_m*cos(\alpha) + u*\Delta l*tan(\phi_m)*cos(\alpha) - Z_{i-1}*cos(\theta)\\- c_m*sin(\alpha) + u*\Delta l*tan(\phi_m)*sin(\alpha) + W - Z_{i-1}*sin(\theta)\end{bmatrix}$
+>>$b = \begin{bmatrix}- c_m*cos(\alpha) + u*\Delta l*tan(\phi_m)*cos(\alpha) - Z_{i}*cos(\theta)\\- c_m*sin(\alpha) + u*\Delta l*tan(\phi_m)*sin(\alpha) + W - Z_{i}*sin(\theta)\end{bmatrix}$
 
 The matrix equation can then be solved for the two unknowns
 ($N$ and $Z_{i+1}$) using the numpy linalg method. The solution is given by:
@@ -144,11 +144,11 @@ Now that we have the forces acting on each slice, we can compute the locations o
 
 where $X_i$ is the horizontal component of the side force and $E_i$ is the vertical component of the side force. Next, we define $\Delta y_{i-1}$ and $\Delta y_{i+1}$ as the distance the base of the slice up to the left and right side forces, $E_{i-1}$ and $E_{i-1}$ respectively, and $\Delta x$ is the width of the slice. Assuming CCW rotation is positive (right-hand rule) we can write the moment equilibrium equation as:
 
->>$\sum M = 0 \Rightarrow - E_{i-1}*\Delta y_{i-1} - X_{i-1}*\frac{\Delta x}{2} + E_{i+1}*\Delta y_{i+1} - X_{i+1}*\frac{\Delta x}{2}= 0$
+>>$\sum M = 0 \Rightarrow - E_{i}*\Delta y_{i-1} - X_{i}*\frac{\Delta x}{2} + E_{i+1}*\Delta y_{i+1} - X_{i+1}*\frac{\Delta x}{2}= 0$
 
 If we start with slice 1 on the left side, the left side force is zero so we have one unknown ($\Delta y_{i+1}$) and one equation. Then on the next slice, the left side moment arm is known and the right side moment arm is unknown. So again we have one equation and one unknown ($\Delta y_{i+1}$) which we can solve for as follows:
 
->>$\Delta y_{i+1} = \dfrac{E_{i-1}*\Delta y_{i-1} + X_{i-1}*\frac{\Delta x}{2} + X_{i+1}*\frac{\Delta x}{2}}{E_{i+1}}$
+>>$\Delta y_{i+1} = \dfrac{E_{i}*\Delta y_{i} + X_{i}*\frac{\Delta x}{2} + X_{i+1}*\frac{\Delta x}{2}}{E_{i+1}}$
 
 We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice, but they should be very close. The average of the two moment arms can be used to compute the location of the resultant side force. 
 

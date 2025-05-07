@@ -150,6 +150,6 @@ If we start with slice 1 on the left side, the left side force is zero so we hav
 
 >>$\Delta y_{i+1} = \dfrac{E_{i-1}*\Delta y_{i-1} + X_{i-1}*\frac{\Delta x}{2} + X_{i+1}*\frac{\Delta x}{2}}{E_{i+1}}$
 
-We can continue this process until we reach the top slice where the right side moment arm is zero.
+We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice, but they should be very close. The average of the two moment arms can be used to compute the location of the resultant side force. 
 
 

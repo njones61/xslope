@@ -197,7 +197,10 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
-def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
+def plot_base_stresses_OLD(ax, df, FS, scale_frac=0.5, alpha=0.3):
+
+    ## THIS METHOD IS NOT CORRECT - NEED TO USE NORMAL FORCES RETURNED BY THRUST LINE CALCS ##
+
     """
     Plots trapezoidal bars at the base of each slice representing normal stresses and pore pressures.
 
@@ -270,6 +273,68 @@ def plot_base_stresses(ax, df, FS, scale_frac=0.5, alpha=0.3):
 
         ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
         #ax.fill(poly_ux, poly_uy, facecolor='none', edgecolor='blue', hatch='.....', linewidth=1)
+
+
+def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
+
+
+    u = df['u'].values
+
+    heights = df['y_ct'] - df['y_cb']
+    max_ht = heights.max() if not heights.empty else 1.0
+    max_bar_len = max_ht * scale_frac
+
+    max_stress = np.max(np.abs(sigma_eff)) if len(sigma_eff) > 0 else 1.0
+    max_u = np.max(u) if len(u) > 0 else 1.0
+
+    for i, (index, row) in enumerate(df.iterrows()):
+        if i >= len(sigma_eff):
+            break
+
+        x1, y1 = row['x_l'], row['y_lb']
+        x2, y2 = row['x_r'], row['y_rb']
+        stress = sigma_eff[i]
+        pore = u[i]
+
+        dx = x2 - x1
+        dy = y2 - y1
+        length = np.hypot(dx, dy)
+        if length == 0:
+            continue
+
+        nx = -dy / length
+        ny = dx / length
+
+        # --- Normal stress trapezoid ---
+        bar_len = (abs(stress) / max_stress) * max_bar_len
+        direction = -np.sign(stress)
+
+        x1_top = x1 + direction * bar_len * nx
+        y1_top = y1 + direction * bar_len * ny
+        x2_top = x2 + direction * bar_len * nx
+        y2_top = y2 + direction * bar_len * ny
+
+        poly_x = [x1, x2, x2_top, x1_top]
+        poly_y = [y1, y2, y2_top, y1_top]
+
+        # ax.fill(poly_x, poly_y, color='red' if stress <= 0 else 'green', alpha=alpha, edgecolor='k', linewidth=0.5)
+        ax.fill(poly_x, poly_y, facecolor='none', edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....',
+                linewidth=1)
+
+        # --- Pore pressure trapezoid ---
+        u_len = (pore / max_stress) * max_bar_len
+        u_dir = -1  # always into the base
+
+        ux1_top = x1 + u_dir * u_len * nx
+        uy1_top = y1 + u_dir * u_len * ny
+        ux2_top = x2 + u_dir * u_len * nx
+        uy2_top = y2 + u_dir * u_len * ny
+
+        poly_ux = [x1, x2, ux2_top, ux1_top]
+        poly_uy = [y1, y2, uy2_top, uy1_top]
+
+        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
+        # ax.fill(poly_ux, poly_uy, facecolor='none', edgecolor='blue', hatch='.....', linewidth=1)
 
 def plot_thrust_line(ax, thrust_line: LineString,
                     color: str = 'red',
@@ -356,14 +421,14 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
 
-    # if results['method'] == 'spencer':
-    #     FS = results['FS']
-    #     theta = results['theta']
-    #     thrust = compute_line_of_thrust(df, FS, theta, debug=True)
-    #     plot_thrust_line(ax, thrust['thrust_line'])
+    if results['method'] == 'spencer':
+        FS = results['FS']
+        theta = results['theta']
+        thrust = compute_line_of_thrust(df, FS, theta, debug=True)
+        #plot_thrust_line(ax, thrust['thrust_line'])
 
     alpha = 0.3
-    plot_base_stresses(ax, df, results['FS'], alpha=alpha)
+    plot_base_stresses(ax, df, thrust['sigma_eff'], alpha=alpha)
 
     import matplotlib.patches as mpatches
     normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....',  label="Eff Normal Stress (σ')")

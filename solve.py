@@ -343,7 +343,7 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
     tan_phi_m = np.tan(phi) / FS
 
     # allocate
-    N       = np.zeros(n)
+    N_eff   = np.zeros(n)
     Z       = np.zeros(n + 1)  # side‐force magnitudes
     Z[0]    = 0.0
 
@@ -354,11 +354,11 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
             [ tan_phi_m[i]*np.sin(alpha[i]) + np.cos(alpha[i]),  -np.sin(theta) ]
         ])
         b = np.array([
-            -c_m[i]*np.cos(alpha[i]) + u[i]*dl[i]*tan_phi_m[i]*np.cos(alpha[i]) - Z[i]*np.cos(theta),
-            -c_m[i]*np.sin(alpha[i]) + u[i]*dl[i]*tan_phi_m[i]*np.sin(alpha[i]) + w[i]   - Z[i]*np.sin(theta)
+            -c_m[i]*dl[i]*np.cos(alpha[i]) + u[i]*dl[i]*np.sin(alpha[i]) - Z[i]*np.cos(theta),
+            -c_m[i]*dl[i]*np.sin(alpha[i]) - u[i]*dl[i]*np.cos(alpha[i]) + w[i] - Z[i]*np.sin(theta)
         ])
         sol       = np.linalg.solve(A, b)
-        N[i]      = sol[0]
+        N_eff[i]  = sol[0]
         Z[i+1]    = sol[1]
 
     # 2) decompose side‐forces
@@ -388,28 +388,30 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
         for i in range(n):
             # recompute A, b for residuals
             A = np.array([
-                [ tan_phi_m[i]*np.cos(alpha[i]) - np.sin(alpha[i]),  -np.cos(theta) ],
-                [ tan_phi_m[i]*np.sin(alpha[i]) + np.cos(alpha[i]),  -np.sin(theta) ]
+                [tan_phi_m[i] * np.cos(alpha[i]) - np.sin(alpha[i]), -np.cos(theta)],
+                [tan_phi_m[i] * np.sin(alpha[i]) + np.cos(alpha[i]), -np.sin(theta)]
             ])
             b = np.array([
-                -c_m[i]*np.cos(alpha[i]) + u[i]*dl[i]*tan_phi_m[i]*np.cos(alpha[i]) - Z[i]*np.cos(theta),
-                -c_m[i]*np.sin(alpha[i]) + u[i]*dl[i]*tan_phi_m[i]*np.sin(alpha[i]) + w[i]   - Z[i]*np.sin(theta)
+                -c_m[i] * dl[i] * np.cos(alpha[i]) + u[i] * dl[i] * np.sin(alpha[i]) - Z[i] * np.cos(theta),
+                -c_m[i] * dl[i] * np.sin(alpha[i]) - u[i] * dl[i] * np.cos(alpha[i]) + w[i] - Z[i] * np.sin(theta)
             ])
             # force‐balance residuals
-            fx_res = A[0,0]*N[i]     + A[0,1]*Z[i+1] - b[0]
-            fy_res = A[1,0]*N[i]     + A[1,1]*Z[i+1] - b[1]
+            fx_res = A[0,0]*N_eff[i]     + A[0,1]*Z[i+1] - b[0]
+            fy_res = A[1,0]*N_eff[i]     + A[1,1]*Z[i+1] - b[1]
             # moment‐balance residual
             m_res  = E[i+1]*delta_y[i+1] - (E[i]*delta_y[i] + (X[i]+X[i+1])*(dx[i]/2))
 
             rows.append({
                 'slice':           i,
                 'alpha (deg)':     np.degrees(alpha[i]),
-                "N'":              N[i],     # effective normal force
+                'alpha (rad)':     alpha[i],
+                "N_eff'":          N_eff[i],     # effective normal force
                 'dl':              dl[i],    # base length
                 'dx':              dx[i],    # slice width
                 'u':               u[i],      # pore pressure
                 'w':               w[i],        # weight
-                'S':               c_m[i] + N[i]*tan_phi_m[i],  # mobilized shear strength
+                'cm':              c_m[i],      # mobilized cohesion
+                'tan_phi_m':       tan_phi_m[i], # mobilized friction
                 'Z_left':          Z[i],
                 'Z_right':         Z[i+1],
                 'X_left':          X[i],
@@ -428,10 +430,7 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
         print("Debug table written to thrust_calc_resuls.xlsx")
 
     return {
-        'N': N,
-        'Z': Z,
-        'X': X,
-        'E': E,
+        'sigma_eff': N_eff/dl,
         'delta_y': delta_y,
         'thrust_line': thrust_line
     }

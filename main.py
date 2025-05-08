@@ -37,7 +37,7 @@ data = load_globals("docs/input_template_lface.xlsx")
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if not data['circular'] else None
 
-success, result = generate_slices(data, circle, non_circ, num_slices=40)
+success, result = generate_slices(data, circle, non_circ, num_slices=20)
 if success:
     df, failure_surface = result
 else:

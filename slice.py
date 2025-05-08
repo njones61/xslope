@@ -393,7 +393,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=20):
     # Slice data were built by iterating from left to right. Flip the order slice data for right-facing slopes.
     # Slice 1 should be at the bottom and slice n at the top. This makes the slice data consistent with the
     # sign convention for alpha and the free-body diagram used to calculate forces.
-    if right_facing:
-        df = df.iloc[::-1].reset_index(drop=True)
+    # if right_facing:
+    #     df = df.iloc[::-1].reset_index(drop=True)
 
     return True, (df, clipped_surface)

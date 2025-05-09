@@ -61,19 +61,19 @@ For the **force equilibrium** method, we solve for the side forces using the ite
 
 For Spencer's method, the process is simpler. The resultant force $Q_i$ that is the central component of Spencer's method represents the resulttant of the of the side forces on each slice. Specifically, 
 
->>$Q_i = E_i - E_{i+1}$
+>>$Q_i = Z_i - Z_{i+1}$
 
 For the first slice, the left side force is zero. So we have:
 
->>$E_{i+1} = E_i - Q_i = - Q_i$
+>>$Z_{i+1} = Z_i - Q_i = - Q_i$
 
 For each subsequent slice, we have:
 
->>$E_{i+1} = E_i - Q_i$
+>>$Z_{i+1} = Z_i - Q_i$
 
-where $E_i$ is the left side force computed from the prior slice. We continue this process until we reach the last slice and for the last slice, we have:
+where $Z_i$ is the left side force computed from the prior slice. We continue this process until we reach the last slice and for the last slice, we have:
 
->>$E_{i+1} = 0$
+>>$Z_{i+1} = 0$
 
 ## Solving for the Thrust Line
 

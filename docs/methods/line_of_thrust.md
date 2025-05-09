@@ -65,6 +65,8 @@ For Spencer's method, the process is simpler. The resultant force $Q_i$ that is 
 
 For the first slice, the left side force is zero. So we have:
 
+>>$Z_{i} = 0$
+
 >>$Z_{i+1} = Z_i - Q_i = - Q_i$
 
 For each subsequent slice, we have:
@@ -96,4 +98,16 @@ If we start with slice 1 on the left side, the left side force is zero so we hav
 
 We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice, but they should be very close. The average of the two moment arms can be used to compute the location of the resultant side force. 
 
+## Solving for the Normal Force
 
+After solving for the side forces, it is helpful to solve for the effective normal force acting on each slice. These can be plotted along with the line of thrust. Negative values are another indicator of tension in the slice. We can find the effective normal force using one of the force equilibrium equations. For example, we can use the vertical force equilibrium equation:
+
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta l + N'*tan(\phi_m)\right]*sin(\alpha) + (N' + u \Delta l)*cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
+
+>>$c_m \Delta l *sin(\alpha) + N'*tan(\phi_m)*sin(\alpha) + N'*cos(\alpha) + u \Delta l*cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+
+>>$c_m \Delta l *sin(\alpha) + N'*\left[tan(\phi_m)*sin(\alpha) + *cos(\alpha)\right] + u \Delta l*cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+
+Solving for $N'$ gives:
+
+>>$N' = \dfrac{- c_m \Delta l *sin(\alpha) - u\Delta l*cos(\alpha) + W - X_{i} + X_{i+1}}{tan(\phi_m)*sin(\alpha) + cos(\alpha)}$

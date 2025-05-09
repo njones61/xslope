@@ -334,191 +334,92 @@ def extract_spencer_Q(df, FS, theta_deg, debug=False):
 
     return Q
 
-def compute_line_of_thrust(df, FS, theta_deg, debug=False):
+
+def compute_line_of_thrust_spencer(df, FS, theta_deg, debug=False, debug_excel_path="thrust_debug.xlsx"):
     """
-    Compute the line of thrust via dual-sweep moment equilibrium,
-    with optional debug output.
+    Compute Spencer line of thrust, exporting a full debug table to Excel if requested.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Must include columns:
-            'alpha', 'phi', 'c', 'w', 'u',
-            'dl', 'dx', 'x_l', 'x_r', 'y_lb', 'y_rb'
+        Must contain slicing geometry: 'dx', 'y_cb'
+        Also alpha, phi, c, dx, w, u for Q extraction
     FS : float
-        Factor of safety from Spencer’s solution.
+        Factor of safety from Spencer
     theta_deg : float
-        Side-force inclination (deg).
-    debug : bool
-        If True, export a per-slice debug table to Excel.
+        Spencer interslice force angle in degrees
+    debug : bool, default False
+        If True, collect all intermediate vars and write to `debug_excel_path`
+    debug_excel_path : str, default "thrust_debug.xlsx"
+        File path for the debug Excel output
 
     Returns
     -------
-    dict
-        'sigma_eff'   : N_eff / dl per slice,
-        'delta_y'     : averaged moment arm at each boundary (n+1),
-        'thrust_line' : Shapely LineString of the averaged y's.
+    y_thrust : np.ndarray, shape (n+1,)
+        Absolute y-coordinates of the thrust line at each slice boundary
     """
-    # 1) unpack & force equilibrium
-    n      = len(df)
-    alpha  = np.radians(df['alpha'].values)
-    phi    = np.radians(df['phi'].values)
-    c_arr  = df['c'].values
-    w      = df['w'].values
-    u      = df['u'].values
-    dl     = df['dl'].values
-    dx     = df['dx'].values
-    theta  = np.radians(theta_deg)
-    y_lb   = df['y_lb'].values
-    y_rb   = df['y_rb'].values
+    # 1) Recompute Q_i from Spencer (user-provided)
+    Q = extract_spencer_Q(df, FS, theta_deg, debug=False)
+    n = len(Q)
 
-    c_m       = c_arr / FS
-    tan_phi_m = np.tan(phi) / FS
+    # 2) Build side-force array Z of length n+1
+    Z = np.zeros(n+1)
+    for i in range(n):
+        Z[i+1] = Z[i] - Q[i]
+    Z[-1] = 0.0
 
-    N_eff = np.zeros(n)
-    Z     = np.zeros(n+1)
-    Z[0]  = 0.0
+    # 3) Components of Z (parallel forces at angle theta)
+    theta = radians(theta_deg)
+    X = Z * sin(theta)  # vertical component of side forces
+    E = Z * cos(theta)  # horizontal component of side forces
+
+    # 4) Sweep moments for vertical offsets dy
+    dx = df['dx'].values
+    dy = np.zeros(n+1)
+    dy[0] = 0.0  # boundary at first slice remains at base center
+
+    # Optional debug storage
+    debug_rows = []
 
     for i in range(n):
-        A = np.array([
-            [ tan_phi_m[i]*np.cos(alpha[i]) - np.sin(alpha[i]),  -np.cos(theta) ],
-            [ tan_phi_m[i]*np.sin(alpha[i]) + np.cos(alpha[i]),  -np.sin(theta) ]
-        ])
-        b = np.array([
-            -c_m[i]*dl[i]*np.cos(alpha[i]) + u[i]*dl[i]*np.sin(alpha[i])- Z[i]*np.cos(theta),
-            -c_m[i]*dl[i]*np.sin(alpha[i]) - u[i]*dl[i]*np.cos(alpha[i]) + w[i] - Z[i]*np.sin(theta)
-        ])
-        sol       = np.linalg.solve(A, b)
-        N_eff[i]  = sol[0]
-        Z[i+1]    = sol[1]
+        # Moment equilibrium about slice center:
+        # E[i]*dy[i] + (X[i] + X[i+1])*(dx[i]/2) - E[i+1]*dy[i+1] = 0
+        if abs(E[i+1]) < 1e-9:
+            dy[i+1] = 0.0
+        else:
+            M_left = E[i] * dy[i] + (X[i] + X[i+1]) * (dx[i] / 2.0)
+            dy[i+1] = M_left / E[i+1]
 
-    # 2) decompose side-forces
-    X = Z * np.sin(theta)
-    E = Z * np.cos(theta)
-
-    # 3a) left-to-right moment sweep about each slice's lower-right
-    delta_y_L = np.zeros(n+1)  # Moment arms to side forces relative to slice lower-right.
-    y_L       = np.zeros(n+1)  # Absolute y-coordinates of the thrust line on all slice boundaries based on left sweep
-    delta_y_L[0] = 0.0         # First slice pivot
-    y_L[0]      = y_lb[0]      # First slice left side y-coordinate
-
-    for i in range(n):
-        # compute left-side moment arm for this slice (pivot at y_rb[i])
-        arm_left = y_L[i] - y_rb[i]
-
-        num = (
-            E[i]*arm_left
-            + X[i]*dx[i]
-            - w[i]*(dx[i]/2)
-            + (N_eff[i] + u[i]*dl[i])*(dl[i]/2)
-        )
-        delta_y_L[i+1]  = num / E[i+1] if E[i+1] != 0 else 0
-        y_L[i+1]  = y_rb[i] + delta_y_L[i+1]
-
-    # 3b) right-to-left moment sweep about each slice's lower-left
-    delta_y_R = np.zeros(n+1)   # Moment arms to side forces relative to slice lower-left.
-    y_R       = np.zeros(n+1)   # Absolute y-coordinates of the thrust line on all slice boundaries based on right sweep
-    delta_y_R[n] = 0.0          # First slice pivot (starting from the right)
-    y_R[n]      = y_rb[n-1]     # First slice left side y-coordinate
-
-    for i in range(n-1, -1, -1):
-        # compute right-side moment arm for this slice (pivot at y_lb[i])
-        arm_right = y_R[i+1] - y_lb[i]
-
-        num = (
-            E[i+1]*arm_right
-            - X[i+1]*dx[i]
-            - w[i]*(dx[i]/2)
-            + (N_eff[i] + u[i]*dl[i])*(dl[i]/2)
-        )
-
-        delta_y_R[i]  = num / E[i] if E[i] != 0 else 0
-        y_R[i]     = y_lb[i] + delta_y_R[i]
-
-    # 3c) average both sweeps
-    y_bound = 0.5 * (y_L + y_R)
-
-    # 4) build LineString
-    x_bound = np.empty(n+1)
-    x_bound[0]  = df['x_l'].iat[0]
-    x_bound[1:] = df['x_r'].values
-    thrust_line = LineString(np.column_stack([x_bound, y_bound]))
-
-    # 5) debug export
-    if debug:
-        import pandas as pd
-
-        Q = extract_spencer_Q(df, FS, theta_deg)
-
-        rows = []
-        for i in range(n):
-            A_i = np.array([
-                [ tan_phi_m[i]*np.cos(alpha[i]) - np.sin(alpha[i]), -np.cos(theta) ],
-                [ tan_phi_m[i]*np.sin(alpha[i]) + np.cos(alpha[i]), -np.sin(theta) ]
-            ])
-            b_i = np.array([
-                -c_m[i]*dl[i]*np.cos(alpha[i]) + u[i]*dl[i]*np.sin(alpha[i]) - Z[i]*np.cos(theta),
-                -c_m[i]*dl[i]*np.sin(alpha[i]) - u[i]*dl[i]*np.cos(alpha[i]) + w[i]   - Z[i]*np.sin(theta)
-            ])
-            fx_res = A_i[0,0]*N_eff[i] + A_i[0,1]*Z[i+1] - b_i[0]
-            fy_res = A_i[1,0]*N_eff[i] + A_i[1,1]*Z[i+1] - b_i[1]
-
-            # recompute arm_left and arm_right here for debug
-            arm_left  = y_L[i]   - y_rb[i]
-            arm_right = y_R[i+1] - y_lb[i]
-
-            m_res_L = (
-                - E[i]*arm_left
-                - X[i]*dx[i]
-                + E[i + 1] * delta_y_L[i + 1]
-                + w[i]*(dx[i]/2)
-                - (N_eff[i] + u[i]*dl[i])*(dl[i]/2)
-            )
-            m_res_R = (
-                - E[i] * delta_y_R[i]
-                + E[i+1]*arm_right
-                - X[i+1]*dx[i]
-                - w[i]*(dx[i]/2)
-                + (N_eff[i] + u[i]*dl[i])*(dl[i]/2)
-            )
-
-            rows.append({
-                'slice':           i,
-                'N_eff':           N_eff[i],
-                'dl':              dl[i],
-                'dx':              dx[i],
-                'y_lb':            y_lb[i],
-                'y_rb':            y_rb[i],
-                'u':               u[i],
-                'w':               w[i],
-                'c_m':             c_m[i],
-                'tan_phi_m':       tan_phi_m[i],
-                'Q':               Q[i],
-                'Z_left':          Z[i],
-                'Z_right':         Z[i+1],
-                'X_left':          X[i],
-                'X_right':         X[i+1],
-                'E_left':          E[i],
-                'E_right':         E[i+1],
-                'delta_y_L': delta_y_L[i],
-                'delta_y_R': delta_y_R[i],
-                'y_L_abs_left':    y_L[i],
-                'y_L_abs_right':   y_L[i+1],
-                'y_R_abs_left':    y_R[i],
-                'y_R_abs_right':   y_R[i+1],
-                'y_ave_left':      y_bound[i],
-                'y_ave_right':     y_bound[i+1],
-                'fx_residual':     fx_res,
-                'fy_residual':     fy_res,
-                'moment_residual_L': m_res_L,
-                'moment_residual_R': m_res_R
+        if debug:
+            debug_rows.append({
+                'slice':  i,
+                'Q_i':    Q[i],
+                'Z_i':    Z[i],
+                'E_i':    Ec[i],
+                'X_i':    Xc[i],
+                'dx_i':   dx[i],
+                'dy_i':   dy[i],
+                'dy_ip1': dy[i+1]
             })
 
-        df_debug = pd.DataFrame(rows)
-        df_debug.to_excel("thrust_calc_resuls.xlsx", index=False)
-        print("Debug table written to thrust_calc_resuls.xlsx")
+    # 5) Enforce last boundary at base center
+    dy[-1] = 0.0
+    if debug:
+        debug_rows.append({
+            'slice':  n,
+            'Q_i':    np.nan,
+            'Z_i':    Z[n],
+            'E_i':    Ec[n],
+            'X_i':    Xc[n],
+            'dx_i':   np.nan,
+            'dy_i':   dy[n],
+            'dy_ip1': np.nan
+        })
+        df_dbg = pd.DataFrame(debug_rows)
+        df_dbg.to_excel(debug_excel_path, index=False)
+        print(f"[debug] exported line-of-thrust debug to '{debug_excel_path}'")
 
-    return {
-        'sigma_eff':   N_eff / dl,
-        'thrust_line': thrust_line
-    }
+    # 6) Convert dy offsets to absolute y-values
+    y_base = df['y_cb'].values
+    y_thrust = y_base + dy
+    return y_thrust

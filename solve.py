@@ -335,91 +335,124 @@ def extract_spencer_Q(df, FS, theta_deg, debug=False):
     return Q
 
 
-def compute_line_of_thrust_spencer(df, FS, theta_deg, debug=False, debug_excel_path="thrust_debug.xlsx"):
+def compute_line_of_thrust_spencer(df, FS, theta_deg, debug=False):
     """
-    Compute Spencer line of thrust, exporting a full debug table to Excel if requested.
+    Computes the line of thrust for Spencer's method of slices by:
+      1. Extracting Q_i side-force resultants from the Spencer solution.
+      2. Summing moments about each slice center to locate thrust.
+      3. Computing the effective normal force N' on each slice base.
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Must contain slicing geometry: 'dx', 'y_cb'
-        Also alpha, phi, c, dx, w, u for Q extraction
-    FS : float
-        Factor of safety from Spencer
-    theta_deg : float
-        Spencer interslice force angle in degrees
-    debug : bool, default False
-        If True, collect all intermediate vars and write to `debug_excel_path`
-    debug_excel_path : str, default "thrust_debug.xlsx"
-        File path for the debug Excel output
+    Parameters:
+        df (pd.DataFrame): Must contain columns 'alpha', 'dx', 'w', 'u', 'y_cb'.
+        FS (float): Factor of safety from Spencer's method.
+        theta_deg (float): Interslice force inclination (degrees).
+        debug (bool): If True, export detailed debug DataFrame to Excel.
 
-    Returns
-    -------
-    y_thrust : np.ndarray, shape (n+1,)
-        Absolute y-coordinates of the thrust line at each slice boundary
+    Returns:
+        y_thrust (np.ndarray): Thrust-line elevations at each slice center (length = n).
+        N_prime (np.ndarray): Effective normal force on each slice base (length = n).
     """
-    # 1) Recompute Q_i from Spencer (user-provided)
-    Q = extract_spencer_Q(df, FS, theta_deg, debug=False)
+    # --- 1) Extract Q_i from Spencer's solution ---
+    Q = extract_spencer_Q(df, FS, theta_deg, debug=debug)  # length n
     n = len(Q)
 
-    # 2) Build side-force array Z of length n+1
+    # --- 2) Solve for Z_i (parallel interslice forces) ---
     Z = np.zeros(n+1)
     for i in range(n):
         Z[i+1] = Z[i] - Q[i]
-    Z[-1] = 0.0
+    Z[-1] = 0.0  # enforce boundary condition
 
-    # 3) Components of Z (parallel forces at angle theta)
+    # --- 3) Decompose Z into components along/normal to base ---
     theta = radians(theta_deg)
-    X = Z * sin(theta)  # vertical component of side forces
-    E = Z * cos(theta)  # horizontal component of side forces
+    X = Z * sin(theta)   # vertical side force component
+    E = Z * cos(theta)   # horizontal side force component
 
-    # 4) Sweep moments for vertical offsets dy
-    dx = df['dx'].values
+    # --- 4) Moment equilibrium sweep about slice centers ---
+    dx = df['dx'].values       # slice base widths
+    y_lb = df['y_lb'].values  # y at left bottom of base
+    y_rb = df['y_rb'].values  # y at right bottom of base
+    y_cb = df['y_cb'].values  # y at slice center
+    tol = 1e-8
+
+    # initialize moment arm above base center
     dy = np.zeros(n+1)
-    dy[0] = 0.0  # boundary at first slice remains at base center
+    dy[0] = 0.0  # no moment arm at left boundary
 
-    # Optional debug storage
-    debug_rows = []
-
+    # For each slice, enforce:
+    #   -E[i]*dy[i] - X[i]*(dx[i]/2) + E[i+1]*dy[i+1] - X[i+1]*(dx[i]/2) = 0
+    # => dy[i+1] = (E[i]*dy[i] + X[i]*(dx[i]/2) + X[i+1]*(dx[i]/2)) / E[i+1]
+    y_thrust = np.zeros(n+1)
+    y_thrust[0] = y_lb[0]
     for i in range(n):
-        # Moment equilibrium about slice center:
-        # E[i]*dy[i] + (X[i] + X[i+1])*(dx[i]/2) - E[i+1]*dy[i+1] = 0
-        if abs(E[i+1]) < 1e-9:
-            dy[i+1] = 0.0
+        denom = E[i+1]
+        if abs(denom) > tol:
+            dy[i+1] = (E[i]*dy[i] + X[i]*(dx[i]/2) + X[i+1]*(dx[i]/2)) / denom
         else:
-            M_left = E[i] * dy[i] + (X[i] + X[i+1]) * (dx[i] / 2.0)
-            dy[i+1] = M_left / E[i+1]
+            dy[i+1] = 0.0
+        y_thrust[i+1] = y_cb[i] + dy[i+1]
 
-        if debug:
-            debug_rows.append({
-                'slice':  i,
-                'Q_i':    Q[i],
-                'Z_i':    Z[i],
-                'E_i':    Ec[i],
-                'X_i':    Xc[i],
-                'dx_i':   dx[i],
-                'dy_i':   dy[i],
-                'dy_ip1': dy[i+1]
-            })
+    # thrust elevations at slice edges (one more than number of slices)
+    x_edges = list(df['x_l'].values) + [df['x_r'].values[-1]]
+    from shapely.geometry import LineString
+    line_of_thrust = LineString(zip(x_edges, y_thrust))
 
-    # 5) Enforce last boundary at base center
-    dy[-1] = 0.0
+    # --- 5) Compute effective normal force N' per slice ---
+    alpha = np.radians(df['alpha'].values)
+    sin_a = np.sin(alpha)
+    cos_a = np.cos(alpha)
+    c_m = df['c'].values/FS
+    phi_rad = np.radians(df['phi'].values)
+    tan_phi_m = np.tan(phi_rad) / FS
+    dl = df['dl'].values
+    w = df['w'].values
+    u = df['u'].values
+    N_prime = np.zeros(n)
+    sigma_prime = np.zeros(n)
+    num = np.zeros(n)
+    denom = np.zeros(n)
+    for i in range(n):
+        num[i] = - c_m[i] * dl[i] * sin_a[i] - u[i] * dl[i] * cos_a[i] + w[i] - X[i] + X[i+1]
+        denom[i] = tan_phi_m[i] * sin_a[i] + cos_a[i]
+        N_prime[i] = num[i] / denom[i] if abs(denom[i]) > tol else 0.0
+        sigma_prime[i] = N_prime[i] / dl[i]
+
+    # --- Debug export if needed ---
     if debug:
-        debug_rows.append({
-            'slice':  n,
-            'Q_i':    np.nan,
-            'Z_i':    Z[n],
-            'E_i':    Ec[n],
-            'X_i':    Xc[n],
-            'dx_i':   np.nan,
-            'dy_i':   dy[n],
-            'dy_ip1': np.nan
-        })
-        df_dbg = pd.DataFrame(debug_rows)
-        df_dbg.to_excel(debug_excel_path, index=False)
-        print(f"[debug] exported line-of-thrust debug to '{debug_excel_path}'")
+        import pandas as pd
+        rows = []
+        for i in range(n):
+            rows.append({
+                'slice': i,
+                'N_prime': N_prime[i],
+                'num': num[i],
+                'denom': denom[i],
+                'sigma_prime': sigma_prime[i],
+                'dl': dl[i],
+                'dx': dx[i],
+                'alpha_rad': alpha[i],
+                'sin_a': sin_a[i],
+                'cos_a': cos_a[i],
+                'y_cb': y_cb[i],
+                'y_lb': y_lb[i],
+                'y_rb': y_rb[i],
+                'u': u[i],
+                'w': w[i],
+                'c_m': c_m[i],
+                'tan_phi_m': tan_phi_m[i],
+                'Q': Q[i],
+                'Z_left': Z[i],
+                'Z_right': Z[i+1],
+                'X_left': X[i],
+                'X_right': X[i + 1],
+                'E_left': E[i],
+                'E_right': E[i+1],
+                'dy_left': dy[i],
+                'dy_right': dy[i+1],
+                'y_left': y_thrust[i],
+                'y_right': y_thrust[i+1],
+            })
+        df_debug = pd.DataFrame(rows)
+        df_debug.to_excel("thrust_calc_results.xlsx", index=False)
+        print("Debug table written to thrust_calc_results.xlsx")
 
-    # 6) Convert dy offsets to absolute y-values
-    y_base = df['y_cb'].values
-    y_thrust = y_base + dy
-    return y_thrust
+    return line_of_thrust, sigma_prime

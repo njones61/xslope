@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from slice import generate_failure_surface, calculate_normal_stresses
-from solve import compute_line_of_thrust
+from solve import compute_line_of_thrust_spencer
 from shapely.geometry import LineString
 
 def plot_profile_lines(ax, profile_lines):
@@ -367,6 +367,36 @@ def plot_thrust_line(ax, thrust_line: LineString,
             linewidth=linewidth,
             label=label)
 
+
+def compute_ylim(data, pad_fraction=0.1):
+    """
+    Compute a reasonable y–axis limit by looking at all profile lines
+    (either shapely LineStrings or lists of (x, y) tuples)
+    and the max_depth. Adds a little padding above and below.
+    """
+    import numpy as np
+
+    y_vals = []
+    for line in data['profile_lines']:
+        # if it's a shapely LineString, use .xy; otherwise assume it's a list of (x,y)
+        if hasattr(line, "xy"):
+            xs, ys = line.xy
+        else:
+            # e.g. [(x0,y0), (x1,y1), ...]
+            xs, ys = zip(*line)
+        y_vals.extend(ys)
+
+    # include the deepest point
+    if "max_depth" in data:
+        top = max(y_vals)
+        bottom = data["max_depth"]
+        y_vals.append(bottom)
+
+    y_min, y_max = min(y_vals), max(y_vals)
+    pad = (y_max - y_min) * pad_fraction
+
+    return y_min - pad, y_max + pad
+
 # ========== FOR PLOTTING INPUT DATA  =========
 
 
@@ -420,15 +450,13 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     plot_dloads(ax, data['dloads'])
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
-
+    alpha = 0.3
     if results['method'] == 'spencer':
         FS = results['FS']
         theta = results['theta']
-        thrust = compute_line_of_thrust(df, FS, theta, debug=True)
-        #plot_thrust_line(ax, thrust['thrust_line'])
-
-    alpha = 0.3
-    plot_base_stresses(ax, df, thrust['sigma_eff'], alpha=alpha)
+        thrust_line, sigma_prime = compute_line_of_thrust_spencer(df, FS, theta, debug=True)
+        plot_thrust_line(ax, thrust_line)
+        plot_base_stresses(ax, df, sigma_prime, alpha=alpha)
 
     import matplotlib.patches as mpatches
     normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....',  label="Eff Normal Stress (σ')")
@@ -461,6 +489,10 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
         fo = results['fo']
         title = f'Janbu-Corrected: FS = {fs:.3f}, fo = {fo:.2f}'
     ax.set_title(title)
+
+    # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
+    ymin, ymax = compute_ylim(data, pad_fraction=0.3)
+    ax.set_ylim(ymin, ymax)
 
     plt.tight_layout()
     plt.show()

@@ -2,9 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu_corrected, spencer, compute_line_of_thrust
-
-
+from solve import oms, bishop, janbu_corrected, spencer
 
 def solve_selected(func, df, circular=True):
     success, result = func(df, circular=circular)

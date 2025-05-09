@@ -30,12 +30,14 @@ def solve_all(df, circular=True):
     solve_selected(janbu_corrected, df, circular=circular)
 
 
-data = load_globals("docs/input_template_lface.xlsx")
+data = load_globals("docs/input_template_lface (utexas match).xlsx")
 
 # plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if not data['circular'] else None
+
+print(f"circle: {circle}")
 
 success, result = generate_slices(data, circle, non_circ, num_slices=20)
 if success:
@@ -44,7 +46,7 @@ else:
     print(result)
 
 # export df to excel
-#df.to_excel("slices.xlsx", index=False)
+df.to_excel("slices.xlsx", index=False)
 
 # options = [oms, bishop, spencer, janbu_corrected]
 results = solve_selected(spencer, df, circular=True)

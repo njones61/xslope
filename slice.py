@@ -17,8 +17,16 @@ def calculate_normal_stresses(df, FS):
 
     return sigma
 
+
 def get_sorted_intersections(failure_surface, ground_surface):
-    # Helper function for generating failure surface
+    """
+    Find and sort the intersection points between the failure and ground surfaces,
+    pruning extras if the circle exits and re-enters the ground beyond the toe.
+
+    Returns:
+        success (bool), msg (str), points (list of shapely Point)
+    """
+    # get all the intersection geometries
     intersections = failure_surface.intersection(ground_surface)
     if isinstance(intersections, MultiPoint):
         points = list(intersections.geoms)
@@ -29,11 +37,29 @@ def get_sorted_intersections(failure_surface, ground_surface):
     else:
         points = []
 
-    if len(points) != 2:
-        return False, f"Expected 2 intersection points, but got {len(points)}.", None
+    # need at least two
+    if len(points) < 2:
+        return False, f"Expected at least 2 intersection points, but got {len(points)}.", None
 
+    # sort by x
     points = sorted(points, key=lambda p: p.x)
-    return True, "", points
+
+    # if exactly two, we're done
+    if len(points) == 2:
+        return True, "", points
+
+    # more than two: decide facing
+    y_first, y_last = points[0].y, points[-1].y
+    if y_first > y_last:
+        # right-facing: keep first two
+        pruned = points[:2]
+    else:
+        # left-facing: keep last two
+        pruned = points[-2:]
+
+    # sort those two again by x (just in case)
+    pruned = sorted(pruned, key=lambda p: p.x)
+    return True, "", pruned
 
 def adjust_ground_for_tcrack(ground_surface, x_center, tcrack_depth, right_facing):
     # helper function to adjust the ground surface for tension crack
@@ -131,7 +157,7 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def generate_slices(data, circle=None, non_circ=None, num_slices=20):
+def generate_slices(data, circle=None, non_circ=None, num_slices=21):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.

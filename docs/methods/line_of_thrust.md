@@ -60,7 +60,7 @@ where:
 For the **force equilibrium** method, we solve for the side forces using the iterative method used to solve for the factor of safety. We simply perform the force equilibrium calculations for each slice the factor of safety that satisifies equilibrium. This process is described on the [Force Equilibrium page](force_eq.md).
 
 For Spencer's method, the process is simpler. The resultant force $Q_i$ that is the central component of Spencer's method represents the resulttant of the of the side forces on each slice. Specifically, 
-
+ 
 >>$Q_i = Z_i - Z_{i+1}$
 
 For the first slice, the left side force is zero. So we have:

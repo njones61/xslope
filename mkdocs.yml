@@ -34,6 +34,7 @@ nav:
     - Bishop's Simplified Method: methods/bishop.md
     - Spencer's Method: methods/spencer.md
     - Janbu Force Equilibrium: methods/janbu.md
+    - Force Equilibrium: methods/force_eq.md
     - Morgenstern & Price: methods/mp.md
     - Line of Thrust: methods/line_of_thrust.md
   - Advanced Techniques:

@@ -59,7 +59,7 @@ where:
 
 For the **force equilibrium** method, we solve for the side forces using the iterative method used to solve for the factor of safety. We simply perform the force equilibrium calculations for each slice the factor of safety that satisifies equilibrium. This process is described on the [Force Equilibrium page](force_eq.md).
 
-For Spencer's method, the process is simpler. The resultant force $Q_i$ that is the central component of Spencer's method represents the resulttant of the of the side forces on each slice. Specifically, 
+For **Spencer's method**, the process is simpler. The resultant force $Q_i$ that is the central component of Spencer's method represents the resulttant of the of the side forces on each slice. Specifically, 
  
 >>$Q_i = Z_i - Z_{i+1}$
 
@@ -100,7 +100,11 @@ We can continue this process until we reach the top slice where the right side m
 
 ## Solving for the Normal Force
 
-After solving for the side forces, it is helpful to solve for the effective normal force acting on each slice. These can be plotted along with the line of thrust. Negative values are another indicator of tension in the slice. We can find the effective normal force using one of the force equilibrium equations. For example, we can use the vertical force equilibrium equation:
+It is useful to solve for the effective normal force at the same time that the line of thrust is calculated. These 
+can be plotted (as stresses) along with the line of thrust. Negative values are another indicator of tension in the 
+slice. If the force equilibrium method is used to solve for the side forces, the normal forces on the base of the slice 
+are calculated at the same time. But if Spencer's method $Q_i$ values are used to get the side forces, it is 
+necessary to solve separately for the effective normal force. We can do this as follows:
 
 >>$\sum F_y = 0 \Rightarrow \left[c_m \Delta l + N'*tan(\phi_m)\right]*sin(\alpha) + (N' + u \Delta l)*cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
 

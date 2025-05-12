@@ -37,7 +37,7 @@ non_circ = data['non_circ'] if not data['circular'] else None
 
 print(f"circle: {circle}")
 
-success, result = generate_slices(data, circle, non_circ, num_slices=20)
+success, result = generate_slices(data, circle, non_circ, num_slices=40)
 if success:
     df, failure_surface = result
 else:

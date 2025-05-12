@@ -157,7 +157,7 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def generate_slices(data, circle=None, non_circ=None, num_slices=21):
+def generate_slices(data, circle=None, non_circ=None, num_slices=40):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.

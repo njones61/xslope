@@ -411,6 +411,9 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     elif method == 'janbu_corrected':
         fo = results['fo']
         title = f'Janbu-Corrected: FS = {fs:.3f}, fo = {fo:.2f}'
+    elif method == 'corps_engineers':
+        theta = results['theta']
+        title = f'Corps Engineers: FS = {fs:.3f}, θ = {theta:.2f}°'
     ax.set_title(title)
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)

@@ -19,7 +19,7 @@ the force as follows:
 
 The shear force ($S$) acting on the bottom of the slice is the mobilized shear strength of the soil, which is equal to:
 
->>$S = \tau_m*\Delta l$
+>>$S = \tau_m  \Delta l$
 
 where $\tau_m$ is the mobilized shear strength of the soil and $\Delta l$ is the length of the slice. The mobilized shear strength is equal to:
 
@@ -40,13 +40,13 @@ where:
 
 Inserting $\tau_m$ into the equation for $S$ gives:
 
->>$S = \left[c_m + (\sigma')*tan\phi_m\right]*\Delta l$
+>>$S = \left[c_m + (\sigma')  tan\phi_m\right]  \Delta l$
 
->>$S = c_m*\Delta l + N'*tan\phi_m$
+>>$S = c_m  \Delta l + N'  tan\phi_m$
 
 where:
 
-- $N'$ = the effective normal force acting on the slice = $\sigma'*\Delta l$
+- $N'$ = the effective normal force acting on the slice = $\sigma'  \Delta l$
 
 ## Solving for Unknown Forces
 
@@ -78,42 +78,42 @@ equilibrium equations are balanced (no residual forces), then the factor of safe
 
 As shown in the previous section, we need to solve for two unknowns at each slice. For the general case, we can set up equations to solve for the unknowns as follows. First, we sum forces in the x-direction:
 
->>$\sum F_x = 0 \Rightarrow \left[c_m \Delta l + N'*tan(\phi_m)\right]*cos(\alpha) - (N' + u \Delta l)*sin(\alpha) + Z_{i}
-> *cos(\theta_i) - Z_{i+1}*cos(\theta_{i+1}) = 0$
+>>$\sum F_x = 0 \Rightarrow \left[c_m \Delta l + N'  tan(\phi_m)\right]  cos(\alpha) - (N' + u \Delta l)  sin(\alpha) + Z_{i}
+>   cos(\theta_i) - Z_{i+1}  cos(\theta_{i+1}) = 0$
 
->>$c_m \Delta l *cos(\alpha) + N'*tan(\phi_m)*cos(\alpha) - N'*sin(\alpha) - u \Delta l*sin(\alpha) - + Z_{i}*cos
+>>$c_m \Delta l   cos(\alpha) + N'  tan(\phi_m)  cos(\alpha) - N'  sin(\alpha) - u \Delta l  sin(\alpha) - + Z_{i}  cos
 > (\theta_{i}) - Z_
-> {i+1}*cos(\theta_{i+1}) = 0$
+> {i+1}  cos(\theta_{i+1}) = 0$
 
->>$c_m \Delta l *cos(\alpha) + N'*\left[tan(\phi_m)*cos(\alpha) - sin(\alpha)\right] - u \Delta l*sin(\alpha) + Z_{i}
-> *cos
-> (\theta_{i}) - Z_{i+1}*cos(\theta_{i+1}) = 0$
+>>$c_m \Delta l   cos(\alpha) + N' \left[tan(\phi_m) cos(\alpha) - sin(\alpha)\right] - u \Delta l sin(\alpha) + Z_{i}
+>  cos
+> (\theta_{i}) - Z_{i+1} cos(\theta_{i+1}) = 0$
 
 Rearranging in terms of our two unknows ($N'$ and $Z_{i+1}$) gives:
 
->>$N'*\left[tan(\phi_m)*cos(\alpha) - sin(\alpha)\right] - Z_{i+1}*cos(\theta_{i+1}) = - c_m \Delta l *cos(\alpha) + u 
-> \Delta l*sin(\alpha) - Z_{i}*cos(\theta_i)$
+>>$N' \left[tan(\phi_m) cos(\alpha) - sin(\alpha)\right] - Z_{i+1} cos(\theta_{i+1}) = - c_m \Delta l  cos(\alpha) + u 
+> \Delta l sin(\alpha) - Z_{i} cos(\theta_i)$
 
 Likewise, we can sum forces in the y-direction:
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta l + N'*tan(\phi_m)\right]*sin(\alpha) + (N' + u \Delta l)*cos(\alpha) - 
-> W + Z_{i}*sin(\theta_{i}) - Z_{i+1}*sin(\theta_{i+1}) = 0$
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta l + N' tan(\phi_m)\right] sin(\alpha) + (N' + u \Delta l) cos(\alpha) - 
+> W + Z_{i} sin(\theta_{i}) - Z_{i+1} sin(\theta_{i+1}) = 0$
 
->>$c_m \Delta l *sin(\alpha) + N'*tan(\phi_m)*sin(\alpha) + N'*cos(\alpha) + u \Delta l*cos(\alpha) - W + Z_{i}*sin
+>>$c_m \Delta l  sin(\alpha) + N' tan(\phi_m) sin(\alpha) + N' cos(\alpha) + u \Delta l cos(\alpha) - W + Z_{i} sin
 > (\theta_{i}) - 
-> Z_{i+1}*sin(\theta_{i+1}) = 0$
+> Z_{i+1} sin(\theta_{i+1}) = 0$
 
->>$c_m \Delta l *sin(\alpha) + N'*\left[tan(\phi_m)*sin(\alpha) + *cos(\alpha)\right] + u \Delta l*cos(\alpha) - W + 
-> Z_{i}*sin
-> (\theta_{i}) - Z_{i+1}*sin(\theta_{i+1}) = 0$
+>>$c_m \Delta l  sin(\alpha) + N' \left[tan(\phi_m) sin(\alpha) +  cos(\alpha)\right] + u \Delta l cos(\alpha) - W + 
+> Z_{i} sin
+> (\theta_{i}) - Z_{i+1} sin(\theta_{i+1}) = 0$
 
 Rearranging in terms of our two unknows ($N$ and $Z_{i+1}$) gives:
 
->>$N'*\left[tan(\phi_m)*sin(\alpha) + cos(\alpha)\right] - Z_{i+1}*sin(\theta_{i+1}) = -c_m \Delta l *sin(\alpha) - u\Delta l*cos(\alpha) + W - Z_{i}*sin(\theta_{i})$
+>>$N' \left[tan(\phi_m) sin(\alpha) + cos(\alpha)\right] - Z_{i+1} sin(\theta_{i+1}) = -c_m \Delta l  sin(\alpha) - u\Delta l cos(\alpha) + W - Z_{i} sin(\theta_{i})$
 
 Now we can take these two equations and rearrange them into a matrix form. We can write the two equations as:
 
->>$A*x = b$
+>>$Ax = b$
 
 where:
 
@@ -123,7 +123,7 @@ where:
 
 The matrix $A$ is given by:
 
->>$A = \begin{bmatrix}tan(\phi_m)*cos(\alpha) - sin(\alpha) & -cos(\theta_{i+1})\\tan(\phi_m)*sin(\alpha) + cos(\alpha) & -sin(\theta_{i+1})\end{bmatrix}$
+>>$A = \begin{bmatrix}tan(\phi_m) cos(\alpha) - sin(\alpha) & -cos(\theta_{i+1})\\tan(\phi_m) sin(\alpha) + cos(\alpha) & -sin(\theta_{i+1})\end{bmatrix}$
 
 The vector $x$ is given by:
 
@@ -131,7 +131,7 @@ The vector $x$ is given by:
 
 The vector $b$ is given by:
 
->>$b = \begin{bmatrix}- c_m \Delta l *cos(\alpha) + u \Delta l*sin(\alpha) - Z_{i}*cos(\theta_{i})\\-c_m \Delta l *sin(\alpha) - u\Delta l*cos(\alpha) + W - Z_{i}*sin(\theta_{i})\end{bmatrix}$
+>>$b = \begin{bmatrix}- c_m \Delta l  cos(\alpha) + u \Delta l sin(\alpha) - Z_{i} cos(\theta_{i})\\-c_m \Delta l  sin(\alpha) - u\Delta l cos(\alpha) + W - Z_{i} sin(\theta_{i})\end{bmatrix}$
 
 The matrix equation can then be solved for the two unknowns
 ($N$ and $Z_{i+1}$) using the numpy linalg method. The solution is given by:

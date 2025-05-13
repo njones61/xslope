@@ -26,11 +26,11 @@ the force as follows:
 
 The shear force ($S_i$) acting on the bottom of the slice is the mobilized shear strength of the soil, which is equal to:
 
->>$S = \tau_m*\Delta l$
+>>$S = \tau_m\Delta l$
 
 where $\tau_m$ is the mobilized shear strength of the soil and $\Delta l$ is the length of the slice. The mobilized shear strength is equal to:
 
->>$\tau_m = \dfrac{c + (\sigma-u)tan\phi}{F}$
+>>$\tau_m = \dfrac{c + (\sigma-u) tan\phi}{F}$
  
 >>$\tau_m = c_m + \sigma' tan\phi_m$
 
@@ -47,13 +47,13 @@ where:
 
 Inserting $\tau_m$ into the equation for $S$ gives:
 
->>$S = \left[c_m + (\sigma')*tan\phi_m\right]*\Delta l$
+>>$S = \left[c_m + (\sigma')tan\phi_m\right]\Delta l$
 
->>$S = c_m*\Delta l + N'*tan\phi_m$
+>>$S = c_m\Delta l + N'tan\phi_m$
 
 where:
 
-- $N'$ = the effective normal force acting on the slice = $\sigma'*\Delta l$
+- $N'$ = the effective normal force acting on the slice = $\sigma'\Delta l$
 
 ## Solving for the Side Forces
 
@@ -81,20 +81,20 @@ where $Z_i$ is the left side force computed from the prior slice. We continue th
 
 Now that we have the forces acting on each slice, we can compute the locations of the resultant sides force acting on each slice. The side force locations are found by summing moments about the center of the base of each slice. W, S, and N all go through the base so the only components in the moment equilibrium equation are the side forces. Also, rather than working in terms of $Z$ and $theta$, we will work in terms of the vertical and horizontal components of the side forces. The horizontal and vertical components are given by:
 
->>$X_{i} = Z_i*sin(\theta)$
+>>$X_{i} = Z_i sin(\theta)$
 
->>$E_{i} = Z_i*cos(\theta)$
+>>$E_{i} = Z_i cos(\theta)$
 
 where $X_i$ is the vertical component of the side force and $E_i$ is the horizontal component of the side force. 
 Next, we define $\Delta y_{i}$ and $\Delta y_{i+1}$ as the distance from the center point of the base of the slice 
 up to the left and right side forces, $E_{i}$ and $E_{i-1}$ respectively, and $\Delta x$ is the width of the slice. Assuming CCW rotation is positive (right-hand rule) we can write the moment equilibrium equation as:
 
->>$\sum M = 0 \Rightarrow - E_{i}*\Delta y_{i} - X_{i}*\dfrac{\Delta x}{2} + E_{i+1}*\Delta y_{i+1} - X_{i+1}*\dfrac
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \dfrac{\Delta x}{2} + E_{i+1} \Delta y_{i+1} - X_{i+1} \dfrac
 > {\Delta x}{2}= 0$
 
 If we start with slice 1 on the left side, the left side force is zero so we have one unknown ($\Delta y_{i+1}$) and one equation. Then on the next slice, the left side moment arm is known and the right side moment arm is unknown. So again we have one equation and one unknown ($\Delta y_{i+1}$) which we can solve for as follows:
 
->>$\Delta y_{i+1} = \dfrac{E_{i}*\Delta y_{i} + X_{i}*\dfrac{\Delta x}{2} + X_{i+1}*\dfrac{\Delta x}{2}}{E_{i+1}}$
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \dfrac{\Delta x}{2} + X_{i+1} \dfrac{\Delta x}{2}}{E_{i+1}}$
 
 We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice, but they should be very close. The average of the two moment arms can be used to compute the location of the resultant side force. 
 
@@ -106,12 +106,12 @@ slice. If the force equilibrium method is used to solve for the side forces, the
 are calculated at the same time. But if Spencer's method $Q_i$ values are used to get the side forces, it is 
 necessary to solve separately for the effective normal force. We can do this as follows:
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta l + N'*tan(\phi_m)\right]*sin(\alpha) + (N' + u \Delta l)*cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta l + N' tan(\phi_m)\right] sin(\alpha) + (N' + u \Delta l) cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
 
->>$c_m \Delta l *sin(\alpha) + N'*tan(\phi_m)*sin(\alpha) + N'*cos(\alpha) + u \Delta l*cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+>>$c_m \Delta l  sin(\alpha) + N' tan(\phi_m) sin(\alpha) + N' cos(\alpha) + u \Delta l cos(\alpha) - W + X_{i} - X_{i+1} = 0$
 
->>$c_m \Delta l *sin(\alpha) + N'*\left[tan(\phi_m)*sin(\alpha) + *cos(\alpha)\right] + u \Delta l*cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+>>$c_m \Delta l  sin(\alpha) + N' \left[tan(\phi_m) sin(\alpha) +  cos(\alpha)\right] + u \Delta l cos(\alpha) - W + X_{i} - X_{i+1} = 0$
 
 Solving for $N'$ gives:
 
->>$N' = \dfrac{- c_m \Delta l *sin(\alpha) - u\Delta l*cos(\alpha) + W - X_{i} + X_{i+1}}{tan(\phi_m)*sin(\alpha) + cos(\alpha)}$
+>>$N' = \dfrac{- c_m \Delta l  sin(\alpha) - u\Delta l cos(\alpha) + W - X_{i} + X_{i+1}}{tan(\phi_m) sin(\alpha) + cos(\alpha)}$

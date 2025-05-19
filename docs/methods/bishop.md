@@ -57,6 +57,10 @@ For total stress analysis:
 
 The factor of safety $F$ appears on both sides of the equation, so it must be solved **iteratively**.
 
+Once F is determined, N can be computed as follows:
+
+>$N = \dfrac{W - \dfrac{1}{F} \left[ c' \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$
+
 ---
 
 ## Summary

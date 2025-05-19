@@ -3,7 +3,10 @@
 The force equilibrium method is a common method used to analyze the stability of slopes. It works for both circular 
 and non-circular surfaces. It satisfies the force equilibrium equations for each slice, but it does not satisfy the 
 moment equilibrium equations. There are several variations of the force equilibrium method, depending on the 
-assumptions used for the side force inclination. 
+assumptions used for the side force inclination. In slope tools, two variations of the force equilibrium method are 
+supported: the **Lowe and 
+Karafaith** method and the **US Army Corps of Engineers** method. Both methods use the same equations, but they differ in 
+the side force assumptions.
 
 ## Forces Acting on the Slice
 
@@ -144,12 +147,8 @@ N[i], Z[i + 1] = np.linalg.solve(A, b)
 
 ## Side Force Inclination Assumptions
 
-The side force inclination is a critical parameter in the force equilibrium method. There are several methods for 
-estimating the side force inclination. The most common methods are:
-
-### Simplified Janbu
-
-The simplified Janbu method assumes that the side force inclinations are all horizontal. 
+The side force inclination is a critical parameter in the force equilibrium method. Two solution methods are 
+supported in slope tools:
 
 ### Lowe and Karafaith
 
@@ -162,3 +161,6 @@ The US Army Corps of Engineers method assumes that the side force inclinations a
 using one of the following methods:
 
 ![uscoe_theta.png](images/uscoe_theta.png){width=500px }
+
+In slope tools, first method shown above is used. That is, all interslice forces are parallel to a line connecting the 
+bottom of the failure surface to the top of the failure surface. 

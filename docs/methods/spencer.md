@@ -54,8 +54,8 @@ and we get:
 
 Where:
 
-- $\alpha$ = base inclination of slice
-- $R$ = moment arm to center
+>$\alpha$ = base inclination of slice<br>
+$R$ = moment arm to center
 
 Since Q acts through point b, Q must be equal to the sum of W, S, and N. Therefore, we can work in terms of Q.
 
@@ -94,16 +94,16 @@ detailed diagram of a slice:
 where: 
 
 >$W$ = weight of the slice (vertical)<br>
-$N$ = normal force on base = $N'$ + $u \Delta l$<br>
+$N$ = normal force on base = $N'$ + $u \Delta \ell$<br>
 $N'$ = effective normal force on base <br>
-$S$ = shear force on base = $c_m \Delta l + N' \tan \phi_m'$<br>
+$S$ = shear force on base = $c_m \Delta \ell + N' \tan \phi_m'$<br>
 $c_m$ = mobilized cohesion = $\dfrac{c}{F}$<br>
 $tan \phi_m'$ = mobilized friction  = $\dfrac{tan\phi'}{F}$<br>
 $Z_i$ = side force on interslice boundary<br>
 $theta$ = interslice force inclination<br>
 $\alpha$ = base inclination<br>
 $\Delta x$ = horizontal width of slice<br>
-$\Delta l$ = length along base of slice<br>
+$\Delta \ell$ = length along base of slice<br>
 $u$ = pore pressure
 
 
@@ -164,10 +164,10 @@ W \sin \alpha - \dfrac{c'}{F} \Delta x \sec \alpha - \dfrac{(W \cos \alpha - u \
 \cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
 }$
 
-Writing in terms of $\Delta l$:
+Writing in terms of $\Delta \ell$:
 
 >$Q = \dfrac{
-W \sin \alpha - \dfrac{c'}{F} \Delta l - \dfrac{(W \cos \alpha - u \Delta l) \tan \phi'}{F}
+W \sin \alpha - \dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha - u \Delta \ell) \tan \phi'}{F}
 }{
 \cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
 }$

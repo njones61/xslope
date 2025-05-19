@@ -49,7 +49,7 @@ Inserting $\tau_m$ into the equation for $S$ gives:
 
 where:
 
-- $N'$ = the effective normal force acting on the slice = $\sigma'  \Delta l$
+>>$N'$ = the effective normal force acting on the slice = $\sigma'  \Delta l$
 
 ## Solving for Unknown Forces
 

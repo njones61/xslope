@@ -27,29 +27,33 @@ Summing forces in the vertical direction:
 
 >$\sum F_y = 0$
 
->$N \cos \alpha + S \sin \alpha - W = 0$
+>$N \cos \alpha + S \sin \alpha - W = 0  \qquad (1)$
 
 >$S = \tau \Delta l = \dfrac{s \Delta \ell}{F}$
 
->$S = \dfrac{1}{F} \left[c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]$
+>$S = \dfrac{1}{F} \left[c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]   \qquad (2)$
 
-Substituting:
+Substituting (2) into (1):
 
->$N \cos \alpha + \left( \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right] \right) \sin \alpha - W = 0$
+>$N \cos \alpha + \left( \dfrac{1}{F} \left[ c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right] \right) \sin \alpha - W = 0$
 
 Solving for N:
 
->$N = \dfrac{W - \dfrac{1}{F} \left[ c' \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$
-
->$\sigma' = \dfrac{N}{\Delta \ell} u$
+>$N = \dfrac{W - \dfrac{1}{F} \left[ c \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (3)$
 
 From the general equation (based on moment equilibrium):
 
->$F = \dfrac{\sum (c' + \sigma' tan \phi') \Delta \ell}{\sum W sin \alpha}$
+>$F = \dfrac{\sum (c + \sigma' tan \phi') \Delta \ell}{\sum W sin \alpha}$
 
-Combining the three previous equations and solving for $F$ gives:
+>$\sigma' = \dfrac{N}{\Delta \ell} - u$
 
->$F = \dfrac{\sum \left[ \dfrac{c' \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}$
+thus:
+
+>$F = \dfrac{\sum (c \Delta \ell + (N - u \Delta \ell) tan \phi')}{\sum W sin \alpha}   \qquad (4)$
+
+Substituing (3) into (4) and solving for $F$ gives:
+
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (5)$
 
 For total stress analysis:
 
@@ -57,9 +61,7 @@ For total stress analysis:
 
 The factor of safety $F$ appears on both sides of the equation, so it must be solved **iteratively**.
 
-Once F is determined, N can be computed as follows:
-
->$N = \dfrac{W - \dfrac{1}{F} \left[ c' \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$
+Once $F$ is determined, $N$ can be computed using equation (3) above.
 
 ---
 

@@ -86,6 +86,8 @@ The rest of the forces are the same as before.
 
 The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope therefore the inclination of the distributed load from a vertical line is equal to the slope angle. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 
 
+**REDO THIS PART AND GO BACK TO SIMPLE ORIGINAL FORMULATION**
+
 To recalculate the factor of safety to account for the distributed load, we start by redefining the **effective weight**. If we consider the distributed load to effectively increase the weigh of the slice, we can represent the effective weight as:
 
 >$W' = (W + D \cos \beta) - u b$
@@ -121,6 +123,10 @@ Or if we divide everything by R, we get:
 ### Seismic Force
 
 The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.
+
+**REDO THIS PART USING SIMPLE ORIGINAL FORMULATION**
+
+**ALSO, YOU NEED TO INCLUDE -KWSIN(ALPHA) TO NORMAL FORCE - SEE NOTES**
 
 The seismic force is an additional force acting in the direction of sliding and causing failure, therefore we add it to the denominator of the factor of safety equation. Since the force acts horizontally, the moment arm is equal to the vertical distance between the center of the circle and the center of gravity. If we call this distance $a_s$ then the moment arm from the seismic force is:
 

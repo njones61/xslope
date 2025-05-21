@@ -82,84 +82,70 @@ $water$ = tension crack water force <br>
 
 The rest of the forces are the same as before.
 
-### Distributed Load
-
-The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope therefore the inclination of the distributed load from a vertical line is equal to the slope angle. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 
-
-**REDO THIS PART AND GO BACK TO SIMPLE ORIGINAL FORMULATION**
-
-To recalculate the factor of safety to account for the distributed load, we start by redefining the **effective weight**. If we consider the distributed load to effectively increase the weigh of the slice, we can represent the effective weight as:
-
->$W' = (W + D \cos \beta) - u b$
-
->$W' = W + D \cos \beta - u \Delta \ell cos \alpha   \qquad (4)$
-
-Then the effective normal force is:
-
->$N' = W' \cos \alpha$
-
-Substituting (4) into this gives:
-
->$N' = (W + D \cos \beta - u \Delta \ell cos \alpha) \cos \alpha$
-
->$N' = W \cos \alpha + D \cos \beta \cos \alpha - u \Delta \ell \cos^2 \alpha  \qquad (5)$
-
-We also need to consider the distributed load in the denominator of the factor of safety equation. Before we do this, we recall that the OMS equation is based on moments about the center of the slip circle. The moments in the original method of slices formulation included the weight of the slice and the shear force. The normal force acts through the center of the slice and therefore produces no moment. In the original equation, the limit equilibrium equation is:
-
->$F = \dfrac{R \sum S}{R \sum W sin \alpha}$
-
-R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the R value because it was in both the numerator and denominator. But now we have a distributed load $D$ that is not acting through the center of the slice. The moment arm for the distributed load is the shortest distance from the center of the circle to a line parallel to $D$ that passes through point $d$. We will call this distance $a_d$. Thus, the moment from the distributed load is:
-
->$M_D = a_d D  \qquad (6)$
-
-Substituting the effective normal force defined by (5) into the numerator and (6) into the denominator of the preferred formulation (3) gives:
-
->$F = \dfrac{R \sum \left[ c' \Delta \ell + (W \cos \alpha + D \cos \beta \cos \alpha - u \Delta \ell \cos^2 \alpha) \tan \phi'\right]}{R \sum W \sin \alpha + \sum a_d D}   \qquad (7)$
-
-Or if we divide everything by R, we get:
-
->$F = \dfrac{\sum \left[ c' \Delta \ell + (W \cos \alpha + D \cos \beta \cos \alpha - u \Delta \ell \cos^2 \alpha) \tan \phi'\right]}{\sum W \sin \alpha + \dfrac{1}{R} \sum a_d D}   \qquad (8)$
-
-### Seismic Force
+The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope, therefore the inclination of the distributed load from a vertical line is equal to the slope angle, $\beta$. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 
 
 The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.
 
-**REDO THIS PART USING SIMPLE ORIGINAL FORMULATION**
+The **reinforcement force** $P$ is a force on the base of the slice resisting sliding. The reinforcement force is calculated using the reinforcement lines in the input, where the user defines a longitudinal reinforcement force $F_L$ and a transverse reinforcement force $F_T$ at a series of points along each reinforcement line. With the current implementation of slope tools, only the longitudinal reinforcement force $F_L$ is used. We assume that the reinforcement is flexible and therefore bends with the sliding of the failure surface to act parallel to the bottom of the slice. Thus, the reinforcement force is equal to the sum of the interpolated $F_L$ values for the reinforcement lines that intersect the base of the slice.
 
-**ALSO, YOU NEED TO INCLUDE -KWSIN(ALPHA) TO NORMAL FORCE - SEE NOTES**
+The **water force** $T$ on the side of the slice is calculated from the tension crack water input only applies if there is both a tension crack, and if the user has selected to fill the crack with water. This force only applies to the side of the uppermost slice and pushes in the direction of sliding. The force is calculated using the hydrostatic water pressure that is zero at the top of the crack (side of slice) and = $\gamma_w d_{tc}$ where $\gamma_w$ = the unit wt of water and $d_{tc}$ is the depth of the tension crack. The resultant force = $\frac{1}{2} \gamma_w d_{tc}^2$ and it acts at point $c$ which is 1/3 of the height of the slice $d_{tc}$.
 
-The seismic force is an additional force acting in the direction of sliding and causing failure, therefore we add it to the denominator of the factor of safety equation. Since the force acts horizontally, the moment arm is equal to the vertical distance between the center of the circle and the center of gravity. If we call this distance $a_s$ then the moment arm from the seismic force is:
+### Normal Force
 
->$a_s = y_o - y_{cg}$
+To revise the factor of safety equation for the OMS method to include the $D$, $kw$, $P$, and $T$ forces, we first need to consider how these forces affect the normal force on the base of the slice. In doing so, we will return to the original equation for the normal force, not the preferred formulation that uses an effective weight. Previously, the normal force on the base of the slice was defined as:
 
-where: 
+>$N = W \cos \alpha$
 
->$y_o$ = y-coordinate of the center of the circle<br>
->$y_{cg}$ = y-coordinate of the center of gravity of the slice<br>
+This is defined by considering the forces parallel to N, or perpendicular to the base of the slice. But if we include the new foces, the normal force is:
 
-The moment from the seismic force is then:
+>$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha$
 
->$M_s = a_s kW$
+and the effective normal force is:
 
-Using the same method as before, we can substitute this into the denominator of the factor of safety equation. Inserting the moment from the seismic force into (8), we get:
+>$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell    \qquad (4)$
 
->$F = \dfrac{\sum \left[ c' \Delta \ell + (W \cos \alpha + D \cos \beta \cos \alpha - u \Delta \ell \cos^2 \alpha) \tan \phi'\right]}{\sum W \sin \alpha + \dfrac{1}{R} \left( \sum a_d D + k\sum a_s W \right)}   \qquad (9)$
+This effective normal force is used in the shear force equation in the numerator of the factor of safety equation. The shear force on the base of the slice was originally defined as:
 
+>$S = c \Delta \ell + N \tan \phi$
 
-### Reinforcement Force
+Substituting the new normal force from (4) into this gives:
 
-The **reinforcement force** $R_{f}$ is a force on the base of the slice resisting sliding. The reinforcement force is calculated using the reinforcement lines in the input, where the user defines a longitudinal reinforcement force $F_L$ and a transverse reinforcement force $F_T$ at a series of points along each reinforcement line. With the current implementation of slope tools, only the longitudinal reinforcement force $F_L$ is used. We assume that the reinforcement is flexible and therefore bends with the sliding of the failure surface to act parallel to the bottom of the slice. Thus, the reinforcement force is equal to the sum of the interpolated $F_L$ values for the reinforcement lines that intersect the base of the slice.
+>$S = c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi    \qquad (5)$
 
+### Moments
 
+The OMS equation is based on moment equilibrium about the center of the slip circle. The moments in the original method of slices formulation included the weight of the slice and the shear force. The normal force acts through the center of the slice and therefore produces no moment. In the original equation, the limit equilibrium equation is:
 
+>$F = \dfrac{R \sum S}{R \sum W sin \alpha}    \qquad (6)$ 
 
+R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the R value because it was in both the numerator and denominator. But now we have to consider the moments resulting from the extra forces. Relative to the center of the circle, the moment arm for each force is as follows:   
 
+|      Force      | Moment Arm | Calculation |
+|:---------------:|:----------:|-------------|
+| $W \sin \alpha$ |    $R$     | Radius of the circle |
+|       $S$       |    $R$     | Radius of the circle |
+|       $D$       |   $a_d$    | Distance from center of circle to a line parallel to $D$ that passes through point $d$ |
+|      $kW$       |   $a_s$    | Vertical distance from center of circle to center of gravity of the slice |
+|       $P$       |    $R$     | Radius of the circle |
+|       $T$       |   $a_t$    | The vertical distance beteeen center of circle and the y-coordinate of point $c$ |
 
-### Water Force
+We can now add these moments to the limit equilibrium equation (6). To do this, we put resisting moments in the numerator and driving moments in the denominator. The new equation is:
 
-The **water force** $water$ on the side of the slice is calculated from the tension crack water input only applies if there is both a tension crack, and if the user has selected to fill the crack with water. This force only applies to the side of the upper-most slice and pushes in the direction of sliding. The force is calculated using the hydrostatic water pressure that is zero at the top of the crack (side of slice) and = $\gamma_w d_{tc}$ where $\gamma_w$ = the unit wt of water and $d_{tc}$ is the depth of the tension crack. The resultant force = $\frac{1}{2} \gamma_w d_{tc}^2$ and it acts at point $c$ which is 1/3 of the height of the slice $d_{tc}$.
+>$F = \dfrac{R \sum (S + P)}{R \sum W sin \alpha + \sum  D a_d + k\sum W a_s  + T a_t }   \qquad (7)$
 
+There is no summation for the term involving $T$ because it only applies to the uppermost slice. 
 
+### Complete Factor of Safety Equation
+
+Combining (5) and (7), we get:
+
+>$F = \dfrac{R \sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{R \sum W sin \alpha  + \sum  D a_d + k\sum W a_s  + T a_t }   \qquad (8)$
+
+If we divide everything by R, we get:
+
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{\sum W sin \alpha + \frac{1}{R}\sum D a_d  + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (9)$
+
+Remember that the water force only applies to the side of the uppermost slice, so for the summation in the numerator, the T value is zero for all other slices.
 
 ## Summary
 

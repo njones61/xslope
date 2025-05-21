@@ -148,12 +148,12 @@ If we divide everything by R, we get:
 
 >$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{\sum W sin \alpha + \frac{1}{R}\sum  D \cos \beta a_{dx} - \frac{1}{R}\sum  D \sin \beta a_{dy}  + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (9)$
 
-Remember that the water force only applies to the side of the uppermost slice, so for the summation in the numerator, the T value is zero for all other slices.
+Remember that the water force only applies to the side of the uppermost slice, so for the summation in the numerator, the $T$ value is zero for all other slices.
 
 ## Summary
 
 - Applicable only to **circular** slip surfaces.
 - **Only moment equilibrium** is satisfied.
 - **No iteration** is required.
-- **Less accurate** than more complete methods (e.g., Bishop’s or Spencer’s).
+- **Less accurate** than more complete methods (e.g., Bishop's or Spencer's).
 - Provides the same solution as the Swedish method when $\phi = 0$.

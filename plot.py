@@ -5,11 +5,32 @@ from solve import compute_line_of_thrust
 from shapely.geometry import LineString
 
 def plot_profile_lines(ax, profile_lines):
+    """
+    Plots the profile lines for each material in the slope.
+
+    Parameters:
+        ax: matplotlib Axes object
+        profile_lines: List of line coordinates representing material boundaries
+
+    Returns:
+        None
+    """
     for i, line in enumerate(profile_lines):
         xs, ys = zip(*line)
         ax.plot(xs, ys, label=f'Material {i+1}')
 
 def plot_max_depth(ax, profile_lines, max_depth):
+    """
+    Plots a horizontal line representing the maximum depth limit with hash marks.
+
+    Parameters:
+        ax: matplotlib Axes object
+        profile_lines: List of line coordinates representing material boundaries
+        max_depth: Maximum allowed depth for analysis
+
+    Returns:
+        None
+    """
     if max_depth is None:
         return
     x_vals = [x for line in profile_lines for x, _ in line]
@@ -27,11 +48,32 @@ def plot_max_depth(ax, profile_lines, max_depth):
         ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1)
 
 def plot_failure_surface(ax, failure_surface):
+    """
+    Plots the failure surface as a black line.
+
+    Parameters:
+        ax: matplotlib Axes object
+        failure_surface: Shapely LineString representing the failure surface
+
+    Returns:
+        None
+    """
     if failure_surface:
         x_clip, y_clip = zip(*failure_surface.coords)
         ax.plot(x_clip, y_clip, 'k-', linewidth=2, label="Failure Surface")
 
 def plot_slices(ax, df, fill=True):
+    """
+    Plots the slices used in the analysis.
+
+    Parameters:
+        ax: matplotlib Axes object
+        df: DataFrame containing slice data
+        fill: Boolean indicating whether to fill the slices with color
+
+    Returns:
+        None
+    """
     if df is not None:
         for _, row in df.iterrows():
             if fill:
@@ -44,6 +86,16 @@ def plot_slices(ax, df, fill=True):
                 ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5)
 
 def plot_piezo_line(ax, piezo_line):
+    """
+    Plots the piezometric line with a marker at its midpoint.
+
+    Parameters:
+        ax: matplotlib Axes object
+        piezo_line: List of coordinates representing the piezometric line
+
+    Returns:
+        None
+    """
     if piezo_line:
         piezo_xs, piezo_ys = zip(*piezo_line)
         ax.plot(piezo_xs, piezo_ys, 'b-', label="Piezometric Line")
@@ -70,6 +122,16 @@ def plot_tcrack_surface(ax, tcrack_surface):
     ax.plot(x_vals, y_vals, linestyle='--', color='red', linewidth=1.0, label='Tension Crack Depth')
 
 def plot_dloads(ax, dloads):
+    """
+    Plots distributed loads as arrows along the surface.
+
+    Parameters:
+        ax: matplotlib Axes object
+        dloads: List of distributed load data points with X, Y, and Normal force components
+
+    Returns:
+        None
+    """
     for line in dloads:
         xs = [pt['X'] for pt in line]
         ys = [pt['Y'] for pt in line]
@@ -149,12 +211,31 @@ def plot_circles(ax, data):
                  head_width=5, head_length=5, fc='red', ec='red')
 
 def plot_non_circ(ax, non_circ):
+    """
+    Plots a non-circular failure surface.
+
+    Parameters:
+        ax: matplotlib Axes object
+        non_circ: List of coordinates representing the non-circular failure surface
+
+    Returns:
+        None
+    """
     xs, ys = zip(*non_circ)
     ax.plot(xs, ys, 'r--', label='Non-Circular Surface')
 
 def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     """
     Adds a material properties table to the plot.
+
+    Parameters:
+        ax: matplotlib Axes object
+        materials: List of material property dictionaries
+        xloc: x-location of table (0-1)
+        yloc: y-location of table (0-1)
+
+    Returns:
+        None
     """
     if not materials:
         return
@@ -197,10 +278,20 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
-
 def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
+    """
+    Plots the effective normal stresses and pore pressures on the base of each slice.
 
+    Parameters:
+        ax: matplotlib Axes object
+        df: DataFrame containing slice data
+        sigma_eff: Array of effective normal stresses
+        scale_frac: Scaling factor for stress visualization
+        alpha: Transparency value for filled areas
 
+    Returns:
+        None
+    """
     u = df['u'].values
 
     heights = df['y_ct'] - df['y_cb']
@@ -240,7 +331,6 @@ def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
         poly_x = [x1, x2, x2_top, x1_top]
         poly_y = [y1, y2, y2_top, y1_top]
 
-        # ax.fill(poly_x, poly_y, color='red' if stress <= 0 else 'green', alpha=alpha, edgecolor='k', linewidth=0.5)
         ax.fill(poly_x, poly_y, facecolor='none', edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....',
                 linewidth=1)
 
@@ -257,7 +347,6 @@ def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
         poly_uy = [y1, y2, uy2_top, uy1_top]
 
         ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
-        # ax.fill(poly_ux, poly_uy, facecolor='none', edgecolor='blue', hatch='.....', linewidth=1)
 
 def plot_thrust_line(ax, thrust_line: LineString,
                     color: str = 'red',
@@ -265,22 +354,18 @@ def plot_thrust_line(ax, thrust_line: LineString,
                     linewidth: float = 1,
                     label: str = 'Line of Thrust'):
     """
-    Plot a Shapely LineString of the line of thrust on the given Axes.
+    Plots the line of thrust on the slope.
 
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        The axes to plot onto.
-    thrust_line : LineString
-        The Shapely LineString returned by compute_line_of_thrust.
-    color : str, optional
-        Line color (default 'red').
-    linestyle : str, optional
-        Matplotlib linestyle (default '--').
-    linewidth : float, optional
-        Line width (default 2).
-    label : str, optional
-        Legend label for the thrust line.
+    Parameters:
+        ax: matplotlib Axes object
+        thrust_line: Shapely LineString representing the line of thrust
+        color: Color of the line
+        linestyle: Style of the line
+        linewidth: Width of the line
+        label: Label for the line in the legend
+
+    Returns:
+        None
     """
     # extract x,y coords
     xs, ys = zip(*list(thrust_line.coords))
@@ -290,12 +375,16 @@ def plot_thrust_line(ax, thrust_line: LineString,
             linewidth=linewidth,
             label=label)
 
-
 def compute_ylim(data, pad_fraction=0.1):
     """
-    Compute a reasonable y–axis limit by looking at all profile lines
-    (either shapely LineStrings or lists of (x, y) tuples)
-    and the max_depth. Adds a little padding above and below.
+    Computes the y-axis limits for the plot with padding.
+
+    Parameters:
+        data: Dictionary containing plot data
+        pad_fraction: Fraction of the range to add as padding
+
+    Returns:
+        tuple: (y_min, y_max) for the plot
     """
     import numpy as np
 
@@ -322,10 +411,18 @@ def compute_ylim(data, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-
 def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     """
-    Simple clean slope plot with equal aspect ratio and normal legend.
+    Creates a plot showing the slope geometry and input parameters.
+
+    Parameters:
+        data: Dictionary containing plot data
+        title: Title for the plot
+        width: Width of the plot in inches
+        height: Height of the plot in inches
+
+    Returns:
+        None
     """
     fig, ax = plt.subplots(figsize=(width, height))
 
@@ -358,8 +455,21 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-
 def plot_solution(data, df, failure_surface, results, width=12, height=7):
+    """
+    Creates a plot showing the slope stability analysis solution.
+
+    Parameters:
+        data: Dictionary containing plot data
+        df: DataFrame containing slice data
+        failure_surface: Shapely LineString representing the failure surface
+        results: Dictionary containing analysis results
+        width: Width of the plot in inches
+        height: Height of the plot in inches
+
+    Returns:
+        None
+    """
     fig, ax = plt.subplots(figsize=(width, height))
     ax.set_xlabel("x")
     ax.set_ylabel("y")
@@ -385,8 +495,6 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....',  label="Eff Normal Stress (σ')")
     pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
 
-    # Add these to the legend
-    # ax.legend(handles=ax.get_legend_handles_labels()[0] + [normal_patch, pore_patch])
     # Add legend below the plot
     ax.legend(
         handles=ax.get_legend_handles_labels()[0] + [normal_patch, pore_patch],
@@ -427,9 +535,14 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
 
 def plot_failure_surfaces(ax, fs_cache):
     """
-    Plots all failure surfaces.
-    Critical surface (lowest FS) is plotted in red, others in gray.
-    Drawing order is reversed so the critical surface is on top.
+    Plots all failure surfaces from the factor of safety cache.
+
+    Parameters:
+        ax: matplotlib Axes object
+        fs_cache: List of dictionaries containing failure surface data and FS values
+
+    Returns:
+        None
     """
     for i, result in reversed(list(enumerate(fs_cache))):
         surface = result['failure_surface']
@@ -440,18 +553,30 @@ def plot_failure_surfaces(ax, fs_cache):
         lw = 2 if i == 0 else 1
         ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6)
 
-
 def plot_circle_centers(ax, fs_cache):
     """
-    Plots a dot at each circle center tried during the search.
+    Plots the centers of circular failure surfaces.
+
+    Parameters:
+        ax: matplotlib Axes object
+        fs_cache: List of dictionaries containing circle center data
+
+    Returns:
+        None
     """
     for result in fs_cache:
         ax.plot(result['Xo'], result['Yo'], 'ko', markersize=3, alpha=0.6)
 
-
 def plot_search_path(ax, search_path):
     """
-    Plots small arrows showing the search refinement path.
+    Plots the search path used to find the critical failure surface.
+
+    Parameters:
+        ax: matplotlib Axes object
+        search_path: List of dictionaries containing search path coordinates
+
+    Returns:
+        None
     """
     if len(search_path) < 2:
         return  # need at least two points to draw an arrow
@@ -464,16 +589,20 @@ def plot_search_path(ax, search_path):
         ax.arrow(start['x'], start['y'], dx, dy,
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
 
-
 def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
     """
-    Main function to plot slope geometry and circular search results.
+    Creates a plot showing the results of a circular failure surface search.
 
     Parameters:
-        data (dict): Global data dictionary
-        fs_cache (list of dict): Search results sorted by FS
-        search_path (list of dict, optional): Path of search refinements
-        highlight_fs (bool): Whether to label critical FS on plot
+        data: Dictionary containing plot data
+        fs_cache: List of dictionaries containing failure surface data and FS values
+        search_path: List of dictionaries containing search path coordinates
+        highlight_fs: Boolean indicating whether to highlight the critical failure surface
+        width: Width of the plot in inches
+        height: Height of the plot in inches
+
+    Returns:
+        None
     """
     fig, ax = plt.subplots(figsize=(width, height))
 

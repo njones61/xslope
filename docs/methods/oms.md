@@ -120,18 +120,21 @@ The OMS equation is based on moment equilibrium about the center of the slip cir
 
 R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the R value because it was in both the numerator and denominator. But now we have to consider the moments resulting from the extra forces. Relative to the center of the circle, the moment arm for each force is as follows:   
 
-|      Force      | Moment Arm | Calculation |
-|:---------------:|:----------:|-------------|
-| $W \sin \alpha$ |    $R$     | Radius of the circle |
-|       $S$       |    $R$     | Radius of the circle |
-|       $D$       |   $a_d$    | Distance from center of circle to a line parallel to $D$ that passes through point $d$ |
-|      $kW$       |   $a_s$    | Vertical distance from center of circle to center of gravity of the slice |
-|       $P$       |    $R$     | Radius of the circle |
+|      Force      | Moment Arm | Calculation                                                                      |
+|:---------------:|:----------:|----------------------------------------------------------------------------------|
+| $W \sin \alpha$ |    $R$     | Radius of the circle                                                             |
+|       $S$       |    $R$     | Radius of the circle                                                             |
+| $D \cos \beta$  |  $a_{dx}$  | Horizontal distance from center of circle to point $d$                             |
+| $D \sin \beta$  |  $a_{dy}$  | Vertical distance from center of circle to point $d$                           |
+|      $kW$       |   $a_s$    | Vertical distance from center of circle to center of gravity of the slice        |
+|       $P$       |    $R$     | Radius of the circle                                                             |
 |       $T$       |   $a_t$    | The vertical distance beteeen center of circle and the y-coordinate of point $c$ |
+
+Notice that for the distributed load, $D$, because the load is at an oblique angle, we decompose it into vertical and horizontal components. The vertical component of the distributed load is $D \cos \beta$ and the horizontal component is $D \sin \beta$. 
 
 We can now add these moments to the limit equilibrium equation (6). To do this, we put resisting moments in the numerator and driving moments in the denominator. The new equation is:
 
->$F = \dfrac{R \sum (S + P)}{R \sum W sin \alpha + \sum  D a_d + k\sum W a_s  + T a_t }   \qquad (7)$
+>$F = \dfrac{R \sum (S + P)}{R \sum W sin \alpha + \sum  D \cos \beta a_{dx} - \sum  D \sin \beta a_{dy} + k\sum W a_s  + T a_t }   \qquad (7)$
 
 There is no summation for the term involving $T$ because it only applies to the uppermost slice. 
 
@@ -139,11 +142,11 @@ There is no summation for the term involving $T$ because it only applies to the 
 
 Combining (5) and (7), we get:
 
->$F = \dfrac{R \sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{R \sum W sin \alpha  + \sum  D a_d + k\sum W a_s  + T a_t }   \qquad (8)$
+>$F = \dfrac{R \sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{R \sum W sin \alpha  + \sum  D \cos \beta a_{dx} - \sum  D \sin \beta a_{dy} + k\sum W a_s  + T a_t }   \qquad (8)$
 
 If we divide everything by R, we get:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{\sum W sin \alpha + \frac{1}{R}\sum D a_d  + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (9)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{\sum W sin \alpha + \frac{1}{R}\sum  D \cos \beta a_{dx} - \frac{1}{R}\sum  D \sin \beta a_{dy}  + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (9)$
 
 Remember that the water force only applies to the side of the uppermost slice, so for the summation in the numerator, the T value is zero for all other slices.
 

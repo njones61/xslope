@@ -70,11 +70,11 @@ Next, we define $\Delta y_{i}$ and $\Delta y_{i+1}$ as the distance from the cen
 up to the left and right side forces, $E_{i}$ and $E_{i-1}$ respectively, and $\Delta x$ is the width of the slice. Assuming CCW rotation is positive (right-hand rule) we can write the moment equilibrium equation as:
 
 >>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \dfrac{\Delta x}{2} + E_{i+1} \Delta y_{i+1} - X_{i+1} \dfrac
-> {\Delta x}{2}= 0$
+> {\Delta x}{2}= 0   \qquad (1)$
 
 If we start with slice 1 on the left side, the left side force is zero so we have one unknown ($\Delta y_{i+1}$) and one equation. Then on the next slice, the left side moment arm is known and the right side moment arm is unknown. So again we have one equation and one unknown ($\Delta y_{i+1}$) which we can solve for as follows:
 
->>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \dfrac{\Delta x}{2} + X_{i+1} \dfrac{\Delta x}{2}}{E_{i+1}}$
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \dfrac{\Delta x}{2} + X_{i+1} \dfrac{\Delta x}{2}}{E_{i+1}}   \qquad (2)$
 
 We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice and the average of the two moment arms can be used to compute the location of the resultant side force. 
 
@@ -98,11 +98,11 @@ For the sweep starting on the left side, we pivot about the base of the right si
 arms for the left and right side forces, respectively. Assuming CCW rotation is positive (right-hand rule) we can write the moment equilibrium equation as:
 
 >>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \Delta x + E_{i+1} \Delta y_{i+1} + W \dfrac{\Delta x}{2} - 
-> N \dfrac{\Delta \ell}{2} = 0$
+> N \dfrac{\Delta \ell}{2} = 0   \qquad (3)$
 
 Solving for $\Delta y_{i+1}$ gives:
 
->>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2}}{E_{i+1}}$
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2}}{E_{i+1}}   \qquad (4)$
 
 We then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower right 
 corner of the slice $y_{rb}$ as follows:
@@ -123,12 +123,12 @@ i vs i+1 indexing is the same as before - i.e., the left side is always i and th
 we iterate through the slices from i = n to i = 1, where n is the number of slices. In this case, the moment arm on 
 the right side is known and the moment arm on the left side is unknown. The moment equilibrium equation is given by:
 
->>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} +  N \dfrac{\Delta \ell}{2} = 0$
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} +  N \dfrac{\Delta \ell}{2} = 0   \qquad (5)$
 
 
 Solving for $\Delta y_{i}$ gives:
 
->>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2}}{E_{i}}$
+>>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2}}{E_{i}}   \qquad (6)$
 
 Again, we then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower left 
 corner of the slice $y_{lb}$ as follows:
@@ -158,7 +158,7 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 For the left sweep, we pivot about the base of the right side of the slice. The moment equilibrium equation is given by:
 
->>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \Delta x + E_{i+1} \Delta y_{i+1} + W \dfrac{\Delta x}{2} - N \dfrac{\Delta \ell}{2} + D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k  + T a_t = 0$
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \Delta x + E_{i+1} \Delta y_{i+1} + W \dfrac{\Delta x}{2} - N \dfrac{\Delta \ell}{2} + D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k  + T a_t = 0   \qquad (7)$
 
 where:
 
@@ -169,18 +169,22 @@ where:
 
 Solving for $\Delta y_{i+1}$ gives:
 
->>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} - D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i+1}}$
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} - D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i+1}}   \qquad (8)$
 
-We then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower right corner of the slice $y_{rb}$ as described earlier.
+It should be noted that the tension crack water force ($T$) only applies to right side of the top slice on a left-facing slope. For a right-facing slope, the tension crack water force is applied to the left side of the top slice and would act in the opposite direction. Therefore, the sign on $T$ in equation (8) would be reversed (positive) in that case.
+
+Finally, we then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower right corner of the slice $y_{rb}$ as described earlier.
 
 ### Right Sweep with Additional Forces
 
 For the right sweep, we pivot about the base of the left side of the slice. The moment equilibrium equation is given by:
 
->>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac{\Delta \ell}{2} - D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k + T a_t = 0$
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac{\Delta \ell}{2} - D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k + T a_t = 0   \qquad (9)$
+
+Again, care must be taken with the tension crack water force ($T$) as described earlier.
 
 Solving for $\Delta y_{i}$ gives:
 
->>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} + D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i}}$
+>>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} + D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i}}   \qquad (10)$
 
 Again, we convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower left corner of the slice $y_{lb}$ as described earlier.

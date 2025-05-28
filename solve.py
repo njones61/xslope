@@ -138,14 +138,19 @@ def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
     tan_phi = np.tan(phi_rad)
 
     W = df['w']
-    shear_reinf = df.get('shear_reinf', 0)
-    normal_reinf = df.get('normal_reinf', 0)
     c = df['c'].values
     dl = df['dl'].values
     u = df['u'].values
 
     sin_alpha = np.sin(alpha_rad)
     cos_alpha = np.cos(alpha_rad)
+
+    # === Calculate base FS ===
+
+    N_eff = W * cos_alpha - u * dl
+    F = sum(c * dl + N_eff * tan_phi) / sum(W * sin_alpha)
+
+    df['n_eff'] = N_eff  # store effective normal forces in df
 
     # === Compute Janbu correction factor ===
     x_l = df['x_l'].iloc[0]
@@ -172,35 +177,14 @@ def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
 
     fo = 1 + b1 * (dL_ratio - 1.4 * dL_ratio**2)
 
-    # === Iterative FS solver ===
-    F = 1.0  # initial guess
-    converged = False
-    for _ in range(max_iter):
-        N = W * cos_alpha + normal_reinf
-        S = c * dl + (N - u * dl) * tan_phi / F
-        T = W * sin_alpha - shear_reinf
-
-        F_new = S.sum() / T.sum()
-
-        if abs(F_new - F) < tol:
-            converged = True
-            break
-
-        F = F_new
-
     # === Return solution ===
     FS = F * fo
 
-    if not converged:
-        return False, 'Janbu-Corrected method did not converge within the maximum number of iterations.'
-    else:
-        results = {}
-        results['method'] = 'janbu_corrected'
-        results['FS'] = FS
-        results['fo'] = fo
-        return True, results
-
-    return results
+    results = {}
+    results['method'] = 'janbu_corrected'
+    results['FS'] = FS
+    results['fo'] = fo
+    return True, results
 
 
 def force_equilibrium_OLD(df, theta_list, circular=True,

@@ -522,6 +522,8 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     elif method == 'corps_engineers':
         theta = results['theta']
         title = f'Corps Engineers: FS = {fs:.3f}, θ = {theta:.2f}°'
+    elif method == 'lowe_karafiath':
+        title = f'Lowe & Karafiath: FS = {fs:.3f}'
     ax.set_title(title)
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)

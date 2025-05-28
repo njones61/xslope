@@ -404,6 +404,65 @@ def corps_engineers(df, circular=True, debug=True):
         results['theta'] = theta_deg           # append theta
         return success, results
 
+def lowe_karafiath(df, circular=True, debug=True):
+    """
+    Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
+    the average of the top‐and bottom‐surface slopes of the two adjacent slices
+    at each boundary.
+    """
+    n = len(df)
+
+    # grab boundary coords
+    x_l = df['x_l'].values
+    y_lt = df['y_lt'].values
+    y_lb = df['y_lb'].values
+    x_r = df['x_r'].values
+    y_rt = df['y_rt'].values
+    y_rb = df['y_rb'].values
+
+    # determine facing
+    right_facing = (y_lt[0] > y_rt[-1])
+
+    # precompute each slice's top & bottom slopes
+    widths   = (x_r - x_l)
+    slope_top    = (y_rt - y_lt) / widths
+    slope_bottom = (y_rb - y_lb) / widths
+
+    # build θ_list for j=0..n
+    if debug:
+        print("boundary slopes (top/bottom) avg, θ_list:")  # header for debug list
+
+    theta_list = np.zeros(n+1)
+    for j in range(n+1):
+        if j == 0:
+            st = slope_top[0]
+            sb = slope_bottom[0]
+        elif j == n:
+            st = slope_top[-1]
+            sb = slope_bottom[-1]
+        else:
+            st = 0.5*(slope_top[j-1] + slope_top[j])
+            sb = 0.5*(slope_bottom[j-1] + slope_bottom[j])
+
+        avg_slope = 0.5*(st + sb)
+        theta = np.degrees(np.arctan(avg_slope))
+
+        # sign convention
+        if right_facing:
+            theta_list[j] =  -theta
+        else:
+            theta_list[j] = theta
+
+        if debug:
+            print(f"  j={j:2d}: st={st:.3f}, sb={sb:.3f}, θ={theta:.3f}°")
+
+    # call your force_equilibrium solver
+    success, results = force_equilibrium(df, theta_list, debug=debug)
+    if not success:
+        return success, results
+    else:
+        results['method'] = 'lowe_karafiath'  # append method
+        return success, results
 
 def spencer(df, circular=True):
     """

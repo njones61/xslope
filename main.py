@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu_corrected, spencer, corps_engineers
+from solve import oms, bishop, janbu_corrected, spencer, corps_engineers, lowe_karafiath
 
 
 def solve_selected(func, df, circular=True):
@@ -21,6 +21,8 @@ def solve_selected(func, df, circular=True):
         print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
     elif func == corps_engineers:
         print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
+    elif func == lowe_karafiath:
+        print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
     return result
 
 def solve_all(df, circular=True):
@@ -40,7 +42,7 @@ non_circ = data['non_circ'] if not data['circular'] else None
 
 print(f"circle: {circle}")
 
-success, result = generate_slices(data, circle, non_circ, num_slices=40)
+success, result = generate_slices(data, circle, non_circ, num_slices=20)
 if success:
     df, failure_surface = result
 else:
@@ -50,7 +52,7 @@ else:
 # df.to_excel("slices.xlsx", index=False)
 
 # options = [oms, bishop, spencer, janbu_corrected]
-results = solve_selected(corps_engineers, df, circular=True)
+results = solve_selected(lowe_karafiath, df, circular=True)
 
 
 plot_solution(data, df, failure_surface, results)

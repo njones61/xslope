@@ -45,10 +45,12 @@ def oms(df, circular=True):
     u = df['u'].values
     dl = df['dl'].values
 
-    N = W * cos_alpha - u * dl * cos2_alpha
-    numerator = c * dl + N * np.tan(phi)
+    N_eff = W * cos_alpha - u * dl * cos2_alpha
+    numerator = c * dl + N_eff * np.tan(phi)
     denominator = W * sin_alpha - shear_reinf
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
+
+    df['n_eff'] = N_eff  # store effective normal forces in df
 
     results = {}
     results['method'] = 'oms'
@@ -94,8 +96,8 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
     # Start iteration with an initial guess
     converge = False
     F_guess = 1.0
-    N = W * cos_alpha - u * dl * cos2_alpha
-    num = c * dl + N * tan_phi
+    N_eff = W * cos_alpha - u * dl * cos2_alpha
+    num = c * dl + N_eff * tan_phi
     for _ in range(max_iter):
         denom = cos_alpha + (sin_alpha * tan_phi) / F_guess
         terms = num / denom
@@ -105,6 +107,7 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
             break
         F_guess = F_calc
 
+    df['n_eff'] = N_eff  # store effective normal forces in df
 
     if not converge:
         return False, 'Bishop method did not converge within the maximum number of iterations.'
@@ -327,12 +330,14 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
     u       = df['u'].values
     dl      = df['dl'].values
     theta   = np.radians(np.asarray(theta_list))
+    N = np.zeros(n)  # normal forces on slice bases
+    Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
 
     def residual(FS):
         """Return the right‐side interslice force Z[n] for a given FS."""
         c_m       = c / FS
         tan_phi_m = np.tan(phi) / FS
-        Z = np.zeros(n+1)
+        Z[:] = 0.0  # reset Z for each call
         for i in range(n):
             ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
             A = np.array([
@@ -341,8 +346,9 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
             ])
             b0 = -c_m[i]*dl[i]*ca + u[i]*dl[i]*sa - Z[i]*np.cos(theta[i])
             b1 = -c_m[i]*dl[i]*sa - u[i]*dl[i]*ca + w[i]    - Z[i]*np.sin(theta[i])
-            _, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
+            N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
             Z[i+1] = Z_ip1
+            N[i] = N_i  # store normal force on slice base
         return Z[n]
 
     if debug:
@@ -354,6 +360,9 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
         FS_opt = newton(residual, fs_guess, tol=tol, maxiter=max_iter)
     except Exception as e:
         return False, f"force_equilibrium failed to converge: {e}"
+
+    df['n_eff'] = N  # store effective normal forces in df
+    df['z'] = Z[:-1]  # store interslice forces in df, adjust length to n slices
 
     if debug:
         r_opt = residual(FS_opt)
@@ -394,6 +403,8 @@ def corps_engineers(df, circular=True, debug=True):
     # one theta per slice boundary
     n = len(df)
     theta_list = np.full(n+1, theta_deg)
+
+    df['theta'] = theta_list[:-1]  # store theta in df. Adjust length to n slices.
 
     # delegate to your force_equilibrium solver
     success, results = force_equilibrium(df, theta_list, debug=debug)
@@ -456,6 +467,8 @@ def lowe_karafiath(df, circular=True, debug=True):
         if debug:
             print(f"  j={j:2d}: st={st:.3f}, sb={sb:.3f}, θ={theta:.3f}°")
 
+    df['theta'] = theta_list[:-1]  # store theta in df. Adjust length to n slices.
+
     # call your force_equilibrium solver
     success, results = force_equilibrium(df, theta_list, debug=debug)
     if not success:
@@ -487,6 +500,7 @@ def spencer(df, circular=True):
     phi = np.radians(df['phi'].values)
     c = df['c'].values
     dx = df['dx'].values
+    dl = df['dl'].values
     w = df['w'].values
     u = df['u'].values
     x_c = df['x_c'].values
@@ -538,6 +552,47 @@ def spencer(df, circular=True):
     FS_force = fs_force(theta_rad)
     FS_moment = fs_moment(theta_rad)
 
+    df['theta'] = theta_opt  # store theta in df.
+
+    # --- NEW: compute interslice forces Z and effective normals n_eff ---
+    Q = compute_Q(FS_force, theta_rad)
+    n = len(Q)
+    Z = np.zeros(n+1)
+    # Q_i = Z_i - Z_{i+1}  ⇒  Z_{i+1} = Z_i - Q_i
+    for i in range(n):
+        Z[i+1] = Z[i] - Q[i]
+
+    # horizontal component X = Z * sin(θ)
+    X = Z * np.sin(theta_rad)
+
+    # --- compute effective normal N' per slice from your doc:
+    # N' = [ -c_m·dl·sinα  - u·dl·cosα  + W  - X_i  + X_{i+1} ]
+    #      -----------------------------------------------
+    #          tan(φ_m)·sinα  +  cosα
+
+    # mobilized cohesion and friction
+    c_m      = c / FS_force
+    tan_phi_m = np.tan(phi) / FS_force
+
+    # X runs from 0..n, and X[i] is the horizontal side‐force on the left face of slice i
+    X_i   = X[:-1]
+    X_ip1 = X[1:]
+
+    num = (
+        -c_m * dl * np.sin(alpha)
+        - u   * dl * np.cos(alpha)
+        + w
+        - X_i
+        + X_ip1
+    )
+    denom = tan_phi_m * np.sin(alpha) + np.cos(alpha)
+
+    N_eff = num / denom
+
+    # store back into df
+    df['z']     = Z[:-1]        # Z_i acting on slice i’s left face
+    df['n_eff'] = N_eff
+
     # Check convergence
     converged = abs(FS_force - FS_moment) < tol
     if not converged:
@@ -549,7 +604,6 @@ def spencer(df, circular=True):
         results['theta'] = theta_opt
 
         # debug print values per slice
-        Q = compute_Q(FS_force, theta_rad)
         for i in range(len(Q)):
             print(f"Slice {i}: Q = {Q[i]:.3f}, alpha = {degrees(alpha[i]):.2f}, phi = {degrees(phi[i]):.2f}, c = {c[i]:.2f}, w = {w[i]:.2f}, u = {u[i]:.2f}")
 
@@ -599,10 +653,13 @@ def extract_spencer_Q(df, FS, theta_deg, debug=False):
 
     return Q
 
-def compute_line_of_thrust(df, FS, theta_deg, debug=False):
+def compute_line_of_thrust(df, FS, debug=False):
     """
     Compute the line of thrust via dual-sweep moment equilibrium,
-    with optional debug output.
+    with optional debug output. This should only be called after
+    Spencer's method has been run to obtain the factor of safety (FS).
+    It does not work for methods that do not satisfy complete force
+    and moment equilibrium.
 
     Parameters
     ----------
@@ -628,50 +685,30 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
     n      = len(df)
     alpha  = np.radians(df['alpha'].values)
     phi    = np.radians(df['phi'].values)
+    theta  = np.zeros(n+1)
+    theta[:-1]   = np.radians(df['theta'].values)
     c      = df['c'].values
     w      = df['w'].values
     u      = df['u'].values
     dl     = df['dl'].values
     dx     = df['dx'].values
-    theta  = np.radians(theta_deg)
     y_lb   = df['y_lb'].values
     y_rb   = df['y_rb'].values
 
     c_m       = c / FS
     tan_phi_m = np.tan(phi) / FS
 
-    N_eff = np.zeros(n)
+    N_eff = df['n_eff'].values
     Z     = np.zeros(n+1)
-    Z[0]  = 0.0
+    Z[:-1]  = df['z'].values
 
     tol = 1e-8
 
-    # ---- 1) Solve for Z_i (interslice forces) and effective normal forces ----
-
-       # NOTE: for spencer's method, there is a simpler way to get Z_i using Q_i. However,
-       # you then have to calculate the effective normal forces N_eff_i from Z_i. I originally
-       # had both methods here with an if statement based on the method used, but it
-       # was more efficient to just use the force equilibrium method for all methods. So
-       # this should work equally well for both Spencer and FE methods.
-
-    for i in range(n):
-        A = np.array([
-            [ tan_phi_m[i]*np.cos(alpha[i]) - np.sin(alpha[i]),  -np.cos(theta) ],
-            [ tan_phi_m[i]*np.sin(alpha[i]) + np.cos(alpha[i]),  -np.sin(theta) ]
-        ])
-        b = np.array([
-            -c_m[i]*dl[i]*np.cos(alpha[i]) + u[i]*dl[i]*np.sin(alpha[i])- Z[i]*np.cos(theta),
-            -c_m[i]*dl[i]*np.sin(alpha[i]) - u[i]*dl[i]*np.cos(alpha[i]) + w[i] - Z[i]*np.sin(theta)
-        ])
-        sol       = np.linalg.solve(A, b)
-        N_eff[i]  = sol[0]
-        Z[i+1]    = sol[1]
-
-    # 2) decompose side-forces
+    # 1) decompose side-forces
     X = Z * np.sin(theta)
     E = Z * np.cos(theta)
 
-    # 3a) left-to-right moment sweep about each slice's lower-right
+    # 2a) left-to-right moment sweep about each slice's lower-right
     delta_y_L = np.zeros(n+1)  # Moment arms to side forces relative to slice lower-right.
     y_L       = np.zeros(n+1)  # Absolute y-coordinates of the thrust line on all slice boundaries based on left sweep
     delta_y_L[0] = 0.0         # First slice pivot (starting from the left)
@@ -692,7 +729,7 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
     delta_y_L[n] = 0.0         # Last (right-most) slice pivot
     y_L[n]       = y_rb[n-1]   # Last (right-most) slice right side y-coordinate
 
-    # 3b) right-to-left moment sweep about each slice's lower-left
+    # 2b) right-to-left moment sweep about each slice's lower-left
     delta_y_R = np.zeros(n+1)   # Moment arms to side forces relative to slice lower-left.
     y_R       = np.zeros(n+1)   # Absolute y-coordinates of the thrust line on all slice boundaries based on right sweep
     delta_y_R[n] = 0.0          # First slice pivot (starting from the right)
@@ -714,33 +751,20 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
     delta_y_R[0] = 0.0       # Last (left-most) slice pivot
     y_R[0] = y_lb[0]         # Last (left-most) slice left side y-coordinate
 
-    # 3c) average both sweeps
+    # 2c) average both sweeps
     y_bound = 0.5 * (y_L + y_R)
 
-    # 4) build LineString
+    # 3) build LineString
     x_bound = np.empty(n+1)
     x_bound[0]  = df['x_l'].iat[0]
     x_bound[1:] = df['x_r'].values
     thrust_line = LineString(np.column_stack([x_bound, y_bound]))
 
-    # 5) debug export
+    # 4) debug export
     if debug:
-        import pandas as pd
-
-        Q = extract_spencer_Q(df, FS, theta_deg)
 
         rows = []
         for i in range(n):
-            A_i = np.array([
-                [ tan_phi_m[i]*np.cos(alpha[i]) - np.sin(alpha[i]), -np.cos(theta) ],
-                [ tan_phi_m[i]*np.sin(alpha[i]) + np.cos(alpha[i]), -np.sin(theta) ]
-            ])
-            b_i = np.array([
-                -c_m[i]*dl[i]*np.cos(alpha[i]) + u[i]*dl[i]*np.sin(alpha[i]) - Z[i]*np.cos(theta),
-                -c_m[i]*dl[i]*np.sin(alpha[i]) - u[i]*dl[i]*np.cos(alpha[i]) + w[i]   - Z[i]*np.sin(theta)
-            ])
-            fx_res = A_i[0,0]*N_eff[i] + A_i[0,1]*Z[i+1] - b_i[0]
-            fy_res = A_i[1,0]*N_eff[i] + A_i[1,1]*Z[i+1] - b_i[1]
 
             # recompute arm_left and arm_right here for debug
             arm_left  = y_L[i]   - y_rb[i]
@@ -778,7 +802,6 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
                 'w':               w[i],
                 'c_m':             c_m[i],
                 'tan_phi_m':       tan_phi_m[i],
-                'Q':               Q[i],
                 'Z_left':          Z[i],
                 'Z_right':         Z[i+1],
                 'X_left':          X[i],
@@ -793,16 +816,14 @@ def compute_line_of_thrust(df, FS, theta_deg, debug=False):
                 'y_R_abs_right':   y_R[i+1],
                 'y_ave_left':      y_bound[i],
                 'y_ave_right':     y_bound[i+1],
-                'fx_res':          fx_res,
-                'fy_res':          fy_res,
                 'mom_res_L':       m_res_L,
                 'mom_res_R':       m_res_R
             })
 
         df_debug = pd.DataFrame(rows)
-        df_debug.to_excel("thrust_calc_resuls.xlsx", index=False)
-        print("Debug table written to thrust_calc_resuls.xlsx")
+        df_debug.to_excel("thrust_calc_results.xlsx", index=False)
+        print("Debug table written to thrust_calc_results.xlsx")
 
     # 6) return results
-    sigma_prime = N_eff / dl
-    return thrust_line, sigma_prime
+    return thrust_line
+

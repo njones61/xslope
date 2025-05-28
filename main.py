@@ -49,11 +49,13 @@ else:
     print(result)
 
 # export df to excel
-# df.to_excel("slices.xlsx", index=False)
+df.to_excel("slices.xlsx", index=False)
 
-# options = [oms, bishop, spencer, janbu_corrected]
-results = solve_selected(lowe_karafiath, df, circular=True)
+# options = [oms, bishop, spencer, janbu_corrected, corps_engineers, lowe_karafiath]
+results = solve_selected(bishop, df, circular=True)
 
+# export df to excel agian
+df.to_excel("slices_2.xlsx", index=False)
 
 plot_solution(data, df, failure_surface, results)
 

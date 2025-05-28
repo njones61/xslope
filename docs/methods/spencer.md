@@ -198,6 +198,22 @@ In both cases, we need to solve for $FS$ and $\theta$ **iteratively**.
 
 To do this, we assume a value for $theta$ and then find the factor of safety that satisfies the moment equilibrium equation $FS_{mom}$ and the factor of safety that satisfies the force equilibrium equation, $FS_{force}$. If the two are different, we pick a new value of $theta$ and iterate until they converge, i.e., $FS_{mom}$ = $FS_{force}$.
 
+## Solving for the Normal Force
+
+It is useful to solve for the effective normal force at the same time that the factor of safety is calculated. These 
+can be plotted (as stresses) along with the line of thrust. Negative values are another indicator of tension in the 
+slice. We can do this as follows:
+
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' tan(\phi_m)\right] sin(\alpha) + (N' + u \Delta \ell) cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
+
+>>$c_m \Delta \ell  sin(\alpha) + N' tan(\phi_m) sin(\alpha) + N' cos(\alpha) + u \Delta \ell cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+
+>>$c_m \Delta \ell  sin(\alpha) + N' \left[tan(\phi_m) sin(\alpha) +  cos(\alpha)\right] + u \Delta \ell cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+
+Solving for $N'$ gives:
+
+>>$N' = \dfrac{- c_m \Delta \ell  sin(\alpha) - u\Delta \ell cos(\alpha) + W - X_{i} + X_{i+1}}{tan(\phi_m) sin(\alpha) + cos(\alpha)}$
+
 ## Summary
 
 - Assumes constant side force inclination $\theta$

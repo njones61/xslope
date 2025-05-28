@@ -26,40 +26,20 @@ the force as follows:
 
 The shear force ($S_i$) acting on the bottom of the slice is the mobilized shear strength of the soil, which is equal to:
 
->>$S = \tau_m\Delta l$
-
-where $\tau_m$ is the mobilized shear strength of the soil and $\Delta l$ is the length of the slice. The mobilized shear strength is equal to:
-
->>$\tau_m = \dfrac{c + (\sigma-u) tan\phi}{F}$
- 
->>$\tau_m = c_m + \sigma' tan\phi_m$
+>>$S = c_m \Delta \ell  + (N - u \Delta \ell) tan\phi_m$
 
 where:
 
-- $c$ = the cohesion of the soil
 - $c_m$ = the mobilized cohesion of the soil = $c/F$
-- $\sigma$ = the normal stress acting on the slice
-- $\sigma'$ = the effective normal stress acting on the slice = $\sigma - u$
+- $N$ = the normal force acting on the slice 
 - $u$ = the pore water pressure acting on the slice
 - $\phi$ = the angle of internal friction of the soil
 - tan$\phi_m$ = the mobilized friction of the soil = tan$\phi/F$
 - $F$ = the factor of safety
 
-Inserting $\tau_m$ into the equation for $S$ gives:
-
->>$S = \left[c_m + (\sigma')tan\phi_m\right]\Delta l$
-
->>$S = c_m\Delta l + N'tan\phi_m$
-
-where:
-
-- $N'$ = the effective normal force acting on the slice = $\sigma'\Delta l$
-
 ## Solving for the Side Forces
 
-For the **force equilibrium** method, we solve for the side forces using the iterative method used to solve for the factor of safety. We simply perform the force equilibrium calculations for each slice the factor of safety that satisifies equilibrium. This process is described on the [Force Equilibrium page](force_eq.md).
-
-For **Spencer's method**, the process is simpler. The resultant force $Q_i$ that is the central component of Spencer's method represents the resulttant of the of the side forces on each slice. Specifically, 
+To solve for the line of thrust, we need to know the values of $Z_i$ and $Z_{i+1}$ for each slice. The  force$Q_i$ that is the central component of Spencer's method represents the resultant of the of the side forces on each slice. Specifically, 
  
 >>$Q_i = Z_i - Z_{i+1}$
 
@@ -118,12 +98,11 @@ For the sweep starting on the left side, we pivot about the base of the right si
 arms for the left and right side forces, respectively. Assuming CCW rotation is positive (right-hand rule) we can write the moment equilibrium equation as:
 
 >>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \Delta x + E_{i+1} \Delta y_{i+1} + W \dfrac{\Delta x}{2} - 
-> (N'+ u\Delta \ell)*\dfrac{\Delta \ell}{2} = 0$
+> N \dfrac{\Delta \ell}{2} = 0$
 
 Solving for $\Delta y_{i+1}$ gives:
 
->>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + (N' + u\Delta \ell) \dfrac
-> {\Delta \ell}{2}}{E_{i+1}}$
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2}}{E_{i+1}}$
 
 We then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower right 
 corner of the slice $y_{rb}$ as follows:
@@ -144,35 +123,64 @@ i vs i+1 indexing is the same as before - i.e., the left side is always i and th
 we iterate through the slices from i = n to i = 1, where n is the number of slices. In this case, the moment arm on 
 the right side is known and the moment arm on the left side is unknown. The moment equilibrium equation is given by:
 
->>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} +  (N' + u\Delta \ell) \dfrac{\Delta \ell}{2} = 0$
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} +  N \dfrac{\Delta \ell}{2} = 0$
 
 
 Solving for $\Delta y_{i}$ gives:
 
->>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + (N' + u\Delta \ell) \dfrac
-> {\Delta \ell}{2}}{E_{i}}$
+>>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2}}{E_{i}}$
 
 Again, we then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower left 
-corner of the slice $y_{rl}$ as follows:
+corner of the slice $y_{lb}$ as follows:
 
->>$y_{i} = y_{rl} + \Delta y_{i}$
+>>$y_{i} = y_{lb} + \Delta y_{i}$
 
->>$y_{i+1} = y_{rl} + \Delta y_{i+1}$
+>>$y_{i+1} = y_{lb} + \Delta y_{i+1}$
 
-## Solving for the Normal Force
+## Complete Formulation
 
-It is useful to solve for the effective normal force at the same time that the line of thrust is calculated. These 
-can be plotted (as stresses) along with the line of thrust. Negative values are another indicator of tension in the 
-slice. If the force equilibrium method is used to solve for the side forces, the normal forces on the base of the slice 
-are calculated at the same time. But if Spencer's method $Q_i$ values are used to get the side forces, it is 
-necessary to solve separately for the effective normal force. We can do this as follows:
+For a complete formulation of the line of thrust, we need to consider the entire set of forces that could potentially act on the slice. The forces include:
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' tan(\phi_m)\right] sin(\alpha) + (N' + u \Delta \ell) cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
+![slice_thrust_general.png](images/slice_thrust_general.png){width=400px}
 
->>$c_m \Delta \ell  sin(\alpha) + N' tan(\phi_m) sin(\alpha) + N' cos(\alpha) + u \Delta \ell cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+where:
 
->>$c_m \Delta \ell  sin(\alpha) + N' \left[tan(\phi_m) sin(\alpha) +  cos(\alpha)\right] + u \Delta \ell cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+>>$D$ = distributed load resultant force <br>
+$\beta$ = inclination of the distributed load (perpendicular to slope) <br>
+$kW$ = seismic force for pseudo-static seismic analysis <br>
+$c.g.$ = center of gravity of the slice <br>
+$P$ = reinforcement force on base of slice <br>
+$T$ = tension crack water force <br>
 
-Solving for $N'$ gives:
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. We will only repeat the dual sweep method for computing the moment arms for the side forces based on the corners of the slices. 
 
->>$N' = \dfrac{- c_m \Delta \ell  sin(\alpha) - u\Delta \ell cos(\alpha) + W - X_{i} + X_{i+1}}{tan(\phi_m) sin(\alpha) + cos(\alpha)}$
+### Left Sweep with Additional Forces
+
+For the left sweep, we pivot about the base of the right side of the slice. The moment equilibrium equation is given by:
+
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \Delta x + E_{i+1} \Delta y_{i+1} + W \dfrac{\Delta x}{2} - N \dfrac{\Delta \ell}{2} + D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k  + T a_t = 0$
+
+where:
+
+>>$a_dx$ = horizontal distance from the pivot point to the point $d$ <br>
+> $a_dy$ = vertical distance from the pivot point to point $d$ <br>
+> $a_k$ = vertical distance from the pivot point to the center of gravity (c.g.) <br>
+> $a_t$ = vertical distance from the pivot point to the tension crack water force <br>
+
+Solving for $\Delta y_{i+1}$ gives:
+
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} - D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i+1}}$
+
+We then convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower right corner of the slice $y_{rb}$ as described earlier.
+
+### Right Sweep with Additional Forces
+
+For the right sweep, we pivot about the base of the left side of the slice. The moment equilibrium equation is given by:
+
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} + E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac{\Delta \ell}{2} - D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k + T a_t = 0$
+
+Solving for $\Delta y_{i}$ gives:
+
+>>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} + D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i}}$
+
+Again, we convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower left corner of the slice $y_{lb}$ as described earlier.

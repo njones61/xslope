@@ -3,20 +3,6 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 from math import sin, tan, atan, atan2, degrees, sqrt, cos, radians
 
-def calculate_normal_stresses(df, FS):
-    # Mobilized parameters
-    phi_mob = np.arctan(np.tan(np.radians(df['phi'].values)) / FS)
-    c_mob = df['c'].values / FS
-
-    # Earth pressure coefficient (Ko), computed from mobilized phi
-    Ko = (1 - np.sin(phi_mob)) / (1 + np.sin(phi_mob))
-
-    sigma_1 = df['w'].values / df['dx']  # Major principal stress (weight)
-    sigma_3 = Ko * sigma_1 - 2 * c_mob * np.sqrt(Ko)  # Minor principal stress
-    sigma = (sigma_1 + sigma_3) / 2 + (sigma_1 - sigma_3) / 2 * np.cos(np.radians(2 * df['alpha']))
-
-    return sigma
-
 
 def get_sorted_intersections(failure_surface, ground_surface):
     """
@@ -383,7 +369,6 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
                 c = (materials[base_material_idx]['r_elev'] - y_cb) * materials[base_material_idx]['cp']
                 phi = 0
 
-
         slice_data = {
             'slice #': i + 1,
             'x_l': x_l,
@@ -403,6 +388,9 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             'w_s': soil_weight,
             'dload': dload,
             'w': total_weight,
+            'n_eff': 0, # Placeholder for effective normal force
+            'z': 0, # Placeholder for interslice side forces
+            'theta': 0, # Placeholder for interslice angles
             'shear_reinf': shear_reinf,
             'normal_reinf': normal_reinf,
             'piezo_y': piezo_y,

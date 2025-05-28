@@ -130,7 +130,7 @@ The matrix $A$ is given by:
 
 The vector $x$ is given by:
 
->>$x = \begin{bmatrix}N\\Z_{i+1}\end{bmatrix}$
+>>$x = \begin{bmatrix}N'\\Z_{i+1}\end{bmatrix}$
 
 The vector $b$ is given by:
 

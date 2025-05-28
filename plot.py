@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from slice import generate_failure_surface, calculate_normal_stresses
+from slice import generate_failure_surface
 from solve import compute_line_of_thrust
 from shapely.geometry import LineString
 
@@ -278,14 +278,13 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
-def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
+def plot_base_stresses(ax, df, scale_frac=0.5, alpha=0.3):
     """
     Plots the effective normal stresses and pore pressures on the base of each slice.
 
     Parameters:
         ax: matplotlib Axes object
         df: DataFrame containing slice data
-        sigma_eff: Array of effective normal stresses
         scale_frac: Scaling factor for stress visualization
         alpha: Transparency value for filled areas
 
@@ -293,6 +292,9 @@ def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
         None
     """
     u = df['u'].values
+    n_eff = df['n_eff'].values
+    dl = df['dl'].values
+    sigma_eff = n_eff / dl
 
     heights = df['y_ct'] - df['y_cb']
     max_ht = heights.max() if not heights.empty else 1.0
@@ -307,6 +309,7 @@ def plot_base_stresses(ax, df, sigma_eff, scale_frac=0.5, alpha=0.3):
 
         x1, y1 = row['x_l'], row['y_lb']
         x2, y2 = row['x_r'], row['y_rb']
+
         stress = sigma_eff[i]
         pore = u[i]
 
@@ -375,38 +378,55 @@ def plot_thrust_line(ax, thrust_line: LineString,
             linewidth=linewidth,
             label=label)
 
-def compute_ylim(data, pad_fraction=0.1):
+def compute_ylim(data, df, scale_frac=0.5, pad_fraction=0.1):
     """
-    Computes the y-axis limits for the plot with padding.
+    Computes y‐axis limits for the solution plot, ensuring that:
+      • All profile_lines are included,
+      • The max_depth (toe) is included below,
+      • Stress bars (length = max slice height * scale_frac) fit inside,
+      • And an extra pad_fraction of breathing‐room is added.
 
     Parameters:
-        data: Dictionary containing plot data
-        pad_fraction: Fraction of the range to add as padding
+        data: dict containing at least 'profile_lines' and 'max_depth'
+        df: pandas.DataFrame with slice data, must have 'y_lt' and 'y_lb' for stress‐bar sizing
+        scale_frac: fraction of max slice height used when drawing stress bars
+        pad_fraction: fraction of total range to pad above/below finally
 
     Returns:
-        tuple: (y_min, y_max) for the plot
+        (y_min, y_max) suitable for ax.set_ylim(...)
     """
     import numpy as np
 
     y_vals = []
-    for line in data['profile_lines']:
-        # if it's a shapely LineString, use .xy; otherwise assume it's a list of (x,y)
+
+    # 1) collect all profile line elevations
+    for line in data.get('profile_lines', []):
         if hasattr(line, "xy"):
-            xs, ys = line.xy
+            _, ys = line.xy
         else:
-            # e.g. [(x0,y0), (x1,y1), ...]
-            xs, ys = zip(*line)
+            _, ys = zip(*line)
         y_vals.extend(ys)
 
-    # include the deepest point
-    if "max_depth" in data:
-        top = max(y_vals)
-        bottom = data["max_depth"]
-        y_vals.append(bottom)
+    # 2) explicitly include the deepest allowed depth
+    if "max_depth" in data and data["max_depth"] is not None:
+        y_vals.append(data["max_depth"])
 
-    y_min, y_max = min(y_vals), max(y_vals)
+    if not y_vals:
+        return 0.0, 1.0
+
+    y_min = min(y_vals)
+    y_max = max(y_vals)
+
+    # 3) ensure the largest stress bar will fit
+    #    stress‐bar length = scale_frac * slice height
+    heights = df["y_lt"] - df["y_lb"]
+    if not heights.empty:
+        max_bar = heights.max() * scale_frac
+        y_min -= max_bar
+        y_max += max_bar
+
+    # 4) add a final small pad
     pad = (y_max - y_min) * pad_fraction
-
     return y_min - pad, y_max + pad
 
 # ========== FOR PLOTTING INPUT DATA  =========
@@ -486,10 +506,10 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     alpha = 0.3
     if results['method'] == 'spencer':
         FS = results['FS']
-        theta = results['theta']
-        thrust_line, sigma_prime = compute_line_of_thrust(df, FS, theta, debug=True)
+        thrust_line = compute_line_of_thrust(df, FS,  debug=True)
         plot_thrust_line(ax, thrust_line)
-        plot_base_stresses(ax, df, sigma_prime, alpha=alpha)
+
+    plot_base_stresses(ax, df, alpha=alpha)
 
     import matplotlib.patches as mpatches
     normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....',  label="Eff Normal Stress (σ')")
@@ -527,7 +547,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     ax.set_title(title)
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
-    ymin, ymax = compute_ylim(data, pad_fraction=0.3)
+    ymin, ymax = compute_ylim(data, df, pad_fraction=0.05)
     ax.set_ylim(ymin, ymax)
 
     plt.tight_layout()

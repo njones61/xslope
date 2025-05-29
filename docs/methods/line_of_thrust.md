@@ -162,8 +162,8 @@ For the left sweep, we pivot about the base of the right side of the slice. The 
 
 where:
 
->>$a_dx$ = horizontal distance from the pivot point to the point $d$ <br>
-> $a_dy$ = vertical distance from the pivot point to point $d$ <br>
+>>$a_{dx}$ = horizontal distance from the pivot point to the point $d$ <br>
+> $a_{dy}$ = vertical distance from the pivot point to point $d$ <br>
 > $a_k$ = vertical distance from the pivot point to the center of gravity (c.g.) <br>
 > $a_t$ = vertical distance from the pivot point to the tension crack water force <br>
 

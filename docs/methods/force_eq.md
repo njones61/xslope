@@ -153,7 +153,7 @@ For a complete implementation of the Force Equilibrium method, we need to consid
 
 ![slice_fe_complete.png](images/slice_fe_complete.png){width=400px}
 
-Where:
+where:
 
 >$D$ = distributed load resultant force <br>
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>

@@ -106,10 +106,13 @@ $\Delta x$ = horizontal width of slice<br>
 $\Delta \ell$ = length along base of slice<br>
 $u$ = pore pressure
 
+In the following derivation we replace the resultant side force ($Z_i$ - $Z_{i+1}$ with $Q$ and then solve for Q in relation to the other forces on the slice.
 
-**Step 1** - Resolve Equilibrium Perpendicular to the Base
+**Step 1** - Resolve Equilibrium Perpendicular to the Base.
 
->$Q \sin(\alpha - \theta) + N = W \cos \alpha  \qquad (1)$
+>$N =  W \cos \alpha + Q \sin(\alpha - \theta)  \qquad (1)$
+
+**Note:** In the diagram above with $Q$ shown on the base of the slice, the $Q$ vector is inclined at an angle $\theta$ such that it is pointing above the base of the slice which is at an angle $\alpha$. However, the expression for the component of $Q$ perpendicular to the base is $Q \sin(\alpha - \theta)$. This expression is positive only if $\alpha$ is greater than $\theta$. Thus, when summing the forces, we assume the expression is positive and therefore acting in a downward direction from the base. For this reason, we put it on the right hand side in equation (1).
 
 **Step 2** - Resolve Equilibrium Parallel to the Base
 
@@ -121,50 +124,41 @@ $u$ = pore pressure
 
 Where:
 
->>$\Delta \ell = \Delta x \sec \alpha$<br>
 > $\sigma' = \dfrac{N}{\Delta \ell} - u$
 
 Substitute in:
 
->$S = \dfrac{1}{F} \left[ c' \Delta x \sec \alpha + (N - u \Delta x \sec \alpha) \tan \phi' \right]  \qquad (3)$
+>$S = \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]  \qquad (3)$
 
-**Step 4** = Eliminate $N$ 
+**Step 4** - Eliminate $N$ 
 
 From (1):
 
->$N = W \cos \alpha - Q \sin(\alpha - \theta)$
+>$N = W \cos \alpha + Q \sin(\alpha - \theta)$
 
 Substitute into (3):
 
->$S = \dfrac{1}{F} \left[ c' \Delta x \sec \alpha + (W \cos \alpha - Q \sin(\alpha - \theta) - u \Delta x \sec \alpha)
+>$S = \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + Q \sin(\alpha - \theta) - u \Delta \ell)
 > \tan \phi' \right]  \qquad (4)$
 
-**Step 5** = Substitute $S$ into (2)
+**Step 5** - Substitute $S$ into (2)
 
 >$Q \cos(\alpha - \theta) + S = W \sin \alpha$
 
 Substitute (4):
 
->$Q \cos(\alpha - \theta) + \dfrac{1}{F} \left[ c' \Delta x \sec \alpha + (W \cos \alpha - Q \sin(\alpha - \theta) - 
-> u \Delta x \sec \alpha) \tan \phi' \right] = W \sin \alpha$
+>$Q \cos(\alpha - \theta) + \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + Q \sin(\alpha - \theta) - 
+> u \Delta \ell) \tan \phi' \right] = W \sin \alpha$
 
-**Step 6** = Solve for $Q$
+**Step 6** - Solve for $Q$
 
 Group terms:
 
->$Q \left[ \cos(\alpha - \theta) - \dfrac{1}{F} \sin(\alpha - \theta) \tan \phi' \right] =
-W \sin \alpha - \dfrac{1}{F} \left[ c' \Delta x \sec \alpha + (W \cos \alpha - u \Delta x \sec \alpha) \tan \phi' 
+>$Q \left[ \cos(\alpha - \theta) + \dfrac{1}{F} \sin(\alpha - \theta) \tan \phi' \right] =
+W \sin \alpha - \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha - u \Delta \ell) \tan \phi' 
 > \right]$
 
 Final form:
-
->$Q = \dfrac{
-W \sin \alpha - \dfrac{c'}{F} \Delta x \sec \alpha - \dfrac{(W \cos \alpha - u \Delta x \sec \alpha) \tan \phi'}{F}
-}{
-\cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
-}$
-
-Writing in terms of $\Delta \ell$:
 
 >$Q = \dfrac{
 W \sin \alpha - \dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha - u \Delta \ell) \tan \phi'}{F}
@@ -198,21 +192,95 @@ In both cases, we need to solve for $FS$ and $\theta$ **iteratively**.
 
 To do this, we assume a value for $theta$ and then find the factor of safety that satisfies the moment equilibrium equation $FS_{mom}$ and the factor of safety that satisfies the force equilibrium equation, $FS_{force}$. If the two are different, we pick a new value of $theta$ and iterate until they converge, i.e., $FS_{mom}$ = $FS_{force}$.
 
+## Complete Formulation of Q
+
+For a complete implementation of Spencer's method, we need to consider additional forces acting on the slice. The full set of forces are shown in the following figure:
+
+>![spencer_complete.png](images/spencer_complete.png){width=400px}
+
+where:
+
+>$D$ = distributed load resultant force <br>
+$\beta$ = inclination of the distributed load (perpendicular to slope) <br>
+$kW$ = seismic force for pseudo-static seismic analysis <br>
+$c.g.$ = center of gravity of the slice <br>
+$P$ = reinforcement force on base of slice <br>
+$T$ = tension crack water force <br>
+
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. 
+
+Also, recall that:
+
+>$S$ = shear force on base = $c_m \Delta \ell + N' \tan \phi_m'$<br>
+>$S = \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]$<br>
+>$N = N' + u \Delta \ell$<br>
+
+To include these additional forces in the Spencer's method formulation, we can modify the expression for $Q$. We will follow the same steps as before, but now we will include the additional forces in the equilibrium equations. Once again, we replace the resultant side force ($Z_i$ - $Z_{i+1}$ with $Q$ and then solve for Q in relation to the other forces on the slice.
+
+**Step 1** - Resolve Equilibrium Perpendicular to the Base
+
+>$N + kW \sin \alpha + T \sin \alpha = W \cos \alpha  + D \cos(\beta - \alpha)  + Q \sin(\alpha - \theta) \qquad (5)$
+
+**Step 2** - Resolve Equilibrium Parallel to the Base
+
+>$Q \cos(\alpha - \theta) + S  + P  + D \sin(\beta - \alpha) = W \sin \alpha + kW \cos \alpha + T \cos \alpha  \qquad (6)$
+
+**Step 3** - Shear Strength (Mohr–Coulomb Criterion)
+
+>$S = \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]  \qquad (7)$
+
+**Step 4** - Eliminate $N$
+
+From (5):
+
+>$N = W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \qquad (8)$
+
+Substitute into (7):
+
+>$S = \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi' \right]  \qquad (9)$
+
+**Step 5** - Substitute $S$ into (6)
+
+>$Q \cos(\alpha - \theta) + S + P + D \sin(\beta - \alpha) = W \sin \alpha + kW \cos \alpha + T \cos \alpha$
+
+Substitute (9):
+
+>$\begin{aligned}
+Q \cos(\alpha - \theta) 
+&+ \frac{1}{F} \Big[ c' \Delta \ell + \big(W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell\big) \tan \phi' \Big] + P + D \sin(\beta - \alpha) \\
+&= W \sin \alpha + kW \cos \alpha + T \cos \alpha
+\end{aligned}$
+
+**Step 6** - Solve for $Q$  
+
+Group terms:
+
+>$\begin{aligned}
+Q \Big[ \cos(\alpha - \theta) + \frac{1}{F} \sin(\alpha - \theta) \tan \phi' \Big]
+&= W \sin \alpha + kW \cos \alpha + T \cos \alpha - P - D \sin(\beta - \alpha) - \frac{c'}{F} \Delta \ell \\
+&\quad - \frac{(W \cos \alpha + D \cos(\beta - \alpha) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
+\end{aligned}$
+
+Final form:
+
+>$Q = \dfrac{W \sin \alpha + kW \cos \alpha + T \cos \alpha - P - D \sin(\beta - \alpha) -\dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha + D \cos(\beta - \alpha) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
+}{\cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
+}$
+
+**Note:** It is important to remember that the tension crack water force $T$ is only included if a tension crack is present. Furthermore, for a left-facing slope, $T$ applies to the right side of the uppermost (last) slice as shown in the diagram above. However, for a right-facing slope, $T$ applies to the left side of the uppermost (first) slice (slices are numbered from left to right in either case). In this case, the derivation of $Q$ is the same, but the sign of $T$ will be flipped (negated) before insertion in the final expression. $T = 0$ for all other slices.
+
 ## Solving for the Normal Force
 
 It is useful to solve for the effective normal force at the same time that the factor of safety is calculated. These 
 can be plotted (as stresses) along with the line of thrust. Negative values are another indicator of tension in the 
 slice. We can do this as follows:
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' tan(\phi_m)\right] sin(\alpha) + (N' + u \Delta \ell) cos(\alpha) -  W + X_{i} - X_{i+1} = 0$
+>$N' = N - u \Delta \ell$
 
->>$c_m \Delta \ell  sin(\alpha) + N' tan(\phi_m) sin(\alpha) + N' cos(\alpha) + u \Delta \ell cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+Substituting the expression for $N$ from (8):
 
->>$c_m \Delta \ell  sin(\alpha) + N' \left[tan(\phi_m) sin(\alpha) +  cos(\alpha)\right] + u \Delta \ell cos(\alpha) - W + X_{i} - X_{i+1} = 0$
+>$N' = \left[ W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \right] - u \Delta \ell$
 
-Solving for $N'$ gives:
-
->>$N' = \dfrac{- c_m \Delta \ell  sin(\alpha) - u\Delta \ell cos(\alpha) + W - X_{i} + X_{i+1}}{tan(\phi_m) sin(\alpha) + cos(\alpha)}$
 
 ## Summary
 

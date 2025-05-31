@@ -32,7 +32,6 @@ def solve_all(df, circular=True):
     solve_selected(spencer, df, circular=circular)
     solve_selected(janbu_corrected, df, circular=circular)
 
-
 data = load_globals("docs/input_template_lface.xlsx")
 
 # plot_inputs(data)
@@ -49,10 +48,10 @@ else:
     print(result)
 
 # export df to excel
-# df.to_excel("slices.xlsx", index=False)
+df.to_excel("slices.xlsx", index=False)
 
 # options = [oms, bishop, spencer, janbu_corrected, corps_engineers, lowe_karafiath]
-results = solve_selected(janbu_corrected, df, circular=True)
+results = solve_selected(corps_engineers, df, circular=True)
 
 plot_solution(data, df, failure_surface, results)
 

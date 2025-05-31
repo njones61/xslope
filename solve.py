@@ -7,7 +7,7 @@ from scipy.optimize import minimize_scalar, root_scalar
 from tabulate import tabulate
 
 
-def oms(df, circular=True):
+def oms_OLD(df, circle=None, circular=True, debug=True):
     """
     Computes the Factor of Safety (FS) using the Ordinary Method of Slices (OMS).
     This method works on circular failure surfaces only.
@@ -20,8 +20,6 @@ def oms(df, circular=True):
             - 'phi': friction angle (degrees)
             - 'u': pore pressure
             - 'dl': base length
-            - 'shear_reinf' (optional): reinforcement force opposing sliding (FL)
-            - 'normal_reinf' (optional): reinforcement force contributing to base normal force (FT)
 
     Returns:
         dict:
@@ -39,7 +37,6 @@ def oms(df, circular=True):
     cos2_alpha = cos_alpha ** 2
 
     W = df['w'].values
-    shear_reinf = df.get('shear_reinf', 0).values
     c = df['c'].values
     phi = np.radians(df['phi']).values
     u = df['u'].values
@@ -47,15 +44,161 @@ def oms(df, circular=True):
 
     N_eff = W * cos_alpha - u * dl * cos2_alpha
     numerator = c * dl + N_eff * np.tan(phi)
-    denominator = W * sin_alpha - shear_reinf
+    denominator = W * sin_alpha
     FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
 
     df['n_eff'] = N_eff  # store effective normal forces in df
+
+    if debug==True:
+        print(f'numerator = {numerator.sum():.4f}')
+        print(f'denominator = {denominator.sum():.4f}')
+        print('N_eff =', np.array2string(N_eff.values, precision=4, separator=', '))
 
     results = {}
     results['method'] = 'oms'
     results['FS'] = FS
     return True, results
+
+def oms(df, circle, circular=True, debug=True):
+    """
+    Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
+
+    Inputs
+    ------
+    df : pandas.DataFrame
+        Must contain exactly these columns (length = n slices):
+          'alpha'   (deg)   = base inclination αᵢ
+          'phi'     (deg)   = friction angle φᵢ
+          'c'             = cohesion cᵢ
+          'w'             = slice weight Wᵢ
+          'u'             = pore pressure force/unit‐length on base, uᵢ
+          'dl'            = base length Δℓᵢ
+          'd'             = resultant distributed load Dᵢ
+          'd_x','d_y'     = centroid (x,y) at which Dᵢ acts
+          'beta'   (deg)   = top slope βᵢ
+          'kw'            = seismic horizontal kWᵢ
+          't'             = tension‐crack horizontal Tᵢ  (zero except one slice)
+          'y_t'           = y‐loc of Tᵢ’s line of action (zero except that one slice)
+          'p'             = reinforcement uplift pᵢ (zero if none)
+          'x_c','y_cg'    = slice‐centroid (x,y) for seismic moment arm
+
+    circle : dict with keys:
+          'Xo' : float   = x‐coordinate of circle center
+          'Yo' : float   = y‐coordinate of circle center
+          'R'  : float   = circle radius > 0
+
+    Returns
+    -------
+    (bool, dict_or_str)
+      • If success: (True, {'method':'oms', 'FS': <computed value>})
+      • If denominator → 0 or other fatal error: (False, "<error message>")
+
+    NOTES
+    -----
+    Implements exactly:
+      FS
+      = [ Σ { cᵢ·Δℓᵢ
+            + [ Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ ]·tanφᵢ
+            + pᵢ } ]
+        / [  Σ(Wᵢ·sinαᵢ)
+           + (1/R)·Σ[ Dᵢ·cosβᵢ·(Xo - d_{x,i})  −  Dᵢ·sinβᵢ·(Yo - d_{y,i}) ]
+           + (1/R)·Σ[ kWᵢ·(Yo - y_{cg,i}) ]
+           + (1/R)·Σ[ Tᵢ·(Yo - y_{t,i}) ]  ].
+
+    """
+
+    # 1) Unpack circle‐center and radius
+    Xo = circle['Xo']
+    Yo = circle['Yo']
+    R  = circle['R']
+
+    # 2) Pull arrays directly from df
+    alpha_deg = df['alpha'].values    # αᵢ in degrees
+    phi_deg   = df['phi'].values      # φᵢ in degrees
+    c     = df['c'].values        # cᵢ
+    W     = df['w'].values        # Wᵢ
+    u     = df['u'].values        # uᵢ (pore‐force per unit length)
+    dl     = df['dl'].values       # Δℓᵢ
+    D     = df['d'].values        # Dᵢ
+    d_x    = df['d_x'].values      # d_{x,i}
+    d_y    = df['d_y'].values      # d_{y,i}
+    beta_deg  = df['beta'].values     # βᵢ in degrees
+    kw    = df['kw'].values       # kWᵢ
+    T     = df['t'].values        # Tᵢ (zero except one slice)
+    y_t    = df['y_t'].values      # y_{t,i} (zero except one slice)
+    P     = df['p'].values        # pᵢ
+    x_c    = df['x_c'].values      # x_{c,i}
+    y_cg = df['y_cg'].values       # y_{cg,i} coordinate of slice centroid
+
+    # 3) Convert angles to radians
+    alpha = np.radians(alpha_deg)   # αᵢ [rad]
+    phi   = np.radians(phi_deg)     # φᵢ [rad]
+    beta  = np.radians(beta_deg)    # βᵢ [rad]
+
+    # 4) Precompute sines/cosines
+    sin_alpha = np.sin(alpha)          # sin(αᵢ)
+    cos_alpha = np.cos(alpha)          # cos(αᵢ)
+    sin_ab    = np.sin(alpha - beta)   # sin(αᵢ−βᵢ)
+    cos_ab    = np.cos(alpha - beta)   # cos(αᵢ−βᵢ)
+    tan_phi   = np.tan(phi)            # tan(φᵢ)
+
+    # ————————————————————————————————————————————————————————
+    # 5) Build the NUMERATOR = Σᵢ [  cᵢ·Δℓᵢ
+    #                               + (Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ )·tanφᵢ
+    #                               + pᵢ  ]
+    #
+
+    N_eff = (
+        W * cos_alpha
+      + D * cos_ab
+      - kw * sin_alpha
+      - T * sin_alpha
+      - (u * dl)
+    )  # N′ᵢ = Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ
+
+    numerator = np.sum(c * dl + N_eff * tan_phi + P)
+
+    # ————————————————————————————————————————————————————————
+    # 6) Build each piece of the DENOMINATOR exactly as Eqn 9:
+
+    #  (A) = Σ [ Wᵢ · sinαᵢ ]
+    sum_W = np.sum(W * sin_alpha)
+
+    #  (B) = Σ [ Dᵢ·cosβᵢ·(Xo - d_{x,i})  −  Dᵢ·sinβᵢ·(Yo - d_{y,i}) ]
+    a_dx = Xo - d_x
+    a_dy = Yo - d_y
+    sum_Dx = np.sum(D * np.cos(beta) * a_dx)
+    sum_Dy = np.sum(D * np.sin(beta) * a_dy)
+
+    #  (C) = Σ [ kWᵢ * (Yo - y_{cg,i}) ]
+    a_s = Yo - y_cg
+    sum_kw = np.sum(kw * a_s)
+
+    #  (D) = Σ [ Tᵢ * (Yo - y_{t,i}) ]
+    a_t = Yo - y_t
+    sum_T = np.sum(T * a_t)
+
+    # Put them together with their 1/R factors:
+    denominator = sum_W + (1.0 / R) * (sum_Dx - sum_Dy + sum_kw + sum_T)
+
+    # 7) Finally compute FS = (numerator)/(denominator)
+    FS = numerator / denominator
+
+    # 8) Store effective normal forces in the DataFrame
+    df['n_eff'] = N_eff
+
+    if debug==True:
+        print(f'numerator = {numerator:.4f}')
+        print(f'denominator = {denominator:.4f}')
+        print(f'Sum_W = {sum_W:.4f}')
+        print(f'Sum_Dx = {sum_Dx:.4f}')
+        print(f'Sum_Dy = {sum_Dy:.4f}')
+        print(f'Sum_kw = {sum_kw:.4f}')
+        print(f'Sum_T = {sum_T:.4f}')
+        print('N_eff =', np.array2string(N_eff, precision=4, separator=', '))
+
+    # 9) Return success and the FS
+    return True, {'method': 'oms', 'FS': FS}
 
 def bishop(df, circular=True, tol=1e-6, max_iter=100):
     """
@@ -109,6 +252,17 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
 
     df['n_eff'] = N_eff  # store effective normal forces in df
 
+    if debug==True:
+        print(f'numerator = {numerator:.4f}')
+        print(f'denominator = {denominator:.4f}')
+        print(f'Sum_W = {sum_W:.4f}')
+        print(f'Sum_Dx = {sum_Dx:.4f}')
+        print(f'Sum_Dy = {sum_Dy:.4f}')
+        print(f'Sum_kw = {sum_kw:.4f}')
+        print(f'Sum_T = {sum_T:.4f}')
+        print('N_eff =', np.array2string(N_eff, precision=4, separator=', '))
+
+
     if not converge:
         return False, 'Bishop method did not converge within the maximum number of iterations.'
     else:
@@ -116,6 +270,7 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
         results['method'] = 'bishop'
         results['FS'] = F_calc
         return True, results
+
 
 
 def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):

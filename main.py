@@ -5,8 +5,8 @@ from plot import plot_solution, plot_inputs
 from solve import oms, bishop, janbu_corrected, spencer, corps_engineers, lowe_karafiath
 
 
-def solve_selected(func, df, circular=True):
-    success, result = func(df, circular=circular)
+def solve_selected(func, df, circle=None, circular=True):
+    success, result = func(df, circle=circle, circular=circular)
     if not success:
         print(f'Error: {result}')
         return result
@@ -51,7 +51,7 @@ else:
 df.to_excel("slices.xlsx", index=False)
 
 # options = [oms, bishop, spencer, janbu_corrected, corps_engineers, lowe_karafiath]
-results = solve_selected(corps_engineers, df, circular=True)
+results = solve_selected(oms, df, circle=circle, circular=True)
 
 plot_solution(data, df, failure_surface, results)
 

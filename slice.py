@@ -143,6 +143,87 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
+def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
+    """
+    Compute:
+      - D    : total resultant force from a trapezoidal load varying
+               linearly from intensity qL at (x_l,y_lt) to qR at (x_r,y_rt).
+      - d_x  : x‐coordinate of the resultant’s centroid on the top edge
+      - d_y  : y‐coordinate of the resultant’s centroid on the top edge
+      - beta : angle (in degrees) of the slice’s top edge (positive CCW
+               from the +x direction).
+
+    Parameters
+    ----------
+    x_l, y_lt : float
+        Coordinates of the left‐end of the top edge.
+    x_r, y_rt : float
+        Coordinates of the right‐end of the top edge.
+    qL : float
+        Load intensity (force per unit length) at (x_l, y_lt).
+    qR : float
+        Load intensity (force per unit length) at (x_r, y_rt).
+
+    Returns
+    -------
+    D    : float
+           Total resultant (area of trapezoid) = ½ (qL + qR) * (x_r − x_l)
+    d_x  : float
+           Global x‐coordinate of the centroid of that trapezoid
+    d_y  : float
+           Global y‐coordinate of the centroid (lies on the line segment
+           between (x_l,y_lt) and (x_r,y_rt))
+    beta : float
+           Slope angle of the top edge (in degrees), measured positive CCW
+           from the horizontal.
+
+    Notes
+    -----
+    1.  If x_r == x_l (zero‐width slice), this will return D=0 and place
+        the “centroid” at (x_l, y_lt), with β=0°.
+    2.  For a nonzero‐width trapezoid, the horizontal centroid‐offset from
+        x_l is:
+             x_offset = (x_r – x_l) * ( qL + 2 qR ) / [3 (qL + qR) ]
+        provided (qL + qR) ≠ 0.  If qL + qR ≈ 0, it simply places the
+        centroid at the midpoint in x.
+    3.  The vertical coordinate d_y is found by linear‐interpolation:
+          t = x_offset / (x_r – x_l)
+          d_y = y_lt + t ·(y_rt – y_lt)
+    4.  β is measured by atan2(Δy, Δx) in degrees.
+
+    """
+    dx_top = x_r - x_l
+    if abs(dx_top) < 1e-12:
+        # Degenerate slice‐width => no trapezoid.  Return zero‐load at left corner.
+        D = 0.0
+        d_x = x_l
+        d_y = y_lt
+        beta = 0.0
+        return D, d_x, d_y, beta
+
+    # 1) Total resultant force (area under trapezoid)
+    D = 0.5 * (qL + qR) * dx_top
+
+    # 2) Horizontal centroid offset from left end
+    sum_q = qL + qR
+    if abs(sum_q) < 1e-12:
+        # nearly zero trapezoid => centroid at geometric midpoint
+        x_offset = dx_top * 0.5
+    else:
+        x_offset = dx_top * (qL + 2.0 * qR) / (3.0 * sum_q)
+
+    # 3) Global x‐coordinate of centroid
+    d_x = x_l + x_offset
+
+    # 4) Corresponding y‐coordinate by linear interpolation along top edge
+    t = x_offset / dx_top
+    d_y = y_lt + t * (y_rt - y_lt)
+
+    # 5) Slope angle β of the top edge, in degrees:
+    beta = np.degrees(np.arctan2(y_rt - y_lt, x_r - x_l))
+
+    return D, d_x, d_y, beta
+
 def generate_slices(data, circle=None, non_circ=None, num_slices=40):
 
     """
@@ -183,6 +264,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
     piezo_line = data["piezo_line"]
     gamma_w = data["gamma_water"]
     tcrack_depth = data["tcrack_depth"]
+    tcrack_water = data["tcrack_water"]
+    k_seismic = data['k_seismic']
     if circle is not None:
         circular = True
         Xo, Yo, depth, R = circle['Xo'], circle['Yo'], circle['Depth'], circle['R']
@@ -190,7 +273,14 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
         circular = False
     dloads = data["dloads"]
     max_depth = data["max_depth"]
-    reinforce_lines = data["reinforce_lines"]
+
+    reinf_lines_data = []
+    if data.get("reinforce_lines"):
+        for line in data["reinforce_lines"]:
+            xs = [pt["X"] for pt in line]
+            fls = [pt["FL"] for pt in line]
+            geom = LineString([(pt["X"], pt["Y"]) for pt in line])
+            reinf_lines_data.append({"xs": xs, "fls": fls, "geom": geom})
 
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
@@ -243,17 +333,6 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             xs = [pt['X'] for pt in line]
             normals = [pt['Normal'] for pt in line]
             dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
-
-    # Interpolation functions for reinforcement
-    reinforce_interp_FL = []
-    reinforce_interp_FT = []
-    if reinforce_lines:
-        for line in reinforce_lines:
-            xs = [pt['X'] for pt in line]
-            fls = [pt['FL'] for pt in line]
-            fts = [pt['FT'] for pt in line]
-            reinforce_interp_FL.append(lambda x, xs=xs, fls=fls: np.interp(x, xs, fls, left=0, right=0))
-            reinforce_interp_FT.append(lambda x, xs=xs, fts=fts: np.interp(x, xs, fts, left=0, right=0))
 
     slices = []
     for i in range(len(all_xs) - 1):
@@ -314,18 +393,84 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             if base_material_idx is None and h > 0:
                 base_material_idx = mat_index
 
-        # Distributed load
-        dload_normal = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0
-        dload = dload_normal * dx
-        total_weight = soil_weight + dload
-
         # Center of gravity
-        y_cg = (sum_gam_h_y + dload_normal * y_ct) / sum_gam_h if sum_gam_h > 0 else None
+        y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
 
-        # Interpolate reinforcement at x_c
-        shear_reinf = sum(func(x_c) for func in reinforce_interp_FL) if reinforce_interp_FL else 0
-        normal_reinf = sum(func(x_c) for func in reinforce_interp_FT) if reinforce_interp_FT else 0
+        # Distributed load
+        qC = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at center
+        if qC > 0: # We need to check qC to distinguish between a linear ramp up (down) and the case where the load starts or ends on one of the sides
+            qL = sum(func(x_l) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at left‐top corner
+            qR = sum(func(x_r) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at right‐top corner
+        else:
+            qL = 0
+            qR = 0
+        d, d_x, d_y, beta = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR)
 
+        # Seismic force
+        kw = k_seismic * soil_weight
+
+        # === BEGIN : “Tension crack water force” ===
+
+        # By default, zero out t and its line‐of‐action:
+        t_force = 0.0
+        y_t_loc  = 0.0
+
+        # Only nonzero for the appropriate end‐slice:
+        if tcrack_water is not None and tcrack_water > 0:
+            # Horizontal resultant of water in tension crack (triangular distribution):
+            #    t = (1/2) * γ_w * (d_tc)^2
+            # Here, gamma_w is the unit weight of the crack‐water (y_w),
+            # and tcrack_water is the depth of water in the crack (d_tc).
+            t_force = 0.5 * gamma_w * (tcrack_water ** 2)
+
+            if right_facing:
+                # Right‐facing slope → water pushes on left side of the first slice (i == 0)
+                if i == 0:
+                    # line of action is d_tc/3 above the bottom left corner y_lb
+                    t_force = - t_force  # negative because it acts to the right on free body diagram
+                    y_t_loc = y_lb + (tcrack_water / 3.0)
+                else:
+                    # other slices = no tension‐crack force
+                    t_force = 0.0
+                    y_t_loc = 0.0
+
+            else:
+                # Left‐facing slope → water pushes on right side of the last slice (i == n-1)
+                if i == (len(all_xs) - 2):  # last slice index = (number_of_slices − 1)
+                    # line of action is d_tc/3 above the bottom right corner y_rb
+                    y_t_loc = y_rb + (tcrack_water / 3.0)
+                else:
+                    t_force = 0.0
+                    y_t_loc = y_rb
+        # === END: “Tension crack water force” ===
+
+        # === BEGIN : “Reinforcement lines” ===
+
+        # 1) Build this slice’s base as a LineString from (x_l, y_lb) to (x_r, y_rb):
+        slice_base = LineString([(x_l, y_lb), (x_r, y_rb)])
+
+        # 2) For each reinforcement line, check a single‐point intersection:
+        p_sum = 0.0
+        for rl in reinf_lines_data:
+            intersec = slice_base.intersection(rl["geom"])
+            if intersec.is_empty:
+                continue
+
+            # Since we guarantee only one intersection point, it must be a Point:
+            if isinstance(intersec, Point):
+                xi = intersec.x
+                # interpolated FL at xi
+                fl_i = np.interp(xi, rl["xs"], rl["fls"], left=0.0, right=0.0)
+                p_sum += fl_i
+            else:
+                # (In the extremely unlikely case that intersection is not a Point,
+                #  skip it. Our assumption is only one Point per slice-base.)
+                continue
+
+        # Now p_sum is the TOTAL FL‐pull acting at this slice’s base.
+        # === END: “Tension crack water force” ===
+
+        # --Process piezometric line and pore pressures---
         hw = 0
         piezo_y = None
         if piezo_line:
@@ -370,35 +515,41 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
                 phi = 0
 
         slice_data = {
-            'slice #': i + 1,
-            'x_l': x_l,
-            'y_lb': y_lb,
-            'y_lt': y_lt,
-            'x_r': x_r,
-            'y_rb': y_rb,
-            'y_rt': y_rt,
-            'x_c': x_c,
-            'y_cb': y_cb,
-            'y_ct': y_ct,
-            'y_cg': y_cg,
-            'dx': dx,
-            'alpha': alpha,
-            'dl': dl,
-            **{f'h{j+1}': h for j, h in enumerate(heights)},
-            'w_s': soil_weight,
-            'dload': dload,
-            'w': total_weight,
+            'slice #': i + 1, # Slice numbering starts at 1
+            'x_l': x_l,     # left x-coordinate of the slice
+            'y_lb': y_lb,   # left y-coordinate of the slice base
+            'y_lt': y_lt,   # left y-coordinate of the slice top
+            'x_r': x_r,     # right x-coordinate of the slice
+            'y_rb': y_rb,   # right y-coordinate of the slice base
+            'y_rt': y_rt,   # right y-coordinate of the slice top
+            'x_c': x_c,     # center x-coordinate of the slice
+            'y_cb': y_cb,   # center y-coordinate of the slice base
+            'y_ct': y_ct,   # center y-coordinate of the slice top
+            'y_cg': y_cg,   # center of gravity y-coordinate of the slice
+            'dx': dx,       # width of the slice
+            'alpha': alpha,  # slope angle of the bottom of the slice in degrees
+            'dl': dl,        # length of the slice along the failure surface
+            **{f'h{j+1}': h for j, h in enumerate(heights)},  # heights of each layer in the slice
+            'w': soil_weight,  # weight of the slice
+            'qL': qL,  # distributed load intensity at left edge
+            'qR': qR,  # distributed load intensity at right edge
+            'd': d,     # distributed load resultant (area of trapezoid)
+            'd_x': d_x, # dist load resultant x-coordinate (point d)
+            'd_y': d_y, # dist load resultant y-coordinate (point d)
+            'kw': kw,   # seismic force
+            't': t_force,  # tension crack water force
+            'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
+            'beta': beta, # slope angle of the top edge in degrees
+            'p': p_sum,   # sum of reinforcement line FL values that intersect base of slice.
             'n_eff': 0, # Placeholder for effective normal force
-            'z': 0, # Placeholder for interslice side forces
+            'z': 0,     # Placeholder for interslice side forces
             'theta': 0, # Placeholder for interslice angles
-            'shear_reinf': shear_reinf,
-            'normal_reinf': normal_reinf,
-            'piezo_y': piezo_y,
-            'hw': hw,
+            'piezo_y': piezo_y,  # y-coordinate of the piezometric surface at x_c
+            'hw': hw,   # height of water at x_c
             'u': u,
-            'mat': base_material_idx + 1 if base_material_idx is not None else None,
-            'phi': phi,
-            'c': c,
+            'mat': base_material_idx + 1 if base_material_idx is not None else None,  # index of the base material (1-indexed)
+            'phi': phi,  # friction angle of the base material in degrees
+            'c': c,      # cohesion of the base material
         }
         slices.append(slice_data)
 

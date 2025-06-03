@@ -3,7 +3,7 @@
 Bishop's Simplified Method is a widely used limit equilibrium technique for analyzing slope stability, especially suitable for **circular slip surfaces**. It improves on the Ordinary Method of Slices by including interslice normal forces and satisfies both **moment** and **vertical force** equilibrium. The key assumptions are:
 
 - Circular slip surface  
-- Side forces are **horizontal** (i.e., interslice shear forces are neglected, but normal forces are included)
+- Interslice side forces are **horizontal** and the moments they create are negligible
 - Satisfies:
     - Moment equilibrium
     - Vertical force equilibrium
@@ -75,24 +75,19 @@ thus:
 
 Next, we substitute (3) into (4):
 
->$F = \dfrac{\sum \left[ c \Delta \ell + \left( \dfrac{W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right) \tan \phi' \right]}{\sum W \sin \alpha}   \qquad (5)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + \left( \dfrac{W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right) \tan \phi' \right]}{\sum W \sin \alpha}$
 
-To simplify, we can expand the numerator:
+To simplify the numerator, we multiply  $c \Delta \ell$ by $\dfrac{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$ to combine like terms:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + \dfrac{(W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}\right]}{\sum W \sin \alpha}   \qquad (6)$
-> 
-
-Next, multiply  $c \Delta \ell$ by $\dfrac{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$ to combine like terms:
-
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell (\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}) + (W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (7)$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell (\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}) + (W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}$
 
 Now we rearrange the numerator:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi' + (W - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (7)$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi' + (W - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}$
 
 Finally, the $\dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi'$ terms cancel out, leading to:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha)  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (8)$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha)  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (5)$
 
 Which is the standard equation for the factor of safety for Bishop's method.
 
@@ -121,23 +116,29 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 First we first need to consider how these forces affect the vertical force equilibrium. The vertical force equilibrium equation becomes:
 
->$N \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0  \qquad (6)$
+>$N \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
+> 
+>$(N' + u \Delta \ell) \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
 
+>$N'  \cos \alpha + u \Delta \ell \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0  \qquad (6)$
+ 
 The shear force on the base of the slice remains the same as before:
 
->$S = \dfrac{1}{F} \left[c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]   \qquad (7)$
+>$S = \dfrac{1}{F} \left[c \Delta \ell + N' \tan \phi' \right]   \qquad (7)$
 
-Substituting (7) into (6) and solving for N:
+Substituting (7) into (6) and solving for N':
 
->$N \cos \alpha + \dfrac{1}{F} \left[c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right] \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
+>$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} \left[c \Delta \ell + N' \tan \phi' \right] \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
 
->$N \cos \alpha + \dfrac{1}{F} c \Delta \ell \sin \alpha + \dfrac{1}{F} N \tan \phi' \sin \alpha - \dfrac{1}{F} u \Delta \ell \tan \phi' \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
+>$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} c \Delta \ell \sin \alpha + \dfrac{1}{F} N' \tan \phi' \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
+> 
+>$N' \cos \alpha + \dfrac{1}{F} N' \tan \phi' \sin \alpha = W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{1}{F} c \Delta \ell \sin \alpha$
+> 
+>$N' \left( \cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F} \right) = W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{1}{F} c \Delta \ell \sin \alpha$
 
->$N \cos \alpha + \dfrac{1}{F} N \tan \phi' \sin \alpha = W + D \cos \beta - P \sin \alpha + \dfrac{1}{F} \left[ c \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha$
+Finally, we can solve for $N'$:
 
->$N \left( \cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F} \right) = W + D \cos \beta - P \sin \alpha + \dfrac{1}{F} \left[ c \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha$
-
->$N = \dfrac{W + D \cos \beta - P \sin \alpha - \dfrac{1}{F} \left[ c \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (8)$
+>$N' = \dfrac{W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F}  \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (8)$
 
 ### Moment Equilibrium
 
@@ -146,28 +147,34 @@ The moment equilibrium equation about the center of the slip circle must also be
 >$F = \dfrac{R \sum (S + P)}{R \sum W \sin \alpha + \sum D \cos \beta a_{dx} - \sum D \sin \beta a_{dy} + k\sum W a_s + T a_t}   \qquad (9)$
 
 Where:
-- $a_{dx}$ = horizontal distance from center of circle to point $d$
-- $a_{dy}$ = vertical distance from center of circle to point $d$
-- $a_s$ = vertical distance from center of circle to center of gravity of the slice
-- $a_t$ = vertical distance from center of circle to point $c$
+>$a_{dx}$ = horizontal distance from center of circle to point $d$<br>
+> $a_{dy}$ = vertical distance from center of circle to point $d$<br>
+> $a_s$ = vertical distance from center of circle to center of gravity of the slice<br>
+> $a_t$ = vertical distance from center of circle to point $c$
 
-### Complete Factor of Safety Equation
-
-Combining (8) and (9), and dividing by R, we get:
+Dividing by $R$, we get:
 
 >$F = \dfrac{\sum (S + P)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
 
-Substituting (7) for S:
+Substituting for $S$ (note: in this case $S$ is the full shear force at the base of the slice - not the mobilized shear force):
 
->$F = \dfrac{\sum \left( \dfrac{1}{F} \left[c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right] + P \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
+>$F = \dfrac{\sum \left( \left[c \Delta \ell + N' \tan \phi' \right] + P \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
 
-Substituting (8) for N:
+Substituting (8) for $N'$:
 
->$F = \dfrac{\sum \left( \dfrac{1}{F} \left[c \Delta \ell + \left( \dfrac{W + D \cos \beta - P \sin \alpha - \dfrac{1}{F} \left[ c \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} - u \Delta \ell \right) \tan \phi' \right] + P \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
+>$F = \dfrac{\sum \left(c \Delta \ell + \left[ \dfrac{W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F}  \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]  \tan \phi' + P\right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
 
-Simplifying the numerator:
+Again, to simplify the numerator, we multiply $c \Delta \ell$ by $\dfrac{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha) \tan \phi' + P}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (10)$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell (\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}) + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} + P\right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
+
+Now, we can rearrange the numerator:
+
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi' + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} + P\right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}$
+
+Finally, the $\dfrac{c\Delta\ell}{F} \sin \alpha \tan \phi'$ terms cancel out, leading to:
+
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha)  \tan \phi' + P}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} - \frac{1}{R}\sum D \sin \beta a_{dy} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (10)$
 
 This is the **complete formulation** for Bishop's Simplified Method. Note that the water force $T$ only applies to the uppermost slice, so for the summation in the numerator, the $T$ value is zero for all other slices.
 

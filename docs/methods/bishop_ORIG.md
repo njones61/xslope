@@ -23,82 +23,84 @@ $u$ = pore water pressure
 $N$ = normal force on the base of the slice  
 $S$ = shear force at the base
 
-Recall that:
-
->$N = N' + u \Delta \ell$
-
->$N' = N - u \Delta \ell$
-
-Where $N'$ is the effective normal stress on the base of the slice.
-
 Summing forces in the vertical direction:
 
 >$\sum F_y = 0$
 
->$N \cos \alpha + S \sin \alpha - W = 0$
->
->$(N' + u \Delta \ell) \cos \alpha + S \sin \alpha - W = 0$
-> 
->$N' \cos \alpha + u \Delta \ell \cos \alpha + S \sin \alpha - W = 0  \qquad (1)$
+>$N \cos \alpha + S \sin \alpha - W = 0  \qquad (1)$
 
-Where $S$ is the mobilized shear force at the base of the slice. The shear force is given by:
+>$S = \tau \Delta l = \dfrac{s \Delta \ell}{F}$
 
->$S = \dfrac{1}{F} \left[c \Delta \ell + N' \tan \phi' \right]   \qquad (2)$
+>$S = \dfrac{1}{F} \left[c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]   \qquad (2)$
 
 Substituting (2) into (1):
 
->$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} \left[ c \Delta \ell + N' \tan \phi' \right] \sin \alpha - W = 0$
+>$N \cos \alpha + \left( \dfrac{1}{F} \left[ c \Delta \ell + (N - u \Delta \ell) \tan \phi' \right] \right) \sin \alpha - W = 0$
 
-Now solve for the effective normal force $N'$. First, we rearrange the equation:
+Now we solve for the normal force $N$. First, we rearrange the equation:
 
->$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F} \sin \alpha + \dfrac{N' \tan \phi'}{F} \sin \alpha - W = 0$
+>$N \cos \alpha + \Bigl[\dfrac{c \Delta \ell}{F} \sin \alpha + \dfrac{(N - u \Delta \ell) \tan \phi'}{F} \sin \alpha\Bigr] - W \;=\; 0$
 
-Next, we isolate all terms involving $N'$:
+Next we isolate all terms involving $N$:
 
->$N' \cos \alpha + \dfrac{N' \tan \phi'}{F} \sin \alpha = W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha$
+>$N \cos \alpha + \dfrac{N \tan \phi'}{F} \sin \alpha + \left(-u \Delta \ell \tan \phi' \right)\dfrac{\sin \alpha}{F} + 
+\dfrac{c\,\Delta \ell}{F} \sin \alpha - W = 0$
 
->$N' \left( \cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F} \right) = W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha$
+Now, collect the $N$ terms on the left side:
 
-Finally, we can solve for $N'$:
+>$N \cos \alpha + \dfrac{N \tan \phi'}{F} \sin \alpha = W - \dfrac{c\,\Delta \ell}{F} \sin \alpha - \left(-u \Delta \ell \tan \phi' \right)\dfrac{\sin \alpha}{F}$
 
->$N' = \dfrac{W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (3)$
+>$N\Bigl(\cos \alpha + \dfrac{\sin \alpha\,\tan \phi'}{F}\Bigr)  =
+W - \dfrac{c\,\Delta \ell}{F}\,\sin \alpha + \dfrac{u\,\Delta \ell\,\tan \phi'}{F}\,\sin \alpha$
+
+Finally, we can solve for $N$:
+
+>$N = \dfrac{W - \dfrac{1}{F} \left[ c \Delta \ell - u \Delta \ell \tan \phi' \right] \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (3)$
 
 From the general equation (based on moment equilibrium):
 
 >$F = \dfrac{\sum (c + \sigma' tan \phi') \Delta \ell}{\sum W sin \alpha}$
 
->$N' = \sigma' \Delta \ell$
+>$\sigma' = \dfrac{N}{\Delta \ell} - u$
 
 thus:
 
->$F = \dfrac{\sum (c \Delta \ell + N' tan \phi')}{\sum W sin \alpha}   \qquad (4)$
+>$F = \dfrac{\sum (c \Delta \ell + (N - u \Delta \ell) tan \phi')}{\sum W sin \alpha}   \qquad (4)$
 
-Next, we substitute (3) into (4):
+Next, we substitute (3) into (4) and solve for $F$:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + \left( \dfrac{W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right) \tan \phi' \right]}{\sum W \sin \alpha}   \qquad (5)$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (5)$
 
-To simplify, we can expand the numerator:
+## BEGIN INSERT
 
->$F = \dfrac{\sum \left[ c \Delta \ell + \dfrac{(W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}\right]}{\sum W \sin \alpha}   \qquad (6)$
-> 
 
-Next, multiply  $c \Delta \ell$ by $\dfrac{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$ to combine like terms:
+Step 1: Substitute <span>N</span> from (3) into (4):
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell (\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}) + (W - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F} \sin \alpha) \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (7)$
+<span>F = \frac{\sum \left[ c \Delta \ell + \left( \frac{W - \frac{1}{F} [c \Delta \ell - u \Delta \ell \tan \phi'] \sin \alpha}{\cos \alpha + \frac{\sin \alpha \tan \phi'}{F}} - u \Delta \ell \right) \tan \phi' \right]}{\sum W \sin \alpha}</span>
 
-Now we rearrange the numerator:
+Step 2: Expand the numerator:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi' + (W - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (7)$
+<span>= \frac{\sum \left[ c \Delta \ell + \frac{(W - \frac{1}{F} [c \Delta \ell - u \Delta \ell \tan \phi'] \sin \alpha) \tan \phi'}{\cos \alpha + \frac{\sin \alpha \tan \phi'}{F}} - u \Delta \ell \tan \phi' \right]}{\sum W \sin \alpha}</span>
 
-Finally, the $\dfrac{c \Delta \ell}{F} \sin \alpha \tan \phi'$ terms cancel out, leading to:
+Step 3: Combine like terms:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha)  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}   \qquad (8)$
+Notice <span>-u \Delta \ell \tan \phi'</span> appears both inside and outside the fraction. Combine them:
 
-Which is the standard equation for the factor of safety for Bishop's method.
+<span>= \frac{\sum \left[ \frac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha) \tan \phi'}{\cos \alpha + \frac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}</span>
+
+Step 4: Final form (Equation 5):
+
+<span>F = \frac{\sum \left[ \frac{c \Delta \ell \cos \alpha + (W - u \Delta \ell \cos \alpha) \tan \phi'}{\cos \alpha + \frac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha}</span>
+
+## END INSERT
+
+For total stress analysis:
+
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + W \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi}{F}} \right]}{\sum W \sin \alpha}$
 
 The factor of safety $F$ appears on both sides of the equation, so it must be solved **iteratively**.
 
-Once $F$ is determined, $N'$ can be computed using equation (3) above.
+Once $F$ is determined, $N$ can be computed using equation (3) above.
 
 ## Complete Formulation
 

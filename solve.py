@@ -7,58 +7,6 @@ from scipy.optimize import minimize_scalar, root_scalar
 from tabulate import tabulate
 
 
-def oms_OLD(df, circle=None, circular=True, debug=True):
-    """
-    Computes the Factor of Safety (FS) using the Ordinary Method of Slices (OMS).
-    This method works on circular failure surfaces only.
-
-    Parameters:
-        df (pd.DataFrame): DataFrame containing slice data with columns:
-            - 'alpha': base angle (degrees)
-            - 'w': total slice weight
-            - 'c': cohesion
-            - 'phi': friction angle (degrees)
-            - 'u': pore pressure
-            - 'dl': base length
-
-    Returns:
-        dict:
-            - float: Computed Factor of Safety (FS)
-            - np.ndarray: Normal force on the base of each slice
-    """
-
-    if not circular:
-        return False, 'OMS method is only applicable for circular failure surfaces.'
-
-    alpha_rad = np.radians(df['alpha'])
-
-    cos_alpha = np.cos(alpha_rad)
-    sin_alpha = np.sin(alpha_rad)
-    cos2_alpha = cos_alpha ** 2
-
-    W = df['w'].values
-    c = df['c'].values
-    phi = np.radians(df['phi']).values
-    u = df['u'].values
-    dl = df['dl'].values
-
-    N_eff = W * cos_alpha - u * dl * cos2_alpha
-    numerator = c * dl + N_eff * np.tan(phi)
-    denominator = W * sin_alpha
-    FS = numerator.sum() / denominator.sum() if denominator.sum() != 0 else float('inf')
-
-    df['n_eff'] = N_eff  # store effective normal forces in df
-
-    if debug==True:
-        print(f'numerator = {numerator.sum():.4f}')
-        print(f'denominator = {denominator.sum():.4f}')
-        print('N_eff =', np.array2string(N_eff.values, precision=4, separator=', '))
-
-    results = {}
-    results['method'] = 'oms'
-    results['FS'] = FS
-    return True, results
-
 def oms(df, circle, circular=True, debug=True):
     """
     Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
@@ -200,79 +148,7 @@ def oms(df, circle, circular=True, debug=True):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(df, circle, circular=True, tol=1e-6, max_iter=100, debug=True):
-    """
-    Computes the Factor of Safety (FS) using Bishop's Simplified Method.
-    This method works on circular failure surfaces only.
-    It iterates on the factor of safety until convergence is achieved.
-
-    Parameters:
-        df (pd.DataFrame): DataFrame containing slice data with necessary columns.
-        tol (float, optional): Convergence tolerance. Default is 1e-6.
-        max_iter (int, optional): Maximum number of iterations. Default is 100.
-
-    Returns:
-        tuple:
-            - float: Computed Factor of Safety (FS)
-            - np.ndarray: Normal force on the base of each slice
-            - bool: Whether the solution converged
-    """
-
-    if circular == False:
-        return False, 'Bishop method is only applicable for circular failure surfaces.'
-
-    alpha_rad = np.radians(df['alpha'])
-    cos_alpha = np.cos(alpha_rad)
-    sin_alpha = np.sin(alpha_rad)
-    cos2_alpha = cos_alpha**2
-    tan_phi = np.tan(np.radians(df['phi']))
-
-    W = df['w']
-    c = df['c']
-    dl = df['dl']
-    u = df['u']
-
-    # Right-hand side: sum of W * sin(alpha)
-    denominator = (W * sin_alpha).sum()
-
-    # Start iteration with an initial guess
-    converge = False
-    F_guess = 1.0
-    N_eff = W * cos_alpha - u * dl * cos2_alpha
-    num = c * dl + N_eff * tan_phi
-    for _ in range(max_iter):
-
-        num_N = (
-            W - u * dl * cos_alpha
-            - (c * dl * sin_alpha) / F_guess
-        )
-        denom_N = cos_alpha + (sin_alpha * tan_phi) / F_guess
-        N_eff = num_N / denom_N
-
-        numerator = (c * dl + N_eff * tan_phi).sum()
-        F_calc = numerator / denominator
-        if abs(F_calc - F_guess) < tol:
-            converge = True
-            break
-        F_guess = F_calc
-
-    df['n_eff'] = N_eff  # store effective normal forces in df
-
-    if debug:
-        print(f"FS = {F_calc:.6f}")
-        print(f"Numerator = {numerator:.6f}")
-        print(f"Denominator = {denominator:.6f}")
-        print("N_eff =", np.array2string(N_eff.to_numpy(), precision=4, separator=', '))
-
-    if not converge:
-        return False, 'Bishop method did not converge within the maximum number of iterations.'
-    else:
-        results = {}
-        results['method'] = 'bishop'
-        results['FS'] = F_calc
-        return True, results
-
-def bishop_NEW(df, circle, circular=True, debug=True, tol=1e-6, max_iter=100):
+def bishop(df, circle, circular=True, debug=True, tol=1e-6, max_iter=100):
     """
     Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
     Requires circular slip surface and full input data structure consistent with OMS.
@@ -369,73 +245,117 @@ def bishop_NEW(df, circle, circular=True, debug=True, tol=1e-6, max_iter=100):
 
     return False, "Bishop method did not converge within the maximum number of iterations."
 
-def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
+def janbu(df, circle=None, circular=True, debug=True):
     """
-    Computes the Factor of Safety (FS) using Janbu's Simplified Method with correction factor.
-    Applies the Janbu correction based on d/L ratio and soil type.
+    Computes FS using Janbu's Simplified Method with correction factor (Equation 7).
+
+    Implements the complete formulation including distributed loads, seismic forces,
+    reinforcement, and tension crack water forces. Applies Janbu correction factor
+    based on d/L ratio and soil type.
 
     Parameters:
-        df (pd.DataFrame): DataFrame containing slice data.
-        tol (float, optional): Convergence tolerance. Default is 1e-6.
-        max_iter (int, optional): Maximum number of iterations. Default is 100.
+        df : pandas.DataFrame with required columns (see OMS spec)
+        circular : bool, method works for both circular and non-circular surfaces
+        debug : bool, if True prints diagnostic info
 
     Returns:
-        float: Corrected Factor of Safety (FS)
-        float: Correction factor (fo)
-        bool: Convergence flag
+        (bool, dict | str): (True, {'method': 'janbu_simplified', 'FS': value, 'fo': correction_factor})
+                           or (False, error message)
     """
-    alpha_rad = np.radians(df['alpha'])
-    phi_rad = np.radians(df['phi'])
-    tan_phi = np.tan(phi_rad)
 
-    W = df['w']
+    # Load input arrays
+    alpha = np.radians(df['alpha'].values)
+    phi = np.radians(df['phi'].values)
     c = df['c'].values
-    dl = df['dl'].values
+    W = df['w'].values
     u = df['u'].values
+    dl = df['dl'].values
+    D = df['d'].values
+    beta = np.radians(df['beta'].values)
+    kw = df['kw'].values
+    T = df['t'].values
+    P = df['p'].values
 
-    sin_alpha = np.sin(alpha_rad)
-    cos_alpha = np.cos(alpha_rad)
+    # Trigonometric terms
+    sin_alpha = np.sin(alpha)
+    cos_alpha = np.cos(alpha)
+    tan_phi = np.tan(phi)
+    sin_beta_alpha = np.sin(beta - alpha)
+    cos_beta_alpha = np.cos(beta - alpha)
 
-    # === Calculate base FS ===
+    # Effective normal forces (Equation 10)
+    N_eff = W * cos_alpha - kw * sin_alpha + D * cos_beta_alpha - T * sin_alpha - u * dl
 
-    N_eff = W * cos_alpha - u * dl
-    F = sum(c * dl + N_eff * tan_phi) / sum(W * sin_alpha)
+    # Numerator: resisting forces (shear resistance)
+    numerator = np.sum(c * dl + N_eff * tan_phi + P)
 
-    df['n_eff'] = N_eff  # store effective normal forces in df
+    # Denominator: driving forces parallel to base (Equation 6)
+    denominator = np.sum(W * sin_alpha + kw * cos_alpha - D * sin_beta_alpha + T * cos_alpha)
+
+    # Base factor of safety (Equation 7)
+    if abs(denominator) < 1e-12:
+        return False, "Division by zero in Janbu method: driving forces sum to zero"
+
+    FS_base = numerator / denominator
 
     # === Compute Janbu correction factor ===
-    x_l = df['x_l'].iloc[0]
-    y_lt = df['y_lt'].iloc[0]
-    x_r = df['x_r'].iloc[-1]
-    y_rt = df['y_rt'].iloc[-1]
 
+    # Get failure surface endpoints
+    x_l = df['x_l'].iloc[0]  # leftmost x
+    y_lt = df['y_lt'].iloc[0]  # leftmost top y
+    x_r = df['x_r'].iloc[-1]  # rightmost x
+    y_rt = df['y_rt'].iloc[-1]  # rightmost top y
+
+    # Length of failure surface (straight line approximation)
     L = np.hypot(x_r - x_l, y_rt - y_lt)
+
+    # Calculate perpendicular distance from each slice center to failure surface line
     x0 = df['x_c'].values
     y0 = df['y_cb'].values
-    numerator = np.abs((y_rt - y_lt) * x0 - (x_r - x_l) * y0 + x_r * y_lt - y_rt * x_l)
-    dists = numerator / L
-    d = np.max(dists)
+
+    # Distance from point to line formula: |ax + by + c| / sqrt(a² + b²)
+    # Line equation: (y_rt - y_lt)x - (x_r - x_l)y + (x_r * y_lt - y_rt * x_l) = 0
+    numerator_dist = np.abs((y_rt - y_lt) * x0 - (x_r - x_l) * y0 + x_r * y_lt - y_rt * x_l)
+    dists = numerator_dist / L
+    d = np.max(dists)  # maximum perpendicular distance
+
     dL_ratio = d / L
 
+    # Determine b1 factor based on soil type
     phi_sum = df['phi'].sum()
     c_sum = df['c'].sum()
-    if phi_sum == 0:
-        b1 = 0.69
-    elif c_sum == 0:
+
+    if phi_sum == 0:  # c-only soil (undrained, φ = 0)
+        b1 = 0.67
+    elif c_sum == 0:  # φ-only soil (no cohesion)
         b1 = 0.31
-    else:
+    else:  # c-φ soil
         b1 = 0.50
 
-    fo = 1 + b1 * (dL_ratio - 1.4 * dL_ratio**2)
+    # Correction factor
+    fo = 1 + b1 * (dL_ratio - 1.4 * dL_ratio ** 2)
 
-    # === Return solution ===
-    FS = F * fo
+    # Final corrected factor of safety
+    FS = FS_base * fo
 
-    results = {}
-    results['method'] = 'janbu_corrected'
-    results['FS'] = FS
-    results['fo'] = fo
-    return True, results
+    # Store effective normal forces in DataFrame
+    df['n_eff'] = N_eff
+
+    if debug:
+        print(f"FS_base = {FS_base:.6f}")
+        print(f"d/L ratio = {dL_ratio:.4f}")
+        print(f"b1 factor = {b1:.2f}")
+        print(f"fo correction = {fo:.4f}")
+        print(f"FS_corrected = {FS:.6f}")
+        print(f"Numerator = {numerator:.6f}")
+        print(f"Denominator = {denominator:.6f}")
+        print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
+
+    return True, {
+        'method': 'janbu',
+        'FS': FS,
+        'fo': fo
+    }
 
 
 def force_equilibrium_OLD(df, theta_list, circular=True,

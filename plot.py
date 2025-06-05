@@ -536,7 +536,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     elif method == 'spencer':
         theta = results['theta']
         title = f'Spencer: FS = {fs:.3f}, θ = {theta:.2f}°'
-    elif method == 'janbu_corrected':
+    elif method == 'janbu':
         fo = results['fo']
         title = f'Janbu-Corrected: FS = {fs:.3f}, fo = {fo:.2f}'
     elif method == 'corps_engineers':

@@ -32,9 +32,9 @@ nav:
   - Solution Techniques:
     - Ordinary Method of Slices: methods/oms.md
     - Bishop's Simplified Method: methods/bishop.md
-    - Spencer's Method: methods/spencer.md
     - Janbu Method: methods/janbu.md
     - Force Equilibrium Methods: methods/force_eq.md
+    - Spencer's Method: methods/spencer.md
     - Line of Thrust: methods/line_of_thrust.md
   - Advanced Techniques:
     - Rapid Drawdown Analysis: advanced/rapid.md

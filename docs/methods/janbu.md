@@ -20,17 +20,23 @@ To get the normal force N, we sum forces in perpendicular to the base of the sli
 
 >>$N = W \cos\alpha  \qquad (2)$
 
+>>$N' = W \cos\alpha - u \Delta \ell  \qquad (3)$
+
 Therefore, the shear force becomes:
 
->>$S = c \Delta \ell + (W \cos\alpha - u \Delta \ell) \tan\phi$
+>>$S = c \Delta \ell + N' \tan\phi$
 
-The resisting force is the component of the weight acting parallel to the base of the slice, which is given by:
+>>$S = c \Delta \ell + (W \cos\alpha - u \Delta \ell) \tan\phi  \qquad (4)$
 
->>$W \sin\alpha     \qquad (3)$
+This represents the resisting force on the base of the slice. The driving force is the component of the weight acting parallel to the base of the slice, which is given by:
+
+>>$W \sin\alpha     \qquad (5)$
 
 So the factor of safety can be expressed as:
 
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - u \Delta \ell) \tan\phi\right]}{\sum W \sin\alpha}     \qquad (4)$
+>>$F = \dfrac{resisting force}{driving force}   \qquad (6)$
+
+>>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - u \Delta \ell) \tan\phi\right]}{\sum W \sin\alpha}     \qquad (7)$
 
 ## Correction Factor $f_o$
 
@@ -42,7 +48,7 @@ The correction factor $f_o$ is based on the following relationship:
 
 The d/L ratio is the ratio of the distance from the center of the failure surface to the point of interest (d) and the length of the failure surface (L). The correction factor is used to account for the fact that the Janbu method does not satisfy moment equilibrium. The correction factor is a function of the d/L ratio and is calculated using the following equation:
 
->>$f_o = 1 + b_1  * \left[\dfrac{d}{L} - 1.4 * \left(\dfrac{d}{L}\right)^2\right]$
+>>$f_o = 1 + b_1  * \left[\dfrac{d}{L} - 1.4 * \left(\dfrac{d}{L}\right)^2\right]    \qquad (8)$
 
 The $b_1$ value is a function of the soils in the slope and is found as follows:
 
@@ -53,7 +59,11 @@ The $b_1$ value is a function of the soils in the slope and is found as follows:
 | c-$\phi$ soil                       | 0.5   |
 | $\phi$-only soil (no cohesion)      | 0.31  |
 
-This correction attempts to mimic the effects of moment balance and interslice forces without modeling them directly.
+This correction attempts to mimic the effects of moment balance and interslice forces without modeling them directly. Thus, the final factor of safety equation for Janbu's Simplified Method becomes:
+
+>>$F_{corr} = f_o \cdot F   \qquad (9)$
+
+Where $F_{corr}$ is the corrected factor of safety, $F$ is the factor of safety calculated using equation (7), and $f_o$ is the correction factor.
 
 ## Complete Formulation with Extra Forces
 
@@ -72,19 +82,29 @@ $T$ = tension crack water force <br>
 
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, and $T$ are included in the Janbu simplified method factor of safety equation as follows:
 
-To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, and $T$ forces, we first need to consider how these forces affect the calculation of the normal force $N$ (equation 2 above). To do this, we again sum forces perpendicular to the base of the slice. The equation for N then becomes:
+To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, and $T$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The equation for N then becomes:
 
->>$N = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha   \qquad (5)$
+>>$N'  = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell  \qquad (10)$
 
-Next, we need to update the driving force parallel to the base of the slice. Updating equation (3) above gives:
+The resisting force parallel to the base of the slice includes both the shear force $S$ and the reinforcement force $P$. The shear force is given by:
 
->>$W \sin \alpha + kW \cos \alpha  - D \sin (\beta - \alpha)  + T \cos \alpha   \qquad (6)$
+>>$S = c \Delta \ell + N' \tan\phi$
 
-Finally, combining (5) and (6) into (4) we can update the factor of safety equation to include the additional forces. The updated factor of safety equation is:
+Substituting equation (10) into this gives:
 
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha))  + T \cos \alpha}   \qquad (7)$
+>>$S = c \Delta \ell + (W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi   \qquad (11)$
+
+Next, we need to update the driving force parallel to the base of the slice. Updating equation (5) above gives:
+
+>>$W \sin \alpha + kW \cos \alpha  - D \sin (\beta - \alpha)  + T \cos \alpha   \qquad (12)$
+
+Finally, the factor of safety is founcd by substituting the updated resisting and driving forces into equation (6):
+
+>>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi\right] + P}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha))  + T \cos \alpha}   \qquad (13)$
 
 It should be remembered that $T$ only applies to the side of the uppermost slice. $T$ = 0  for all the other slices.
+
+Once again, we apply the correction factor $f_o$ to account for the neglect of interslice forces and moment equilibrium as shown in equation (9) above.
 
 ---
 

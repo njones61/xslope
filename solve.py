@@ -200,7 +200,7 @@ def oms(df, circle, circular=True, debug=True):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(df, circular=True, tol=1e-6, max_iter=100):
+def bishop(df, circle, circular=True, tol=1e-6, max_iter=100, debug=True):
     """
     Computes the Factor of Safety (FS) using Bishop's Simplified Method.
     This method works on circular failure surfaces only.
@@ -218,7 +218,7 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
             - bool: Whether the solution converged
     """
 
-    if not circular:
+    if circular == False:
         return False, 'Bishop method is only applicable for circular failure surfaces.'
 
     alpha_rad = np.radians(df['alpha'])
@@ -228,13 +228,12 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
     tan_phi = np.tan(np.radians(df['phi']))
 
     W = df['w']
-    shear_reinf = df.get('shear_reinf', 0)
     c = df['c']
     dl = df['dl']
     u = df['u']
 
     # Right-hand side: sum of W * sin(alpha)
-    denominator = (W * sin_alpha - shear_reinf).sum()
+    denominator = (W * sin_alpha).sum()
 
     # Start iteration with an initial guess
     converge = False
@@ -242,9 +241,16 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
     N_eff = W * cos_alpha - u * dl * cos2_alpha
     num = c * dl + N_eff * tan_phi
     for _ in range(max_iter):
-        denom = cos_alpha + (sin_alpha * tan_phi) / F_guess
-        terms = num / denom
-        F_calc = terms.sum() / denominator
+
+        num_N = (
+            W - u * dl * cos_alpha
+            - (c * dl * sin_alpha) / F_guess
+        )
+        denom_N = cos_alpha + (sin_alpha * tan_phi) / F_guess
+        N_eff = num_N / denom_N
+
+        numerator = (c * dl + N_eff * tan_phi).sum()
+        F_calc = numerator / denominator
         if abs(F_calc - F_guess) < tol:
             converge = True
             break
@@ -252,16 +258,11 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
 
     df['n_eff'] = N_eff  # store effective normal forces in df
 
-    if debug==True:
-        print(f'numerator = {numerator:.4f}')
-        print(f'denominator = {denominator:.4f}')
-        print(f'Sum_W = {sum_W:.4f}')
-        print(f'Sum_Dx = {sum_Dx:.4f}')
-        print(f'Sum_Dy = {sum_Dy:.4f}')
-        print(f'Sum_kw = {sum_kw:.4f}')
-        print(f'Sum_T = {sum_T:.4f}')
-        print('N_eff =', np.array2string(N_eff, precision=4, separator=', '))
-
+    if debug:
+        print(f"FS = {F_calc:.6f}")
+        print(f"Numerator = {numerator:.6f}")
+        print(f"Denominator = {denominator:.6f}")
+        print("N_eff =", np.array2string(N_eff.to_numpy(), precision=4, separator=', '))
 
     if not converge:
         return False, 'Bishop method did not converge within the maximum number of iterations.'
@@ -271,7 +272,102 @@ def bishop(df, circular=True, tol=1e-6, max_iter=100):
         results['FS'] = F_calc
         return True, results
 
+def bishop_NEW(df, circle, circular=True, debug=True, tol=1e-6, max_iter=100):
+    """
+    Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
+    Requires circular slip surface and full input data structure consistent with OMS.
 
+    Parameters:
+        df : pandas.DataFrame with required columns (see OMS spec)
+        circle : dict with 'Xo', 'Yo', 'R'
+        circular : bool, must be True
+        debug : bool, if True prints diagnostic info
+        tol : float, convergence tolerance
+        max_iter : int, maximum iteration steps
+
+    Returns:
+        (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
+    """
+
+    if not circular:
+        return False, "Bishop method requires circular slip surfaces."
+
+    Xo = circle['Xo']
+    Yo = circle['Yo']
+    R = circle['R']
+
+    # Load input arrays
+    alpha = np.radians(df['alpha'].values)
+    phi   = np.radians(df['phi'].values)
+    c     = df['c'].values
+    W     = df['w'].values
+    u     = df['u'].values
+    dl    = df['dl'].values
+    D     = df['d'].values
+    d_x   = df['d_x'].values
+    d_y   = df['d_y'].values
+    beta  = np.radians(df['beta'].values)
+    kw    = df['kw'].values
+    T     = df['t'].values
+    y_t   = df['y_t'].values
+    P     = df['p'].values
+    x_c   = df['x_c'].values
+    y_cg  = df['y_cg'].values
+
+    # Trigonometric terms
+    sin_alpha = np.sin(alpha)
+    cos_alpha = np.cos(alpha)
+    tan_phi   = np.tan(phi)
+    sin_beta  = np.sin(beta)
+    cos_beta  = np.cos(beta)
+
+    # Moment arms
+    a_dx = Xo - d_x
+    a_dy = Yo - d_y
+    a_s  = Yo - y_cg
+    a_t  = Yo - y_t
+
+    # Denominator (moment equilibrium)
+    sum_W = np.sum(W * sin_alpha)
+    sum_Dx = np.sum(D * cos_beta * a_dx)
+    sum_Dy = np.sum(D * sin_beta * a_dy)
+    sum_kw = np.sum(kw * a_s)
+    sum_T = np.sum(T * a_t)
+    denominator = sum_W + (1.0 / R) * (sum_Dx - sum_Dy + sum_kw + sum_T)
+
+    # Iterative solution
+    F = 1.0
+    for _ in range(max_iter):
+        # Compute N_eff from Equation (8)
+        num_N = (
+            W + D * cos_beta - P * sin_alpha
+            - u * dl * cos_alpha
+            - (c * dl * sin_alpha) / F
+        )
+        denom_N = cos_alpha + (sin_alpha * tan_phi) / F
+        N_eff = num_N / denom_N
+
+        # Numerator for FS from Equation (10)
+        shear = (
+            c * dl * cos_alpha
+            + (W + D * cos_beta - P * sin_alpha - u * dl * cos_alpha) * tan_phi
+            + P
+        )
+        numer_slice = shear / denom_N
+        F_new = np.sum(numer_slice) / denominator
+
+        if abs(F_new - F) < tol:
+            df['n_eff'] = N_eff
+            if debug:
+                print(f"FS = {F_new:.6f}")
+                print(f"Numerator = {np.sum(numer_slice):.6f}")
+                print(f"Denominator = {denominator:.6f}")
+                print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
+            return True, {'method': 'bishop', 'FS': F_new}
+
+        F = F_new
+
+    return False, "Bishop method did not converge within the maximum number of iterations."
 
 def janbu_corrected(df, circular=True, tol=1e-6, max_iter=100):
     """

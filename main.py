@@ -50,8 +50,8 @@ else:
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
 
-# options = [oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath]
-results = solve_selected(lowe_karafiath, df, circle=circle, circular=True)
+# options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
+results = solve_selected(spencer, df, circle=circle, circular=True)
 
 plot_solution(data, df, failure_surface, results)
 

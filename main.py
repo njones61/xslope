@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu_corrected, janbu, spencer, corps_engineers, lowe_karafiath
+from solve import oms, bishop, janbu, spencer, corps_engineers, lowe_karafiath
 
 
 def solve_selected(func, df, circle=None, circular=True):
@@ -17,8 +17,6 @@ def solve_selected(func, df, circle=None, circular=True):
         print(f'Bishop: FS={result["FS"]:.3f}')
     elif func == spencer:
         print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
-    elif func == janbu_corrected:
-        print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
     elif func == janbu:
         print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
     elif func == corps_engineers:
@@ -52,8 +50,8 @@ else:
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
 
-# options = [oms, bishop, spencer, janbu_corrected, corps_engineers, lowe_karafiath]
-results = solve_selected(janbu, df, circle=circle, circular=True)
+# options = [oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath]
+results = solve_selected(lowe_karafiath, df, circle=circle, circular=True)
 
 plot_solution(data, df, failure_surface, results)
 

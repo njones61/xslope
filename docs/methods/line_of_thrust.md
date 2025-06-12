@@ -185,6 +185,6 @@ Again, care must be taken with the tension crack water force ($T$) as described 
 
 Solving for $\Delta y_{i}$ gives:
 
->>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} + D \cos(\beta) a_{dx} + D \sin(\beta) a_{dy} - kW a_k - T a_t}{E_{i}}   \qquad (10)$
+>>$\Delta y_{i} = \dfrac{E_{i+1} \Delta y_{i+1} - X_{i+1} \Delta x - W \dfrac{\Delta x}{2} + N \dfrac {\Delta \ell}{2} - D \cos(\beta) a_{dx} - D \sin(\beta) a_{dy} + kW a_k + T a_t}{E_{i}}   \qquad (10)$
 
 Again, we convert both $\Delta y_{i}$ and $\Delta y_{i+1}$ to y values by adding the elevation of the lower left corner of the slice $y_{lb}$ as described earlier.

@@ -778,9 +778,9 @@ def compute_line_of_thrust(df, FS, debug=False):
             - w[i] * dx[i] / 2
             + N * dl[i] / 2
             - D[i] * np.cos(beta[i]) * (x_r[i] - d_x[i])  # D*cos(β)*a_dx relative to right corner
-            + D[i] * np.sin(beta[i]) * (y_rb[i] - d_y[i])  # D*sin(β)*a_dy relative to right corner
-            - kw[i] * (y_rb[i] - y_cg[i])  # kW*a_k relative to right corner
-            - T[i] * (y_rb[i] - y_t[i])    # T*a_t relative to right corner
+            + D[i] * np.sin(beta[i]) * (d_y[i]- y_rb[i])  # D*sin(β)*a_dy relative to right corner
+            - kw[i] * (y_cg[i] - y_rb[i])  # kW*a_k relative to right corner
+            - T[i] * (y_t[i] - y_rb[i])    # T*a_t relative to right corner
         )
         delta_y_L[i+1]  = num / E[i+1] if abs(E[i+1]) > tol else 0  # right-side moment arm
         y_L[i+1]  = y_rb[i] + delta_y_L[i+1]    # absolute y value on right side
@@ -803,10 +803,10 @@ def compute_line_of_thrust(df, FS, debug=False):
             - X[i+1] * dx[i]
             - w[i] * dx[i] / 2
             + N * dl[i] / 2
-            + D[i] * np.cos(beta[i]) * (x_l[i] - d_x[i])  # D*cos(β)*a_dx relative to left corner
-            + D[i] * np.sin(beta[i]) * (y_lb[i] - d_y[i])  # D*sin(β)*a_dy relative to left corner
-            - kw[i] * (y_lb[i] - y_cg[i])  # kW*a_k relative to left corner
-            - T[i] * (y_lb[i] - y_t[i])    # T*a_t relative to left corner
+            - D[i] * np.cos(beta[i]) * (d_x[i] - x_l[i])  # D*cos(β)*a_dx relative to left corner
+            - D[i] * np.sin(beta[i]) * (d_y[i] -y_lb[i]) # D*sin(β)*a_dy relative to left corner
+            + kw[i] * (y_cg[i] - y_lb[i])  # kW*a_k relative to left corner
+            + T[i] * (y_t[i] - y_lb[i])    # T*a_t relative to left corner
         )
 
         delta_y_R[i] = num / E[i] if abs(E[i]) > tol else 0

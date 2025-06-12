@@ -32,7 +32,7 @@ def solve_all(df, circular=True):
     solve_selected(spencer, df, circular=circular)
     solve_selected(janbu_corrected, df, circular=circular)
 
-data = load_globals("docs/input_template_lface.xlsx")
+data = load_globals("docs/input_template_lface (with dload).xlsx")
 
 # plot_inputs(data)
 

@@ -1,9 +1,8 @@
-
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point
 from math import sin, cos, tan, radians, atan, atan2, degrees
-from scipy.optimize import minimize_scalar, root_scalar
+from scipy.optimize import minimize_scalar, root_scalar, newton
 from tabulate import tabulate
 
 
@@ -358,95 +357,6 @@ def janbu(df, circle=None, circular=True, debug=True):
     }
 
 
-def force_equilibrium_OLD(df, theta_list, circular=True,
-                      fs_min=0.5, fs_max=4.0, tol=1e-6, max_iter=50, debug=False):
-    """
-    Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
-
-    Parameters:
-        df (pd.DataFrame): must contain columns
-            'alpha' (slice base inclination, degrees),
-            'phi'   (slice friction angle, degrees),
-            'c'     (cohesion),
-            'dl'    (slice base length),
-            'w'     (slice weight),
-            'u'     (pore force per unit length)
-        theta_list (array-like): slice-boundary force inclinations (degrees),
-                                 length must be n+1 if there are n slices
-        circular (bool): unused but kept for API consistency
-        fs_min, fs_max (float): bracket for FS search
-        tol (float): convergence tolerance on residual
-        max_iter (int): maximum bisection steps
-        debug (bool): print residuals during iteration
-
-    Returns:
-        (bool, dict or str):
-           - If converged: (True, {'method':'force_equilibrium','FS':<value>})
-           - If failed:   (False, "error message")
-    """
-    n = len(df)
-    if len(theta_list) != n+1:
-        return False, f"theta_list length ({len(theta_list)}) must be n+1 ({n+1})"
-
-    # extract and convert to radians
-    alpha   = np.radians(df['alpha'].values)
-    phi     = np.radians(df['phi'].values)
-    c       = df['c'].values
-    w       = df['w'].values
-    u       = df['u'].values
-    dl      = df['dl'].values
-    theta   = np.radians(np.asarray(theta_list))
-
-    def residual(FS):
-        """Return the last interslice force Z[n] for a given FS."""
-        c_m       = c / FS
-        tan_phi_m = np.tan(phi) / FS
-        Z = np.zeros(n+1)
-        # Z[0] = 0 by definition (no force entering leftmost slice)
-        for i in range(n):
-            ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
-            # build coefficient matrix: [N_i, Z_{i+1}]
-            A = np.array([
-                [tan_phi_m[i]*ca - sa,   -np.cos(theta[i+1])],
-                [tan_phi_m[i]*sa + ca,   -np.sin(theta[i+1])]
-            ])
-            # RHS vector
-            b0 = -c_m[i]*dl[i]*ca + u[i]*dl[i]*sa - Z[i]*np.cos(theta[i])
-            b1 = -c_m[i]*dl[i]*sa - u[i]*dl[i]*ca + w[i]    - Z[i]*np.sin(theta[i])
-            N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
-            Z[i+1] = Z_ip1
-        return Z[n] # side force on right side of last slice should be zero if forces balance.
-
-    # bracket check
-    r_lo = residual(fs_min)
-    r_hi = residual(fs_max)
-    if debug:
-        print(f"FS={fs_min:.4f} -> residual={r_lo:.4g}; FS={fs_max:.4f} -> residual={r_hi:.4g}")
-    if r_lo * r_hi > 0:
-        return False, (f"Cannot bracket root in [{fs_min}, {fs_max}]: "
-                       f"residuals are {r_lo:.4g}, {r_hi:.4g}")
-
-    # bisection
-    lo, hi = fs_min, fs_max
-    for it in range(max_iter):
-        mid = 0.5*(lo + hi)
-        r_mid = residual(mid)
-        if debug:
-            print(f" iter {it:2d}: FS={mid:.6f}, residual={r_mid:.4g}")
-        if abs(r_mid) < tol:
-            FS = mid
-            break
-        if r_lo * r_mid < 0:
-            hi, r_hi = mid, r_mid
-        else:
-            lo, r_lo = mid, r_mid
-    else:
-        return False, f"force_equilibrium did not converge after {max_iter} iterations"
-
-    return True, {'FS': FS}
-
-from scipy.optimize import newton
-
 def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
@@ -458,7 +368,12 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
             'c'     (cohesion),
             'dl'    (slice base length),
             'w'     (slice weight),
-            'u'     (pore force per unit length)
+            'u'     (pore force per unit length),
+            'd'     (distributed load),
+            'beta'  (distributed load inclination, degrees),
+            'kw'    (seismic force),
+            't'     (tension crack water force),
+            'p'     (reinforcement force)
         theta_list (array-like): slice‐boundary force inclinations (degrees),
                                  length must be n+1 if there are n slices
         fs_guess (float): initial guess for factor of safety
@@ -484,6 +399,11 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
     w       = df['w'].values
     u       = df['u'].values
     dl      = df['dl'].values
+    D       = df['d'].values
+    beta    = np.radians(df['beta'].values)
+    kw      = df['kw'].values
+    T       = df['t'].values
+    P       = df['p'].values
     theta   = np.radians(np.asarray(theta_list))
     N = np.zeros(n)  # normal forces on slice bases
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
@@ -495,12 +415,33 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
         Z[:] = 0.0  # reset Z for each call
         for i in range(n):
             ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
+            cb, sb = np.cos(beta[i]), np.sin(beta[i])
+            
+            # Matrix A coefficients from equations (6) and (7)
             A = np.array([
                 [tan_phi_m[i]*ca - sa,   -np.cos(theta[i+1])],
                 [tan_phi_m[i]*sa + ca,   -np.sin(theta[i+1])]
             ])
-            b0 = -c_m[i]*dl[i]*ca + u[i]*dl[i]*sa - Z[i]*np.cos(theta[i])
-            b1 = -c_m[i]*dl[i]*sa - u[i]*dl[i]*ca + w[i]    - Z[i]*np.sin(theta[i])
+            
+            # Vector b from equations (6) and (7)
+            b0 = (
+                -c_m[i]*dl[i]*ca 
+                - P[i]*ca 
+                + u[i]*dl[i]*sa 
+                - Z[i]*np.cos(theta[i]) 
+                - D[i]*sb 
+                + kw[i] 
+                + T[i]
+            )
+            b1 = (
+                -c_m[i]*dl[i]*sa 
+                - P[i]*sa 
+                - u[i]*dl[i]*ca 
+                + w[i] 
+                - Z[i]*np.sin(theta[i]) 
+                + D[i]*cb
+            )
+            
             N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
             Z[i+1] = Z_ip1
             N[i] = N_i  # store normal force on slice base
@@ -525,7 +466,7 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(df, circular=True, debug=True):
+def corps_engineers(df, circle=None, circular=True, debug=True):
     """
     Corps‐of‐Engineers style force‐equilibrium solver.
 
@@ -570,7 +511,7 @@ def corps_engineers(df, circular=True, debug=True):
         results['theta'] = theta_deg           # append theta
         return success, results
 
-def lowe_karafiath(df, circular=True, debug=True):
+def lowe_karafiath(df, circle=None,circular=True, debug=True):
     """
     Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
     the average of the top‐and bottom‐surface slopes of the two adjacent slices

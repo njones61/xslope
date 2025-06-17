@@ -148,9 +148,9 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     Compute:
       - D    : total resultant force from a trapezoidal load varying
                linearly from intensity qL at (x_l,y_lt) to qR at (x_r,y_rt).
-      - d_x  : x‐coordinate of the resultant’s centroid on the top edge
-      - d_y  : y‐coordinate of the resultant’s centroid on the top edge
-      - beta : angle (in degrees) of the slice’s top edge (positive CCW
+      - d_x  : x‐coordinate of the resultant's centroid on the top edge
+      - d_y  : y‐coordinate of the resultant's centroid on the top edge
+      - beta : angle (in degrees) of the slice's top edge (positive CCW
                from the +x direction).
 
     Parameters
@@ -409,7 +409,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
         # Seismic force
         kw = k_seismic * soil_weight
 
-        # === BEGIN : “Tension crack water force” ===
+        # === BEGIN : "Tension crack water force" ===
 
         # By default, zero out t and its line‐of‐action:
         t_force = 0.0
@@ -467,8 +467,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
                 #  skip it. Our assumption is only one Point per slice-base.)
                 continue
 
-        # Now p_sum is the TOTAL FL‐pull acting at this slice’s base.
-        # === END: “Tension crack water force” ===
+        # Now p_sum is the TOTAL FL‐pull acting at this slice's base.
+        # === END: "Tension crack water force" ===
 
         # --Process piezometric line and pore pressures---
         hw = 0

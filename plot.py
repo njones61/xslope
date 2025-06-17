@@ -506,7 +506,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     alpha = 0.3
     if results['method'] == 'spencer':
         FS = results['FS']
-        thrust_line = compute_line_of_thrust(df, FS,  debug=True)
+        thrust_line = compute_line_of_thrust(df, FS,  debug=False)
         plot_thrust_line(ax, thrust_line)
 
     plot_base_stresses(ax, df, alpha=alpha)
@@ -638,6 +638,71 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     plot_circle_centers(ax, fs_cache)
     if search_path:
         plot_search_path(ax, search_path)
+
+    ax.set_aspect('equal')
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.grid(False)
+    ax.legend()
+
+    if highlight_fs and fs_cache:
+        critical_fs = fs_cache[0]['FS']
+        ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
+    """
+    Creates a plot showing the results of a non-circular failure surface search.
+
+    Parameters:
+        data: Dictionary containing plot data
+        fs_cache: List of dictionaries containing failure surface data and FS values
+        search_path: List of dictionaries containing search path coordinates
+        highlight_fs: Boolean indicating whether to highlight the critical failure surface
+        width: Width of the plot in inches
+        height: Height of the plot in inches
+
+    Returns:
+        None
+    """
+    fig, ax = plt.subplots(figsize=(width, height))
+
+    # Plot basic profile elements
+    plot_profile_lines(ax, data['profile_lines'])
+    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
+    plot_piezo_line(ax, data['piezo_line'])
+    plot_dloads(ax, data['dloads'])
+    plot_tcrack_surface(ax, data['tcrack_surface'])
+
+    # Plot all failure surfaces from cache
+    for i, result in reversed(list(enumerate(fs_cache))):
+        surface = result['failure_surface']
+        if surface is None or surface.is_empty:
+            continue
+        x, y = zip(*surface.coords)
+        color = 'red' if i == 0 else 'gray'
+        lw = 2 if i == 0 else 1
+        ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6)
+
+    # Plot search path if provided
+    if search_path:
+        for i in range(len(search_path) - 1):
+            start = search_path[i]
+            end = search_path[i + 1]
+            # For non-circular search, we need to plot the movement of each point
+            start_points = np.array(start['points'])
+            end_points = np.array(end['points'])
+            
+            # Plot arrows for each moving point
+            for j in range(len(start_points)):
+                dx = end_points[j, 0] - start_points[j, 0]
+                dy = end_points[j, 1] - start_points[j, 1]
+                if abs(dx) > 1e-6 or abs(dy) > 1e-6:  # Only plot if point moved
+                    ax.arrow(start_points[j, 0], start_points[j, 1], dx, dy,
+                            head_width=1, head_length=2, fc='green', ec='green',
+                            length_includes_head=True, alpha=0.6)
 
     ax.set_aspect('equal')
     ax.set_xlabel("x")

@@ -6,7 +6,7 @@ from scipy.optimize import minimize_scalar, root_scalar, newton
 from tabulate import tabulate
 
 
-def oms(df, circle, circular=True, debug=True):
+def oms(df, circle, circular=True, debug=False):
     """
     Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
 
@@ -25,7 +25,7 @@ def oms(df, circle, circular=True, debug=True):
           'beta'   (deg)   = top slope βᵢ
           'kw'            = seismic horizontal kWᵢ
           't'             = tension‐crack horizontal Tᵢ  (zero except one slice)
-          'y_t'           = y‐loc of Tᵢ’s line of action (zero except that one slice)
+          'y_t'           = y‐loc of Tᵢ's line of action (zero except that one slice)
           'p'             = reinforcement uplift pᵢ (zero if none)
           'x_c','y_cg'    = slice‐centroid (x,y) for seismic moment arm
 
@@ -147,7 +147,7 @@ def oms(df, circle, circular=True, debug=True):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(df, circle, circular=True, debug=True, tol=1e-6, max_iter=100):
+def bishop(df, circle, circular=True, debug=False, tol=1e-6, max_iter=100):
     """
     Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
     Requires circular slip surface and full input data structure consistent with OMS.
@@ -244,7 +244,7 @@ def bishop(df, circle, circular=True, debug=True, tol=1e-6, max_iter=100):
 
     return False, "Bishop method did not converge within the maximum number of iterations."
 
-def janbu(df, circle=None, circular=True, debug=True):
+def janbu(df, circle=None, circular=True, debug=False):
     """
     Computes FS using Janbu's Simplified Method with correction factor (Equation 7).
 
@@ -466,7 +466,7 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(df, circle=None, circular=True, debug=True):
+def corps_engineers(df, circle=None, circular=True, debug=False):
     """
     Corps of Engineers style force equilibrium solver.
 
@@ -511,7 +511,7 @@ def corps_engineers(df, circle=None, circular=True, debug=True):
         results['theta'] = theta_deg           # append theta
         return success, results
 
-def lowe_karafiath(df, circle=None,circular=True, debug=True):
+def lowe_karafiath(df, circle=None,circular=True, debug=False):
     """
     Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
     the average of the top‐and bottom‐surface slopes of the two adjacent slices
@@ -573,7 +573,7 @@ def lowe_karafiath(df, circle=None,circular=True, debug=True):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, circle=None, circular=True, tol=1e-6):
+def spencer(df, circle=None, circular=True, tol=1e-6, debug=True):
     """
     Spencer's Method using Steve G. Wright's formulation.
     Solves for FS_force and FS_moment independently using the Wright Q equation.
@@ -598,7 +598,6 @@ def spencer(df, circle=None, circular=True, tol=1e-6):
         bool: converged flag
     """
 
-    beta_bounds = (-60, 60)
     tol = 1e-6
     max_iter = 100
 
@@ -619,7 +618,6 @@ def spencer(df, circle=None, circular=True, tol=1e-6):
     cos_a = np.cos(alpha)
     sin_a = np.sin(alpha)
     tan_p = np.tan(phi)
-
 
     def compute_Q(F, theta_rad):
         term1 = w * sin_a + kw * cos_a + T * cos_a - P - D * np.sin(beta - alpha)
@@ -653,14 +651,47 @@ def spencer(df, circle=None, circular=True, tol=1e-6):
         return result.x
 
     def fs_difference(theta_deg):
-        theta_rad = radians(theta_deg)
+        theta_rad = np.radians(theta_deg)
         Ff = fs_force(theta_rad)
         Fm = fs_moment(theta_rad)
-        return abs(Ff - Fm)
+        return Ff - Fm
 
-    result = minimize_scalar(fs_difference, bounds=beta_bounds, method='bounded', options={'xatol': tol})
-    theta_opt = result.x
-    theta_rad = radians(theta_opt)
+    # First try Newton's method to find theta_opt
+    try:
+        theta_guess = 10.0  # This seems to work well for most cases
+        if debug:
+            print(f"Trying Newton's method for theta root-finding with initial guess {theta_guess:.1f} deg")
+        theta_opt = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
+        # Check if the solution is valid
+        if (
+            abs(theta_opt) > 59 or
+            abs(fs_difference(theta_opt)) > 0.01 or
+            fs_force(np.radians(theta_opt)) >= fs_max - 1e-3
+        ):
+            raise ValueError("Newton's method converged to an invalid solution, trying sweep...")
+    except Exception:
+        # If Newton's method fails, try sweeping theta to find a bracket where fs_difference changes sign,
+        #  then use root_scalar to find theta_opt
+        if debug: 
+            print("Newton's method failed or gave invalid result, sweeping theta to find a bracket...")
+        theta_range = np.linspace(-60, 60, 49)
+        fs_diff_values = [fs_difference(theta) for theta in theta_range]
+        bracket = None
+        for i in range(len(fs_diff_values) - 1):
+            if fs_diff_values[i] * fs_diff_values[i+1] < 0:
+                bracket = [theta_range[i], theta_range[i+1]]
+                break
+        if bracket is None:
+            return False, "Spencer's method: No sign change found in fs_difference over theta range."
+        try:
+            if debug:
+                print(f"Trying root_scalar with bracket {bracket}")
+            sol = root_scalar(fs_difference, bracket=bracket, method='brentq', xtol=tol)
+            theta_opt = sol.root
+        except Exception as e:
+            return False, f"Spencer's method failed to converge: {e}"
+
+    theta_rad = np.radians(theta_opt)
     FS_force = fs_force(theta_rad)
     FS_moment = fs_moment(theta_rad)
 
@@ -691,8 +722,9 @@ def spencer(df, circle=None, circular=True, tol=1e-6):
         results['theta'] = theta_opt
 
         # debug print values per slice
-        for i in range(len(Q)):
-            print(f"Slice {i}: Q = {Q[i]:.3f}, alpha = {degrees(alpha[i]):.2f}, phi = {degrees(phi[i]):.2f}, c = {c[i]:.2f}, w = {w[i]:.2f}, u = {u[i]:.2f}")
+        if debug:
+            for i in range(len(Q)):
+                print(f"Slice {i}: Q = {Q[i]:.3f}, alpha = {np.degrees(alpha[i]):.2f}, phi = {np.degrees(phi[i]):.2f}, c = {c[i]:.2f}, w = {w[i]:.2f}, u = {u[i]:.2f}")
 
         return True, results
 

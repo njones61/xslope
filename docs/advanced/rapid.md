@@ -12,7 +12,7 @@ To simulate this scenario, we utilize a "multi-stage" approach in our analysis. 
 
 Rapid drawdown occurs when the pool is lowered rapidly enough that pore water pressures in some of the soils cannot dissipate quickly enough to maintain stability. To determine when rapid drawdown may apply, Duncan, et al. (1992) suggested using the dimensionless time factor, T, from consolidation theory. T is defined as:
 
->>$T = \dfrac{c_v t}{D^2}$
+>>$T = \dfrac{c_v t}{D^2}   \qquad (1)$
 
 where:
 
@@ -78,15 +78,17 @@ Using the normal force ($N$) found by the solution, we can calculate the effecti
 
 Since the values returned by the solvers are actually effective normal forces ($N'$), we can also calculate as follows:
 
->>$\sigma_{fc} = \dfrac{N'}{\Delta \ell}$
+>>$\sigma'_{fc} = \dfrac{N'}{\Delta \ell}   \qquad (2)$
+
+The precise mechanics of how $N'$ is computed vary according to the solver used. The equations and methodology for computing $N'$ is described in the **Methods** section of this documentation.
 
 Likewise, the shear stress on the failure plane at the end of the consolidation stage is:
 
->>$\tau_{fc} = \dfrac{1}{F}(c' + \sigma' \tan \phi')$
-
 >>$\tau_{fc} = \dfrac{S}{\Delta \ell}$
 
-The precise mechanics of how $N'$ is computed vary according to the solver used. The equations and methodology for computing $N'$ is described in the **Methods** section of this documentation.
+>>$\tau_{fc} = \dfrac{1}{F}(c' + \sigma' \tan \phi')   \qquad (3)$
+
+Note that this is the mobilized shear strength and $F$ is the factory of safety returned by the solver in the Stage 1 solution.
 
 ## Stage 2 - Compute FS for Post-Drawdown Conditions
 
@@ -114,15 +116,15 @@ For the stresses on the base of each slice, the actual $K$ ratio should vary som
 
 If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpoloate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
 
->>$K_1 = \dfrac{\sigma' + \tau[(\sin \phi' + 1) / \cos \phi']}{\sigma' + \tau[(\sin \phi' - 1) / \cos \phi']}$
+>>$K_1 = \dfrac{\sigma' + \tau[(\sin \phi' + 1) / \cos \phi']}{\sigma' + \tau[(\sin \phi' - 1) / \cos \phi']}   \qquad (4)$
 
-Where $\sigma'$ and $\tau$ are the effective normal and shear stresses on the shear plane at the end of consolidation. This equation assumes that the orientation of the principal stresses at the end of consolidation is the same as the orientation of the principal stresses at failure. Values of the undrained shear strength for the effective consolidation stress $\sigma'$ and a consolidation ratio $K_c = K_1$ are obtained by interpolating the $K_c = 1$  and $K_c = K_f$  failure envelopes using the following equation:
+Where $\sigma'$ and $\tau$ are the effective normal and shear stresses on the shear plane at the end of consolidation and are found using equations (2) and (3) above. Equation (4) assumes that the orientation of the principal stresses at the end of consolidation is the same as the orientation of the principal stresses at failure. Values of the undrained shear strength for the effective consolidation stress $\sigma'$ and a consolidation ratio $K_c = K_1$ are obtained by interpolating the $K_c = 1$  and $K_c = K_f$  failure envelopes using the following equation:
 
->>$\tau_{ff} = \dfrac{(K_f - K_1) \tau_{ff(K_c=1)} + (K_1 - 1) \tau_{ff(K_c=K_f)}}{K_f - 1}$
+>>$\tau_{ff} = \dfrac{(K_f - K_1) \tau_{ff(K_c=1)} + (K_1 - 1) \tau_{ff(K_c=K_f)}}{K_f - 1}  \qquad (5)$
 
 The two $\tau_{ff}$ values are found by evaluating the two envelopes using the $\sigma'_{fc}$ found from stage 1. The $K_{ff} value used in this equation can be found from:
 
->>$K_f = \dfrac{(\sigma' + c' \cos \phi')(1 + \sin \phi')}{(\sigma' - c' \cos \phi')(1 - \sin \phi')}$
+>>$K_f = \dfrac{(\sigma' + c' \cos \phi')(1 + \sin \phi')}{(\sigma' - c' \cos \phi')(1 - \sin \phi')}   \qquad (6)$
 
 ### Negative Stresses
 
@@ -132,9 +134,9 @@ If significant cohesion exists, the $\sigma'_3$ values can become negative, lead
 
 In this case, we use the lower of the $K_c = 1$  and $K_c = K_f$  curves. Negative effective stresses can be checked using the following two equations:
 
->>$\sigma'_{3c} = \sigma'_{fc} + \tau_{fc} \dfrac{\sin \phi' - 1}{\cos \phi'}$ (for the $K_c = 1$ envelope)
+>>$\sigma'_{3c} = \sigma'_{fc} + \tau_{fc} \dfrac{\sin \phi' - 1}{\cos \phi'}  \qquad (7)$ (for the $K_c = 1$ envelope)
 
->>$\sigma'_{3c} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}$ (for the $K_c = K_f$ envelope)
+>>$\sigma'_{3c} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}  \qquad (8)$ (for the $K_c = K_f$ envelope)  
 
 If either is negative, no interpolation is required and we use the lower of the two strength values coming from the two curves.
 
@@ -146,15 +148,15 @@ After the undrained strengths are computed for low K zones, the factor of safety
 
 For Stage 3, undrained strengths used for slices in low K zones are compared with drained strengths. If drained strength is lower than the undrained strength, the drained strength is assigned to that slice and the FS is re-calculated. Note that some slices may used drained strength while others may use undrained. If drained > undrained for all slices, there is no need to re-calculate FS. For the drained strength calculations:
 
->>$\sigma = \dfrac{F}{\Delta \ell}$
+>>$\sigma' = \dfrac{N'}{\Delta \ell}   \qquad (9)$
 
->>$s = c' + (\sigma - u) \tan \phi'$
+>>$\tau = c' + (\sigma') \tan \phi'   \qquad (10)$
 
-The pore pressure $u$ is found from post-drawdown conditions.
+Where $N'$ is the effective normal force found in Stage 2 using post-drawdown conditions.
 
 If Stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If Stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. 
 
-## Inputs for Rapid Drawdown Analysis
+## Inputs and Calculations
 
 To perform a rapid drawdown analysis, the following additional inputs must be provided in the input template Excel file:
 
@@ -163,3 +165,31 @@ To perform a rapid drawdown analysis, the following additional inputs must be pr
 | Material Properties| $d$ and $\psi$ for all materials to be analyzed using multi-stage approach. |
 | Pore Pressures | Two piezometric lines: one for Stage 1 and one for Stage 2 |
 | Distributed Loads | Two sets of distributed loads, one for Stage 1 (full pool) and one for Stage 2 (lowered pool) |
+
+In summary, the calculations are done in the following process:
+
+**Stage 1**
+
+1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factory of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice.<br>
+
+2.  Calculate $\sigma'_{fc}$ and $\tau_{fc}$ using equations (2) and (3).<br>
+
+**Stage 2**
+
+3. Calculate $K_1$ via equation (4), using $\sigma'_{fc}$ and $\tau_{fc}$ from step 2.<br>
+
+4. Using $\sigma'_{fc}$ from step 2, calculate $\tau_{ff(K_c=1)}$ from the $d - \psi$ curve and $\tau_{ff(K_c=K_f)}$ from the $c - \phi$ curve.<br>
+
+5. Calculate $K_f$ using equation (6) and $\sigma'_{fc}$ from step 2.<br>
+
+6. Calculate $\tau_{ff}$ from equation (5)<br>
+
+7. Steps 3-6 are performed for each low K soil. For each of these soils, set $c$ = $\tau_{ff}$ and set $\phi = 0$. For the high K soils, use the normal $c - \phi$ values.
+
+8. Using the strengths from step 7 and the pore pressures and distributed loads corresponding to drawdown (lowered pool) conditions, calculate $FS$ using the selected solver. This is the $FS$ for Stage 2.
+
+**Stage 3**
+
+9. For each slice with a low K soil at the bottom, use the $N'$ values calculated in Stage 2 and calculate the drained shear strength ($\tau$) using equations (9) and (10). Compare this value to the $\tau_{ff}$ value used in Stage 2. If the drained strength is smaller for any slice, replace the undrained strength values with the original $c - \phi$ values and recompute $FS$. This is the $FS$ for Stage 3.
+
+10. Compare the $FS$ for Stages 2 & 3. The smaller of the two is the final $FS$ for rapid drawdown conditions.

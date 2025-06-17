@@ -8,8 +8,6 @@ When designing a dam or levee, it is crucial to consider the potential for rapid
 
 To simulate this scenario, we utilize a "multi-stage" approach in our analysis. In the first stage, we apply the initial conditions with the water level at its full height and use the consolidation stresses resulting from these conditions to determine the undrained strength of the soils. In the second stage, we use these undrained strengths and the loading conditions corresponding to the lowered water level and determine the factor of safety for rapid drawdown conditions. The **slopetools** package provides a convenient way to perform this analysis using the `rapid_drawdown` function. The equations and methodology used in this function are described in the following sections.
 
-
-
 ## When Does Rapid Drawdown Apply?
 
 Rapid drawdown occurs when the pool is lowered rapidly enough that pore water pressures in some of the soils cannot dissipate quickly enough to maintain stability. To determine when rapid drawdown may apply, Duncan, et al. (1992) suggested using the dimensionless time factor, T, from consolidation theory. T is defined as:
@@ -98,7 +96,7 @@ In Stage 2, we perform a total stress analysis using undrained shear strengths f
 
 The process of finding the appropriate undrained strength for the Stage 2 analysis based on the consolidation stresses from Stage 1, involves a variation of the Mohr-Coulomb failure envelope. Consider the following diagram:
 
-![mc_tauff.png](rapid_images/mc_tauff.png){width=700px}
+![mc_tauff.png](rapid_images/mc_tauff.png){width=610px}
 
 The $\tau_{ff}$ is the shear stress on the failure plane at failure. $\sigma'_{1f}$ and $\sigma'_{3f}$ are major and minor principal effective stresses at failure. For our application, we need to correlate $\tau_{ff}$ with $\sigma'_{fc}$. To do this, we create a new plot as follows:
 
@@ -112,7 +110,7 @@ When performing rapid drawdown analysis with the **slopetools** package, a set o
 
 For the stresses on the base of each slice, the actual $K$ ratio should vary somewhere between $K_c = 1$ and $K_c = K_f$. For example, if $K_c = 2$, the middle line in this figure would apply.
 
-![k_interp.png](rapid_images/k_interp.png)
+![k_interp.png](rapid_images/k_interp.png){width=720px}
 
 If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpoloate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
 
@@ -154,7 +152,7 @@ For Stage 3, undrained strengths used for slices in low K zones are compared wit
 
 The pore pressure $u$ is found from post-drawdown conditions.
 
-If stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. 
+If Stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If Stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. 
 
 ## Inputs for Rapid Drawdown Analysis
 
@@ -164,4 +162,4 @@ To perform a rapid drawdown analysis, the following additional inputs must be pr
 |----------|-------------|
 | Material Properties| $d$ and $\psi$ for all materials to be analyzed using multi-stage approach. |
 | Pore Pressures | Two piezometric lines: one for Stage 1 and one for Stage 2 |
-| Distributed Loads | Two sets of distributed loads, one for Stage 1 (full pool) and one for Stage 2 (lowered) |
+| Distributed Loads | Two sets of distributed loads, one for Stage 1 (full pool) and one for Stage 2 (lowered pool) |

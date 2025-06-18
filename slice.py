@@ -550,6 +550,9 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             'mat': base_material_idx + 1 if base_material_idx is not None else None,  # index of the base material (1-indexed)
             'phi': phi,  # friction angle of the base material in degrees
             'c': c,      # cohesion of the base material
+            'r': R,      # radius of the circular failure surface
+            'xo': Xo,    # x-coordinate of the center of the circular failure surface
+            'yo': Yo,    # y-coordinate of the center of the circular failure surface
         }
         slices.append(slice_data)
 

@@ -6,7 +6,7 @@ from scipy.optimize import minimize_scalar, root_scalar, newton
 from tabulate import tabulate
 
 
-def oms(df, circle, debug=False):
+def oms(df, debug=False):
     """
     Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
 
@@ -28,11 +28,8 @@ def oms(df, circle, debug=False):
           'y_t'           = y‐loc of Tᵢ's line of action (zero except that one slice)
           'p'             = reinforcement uplift pᵢ (zero if none)
           'x_c','y_cg'    = slice‐centroid (x,y) for seismic moment arm
-
-    circle : dict with keys:
-          'Xo' : float   = x‐coordinate of circle center
-          'Yo' : float   = y‐coordinate of circle center
-          'R'  : float   = circle radius > 0
+          'r'             = radius of circular failure surface
+          'xo','yo'       = x,y coordinates of circle center
 
     Returns
     -------
@@ -53,13 +50,13 @@ def oms(df, circle, debug=False):
            + (1/R)·Σ[ Tᵢ·(Yo - y_{t,i}) ]  ].
 
     """
-    if circle is None:
+    if 'r' not in df.columns:
         return False, "Circle is required for OMS method."
 
-    # 1) Unpack circle‐center and radius
-    Xo = circle['Xo']
-    Yo = circle['Yo']
-    R  = circle['R']
+    # 1) Unpack circle‐center and radius as single values
+    Xo = df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
+    Yo = df['yo'].iloc[0]    # Yoᵢ (y-coordinate of circle center)
+    R  = df['r'].iloc[0]     # Rᵢ (radius of circular failure surface)
 
     # 2) Pull arrays directly from df
     alpha_deg = df['alpha'].values    # αᵢ in degrees
@@ -149,14 +146,13 @@ def oms(df, circle, debug=False):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(df, circle, debug=False, tol=1e-6, max_iter=100):
+def bishop(df, debug=False, tol=1e-6, max_iter=100):
     """
     Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
     Requires circular slip surface and full input data structure consistent with OMS.
 
     Parameters:
         df : pandas.DataFrame with required columns (see OMS spec)
-        circle : dict with 'Xo', 'Yo', 'R'
         debug : bool, if True prints diagnostic info
         tol : float, convergence tolerance
         max_iter : int, maximum iteration steps
@@ -165,12 +161,13 @@ def bishop(df, circle, debug=False, tol=1e-6, max_iter=100):
         (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
     """
 
-    if circle is None:
-        return False, "Bishop method requires circular slip surfaces."
+    if 'r' not in df.columns:
+        return False, "Circle is required for Bishop method."
 
-    Xo = circle['Xo']
-    Yo = circle['Yo']
-    R = circle['R']
+    # 1) Unpack circle‐center and radius as single values
+    Xo = df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
+    Yo = df['yo'].iloc[0]    # Yoᵢ (y-coordinate of circle center)
+    R  = df['r'].iloc[0]     # Rᵢ (radius of circular failure surface)
 
     # Load input arrays
     alpha = np.radians(df['alpha'].values)
@@ -245,7 +242,7 @@ def bishop(df, circle, debug=False, tol=1e-6, max_iter=100):
 
     return False, "Bishop method did not converge within the maximum number of iterations."
 
-def janbu(df, circle=None, debug=False):
+def janbu(df, debug=False):
     """
     Computes FS using Janbu's Simplified Method with correction factor (Equation 7).
 
@@ -255,7 +252,6 @@ def janbu(df, circle=None, debug=False):
 
     Parameters:
         df : pandas.DataFrame with required columns (see OMS spec)
-        circle: for compatibility with other methods, but not used in Janbu method.
         debug : bool, if True prints diagnostic info
 
     Returns:
@@ -467,7 +463,7 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(df, circle=None, debug=False):
+def corps_engineers(df, debug=False):
     """
     Corps of Engineers style force equilibrium solver.
 
@@ -480,7 +476,6 @@ def corps_engineers(df, circle=None, debug=False):
         df (pd.DataFrame): Must include at least ['x_l','y_lt','x_r','y_rt']
                            plus all the columns required by force_equilibrium:
                            ['alpha','phi','c','dl','w','u','dx'].
-        circle (dictionary): For compatibility with other methods, but not used in Corps of Engineers method.
 
     Returns:
         Tuple(bool, dict or str): Whatever force_equilibrium returns.
@@ -512,7 +507,7 @@ def corps_engineers(df, circle=None, debug=False):
         results['theta'] = theta_deg           # append theta
         return success, results
 
-def lowe_karafiath(df, circle=None, debug=False):
+def lowe_karafiath(df, debug=False):
     """
     Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
     the average of the top‐and bottom‐surface slopes of the two adjacent slices
@@ -574,7 +569,7 @@ def lowe_karafiath(df, circle=None, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, circle=None, tol=1e-6, debug=False):
+def spencer(df, tol=1e-6, debug=False):
     """
     Spencer's Method using Steve G. Wright's formulation.
     Solves for FS_force and FS_moment independently using the Wright Q equation.
@@ -599,7 +594,8 @@ def spencer(df, circle=None, tol=1e-6, debug=False):
         bool: converged flag
     """
 
-    circular = circle is not None
+    # Check if the 'r' column is present in df. If so, circular = True.
+    circular = 'r' in df.columns
 
     tol = 1e-6
     max_iter = 100

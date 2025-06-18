@@ -51,7 +51,7 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
                     solver_result = None
                 else:
                     df_slices, failure_surface = result
-                    solver_success, solver_result = solver(df_slices, circular=True, circle=test_circle)
+                    solver_success, solver_result = solver(df_slices, circle=test_circle)
                     FS = solver_result['FS'] if solver_success else fs_fail
                 fs_results.append((FS, d, df_slices, failure_surface, solver_result))
 
@@ -254,7 +254,7 @@ def noncircular_search(data, solver, diagnostic=True, movement_distance=4.0, shr
             return float('inf'), None, None, None, fs_cache
             
         df_slices, failure_surface = result
-        solver_success, solver_result = solver(df_slices, circular=False)
+        solver_success, solver_result = solver(df_slices, circle=None)
         FS = solver_result['FS'] if solver_success else float('inf')
         
         # Cache result

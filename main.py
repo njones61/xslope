@@ -5,8 +5,8 @@ from plot import plot_solution, plot_inputs
 from solve import oms, bishop, janbu, spencer, corps_engineers, lowe_karafiath
 
 
-def solve_selected(func, df, circle=None):
-    success, result = func(df, circle)
+def solve_selected(func, df):
+    success, result = func(df)
     if not success:
         print(f'Error: {result}')
         return result
@@ -25,13 +25,13 @@ def solve_selected(func, df, circle=None):
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
     return result
 
-def solve_all(df, circle=None):
-    solve_selected(oms, df, circle)
-    solve_selected(bishop, df, circle)
-    solve_selected(janbu, df, circle)
-    solve_selected(spencer, df, circle)
-    solve_selected(corps_engineers, df, circle)
-    solve_selected(lowe_karafiath, df, circle)
+def solve_all(df):
+    solve_selected(oms, df)
+    solve_selected(bishop, df)
+    solve_selected(janbu, df)
+    solve_selected(spencer, df)
+    solve_selected(corps_engineers, df)
+    solve_selected(lowe_karafiath, df)
 
 data = load_globals("docs/input_template_lface.xlsx")
 
@@ -53,10 +53,9 @@ else:
 df.to_excel("slices.xlsx", index=False)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-# results = solve_selected(spencer, df, circle=circle)
-# results = solve_selected(spencer, df, circle=None)
+results = solve_selected(bishop, df)
 
-solve_all(df, circle=circle)
+# solve_all(df)
 
-# plot_solution(data, df, failure_surface, results)
+plot_solution(data, df, failure_surface, results)
 

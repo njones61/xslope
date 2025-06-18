@@ -33,7 +33,7 @@ def solve_all(df):
     solve_selected(corps_engineers, df)
     solve_selected(lowe_karafiath, df)
 
-data = load_globals("docs/input_template_lface.xlsx")
+data = load_globals("docs/input_template_dam.xlsx")
 
 # plot_inputs(data)
 
@@ -50,10 +50,10 @@ else:
     print(result)
 
 # export df to excel
-df.to_excel("slices.xlsx", index=False)
+df.to_csv("slices.csv", index=False)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(bishop, df)
+results = solve_selected(oms, df)
 
 # solve_all(df)
 

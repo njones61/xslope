@@ -6,7 +6,7 @@ from scipy.optimize import minimize_scalar, root_scalar, newton
 from tabulate import tabulate
 
 
-def oms(df, circle, circular=True, debug=False):
+def oms(df, circle, debug=False):
     """
     Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
 
@@ -53,6 +53,8 @@ def oms(df, circle, circular=True, debug=False):
            + (1/R)·Σ[ Tᵢ·(Yo - y_{t,i}) ]  ].
 
     """
+    if circle is None:
+        return False, "Circle is required for OMS method."
 
     # 1) Unpack circle‐center and radius
     Xo = circle['Xo']
@@ -147,7 +149,7 @@ def oms(df, circle, circular=True, debug=False):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(df, circle, circular=True, debug=False, tol=1e-6, max_iter=100):
+def bishop(df, circle, debug=False, tol=1e-6, max_iter=100):
     """
     Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
     Requires circular slip surface and full input data structure consistent with OMS.
@@ -155,7 +157,6 @@ def bishop(df, circle, circular=True, debug=False, tol=1e-6, max_iter=100):
     Parameters:
         df : pandas.DataFrame with required columns (see OMS spec)
         circle : dict with 'Xo', 'Yo', 'R'
-        circular : bool, must be True
         debug : bool, if True prints diagnostic info
         tol : float, convergence tolerance
         max_iter : int, maximum iteration steps
@@ -164,7 +165,7 @@ def bishop(df, circle, circular=True, debug=False, tol=1e-6, max_iter=100):
         (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
     """
 
-    if not circular:
+    if circle is None:
         return False, "Bishop method requires circular slip surfaces."
 
     Xo = circle['Xo']
@@ -244,7 +245,7 @@ def bishop(df, circle, circular=True, debug=False, tol=1e-6, max_iter=100):
 
     return False, "Bishop method did not converge within the maximum number of iterations."
 
-def janbu(df, circle=None, circular=True, debug=False):
+def janbu(df, circle=None, debug=False):
     """
     Computes FS using Janbu's Simplified Method with correction factor (Equation 7).
 
@@ -254,7 +255,7 @@ def janbu(df, circle=None, circular=True, debug=False):
 
     Parameters:
         df : pandas.DataFrame with required columns (see OMS spec)
-        circular : bool, method works for both circular and non-circular surfaces
+        circle: for compatibility with other methods, but not used in Janbu method.
         debug : bool, if True prints diagnostic info
 
     Returns:
@@ -466,20 +467,20 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(df, circle=None, circular=True, debug=False):
+def corps_engineers(df, circle=None, debug=False):
     """
     Corps of Engineers style force equilibrium solver.
 
     1. Computes a single θ from the slope between
        (x_l[0], y_lt[0]) and (x_r[-1], y_rt[-1]).
     2. Builds a constant θ array of length n+1.
-    3. Calls force_equilibrium(df, theta_array, circular).
+    3. Calls force_equilibrium(df, theta_array).
 
     Parameters:
         df (pd.DataFrame): Must include at least ['x_l','y_lt','x_r','y_rt']
                            plus all the columns required by force_equilibrium:
                            ['alpha','phi','c','dl','w','u','dx'].
-        circular (bool): Passed through to force_equilibrium (unused).
+        circle (dictionary): For compatibility with other methods, but not used in Corps of Engineers method.
 
     Returns:
         Tuple(bool, dict or str): Whatever force_equilibrium returns.
@@ -511,7 +512,7 @@ def corps_engineers(df, circle=None, circular=True, debug=False):
         results['theta'] = theta_deg           # append theta
         return success, results
 
-def lowe_karafiath(df, circle=None,circular=True, debug=False):
+def lowe_karafiath(df, circle=None, debug=False):
     """
     Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
     the average of the top‐and bottom‐surface slopes of the two adjacent slices
@@ -573,7 +574,7 @@ def lowe_karafiath(df, circle=None,circular=True, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, circle=None, circular=True, tol=1e-6, debug=True):
+def spencer(df, circle=None, tol=1e-6, debug=False):
     """
     Spencer's Method using Steve G. Wright's formulation.
     Solves for FS_force and FS_moment independently using the Wright Q equation.
@@ -597,6 +598,8 @@ def spencer(df, circle=None, circular=True, tol=1e-6, debug=True):
         float: beta (degrees)
         bool: converged flag
     """
+
+    circular = circle is not None
 
     tol = 1e-6
     max_iter = 100

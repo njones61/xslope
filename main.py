@@ -5,8 +5,8 @@ from plot import plot_solution, plot_inputs
 from solve import oms, bishop, janbu, spencer, corps_engineers, lowe_karafiath
 
 
-def solve_selected(func, df, circle=None, circular=True):
-    success, result = func(df, circle=circle, circular=circular)
+def solve_selected(func, df):
+    success, result = func(df)
     if not success:
         print(f'Error: {result}')
         return result
@@ -25,34 +25,37 @@ def solve_selected(func, df, circle=None, circular=True):
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
     return result
 
-def solve_all(df, circular=True):
-    solve_selected(oms, df, circular=circular)
-    solve_selected(bishop, df, circular=circular)
-    solve_selected(oms, df, circular=circular)
-    solve_selected(spencer, df, circular=circular)
-    solve_selected(janbu_corrected, df, circular=circular)
+def solve_all(df):
+    solve_selected(oms, df)
+    solve_selected(bishop, df)
+    solve_selected(janbu, df)
+    solve_selected(corps_engineers, df)
+    solve_selected(lowe_karafiath, df)
+    solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_lface (with dload).xlsx")
+data = load_globals("docs/input_template_lface.xlsx")
 
 # plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
-non_circ = data['non_circ'] if not data['circular'] else None
+# non_circ = data['non_circ'] if data['non_circ'] else None
 
-print(f"circle: {circle}")
+# print(f"circle: {circle}")
 
-success, result = generate_slices(data, circle, non_circ, num_slices=20)
+success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=20)
+# success, result = generate_slices(data, circle=None, non_circ=non_circ, num_slices=20)
 if success:
     df, failure_surface = result
 else:
     print(result)
 
 # export df to excel
-df.to_excel("slices.xlsx", index=False)
+df.to_csv("slices.csv", index=False)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df, circle=circle, circular=True)
+results = solve_selected(oms, df)
+
+# solve_all(df)
 
 plot_solution(data, df, failure_surface, results)
 
-# solve_all(df, circular=True)

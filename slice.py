@@ -113,7 +113,27 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
         y_left, y_right = points[0].y, points[1].y
 
     # --- Step 4: Clip the failure surface between intersection x-range ---
-    clipped_surface = LineString([pt for pt in failure_coords if x_min <= pt[0] <= x_max])
+    # Filter coordinates within the x-range
+    filtered_coords = [pt for pt in failure_coords if x_min <= pt[0] <= x_max]
+    
+    # Add the exact intersection points if they're not already in the filtered list
+    left_intersection = (x_min, y_left)
+    right_intersection = (x_max, y_right)
+    
+    # Check if intersection points are already in the filtered list (with tolerance)
+    tol = 1e-6
+    has_left = any(abs(pt[0] - x_min) < tol and abs(pt[1] - y_left) < tol for pt in filtered_coords)
+    has_right = any(abs(pt[0] - x_max) < tol and abs(pt[1] - y_right) < tol for pt in filtered_coords)
+    
+    if not has_left:
+        filtered_coords.insert(0, left_intersection)
+    if not has_right:
+        filtered_coords.append(right_intersection)
+    
+    # Sort by x-coordinate to ensure proper ordering
+    filtered_coords.sort(key=lambda pt: pt[0])
+    
+    clipped_surface = LineString(filtered_coords)
 
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
 
@@ -148,9 +168,9 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     Compute:
       - D    : total resultant force from a trapezoidal load varying
                linearly from intensity qL at (x_l,y_lt) to qR at (x_r,y_rt).
-      - d_x  : x‐coordinate of the resultant’s centroid on the top edge
-      - d_y  : y‐coordinate of the resultant’s centroid on the top edge
-      - beta : angle (in degrees) of the slice’s top edge (positive CCW
+      - d_x  : x‐coordinate of the resultant's centroid on the top edge
+      - d_y  : y‐coordinate of the resultant's centroid on the top edge
+      - beta : angle (in degrees) of the slice's top edge (positive CCW
                from the +x direction).
 
     Parameters
@@ -180,7 +200,7 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     Notes
     -----
     1.  If x_r == x_l (zero‐width slice), this will return D=0 and place
-        the “centroid” at (x_l, y_lt), with β=0°.
+        the "centroid" at (x_l, y_lt), with β=0°.
     2.  For a nonzero‐width trapezoid, the horizontal centroid‐offset from
         x_l is:
              x_offset = (x_r – x_l) * ( qL + 2 qR ) / [3 (qL + qR) ]
@@ -192,31 +212,24 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     4.  β is measured by atan2(Δy, Δx) in degrees.
 
     """
-    dx_top = x_r - x_l
-    if abs(dx_top) < 1e-12:
-        # Degenerate slice‐width => no trapezoid.  Return zero‐load at left corner.
-        D = 0.0
-        d_x = x_l
-        d_y = y_lt
-        beta = 0.0
-        return D, d_x, d_y, beta
+    dx = x_r - x_l
 
     # 1) Total resultant force (area under trapezoid)
-    D = 0.5 * (qL + qR) * dx_top
+    D = 0.5 * (qL + qR) * dx
 
     # 2) Horizontal centroid offset from left end
     sum_q = qL + qR
     if abs(sum_q) < 1e-12:
         # nearly zero trapezoid => centroid at geometric midpoint
-        x_offset = dx_top * 0.5
+        x_offset = dx * 0.5
     else:
-        x_offset = dx_top * (qL + 2.0 * qR) / (3.0 * sum_q)
+        x_offset = dx * (qL + 2.0 * qR) / (3.0 * sum_q)
 
     # 3) Global x‐coordinate of centroid
     d_x = x_l + x_offset
 
     # 4) Corresponding y‐coordinate by linear interpolation along top edge
-    t = x_offset / dx_top
+    t = x_offset / dx
     d_y = y_lt + t * (y_rt - y_lt)
 
     # 5) Slope angle β of the top edge, in degrees:
@@ -224,7 +237,8 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
 
     return D, d_x, d_y, beta
 
-def generate_slices(data, circle=None, non_circ=None, num_slices=40):
+
+def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -334,12 +348,14 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             normals = [pt['Normal'] for pt in line]
             dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
 
+    # Generate slices
     slices = []
     for i in range(len(all_xs) - 1):
         x_l, x_r = all_xs[i], all_xs[i + 1]
         x_c = (x_l + x_r) / 2
         dx = x_r - x_l
 
+        # Find the y-coordinates of the failure surface at the left, right, and center of the slice
         if non_circ:
             failure_line = clipped_surface
             y_cb = get_y_from_intersection(failure_line.intersection(LineString([(x_c, -1e6), (x_c, 1e6)])))
@@ -353,9 +369,13 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             except ValueError:
                 continue
 
-        vertical_l = LineString([(x_l, ground_surface.bounds[1] - 10), (x_l, ground_surface.bounds[3] + 10)])
-        vertical_r = LineString([(x_r, ground_surface.bounds[1] - 10), (x_r, ground_surface.bounds[3] + 10)])
-        vertical_c = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        # Find the y-coordinates of the ground surface at the left, right, and center of the slice
+        # vertical_l = LineString([(x_l, ground_surface.bounds[1] - 10), (x_l, ground_surface.bounds[3] + 10)])
+        # vertical_r = LineString([(x_r, ground_surface.bounds[1] - 10), (x_r, ground_surface.bounds[3] + 10)])
+        # vertical_c = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        vertical_l = LineString([(x_l, -1e6), (x_l, 1e6)])
+        vertical_r = LineString([(x_r, -1e6), (x_r, 1e6)])
+        vertical_c = LineString([(x_c, -1e6), (x_c, 1e6)])
 
         y_lt = get_y_from_intersection(ground_surface.intersection(vertical_l))
         y_rt = get_y_from_intersection(ground_surface.intersection(vertical_r))
@@ -365,7 +385,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
         soil_weight = 0
         base_material_idx = None
 
-        vertical = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        # Make a vertical line at the center of the slice
+        vertical = LineString([(x_c, -1e6), (x_c, 1e6)])
 
         sum_gam_h_y = 0 # for calculating center of gravity of slice
         sum_gam_h = 0   # ditto
@@ -373,11 +394,15 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             layer_line = LineString(line)
             layer_top_y = get_y_from_intersection(layer_line.intersection(vertical))
 
-            if mat_index + 1 < len(profile_lines):
-                next_line = LineString(profile_lines[mat_index + 1])
-                layer_bot_y = get_y_from_intersection(next_line.intersection(vertical))
-            else:
-                layer_bot_y = y_cb
+            # Bottom: highest of all other profile lines at x, or failure surface
+            layer_bot_y = y_cb  # Start with failure surface as default bottom
+            for j in range(mat_index + 1, len(profile_lines)):
+                # Check each lower profile line
+                next_line = LineString(profile_lines[j])
+                next_y = get_y_from_intersection(next_line.intersection(vertical))
+                if next_y is not None and next_y > layer_bot_y:
+                    # Take the highest of the lower profile lines
+                    layer_bot_y = next_y
 
             if layer_top_y is None or layer_bot_y is None:
                 h = 0
@@ -390,8 +415,12 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
 
             heights.append(h)
             soil_weight += h * materials[mat_index]['gamma'] * dx
-            if base_material_idx is None and h > 0:
+
+            if h > 0:
                 base_material_idx = mat_index
+
+            # if base_material_idx is None and h > 0:
+            #     base_material_idx = mat_index
 
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
@@ -409,7 +438,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
         # Seismic force
         kw = k_seismic * soil_weight
 
-        # === BEGIN : “Tension crack water force” ===
+        # === BEGIN : "Tension crack water force" ===
 
         # By default, zero out t and its line‐of‐action:
         t_force = 0.0
@@ -467,8 +496,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
                 #  skip it. Our assumption is only one Point per slice-base.)
                 continue
 
-        # Now p_sum is the TOTAL FL‐pull acting at this slice’s base.
-        # === END: “Tension crack water force” ===
+        # Now p_sum is the TOTAL FL‐pull acting at this slice's base.
+        # === END: "Tension crack water force" ===
 
         # --Process piezometric line and pore pressures---
         hw = 0
@@ -550,6 +579,9 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40):
             'mat': base_material_idx + 1 if base_material_idx is not None else None,  # index of the base material (1-indexed)
             'phi': phi,  # friction angle of the base material in degrees
             'c': c,      # cohesion of the base material
+            'r': R,      # radius of the circular failure surface
+            'xo': Xo,    # x-coordinate of the center of the circular failure surface
+            'yo': Yo,    # y-coordinate of the center of the circular failure surface
         }
         slices.append(slice_data)
 

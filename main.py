@@ -53,9 +53,9 @@ else:
 df.to_csv("slices.csv", index=False)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-# results = solve_selected(oms, df)
+results = solve_selected(spencer, df)
 
-solve_all(df)
+# solve_all(df)
 
-# plot_solution(data, df, failure_surface, results)
+plot_solution(data, df, failure_surface, results)
 

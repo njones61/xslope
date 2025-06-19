@@ -212,31 +212,24 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     4.  β is measured by atan2(Δy, Δx) in degrees.
 
     """
-    dx_top = x_r - x_l
-    if abs(dx_top) < 1e-12:
-        # Degenerate slice‐width => no trapezoid.  Return zero‐load at left corner.
-        D = 0.0
-        d_x = x_l
-        d_y = y_lt
-        beta = 0.0
-        return D, d_x, d_y, beta
+    dx = x_r - x_l
 
     # 1) Total resultant force (area under trapezoid)
-    D = 0.5 * (qL + qR) * dx_top
+    D = 0.5 * (qL + qR) * dx
 
     # 2) Horizontal centroid offset from left end
     sum_q = qL + qR
     if abs(sum_q) < 1e-12:
         # nearly zero trapezoid => centroid at geometric midpoint
-        x_offset = dx_top * 0.5
+        x_offset = dx * 0.5
     else:
-        x_offset = dx_top * (qL + 2.0 * qR) / (3.0 * sum_q)
+        x_offset = dx * (qL + 2.0 * qR) / (3.0 * sum_q)
 
     # 3) Global x‐coordinate of centroid
     d_x = x_l + x_offset
 
     # 4) Corresponding y‐coordinate by linear interpolation along top edge
-    t = x_offset / dx_top
+    t = x_offset / dx
     d_y = y_lt + t * (y_rt - y_lt)
 
     # 5) Slope angle β of the top edge, in degrees:

@@ -33,9 +33,9 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_dam.xlsx")
+data = load_globals("docs/input_template_lface.xlsx")
 
-plot_inputs(data)
+# plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
 # non_circ = data['non_circ'] if data['non_circ'] else None
@@ -53,7 +53,7 @@ else:
 df.to_csv("slices.csv", index=False)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df)
+results = solve_selected(oms, df)
 
 # solve_all(df)
 

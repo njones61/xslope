@@ -111,7 +111,7 @@ def oms(df, debug=False):
     sum_W = np.sum(W * sin_alpha)
 
     #  (B) = Σ [ Dᵢ·cosβᵢ·(Xo - d_{x,i})  −  Dᵢ·sinβᵢ·(Yo - d_{y,i}) ]
-    a_dx = Xo - d_x
+    a_dx = d_x - Xo
     a_dy = Yo - d_y
     sum_Dx = np.sum(D * np.cos(beta) * a_dx)
     sum_Dy = np.sum(D * np.sin(beta) * a_dy)
@@ -195,7 +195,7 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
     cos_beta  = np.cos(beta)
 
     # Moment arms
-    a_dx = Xo - d_x
+    a_dx = d_x - Xo
     a_dy = Yo - d_y
     a_s  = Yo - y_cg
     a_t  = Yo - y_t

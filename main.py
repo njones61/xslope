@@ -33,7 +33,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_lface.xlsx")
+data = load_globals("docs/input_template_dam.xlsx")
 
 # plot_inputs(data)
 
@@ -53,9 +53,9 @@ else:
 df.to_csv("slices.csv", index=False)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df)
+# results = solve_selected(oms, df)
 
-# solve_all(df)
+solve_all(df)
 
-plot_solution(data, df, failure_surface, results)
+# plot_solution(data, df, failure_surface, results)
 

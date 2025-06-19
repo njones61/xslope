@@ -390,29 +390,30 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     # Check material options
     options = set(mat['option'] for mat in materials)
 
-    # Decide column headers
+    # Decide column headers - need 5 columns to match the data
     if options == {'mc'}:
-        col_labels = ["Mat", "γ", "c", "φ"]
+        col_labels = ["Mat", "Name", "γ", "c", "φ"]
     elif options == {'cp'}:
-        col_labels = ["Mat", "γ", "cp", "rₑ"]
+        col_labels = ["Mat", "Name", "γ", "cp", "rₑ"]
     else:
-        col_labels = ["Mat", "γ", "c / cp", "φ / rₑ"]
+        col_labels = ["Mat", "Name", "γ", "c / cp", "φ / rₑ"]
 
     # Build table rows
     table_data = []
     for idx, mat in enumerate(materials):
+        name = mat['name']
         gamma = mat['gamma']
         option = mat['option']
         if option == 'mc':
             c = mat['c']
             phi = mat['phi']
-            row = [idx+1, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}"]
+            row = [idx+1, name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}"]
         elif option == 'cp':
             cp = mat['cp']
             r_elev = mat['r_elev']
-            row = [idx+1, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}"]
+            row = [idx+1, name, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}"]
         else:
-            row = [idx+1, f"{gamma:.1f}", "-", "-"]
+            row = [idx+1, name, f"{gamma:.1f}", "-", "-"]
         table_data.append(row)
 
     # Add the table

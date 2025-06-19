@@ -159,9 +159,10 @@ def load_globals(filepath):
     materials = []
 
     for _, row in mat_df.iterrows():
+        name = row.get('name')
         gamma = row.get('g')
         option = str(row.get('option', '')).strip().lower()
-        piezo = row.get('Piezo', 1.0)
+        piezo = row.get('piezo', 1.0)
 
         if pd.isna(gamma) or option not in ('mc', 'cp'):
             continue
@@ -199,6 +200,7 @@ def load_globals(filepath):
             phi = 0
 
         materials.append({
+            "name": name,
             "gamma": gamma,
             "option": option,
             "c": c,

@@ -1,6 +1,6 @@
 import numpy as np
-from slice import generate_slices
-from shapely.geometry import LineString
+from slice import generate_slices, get_y_from_intersection
+from shapely.geometry import LineString, Point
 import time
 
 def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
@@ -51,7 +51,7 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
                     solver_result = None
                 else:
                     df_slices, failure_surface = result
-                    solver_success, solver_result = solver(df_slices, circular=True, circle=test_circle)
+                    solver_success, solver_result = solver(df_slices, circle=test_circle)
                     FS = solver_result['FS'] if solver_success else fs_fail
                 fs_results.append((FS, d, df_slices, failure_surface, solver_result))
 
@@ -172,5 +172,217 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
     if not converged and diagnostic:
         print(f"\n[❌ max iterations reached] FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f})")
 
+    sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
+    return sorted_fs_cache, converged, search_path
+
+def noncircular_search(data, solver, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
+    """
+    Non-circular search using the specified solver.
+    
+    Parameters:
+    -----------
+    data : dict
+        Input data dictionary containing all necessary parameters
+    solver : function
+        The solver function to use (e.g., lowe_karafiath, spencer)
+    diagnostic : bool
+        If True, print diagnostic information during search
+    movement_distance : float
+        Initial distance to move points in each iteration
+    shrink_factor : float
+        Factor to reduce movement_distance by when no improvement is found
+    fs_tol : float
+        Factor of safety convergence tolerance
+    max_iter : int
+        Maximum number of iterations
+    move_tol : float
+        Minimum movement distance for convergence (AND logic with fs_tol)
+        
+    Returns:
+    --------
+    tuple : (fs_cache, converged, search_path)
+        fs_cache : dict of all evaluated surfaces and their FS values
+        converged : bool indicating if search converged
+        search_path : list of surfaces evaluated during search
+    """
+    def move_point(points, i, dx, dy, movement_type, ground_surface, max_depth):
+        """Move a point while respecting constraints"""
+        # Get current point
+        point = points[i]
+        
+        # Calculate new position
+        new_x = point[0] + dx
+        new_y = point[1] + dy
+        
+        # For endpoints, ensure they stay on ground surface
+        if i == 0 or i == len(points)-1:
+            # Create vertical line at new_x
+            vertical_line = LineString([(new_x, 0), (new_x, 1000)])  # Arbitrary high y value
+            intersection = ground_surface.intersection(vertical_line)
+            y = get_y_from_intersection(intersection)
+            if y is None:
+                return False
+            new_y = y
+        else:
+            # For middle points, ensure they stay below ground surface but above max_depth
+            if new_y > ground_surface.interpolate(ground_surface.project(Point(new_x, new_y))).y:
+                return False
+            if new_y < max_depth:
+                return False
+        
+        # Check x-ordering constraints
+        if i > 0 and new_x <= points[i-1][0]:  # Don't move past left neighbor
+            return False
+        if i < len(points)-1 and new_x >= points[i+1][0]:  # Don't move past right neighbor
+            return False
+        
+        # Update point
+        points[i] = [new_x, new_y]
+        return True
+
+    def evaluate_surface(points, distance, fs_cache=None):
+        """Evaluate factor of safety for current surface configuration"""
+        if fs_cache is None:
+            fs_cache = {}
+            
+        # Create non_circ format from points
+        non_circ = [{'X': x, 'Y': y, 'Movement': movements[i]} for i, (x, y) in enumerate(points)]
+        
+        # Generate slices and compute FS
+        success, result = generate_slices(data, non_circ=non_circ)
+        if not success:
+            return float('inf'), None, None, None, fs_cache
+            
+        df_slices, failure_surface = result
+        solver_success, solver_result = solver(df_slices, circle=None)
+        FS = solver_result['FS'] if solver_success else float('inf')
+        
+        # Cache result
+        key = tuple(map(tuple, points))
+        fs_cache[key] = {
+            'points': points.copy(),
+            'FS': FS,
+            'slices': df_slices,
+            'failure_surface': failure_surface,
+            'solver_result': solver_result
+        }
+        
+        return FS, df_slices, failure_surface, solver_result, fs_cache
+
+    # Get initial surface from non_circ data
+    non_circ = data['non_circ']
+    points = np.array([[p['X'], p['Y']] for p in non_circ])
+    movements = [p['Movement'] for p in non_circ]
+    ground_surface = data['ground_surface']
+    
+    # Initialize cache and search path
+    fs_cache = {}
+    search_path = []
+    
+    # Evaluate initial surface
+    FS, df_slices, failure_surface, solver_result, fs_cache = evaluate_surface(
+        points, movement_distance, fs_cache)
+    
+    # Initialize best surface with initial evaluation
+    best_points = points.copy()
+    best_fs = FS
+    best_df = df_slices
+    best_surface = failure_surface
+    best_solver_result = solver_result
+    
+    # Track convergence
+    converged = False
+    start_time = time.time()
+    prev_fs = best_fs
+    
+    if diagnostic:
+        print(f"\n[✅ starting search] Initial FS={best_fs:.4f}\n")
+        print("Initial failure surface:")
+        for i, point in enumerate(points):
+            print(f"Point {i}: ({point[0]:.2f}, {point[1]:.2f})")
+        print("\nGround surface:")
+        for i, point in enumerate(ground_surface.coords):
+            print(f"Point {i}: ({point[0]:.2f}, {point[1]:.2f})")
+    
+    # Main search loop
+    for iteration in range(max_iter):
+        improved = False
+        
+        if diagnostic:
+            print(f"\nIteration {iteration + 1}")
+            print("Current surface points:")
+            for i, point in enumerate(best_surface.coords):
+                print(f"Point {i}: ({point[0]:.2f}, {point[1]:.2f})")
+        
+        # Try moving each point
+        for i in range(len(points)):
+            # Try both positive and negative directions
+            for direction in [-1, 1]:
+                test_points = points.copy()
+                
+                # Get movement direction based on point type
+                if i == 0 or i == len(points)-1:  # End points
+                    dx = direction * movement_distance
+                    dy = 0  # y will be determined by ground surface
+                elif movements[i] == 'Horiz':
+                    dx = direction * movement_distance
+                    dy = 0
+                elif movements[i] == 'Free':
+                    # For free points, move perpendicular to tangent
+                    dx_tangent = points[i+1][0] - points[i-1][0] if i > 0 and i < len(points)-1 else 1
+                    dy_tangent = points[i+1][1] - points[i-1][1] if i > 0 and i < len(points)-1 else 0
+                    length = np.sqrt(dx_tangent**2 + dy_tangent**2)
+                    if length > 0:
+                        dx = -dy_tangent/length * direction * movement_distance
+                        dy = dx_tangent/length * direction * movement_distance
+                    else:
+                        dx = direction * movement_distance
+                        dy = 0
+                else:  # Fixed
+                    continue
+                
+                # Try to move the point
+                if move_point(test_points, i, dx, dy, movements[i], ground_surface, data['max_depth']):
+                    # Evaluate new surface
+                    FS, df_slices, failure_surface, solver_result, fs_cache = evaluate_surface(
+                        test_points, movement_distance, fs_cache)
+                    
+                    if FS < best_fs:
+                        best_fs = FS
+                        best_points = test_points.copy()
+                        best_df = df_slices
+                        best_surface = failure_surface
+                        best_solver_result = solver_result
+                        improved = True
+                        if diagnostic:
+                            print(f"[✓ improved] iter={iteration}, point={i}, FS={FS:.4f}")
+        
+        # print iteration results
+        print(f"iteration {iteration+1} FS={best_fs:.4f}")
+        
+        # Check convergence based on FS change and movement distance (AND logic)
+        fs_change = abs(best_fs - prev_fs)
+        if fs_change < fs_tol and movement_distance < move_tol:
+            converged = True
+            if diagnostic:
+                print(f"[✓ converged] FS change {fs_change:.6f} < tolerance {fs_tol} and movement_distance {movement_distance:.4f} < move_tol {move_tol}")
+            break
+        prev_fs = best_fs
+        
+        if not improved or fs_change < fs_tol:
+            movement_distance *= shrink_factor
+            if True:
+                print(f"[↘️ shrinking] movement_distance={movement_distance:.4f}")
+        
+        points = best_points.copy()
+        
+    end_time = time.time()
+    elapsed = end_time - start_time
+    
+    if converged:
+        print(f"\n[✅ converged] Iter={iteration+1}, FS={best_fs:.4f}, elapsed time={elapsed:.2f} seconds")
+    else:
+        print(f"\n[❌ max iterations reached] FS={best_fs:.4f}, elapsed time={elapsed:.2f} seconds")
+    
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path

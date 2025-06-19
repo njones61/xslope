@@ -85,6 +85,32 @@ def plot_slices(ax, df, fill=True):
                 ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5)
                 ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5)
 
+def plot_slice_numbers(ax, df):
+    """
+    Plots the slice number in the middle of each slice at the middle height.
+    Numbers are 1-indexed.
+
+    Parameters:
+        ax: matplotlib Axes object
+        df: DataFrame containing slice data
+
+    Returns:
+        None
+    """
+    if df is not None:
+        for _, row in df.iterrows():
+            # Calculate middle x-coordinate of the slice
+            x_middle = row['x_c']
+            
+            # Calculate middle height of the slice
+            y_middle = (row['y_cb'] + row['y_ct']) / 2
+            
+            # Plot the slice number (1-indexed)
+            slice_number = int(row['slice #'])
+            ax.text(x_middle, y_middle, str(slice_number), 
+                   ha='center', va='center', fontsize=8, fontweight='bold',
+                   bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+
 def plot_piezo_line(ax, piezo_line):
     """
     Plots the piezometric line with a marker at its midpoint.
@@ -475,7 +501,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_solution(data, df, failure_surface, results, width=12, height=7):
+def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_numbers=True):
     """
     Creates a plot showing the slope stability analysis solution.
 
@@ -502,6 +528,8 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7):
     plot_piezo_line(ax, data['piezo_line'])
     plot_dloads(ax, data['dloads'])
     plot_tcrack_surface(ax, data['tcrack_surface'])
+    if slice_numbers:
+        plot_slice_numbers(ax, df)
 
     alpha = 0.3
     if results['method'] == 'spencer':

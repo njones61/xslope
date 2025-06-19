@@ -244,6 +244,7 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
 
     return D, d_x, d_y, beta
 
+
 def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True):
 
     """
@@ -314,21 +315,6 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right
 
-    if debug:
-        print(f"right_facing: {right_facing}")
-        print(f"y_left: {y_left}")
-        print(f"y_right: {y_right}")
-        print(f"x_min: {x_min}")
-        print(f"x_max: {x_max}")
-        print(f"y_left: {y_left}")
-        print(f"y_right: {y_right}")
-        print("Clipped surface coordinates:")
-        i = 0
-        for x,y in clipped_surface.coords:
-            print(f"clipped_surface: {i}: {x:.2f}, {y:.2f}") 
-            i += 1
-
-
     # Build fixed_xs set
     fixed_xs = set(
         x for line in profile_lines for x, _ in line
@@ -369,12 +355,14 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             normals = [pt['Normal'] for pt in line]
             dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
 
+    # Generate slices
     slices = []
     for i in range(len(all_xs) - 1):
         x_l, x_r = all_xs[i], all_xs[i + 1]
         x_c = (x_l + x_r) / 2
         dx = x_r - x_l
 
+        # Find the y-coordinates of the failure surface at the left, right, and center of the slice
         if non_circ:
             failure_line = clipped_surface
             y_cb = get_y_from_intersection(failure_line.intersection(LineString([(x_c, -1e6), (x_c, 1e6)])))
@@ -388,68 +376,58 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             except ValueError:
                 continue
 
-        vertical_l = LineString([(x_l, ground_surface.bounds[1] - 10), (x_l, ground_surface.bounds[3] + 10)])
-        vertical_r = LineString([(x_r, ground_surface.bounds[1] - 10), (x_r, ground_surface.bounds[3] + 10)])
-        vertical_c = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        # Find the y-coordinates of the ground surface at the left, right, and center of the slice
+        # vertical_l = LineString([(x_l, ground_surface.bounds[1] - 10), (x_l, ground_surface.bounds[3] + 10)])
+        # vertical_r = LineString([(x_r, ground_surface.bounds[1] - 10), (x_r, ground_surface.bounds[3] + 10)])
+        # vertical_c = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        vertical_l = LineString([(x_l, -1e6), (x_l, 1e6)])
+        vertical_r = LineString([(x_r, -1e6), (x_r, 1e6)])
+        vertical_c = LineString([(x_c, -1e6), (x_c, 1e6)])
 
         y_lt = get_y_from_intersection(ground_surface.intersection(vertical_l))
         y_rt = get_y_from_intersection(ground_surface.intersection(vertical_r))
         y_ct = get_y_from_intersection(ground_surface.intersection(vertical_c))
 
-        n_materials = len(profile_lines)
-        heights = [0] * n_materials  # Always length = number of materials
+        heights = []
         soil_weight = 0
         base_material_idx = None
 
-        vertical = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
+        # Make a vertical line at the center of the slice
+        vertical = LineString([(x_c, -1e6), (x_c, 1e6)])
 
         sum_gam_h_y = 0 # for calculating center of gravity of slice
         sum_gam_h = 0   # ditto
-        
-        for mat_index in range(n_materials):
-            # Top of material i
-            top_line = LineString(profile_lines[mat_index])
-            top_inter = top_line.intersection(vertical)
-            if isinstance(top_inter, Point):
-                layer_top_y = top_inter.y
-            elif isinstance(top_inter, MultiPoint):
-                layer_top_y = max(pt.y for pt in top_inter.geoms)
-            else:
-                layer_top_y = None
-            # No need to clip to ground surface
+        for mat_index, line in enumerate(profile_lines):
+            layer_line = LineString(line)
+            layer_top_y = get_y_from_intersection(layer_line.intersection(vertical))
 
-            # Bottom: search for highest profile_lines[j] (j < i) that exists at x, or use failure surface
-            layer_bot_y = y_cb
-            for j in range(mat_index-1, -1, -1):
-                bot_line = LineString(profile_lines[j])
-                bot_inter = bot_line.intersection(vertical)
-                if isinstance(bot_inter, Point):
-                    candidate_y = bot_inter.y
-                elif isinstance(bot_inter, MultiPoint):
-                    candidate_y = max(pt.y for pt in bot_inter.geoms)
-                else:
-                    continue
-                if candidate_y > layer_bot_y:
-                    layer_bot_y = candidate_y
-                    break
-            # The bottom boundary cannot be below the failure surface
-            if layer_bot_y < y_cb:
-                layer_bot_y = y_cb
+            # Bottom: highest of all other profile lines at x, or failure surface
+            layer_bot_y = y_cb  # Start with failure surface as default bottom
+            for j in range(mat_index + 1, len(profile_lines)):
+                # Check each lower profile line
+                next_line = LineString(profile_lines[j])
+                next_y = get_y_from_intersection(next_line.intersection(vertical))
+                if next_y is not None and next_y > layer_bot_y:
+                    # Take the highest of the lower profile lines
+                    layer_bot_y = next_y
 
-            # The thickness is the overlap between top and bottom boundaries
-            if layer_top_y is None or layer_top_y <= layer_bot_y:
+            if layer_top_y is None or layer_bot_y is None:
                 h = 0
             else:
-                h = layer_top_y - layer_bot_y
-                if debug and i < 5:
-                    print(f"  mat {mat_index}: layer_top_y={layer_top_y}, layer_bot_y={layer_bot_y}, h={h}")
-                sum_gam_h_y += h * materials[mat_index]['gamma'] * (layer_top_y + layer_bot_y) / 2
+                overlap_top = min(y_ct, layer_top_y)
+                overlap_bot = max(y_cb, layer_bot_y)
+                h = max(0, overlap_top - overlap_bot)
+                sum_gam_h_y += h * materials[mat_index]['gamma'] * (overlap_top + overlap_bot) / 2
                 sum_gam_h += h * materials[mat_index]['gamma']
 
-            heights[mat_index] = h
+            heights.append(h)
             soil_weight += h * materials[mat_index]['gamma'] * dx
-            if base_material_idx is None and h > 0:
+
+            if h > 0:
                 base_material_idx = mat_index
+
+            # if base_material_idx is None and h > 0:
+            #     base_material_idx = mat_index
 
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
@@ -500,11 +478,11 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
                 else:
                     t_force = 0.0
                     y_t_loc = y_rb
-        # === END: "Tension crack water force" ===
+        # === END: “Tension crack water force” ===
 
-        # === BEGIN : "Reinforcement lines" ===
+        # === BEGIN : “Reinforcement lines” ===
 
-        # 1) Build this slice's base as a LineString from (x_l, y_lb) to (x_r, y_rb):
+        # 1) Build this slice’s base as a LineString from (x_l, y_lb) to (x_r, y_rb):
         slice_base = LineString([(x_l, y_lb), (x_r, y_rb)])
 
         # 2) For each reinforcement line, check a single‐point intersection:

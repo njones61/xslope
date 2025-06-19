@@ -3,6 +3,29 @@ import numpy as np
 from slice import generate_failure_surface
 from solve import compute_line_of_thrust
 from shapely.geometry import LineString
+from matplotlib.lines import Line2D
+from matplotlib.path import Path
+
+
+def get_dload_legend_handler():
+    """
+    Creates and returns a custom legend entry for distributed loads.
+    Returns a tuple of (handler_class, dummy_patch) for use in matplotlib legends.
+    """
+    # Create a line with built-in arrow marker
+    dummy_line = Line2D([0.0, 1.0], [0, 0],  # Two points to define line
+                       color='purple', 
+                       alpha=0.7, 
+                       linewidth=2,
+                       marker='>',  # Built-in right arrow marker
+                       markersize=6,  # Smaller marker size
+                       markerfacecolor='purple',
+                       markeredgecolor='purple',
+                       drawstyle='steps-post',  # Draw line then marker
+                       solid_capstyle='butt')
+    
+    return None, dummy_line
+
 
 def plot_profile_lines(ax, profile_lines):
     """
@@ -147,40 +170,138 @@ def plot_tcrack_surface(ax, tcrack_surface):
     x_vals, y_vals = tcrack_surface.xy
     ax.plot(x_vals, y_vals, linestyle='--', color='red', linewidth=1.0, label='Tension Crack Depth')
 
-def plot_dloads(ax, dloads):
+def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
     """
     Plots distributed loads as arrows along the surface.
 
     Parameters:
         ax: matplotlib Axes object
         dloads: List of distributed load data points with X, Y, and Normal force components
+        data: Dictionary containing plot data (needed for ground_surface to calculate slope height)
+        max_height_frac: Maximum arrow height as fraction of slope height (default 0.3)
 
     Returns:
         None
     """
+    if not dloads:
+        return
+    
+    # Calculate slope height from ground surface if available
+    slope_height = None
+    if data and 'ground_surface' in data:
+        ground_surface = data['ground_surface']
+        if hasattr(ground_surface, 'coords'):
+            y_vals = [y for _, y in ground_surface.coords]
+            slope_height = max(y_vals) - min(y_vals)
+    
+    # If we can't get slope height, use a default scaling
+    if slope_height is None:
+        # Fallback: find max load value across all dloads for scaling
+        max_load = 0
+        for line in dloads:
+            max_load = max(max_load, max(pt['Normal'] for pt in line))
+        slope_height = max_load / 10  # Arbitrary scaling if no ground surface available
+    
+    # Find the maximum load value for scaling
+    max_load = 0
     for line in dloads:
+        max_load = max(max_load, max(pt['Normal'] for pt in line))
+    
+    # Calculate maximum arrow height
+    max_arrow_height = slope_height * max_height_frac
+    
+    for line in dloads:
+        if len(line) < 2:
+            continue
+            
         xs = [pt['X'] for pt in line]
         ys = [pt['Y'] for pt in line]
         ns = [pt['Normal'] for pt in line]
-
-        interp_y = lambda x: np.interp(x, xs, ys)
-        interp_n = lambda x: np.interp(x, xs, ns)
-
-        x_arrows = np.linspace(min(xs), max(xs), 15)
-        top_xs = []
-        top_ys = []
-
-        for x in x_arrows:
-            y = interp_y(x)
-            n = interp_n(x)
-            arrow_height = min(n / 100, 10)
-            y_top = y + arrow_height + 2
-            ax.arrow(x, y_top, 0, -arrow_height,
-                     head_width=2, head_length=2, fc='purple', ec='purple')
-            top_xs.append(x)
-            top_ys.append(y_top)
-
-        ax.plot(top_xs, top_ys, color='purple', linewidth=1.5)
+        
+        # Process line segments
+        for i in range(len(line) - 1):
+            x1, y1, n1 = xs[i], ys[i], ns[i]
+            x2, y2, n2 = xs[i+1], ys[i+1], ns[i+1]
+            
+            # Calculate segment direction (perpendicular to this segment)
+            dx = x2 - x1
+            dy = y2 - y1
+            segment_length = np.sqrt(dx**2 + dy**2)
+            
+            if segment_length == 0:
+                continue
+                
+            # Normalize the segment direction
+            dx_norm = dx / segment_length
+            dy_norm = dy / segment_length
+            
+            # Perpendicular direction (rotate 90 degrees CCW)
+            perp_dx = -dy_norm
+            perp_dy = dx_norm
+            
+            # Generate arrows along this segment
+            num_arrows = max(3, min(10, int(segment_length / 5)))  # Adaptive number of arrows
+            t_values = np.linspace(0, 1, num_arrows)
+            
+            # Store arrow top points for connecting line
+            top_xs = []
+            top_ys = []
+            
+            # Add start point if it's the first segment and load is zero
+            if i == 0 and n1 == 0:
+                top_xs.append(x1)
+                top_ys.append(y1)
+            
+            for t in t_values:
+                # Interpolate position along segment
+                x = x1 + t * dx
+                y = y1 + t * dy
+                
+                # Interpolate load value
+                n = n1 + t * (n2 - n1)
+                
+                # Scale arrow height
+                if max_load > 0:
+                    arrow_height = (n / max_load) * max_arrow_height
+                else:
+                    arrow_height = 0
+                
+                # For very small arrows, just store surface point for connecting line
+                if arrow_height < 0.5:
+                    top_xs.append(x)
+                    top_ys.append(y)
+                    continue
+                
+                # Calculate arrow dimensions
+                head_length = arrow_height * 0.2
+                head_width = arrow_height * 0.15
+                
+                # Calculate arrow start point (above surface)
+                arrow_start_x = x + perp_dx * arrow_height
+                arrow_start_y = y + perp_dy * arrow_height
+                
+                # Store points for connecting line
+                top_xs.append(arrow_start_x)
+                top_ys.append(arrow_start_y)
+                
+                # Draw arrow - extend all the way to surface point
+                ax.arrow(arrow_start_x, arrow_start_y, 
+                        x - arrow_start_x, y - arrow_start_y,
+                        head_width=head_width, head_length=head_length, 
+                        fc='purple', ec='purple', alpha=0.7,
+                        length_includes_head=True)
+            
+            # Add end point if it's the last segment and load is zero
+            if i == len(line) - 2 and n2 == 0:
+                top_xs.append(x2)
+                top_ys.append(y2)
+            
+            # Draw connecting line at arrow tops
+            if top_xs:
+                ax.plot(top_xs, top_ys, color='purple', linewidth=1.5, alpha=0.8)
+        
+        # Draw the surface line itself
+        ax.plot(xs, ys, color='purple', linewidth=1.5, alpha=0.8)
 
 def plot_circles(ax, data):
     """
@@ -476,7 +597,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'])
+    plot_dloads(ax, data['dloads'], data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
     if data['circular']:
@@ -491,8 +612,22 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     ax.set_ylabel("y")
     ax.grid(False)
 
-    # Normal legend inside plot
-    ax.legend()
+    # Get legend handles and labels
+    handles, labels = ax.get_legend_handles_labels()
+    
+    # Add distributed load to legend if present
+    if data['dloads']:
+        handler_class, dummy_line = get_dload_legend_handler()
+        handles.append(dummy_line)
+        labels.append('Distributed Load')
+    
+    ax.legend(
+        handles=handles,
+        labels=labels,
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.12),
+        ncol=2
+    )
 
     ax.set_title(title)
 
@@ -526,7 +661,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     plot_slices(ax, df, fill=False)
     plot_failure_surface(ax, failure_surface)
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'])
+    plot_dloads(ax, data['dloads'], data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
     if slice_numbers:
         plot_slice_numbers(ax, df)
@@ -540,19 +675,30 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     plot_base_stresses(ax, df, alpha=alpha)
 
     import matplotlib.patches as mpatches
-    normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....',  label="Eff Normal Stress (σ')")
+    normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....', label="Eff Normal Stress (σ')")
     pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
 
-    # Add legend below the plot
+    # Get legend handles and labels
+    handles, labels = ax.get_legend_handles_labels()
+    handles.extend([normal_patch, pore_patch])
+    labels.extend(["Eff Normal Stress (σ')", 'Pore Pressure (u)'])
+    
+    # Add distributed load to legend if present
+    if data['dloads']:
+        handler_class, dummy_line = get_dload_legend_handler()
+        handles.append(dummy_line)
+        labels.append('Distributed Load')
+    
     ax.legend(
-        handles=ax.get_legend_handles_labels()[0] + [normal_patch, pore_patch],
+        handles=handles,
+        labels=labels,
         loc='upper center',
-        bbox_to_anchor=(0.5, -0.12),  # x=centered, y=slightly below axes
+        bbox_to_anchor=(0.5, -0.12),
         ncol=2
     )
 
     # Add vertical space below for the legend
-    plt.subplots_adjust(bottom=0.2)  # Increase if needed
+    plt.subplots_adjust(bottom=0.2)
     ax.set_aspect('equal')
 
     fs = results['FS']
@@ -659,7 +805,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'])
+    plot_dloads(ax, data['dloads'], data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
     plot_failure_surfaces(ax, fs_cache)
@@ -701,7 +847,7 @@ def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'])
+    plot_dloads(ax, data['dloads'], data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
     # Plot all failure surfaces from cache

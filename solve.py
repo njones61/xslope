@@ -704,7 +704,7 @@ def spencer(df, tol=1e-6, debug=False):
     n = len(Q)
     Z = np.zeros(n+1)
     for i in range(n):
-        Z[i+1] = Z[i] - Q[i]
+        Z[i+1] = Z[i] - Q[i] 
 
     # store back into df
     df['z']     = Z[:-1]        # Z_i acting on slice i's left face
@@ -728,7 +728,7 @@ def spencer(df, tol=1e-6, debug=False):
         return True, results
 
 
-def compute_line_of_thrust(df, FS, debug=False):
+def compute_line_of_thrust(df, FS, debug=True):
     """
     Compute the line of thrust via dual-sweep moment equilibrium,
     with optional debug output. This should only be called after
@@ -786,6 +786,12 @@ def compute_line_of_thrust(df, FS, debug=False):
     N_eff = df['n_eff'].values  # effective normal force
     Z     = np.zeros(n+1)  # interslice force
     Z[:-1]  = df['z'].values  # interslice force on left face
+
+    # Determine if the slope is left-facing or right-facing
+    right_facing = (y_lb[0] > y_rb[-1])
+    if right_facing:  # if right-facing, flip the interslice force and theta
+        Z = -Z
+        theta = -theta
 
     tol = 1e-8
 

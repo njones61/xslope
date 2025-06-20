@@ -42,7 +42,7 @@ circle = data['circles'][0] if data['circular'] else None
 
 # print(f"circle: {circle}")
 
-success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=30)
+success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=20)
 # success, result = generate_slices(data, circle=None, non_circ=non_circ, num_slices=20)
 if success:
     df, failure_surface = result
@@ -57,5 +57,5 @@ results = solve_selected(spencer, df)
 
 # solve_all(df)
 
-plot_solution(data, df, failure_surface, results)
+plot_solution(data, df, failure_surface, results, slice_numbers=True)
 

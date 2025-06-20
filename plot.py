@@ -671,7 +671,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     alpha = 0.3
     if results['method'] == 'spencer':
         FS = results['FS']
-        thrust_line = compute_line_of_thrust(df, FS,  debug=False)
+        thrust_line = compute_line_of_thrust(df, FS)
         plot_thrust_line(ax, thrust_line)
 
     plot_base_stresses(ax, df, alpha=alpha)

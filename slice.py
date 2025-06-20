@@ -308,24 +308,57 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right
 
-    # Build fixed_xs set
-    fixed_xs = set(
-        x for line in profile_lines for x, _ in line
-        if x_min <= x <= x_max
-    )
+    # === BEGIN : Find set of points that should correspond to slice boundaries. ===
+
+    # Find set of points that are on the profile lines if the points are above the failure surface.
+    fixed_xs = set()
+    for line in profile_lines:
+        for x, y in line:
+            if x_min <= x <= x_max:
+                # Check if this point is above the failure surface
+                if non_circ:
+                    # For non-circular failure surface, check intersection with vertical line
+                    vertical_line = LineString([(x, -1e6), (x, 1e6)])
+                    failure_y = get_y_from_intersection(clipped_surface.intersection(vertical_line))
+                else:
+                    # For circular failure surface, calculate y-coordinate
+                    try:
+                        failure_y = Yo - sqrt(R**2 - (x - Xo)**2)
+                    except ValueError:
+                        continue
+                
+                # Only add the point if it's above the failure surface
+                if failure_y is not None and y > failure_y:
+                    fixed_xs.add(x)
+    
     fixed_xs.update([x_min, x_max])
 
+    # Add transition points from dloads.
     if dloads:
         fixed_xs.update(
             pt['X'] for line in dloads for pt in line
             if x_min <= pt['X'] <= x_max
         )
 
+    # Add transition points from non_circ.
     if non_circ:
         fixed_xs.update(
             pt['X'] for pt in non_circ
             if x_min <= pt['X'] <= x_max
         )
+
+    # Find points associated with intersections of the profile lines and the failure surface.
+    for i in range(len(profile_lines)):
+        intersection = LineString(profile_lines[i]).intersection(clipped_surface)
+        if not intersection.is_empty:
+            if hasattr(intersection, 'x'):
+                # Single point intersection
+                fixed_xs.add(intersection.x)
+            elif hasattr(intersection, 'geoms'):
+                # Multiple points or line intersection
+                for geom in intersection.geoms:
+                    if hasattr(geom, 'x'):
+                        fixed_xs.add(geom.x)
 
     fixed_xs = sorted(fixed_xs)
 
@@ -339,6 +372,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
         n_subdiv = max(1, int(round((segment_length / total_length) * num_slices)))
         xs = np.linspace(x_start, x_end, n_subdiv + 1).tolist()
         all_xs.extend(xs[1:])
+
+    # === END : Find set of points that should correspond to slice boundaries. ===
 
     # Interpolation functions for distributed loads
     dload_interp_funcs = []
@@ -370,9 +405,6 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
                 continue
 
         # Find the y-coordinates of the ground surface at the left, right, and center of the slice
-        # vertical_l = LineString([(x_l, ground_surface.bounds[1] - 10), (x_l, ground_surface.bounds[3] + 10)])
-        # vertical_r = LineString([(x_r, ground_surface.bounds[1] - 10), (x_r, ground_surface.bounds[3] + 10)])
-        # vertical_c = LineString([(x_c, ground_surface.bounds[1] - 10), (x_c, ground_surface.bounds[3] + 10)])
         vertical_l = LineString([(x_l, -1e6), (x_l, 1e6)])
         vertical_r = LineString([(x_r, -1e6), (x_r, 1e6)])
         vertical_c = LineString([(x_c, -1e6), (x_c, 1e6)])
@@ -471,11 +503,11 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
                 else:
                     t_force = 0.0
                     y_t_loc = y_rb
-        # === END: “Tension crack water force” ===
+        # === END: "Tension crack water force" ===
 
-        # === BEGIN : “Reinforcement lines” ===
+        # === BEGIN : "Reinforcement lines" ===
 
-        # 1) Build this slice’s base as a LineString from (x_l, y_lb) to (x_r, y_rb):
+        # 1) Build this slice's base as a LineString from (x_l, y_lb) to (x_r, y_rb):
         slice_base = LineString([(x_l, y_lb), (x_r, y_rb)])
 
         # 2) For each reinforcement line, check a single‐point intersection:

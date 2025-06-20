@@ -104,10 +104,11 @@ def load_globals(filepath):
     main_df = xls.parse('main', header=None)
 
     try:
-        gamma_water = float(main_df.iloc[15, 3])  # Excel row 16, column D
-        tcrack_depth = float(main_df.iloc[16, 3])  # Excel row 17, column D
-        tcrack_water = float(main_df.iloc[17, 3])  # Excel row 18, column D
-        k_seismic = float(main_df.iloc[18, 3])  # Excel row 19, column D
+        template_version = main_df.iloc[4, 3]  # Excel row 5, column D
+        gamma_water = float(main_df.iloc[17, 3])  # Excel row 18, column D
+        tcrack_depth = float(main_df.iloc[18, 3])  # Excel row 19, column D
+        tcrack_water = float(main_df.iloc[19, 3])  # Excel row 20, column D
+        k_seismic = float(main_df.iloc[20, 3])  # Excel row 21, column D
     except Exception as e:
         raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
@@ -159,87 +160,72 @@ def load_globals(filepath):
     materials = []
 
     for _, row in mat_df.iterrows():
-        name = row.get('name')
-        gamma = row.get('g')
-        option = str(row.get('option', '')).strip().lower()
-        piezo = row.get('piezo', 1.0)
-
-        if pd.isna(gamma) or option not in ('mc', 'cp'):
+        # Check if the row is blank (columns 2-17, which are indices 1-16)
+        if row.iloc[1:17].isna().all():
             continue
-
-        try:
-            gamma = float(gamma)
-            piezo = float(piezo) if pd.notna(piezo) else 1.0
-        except:
-            continue
-
-        if option == 'mc':
-            c = row.get('c')
-            phi = row.get('f')
-            if pd.isna(c) or pd.isna(phi):
-                continue
-            try:
-                c = float(c)
-                phi = float(phi)
-            except:
-                continue
-            cp = 0
-            r_elev = 0
-
-        elif option == 'cp':
-            cp = row.get('cp')
-            r_elev = row.get('r-elev')
-            if pd.isna(cp) or pd.isna(r_elev):
-                continue
-            try:
-                cp = float(cp)
-                r_elev = float(r_elev)
-            except:
-                continue
-            c = 0
-            phi = 0
-
+            
         materials.append({
-            "name": name,
-            "gamma": gamma,
-            "option": option,
-            "c": c,
-            "phi": phi,
-            "cp": cp,
-            "r_elev": r_elev,
-            "piezo": piezo,
+            "name": row.get('name', ''),
+            "gamma": float(row.get('g', 0) or 0),
+            "option": str(row.get('option', '')).strip().lower(),
+            "c": float(row.get('c', 0) or 0),
+            "phi": float(row.get('f', 0) or 0),
+            "c1": float(row.get('c', 0) or 0),   # make a copy for use in rapid drawdown
+            "phi1": float(row.get('f', 0) or 0), # make a copy for use in rapid drawdown
+            "cp": float(row.get('cp', 0) or 0),
+            "r_elev": float(row.get('r-elev', 0) or 0),
+            "d": float(row.get('d', 0) or 0),
+            "psi": float(row.get('ψ', 0) or 0),
+            "piezo": float(row.get('piezo', 1.0) or 1.0),
             "sigma_gamma": float(row.get('s(g)', 0) or 0),
             "sigma_c": float(row.get('s(c)', 0) or 0),
             "sigma_phi": float(row.get('s(f)', 0) or 0),
             "sigma_cp": float(row.get('s(cp)', 0) or 0),
+            "sigma_d": float(row.get('s(d)', 0) or 0),
+            "sigma_psi": float(row.get('s(ψ)', 0) or 0),
         })
 
     # === PIEZOMETRIC LINE ===
     piezo_df = xls.parse('piezo')
-    piezo_data = piezo_df.iloc[2:].dropna(how='all')
     piezo_line = []
+    piezo_line2 = []
 
+    # Read all data once (rows 4-18)
+    piezo_data = piezo_df.iloc[2:18].dropna(how='all')
+    
     if len(piezo_data) >= 2:
+        # Extract first table (A4:B18) - columns 0 and 1
         try:
-            piezo_data = piezo_data.dropna(subset=[piezo_data.columns[0], piezo_data.columns[1]], how='any')
-            if len(piezo_data) < 2:
-                raise ValueError("Piezometric line must contain at least two points.")
-            piezo_line = piezo_data.apply(lambda row: (float(row.iloc[0]), float(row.iloc[1])), axis=1).tolist()
+            piezo_data1 = piezo_data.dropna(subset=[piezo_data.columns[0], piezo_data.columns[1]], how='all')
+            if len(piezo_data1) < 2:
+                raise ValueError("First piezometric line must contain at least two points.")
+            piezo_line = piezo_data1.apply(lambda row: (float(row.iloc[0]), float(row.iloc[1])), axis=1).tolist()
         except Exception:
-            raise ValueError("Invalid piezometric line format.")
+            raise ValueError("Invalid first piezometric line format.")
+
+        # Extract second table (D4:E18) - columns 3 and 4
+        try:
+            piezo_data2 = piezo_data.dropna(subset=[piezo_data.columns[3], piezo_data.columns[4]], how='all')
+            if len(piezo_data2) < 2:
+                raise ValueError("Second piezometric line must contain at least two points.")
+            piezo_line2 = piezo_data2.apply(lambda row: (float(row.iloc[3]), float(row.iloc[4])), axis=1).tolist()
+        except Exception:
+            # If second table reading fails, just leave piezo_line2 as empty list
+            piezo_line2 = []
     elif len(piezo_data) == 1:
         raise ValueError("Piezometric line must contain at least two points.")
 
     # === DISTRIBUTED LOADS ===
     dload_df = xls.parse('dloads', header=None)
     dloads = []
+    dloads2 = []
     dload_data_blocks = [
         {"start_row": 3, "end_row": 13},
         {"start_row": 16, "end_row": 26}
     ]
     dload_block_starts = [1, 5, 9, 13]
 
-    for block in dload_data_blocks:
+    for block_idx, block in enumerate(dload_data_blocks):
         for col in dload_block_starts:
             section = dload_df.iloc[block["start_row"]:block["end_row"], col:col + 3]
             section = section.dropna(how='all')
@@ -252,7 +238,10 @@ def load_globals(filepath):
                             "Y": float(row.iloc[1]),
                             "Normal": float(row.iloc[2])
                         }, axis=1).tolist()
-                    dloads.append(block_points)
+                    if block_idx == 0:
+                        dloads.append(block_points)
+                    else:
+                        dloads2.append(block_points)
                 except:
                     raise ValueError("Invalid data format in distributed load block.")
             elif len(section) == 1:
@@ -334,6 +323,7 @@ def load_globals(filepath):
                 raise ValueError("Each reinforcement line must contain at least two points.")
 
     # === VALIDATION ===
+ 
     circular = len(circles) > 0
     if not circular and len(non_circ) == 0:
         raise ValueError("Input must include either circular or non-circular surface data.")
@@ -343,8 +333,10 @@ def load_globals(filepath):
         raise ValueError("Materials sheet is empty.")
     if len(materials) != len(profile_lines):
         raise ValueError("Each profile line must have a corresponding material.")
+        
 
     # Add everything to globals_data
+    globals_data["template_version"] = template_version
     globals_data["gamma_water"] = gamma_water
     globals_data["tcrack_depth"] = tcrack_depth
     globals_data["tcrack_water"] = tcrack_water
@@ -354,11 +346,13 @@ def load_globals(filepath):
     globals_data["tcrack_surface"] = tcrack_surface
     globals_data["materials"] = materials
     globals_data["piezo_line"] = piezo_line
+    globals_data["piezo_line2"] = piezo_line2
     globals_data["circular"] = circular # True if circles are present
     globals_data["max_depth"] = max_depth
     globals_data["circles"] = circles
     globals_data["non_circ"] = non_circ
     globals_data["dloads"] = dloads
+    globals_data["dloads2"] = dloads2
     globals_data["reinforce_lines"] = reinforce_lines
 
     return globals_data

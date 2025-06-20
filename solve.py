@@ -65,7 +65,7 @@ def oms(df, debug=False):
     W     = df['w'].values        # Wᵢ
     u     = df['u'].values        # uᵢ (pore‐force per unit length)
     dl     = df['dl'].values       # Δℓᵢ
-    D     = df['d'].values        # Dᵢ
+    D     = df['dload'].values        # Dᵢ
     d_x    = df['d_x'].values      # d_{x,i}
     d_y    = df['d_y'].values      # d_{y,i}
     beta_deg  = df['beta'].values     # βᵢ in degrees
@@ -176,7 +176,7 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
     W     = df['w'].values
     u     = df['u'].values
     dl    = df['dl'].values
-    D     = df['d'].values
+    D     = df['dload'].values
     d_x   = df['d_x'].values
     d_y   = df['d_y'].values
     beta  = np.radians(df['beta'].values)
@@ -266,7 +266,7 @@ def janbu(df, debug=False):
     W = df['w'].values
     u = df['u'].values
     dl = df['dl'].values
-    D = df['d'].values
+    D = df['dload'].values
     beta = np.radians(df['beta'].values)
     kw = df['kw'].values
     T = df['t'].values
@@ -396,7 +396,7 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
     w       = df['w'].values
     u       = df['u'].values
     dl      = df['dl'].values
-    D       = df['d'].values
+    D       = df['dload'].values
     beta    = np.radians(df['beta'].values)
     kw      = df['kw'].values
     T       = df['t'].values
@@ -609,7 +609,7 @@ def spencer(df, tol=1e-6, debug=False):
     u     = df['u'].values
     x_c   = df['x_c'].values
     y_cb  = df['y_cb'].values
-    D     = df['d'].values
+    D     = df['dload'].values
     beta  = np.radians(df['beta'].values)
     kw    = df['kw'].values
     T     = df['t'].values
@@ -771,7 +771,7 @@ def compute_line_of_thrust(df, FS, debug=True):
     x_l    = df['x_l'].values  # left side x-coordinate
     y_lb   = df['y_lb'].values  # left side base y-coordinate
     y_rb   = df['y_rb'].values  # right side base y-coordinate
-    D      = df['d'].values     # distributed load
+    D      = df['dload'].values     # distributed load
     d_x    = df['d_x'].values   # distributed load x-coordinate
     d_y    = df['d_y'].values   # distributed load y-coordinate
     beta   = np.radians(df['beta'].values)  # distributed load inclination
@@ -792,6 +792,7 @@ def compute_line_of_thrust(df, FS, debug=True):
     if right_facing:  # if right-facing, flip the interslice force and theta
         Z = -Z
         theta = -theta
+        beta = -beta
 
     tol = 1e-8
 
@@ -815,10 +816,13 @@ def compute_line_of_thrust(df, FS, debug=True):
             - w[i] * dx[i] / 2
             + N * dl[i] / 2
             - D[i] * np.cos(beta[i]) * (x_r[i] - d_x[i])  # D*cos(β)*a_dx relative to right corner
-            + D[i] * np.sin(beta[i]) * (d_y[i]- y_rb[i])  # D*sin(β)*a_dy relative to right corner
+            + D[i] * np.sin(beta[i]) * (d_y[i] - y_rb[i])  # D*sin(β)*a_dy relative to right corner
             - kw[i] * (y_cg[i] - y_rb[i])  # kW*a_k relative to right corner
             - T[i] * (y_t[i] - y_rb[i])    # T*a_t relative to right corner
         )
+        if D[i] != 0:
+            print(f"LEFT SWEEP:for slice {i}, a_dx = {x_r[i] - d_x[i]:.2f}, a_dy = {d_y[i] - y_rb[i]:.2f}")
+            print(f"beta = {beta[i]:.2f}, beta(deg) = {np.degrees(beta[i]):.2f}")
         delta_y_L[i+1]  = num / E[i+1] if abs(E[i+1]) > tol else 0  # right-side moment arm
         y_L[i+1]  = y_rb[i] + delta_y_L[i+1]    # absolute y value on right side
 
@@ -841,11 +845,13 @@ def compute_line_of_thrust(df, FS, debug=True):
             - w[i] * dx[i] / 2
             + N * dl[i] / 2
             - D[i] * np.cos(beta[i]) * (d_x[i] - x_l[i])  # D*cos(β)*a_dx relative to left corner
-            - D[i] * np.sin(beta[i]) * (d_y[i] -y_lb[i]) # D*sin(β)*a_dy relative to left corner
+            - D[i] * np.sin(beta[i]) * (d_y[i] - y_lb[i]) # D*sin(β)*a_dy relative to left corner
             + kw[i] * (y_cg[i] - y_lb[i])  # kW*a_k relative to left corner
             + T[i] * (y_t[i] - y_lb[i])    # T*a_t relative to left corner
         )
-
+        if D[i] != 0:
+            print(f"Right SWEEP:for slice {i}, a_dx = {d_x[i] - x_l[i]:.2f}, a_dy = {d_y[i] - y_lb[i]:.2f}")
+            print(f"beta = {beta[i]:.2f}, beta(deg) = {np.degrees(beta[i]):.2f}")
         delta_y_R[i] = num / E[i] if abs(E[i]) > tol else 0
         y_R[i] = y_lb[i] + delta_y_R[i]
 
@@ -880,6 +886,10 @@ def compute_line_of_thrust(df, FS, debug=True):
                     + E[i + 1] * delta_y_L[i + 1]
                     + w[i]*(dx[i]/2)
                     - (N_eff[i] + u[i]*dl[i])*(dl[i]/2)
+                    + D[i] * np.cos(beta[i]) * (x_r[i] - d_x[i])  # D*cos(β)*a_dx relative to right corner
+                    - D[i] * np.sin(beta[i]) * (d_y[i] - y_rb[i])  # D*sin(β)*a_dy relative to right corner
+                    + kw[i] * (y_cg[i] - y_rb[i])  # kW*a_k relative to right corner
+                    + T[i] * (y_t[i] - y_rb[i])    # T*a_t relative to right corner
                 )
             if i==0:
                 m_res_R = 0
@@ -890,6 +900,10 @@ def compute_line_of_thrust(df, FS, debug=True):
                     - X[i+1]*dx[i]
                     - w[i]*(dx[i]/2)
                     + (N_eff[i] + u[i]*dl[i])*(dl[i]/2)
+                    - D[i] * np.cos(beta[i]) * (d_x[i] - x_l[i])  # D*cos(β)*a_dx relative to left corner
+                    - D[i] * np.sin(beta[i]) * (d_y[i] - y_lb[i]) # D*sin(β)*a_dy relative to left corner
+                    + kw[i] * (y_cg[i] - y_lb[i])  # kW*a_k relative to left corner
+                    + T[i] * (y_t[i] - y_lb[i])    # T*a_t relative to left corner
                 )
 
             rows.append({
@@ -909,6 +923,13 @@ def compute_line_of_thrust(df, FS, debug=True):
                 'X_right':         X[i+1],
                 'E_left':          E[i],
                 'E_right':         E[i+1],
+                'D':               D[i],
+                'beta':            beta[i],
+                'd_x':             d_x[i],
+                'd_y':             d_y[i],
+                'kw':              kw[i],
+                'y_cg':            y_cg[i],
+                'y_t':             y_t[i],
                 'delta_y_L': delta_y_L[i],
                 'delta_y_R': delta_y_R[i],
                 'y_L_abs_left':    y_L[i],

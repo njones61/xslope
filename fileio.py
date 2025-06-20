@@ -170,12 +170,10 @@ def load_globals(filepath):
             "option": str(row.get('option', '')).strip().lower(),
             "c": float(row.get('c', 0) or 0),
             "phi": float(row.get('f', 0) or 0),
-            "c1": float(row.get('c', 0) or 0),   # make a copy for use in rapid drawdown
-            "phi1": float(row.get('f', 0) or 0), # make a copy for use in rapid drawdown
             "cp": float(row.get('cp', 0) or 0),
             "r_elev": float(row.get('r-elev', 0) or 0),
-            "d": float(row.get('d', 0) or 0),
-            "psi": float(row.get('ψ', 0) or 0),
+            "d": float(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
+            "psi": float(row.get('ψ', 0)) if pd.notna(row.get('ψ')) else 0,
             "piezo": float(row.get('piezo', 1.0) or 1.0),
             "sigma_gamma": float(row.get('s(g)', 0) or 0),
             "sigma_c": float(row.get('s(c)', 0) or 0),

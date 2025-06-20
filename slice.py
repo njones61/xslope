@@ -163,15 +163,13 @@ def get_y_from_intersection(geom):
         return max(pt.y for pt in pts) if pts else None
     return None
 
-def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
+def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl):
     """
     Compute:
       - D    : total resultant force from a trapezoidal load varying
                linearly from intensity qL at (x_l,y_lt) to qR at (x_r,y_rt).
       - d_x  : x‐coordinate of the resultant's centroid on the top edge
       - d_y  : y‐coordinate of the resultant's centroid on the top edge
-      - beta : angle (in degrees) of the slice's top edge (positive CCW
-               from the +x direction).
 
     Parameters
     ----------
@@ -183,24 +181,23 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
         Load intensity (force per unit length) at (x_l, y_lt).
     qR : float
         Load intensity (force per unit length) at (x_r, y_rt).
+    dl : float
+        Actual length along the inclined surface.
 
     Returns
     -------
     D    : float
-           Total resultant (area of trapezoid) = ½ (qL + qR) * (x_r − x_l)
+           Total resultant (area of trapezoid) = ½ (qL + qR) * dl
     d_x  : float
            Global x‐coordinate of the centroid of that trapezoid
     d_y  : float
            Global y‐coordinate of the centroid (lies on the line segment
            between (x_l,y_lt) and (x_r,y_rt))
-    beta : float
-           Slope angle of the top edge (in degrees), measured positive CCW
-           from the horizontal.
 
     Notes
     -----
     1.  If x_r == x_l (zero‐width slice), this will return D=0 and place
-        the "centroid" at (x_l, y_lt), with β=0°.
+        the "centroid" at (x_l, y_lt).
     2.  For a nonzero‐width trapezoid, the horizontal centroid‐offset from
         x_l is:
              x_offset = (x_r – x_l) * ( qL + 2 qR ) / [3 (qL + qR) ]
@@ -209,13 +206,12 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     3.  The vertical coordinate d_y is found by linear‐interpolation:
           t = x_offset / (x_r – x_l)
           d_y = y_lt + t ·(y_rt – y_lt)
-    4.  β is measured by atan2(Δy, Δx) in degrees.
 
     """
     dx = x_r - x_l
 
-    # 1) Total resultant force (area under trapezoid)
-    D = 0.5 * (qL + qR) * dx
+    # 1) Total resultant force (area under trapezoid) using actual length
+    D = 0.5 * (qL + qR) * dl
 
     # 2) Horizontal centroid offset from left end
     sum_q = qL + qR
@@ -232,10 +228,7 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR):
     t = x_offset / dx
     d_y = y_lt + t * (y_rt - y_lt)
 
-    # 5) Slope angle β of the top edge, in degrees:
-    beta = np.degrees(np.arctan2(y_rt - y_lt, x_r - x_l))
-
-    return D, d_x, d_y, beta
+    return D, d_x, d_y
 
 
 def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True):
@@ -257,6 +250,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
         gamma_w (float, optional): Unit weight of water (default is 62.4).
         piezo_line (list, optional): List of (x, y) tuples defining the piezometric surface.
         dloads (list, optional): List of distributed load lines, each a list of dicts with 'X', 'Y', and 'Normal'.
+        dloads2 (list, optional): Second list of distributed load lines, each a list of dicts with 'X', 'Y', and 'Normal'.
         reinforce_lines (list, optional): List of reinforcement lines, each a list of dicts with 'X', 'Y', 'FL', and 'FT'.
 
     Returns:
@@ -276,6 +270,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
     ground_surface = data["ground_surface"]
     materials = data["materials"]
     piezo_line = data["piezo_line"]
+    piezo_line2 = data.get("piezo_line2", [])  # Second piezometric line
     gamma_w = data["gamma_water"]
     tcrack_depth = data["tcrack_depth"]
     tcrack_water = data["tcrack_water"]
@@ -286,6 +281,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
     else:
         circular = False
     dloads = data["dloads"]
+    dloads2 = data.get("dloads2", [])  # Second set of distributed loads
     max_depth = data["max_depth"]
 
     reinf_lines_data = []
@@ -340,6 +336,13 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             if x_min <= pt['X'] <= x_max
         )
 
+    # Add transition points from dloads2.
+    if dloads2:
+        fixed_xs.update(
+            pt['X'] for line in dloads2 for pt in line
+            if x_min <= pt['X'] <= x_max
+        )
+
     # Add transition points from non_circ.
     if non_circ:
         fixed_xs.update(
@@ -383,6 +386,14 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             normals = [pt['Normal'] for pt in line]
             dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
 
+    # Interpolation functions for second set of distributed loads
+    dload2_interp_funcs = []
+    if dloads2:
+        for line in dloads2:
+            xs = [pt['X'] for pt in line]
+            normals = [pt['Normal'] for pt in line]
+            dload2_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
+
     # Generate slices
     slices = []
     for i in range(len(all_xs) - 1):
@@ -412,6 +423,14 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
         y_lt = get_y_from_intersection(ground_surface.intersection(vertical_l))
         y_rt = get_y_from_intersection(ground_surface.intersection(vertical_r))
         y_ct = get_y_from_intersection(ground_surface.intersection(vertical_c))
+
+        # Calculate beta (slope angle of the top edge) in degrees
+        beta = degrees(atan2(y_rt - y_lt, x_r - x_l))
+        if right_facing:
+            beta = -beta
+
+        # Calculate dl for the top surface (for distributed loads)
+        dl_top = sqrt((x_r - x_l)**2 + (y_rt - y_lt)**2)
 
         heights = []
         soil_weight = 0
@@ -451,9 +470,6 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             if h > 0:
                 base_material_idx = mat_index
 
-            # if base_material_idx is None and h > 0:
-            #     base_material_idx = mat_index
-
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
 
@@ -465,7 +481,17 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
         else:
             qL = 0
             qR = 0
-        d, d_x, d_y, beta = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR)
+        dload, d_x, d_y = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl_top)
+
+        # Second distributed load
+        qC2 = sum(func(x_c) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at center
+        if qC2 > 0: # We need to check qC2 to distinguish between a linear ramp up (down) and the case where the load starts or ends on one of the sides
+            qL2 = sum(func(x_l) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at left‐top corner
+            qR2 = sum(func(x_r) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at right‐top corner
+        else:
+            qL2 = 0
+            qR2 = 0
+        dload2, d_x2, d_y2 = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL2, qR2, dl_top)
 
         # Seismic force
         kw = k_seismic * soil_weight
@@ -533,18 +559,25 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
 
         # --Process piezometric line and pore pressures---
         hw = 0
+        hw2 = 0
         piezo_y = None
+        piezo_y2 = None
         if piezo_line:
-            piezo_geom = LineString(piezo_line)
+            piezo_geom1 = LineString(piezo_line)
+            piezo_geom2 = LineString(piezo_line2)
             if circle:
                 piezo_vertical = LineString([(x_c, y_cb - 2 * R), (x_c, y_ct + 2 * R)])
             else: # non-circular
                 span = abs(y_ct - y_cb)
                 piezo_vertical = LineString([(x_c, y_cb - 0.5 * span), (x_c, y_ct + 0.5 * span)])
-            piezo_y = get_y_from_intersection(piezo_geom.intersection(piezo_vertical))
+            piezo_y = get_y_from_intersection(piezo_geom1.intersection(piezo_vertical))
+            piezo_y2 = get_y_from_intersection(piezo_geom2.intersection(piezo_vertical))
             if piezo_y is not None and piezo_y > y_cb:
                 hw = piezo_y - y_cb
+            if piezo_y2 is not None and piezo_y2 > y_cb:
+                hw2 = piezo_y2 - y_cb
         u = hw * gamma_w if piezo_y is not None else 0
+        u2 = hw2 * gamma_w if piezo_y2 is not None else 0
 
         delta = 0.01
         if not non_circ:
@@ -567,13 +600,25 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
         if base_material_idx is None:
             phi = 0
             c = 0
+            c1 = 0      # not used in rapid drawdown, but must be defined
+            phi1 = 0    # not used in rapid drawdown, but must be defined
+            d = 0       # not used in rapid drawdown, but must be defined
+            psi = 0     # not used in rapid drawdown, but must be defined
         else:
             if materials[base_material_idx]['option'] == 'mc':
                 c = materials[base_material_idx]['c']
                 phi = materials[base_material_idx]['phi']
+                c1 = c       # make a copy for use in rapid drawdown
+                phi1 = phi   # make a copy for use in rapid drawdown
+                d = materials[base_material_idx]['d']
+                psi = materials[base_material_idx]['psi']
             else:
                 c = (materials[base_material_idx]['r_elev'] - y_cb) * materials[base_material_idx]['cp']
                 phi = 0
+                c1 = 0      # not used in rapid drawdown, but must be defined
+                phi1 = 0    # not used in rapid drawdown, but must be defined
+                d = 0       # not used in rapid drawdown, but must be defined
+                psi = 0     # not used in rapid drawdown, but must be defined
 
         slice_data = {
             'slice #': i + 1, # Slice numbering starts at 1
@@ -594,23 +639,34 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             'w': soil_weight,  # weight of the slice
             'qL': qL,  # distributed load intensity at left edge
             'qR': qR,  # distributed load intensity at right edge
-            'd': d,     # distributed load resultant (area of trapezoid)
+            'dload': dload,     # distributed load resultant (area of trapezoid)
             'd_x': d_x, # dist load resultant x-coordinate (point d)
             'd_y': d_y, # dist load resultant y-coordinate (point d)
+            'qL2': qL2,  # second distributed load intensity at left edge
+            'qR2': qR2,  # second distributed load intensity at right edge
+            'dload2': dload2,     # second distributed load resultant (area of trapezoid)
+            'd_x2': d_x2, # second dist load resultant x-coordinate (point d)
+            'd_y2': d_y2, # second dist load resultant y-coordinate (point d)
+            'beta': beta, # slope angle of the top edge in degrees
             'kw': kw,   # seismic force
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
-            'beta': beta, # slope angle of the top edge in degrees
             'p': p_sum,   # sum of reinforcement line FL values that intersect base of slice.
             'n_eff': 0, # Placeholder for effective normal force
             'z': 0,     # Placeholder for interslice side forces
             'theta': 0, # Placeholder for interslice angles
             'piezo_y': piezo_y,  # y-coordinate of the piezometric surface at x_c
             'hw': hw,   # height of water at x_c
-            'u': u,
+            'u': u,     # pore pressure at x_c
+            'hw2': hw2, # height of water at x_c for second piezometric line (rapid drawdown)
+            'u2': u2,   # pore pressure at x_c for second piezometric line (rapid drawdown)
             'mat': base_material_idx + 1 if base_material_idx is not None else None,  # index of the base material (1-indexed)
-            'phi': phi,  # friction angle of the base material in degrees
             'c': c,      # cohesion of the base material
+            'phi': phi,  # friction angle of the base material in degrees
+            'c1': c1,    # cohesion of the base material for rapid drawdown
+            'phi1': phi1,  # friction angle of the base material for rapid drawdown
+            'd': d,       # d cohesion of the base material for rapid drawdown
+            'psi': psi,   # psi friction angle of the base material for rapid drawdown
             'r': R,      # radius of the circular failure surface
             'xo': Xo,    # x-coordinate of the center of the circular failure surface
             'yo': Yo,    # y-coordinate of the center of the circular failure surface

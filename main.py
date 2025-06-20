@@ -33,7 +33,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_dam.xlsx")
+data = load_globals("docs/input_template_lface.xlsx")
 
 # plot_inputs(data)
 

@@ -40,7 +40,7 @@ def plot_profile_lines(ax, profile_lines):
     """
     for i, line in enumerate(profile_lines):
         xs, ys = zip(*line)
-        ax.plot(xs, ys, label=f'Material {i+1}')
+        ax.plot(xs, ys, label=f'Profile {i+1}')
 
 def plot_max_depth(ax, profile_lines, max_depth):
     """
@@ -637,7 +637,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_numbers=True):
+def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_numbers=False):
     """
     Creates a plot showing the slope stability analysis solution.
 
@@ -666,6 +666,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     plot_tcrack_surface(ax, data['tcrack_surface'])
     if slice_numbers:
         plot_slice_numbers(ax, df)
+    # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
 
     alpha = 0.3
     if results['method'] == 'spencer':
@@ -694,8 +695,8 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
         handles=handles,
         labels=labels,
         loc='upper center',
-        bbox_to_anchor=(0.5, -0.12),
-        ncol=2
+        bbox_to_anchor=(0.5, -0.15),
+        ncol=3
     )
 
     # Add vertical space below for the legend

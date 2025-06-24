@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from slice import generate_failure_surface
-from solve import compute_line_of_thrust
+from solve import compute_line_of_thrust_sweep, compute_line_of_thrust_center
 from shapely.geometry import LineString
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
@@ -671,7 +671,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     alpha = 0.3
     if results['method'] == 'spencer':
         FS = results['FS']
-        thrust_line = compute_line_of_thrust(df, FS)
+        thrust_line = compute_line_of_thrust_center(df, FS)
         plot_thrust_line(ax, thrust_line)
 
     plot_base_stresses(ax, df, alpha=alpha)

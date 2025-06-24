@@ -728,7 +728,7 @@ def spencer(df, tol=1e-6, debug=False):
         return True, results
 
 
-def compute_line_of_thrust(df, FS, debug=True):
+def compute_line_of_thrust_sweep(df, FS, debug=True):
     """
     Compute the line of thrust via dual-sweep moment equilibrium,
     with optional debug output. This should only be called after
@@ -758,7 +758,6 @@ def compute_line_of_thrust(df, FS, debug=True):
     """
     # 1) unpack & force equilibrium
     n      = len(df)
-    alpha  = np.radians(df['alpha'].values)
     phi    = np.radians(df['phi'].values)
     theta  = np.zeros(n+1)  # interslice force inclination
     theta[:-1]   = np.radians(df['theta'].values)  # interslice force inclination
@@ -769,8 +768,10 @@ def compute_line_of_thrust(df, FS, debug=True):
     dx     = df['dx'].values  # slice width
     x_r    = df['x_r'].values  # right side x-coordinate
     x_l    = df['x_l'].values  # left side x-coordinate
+    x_c    = df['x_c'].values  # center of base x-coordinate
     y_lb   = df['y_lb'].values  # left side base y-coordinate
     y_rb   = df['y_rb'].values  # right side base y-coordinate
+    y_cb   = df['y_cb'].values  # center base y-coordinate
     D      = df['dload'].values     # distributed load
     d_x    = df['d_x'].values   # distributed load x-coordinate
     d_y    = df['d_y'].values   # distributed load y-coordinate
@@ -911,8 +912,12 @@ def compute_line_of_thrust(df, FS, debug=True):
                 'N_eff':           N_eff[i],
                 'dl':              dl[i],
                 'dx':              dx[i],
+                'x_c':             x_c[i],
+                'x_l':             x_l[i],
+                'x_r':             x_r[i],
                 'y_lb':            y_lb[i],
                 'y_rb':            y_rb[i],
+                'y_cb':            y_cb[i],
                 'u':               u[i],
                 'w':               w[i],
                 'c_m':             c_m[i],
@@ -947,5 +952,196 @@ def compute_line_of_thrust(df, FS, debug=True):
         print("Debug table written to thrust_calc_results.xlsx")
 
     # 6) return results
+    return thrust_line
+
+def compute_line_of_thrust_center(df, FS, debug=True):
+    """
+    Compute the line of thrust using the "center of base of slice" method.
+    This implements equation 8 from the line_of_thrust.md documentation:
+    
+    Δy_{i+1} = (E_i * Δy_i + X_i * Δx/2 + X_{i+1} * Δx/2 - D * cos(β) * d_ax + D * sin(β) * d_ay - kW * a_k - T * a_t) / E_{i+1}
+    
+    This method sums moments about the center of the base of each slice.
+    Only the side forces create moments since W, S, and N all go through the base center.
+    Additional forces (D, kW, T) are included with their respective moment arms.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must include columns:
+            'alpha', 'phi', 'c', 'w', 'u',
+            'dl', 'dx', 'x_l', 'x_r', 'y_lb', 'y_rb',
+            'dload', 'beta', 'kw', 't', 'p',
+            'theta', 'n_eff', 'z', 'd_x', 'd_y', 'y_cg', 'y_t'
+    FS : float
+        Factor of safety from Spencer's solution.
+    debug : bool
+        If True, export a per-slice debug table to Excel.
+
+    Returns
+    -------
+    dict
+        'sigma_eff'   : N_eff / dl per slice,
+        'delta_y'     : moment arms at each boundary (n+1),
+        'thrust_line' : Shapely LineString of the y coordinates.
+    """
+    # 1) unpack & force equilibrium
+    n      = len(df)
+    theta  = np.zeros(n+1)  # interslice force inclination
+    theta[:-1]   = np.radians(df['theta'].values)  # interslice force inclination
+    dx     = df['dx'].values  # slice width
+    x_c    = df['x_c'].values  # center of base x-coordinate
+    x_l    = df['x_l'].values  # left side x-coordinate
+    x_r    = df['x_r'].values  # right side x-coordinate
+    y_cb   = df['y_cb'].values  # center base y-coordinate
+    y_lb   = df['y_lb'].values  # left side base y-coordinate
+    y_rb   = df['y_rb'].values  # right side base y-coordinate
+    D      = df['dload'].values     # distributed load
+    d_x    = df['d_x'].values   # distributed load x-coordinate
+    d_y    = df['d_y'].values   # distributed load y-coordinate
+    beta   = np.radians(df['beta'].values)  # distributed load inclination
+    kw     = df['kw'].values  # seismic force
+    y_cg   = df['y_cg'].values  # seismic force y-coordinate
+    T      = df['t'].values  # tension crack water force
+    y_t    = df['y_t'].values  # tension crack water force y-coordinate
+
+    Z     = np.zeros(n+1)  # interslice force
+    Z[:-1]  = df['z'].values  # interslice force on left face
+
+    # Determine if the slope is left-facing or right-facing
+    right_facing = (y_lb[0] > y_rb[-1])
+    if right_facing:  # if right-facing, flip the interslice force and theta
+        Z = -Z
+        theta = -theta
+        beta = -beta
+
+    tol = 1e-8
+
+    # 1) decompose side-forces
+    X = Z * np.sin(theta)
+    E = Z * np.cos(theta)
+
+    # 2) Compute moment arms using center of base method with additional forces
+    # Start from left side and sweep to right
+    delta_y = np.zeros(n+1)  # Moment arms to side forces relative to center of base
+    y_thrust = np.zeros(n+1)  # Absolute y-coordinates of the thrust line
+    
+    
+
+    y_thrust[0] = y_lb[0]  # First slice left side y-coordinate
+    
+    for i in range(n):
+        # For each slice, solve for the right side moment arm using equation 8
+        # Δy_{i+1} = (E_i * Δy_i + X_i * Δx/2 + X_{i+1} * Δx/2 - D * cos(β) * d_ax + D * sin(β) * d_ay - kW * a_k - T * a_t) / E_{i+1}
+        
+        if i < n-1:  # Not the last slice
+
+            if i == 0:
+                delta_yi = 0.0     # For first slice, left side force is zero
+            else:
+                delta_yi = y_thrust[i] - y_cb[i]  # need to recompute this for each slice as y_cb changes
+
+            # Calculate moment arms for additional forces relative to center of base
+            # d_ax = horizontal distance from point d to pivot point (center of base)
+            d_ax = x_c[i] - d_x[i]
+            
+            # d_ay = vertical distance from point d to pivot point (center of base)
+            d_ay = d_y[i] - y_cb[i]
+            
+            # a_k = vertical distance from c.g. to pivot point (center of base)
+            a_k = y_cg[i] - y_cb[i]
+            
+            # a_t = vertical distance from tension crack to pivot point (center of base)
+            a_t =y_t[i]- y_cb[i]
+            
+            numerator = (E[i] * delta_yi + 
+                        X[i] * dx[i] / 2 + 
+                        X[i+1] * dx[i] / 2 -
+                        D[i] * np.cos(beta[i]) * d_ax +
+                        D[i] * np.sin(beta[i]) * d_ay -
+                        kw[i] * a_k -
+                        T[i] * a_t)
+            
+            if abs(E[i+1]) > tol:
+                delta_yip1 = numerator / E[i+1]
+            else:
+                delta_yip1 = 0.0
+                
+            # Convert to absolute y coordinate
+            y_thrust[i+1] = y_cb[i] + delta_yip1
+        else:
+            # For the last slice, pass through the right side y-coordinate
+            y_thrust[i+1] = y_rb[i]
+
+    # 3) build LineString
+    x_bound = np.empty(n+1)
+    x_bound[0] = df['x_l'].iat[0]
+    x_bound[1:] = df['x_r'].values
+    thrust_line = LineString(np.column_stack([x_bound, y_thrust]))
+
+    # 4) debug export
+    if debug:
+        rows = []
+        for i in range(n):
+            # Calculate moment residual for verification
+            if i < n-1:
+                # Calculate moment arms for additional forces
+                d_ax = x_c[i] - d_x[i]
+                d_ay = d_y[i] - y_cb[i]
+                a_k = y_cg[i] - y_cb[i]
+                a_t = y_t[i] - y_cb[i] 
+
+                delta_yi = y_thrust[i] - y_cb[i]
+                delta_yip1 = y_thrust[i+1] - y_cb[i]
+                
+                m_res = (-E[i] * delta_yi  - 
+                        X[i] * dx[i] / 2 + 
+                        E[i+1] * delta_yip1 - 
+                        X[i+1] * dx[i] / 2 +
+                        D[i] * np.cos(beta[i]) * d_ax -
+                        D[i] * np.sin(beta[i]) * d_ay +
+                        kw[i] * a_k +
+                        T[i] * a_t)
+            else:
+                m_res = 0.0
+
+            rows.append({
+                'slice':           i,
+                'dx':              dx[i],
+                'x_c':             x_c[i],
+                'x_l':             x_l[i],
+                'x_r':             x_r[i],
+                'y_lb':            y_lb[i],
+                'y_rb':            y_rb[i],
+                'y_cb':            y_cb[i],
+                'Z_left':          Z[i],
+                'Z_right':         Z[i+1],
+                'X_left':          X[i],
+                'X_right':         X[i+1],
+                'E_left':          E[i],
+                'E_right':         E[i+1],
+                'D':               D[i],
+                'beta':            beta[i],
+                'd_x':             d_x[i],
+                'd_y':             d_y[i],
+                'kw':              kw[i],
+                'y_cg':            y_cg[i],
+                'y_t':             y_t[i],
+                'd_ax':            d_ax if i < n-1 else 0.0,
+                'd_ay':            d_ay if i < n-1 else 0.0,
+                'a_k':             a_k if i < n-1 else 0.0,
+                'a_t':             a_t if i < n-1 else 0.0,
+                'delta_y_left':    delta_yi,
+                'delta_y_right':   delta_yip1,
+                'y_thrust_left':   y_thrust[i],
+                'y_thrust_right':  y_thrust[i+1],
+                'moment_residual': m_res
+            })
+
+        df_debug = pd.DataFrame(rows)
+        df_debug.to_excel("thrust_calc_results_center_base.xlsx", index=False)
+        print("Debug table written to thrust_calc_results_center_base.xlsx")
+
+    # 5) return results
     return thrust_line
 

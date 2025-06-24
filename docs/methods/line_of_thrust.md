@@ -76,13 +76,13 @@ If we start with slice 1 on the left side, the left side force is zero so we hav
 
 >>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \dfrac{\Delta x}{2} + X_{i+1} \dfrac{\Delta x}{2}}{E_{i+1}}   \qquad (2)$
 
-We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice and the average of the two moment arms can be used to compute the location of the resultant side force. 
+We can continue this process until we reach the top slice where the right side moment arm is set to zero. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice and the average of the two moment arms can be used to compute the location of the resultant side force. 
 
 ## Solving for the Thrust Line - Dual Sweep on Corner of Slice
 
-When solving moments around the center of the base of each slice, the weight, effective normal force, pore pressure, and shear force all go through this point, so the only forces left to create a moment are the side forces. For the first slice, the left side force is typically zero, leaving a single force to resolve moments. Decomposing Z into the X and E components gives two forces, but it is a highly unstable system. As a result, the moment arms can quickly become large and unreasonable after a few slices due to accumulated error. Starting from the left and sweeping to the right and then starting on the right and sweeping to the left and then averaging the results improves the results somewhat, but it is still prone to error.
+When solving moments around the center of the base of each slice, the weight, effective normal force, pore pressure, and shear force all go through this point, so the only forces left to create a moment are the side forces. For the first slice, the left side force is typically zero, leaving a single force to resolve moments. Decomposing Z into the X and E components gives two forces, but it is a slightly unstable system. 
 
- A much more stable and accurate method is to compute the moment arms for each slice by summing moments about the corner of each slice. In this case, only the shear force and the vertical component of the side force on the side in question pass through the pivot point and all other forces create a moment. This method is much more stable. Once again, we can use a dual sweep approach to compute the moment arms. First, we sweep from the left side to the right side and then we sweep from the right 
+ A theoretically more stable and accurate method is to compute the moment arms for each slice by summing moments about the corner of each slice. In this case, only the shear force and the vertical component of the side force on the side in question pass through the pivot point and all other forces create a moment. This method is much more stable. Once again, we can use a dual sweep approach to compute the moment arms. First, we sweep from the left side to the right side and then we sweep from the right 
 side to the left. As we sweep from the left side to the right side, we compute the moment arm for each slice 
 assuming a pivot point at the bottom right corner of the slice. For the first slice, there is no left side force, so 
 we can solve for the moment arm of the right side force. For the second slice, we use the moment arm from the first 
@@ -158,12 +158,20 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 When summing moments about the center of the base of the slice, we have $X_i$ and $E_i$ as before, but now we can include the additional forces. Once again, we define $\Delta y_i$ and $\Delta y_{i+1}$ as the distances from the center of the base of the slice up to the left and right side forces, $E_{i}$ and $E_{i-1}$ respectively, and $\Delta x$ is the horizontal width of the slice. Assuming CCW rotation is positive (right-hand rule) we can write the moment equilibrium equation as:
 
->>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \dfrac{\Delta x}{2} + E_{i+1} \Delta y_{i+1} - X_{i+1} \dfrac
-> {\Delta x}{2}= 0   \qquad (7)$
+>>$\sum M = 0 \Rightarrow - E_{i} \Delta y_{i} - X_{i} \dfrac{\Delta x}{2} + E_{i+1} \Delta y_{i+1} - X_{i+1} \dfrac {\Delta x}{2} + D \cos \beta d_{ax} - D \sin \beta d_{ay} + kW a_k + T a_t = 0   \qquad (7)$
+
+where: 
+
+>>$d_{ax}$ = horizontal distance from point $d$ to pivot point<br>
+$d_{ay}$ = vertical distance from point $d$ to pivot point<br>
+$a_k$ = vertical distance from $c.g.$ to pivot point<br>
+$a_t$ = vertical distance from point $c$ to pivot point
+
+Note: This formulation assumes that point $d$ is just to the left of the pivot point. 
 
 If we start with slice 1 on the left side, the left side force is zero so we have one unknown ($\Delta y_{i+1}$) and one equation. Then on the next slice, the left side moment arm is known and the right side moment arm is unknown. So again we have one equation and one unknown ($\Delta y_{i+1}$) which we can solve for as follows:
 
->>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \dfrac{\Delta x}{2} + X_{i+1} \dfrac{\Delta x}{2}}{E_{i+1}}   \qquad (8)$
+>>$\Delta y_{i+1} = \dfrac{E_{i} \Delta y_{i} + X_{i} \dfrac{\Delta x}{2} + X_{i+1} \dfrac{\Delta x}{2} - D \cos \beta d_{ax} + D \sin \beta d_{ay} - kW a_k - T a_t}{E_{i+1}}   \qquad (8)$
 
 We can continue this process until we reach the top slice where the right side moment arm is zero. On the last slice, the moment equation should balance using the known left side moment arm, but it may not close exactly due to accumulated rounding errors. Another alternative is to start from the left side and sweep to the the right side and then start from the right side and sweep to the left side. This will give two different moment arms for the same slice and the average of the two moment arms can be used to compute the location of the resultant side force. 
 

@@ -1032,7 +1032,7 @@ def compute_line_of_thrust_center(df, FS, debug=True):
     
     for i in range(n):
         # For each slice, solve for the right side moment arm using equation 8
-        # Δy_{i+1} = (E_i * Δy_i + X_i * Δx/2 + X_{i+1} * Δx/2 - D * cos(β) * d_ax + D * sin(β) * d_ay - kW * a_k - T * a_t) / E_{i+1}
+        # Δy_{i+1} = (E_i * Δy_i + X_i * Δx/2 + X_{i+1} * Δx/2 - D * cos(β) * a_dx + D * sin(β) * a_dy - kW * a_k - T * a_t) / E_{i+1}
         
         if i < n-1:  # Not the last slice
 
@@ -1042,11 +1042,11 @@ def compute_line_of_thrust_center(df, FS, debug=True):
                 delta_yi = y_thrust[i] - y_cb[i]  # need to recompute this for each slice as y_cb changes
 
             # Calculate moment arms for additional forces relative to center of base
-            # d_ax = horizontal distance from point d to pivot point (center of base)
-            d_ax = x_c[i] - d_x[i]
+            # a_dx = horizontal distance from point d to pivot point (center of base)
+            a_dx = x_c[i] - d_x[i]
             
-            # d_ay = vertical distance from point d to pivot point (center of base)
-            d_ay = d_y[i] - y_cb[i]
+            # a_dy = vertical distance from point d to pivot point (center of base)
+            a_dy = d_y[i] - y_cb[i]
             
             # a_k = vertical distance from c.g. to pivot point (center of base)
             a_k = y_cg[i] - y_cb[i]
@@ -1057,8 +1057,8 @@ def compute_line_of_thrust_center(df, FS, debug=True):
             numerator = (E[i] * delta_yi + 
                         X[i] * dx[i] / 2 + 
                         X[i+1] * dx[i] / 2 -
-                        D[i] * np.cos(beta[i]) * d_ax +
-                        D[i] * np.sin(beta[i]) * d_ay -
+                        D[i] * np.cos(beta[i]) * a_dx +
+                        D[i] * np.sin(beta[i]) * a_dy -
                         kw[i] * a_k -
                         T[i] * a_t)
             
@@ -1086,8 +1086,8 @@ def compute_line_of_thrust_center(df, FS, debug=True):
             # Calculate moment residual for verification
             if i < n-1:
                 # Calculate moment arms for additional forces
-                d_ax = x_c[i] - d_x[i]
-                d_ay = d_y[i] - y_cb[i]
+                a_dx = x_c[i] - d_x[i]
+                a_dy = d_y[i] - y_cb[i]
                 a_k = y_cg[i] - y_cb[i]
                 a_t = y_t[i] - y_cb[i] 
 
@@ -1098,8 +1098,8 @@ def compute_line_of_thrust_center(df, FS, debug=True):
                         X[i] * dx[i] / 2 + 
                         E[i+1] * delta_yip1 - 
                         X[i+1] * dx[i] / 2 +
-                        D[i] * np.cos(beta[i]) * d_ax -
-                        D[i] * np.sin(beta[i]) * d_ay +
+                        D[i] * np.cos(beta[i]) * a_dx -
+                        D[i] * np.sin(beta[i]) * a_dy +
                         kw[i] * a_k +
                         T[i] * a_t)
             else:
@@ -1127,8 +1127,8 @@ def compute_line_of_thrust_center(df, FS, debug=True):
                 'kw':              kw[i],
                 'y_cg':            y_cg[i],
                 'y_t':             y_t[i],
-                'd_ax':            d_ax if i < n-1 else 0.0,
-                'd_ay':            d_ay if i < n-1 else 0.0,
+                'a_dx':            a_dx if i < n-1 else 0.0,
+                'a_dy':            a_dy if i < n-1 else 0.0,
                 'a_k':             a_k if i < n-1 else 0.0,
                 'a_t':             a_t if i < n-1 else 0.0,
                 'delta_y_left':    delta_yi,

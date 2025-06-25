@@ -219,11 +219,11 @@ To include these additional forces in the Spencer's method formulation, we can m
 
 **Step 1** - Resolve Equilibrium Perpendicular to the Base
 
->$N + kW \sin \alpha + T \sin \alpha = W \cos \alpha  + D \cos(\beta - \alpha)  + Q \sin(\alpha - \theta) \qquad (5)$
+>$N + kW \sin \alpha + T \sin \alpha = W \cos \alpha  + D \cos(\alpha - \beta )  + Q \sin(\alpha - \theta) \qquad (5)$
 
 **Step 2** - Resolve Equilibrium Parallel to the Base
 
->$Q \cos(\alpha - \theta) + S  + P  + D \sin(\beta - \alpha) = W \sin \alpha + kW \cos \alpha + T \cos \alpha  \qquad (6)$
+>$Q \cos(\alpha - \theta) + S  + P  - D \sin(\alpha - \beta) = W \sin \alpha + kW \cos \alpha + T \cos \alpha  \qquad (6)$
 
 **Step 3** - Shear Strength (Mohr–Coulomb Criterion)
 
@@ -233,21 +233,21 @@ To include these additional forces in the Spencer's method formulation, we can m
 
 From (5):
 
->$N = W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \qquad (8)$
+>$N = W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \qquad (8)$
 
 Substitute into (7):
 
->$S = \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi' \right]  \qquad (9)$
+>$S = \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi' \right]  \qquad (9)$
 
 **Step 5** - Substitute $S$ into (6)
 
->$Q \cos(\alpha - \theta) + S + P + D \sin(\beta - \alpha) = W \sin \alpha + kW \cos \alpha + T \cos \alpha$
+>$Q \cos(\alpha - \theta) + S + P - D \sin(\alpha - \beta) = W \sin \alpha + kW \cos \alpha + T \cos \alpha$
 
 Substitute (9):
 
 >$\begin{aligned}
 Q \cos(\alpha - \theta) 
-&+ \frac{1}{F} \Big[ c' \Delta \ell + \big(W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell\big) \tan \phi' \Big] + P + D \sin(\beta - \alpha) \\
+&+ \frac{1}{F} \Big[ c' \Delta \ell + \big(W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell\big) \tan \phi' \Big] + P - D \sin(\alpha - \beta) \\
 &= W \sin \alpha + kW \cos \alpha + T \cos \alpha
 \end{aligned}$
 
@@ -257,13 +257,13 @@ Group terms:
 
 >$\begin{aligned}
 Q \Big[ \cos(\alpha - \theta) + \frac{1}{F} \sin(\alpha - \theta) \tan \phi' \Big]
-&= W \sin \alpha + kW \cos \alpha + T \cos \alpha - P - D \sin(\beta - \alpha) - \frac{c'}{F} \Delta \ell \\
-&\quad - \frac{(W \cos \alpha + D \cos(\beta - \alpha) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
+&= W \sin \alpha + kW \cos \alpha + T \cos \alpha - P + D \sin(\alpha - \beta) - \frac{c'}{F} \Delta \ell \\
+&\quad - \frac{(W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
 \end{aligned}$
 
 Final form:
 
->$Q = \dfrac{W \sin \alpha + kW \cos \alpha + T \cos \alpha - P - D \sin(\beta - \alpha) -\dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha + D \cos(\beta - \alpha) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
+>$Q = \dfrac{W \sin \alpha + kW \cos \alpha + T \cos \alpha - P + D \sin(\alpha - \beta) -\dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
 }{\cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
 }$
 
@@ -279,7 +279,7 @@ slice. We can do this as follows:
 
 Substituting the expression for $N$ from (8):
 
->$N' = \left[ W \cos \alpha + D \cos(\beta - \alpha) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \right] - u \Delta \ell$
+>$N' = \left[ W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \right] - u \Delta \ell$
 
 
 ## Summary

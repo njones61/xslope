@@ -35,7 +35,7 @@ def solve_all(df):
 
 data = load_globals("docs/input_template_lface2.xlsx")
 
-plot_inputs(data)
+# plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
 # non_circ = data['non_circ'] if data['non_circ'] else None

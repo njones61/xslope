@@ -4,288 +4,211 @@ Spencer's Method is a complete equilibrium slope stability method that satisfies
 and can be used on circular and non-circular slip surfaces. The primary assumption for Spencer's method is that all 
 side forces are parallel, i.e., the interslice forces have a constant inclination angle $\theta$.
 
-The following forces are considered on each slice:
+The following derivation is adapted from the US Army Corps of Engineers (USACE) UTEXAS Version 2.0 user manual, which is based on the original work by Spencer (1967).
 
->![spencer_general.png](images/spencer_general.png){width=400px}
+## Slice Geometry and Forces
 
-**Unknowns:**
+The geometry and the forces associated with a representative slice on a left-facing slope are as follows:
 
-- 1 factor of safety $F$
-- $n$ normal forces $N$
-- $n - 1$ side forces $Z$
-- 1 inclination angle $\theta$
-- $n - 1$ locations for $Z$
-
-Total unknowns = $3n$
-
-**Equilibrium equations:**
-
-- $n$ moment equilibrium equations
-- $n$ force equilibrium equations in the horizontal direction
-- $n$ force equilibrium equations in the vertical direction
-
-Total equations = $3n$
-
-The basic idea of Spencer's methods is that the two interslice forces $Z_i$ and $Z_{i+1}$ are combined into a single **resultant force** $Q_i$ acting at an angle $\theta$.
-
->![spencer_q1.png](images/spencer_q1.png){width=700px}
-
-Since the assumption is that all interslice forces are parallel, $Q_i$ captures the net effect of $Z_i$ and $Z_{i+1}$. More specifically:
-
->$Q_i$ = $Z_{i+1}$ - $Z_i$
-
-We also assume that W, S, and N act through the center of the base of each slice. This is a reasonable assumption for most practical applications.
-
->![spencer_q2.png](images/spencer_q2.png){width=200px}
-
-Therefore, Qi must also act through the same point b in order to maintain moment equilibrium:
-
->![spencer_q3.png](images/spencer_q3.png){width=200px}
-
-## Moment Equilibrium
-
-For overall moment equilibrium, we can sum the moments about the circle center for all slices:
-
->![spencer_moment.png](images/spencer_moment.png){width=700px}
-
-and we get:
-
->$\sum M = \sum (W R \sin \alpha) - \sum (S R) = 0$
-
-Where:
-
->$\alpha$ = base inclination of slice<br>
-$R$ = moment arm to center
-
-Since Q acts through point b, Q must be equal to the sum of W, S, and N. Therefore, we can work in terms of Q.
-
->![spencer_q4.png](images/spencer_q4.png){width=400px}
-
-There are two components of Q:
-
->$Q_\perp = Q \sin(\alpha - \theta)$  (perpendicular to base)
-
->$Q_\parallel = Q \cos(\alpha - \theta)$  (parallel to base)
-
-Now if we sum moments in terms of Q, we get:
-
->$\sum M = \sum (R Q_i \cos(\alpha - \theta)) = 0$
-
-## Force Equilibrium
-
-For overall force equilibrium, we can sum the forces in the vertical and horizontal directions for all slices:
-
->$\sum F_v = \sum Q \sin \theta = 0$
-
->$\sum F_H = \sum Q \cos \theta = 0$
-
-Since $theta$ = constant, both simplify to:
-
->$\sum Q = 0$
-
-
-## Deriving an Expression for $Q$
-
-In order to solve the equilbrium equations, we need to derive an expression for $Q_i$. We start with the following 
-detailed diagram of a slice:
-
->![sclice_basic.png](images/sclice_basic.png)
-
-where: 
-
->$W$ = weight of the slice (vertical)<br>
-$N$ = normal force on base = $N'$ + $u \Delta \ell$<br>
-$N'$ = effective normal force on base <br>
-$S$ = shear force on base = $c_m \Delta \ell + N' \tan \phi_m'$<br>
-$c_m$ = mobilized cohesion = $\dfrac{c}{F}$<br>
-$tan \phi_m'$ = mobilized friction  = $\dfrac{tan\phi'}{F}$<br>
-$Z_i$ = side force on interslice boundary<br>
-$theta$ = interslice force inclination<br>
-$\alpha$ = base inclination<br>
-$\Delta x$ = horizontal width of slice<br>
-$\Delta \ell$ = length along base of slice<br>
-$u$ = pore pressure
-
-In the following derivation we replace the resultant side force ($Z_i$ - $Z_{i+1}$ with $Q$ and then solve for Q in relation to the other forces on the slice.
-
-**Step 1** - Resolve Equilibrium Perpendicular to the Base.
-
->$N =  W \cos \alpha + Q \sin(\alpha - \theta)  \qquad (1)$
-
-**Note:** In the diagram above with $Q$ shown on the base of the slice, the $Q$ vector is inclined at an angle $\theta$ such that it is pointing above the base of the slice which is at an angle $\alpha$. However, the expression for the component of $Q$ perpendicular to the base is $Q \sin(\alpha - \theta)$. This expression is positive only if $\alpha$ is greater than $\theta$. Thus, when summing the forces, we assume the expression is positive and therefore acting in a downward direction from the base. For this reason, we put it on the right hand side in equation (1).
-
-**Step 2** - Resolve Equilibrium Parallel to the Base
-
->$Q \cos(\alpha - \theta) + S = W \sin \alpha   \qquad (2)$
-
-**Step 3** - Shear Strength (Mohr–Coulomb Criterion)
-
->$S = \dfrac{1}{F} \left( c \Delta \ell + \sigma' \tan \phi' \right)$
-
-Where:
-
-> $\sigma' = \dfrac{N}{\Delta \ell} - u$
-
-Substitute in:
-
->$S = \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]  \qquad (3)$
-
-**Step 4** - Eliminate $N$ 
-
-From (1):
-
->$N = W \cos \alpha + Q \sin(\alpha - \theta)$
-
-Substitute into (3):
-
->$S = \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + Q \sin(\alpha - \theta) - u \Delta \ell)
-> \tan \phi' \right]  \qquad (4)$
-
-**Step 5** - Substitute $S$ into (2)
-
->$Q \cos(\alpha - \theta) + S = W \sin \alpha$
-
-Substitute (4):
-
->$Q \cos(\alpha - \theta) + \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + Q \sin(\alpha - \theta) - 
-> u \Delta \ell) \tan \phi' \right] = W \sin \alpha$
-
-**Step 6** - Solve for $Q$
-
-Group terms:
-
->$Q \left[ \cos(\alpha - \theta) + \dfrac{1}{F} \sin(\alpha - \theta) \tan \phi' \right] =
-W \sin \alpha - \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha - u \Delta \ell) \tan \phi' 
-> \right]$
-
-Final form:
-
->$Q = \dfrac{
-W \sin \alpha - \dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha - u \Delta \ell) \tan \phi'}{F}
-}{
-\cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
-}$
-
-## Solving the System of Equations
-
-We now have **two equations**:
-
-- $\sum Q \cos(\alpha - \theta) = 0$ (moment equilibrium)
-- $\sum Q = 0$ (force equilibrium)
-
-and **two unknowns**:
-
-- Factor of safety $FS$
-- Interslice force inclination $\theta$
-
-For non-circular surfaces, we can use coordinates of base center $(x_b, y_b)$ to write the moment equation:
-
->![spencer_noncirc.png](images/spencer_noncirc.png){width=600px}
-
->$\sum M = \sum \left[ x_b (-Q \sin \theta) + y_b (Q \cos \theta) \right] = 0$
-
-Again, solved simultaneously with:
-
->$\sum Q = 0$
-
-In both cases, we need to solve for $FS$ and $\theta$ **iteratively**. 
-
-To do this, we assume a value for $theta$ and then find the factor of safety that satisfies the moment equilibrium equation $FS_{mom}$ and the factor of safety that satisfies the force equilibrium equation, $FS_{force}$. If the two are different, we pick a new value of $theta$ and iterate until they converge, i.e., $FS_{mom}$ = $FS_{force}$.
-
-## Complete Formulation of Q
-
-For a complete implementation of Spencer's method, we need to consider additional forces acting on the slice. The full set of forces are shown in the following figure:
-
->![spencer_complete.png](images/spencer_complete.png){width=400px}
+![spencer2_forces.png](images/spencer2_forces.png)
 
 where:
 
->$D$ = distributed load resultant force <br>
-$\beta$ = inclination of the distributed load (perpendicular to slope) <br>
-$kW$ = seismic force for pseudo-static seismic analysis <br>
-$c.g.$ = center of gravity of the slice <br>
-$P$ = reinforcement force on base of slice <br>
-$T$ = tension crack water force <br>
+>>$W$ = weight of the slice<br>
+> $N$ = normal force on the base of the slice<br>
+> $S$ = shear force on the base of the slice<br>
+> $E_i$ = horizontal interslice force on the left side of the slice<br>
+> $X_i$ = vertical interslice force on the left side of the slice<br>
+> $E_{i+1}$ = horizontal interslice force on the right side of the slice<br>
+> $X_{i+1}$ = vertical interslice force on the right side of the slice<br>
+> $kW$ = seismic force on the center of gravity (c.g.) of the slice<br>
+> $P$ = normal force on the top of the slice<br>
+> $d$ = point of action for the normal force on the top of the slice<br>
+> $T$ = shear force on the top of the slice<br>
+> $R$ = reinforcement force on the base of the slice<br>
+> $r$ = point of action for the reinforcement force<br>
+> $V$ = resultunt force of water in tension crack<br>
+> $c$ = point of action for the resultant force of water in the tension crack<br>
+> $\beta$ = angle of the top of the slope<br>
+> $\alpha$ = angle of the base of the slice<br>
+> $\psi$ = angle of the reinforcement force<br>
+> $\Delta \ell$ = length of the base of the slice<br>
+> $\Delta x$ = width of the slice<br>
 
-Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. 
+## General Equations
 
-Also, recall that:
+The equations for Spencer's method are derived from the equilibrium of forces and moments acting on the slice. One of the key features of Spencer's method is how the side forces are represented and lumped to a single force $Q_i$, which will be introduced later. Thus, it is helpeful to sum forces and moments using the forces acting on the slice except for the side forces and $N$ and $S$. Summing forces in the horizontal and vertical directions gives:
 
->$S$ = shear force on base = $c_m \Delta \ell + N' \tan \phi_m'$<br>
->$S = \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]$<br>
->$N = N' + u \Delta \ell$<br>
+>>$F_h = -kW + P \sin \beta + T \cos \beta + R \cos \psi  \qquad (1)$
 
-To include these additional forces in the Spencer's method formulation, we can modify the expression for $Q$. We will follow the same steps as before, but now we will include the additional forces in the equilibrium equations. Once again, we replace the resultant side force ($Z_i$ - $Z_{i+1}$ with $Q$ and then solve for Q in relation to the other forces on the slice.
+>>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \psi  \qquad (2)$
 
-**Step 1** - Resolve Equilibrium Perpendicular to the Base
+Likewise, summing moments about the center of the base of the slice gives:
 
->$N + kW \sin \alpha + T \sin \alpha = W \cos \alpha  + D \cos(\alpha - \beta )  + Q \sin(\alpha - \theta) \qquad (5)$
+$\begin{aligned}
+M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p - y_b) \\
+&\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b)
+\end{aligned}   \qquad (3)$
 
-**Step 2** - Resolve Equilibrium Parallel to the Base
+Note that counter-clockwise moments are positive (right-hand rule).
 
->$Q \cos(\alpha - \theta) + S  + P  - D \sin(\alpha - \beta) = W \sin \alpha + kW \cos \alpha + T \cos \alpha  \qquad (6)$
+The shear force on the base of the slice is:
 
-**Step 3** - Shear Strength (Mohr–Coulomb Criterion)
+>>$S = \tau \Delta \ell  \qquad (4)$
 
->$S = \dfrac{1}{F} \left[ c' \Delta \ell + (N - u \Delta \ell) \tan \phi' \right]  \qquad (7)$
+where $\tau$ is the shear stress on the base of the slice. Recall that from limit equilibrium, the factor of safety $F_s$ is defined as the ratio of the resisting shear strength $s$ to the driving: stress $t$:
 
-**Step 4** - Eliminate $N$
+>>$F_s = \dfrac{s}{t}  \qquad (5)$
 
-From (5):
+The shear strength $s$ is given by:
 
->$N = W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \qquad (8)$
+>>$s = c' + (\sigma - u) \tan \phi'  \qquad (6)$
 
-Substitute into (7):
+This can also be written in terms of effective stress as:
 
->$S = \dfrac{1}{F} \left[ c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi' \right]  \qquad (9)$
+>>$s = c' + \sigma' \tan \phi'$
 
-**Step 5** - Substitute $S$ into (6)
+where$\sigma'$ = $\sigma - u$. It is also convenient to express the shear stress in terms of the mobilized shear strength as follows:
 
->$Q \cos(\alpha - \theta) + S + P - D \sin(\alpha - \beta) = W \sin \alpha + kW \cos \alpha + T \cos \alpha$
+>>$\tau =  \dfrac{c' + (\sigma - u) \tan \phi'}{F}  \qquad (7)$
 
-Substitute (9):
+Combining equations (4) and (7) gives:
 
->$\begin{aligned}
-Q \cos(\alpha - \theta) 
-&+ \frac{1}{F} \Big[ c' \Delta \ell + \big(W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell\big) \tan \phi' \Big] + P - D \sin(\alpha - \beta) \\
-&= W \sin \alpha + kW \cos \alpha + T \cos \alpha
-\end{aligned}$
+>>$S = \dfrac{c' \Delta \ell + (N - u \Delta \ell) \tan \phi'}{F}   \qquad (8)$
 
-**Step 6** - Solve for $Q$  
+Sometimes this is written as:
 
-Group terms:
+>>$S = \dfrac{c' \Delta x \sec \alpha + (N - u \Delta x \sec \alpha) \tan \phi'}{F}   \qquad (9)$
 
->$\begin{aligned}
-Q \Big[ \cos(\alpha - \theta) + \frac{1}{F} \sin(\alpha - \theta) \tan \phi' \Big]
-&= W \sin \alpha + kW \cos \alpha + T \cos \alpha - P + D \sin(\alpha - \beta) - \frac{c'}{F} \Delta \ell \\
-&\quad - \frac{(W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
-\end{aligned}$
+where $\Delta x \sec \alpha$ = $\Delta \ell$. 
 
-Final form:
+Using total stresses, the shear stress can be expressed as:
 
->$Q = \dfrac{W \sin \alpha + kW \cos \alpha + T \cos \alpha - P + D \sin(\alpha - \beta) -\dfrac{c'}{F} \Delta \ell - \dfrac{(W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell) \tan \phi'}{F}
-}{\cos(\alpha - \theta) \left( 1 + \dfrac{\tan(\alpha - \theta) \tan \phi'}{F} \right)
-}$
+>>$s = c + \sigma \tan \phi  \qquad (10)$
 
-**Note:** It is important to remember that the tension crack water force $T$ is only included if a tension crack is present. Furthermore, for a left-facing slope, $T$ applies to the right side of the uppermost (last) slice as shown in the diagram above. However, for a right-facing slope, $T$ applies to the left side of the uppermost (first) slice (slices are numbered from left to right in either case). In this case, the derivation of $Q$ is the same, but the sign of $T$ will be flipped (negated) before insertion in the final expression. $T = 0$ for all other slices.
+And in terms of forces:
 
-## Solving for the Normal Force
+>>$S = \dfrac{c \Delta \ell + N \tan \phi}{F}  \qquad (11)$
 
-It is useful to solve for the effective normal force at the same time that the factor of safety is calculated. These 
-can be plotted (as stresses) along with the line of thrust. Negative values are another indicator of tension in the 
-slice. We can do this as follows:
+or:
 
->$N' = N - u \Delta \ell$
+>>$S = \dfrac{c \Delta x \sec \alpha + N \tan \phi}{F}  \qquad (12)$
 
-Substituting the expression for $N$ from (8):
+where $c$ is the total cohesion, and $\phi$ is the total angle of internal friction.
 
->$N' = \left[ W \cos \alpha + D \cos(\alpha - \beta) + Q \sin(\alpha - \theta) - kW \sin \alpha - T \sin \alpha \right] - u \Delta \ell$
+## Spencer's Method Equations
+
+As stated above, The primary assumption for Spencer's method is that all side forces are parallel, i.e., the interslice forces have a constant inclination angle $\theta$. Thus, there are two unknowns: the inclination angle $\theta$ and the factor of safety $F$. The interslice forces are lumped to a single force $Q$ as follows:
+
+![spencer2_q.png](images/spencer2_q.png)
+
+Since $Q$ is the resultant of the interslice forces and acts through a single point, the resultant of all of the 
+other forces must be equivalent to $Q$. Thus, for overall equilibrium, we can work in terms of 
+$Q$. Summing over all slices, we have:
+
+>>$\sum Q \cos \theta = 0  \qquad (13)$
+
+>>$\sum Q \sin \theta = 0  \qquad (14)$
+
+Since $\theta$ is constant, we can simplify these equations to:
+
+>>$\sum Q  = 0  \qquad (15)$
+
+For the moment equilibrium, we can sum moments about the origin as follows:
+
+>>$\sum Q (x_b \sin \theta - y_Q \cos \theta) = 0  \qquad (16)$
+
+## Solving for Q
+
+Next, we need to solve for $Q$. To do this, we can use equations (1-3) derived above for the forces and moments. First,
+we will sum forces perpendicular to the base of the slice. This gives:
+
+>>$N + F_v \cos \alpha - F_h \sin \alpha - Q \sin (\alpha - \theta) = 0  \qquad (17)$
+
+Solving for the normal force $N$ gives:
+
+>>$N = - F_v \cos \alpha  + F_h \sin \alpha + Q \sin (\alpha - \theta) \qquad (18)$
+
+Substituting this into equation (9) gives:
+
+>>$S = \dfrac{1}{F} \left[ c' \Delta x \sec \alpha + (- F_v \cos \alpha + F_h \sin \alpha + Q \sin (\alpha - \theta) 
+- u \Delta x \sec \alpha) \tan \phi' \right]  \qquad (19)$
+
+Next, we can sum forces parallel to the base of the slice. This gives:
+
+>>$S + F_v \sin \alpha + F_h \cos \alpha + Q \cos (\alpha - \theta) = 0  \qquad (20)$
+
+Solving for $S$ gives:
+
+>>$S = - F_v \sin \alpha - F_h \cos \alpha - Q \cos (\alpha - \theta)  \qquad (21)$
+
+Combining equations (19) and (21) gives:
+
+>>$\dfrac{1}{F} \left[ c' \Delta x \sec \alpha + (- F_v \cos \alpha + F_h \sin \alpha + Q \sin (\alpha - \theta) - u 
+> \Delta x \sec \alpha) \tan \phi' \right] = - F_v \sin \alpha - F_h \cos \alpha - Q \cos (\alpha - \theta)  \qquad (22)$
+
+Solving for $Q$ gives:
+
+>>$Q = \left[ - F_v \sin \alpha - F_h \cos \alpha + \dfrac{c'}{F} \Delta x \sec \alpha + (F_v \cos \alpha - F_h \sin \alpha + u \Delta x \sec \alpha) \dfrac{\tan \phi'}{F} \right] m_{\alpha}  \qquad (23)$
+
+where:
+
+>>$m_{\alpha} = \dfrac{1}{\cos (\alpha - \theta) + \sin (\alpha - \theta) \dfrac{\tan \phi'}{F}}  \qquad (24)$
+
+Next, we need to solve for $y_Q$. To do this, we sum moments about the center of the base of the slice. The moment 
+from $Q$ must equal the moment from the other forces $M_o$ from equation (3). Therefore:
+
+>>$- Q \cos \theta (y_Q - y_b) + M_o = 0  \qquad (25)$
+
+Solving for $y_Q$ gives:
+
+>>$y_Q = y_b + \dfrac{M_o}{Q \cos \theta}  \qquad (26)$
+
+## Solution of Equations
+
+To solve the equations, we can use a numerical method such as the Newton-Raphson method. The steps are as follows:
+
+1. **Initial Guess**: Start with an initial guess for the factor of safety $F$ and the inclination angle $\theta$.
+2. **Calculate Forces and Moments**: For each slice, calculate the forces and moments using equations (1) to (3).
+3. **Calculate $Q$ and $y_Q$**: Use equations (23) and (26) to calculate $Q$ and $y_Q$ for each slice.
+4. **Sum Forces and Moments**: Sum the forces and moments for all slices using equations (15) and (16).
+5. **Check Convergence**: Check if the sum of forces and moments is close to zero. If not, adjust $F$ and $\theta$ and repeat steps 2-5.
+
+Once the solution converges, we can use equation (18) to calculate the normal force $N$. The effective normal force $N'$ can be calculated as:
+
+>>$N' = N - u \Delta \ell  \qquad (27)$
+
+For the side forces, we note that the interslice forces $E_i$ and $X_i$ can be expressed in terms of a resultant force 
+$Z$ acting at  
+$\theta$ as follows:
+
+![spencer2_ztheta.png](images/spencer2_ztheta.png)
+
+After solving for $Q$, we note that $Q_i$ can be expressed in terms of the interslice forces $Z_i$ and $Z_{i+1} as 
+follows:
+
+>>$Q_i = Z_i - Z_{i+1}$
+
+Starting from the left side, we can calculate the interslice forces iteratively. For the first slice, we 
+ set $Z_1 = 0$. For each subsequent slice, we  calculate the interslice forces as:
+
+>>$Z_{i+1} = Z_i - Q_i  \qquad (28)$
+
+## Line of Thrust
+
+The line of thrust is the line along which the side forces $Z$ act on the slice. It is calculated by starting from 
+the left side and summing moments about the center of the base of the slice. The moments are calculated as follows:
+
+>>$M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}{2} - Z_i \cos \theta (y_{t,i} - y_b) + Z_{i+1} \cos \theta (y_{t,i+1} - y_b) = 0   \qquad (29)$
 
 
-## Summary
+where $y_{t,i}$ and $y_{t,i+1}$ are y coordinates of the line of thrust of the left and right side, respectively. If 
+$y_{t,i}$ is known, we can solve for $y_{t,i+1}$ as follows:
 
-- Assumes constant side force inclination $\theta$
-- Works for circular and non-circular surfaces
-- Satisfies both force and moment equilibrium
-- Must be solved iteratively
-- $Q$ represents the net interslice force and is central to the formulation
+>>>$y_{t,i+1} = y_b - \left[ \dfrac{M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}
+> {2} - 
+> Z_i \cos \theta (y_{t,i} - y_b)}{Z_{i+1} \cos \theta} \right]  \qquad (30)$
+
+For the first slice, we can set $y_{t,1} = y_{lb}$ where $y_{lb}$ is the lower left corner of the slice. For each 
+subsequent slice,  $y_{t,i}$ is equal to $y_{t,i+1}$ from the previous slice. We can use that in equation (30) to 
+calculate $y_{t,i+1}$. We repeat this process for all slices until we reach the right side of the slope.

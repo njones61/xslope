@@ -619,14 +619,25 @@ def spencer(df, tol=1e-6, debug=False):
     tan_p = np.tan(phi)
 
     def compute_Q(F, theta_rad):
-        term1 = w * sin_a + kw * cos_a + T * cos_a - P - D * np.sin(beta - alpha)
+        term1 = w * sin_a + kw * cos_a + T * cos_a - P + D * np.sin(alpha - beta)
         term2 = (c / F) * dl
-        term3 = (w * cos_a + D * np.cos(beta - alpha) - kw * sin_a - T * sin_a - u * dl) * tan_p / F
+        term3 = (w * cos_a + D * np.cos(alpha - beta) - kw * sin_a - T * sin_a - u * dl) * tan_p / F
         numerator = term1 - term2 - term3
         theta_diff = alpha - theta_rad
         denominator = np.cos(theta_diff) * (1 + (np.tan(theta_diff) * tan_p) / F)
         Q = numerator / denominator
         return Q
+
+    ## STABL5 Formulation
+    # def compute_Q(F, theta_rad):
+    #     Ca = c * dl
+    #     Ua = u * dl
+    #     S1 = Ca + tan_p * (w * cos_a  - kw * sin_a - Ua + D * np.cos(alpha - beta))
+    #     S2 =  D * np.sin(alpha - beta) - w * sin_a - kw * cos_a 
+    #     theta_diff = alpha - theta_rad
+    #     S3 = tan_p * np.tan(theta_diff)
+    #     Q = (S1/F + S2) / (np.cos(theta_diff) * (1 + S3/F))
+    #     return Q
 
     fs_min = 0.01
     fs_max = 20.0
@@ -698,7 +709,7 @@ def spencer(df, tol=1e-6, debug=False):
 
     # Simplified method for computing N_eff
     Q = compute_Q(FS_force, theta_rad)
-    N_eff = w * cos_a + D * np.cos(beta - alpha) + Q * np.sin(alpha - theta_rad) - kw * sin_a - T * sin_a - u * dl 
+    N_eff = w * cos_a + D * np.cos(alpha - beta) + Q * np.sin(alpha - theta_rad) - kw * sin_a - T * sin_a - u * dl 
 
     # ---  compute interslice forces Z  ---
     n = len(Q)

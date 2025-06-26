@@ -35,7 +35,6 @@ nav:
     - Janbu Method: methods/janbu.md
     - Force Equilibrium Methods: methods/force_eq.md
     - Spencer's Method: methods/spencer.md
-    - Line of Thrust: methods/line_of_thrust.md
   - Advanced Techniques:
     - Rapid Drawdown Analysis: advanced/rapid.md
     - Reliability Analysis: advanced/reliability.md

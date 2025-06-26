@@ -499,17 +499,18 @@ def plot_base_stresses(ax, df, scale_frac=0.5, alpha=0.3):
 
         ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
 
-def plot_thrust_line(ax, thrust_line: LineString,
-                    color: str = 'red',
-                    linestyle: str = '--',
-                    linewidth: float = 1,
-                    label: str = 'Line of Thrust'):
+
+def plot_thrust_line_from_df(ax, df,
+                            color: str = 'red',
+                            linestyle: str = '--',
+                            linewidth: float = 1,
+                            label: str = 'Line of Thrust'):
     """
-    Plots the line of thrust on the slope.
+    Plots the line of thrust on the slope using DataFrame data.
 
     Parameters:
         ax: matplotlib Axes object
-        thrust_line: Shapely LineString representing the line of thrust
+        df: DataFrame containing slice data with 'yt_l' and 'yt_r' columns
         color: Color of the line
         linestyle: Style of the line
         linewidth: Width of the line
@@ -518,9 +519,25 @@ def plot_thrust_line(ax, thrust_line: LineString,
     Returns:
         None
     """
-    # extract x,y coords
-    xs, ys = zip(*list(thrust_line.coords))
-    ax.plot(xs, ys,
+    # Check if required columns exist
+    if 'yt_l' not in df.columns or 'yt_r' not in df.columns:
+        return
+    
+    # Create thrust line coordinates from slice data
+    thrust_xs = []
+    thrust_ys = []
+    
+    for _, row in df.iterrows():
+        # Add left point of current slice
+        thrust_xs.append(row['x_l'])
+        thrust_ys.append(row['yt_l'])
+        
+        # Add right point of current slice (same as left point of next slice)
+        thrust_xs.append(row['x_r'])
+        thrust_ys.append(row['yt_r'])
+    
+    # Plot the thrust line
+    ax.plot(thrust_xs, thrust_ys,
             color=color,
             linestyle=linestyle,
             linewidth=linewidth,
@@ -670,9 +687,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
 
     alpha = 0.3
     if results['method'] == 'spencer':
-        FS = results['FS']
-        thrust_line = compute_line_of_thrust_center(df, FS)
-        plot_thrust_line(ax, thrust_line)
+        plot_thrust_line_from_df(ax, df)
 
     plot_base_stresses(ax, df, alpha=alpha)
 

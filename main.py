@@ -33,7 +33,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_dam2.xlsx")
+data = load_globals("docs/input_template_lface2.xlsx")
 
 # plot_inputs(data)
 
@@ -48,8 +48,6 @@ if success:
     df, failure_surface = result
 else:
     print(result)
-
-
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer2]
 results = solve_selected(spencer, df)

@@ -569,174 +569,6 @@ def lowe_karafiath(df, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-6, debug=False):
-    """
-    Spencer's Method using Steve G. Wright's formulation.
-    Solves for FS_force and FS_moment independently using the Wright Q equation.
-
-    Parameters:
-        df (pd.DataFrame): must contain columns
-            'alpha' (slice base inclination, degrees),
-            'phi'   (slice friction angle, degrees),
-            'c'     (cohesion),
-            'dl'    (slice base length),
-            'w'     (slice weight),
-            'u'     (pore force per unit length),
-            'd'     (distributed load),
-            'beta'  (distributed load inclination, degrees),
-            'kw'    (seismic force),
-            't'     (tension crack water force),
-            'p'     (reinforcement force)
-
-    Returns:
-        float: FS where FS_force = FS_moment
-        float: beta (degrees)
-        bool: converged flag
-    """
-
-    # Check if the 'r' column is present in df. If so, circular = True.
-    circular = 'r' in df.columns
-
-    tol = 1e-6
-    max_iter = 100
-
-    alpha = np.radians(df['alpha'].values)
-    phi   = np.radians(df['phi'].values)
-    c     = df['c'].values
-    dx    = df['dx'].values
-    dl    = df['dl'].values
-    w     = df['w'].values
-    u     = df['u'].values
-    x_c   = df['x_c'].values
-    y_cb  = df['y_cb'].values
-    D     = df['dload'].values
-    beta  = np.radians(df['beta'].values)
-    kw    = df['kw'].values
-    T     = df['t'].values
-    P     = df['p'].values
-    cos_a = np.cos(alpha)
-    sin_a = np.sin(alpha)
-    tan_p = np.tan(phi)
-
-    def compute_Q(F, theta_rad):
-        term1 = w * sin_a + kw * cos_a + T * cos_a - P + D * np.sin(alpha - beta)
-        term2 = (c / F) * dl
-        term3 = (w * cos_a + D * np.cos(alpha - beta) - kw * sin_a - T * sin_a - u * dl) * tan_p / F
-        numerator = term1 - term2 - term3
-        theta_diff = alpha - theta_rad
-        denominator = np.cos(theta_diff) * (1 + (np.tan(theta_diff) * tan_p) / F)
-        Q = numerator / denominator
-        return Q
-
-    ## STABL5 Formulation
-    # def compute_Q(F, theta_rad):
-    #     Ca = c * dl
-    #     Ua = u * dl
-    #     S1 = Ca + tan_p * (w * cos_a  - kw * sin_a - Ua + D * np.cos(alpha - beta))
-    #     S2 =  D * np.sin(alpha - beta) - w * sin_a - kw * cos_a 
-    #     theta_diff = alpha - theta_rad
-    #     S3 = tan_p * np.tan(theta_diff)
-    #     Q = (S1/F + S2) / (np.cos(theta_diff) * (1 + S3/F))
-    #     return Q
-
-    fs_min = 0.01
-    fs_max = 20.0
-
-    def fs_force(theta_rad):
-        def residual(F):
-            Q = compute_Q(F, theta_rad)
-            return Q.sum()
-        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
-        return result.x
-
-    def fs_moment(theta_rad):
-        def residual(F):
-            Q = compute_Q(F, theta_rad)
-            if circular:
-                theta_diff = alpha - theta_rad
-                return np.sum(Q * np.cos(theta_diff))
-            else:
-                return np.sum(-Q * x_c * np.sin(theta_rad) + Q * y_cb * np.cos(theta_rad))
-        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
-        return result.x
-
-    def fs_difference(theta_deg):
-        theta_rad = np.radians(theta_deg)
-        Ff = fs_force(theta_rad)
-        Fm = fs_moment(theta_rad)
-        return Ff - Fm
-
-    # First try Newton's method to find theta_opt
-    try:
-        theta_guess = 10.0  # This seems to work well for most cases
-        if debug:
-            print(f"Trying Newton's method for theta root-finding with initial guess {theta_guess:.1f} deg")
-        theta_opt = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
-        # Check if the solution is valid
-        if (
-            abs(theta_opt) > 59 or
-            abs(fs_difference(theta_opt)) > 0.01 or
-            fs_force(np.radians(theta_opt)) >= fs_max - 1e-3
-        ):
-            raise ValueError("Newton's method converged to an invalid solution, trying sweep...")
-    except Exception:
-        # If Newton's method fails, try sweeping theta to find a bracket where fs_difference changes sign,
-        #  then use root_scalar to find theta_opt
-        if debug: 
-            print("Newton's method failed or gave invalid result, sweeping theta to find a bracket...")
-        theta_range = np.linspace(-60, 60, 49)
-        fs_diff_values = [fs_difference(theta) for theta in theta_range]
-        bracket = None
-        for i in range(len(fs_diff_values) - 1):
-            if fs_diff_values[i] * fs_diff_values[i+1] < 0:
-                bracket = [theta_range[i], theta_range[i+1]]
-                break
-        if bracket is None:
-            return False, "Spencer's method: No sign change found in fs_difference over theta range."
-        try:
-            if debug:
-                print(f"Trying root_scalar with bracket {bracket}")
-            sol = root_scalar(fs_difference, bracket=bracket, method='brentq', xtol=tol)
-            theta_opt = sol.root
-        except Exception as e:
-            return False, f"Spencer's method failed to converge: {e}"
-
-    theta_rad = np.radians(theta_opt)
-    FS_force = fs_force(theta_rad)
-    FS_moment = fs_moment(theta_rad)
-
-    df['theta'] = theta_opt  # store theta in df.
-
-    # Simplified method for computing N_eff
-    Q = compute_Q(FS_force, theta_rad)
-    N_eff = w * cos_a + D * np.cos(alpha - beta) + Q * np.sin(alpha - theta_rad) - kw * sin_a - T * sin_a - u * dl 
-
-    # ---  compute interslice forces Z  ---
-    n = len(Q)
-    Z = np.zeros(n+1)
-    for i in range(n):
-        Z[i+1] = Z[i] - Q[i] 
-
-    # store back into df
-    df['z']     = Z[:-1]        # Z_i acting on slice i's left face
-    df['n_eff'] = N_eff
-
-    # Check convergence
-    converged = abs(FS_force - FS_moment) < tol
-    if not converged:
-        return False, "Spencer's method did not converge within the maximum number of iterations."
-    else:
-        results = {}
-        results['method'] = 'spencer'
-        results['FS'] = FS_force
-        results['theta'] = theta_opt
-
-        # debug print values per slice
-        if debug:
-            for i in range(len(Q)):
-                print(f"Slice {i}: Q = {Q[i]:.3f}, alpha = {np.degrees(alpha[i]):.2f}, phi = {np.degrees(phi[i]):.2f}, c = {c[i]:.2f}, w = {w[i]:.2f}, u = {u[i]:.2f}")
-
-        return True, results
 
 
 def compute_line_of_thrust_sweep(df, FS, debug=True):
@@ -1156,7 +988,7 @@ def compute_line_of_thrust_center(df, FS, debug=True):
     # 5) return results
     return thrust_line
 
-def spencer2(df, tol=1e-4, max_iter = 100, debug=True):
+def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     
@@ -1254,40 +1086,109 @@ def spencer2(df, tol=1e-4, max_iter = 100, debug=True):
         Fm = fs_moment(theta_rad)
         return Ff - Fm
 
-    # First try Newton's method to find theta_opt
-    try:
-        theta_guess = 6.948  # This seems to work well for most cases
-        if debug:
-            print(f"Trying Newton's method for theta root-finding with initial guess {theta_guess:.1f} deg")
-        theta_opt = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
-        # Check if the solution is valid
-        if (
-            abs(theta_opt) > 59 or
-            abs(fs_difference(theta_opt)) > 0.01 or
-            fs_force(np.radians(theta_opt)) >= fs_max - 1e-3
-        ):
-            raise ValueError("Newton's method converged to an invalid solution, trying sweep...")
-    except Exception:
-        # If Newton's method fails, try sweeping theta to find a bracket where fs_difference changes sign,
-        #  then use root_scalar to find theta_opt
-        if debug: 
-            print("Newton's method failed or gave invalid result, sweeping theta to find a bracket...")
-        theta_range = np.linspace(-60, 60, 49)
-        fs_diff_values = [fs_difference(theta) for theta in theta_range]
-        bracket = None
-        for i in range(len(fs_diff_values) - 1):
-            if fs_diff_values[i] * fs_diff_values[i+1] < 0:
-                bracket = [theta_range[i], theta_range[i+1]]
-                break
-        if bracket is None:
-            return False, "Spencer's method: No sign change found in fs_difference over theta range."
+    # Robust theta root-finding with multiple strategies
+    theta_opt = None
+    convergence_error = None
+    
+    # Strategy 1: Try multiple starting points for Newton's method
+
+    newton_starting_points = [10, 9, 8, 7, 12, 5, 3, 1]
+    
+    for theta_guess in newton_starting_points:
         try:
-            if debug:
-                print(f"Trying root_scalar with bracket {bracket}")
-            sol = root_scalar(fs_difference, bracket=bracket, method='brentq', xtol=tol)
-            theta_opt = sol.root
+            if debug_level >= 1:
+                print(f"Trying Newton's method with initial guess {theta_guess:.1f} deg")
+            theta_candidate = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
+            
+            # Check if the solution is valid
+            if (abs(theta_candidate) <= 59 and 
+                abs(fs_difference(theta_candidate)) <= 0.01 and
+                fs_force(np.radians(theta_candidate)) < fs_max - 1e-3):
+                theta_opt = theta_candidate
+                if debug_level >= 1:
+                    print(f"Newton's method succeeded with starting point {theta_guess:.1f} deg")
+                break
         except Exception as e:
-            return False, f"Spencer's method failed to converge: {e}"
+            if debug_level >= 1:
+                print(f"Newton's method failed with starting point {theta_guess:.1f} deg: {e}")
+            continue
+    
+    # Strategy 2: If Newton's method failed, try adaptive grid search
+    if theta_opt is None:
+        if debug_level >= 1:
+            print("Newton's method failed for all starting points, trying adaptive grid search...")
+        
+        # First, do a coarse sweep to identify promising regions
+        theta_coarse = np.linspace(-60, 60, 121)  # More points for better resolution
+        fs_diff_coarse = []
+        
+        for theta in theta_coarse:
+            try:
+                fs_diff_coarse.append(fs_difference(theta))
+            except Exception:
+                fs_diff_coarse.append(np.nan)
+        
+        fs_diff_coarse = np.array(fs_diff_coarse)
+        
+        # Find regions where sign changes occur
+        sign_changes = []
+        for i in range(len(fs_diff_coarse) - 1):
+            if (not np.isnan(fs_diff_coarse[i]) and 
+                not np.isnan(fs_diff_coarse[i+1]) and
+                fs_diff_coarse[i] * fs_diff_coarse[i+1] < 0):
+                sign_changes.append((theta_coarse[i], theta_coarse[i+1]))
+        
+        # Try root_scalar on each bracket
+        for bracket in sign_changes:
+            try:
+                if debug_level >= 1:
+                    print(f"Trying root_scalar with bracket {bracket}")
+                sol = root_scalar(fs_difference, bracket=bracket, method='brentq', xtol=tol)
+                theta_candidate = sol.root
+                
+                # Check if the solution is valid
+                if (abs(theta_candidate) <= 59 and 
+                    abs(fs_difference(theta_candidate)) <= 0.01 and
+                    fs_force(np.radians(theta_candidate)) < fs_max - 1e-3):
+                    theta_opt = theta_candidate
+                    if debug_level >= 1:
+                        print(f"root_scalar succeeded with bracket {bracket}")
+                    break
+            except Exception as e:
+                if debug_level >= 1:
+                    print(f"root_scalar failed with bracket {bracket}: {e}")
+                continue
+    
+    # Strategy 3: If still no solution, try global optimization
+    if theta_opt is None:
+        if debug_level >= 1:
+            print("All root-finding methods failed, trying global optimization...")
+        
+        try:
+            # Use minimize_scalar to find the minimum of |fs_difference|
+            result = minimize_scalar(
+                lambda theta: abs(fs_difference(theta)), 
+                bounds=(-60, 60), 
+                method='bounded', 
+                options={'xatol': tol}
+            )
+            
+            if result.success and abs(fs_difference(result.x)) <= 0.01:
+                theta_opt = result.x
+                if debug_level >= 1:
+                    print(f"Global optimization succeeded with theta = {theta_opt:.6f} deg")
+            else:
+                convergence_error = f"Global optimization failed: {result.message}"
+                
+        except Exception as e:
+            convergence_error = f"Global optimization failed: {e}"
+    
+    # Check if we found a solution
+    if theta_opt is None:
+        if convergence_error:
+            return False, f"Spencer's method failed to converge: {convergence_error}"
+        else:
+            return False, "Spencer's method: No valid solution found with any method."
 
     theta_rad = np.radians(theta_opt)
     FS_force = fs_force(theta_rad)
@@ -1321,8 +1222,6 @@ def spencer2(df, tol=1e-4, max_iter = 100, debug=True):
             yt_l[i+1] = yt_r[i]
     df['yt_l'] = yt_l
     df['yt_r'] = yt_r
-
-    print("Hey Norm!")
     
     # --- Check convergence ---
     converged = abs(FS_force - FS_moment) < tol
@@ -1335,8 +1234,8 @@ def spencer2(df, tol=1e-4, max_iter = 100, debug=True):
         results['theta'] = theta_opt
 
         # debug print values per slice
-        if debug:
+        if debug_level >= 2:
             for i in range(len(Q)):
-                print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, dx = {dx[i]:.1f}, P = {P[i]:.1f}, sin_b = {sin_b[i]:.3f}, cos_b = {cos_b[i]:.3f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}, alpha = {np.degrees(alpha[i]):.2f}, beta = {np.degrees(beta[i]):.2f}, c = {c[i]:.2f}, w = {W[i]:.2f}, u = {u[i]:.2f}")
+                print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
 
         return True, results

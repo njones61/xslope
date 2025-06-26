@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer2
+from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
 
 
 def solve_selected(func, df):
@@ -33,7 +33,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_lface2.xlsx")
+data = load_globals("docs/input_template_dam2.xlsx")
 
 # plot_inputs(data)
 
@@ -49,13 +49,13 @@ if success:
 else:
     print(result)
 
-# export df to excel
-df.to_excel("slices.xlsx", index=False)
+
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer2]
-results = solve_selected(spencer2, df)
+results = solve_selected(spencer, df)
 
-# solve_all(df)
+# export df to excel
+df.to_excel("slices.xlsx", index=False)
 
 plot_solution(data, df, failure_surface, results, slice_numbers=True)
 

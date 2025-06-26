@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from slice import generate_failure_surface
-from solve import compute_line_of_thrust_sweep, compute_line_of_thrust_center
 from shapely.geometry import LineString
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
@@ -170,7 +169,7 @@ def plot_tcrack_surface(ax, tcrack_surface):
     x_vals, y_vals = tcrack_surface.xy
     ax.plot(x_vals, y_vals, linestyle='--', color='red', linewidth=1.0, label='Tension Crack Depth')
 
-def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
+def plot_dloads(ax, data):
     """
     Plots distributed loads as arrows along the surface.
 
@@ -179,36 +178,37 @@ def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
         dloads: List of distributed load data points with X, Y, and Normal force components
         data: Dictionary containing plot data (needed for ground_surface to calculate slope height)
         max_height_frac: Maximum arrow height as fraction of slope height (default 0.3)
+        gamma_w: Unit weight of water for scaling (default 62.4 pcf)
 
     Returns:
         None
     """
-    if not dloads:
-        return
-    
-    # Calculate slope height from ground surface if available
-    slope_height = None
-    if data and 'ground_surface' in data:
-        ground_surface = data['ground_surface']
-        if hasattr(ground_surface, 'coords'):
-            y_vals = [y for _, y in ground_surface.coords]
-            slope_height = max(y_vals) - min(y_vals)
-    
-    # If we can't get slope height, use a default scaling
-    if slope_height is None:
-        # Fallback: find max load value across all dloads for scaling
-        max_load = 0
-        for line in dloads:
-            max_load = max(max_load, max(pt['Normal'] for pt in line))
-        slope_height = max_load / 10  # Arbitrary scaling if no ground surface available
+
+    dloads = data['dloads']
+    gamma_w = data['gamma_water']
+    ground_surface = data['ground_surface']
+
+    # find the max horizontal length of the ground surface
+    max_horizontal_length_ground = 0
+    for pt in ground_surface.coords:
+        max_horizontal_length_ground = max(max_horizontal_length_ground, pt[0])
+
+    arrow_spacing = max_horizontal_length_ground / 60
+
+    # find the max dload value
+    max_dload = 0
+    for line in dloads:
+        max_dload = max(max_dload, max(pt['Normal'] for pt in line))
+
+    arrow_height = max_dload / gamma_w
+    head_length = arrow_height / 12
+    head_width = head_length * 0.8
     
     # Find the maximum load value for scaling
     max_load = 0
     for line in dloads:
         max_load = max(max_load, max(pt['Normal'] for pt in line))
     
-    # Calculate maximum arrow height
-    max_arrow_height = slope_height * max_height_frac
     
     for line in dloads:
         if len(line) < 2:
@@ -240,8 +240,12 @@ def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
             perp_dy = dx_norm
             
             # Generate arrows along this segment
-            num_arrows = max(3, min(10, int(segment_length / 5)))  # Adaptive number of arrows
-            t_values = np.linspace(0, 1, num_arrows)
+            dx_abs = abs(x2 - x1)
+            num_arrows = max(1, int(round(dx_abs / arrow_spacing)))
+            if dx_abs == 0:
+                t_values = np.array([0.0, 1.0])
+            else:
+                t_values = np.linspace(0, 1, num_arrows + 1)
             
             # Store arrow top points for connecting line
             top_xs = []
@@ -260,9 +264,10 @@ def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
                 # Interpolate load value
                 n = n1 + t * (n2 - n1)
                 
-                # Scale arrow height
+                # Scale arrow height based on equivalent water depth
                 if max_load > 0:
-                    arrow_height = (n / max_load) * max_arrow_height
+                    water_depth = n / gamma_w
+                    arrow_height = water_depth  # Direct water depth, not scaled relative to max
                 else:
                     arrow_height = 0
                 
@@ -271,10 +276,7 @@ def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
                     top_xs.append(x)
                     top_ys.append(y)
                     continue
-                
-                # Calculate arrow dimensions
-                head_length = arrow_height * 0.2
-                head_width = arrow_height * 0.15
+        
                 
                 # Calculate arrow start point (above surface)
                 arrow_start_x = x + perp_dx * arrow_height
@@ -285,11 +287,19 @@ def plot_dloads(ax, dloads, data=None, max_height_frac=0.3):
                 top_ys.append(arrow_start_y)
                 
                 # Draw arrow - extend all the way to surface point
-                ax.arrow(arrow_start_x, arrow_start_y, 
-                        x - arrow_start_x, y - arrow_start_y,
-                        head_width=head_width, head_length=head_length, 
-                        fc='purple', ec='purple', alpha=0.7,
-                        length_includes_head=True)
+
+                arrow_length = np.sqrt((x - arrow_start_x)**2 + (y - arrow_start_y)**2)
+                if head_length > arrow_length:
+                    # Draw a simple line without arrowhead
+                    ax.plot([arrow_start_x, x], [arrow_start_y, y], 
+                           color='purple', linewidth=2, alpha=0.7)
+                else:
+                    # Draw arrow with head
+                    ax.arrow(arrow_start_x, arrow_start_y, 
+                            x - arrow_start_x, y - arrow_start_y,
+                            head_width=head_width, head_length=head_length, 
+                            fc='purple', ec='purple', alpha=0.7,
+                            length_includes_head=True)
             
             # Add end point if it's the last segment and load is zero
             if i == len(line) - 2 and n2 == 0:
@@ -615,7 +625,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'], data)
+    plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
     if data['circular']:
@@ -679,7 +689,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     plot_slices(ax, df, fill=False)
     plot_failure_surface(ax, failure_surface)
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'], data)
+    plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
     if slice_numbers:
         plot_slice_numbers(ax, df)
@@ -822,7 +832,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'], data)
+    plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
     plot_failure_surfaces(ax, fs_cache)
@@ -864,7 +874,7 @@ def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_piezo_line(ax, data['piezo_line'])
-    plot_dloads(ax, data['dloads'], data)
+    plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
     # Plot all failure surfaces from cache

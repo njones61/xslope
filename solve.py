@@ -1156,3 +1156,187 @@ def compute_line_of_thrust_center(df, FS, debug=True):
     # 5) return results
     return thrust_line
 
+def spencer2(df, tol=1e-4, max_iter = 100, debug=True):
+    """
+    Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
+    
+
+    Parameters:
+        df (pd.DataFrame): must contain columns
+            'alpha' (slice base inclination, degrees),
+            'phi'   (slice friction angle, degrees),
+            'c'     (cohesion),
+            'dl'    (slice base length),
+            'w'     (slice weight),
+            'u'     (pore force per unit length),
+            'd'     (distributed load),
+            'beta'  (distributed load inclination, degrees),
+            'kw'    (seismic force),
+            't'     (tension crack water force),
+            'p'     (reinforcement force)
+
+    Returns:
+        float: FS where FS_force = FS_moment
+        float: beta (degrees)
+        bool: converged flag
+    """
+
+    alpha = np.radians(df['alpha'].values)  # slice base inclination, degrees
+    phi   = np.radians(df['phi'].values)  # slice friction angle, degrees  
+    c     = df['c'].values  # cohesion
+    dx    = df['dx'].values  # slice width
+    dl    = df['dl'].values  # slice base length
+    W     = df['w'].values  # slice weight
+    u     = df['u'].values  # pore presssure
+    x_c   = df['x_c'].values  # center of base x-coordinate
+    y_cb  = df['y_cb'].values  # center of base y-coordinate
+    y_lb   = df['y_lb'].values  # left side base y-coordinate
+    P     = df['dload'].values  # distributed load resultant 
+    beta  = np.radians(df['beta'].values)  # distributed load inclination, degrees
+    kw    = df['kw'].values  # seismic force
+    V     = df['t'].values  # tension crack water force
+    R     = df['p'].values  # reinforcement force
+
+    # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
+    # at the bottom of the slice. Therefore, the psi value used in the derivation is set to alpha, 
+    # and the point of action is the center of the base of the slice.
+    psi = alpha  # psi is the angle of the reinforcement force from the horizontal
+    y_r = y_cb  # y_r is the y-coordinate of the point of action of the reinforcement
+    x_r = x_c  # x_r is the x-coordinate of the point of action of the reinforcement
+
+    # use variable names to match the derivation.
+    x_p = df['d_x'].values  # distributed load x-coordinate
+    y_p = df['d_y'].values  # distributed load y-coordinate
+    y_k = df['y_cg'].values  # seismic force y-coordinate
+    x_b = x_c  # center of base x-coordinate
+    y_b = y_cb  # center of base y-coordinate
+
+    # pre-compute the trigonometric functions
+    cos_a = np.cos(alpha)  # cos(alpha)
+    sin_a = np.sin(alpha)  # sin(alpha)
+    tan_p = np.tan(phi)  # tan(phi)
+    cos_b = np.cos(beta)  # cos(beta)
+    sin_b = np.sin(beta)  # sin(beta)
+    sin_psi = np.sin(psi)  # sin(psi)
+    cos_psi = np.cos(psi)  # cos(psi)
+
+    Fh = - kw + P * sin_b + R * cos_psi       # Equation (1)
+    Fv = - W - P * cos_b + R * sin_psi        # Equation (2)
+    Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
+        + kw * (y_k - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) # Equation (3)
+
+    def compute_Q(F, theta_rad):
+        ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)  # Equation (24)
+        Q = (- Fv * sin_a - Fh * cos_a - (c / F) * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p / F) * ma     # Equation (23)
+        y_q = y_b + Mo / (Q * np.cos(theta_rad))   # Equation (26)
+        return Q, y_q
+
+    fs_min = 0.01
+    fs_max = 20.0
+
+    def fs_force(theta_rad):
+        def residual(F):
+            Q, y_q = compute_Q(F, theta_rad)
+            return Q.sum()  # Equation (15)
+        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
+        return result.x
+
+    def fs_moment(theta_rad):
+        def residual(F):
+            Q, y_q = compute_Q(F, theta_rad)
+            return np.sum(Q * (x_b * np.sin(theta_rad) - y_q * np.cos(theta_rad)))  # Equation (16)
+        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
+        return result.x
+
+    def fs_difference(theta_deg):
+        theta_rad = np.radians(theta_deg)
+        Ff = fs_force(theta_rad)
+        Fm = fs_moment(theta_rad)
+        return Ff - Fm
+
+    # First try Newton's method to find theta_opt
+    try:
+        theta_guess = 6.948  # This seems to work well for most cases
+        if debug:
+            print(f"Trying Newton's method for theta root-finding with initial guess {theta_guess:.1f} deg")
+        theta_opt = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
+        # Check if the solution is valid
+        if (
+            abs(theta_opt) > 59 or
+            abs(fs_difference(theta_opt)) > 0.01 or
+            fs_force(np.radians(theta_opt)) >= fs_max - 1e-3
+        ):
+            raise ValueError("Newton's method converged to an invalid solution, trying sweep...")
+    except Exception:
+        # If Newton's method fails, try sweeping theta to find a bracket where fs_difference changes sign,
+        #  then use root_scalar to find theta_opt
+        if debug: 
+            print("Newton's method failed or gave invalid result, sweeping theta to find a bracket...")
+        theta_range = np.linspace(-60, 60, 49)
+        fs_diff_values = [fs_difference(theta) for theta in theta_range]
+        bracket = None
+        for i in range(len(fs_diff_values) - 1):
+            if fs_diff_values[i] * fs_diff_values[i+1] < 0:
+                bracket = [theta_range[i], theta_range[i+1]]
+                break
+        if bracket is None:
+            return False, "Spencer's method: No sign change found in fs_difference over theta range."
+        try:
+            if debug:
+                print(f"Trying root_scalar with bracket {bracket}")
+            sol = root_scalar(fs_difference, bracket=bracket, method='brentq', xtol=tol)
+            theta_opt = sol.root
+        except Exception as e:
+            return False, f"Spencer's method failed to converge: {e}"
+
+    theta_rad = np.radians(theta_opt)
+    FS_force = fs_force(theta_rad)
+    FS_moment = fs_moment(theta_rad)
+
+    df['theta'] = theta_opt  # store theta in df.
+
+    # --- Compute N_eff ---
+    Q, y_q = compute_Q(FS_force, theta_rad)
+    N_eff = - Fv * cos_a + Fh * sin_a + Q * np.sin(alpha - theta_rad) - u * dl   # Equation (18)
+
+    # ---  compute interslice forces Z  ---
+    n = len(Q)
+    Z = np.zeros(n+1)
+    for i in range(n):
+        Z[i+1] = Z[i] - Q[i] 
+
+    # --- store back into df ---
+    df['z']     = Z[:-1]        # Z_i acting on slice i's left face
+    df['n_eff'] = N_eff
+
+    # --- compute line of thrust ---
+    yt_l = np.zeros(n)  # the y-coordinate of the line of thrust on the left side of the slice.
+    yt_r = np.zeros(n)  # the y-coordinate of the line of thrust on the right side of the slice.
+    yt_l[0] = y_lb[0]  
+    sin_theta = np.sin(theta_rad)
+    cos_theta = np.cos(theta_rad)
+    for i in range(n):
+        yt_r[i] = y_b[i] - ((Mo[i] - Z[i] * sin_theta * dx[i] / 2 - Z[i+1] * sin_theta * dx[i] / 2 - Z[i] * cos_theta * (yt_l[i] - y_b[i])) / (Z[i+1] * cos_theta))  # Equation (30)
+        if i < n-1:
+            yt_l[i+1] = yt_r[i]
+    df['yt_l'] = yt_l
+    df['yt_r'] = yt_r
+
+    print("Hey Norm!")
+    
+    # --- Check convergence ---
+    converged = abs(FS_force - FS_moment) < tol
+    if not converged:
+        return False, "Spencer's method did not converge within the maximum number of iterations."
+    else:
+        results = {}
+        results['method'] = 'spencer'
+        results['FS'] = FS_force
+        results['theta'] = theta_opt
+
+        # debug print values per slice
+        if debug:
+            for i in range(len(Q)):
+                print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, dx = {dx[i]:.1f}, P = {P[i]:.1f}, sin_b = {sin_b[i]:.3f}, cos_b = {cos_b[i]:.3f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}, alpha = {np.degrees(alpha[i]):.2f}, beta = {np.degrees(beta[i]):.2f}, c = {c[i]:.2f}, w = {W[i]:.2f}, u = {u[i]:.2f}")
+
+        return True, results

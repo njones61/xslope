@@ -4,7 +4,7 @@ Spencer's Method is a complete equilibrium slope stability method that satisfies
 and can be used on circular and non-circular slip surfaces. The primary assumption for Spencer's method is that all 
 side forces are parallel, i.e., the interslice forces have a constant inclination angle $\theta$.
 
-The following derivation is adapted from the US Army Corps of Engineers (USACE) UTEXAS Version 2.0 user manual, which is based on the original work by Spencer (1967).
+The following derivation is adapted from the US Army Corps of Engineers (USACE) UTEXAS Version 2.0 user manual, which is based on the original work by Spencer (1967). The UTEXAS manual can accessed via this [link](https://apps.dtic.mil/sti/tr/pdf/ADA207044.pdf){target='blank'}.
 
 ## Slice Geometry and Forces
 
@@ -149,7 +149,7 @@ Combining equations (19) and (21) gives:
 
 Solving for $Q$ gives:
 
->>$Q = \left[ - F_v \sin \alpha - F_h \cos \alpha + \dfrac{c'}{F} \Delta x \sec \alpha + (F_v \cos \alpha - F_h \sin \alpha + u \Delta x \sec \alpha) \dfrac{\tan \phi'}{F} \right] m_{\alpha}  \qquad (23)$
+>>$Q = \left[ - F_v \sin \alpha - F_h \cos \alpha - \dfrac{c'}{F} \Delta x \sec \alpha + (F_v \cos \alpha - F_h \sin \alpha + u \Delta x \sec \alpha) \dfrac{\tan \phi'}{F} \right] m_{\alpha}  \qquad (23)$
 
 where:
 

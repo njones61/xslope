@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu, spencer, corps_engineers, lowe_karafiath
+from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer2
 
 
 def solve_selected(func, df):
@@ -42,7 +42,7 @@ circle = data['circles'][0] if data['circular'] else None
 
 # print(f"circle: {circle}")
 
-success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=20)
+success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=50)
 # success, result = generate_slices(data, circle=None, non_circ=non_circ, num_slices=20)
 if success:
     df, failure_surface = result
@@ -52,8 +52,8 @@ else:
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
 
-# options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df)
+# options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer2]
+results = solve_selected(spencer2, df)
 
 # solve_all(df)
 

@@ -1,5 +1,6 @@
 import pandas as pd
 from shapely.geometry import LineString, Point
+import numpy as np
 
 def build_ground_surface(profile_lines):
     """
@@ -148,6 +149,7 @@ def load_globals(filepath):
     # === BUILD GROUND SURFACE FROM PROFILE LINES ===
 
     ground_surface = build_ground_surface(profile_lines)
+
 
     # === BUILD TENSILE CRACK LINE ===
 

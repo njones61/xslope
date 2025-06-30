@@ -168,11 +168,13 @@ Solving for $y_Q$ gives:
 
 To solve the equations, we can use a numerical method such as the Newton-Raphson method. The steps are as follows:
 
-1. **Initial Guess**: Start with an initial guess for the factor of safety $F$ and the inclination angle $\theta$.
+1. **Initial Guess**: Start with an initial guess for the inclination angle $\theta$.
 2. **Calculate Forces and Moments**: For each slice, calculate the forces and moments using equations (1) to (3).
 3. **Calculate $Q$ and $y_Q$**: Use equations (23) and (26) to calculate $Q$ and $y_Q$ for each slice.
-4. **Sum Forces and Moments**: Sum the forces and moments for all slices using equations (15) and (16).
-5. **Check Convergence**: Check if the sum of forces and moments is close to zero. If not, adjust $F$ and $\theta$ and repeat steps 2-5.
+4. **Calculate F - Forces**: For the candidate $\theta$, solve for a factor of safety that satisfies force equilibrium ($F_{force}$) using equation 15. 
+5. **Calcualte F - Moments**: For the candidate $\theta$, solve for a factor of safety that satisfies moment equilibrium ($F_{moment}$) using equation 16.
+6. **Calculate F - Differences**: Calculate the difference between the two factors of safety ($F_{diff} = F_{force} - F_{moment}$).
+4. **Find optimal $\theta$**: Using a numerical method such as the Newton-Raphson method, repeat steps 2-6 and find a value of $\theta$ that results in $|F_{diff}| < tol$. 
 
 Once the solution converges, we can use equation (18) to calculate the normal force $N$. The effective normal force $N'$ can be calculated as:
 

@@ -674,12 +674,31 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     
     # Strategy 1: Try multiple starting points for Newton's method
 
-    newton_starting_points = [10, 9, 8, 7, 12, 5, 3, 1]
+    newton_starting_points = [3, 4, 5, 6, 7, 8, 9, 10]
     
+    # Pre-evaluate fs_difference for all starting points and sort by absolute value
+    starting_point_evaluations = []
     for theta_guess in newton_starting_points:
         try:
+            fs_diff = fs_difference(theta_guess)
+            starting_point_evaluations.append((theta_guess, abs(fs_diff), fs_diff))
+        except Exception as e:
             if debug_level >= 1:
-                print(f"Trying Newton's method with initial guess {theta_guess:.1f} deg")
+                print(f"Failed to evaluate fs_difference at {theta_guess:.1f} deg: {e}")
+            continue
+    
+    # Sort by absolute value of fs_difference (smallest first)
+    starting_point_evaluations.sort(key=lambda x: x[1])
+    
+    if debug_level >= 1:
+        print("Starting points sorted by |fs_difference|:")
+        for theta_guess, abs_fs_diff, fs_diff in starting_point_evaluations:
+            print(f"  {theta_guess:.1f}°: |fs_diff| = {abs_fs_diff:.6f}, fs_diff = {fs_diff:.6f}")
+    
+    for theta_guess, abs_fs_diff, fs_diff in starting_point_evaluations:
+        try:
+            if debug_level >= 1:
+                print(f"Trying Newton's method with initial guess {theta_guess:.1f} deg (|fs_diff| = {abs_fs_diff:.6f})")
             theta_candidate = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
             
             # Check if the solution is valid

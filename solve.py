@@ -843,3 +843,233 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
                 print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
 
         return True, results
+
+def rapid_drawdown(df, method_func, debug_level=0):
+    """
+    Performs rapid drawdown analysis using a three-stage approach.
+    
+    Parameters:
+        df : pandas.DataFrame
+            Slice data with all required columns including rapid drawdown specific data:
+            - c, phi: current strength parameters
+            - c1, phi1: original strength parameters (for stage 3)
+            - d, psi: rapid drawdown parameters for low-K materials
+            - u: pore pressure (stage 1)
+            - u2: pore pressure for lowered pool (stage 2)
+            - dload, d_x, d_y: distributed loads (stage 1)
+            - dload2, d_x2, d_y2: distributed loads for lowered pool (stage 2)
+        method_func : function
+            The method function to use (oms, bishop, spencer, etc.)
+        debug_level : int
+            0: no output, 1: print FS at each stage, >1: detailed debug info
+    
+    Returns:
+        tuple: (success, result)
+            - If success: (True, {'method': 'rapid_drawdown', 'FS': final_FS, 'stage1_FS': stage1_FS, 'stage2_FS': stage2_FS, 'stage3_FS': stage3_FS})
+            - If failure: (False, error_message)
+    """
+    
+    # Make a copy of the dataframe to avoid modifying the original
+    df_copy = df.copy()
+    
+    if debug_level >= 1:
+        print("=== RAPID DRAWDOWN ANALYSIS ===")
+    
+    # Stage 1: Pre-drawdown conditions
+    if debug_level >= 1:
+        print("Stage 1: Pre-drawdown conditions...")
+    
+    # Use original conditions (c, phi, u, dload, d_x, d_y)
+    success, result = method_func(df_copy)
+    if not success:
+        return False, f"Stage 1 failed: {result}"
+    
+    stage1_FS = result['FS']
+    if debug_level >= 1:
+        print(f"Stage 1 FS = {stage1_FS:.4f}")
+    
+    # Calculate consolidation stresses for each slice
+    # N_eff should be available from the method function
+    if 'n_eff' not in df_copy.columns:
+        return False, "Stage 1 did not compute n_eff values"
+    
+    # Calculate sigma_fc and tau_fc for each slice
+    sigma_fc = df_copy['n_eff'] / df_copy['dl']  # Equation (2)
+    tau_fc = (1.0 / stage1_FS) * (df_copy['c'] + sigma_fc * np.tan(np.radians(df_copy['phi'])))  # Equation (3)
+    
+    if debug_level >= 2:
+        print("Stage 1 consolidation stresses:")
+        for i in range(len(df_copy)):
+            print(f"  Slice {i+1}: sigma_fc = {sigma_fc.iloc[i]:.2f}, tau_fc = {tau_fc.iloc[i]:.2f}")
+    
+    # Stage 2: Post-drawdown conditions with undrained strengths
+    if debug_level >= 1:
+        print("Stage 2: Post-drawdown conditions with undrained strengths...")
+    
+    # Create a copy for stage 2 modifications
+    df_stage2 = df_copy.copy()
+    
+    # Update pore pressures and distributed loads for stage 2
+    df_stage2['u'] = df_copy['u2']
+    df_stage2['dload'] = df_copy['dload2']
+    df_stage2['d_x'] = df_copy['d_x2']
+    df_stage2['d_y'] = df_copy['d_y2']
+    
+    # Process each slice for undrained strength calculation
+    for i in range(len(df_stage2)):
+        # Check if this slice has low-K material (d and psi are not zero)
+        d_val = df_stage2.iloc[i]['d']
+        psi_val = df_stage2.iloc[i]['psi']
+        
+        if d_val > 0 and psi_val > 0:
+            # Low-K material - calculate undrained strength
+            if debug_level >= 2:
+                print(f"Processing low-K material for slice {i+1}")
+            
+            # Get consolidation stresses for this slice
+            sigma_fc_i = sigma_fc.iloc[i]
+            tau_fc_i = tau_fc.iloc[i]
+            phi_deg = df_stage2.iloc[i]['phi1']  # Use original phi for calculations
+            c_val = df_stage2.iloc[i]['c1']      # Use original c for calculations
+            
+            # Calculate K1 using equation (4)
+            phi_rad = np.radians(phi_deg)
+            if abs(np.cos(phi_rad)) < 1e-12:
+                if debug_level >= 2:
+                    print(f"  Warning: cos(phi) near zero for slice {i+1}, skipping K1 calculation")
+                continue
+            
+            K1 = (sigma_fc_i + tau_fc_i * (np.sin(phi_rad) + 1) / np.cos(phi_rad)) / \
+                 (sigma_fc_i + tau_fc_i * (np.sin(phi_rad) - 1) / np.cos(phi_rad))
+            
+            if debug_level >= 2:
+                print(f"  K1 = {K1:.4f}")
+            
+            # Calculate Kf using equation (6)
+            if abs(sigma_fc_i - c_val * np.cos(phi_rad)) < 1e-12:
+                if debug_level >= 2:
+                    print(f"  Warning: denominator near zero for Kf calculation in slice {i+1}")
+                continue
+            
+            Kf = ((sigma_fc_i + c_val * np.cos(phi_rad)) * (1 + np.sin(phi_rad))) / \
+                 ((sigma_fc_i - c_val * np.cos(phi_rad)) * (1 - np.sin(phi_rad)))
+            
+            if debug_level >= 2:
+                print(f"  Kf = {Kf:.4f}")
+            
+            # Check for negative stresses using equations (7) and (8)
+            sigma3_k1 = sigma_fc_i + tau_fc_i * (np.sin(phi_rad) - 1) / np.cos(phi_rad)  # Equation (7)
+            sigma3_kf = (sigma_fc_i - c_val * np.cos(phi_rad)) * (1 - np.sin(phi_rad)) / (np.cos(phi_rad)**2)  # Equation (8)
+            
+            if debug_level >= 2:
+                print(f"  sigma3_k1 = {sigma3_k1:.4f}, sigma3_kf = {sigma3_kf:.4f}")
+            
+            # Calculate tau_ff values for both curves
+            tau_ff_k1 = d_val + sigma_fc_i * np.tan(np.radians(psi_val))  # d-psi curve
+            tau_ff_kf = c_val + sigma_fc_i * np.tan(phi_rad)  # c-phi curve
+            
+            if debug_level >= 2:
+                print(f"  tau_ff_k1 = {tau_ff_k1:.4f}, tau_ff_kf = {tau_ff_kf:.4f}")
+            
+            # Determine which tau_ff to use
+            if sigma3_k1 < 0 or sigma3_kf < 0:
+                # Use the lower of the two curves
+                tau_ff = min(tau_ff_k1, tau_ff_kf)
+                if debug_level >= 2:
+                    print(f"  Negative stress detected, using lower curve: tau_ff = {tau_ff:.4f}")
+            else:
+                # Interpolate using equation (5)
+                if abs(Kf - 1) < 1e-12:
+                    tau_ff = tau_ff_k1
+                else:
+                    tau_ff = ((Kf - K1) * tau_ff_k1 + (K1 - 1) * tau_ff_kf) / (Kf - 1)
+                
+                if debug_level >= 2:
+                    print(f"  Interpolated tau_ff = {tau_ff:.4f}")
+            
+            # Set undrained strength parameters
+            df_stage2.iloc[i, df_stage2.columns.get_loc('c')] = tau_ff
+            df_stage2.iloc[i, df_stage2.columns.get_loc('phi')] = 0.0
+            
+            if debug_level >= 2:
+                print(f"  Set c = {tau_ff:.4f}, phi = 0.0 for slice {i+1}")
+        else:
+            # High-K material - keep original c and phi
+            if debug_level >= 2:
+                print(f"Slice {i+1}: High-K material, keeping original c and phi")
+    
+    # Calculate Stage 2 FS
+    success, result = method_func(df_stage2)
+    if not success:
+        return False, f"Stage 2 failed: {result}"
+    
+    stage2_FS = result['FS']
+    if debug_level >= 1:
+        print(f"Stage 2 FS = {stage2_FS:.4f}")
+    
+    # Stage 3: Check drained strengths
+    if debug_level >= 1:
+        print("Stage 3: Checking drained strengths...")
+    
+    # Check if any low-K slices need drained strength
+    need_stage3 = False
+    df_stage3 = df_stage2.copy()
+    
+    for i in range(len(df_stage3)):
+        d_val = df_stage3.iloc[i]['d']
+        psi_val = df_stage3.iloc[i]['psi']
+        
+        if d_val > 0 and psi_val > 0:
+            # This is a low-K material slice
+            if 'n_eff' not in df_stage3.columns:
+                return False, "Stage 2 did not compute n_eff values"
+            
+            # Calculate drained strength using equations (9) and (10)
+            sigma_prime = df_stage3.iloc[i]['n_eff'] / df_stage3.iloc[i]['dl']  # Equation (9)
+            tau_drained = df_stage3.iloc[i]['c1'] + sigma_prime * np.tan(np.radians(df_stage3.iloc[i]['phi1']))  # Equation (10)
+            
+            # Compare with undrained strength (current c value)
+            tau_undrained = df_stage3.iloc[i]['c']
+            
+            if debug_level >= 2:
+                print(f"Slice {i+1}: tau_drained = {tau_drained:.4f}, tau_undrained = {tau_undrained:.4f}")
+            
+            if tau_drained < tau_undrained:
+                # Use drained strength
+                df_stage3.iloc[i, df_stage3.columns.get_loc('c')] = df_stage3.iloc[i]['c1']
+                df_stage3.iloc[i, df_stage3.columns.get_loc('phi')] = df_stage3.iloc[i]['phi1']
+                need_stage3 = True
+                
+                if debug_level >= 2:
+                    print(f"  Using drained strength for slice {i+1}")
+    
+    if need_stage3:
+        if debug_level >= 1:
+            print("Stage 3: Recalculating FS with drained strengths...")
+        
+        success, result = method_func(df_stage3)
+        if not success:
+            return False, f"Stage 3 failed: {result}"
+        
+        stage3_FS = result['FS']
+        if debug_level >= 1:
+            print(f"Stage 3 FS = {stage3_FS:.4f}")
+    else:
+        stage3_FS = stage2_FS
+        if debug_level >= 1:
+            print("Stage 3: No drained strength adjustments needed")
+    
+    # Final FS is the lower of Stage 2 and Stage 3
+    final_FS = min(stage2_FS, stage3_FS)
+    
+    if debug_level >= 1:
+        print(f"Final rapid drawdown FS = {final_FS:.4f}")
+        print("=== END RAPID DRAWDOWN ANALYSIS ===")
+    
+    return True, {
+        'method': 'rapid_drawdown',
+        'FS': final_FS,
+        'stage1_FS': stage1_FS,
+        'stage2_FS': stage2_FS,
+        'stage3_FS': stage3_FS
+    }

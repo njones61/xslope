@@ -27,7 +27,7 @@ where:
 > $T$ = shear force on the top of the slice<br>
 > $R$ = reinforcement force on the base of the slice<br>
 > $r$ = point of action for the reinforcement force<br>
-> $V$ = resultunt force of water in tension crack<br>
+> $V$ = resultant force of water in tension crack (only applies to last slice)<br>
 > $c$ = point of action for the resultant force of water in the tension crack<br>
 > $\beta$ = angle of the top of the slope<br>
 > $\alpha$ = angle of the base of the slice<br>
@@ -35,11 +35,13 @@ where:
 > $\Delta \ell$ = length of the base of the slice<br>
 > $\Delta x$ = width of the slice<br>
 
+**Note**: In the current implementation of spencer's method in slopetools, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. All of the other forces are included. 
+
 ## General Equations
 
 The equations for Spencer's method are derived from the equilibrium of forces and moments acting on the slice. One of the key features of Spencer's method is how the side forces are represented and lumped to a single force $Q_i$, which will be introduced later. Thus, it is helpeful to sum forces and moments using the forces acting on the slice except for the side forces and $N$ and $S$. Summing forces in the horizontal and vertical directions gives:
 
->>$F_h = -kW + P \sin \beta + T \cos \beta + R \cos \psi  \qquad (1)$
+>>$F_h = -kW - V + P \sin \beta + T \cos \beta + R \cos \psi  \qquad (1)$
 
 >>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \psi  \qquad (2)$
 
@@ -47,7 +49,7 @@ Likewise, summing moments about the center of the base of the slice gives:
 
 $\begin{aligned}
 M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p - y_b) \\
-&\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b)
+&\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) + V (y_v - y_b) - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b)
 \end{aligned}   \qquad (3)$
 
 Note that counter-clockwise moments are positive (right-hand rule).

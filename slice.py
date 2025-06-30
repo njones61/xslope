@@ -656,6 +656,7 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             'z': 0,     # Placeholder for interslice side forces
             'theta': 0, # Placeholder for interslice angles
             'piezo_y': piezo_y,  # y-coordinate of the piezometric surface at x_c
+            'piezo_y2': piezo_y2,  # y-coordinate of the piezometric surface at x_c for second piezometric line (rapid drawdown)
             'hw': hw,   # height of water at x_c
             'u': u,     # pore pressure at x_c
             'hw2': hw2, # height of water at x_c for second piezometric line (rapid drawdown)

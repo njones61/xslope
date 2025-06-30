@@ -609,6 +609,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     beta  = np.radians(df['beta'].values)  # distributed load inclination, degrees
     kw    = df['kw'].values  # seismic force
     V     = df['t'].values  # tension crack water force
+    y_v   = df['y_t'].values  # tension crack water force y-coordinate
     R     = df['p'].values  # reinforcement force
 
     # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
@@ -634,10 +635,10 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     sin_psi = np.sin(psi)  # sin(psi)
     cos_psi = np.cos(psi)  # cos(psi)
 
-    Fh = - kw + P * sin_b + R * cos_psi       # Equation (1)
+    Fh = - kw - V + P * sin_b + R * cos_psi       # Equation (1)
     Fv = - W - P * cos_b + R * sin_psi        # Equation (2)
     Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
-        + kw * (y_k - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) # Equation (3)
+        + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) # Equation (3)
 
     def compute_Q(F, theta_rad):
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)  # Equation (24)

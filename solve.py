@@ -988,7 +988,7 @@ def rapid_drawdown(df, method_func, debug_level=0):
                     print(f"  Interpolated tau_ff = {tau_ff:.4f}")
             
             # Set undrained strength parameters
-            df_stage2.iloc[i, df_stage2.columns.get_loc('c')] = tau_ff
+            df_stage2.iloc[i, df_stage2.columns.get_loc('c')] = float(tau_ff)
             df_stage2.iloc[i, df_stage2.columns.get_loc('phi')] = 0.0
             
             if debug_level >= 2:
@@ -1036,8 +1036,8 @@ def rapid_drawdown(df, method_func, debug_level=0):
             
             if tau_drained < tau_undrained:
                 # Use drained strength
-                df_stage3.iloc[i, df_stage3.columns.get_loc('c')] = df_stage3.iloc[i]['c1']
-                df_stage3.iloc[i, df_stage3.columns.get_loc('phi')] = df_stage3.iloc[i]['phi1']
+                df_stage3.iloc[i, df_stage3.columns.get_loc('c')] = float(df_stage3.iloc[i]['c1'])
+                df_stage3.iloc[i, df_stage3.columns.get_loc('phi')] = float(df_stage3.iloc[i]['phi1'])
                 need_stage3 = True
                 
                 if debug_level >= 2:

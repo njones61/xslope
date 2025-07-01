@@ -569,7 +569,7 @@ def lowe_karafiath(df, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
+def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     
@@ -675,7 +675,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     
     # Strategy 1: Try multiple starting points for Newton's method
 
-    newton_starting_points = [3, 4, 5, 6, 7, 8, 9, 10]
+    newton_starting_points = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     
     # Pre-evaluate fs_difference for all starting points and sort by absolute value
     starting_point_evaluations = []
@@ -844,7 +844,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
 
         return True, results
 
-def rapid_drawdown(df, method_func, debug_level=0):
+def rapid_drawdown(df, method_func, debug_level=1):
     """
     Performs rapid drawdown analysis using a three-stage approach.
     
@@ -864,13 +864,8 @@ def rapid_drawdown(df, method_func, debug_level=0):
             0: no output, 1: print FS at each stage, >1: detailed debug info
     
     Returns:
-        tuple: (success, result)
-            - If success: (True, {'method': 'rapid_drawdown', 'FS': final_FS, 'stage1_FS': stage1_FS, 'stage2_FS': stage2_FS, 'stage3_FS': stage3_FS})
-            - If failure: (False, error_message)
+        Tuple(bool, dict): (True, result_dict) or (False, error_message)
     """
-    
-    # Make a copy of the dataframe to avoid modifying the original
-    df_copy = df.copy()
     
     if debug_level >= 1:
         print("=== RAPID DRAWDOWN ANALYSIS ===")
@@ -880,46 +875,43 @@ def rapid_drawdown(df, method_func, debug_level=0):
         print("Stage 1: Pre-drawdown conditions...")
     
     # Use original conditions (c, phi, u, dload, d_x, d_y)
-    success, result = method_func(df_copy)
+    success, result_stage1 = method_func(df)
     if not success:
-        return False, f"Stage 1 failed: {result}"
+        return False, f"Stage 1 failed: {result_stage1}"
     
-    stage1_FS = result['FS']
+    stage1_FS = result_stage1['FS']
     if debug_level >= 1:
         print(f"Stage 1 FS = {stage1_FS:.4f}")
     
     # Calculate consolidation stresses for each slice
     # N_eff should be available from the method function
-    if 'n_eff' not in df_copy.columns:
+    if 'n_eff' not in df.columns:
         return False, "Stage 1 did not compute n_eff values"
     
     # Calculate sigma_fc and tau_fc for each slice
-    sigma_fc = df_copy['n_eff'] / df_copy['dl']  # Equation (2)
-    tau_fc = (1.0 / stage1_FS) * (df_copy['c'] + sigma_fc * np.tan(np.radians(df_copy['phi'])))  # Equation (3)
+    sigma_fc = df['n_eff'] / df['dl']  # Equation (2)
+    tau_fc = (1.0 / stage1_FS) * (df['c'] + sigma_fc * np.tan(np.radians(df['phi'])))  # Equation (3)
     
     if debug_level >= 2:
         print("Stage 1 consolidation stresses:")
-        for i in range(len(df_copy)):
+        for i in range(len(df)):
             print(f"  Slice {i+1}: sigma_fc = {sigma_fc.iloc[i]:.2f}, tau_fc = {tau_fc.iloc[i]:.2f}")
     
     # Stage 2: Post-drawdown conditions with undrained strengths
     if debug_level >= 1:
         print("Stage 2: Post-drawdown conditions with undrained strengths...")
-    
-    # Create a copy for stage 2 modifications
-    df_stage2 = df_copy.copy()
-    
+   
     # Update pore pressures and distributed loads for stage 2
-    df_stage2['u'] = df_copy['u2']
-    df_stage2['dload'] = df_copy['dload2']
-    df_stage2['d_x'] = df_copy['d_x2']
-    df_stage2['d_y'] = df_copy['d_y2']
+    df['u'] = df['u2']
+    df['dload'] = df['dload2']
+    df['d_x'] = df['d_x2']
+    df['d_y'] = df['d_y2']
     
     # Process each slice for undrained strength calculation
-    for i in range(len(df_stage2)):
+    for i in range(len(df)):
         # Check if this slice has low-K material (d and psi are not zero)
-        d_val = df_stage2.iloc[i]['d']
-        psi_val = df_stage2.iloc[i]['psi']
+        d_val = df.iloc[i]['d']
+        psi_val = df.iloc[i]['psi']
         
         if d_val > 0 and psi_val > 0:
             # Low-K material - calculate undrained strength
@@ -929,8 +921,8 @@ def rapid_drawdown(df, method_func, debug_level=0):
             # Get consolidation stresses for this slice
             sigma_fc_i = sigma_fc.iloc[i]
             tau_fc_i = tau_fc.iloc[i]
-            phi_deg = df_stage2.iloc[i]['phi1']  # Use original phi for calculations
-            c_val = df_stage2.iloc[i]['c1']      # Use original c for calculations
+            phi_deg = df.iloc[i]['phi1']  # Use original phi for calculations
+            c_val = df.iloc[i]['c1']      # Use original c for calculations
             
             # Calculate K1 using equation (4)
             phi_rad = np.radians(phi_deg)
@@ -988,8 +980,8 @@ def rapid_drawdown(df, method_func, debug_level=0):
                     print(f"  Interpolated tau_ff = {tau_ff:.4f}")
             
             # Set undrained strength parameters
-            df_stage2.iloc[i, df_stage2.columns.get_loc('c')] = float(tau_ff)
-            df_stage2.iloc[i, df_stage2.columns.get_loc('phi')] = 0.0
+            df.iloc[i, df.columns.get_loc('c')] = float(tau_ff)
+            df.iloc[i, df.columns.get_loc('phi')] = 0.0
             
             if debug_level >= 2:
                 print(f"  Set c = {tau_ff:.4f}, phi = 0.0 for slice {i+1}")
@@ -999,11 +991,11 @@ def rapid_drawdown(df, method_func, debug_level=0):
                 print(f"Slice {i+1}: High-K material, keeping original c and phi")
     
     # Calculate Stage 2 FS
-    success, result = method_func(df_stage2)
+    success, result_stage2 = method_func(df)
     if not success:
-        return False, f"Stage 2 failed: {result}"
+        return False, f"Stage 2 failed: {result_stage2}"
     
-    stage2_FS = result['FS']
+    stage2_FS = result_stage2['FS']
     if debug_level >= 1:
         print(f"Stage 2 FS = {stage2_FS:.4f}")
     
@@ -1013,31 +1005,30 @@ def rapid_drawdown(df, method_func, debug_level=0):
     
     # Check if any low-K slices need drained strength
     need_stage3 = False
-    df_stage3 = df_stage2.copy()
     
-    for i in range(len(df_stage3)):
-        d_val = df_stage3.iloc[i]['d']
-        psi_val = df_stage3.iloc[i]['psi']
+    for i in range(len(df)):
+        d_val = df.iloc[i]['d']
+        psi_val = df.iloc[i]['psi']
         
         if d_val > 0 and psi_val > 0:
             # This is a low-K material slice
-            if 'n_eff' not in df_stage3.columns:
+            if 'n_eff' not in df.columns:
                 return False, "Stage 2 did not compute n_eff values"
             
             # Calculate drained strength using equations (9) and (10)
-            sigma_prime = df_stage3.iloc[i]['n_eff'] / df_stage3.iloc[i]['dl']  # Equation (9)
-            tau_drained = df_stage3.iloc[i]['c1'] + sigma_prime * np.tan(np.radians(df_stage3.iloc[i]['phi1']))  # Equation (10)
+            sigma_prime = df.iloc[i]['n_eff'] / df.iloc[i]['dl']  # Equation (9)
+            tau_drained = df.iloc[i]['c1'] + sigma_prime * np.tan(np.radians(df.iloc[i]['phi1']))  # Equation (10)
             
             # Compare with undrained strength (current c value)
-            tau_undrained = df_stage3.iloc[i]['c']
+            tau_undrained = df.iloc[i]['c']
             
             if debug_level >= 2:
                 print(f"Slice {i+1}: tau_drained = {tau_drained:.4f}, tau_undrained = {tau_undrained:.4f}")
             
             if tau_drained < tau_undrained:
                 # Use drained strength
-                df_stage3.iloc[i, df_stage3.columns.get_loc('c')] = float(df_stage3.iloc[i]['c1'])
-                df_stage3.iloc[i, df_stage3.columns.get_loc('phi')] = float(df_stage3.iloc[i]['phi1'])
+                df.iloc[i, df.columns.get_loc('c')] = float(df.iloc[i]['c1'])
+                df.iloc[i, df.columns.get_loc('phi')] = float(df.iloc[i]['phi1'])
                 need_stage3 = True
                 
                 if debug_level >= 2:
@@ -1047,11 +1038,11 @@ def rapid_drawdown(df, method_func, debug_level=0):
         if debug_level >= 1:
             print("Stage 3: Recalculating FS with drained strengths...")
         
-        success, result = method_func(df_stage3)
+        success, result_stage3 = method_func(df)
         if not success:
-            return False, f"Stage 3 failed: {result}"
+            return False, f"Stage 3 failed: {result_stage3}"
         
-        stage3_FS = result['FS']
+        stage3_FS = result_stage3['FS']
         if debug_level >= 1:
             print(f"Stage 3 FS = {stage3_FS:.4f}")
     else:
@@ -1060,16 +1051,20 @@ def rapid_drawdown(df, method_func, debug_level=0):
             print("Stage 3: No drained strength adjustments needed")
     
     # Final FS is the lower of Stage 2 and Stage 3
-    final_FS = min(stage2_FS, stage3_FS)
+    if stage2_FS < stage3_FS:
+        final_FS = stage2_FS
+        result = result_stage2
+    else:
+        final_FS = stage3_FS
+        result = result_stage3
     
     if debug_level >= 1:
         print(f"Final rapid drawdown FS = {final_FS:.4f}")
         print("=== END RAPID DRAWDOWN ANALYSIS ===")
     
-    return True, {
-        'method': 'rapid_drawdown',
-        'FS': final_FS,
-        'stage1_FS': stage1_FS,
-        'stage2_FS': stage2_FS,
-        'stage3_FS': stage3_FS
-    }
+    # Append stage FS to result
+    result['stage1_FS'] = stage1_FS
+    result['stage2_FS'] = stage2_FS
+    result['stage3_FS'] = stage3_FS
+
+    return True, result

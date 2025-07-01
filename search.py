@@ -1,9 +1,10 @@
 import numpy as np
+from solve import rapid_drawdown
 from slice import generate_slices, get_y_from_intersection
 from shapely.geometry import LineString, Point
 import time
 
-def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
+def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
                     fs_fail=9999, depth_tol_frac=0.03, diagnostic=False):
     """
     Global 9-point circular search with adaptive grid refinement.
@@ -51,7 +52,10 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
                     solver_result = None
                 else:
                     df_slices, failure_surface = result
-                    solver_success, solver_result = solver(df_slices, circle=test_circle)
+                    if rapid:
+                        solver, success = rapid_drawdown(df_slices, solver)
+                    else:
+                        solver_success, solver_result = solver(df_slices)
                     FS = solver_result['FS'] if solver_success else fs_fail
                 fs_results.append((FS, d, df_slices, failure_surface, solver_result))
 
@@ -175,7 +179,7 @@ def circular_search(data, solver, tol=1e-2, max_iter=50, shrink_factor=0.5,
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path
 
-def noncircular_search(data, solver, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
+def noncircular_search(data, solver, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
     """
     Non-circular search using the specified solver.
     
@@ -254,7 +258,10 @@ def noncircular_search(data, solver, diagnostic=True, movement_distance=4.0, shr
             return float('inf'), None, None, None, fs_cache
             
         df_slices, failure_surface = result
-        solver_success, solver_result = solver(df_slices, circle=None)
+        if rapid:
+            solver, success = rapid_drawdown(df_slices, solver)
+        else:
+            solver_success, solver_result = solver(df_slices)
         FS = solver_result['FS'] if solver_success else float('inf')
         
         # Cache result

@@ -86,7 +86,7 @@ Likewise, the shear stress on the failure plane at the end of the consolidation 
 
 >>$\tau_{fc} = \dfrac{S}{\Delta \ell}$
 
->>$\tau_{fc} = \dfrac{1}{F}(c' + \sigma' \tan \phi')   \qquad (3)$
+>>$\tau_{fc} = \dfrac{1}{F}(c' + \sigma'_{fc} \tan \phi')   \qquad (3)$
 
 Note that this is the mobilized shear strength and $F$ is the factory of safety returned by the solver in the Stage 1 solution.
 
@@ -116,15 +116,15 @@ For the stresses on the base of each slice, the actual $K$ ratio should vary som
 
 If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpoloate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
 
->>$K_1 = \dfrac{\sigma' + \tau[(\sin \phi' + 1) / \cos \phi']}{\sigma' + \tau[(\sin \phi' - 1) / \cos \phi']}   \qquad (4)$
+>>$K_1 = \dfrac{\sigma'_{fc} + \tau_{fc}[(\sin \phi' + 1) / \cos \phi']}{\sigma'_{fc} + \tau_{fc}[(\sin \phi' - 1) / \cos \phi']}   \qquad (4)$
 
-Where $\sigma'$ and $\tau$ are the effective normal and shear stresses on the shear plane at the end of consolidation and are found using equations (2) and (3) above. Equation (4) assumes that the orientation of the principal stresses at the end of consolidation is the same as the orientation of the principal stresses at failure. Values of the undrained shear strength for the effective consolidation stress $\sigma'$ and a consolidation ratio $K_c = K_1$ are obtained by interpolating the $K_c = 1$  and $K_c = K_f$  failure envelopes using the following equation:
+Where $\sigma'_{fc}$ and $\tau_{fc}$ are the effective normal and shear stresses on the shear plane at the end of consolidation and are found using equations (2) and (3) above. Equation (4) assumes that the orientation of the principal stresses at the end of consolidation is the same as the orientation of the principal stresses at failure. Values of the undrained shear strength for the effective consolidation stress $\sigma'_{fc}$ and a consolidation ratio $K_c = K_1$ are obtained by interpolating the $K_c = 1$  and $K_c = K_f$  failure envelopes using the following equation:
 
 >>$\tau_{ff} = \dfrac{(K_f - K_1) \tau_{ff(K_c=1)} + (K_1 - 1) \tau_{ff(K_c=K_f)}}{K_f - 1}  \qquad (5)$
 
-The two $\tau_{ff}$ values are found by evaluating the two envelopes using the $\sigma'_{fc}$ found from stage 1. The $K_{ff} value used in this equation can be found from:
+The two $\tau_{ff}$ values are found by evaluating the two envelopes using the $\sigma'_{fc}$ found from stage 1. The $K_f$ value used in this equation can be found from:
 
->>$K_f = \dfrac{(\sigma' + c' \cos \phi')(1 + \sin \phi')}{(\sigma' - c' \cos \phi')(1 - \sin \phi')}   \qquad (6)$
+>>$K_f = \dfrac{(\sigma'_{fc} + c' \cos \phi')(1 + \sin \phi')}{(\sigma'_{fc} - c' \cos \phi')(1 - \sin \phi')}   \qquad (6)$
 
 ### Negative Stresses
 
@@ -150,7 +150,7 @@ For Stage 3, undrained strengths used for slices in low K zones are compared wit
 
 >>$\sigma' = \dfrac{N'}{\Delta \ell}   \qquad (9)$
 
->>$\tau = c' + (\sigma') \tan \phi'   \qquad (10)$
+>>$\tau = c' + \sigma' \tan \phi'   \qquad (10)$
 
 Where $N'$ is the effective normal force found in Stage 2 using post-drawdown conditions.
 

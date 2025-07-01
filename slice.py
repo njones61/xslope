@@ -363,6 +363,35 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
                     if hasattr(geom, 'x'):
                         fixed_xs.add(geom.x)
 
+    # Find points associated with intersections of the piezometric lines and the failure surface.
+    if piezo_line:
+        piezo_geom1 = LineString(piezo_line)
+        intersection1 = piezo_geom1.intersection(clipped_surface)
+        if not intersection1.is_empty:
+            if hasattr(intersection1, 'x'):
+                # Single point intersection
+                if x_min <= intersection1.x <= x_max:
+                    fixed_xs.add(intersection1.x)
+            elif hasattr(intersection1, 'geoms'):
+                # Multiple points or line intersection
+                for geom in intersection1.geoms:
+                    if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
+                        fixed_xs.add(geom.x)
+
+    if piezo_line2:
+        piezo_geom2 = LineString(piezo_line2)
+        intersection2 = piezo_geom2.intersection(clipped_surface)
+        if not intersection2.is_empty:
+            if hasattr(intersection2, 'x'):
+                # Single point intersection
+                if x_min <= intersection2.x <= x_max:
+                    fixed_xs.add(intersection2.x)
+            elif hasattr(intersection2, 'geoms'):
+                # Multiple points or line intersection
+                for geom in intersection2.geoms:
+                    if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
+                        fixed_xs.add(geom.x)
+
     fixed_xs = sorted(fixed_xs)
 
     segment_lengths = [fixed_xs[i + 1] - fixed_xs[i] for i in range(len(fixed_xs) - 1)]

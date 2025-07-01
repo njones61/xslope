@@ -118,8 +118,8 @@ The Taylor Series Probability Method (TSPM) is a more efficient approach for cal
 >>$F_i^+$ = the factor of safety calculated using the parameter value = $MLV + \sigma_i$ with all other parameters held at the most likely value<br>
 > $F_i^-$ = the factor of safety calculated using the parameter value = $MLV - \sigma_i$ with all other parameters held at the most likely value
 
-3. Compute $\Delta F_i = |F_i^+ - F_i^-| for each parameter.
-4. Compute $\sigma_F and COV_F$ using the following equations:
+3. Compute $\Delta F_i = |F_i^+ - F_i^-|$ for each parameter.
+4. Compute $\sigma_F$ and $COV_F$ using the following equations:
 
 
 >>$\sigma_F = \sqrt{\left(\dfrac{\Delta F_1}{2} \right)^2 + \left(\dfrac{\Delta F_2}{2} \right)^2 + \ldots + \left(\dfrac{\Delta F_n}{2} \right)^2}$

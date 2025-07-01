@@ -33,17 +33,17 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_dam2.xlsx")
+data = load_globals("docs/input_template_rapid2.xlsx")
 
-# plot_inputs(data)
+plot_inputs(data)
+
 
 circle = data['circles'][0] if data['circular'] else None
-# non_circ = data['non_circ'] if data['non_circ'] else None
+non_circ = data['non_circ'] if data['non_circ'] else None
 
-# print(f"circle: {circle}")
 
 success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=30)
-# success, result = generate_slices(data, circle=None, non_circ=non_circ, num_slices=20)
+
 if success:
     df, failure_surface = result
 else:
@@ -55,5 +55,5 @@ results = solve_selected(spencer, df)
 # export df to excel
 df.to_excel("slices.xlsx", index=False)
 
-plot_solution(data, df, failure_surface, results, slice_numbers=True)
+plot_solution(data, df, failure_surface, results)
 

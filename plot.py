@@ -133,24 +133,40 @@ def plot_slice_numbers(ax, df):
                    ha='center', va='center', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
 
-def plot_piezo_line(ax, piezo_line):
+def plot_piezo_line(ax, data):
     """
-    Plots the piezometric line with a marker at its midpoint.
+    Plots the piezometric line(s) with markers at their midpoints.
 
     Parameters:
         ax: matplotlib Axes object
-        piezo_line: List of coordinates representing the piezometric line
+        data: Dictionary containing plot data with 'piezo_line' and optionally 'piezo_line2'
 
     Returns:
         None
     """
-    if piezo_line:
+    
+    def plot_single_piezo_line(ax, piezo_line, color, label):
+        """Internal function to plot a single piezometric line"""
+        if not piezo_line:
+            return
+            
         piezo_xs, piezo_ys = zip(*piezo_line)
-        ax.plot(piezo_xs, piezo_ys, 'b-', label="Piezometric Line")
-        mid_index = len(piezo_xs) // 2
-        marker_offset = 2
-        ax.plot(piezo_xs[mid_index], piezo_ys[mid_index] + marker_offset,
-                marker='v', color='b', markersize=8)
+        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=2, label=label)
+        
+        # Find middle x-coordinate and corresponding y value
+        x_min, x_max = min(piezo_xs), max(piezo_xs)
+        mid_x = (x_min + x_max) / 2
+        
+        # Interpolate y value at mid_x
+        from scipy.interpolate import interp1d
+        if len(piezo_xs) > 1:
+            f = interp1d(piezo_xs, piezo_ys, kind='linear', bounds_error=False, fill_value='extrapolate')
+            mid_y = f(mid_x)
+            ax.plot(mid_x, mid_y + 6, marker='v', color=color, markersize=8)
+    
+    # Plot both piezometric lines
+    plot_single_piezo_line(ax, data.get('piezo_line'), 'b', "Piezometric Line")
+    plot_single_piezo_line(ax, data.get('piezo_line2'), 'skyblue', "Piezometric Line 2")
 
 def plot_tcrack_surface(ax, tcrack_surface):
     """
@@ -175,143 +191,146 @@ def plot_dloads(ax, data):
 
     Parameters:
         ax: matplotlib Axes object
-        dloads: List of distributed load data points with X, Y, and Normal force components
-        data: Dictionary containing plot data (needed for ground_surface to calculate slope height)
-        max_height_frac: Maximum arrow height as fraction of slope height (default 0.3)
-        gamma_w: Unit weight of water for scaling (default 62.4 pcf)
+        data: Dictionary containing plot data with 'dloads' and optionally 'dloads2'
 
     Returns:
         None
     """
-
-    dloads = data['dloads']
-    gamma_w = data['gamma_water']
-    ground_surface = data['ground_surface']
-
-    # find the max horizontal length of the ground surface
-    max_horizontal_length_ground = 0
-    for pt in ground_surface.coords:
-        max_horizontal_length_ground = max(max_horizontal_length_ground, pt[0])
-
-    arrow_spacing = max_horizontal_length_ground / 60
-
-    # find the max dload value
-    max_dload = 0
-    for line in dloads:
-        max_dload = max(max_dload, max(pt['Normal'] for pt in line))
-
-    arrow_height = max_dload / gamma_w
-    head_length = arrow_height / 12
-    head_width = head_length * 0.8
     
-    # Find the maximum load value for scaling
-    max_load = 0
-    for line in dloads:
-        max_load = max(max_load, max(pt['Normal'] for pt in line))
-    
-    
-    for line in dloads:
-        if len(line) < 2:
-            continue
+    def plot_single_dload_set(ax, dloads, color, label):
+        """Internal function to plot a single set of distributed loads"""
+        if not dloads:
+            return
             
-        xs = [pt['X'] for pt in line]
-        ys = [pt['Y'] for pt in line]
-        ns = [pt['Normal'] for pt in line]
+        gamma_w = data['gamma_water']
+        ground_surface = data['ground_surface']
+
+        # find the max horizontal length of the ground surface
+        max_horizontal_length_ground = 0
+        for pt in ground_surface.coords:
+            max_horizontal_length_ground = max(max_horizontal_length_ground, pt[0])
+
+        arrow_spacing = max_horizontal_length_ground / 60
+
+        # find the max dload value
+        max_dload = 0
+        for line in dloads:
+            max_dload = max(max_dload, max(pt['Normal'] for pt in line))
+
+        arrow_height = max_dload / gamma_w
+        head_length = arrow_height / 12
+        head_width = head_length * 0.8
         
-        # Process line segments
-        for i in range(len(line) - 1):
-            x1, y1, n1 = xs[i], ys[i], ns[i]
-            x2, y2, n2 = xs[i+1], ys[i+1], ns[i+1]
-            
-            # Calculate segment direction (perpendicular to this segment)
-            dx = x2 - x1
-            dy = y2 - y1
-            segment_length = np.sqrt(dx**2 + dy**2)
-            
-            if segment_length == 0:
+        # Find the maximum load value for scaling
+        max_load = 0
+        for line in dloads:
+            max_load = max(max_load, max(pt['Normal'] for pt in line))
+        
+        for line in dloads:
+            if len(line) < 2:
                 continue
                 
-            # Normalize the segment direction
-            dx_norm = dx / segment_length
-            dy_norm = dy / segment_length
+            xs = [pt['X'] for pt in line]
+            ys = [pt['Y'] for pt in line]
+            ns = [pt['Normal'] for pt in line]
             
-            # Perpendicular direction (rotate 90 degrees CCW)
-            perp_dx = -dy_norm
-            perp_dy = dx_norm
-            
-            # Generate arrows along this segment
-            dx_abs = abs(x2 - x1)
-            num_arrows = max(1, int(round(dx_abs / arrow_spacing)))
-            if dx_abs == 0:
-                t_values = np.array([0.0, 1.0])
-            else:
-                t_values = np.linspace(0, 1, num_arrows + 1)
-            
-            # Store arrow top points for connecting line
-            top_xs = []
-            top_ys = []
-            
-            # Add start point if it's the first segment and load is zero
-            if i == 0 and n1 == 0:
-                top_xs.append(x1)
-                top_ys.append(y1)
-            
-            for t in t_values:
-                # Interpolate position along segment
-                x = x1 + t * dx
-                y = y1 + t * dy
+            # Process line segments
+            for i in range(len(line) - 1):
+                x1, y1, n1 = xs[i], ys[i], ns[i]
+                x2, y2, n2 = xs[i+1], ys[i+1], ns[i+1]
                 
-                # Interpolate load value
-                n = n1 + t * (n2 - n1)
+                # Calculate segment direction (perpendicular to this segment)
+                dx = x2 - x1
+                dy = y2 - y1
+                segment_length = np.sqrt(dx**2 + dy**2)
                 
-                # Scale arrow height based on equivalent water depth
-                if max_load > 0:
-                    water_depth = n / gamma_w
-                    arrow_height = water_depth  # Direct water depth, not scaled relative to max
-                else:
-                    arrow_height = 0
-                
-                # For very small arrows, just store surface point for connecting line
-                if arrow_height < 0.5:
-                    top_xs.append(x)
-                    top_ys.append(y)
+                if segment_length == 0:
                     continue
-        
+                    
+                # Normalize the segment direction
+                dx_norm = dx / segment_length
+                dy_norm = dy / segment_length
                 
-                # Calculate arrow start point (above surface)
-                arrow_start_x = x + perp_dx * arrow_height
-                arrow_start_y = y + perp_dy * arrow_height
+                # Perpendicular direction (rotate 90 degrees CCW)
+                perp_dx = -dy_norm
+                perp_dy = dx_norm
                 
-                # Store points for connecting line
-                top_xs.append(arrow_start_x)
-                top_ys.append(arrow_start_y)
-                
-                # Draw arrow - extend all the way to surface point
-
-                arrow_length = np.sqrt((x - arrow_start_x)**2 + (y - arrow_start_y)**2)
-                if head_length > arrow_length:
-                    # Draw a simple line without arrowhead
-                    ax.plot([arrow_start_x, x], [arrow_start_y, y], 
-                           color='purple', linewidth=2, alpha=0.7)
+                # Generate arrows along this segment
+                dx_abs = abs(x2 - x1)
+                num_arrows = max(1, int(round(dx_abs / arrow_spacing)))
+                if dx_abs == 0:
+                    t_values = np.array([0.0, 1.0])
                 else:
-                    # Draw arrow with head
-                    ax.arrow(arrow_start_x, arrow_start_y, 
-                            x - arrow_start_x, y - arrow_start_y,
-                            head_width=head_width, head_length=head_length, 
-                            fc='purple', ec='purple', alpha=0.7,
-                            length_includes_head=True)
+                    t_values = np.linspace(0, 1, num_arrows + 1)
+                
+                # Store arrow top points for connecting line
+                top_xs = []
+                top_ys = []
+                
+                # Add start point if it's the first segment and load is zero
+                if i == 0 and n1 == 0:
+                    top_xs.append(x1)
+                    top_ys.append(y1)
+                
+                for t in t_values:
+                    # Interpolate position along segment
+                    x = x1 + t * dx
+                    y = y1 + t * dy
+                    
+                    # Interpolate load value
+                    n = n1 + t * (n2 - n1)
+                    
+                    # Scale arrow height based on equivalent water depth
+                    if max_load > 0:
+                        water_depth = n / gamma_w
+                        arrow_height = water_depth  # Direct water depth, not scaled relative to max
+                    else:
+                        arrow_height = 0
+                    
+                    # For very small arrows, just store surface point for connecting line
+                    if arrow_height < 0.5:
+                        top_xs.append(x)
+                        top_ys.append(y)
+                        continue
             
-            # Add end point if it's the last segment and load is zero
-            if i == len(line) - 2 and n2 == 0:
-                top_xs.append(x2)
-                top_ys.append(y2)
+                    
+                    # Calculate arrow start point (above surface)
+                    arrow_start_x = x + perp_dx * arrow_height
+                    arrow_start_y = y + perp_dy * arrow_height
+                    
+                    # Store points for connecting line
+                    top_xs.append(arrow_start_x)
+                    top_ys.append(arrow_start_y)
+                    
+                    # Draw arrow - extend all the way to surface point
+                    arrow_length = np.sqrt((x - arrow_start_x)**2 + (y - arrow_start_y)**2)
+                    if head_length > arrow_length:
+                        # Draw a simple line without arrowhead
+                        ax.plot([arrow_start_x, x], [arrow_start_y, y], 
+                               color=color, linewidth=2, alpha=0.7)
+                    else:
+                        # Draw arrow with head
+                        ax.arrow(arrow_start_x, arrow_start_y, 
+                                x - arrow_start_x, y - arrow_start_y,
+                                head_width=head_width, head_length=head_length, 
+                                fc=color, ec=color, alpha=0.7,
+                                length_includes_head=True)
+                
+                # Add end point if it's the last segment and load is zero
+                if i == len(line) - 2 and n2 == 0:
+                    top_xs.append(x2)
+                    top_ys.append(y2)
+                
+                # Draw connecting line at arrow tops
+                if top_xs:
+                    ax.plot(top_xs, top_ys, color=color, linewidth=1.5, alpha=0.8)
             
-            # Draw connecting line at arrow tops
-            if top_xs:
-                ax.plot(top_xs, top_ys, color='purple', linewidth=1.5, alpha=0.8)
-        
-        # Draw the surface line itself
-        ax.plot(xs, ys, color='purple', linewidth=1.5, alpha=0.8)
+            # Draw the surface line itself
+            ax.plot(xs, ys, color=color, linewidth=1.5, alpha=0.8, label=label)
+    
+    # Plot both sets of distributed loads
+    plot_single_dload_set(ax, data.get('dloads'), 'purple', 'Distributed Load')
+    plot_single_dload_set(ax, data.get('dloads2'), 'orange', 'Distributed Load 2')
 
 def plot_circles(ax, data):
     """
@@ -397,16 +416,28 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     if not materials:
         return
 
+    # Check if any materials have non-zero d and psi values
+    has_d_psi = any(mat.get('d', 0) > 0 or mat.get('psi', 0) > 0 for mat in materials)
+
     # Check material options
     options = set(mat['option'] for mat in materials)
 
-    # Decide column headers - need 5 columns to match the data
+    # Decide column headers
     if options == {'mc'}:
-        col_labels = ["Mat", "Name", "γ", "c", "φ"]
+        if has_d_psi:
+            col_labels = ["Mat", "Name", "γ", "c", "φ", "d", "ψ"]
+        else:
+            col_labels = ["Mat", "Name", "γ", "c", "φ"]
     elif options == {'cp'}:
-        col_labels = ["Mat", "Name", "γ", "cp", "rₑ"]
+        if has_d_psi:
+            col_labels = ["Mat", "Name", "γ", "cp", "rₑ", "d", "ψ"]
+        else:
+            col_labels = ["Mat", "Name", "γ", "cp", "rₑ"]
     else:
-        col_labels = ["Mat", "Name", "γ", "c / cp", "φ / rₑ"]
+        if has_d_psi:
+            col_labels = ["Mat", "Name", "γ", "c / cp", "φ / rₑ", "d", "ψ"]
+        else:
+            col_labels = ["Mat", "Name", "γ", "c / cp", "φ / rₑ"]
 
     # Build table rows
     table_data = []
@@ -414,17 +445,42 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
         name = mat['name']
         gamma = mat['gamma']
         option = mat['option']
+        
         if option == 'mc':
             c = mat['c']
             phi = mat['phi']
-            row = [idx+1, name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}"]
+            if has_d_psi:
+                d = mat.get('d', 0)
+                psi = mat.get('psi', 0)
+                d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
+                psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
+                row = [idx+1, name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}", d_str, psi_str]
+            else:
+                row = [idx+1, name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}"]
         elif option == 'cp':
             cp = mat['cp']
             r_elev = mat['r_elev']
-            row = [idx+1, name, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}"]
+            if has_d_psi:
+                d = mat.get('d', 0)
+                psi = mat.get('psi', 0)
+                d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
+                psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
+                row = [idx+1, name, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}", d_str, psi_str]
+            else:
+                row = [idx+1, name, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}"]
         else:
-            row = [idx+1, name, f"{gamma:.1f}", "-", "-"]
+            if has_d_psi:
+                d = mat.get('d', 0)
+                psi = mat.get('psi', 0)
+                d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
+                psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
+                row = [idx+1, name, f"{gamma:.1f}", "-", "-", d_str, psi_str]
+            else:
+                row = [idx+1, name, f"{gamma:.1f}", "-", "-"]
         table_data.append(row)
+
+    # Adjust table width based on number of columns
+    table_width = 0.25 if has_d_psi else 0.2
 
     # Add the table
     table = ax.table(cellText=table_data,
@@ -432,7 +488,7 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
                      loc='upper right',
                      colLoc='center',
                      cellLoc='center',
-                     bbox=[xloc, yloc, 0.2, 0.25])
+                     bbox=[xloc, yloc, table_width, 0.25])
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
@@ -624,7 +680,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     # Plot contents
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_piezo_line(ax, data['piezo_line'])
+    plot_piezo_line(ax, data)
     plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
@@ -688,7 +744,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
     plot_slices(ax, df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    plot_piezo_line(ax, data['piezo_line'])
+    plot_piezo_line(ax, data)
     plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
     if slice_numbers:
@@ -831,7 +887,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
 
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_piezo_line(ax, data['piezo_line'])
+    plot_piezo_line(ax, data)
     plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 
@@ -873,7 +929,7 @@ def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_
     # Plot basic profile elements
     plot_profile_lines(ax, data['profile_lines'])
     plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_piezo_line(ax, data['piezo_line'])
+    plot_piezo_line(ax, data)
     plot_dloads(ax, data)
     plot_tcrack_surface(ax, data['tcrack_surface'])
 

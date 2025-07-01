@@ -45,6 +45,12 @@ def test_rapid_drawdown():
     
     df = pd.DataFrame(data)
     
+    # Ensure numeric columns have float dtype to avoid warnings
+    numeric_columns = ['c', 'phi', 'c1', 'phi1', 'd', 'psi', 'u', 'u2', 'dload', 'dload2', 'd_x', 'd_x2', 'd_y', 'd_y2']
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = df[col].astype(float)
+    
     print("Testing rapid_drawdown function...")
     print("Input data:")
     print(df[['slice #', 'c', 'phi', 'd', 'psi', 'u', 'u2']])

@@ -93,7 +93,7 @@ def calculate_reliability(F_MLV, COV_F):
     return R
 ```
 
-But first, we have to calculate the factor of safety based on the most likely values of the parameters ($F_{MLV}$) and the coefficient of variation of the factor of safety ($COV_F$). Calculating the $F_{MLV} is straightforward, as it is simply the factor of safety calculated using the most likely values of the parameters. This can be done using any of the limit equilibrium methods implemented in the **slopetools** package, such as Bishop's method, Janbu's method, or Spencer's method.
+But first, we have to calculate the factor of safety based on the most likely values of the parameters ($F_{MLV}$) and the coefficient of variation of the factor of safety ($COV_F$). Calculating the $F_{MLV}$ is straightforward, as it is simply the factor of safety calculated using the most likely values of the parameters. This can be done using any of the limit equilibrium methods implemented in the **slopetools** package, such as Bishop's method, Janbu's method, or Spencer's method.
 
 To calculate the $COV_F$, there are two common approaches to calculate these values: the Monte Carlo method and the Taylor Series Probability Method (TSPM).
 

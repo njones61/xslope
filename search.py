@@ -53,7 +53,7 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
                 else:
                     df_slices, failure_surface = result
                     if rapid:
-                        solver, success = rapid_drawdown(df_slices, solver)
+                        solver_success, solver_result = rapid_drawdown(df_slices, solver)
                     else:
                         solver_success, solver_result = solver(df_slices)
                     FS = solver_result['FS'] if solver_success else fs_fail
@@ -259,7 +259,7 @@ def noncircular_search(data, solver, rapid=False, diagnostic=True, movement_dist
             
         df_slices, failure_surface = result
         if rapid:
-            solver, success = rapid_drawdown(df_slices, solver)
+            solver_success, solver_result = rapid_drawdown(df_slices, solver)
         else:
             solver_success, solver_result = solver(df_slices)
         FS = solver_result['FS'] if solver_success else float('inf')

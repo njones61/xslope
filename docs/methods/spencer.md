@@ -267,8 +267,6 @@ Second-Order Partial Derivatives of Q
 
 >>$\dfrac{\partial^2 Q}{\partial F \partial \theta} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left \{ \left(C_3 + \dfrac{C_4}{F}\right) \left[\dfrac{C_2}{F^2} \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{1}{F^2} \dfrac{\partial C_4}{\partial \theta}\right] - 2 \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right] \right \}  \qquad (53)$
 
->>$\dfrac{\partial^2 Q}{\partial \theta^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left \{ \left(C_3 + \dfrac{C_4}{F}\right) \left[\dfrac{C_2}{F^2}\left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{1}{F^2}\right] - 2 \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]\right \}   \qquad (54)$
-
 >>$\dfrac{\partial^2 Q}{\partial \theta^2} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left[ \left(C_3 + \dfrac{C_4}{F}\right) \left(C_1 + \dfrac{C_2}{F}\right)\left(\dfrac{\partial^2 C_3}{\partial \theta^2} + \dfrac{1}{F} \dfrac{\partial^2 C_4}{\partial \theta^2}\right) - 2 \left(C_1 + \dfrac{C_2}{F}\right) \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right)^2\right]    \qquad (54)$
 
 where:

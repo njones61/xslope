@@ -783,7 +783,10 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         R1, R2, Q, y_q = compute_residuals(F, theta_rad)
         
         if debug_level >= 1:
-            print(f"Iteration {iteration + 1}: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
+            if iteration == 0:
+                print(f"Iteration {1} - Initial: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
+            else:
+                print(f"Iteration {iteration + 1} - Updated: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
         
         # Check convergence
         if abs(R1) < tol and abs(R2) < tol:
@@ -795,13 +798,17 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_partial_derivatives(F, theta_rad, Q, y_q)
         
         # Basic Newton method (Equations 31-32)
-        denominator = dR1_dF * dR2_dtheta - dR1_dtheta * dR2_dF
+        # denominator = dR1_dF * dR2_dtheta - dR1_dtheta * dR2_dF  # this seems wrong
+        denominator = dR1_dtheta * dR2_dF - dR1_dF * dR2_dtheta
         
         if abs(denominator) < 1e-12:
             return False, "Singular Jacobian matrix in Newton iteration"
         
         delta_F = (R1 * dR2_dtheta - R2 * dR1_dtheta) / denominator
         delta_theta = (R2 * dR1_dF - R1 * dR2_dF) / denominator
+
+        if debug_level >= 1 and not extended:
+            print(f"Iteration {iteration + 1} - Basic: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
         
         # Check if we should switch to extended Newton method
         if abs(delta_F) < 0.5 and abs(delta_theta) < 0.15:
@@ -832,7 +839,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
                 pass
 
         if debug_level >= 1:
-            print(f"Iteration {iteration + 1}: delta_F = {delta_F:.3f}, delta_theta = {delta_theta:.3f}")
+            print(f"Iteration {iteration + 1} - Extended: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
 
         # Update values
         F += delta_F

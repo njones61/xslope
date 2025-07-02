@@ -569,7 +569,7 @@ def lowe_karafiath(df, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
+def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     
@@ -640,179 +640,240 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
         + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) # Equation (3)
 
-    def compute_Q(F, theta_rad):
-        ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)  # Equation (24)
-        Q = (- Fv * sin_a - Fh * cos_a - (c / F) * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p / F) * ma     # Equation (23)
-        y_q = y_b + Mo / (Q * np.cos(theta_rad))   # Equation (26)
+
+    # ========== BEGIN SOLUTION ==========
+    
+    def compute_Q_and_yQ(F, theta_rad):
+        """Compute Q and y_Q for given F and theta values."""
+        # Equation (24): m_alpha
+        ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
+        
+        # Equation (23): Q
+        Q = (- Fv * sin_a - Fh * cos_a - (c / F) * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p / F) * ma
+        
+        # Equation (26): y_Q
+        y_q = y_b + Mo / (Q * np.cos(theta_rad))
+        
         return Q, y_q
-
-    fs_min = 0.01
-    fs_max = 20.0
-
-    def fs_force(theta_rad):
-        def residual(F):
-            Q, y_q = compute_Q(F, theta_rad)
-            return Q.sum()  # Equation (15)
-        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
-        return result.x
-
-    def fs_moment(theta_rad):
-        def residual(F):
-            Q, y_q = compute_Q(F, theta_rad)
-            return np.sum(Q * (x_b * np.sin(theta_rad) - y_q * np.cos(theta_rad)))  # Equation (16)
-        result = minimize_scalar(lambda F: abs(residual(F)), bounds=(fs_min, fs_max), method='bounded', options={'xatol': tol})
-        return result.x
-
-    def fs_difference(theta_deg):
-        theta_rad = np.radians(theta_deg)
-        Ff = fs_force(theta_rad)
-        Fm = fs_moment(theta_rad)
-        return Ff - Fm
-
-    # Robust theta root-finding with multiple strategies
-    theta_opt = None
-    convergence_error = None
     
-    # Strategy 1: Try multiple starting points for Newton's method
-
-    newton_starting_points = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    def compute_residuals(F, theta_rad):
+        """Compute residuals R1 and R2 for given F and theta values."""
+        Q, y_q = compute_Q_and_yQ(F, theta_rad)
+        
+        # Equation (27): R1 = sum(Q)
+        R1 = np.sum(Q)
+        
+        # Equation (28): R2 = sum(Q * (x_b * sin(theta) - y_Q * cos(theta)))
+        R2 = np.sum(Q * (x_b * np.sin(theta_rad) - y_q * np.cos(theta_rad)))
+        
+        return R1, R2, Q, y_q
     
-    # Pre-evaluate fs_difference for all starting points and sort by absolute value
-    starting_point_evaluations = []
-    for theta_guess in newton_starting_points:
-        try:
-            fs_diff = fs_difference(theta_guess)
-            starting_point_evaluations.append((theta_guess, abs(fs_diff), fs_diff))
-        except Exception as e:
-            if debug_level >= 1:
-                print(f"Failed to evaluate fs_difference at {theta_guess:.1f} deg: {e}")
-            continue
+    def compute_partial_derivatives(F, theta_rad, Q, y_q):
+        """Compute all partial derivatives needed for Newton's method."""
+        # Precompute trigonometric terms
+        cos_alpha_theta = np.cos(alpha - theta_rad)
+        sin_alpha_theta = np.sin(alpha - theta_rad)
+        cos_theta = np.cos(theta_rad)
+        sin_theta = np.sin(theta_rad)
+        
+        # Constants for Q expression (Equations 45-49)
+        C1 = -Fv * sin_a - Fh * cos_a
+        C2 = -c * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p
+        C3 = cos_alpha_theta
+        C4 = sin_alpha_theta * tan_p
+        
+        # Denominator for Q
+        denom_Q = C3 + C4 / F
+        
+        # First-order partial derivatives of Q (Equations 50-51)
+        dQ_dF = (-1 / denom_Q**2) * ((denom_Q * C2 / F**2) - (C1 + C2 / F) * C4 / F**2)
+        
+        dC3_dtheta = sin_alpha_theta  # Equation (55)
+        dC4_dtheta = -cos_alpha_theta * tan_p  # Equation (56)
+        dQ_dtheta = (-1 / denom_Q**2) * (C1 + C2 / F) * (dC3_dtheta + dC4_dtheta / F)
+        
+        # Partial derivatives of y_Q (Equations 59-60)
+        dyQ_dF = (-1 / (Q * cos_theta)**2) * Mo * dQ_dF * cos_theta
+        dyQ_dtheta = (-1 / (Q * cos_theta)**2) * Mo * (dQ_dtheta * cos_theta - Q * sin_theta)
+        
+        # First-order partial derivatives of R1 (Equations 35-36)
+        dR1_dF = np.sum(dQ_dF)
+        dR1_dtheta = np.sum(dQ_dtheta)
+        
+        # First-order partial derivatives of R2 (Equations 40-41)
+        dR2_dF = np.sum(dQ_dF * (x_b * sin_theta - y_q * cos_theta)) - np.sum(Q * dyQ_dF * cos_theta)
+        dR2_dtheta = np.sum(dQ_dtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(Q * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta))
+        
+        return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta
     
-    # Sort by absolute value of fs_difference (smallest first)
-    starting_point_evaluations.sort(key=lambda x: x[1])
+    def compute_second_derivatives(F, theta_rad, Q, y_q):
+        """Compute second-order partial derivatives for extended Newton method."""
+        # Precompute trigonometric terms
+        cos_alpha_theta = np.cos(alpha - theta_rad)
+        sin_alpha_theta = np.sin(alpha - theta_rad)
+        cos_theta = np.cos(theta_rad)
+        sin_theta = np.sin(theta_rad)
+        
+        # Constants for Q expression
+        C1 = -Fv * sin_a - Fh * cos_a
+        C2 = -c * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p
+        C3 = cos_alpha_theta
+        C4 = sin_alpha_theta * tan_p
+        
+        # Denominator for Q
+        denom_Q = C3 + C4 / F
+        
+        # First derivatives (needed for second derivatives)
+        dQ_dF = (-1 / denom_Q**2) * ((denom_Q * C2 / F**2) - (C1 + C2 / F) * C4 / F**2)
+        dC3_dtheta = sin_alpha_theta
+        dC4_dtheta = -cos_alpha_theta * tan_p
+        dQ_dtheta = (-1 / denom_Q**2) * (C1 + C2 / F) * (dC3_dtheta + dC4_dtheta / F)
+        
+        # Second derivatives of C3 and C4 (Equations 57-58)
+        d2C3_dtheta2 = -cos_alpha_theta
+        d2C4_dtheta2 = -sin_alpha_theta * tan_p
+        
+        # Second-order partial derivatives of Q (Equations 52-54)
+        d2Q_dF2 = (1 / denom_Q**3) * (
+            denom_Q * (2 * denom_Q * C2 / F**3 - 2 * (C1 + C2 / F) * C4 / F**3) -
+            2 * C4 / F**2 * (denom_Q * C2 / F**2 - (C1 + C2 / F) * C4 / F**2)
+        )
+        
+        d2Q_dFdtheta = (-1 / denom_Q**3) * (
+            denom_Q * (C2 / F**2 * (dC3_dtheta + dC4_dtheta / F) - (C1 + C2 / F) * dC4_dtheta / F**2) -
+            2 * (dC3_dtheta + dC4_dtheta / F) * (denom_Q * C2 / F**2 - (C1 + C2 / F) * C4 / F**2)
+        )
+        
+        d2Q_dtheta2 = (-1 / denom_Q**3) * (
+            denom_Q * (C1 + C2 / F) * (d2C3_dtheta2 + d2C4_dtheta2 / F) -
+            2 * (C1 + C2 / F) * (dC3_dtheta + dC4_dtheta / F)**2
+        )
+        
+        # Second-order partial derivatives of y_Q (Equations 61-63)
+        dyQ_dF = (-1 / (Q * cos_theta)**2) * Mo * dQ_dF * cos_theta
+        dyQ_dtheta = (-1 / (Q * cos_theta)**2) * Mo * (dQ_dtheta * cos_theta - Q * sin_theta)
+        
+        d2yQ_dF2 = (-1 / (Q**2 * cos_theta)) * Mo * (d2Q_dF2 - 2 / Q * dQ_dF**2)
+        d2yQ_dFdtheta = (-1 / (Q**2 * cos_theta)) * Mo * (d2Q_dFdtheta + dQ_dF * np.tan(theta_rad) - 2 * dQ_dF * dQ_dtheta / Q)
+        d2yQ_dtheta2 = (-1 / (Q**2 * cos_theta)) * Mo * (2 * d2Q_dtheta2 * np.tan(theta_rad) - d2Q_dtheta2 + Q + 2 / Q * (dQ_dtheta - Q * np.tan(theta_rad))**2)
+        
+        # Second-order partial derivatives of R1 (Equations 37-39)
+        d2R1_dF2 = np.sum(d2Q_dF2)
+        d2R1_dFdtheta = np.sum(d2Q_dFdtheta)
+        d2R1_dtheta2 = np.sum(d2Q_dtheta2)
+        
+        # Second-order partial derivatives of R2 (Equations 42-44)
+        d2R2_dF2 = np.sum(d2Q_dF2 * (x_b * sin_theta - y_q * cos_theta)) - 2 * np.sum(dQ_dF * dyQ_dF * cos_theta) - np.sum(Q * d2yQ_dF2 * cos_theta)
+        d2R2_dFdtheta = np.sum(d2Q_dFdtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(dQ_dF * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta)) - np.sum(dQ_dtheta * dyQ_dF * cos_theta) - np.sum(Q * (d2yQ_dFdtheta * cos_theta - dyQ_dF * sin_theta))
+        d2R2_dtheta2 = np.sum(d2Q_dtheta2 * (x_b * sin_theta - y_q * cos_theta)) + 2 * np.sum(dQ_dtheta * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta)) - np.sum(Q * (x_b * sin_theta - y_q * cos_theta - 2 * dyQ_dtheta * sin_theta + d2yQ_dtheta2 * cos_theta))
+        
+        return d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2
     
-    if debug_level >= 1:
-        print("Starting points sorted by |fs_difference|:")
-        for theta_guess, abs_fs_diff, fs_diff in starting_point_evaluations:
-            print(f"  {theta_guess:.1f}°: |fs_diff| = {abs_fs_diff:.6f}, fs_diff = {fs_diff:.6f}")
+    # Initial guesses
+    F0 = 1.5
+    theta0_rad = np.radians(8) 
     
-    for theta_guess, abs_fs_diff, fs_diff in starting_point_evaluations:
-        try:
-            if debug_level >= 1:
-                print(f"Trying Newton's method with initial guess {theta_guess:.1f} deg (|fs_diff| = {abs_fs_diff:.6f})")
-            theta_candidate = newton(fs_difference, x0=theta_guess, tol=tol, maxiter=max_iter)
-            
-            # Check if the solution is valid
-            if (abs(theta_candidate) <= 59 and 
-                abs(fs_difference(theta_candidate)) <= 0.01 and
-                fs_force(np.radians(theta_candidate)) < fs_max - 1e-3):
-                theta_opt = theta_candidate
-                if debug_level >= 1:
-                    print(f"Newton's method succeeded with starting point {theta_guess:.1f} deg")
-                break
-        except Exception as e:
-            if debug_level >= 1:
-                print(f"Newton's method failed with starting point {theta_guess:.1f} deg: {e}")
-            continue
+    # Newton iteration
+    F = F0
+    theta_rad = theta0_rad
+    extended = False
     
-    # Strategy 2: If Newton's method failed, try adaptive grid search
-    if theta_opt is None:
+    for iteration in range(max_iter):
+        # Compute residuals
+        R1, R2, Q, y_q = compute_residuals(F, theta_rad)
+        
         if debug_level >= 1:
-            print("Newton's method failed for all starting points, trying adaptive grid search...")
+            print(f"Iteration {iteration + 1}: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
         
-        # First, do a coarse sweep to identify promising regions
-        theta_coarse = np.linspace(-60, 60, 121)  # More points for better resolution
-        fs_diff_coarse = []
+        # Check convergence
+        if abs(R1) < tol and abs(R2) < tol:
+            if debug_level >= 1:
+                print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
+            break
         
-        for theta in theta_coarse:
-            try:
-                fs_diff_coarse.append(fs_difference(theta))
-            except Exception:
-                fs_diff_coarse.append(np.nan)
+        # Compute first-order partial derivatives
+        dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_partial_derivatives(F, theta_rad, Q, y_q)
         
-        fs_diff_coarse = np.array(fs_diff_coarse)
+        # Basic Newton method (Equations 31-32)
+        denominator = dR1_dF * dR2_dtheta - dR1_dtheta * dR2_dF
         
-        # Find regions where sign changes occur
-        sign_changes = []
-        for i in range(len(fs_diff_coarse) - 1):
-            if (not np.isnan(fs_diff_coarse[i]) and 
-                not np.isnan(fs_diff_coarse[i+1]) and
-                fs_diff_coarse[i] * fs_diff_coarse[i+1] < 0):
-                sign_changes.append((theta_coarse[i], theta_coarse[i+1]))
+        if abs(denominator) < 1e-12:
+            return False, "Singular Jacobian matrix in Newton iteration"
         
-        # Try root_scalar on each bracket
-        for bracket in sign_changes:
-            try:
-                if debug_level >= 1:
-                    print(f"Trying root_scalar with bracket {bracket}")
-                sol = root_scalar(fs_difference, bracket=bracket, method='brentq', xtol=tol)
-                theta_candidate = sol.root
-                
-                # Check if the solution is valid
-                if (abs(theta_candidate) <= 59 and 
-                    abs(fs_difference(theta_candidate)) <= 0.01 and
-                    fs_force(np.radians(theta_candidate)) < fs_max - 1e-3):
-                    theta_opt = theta_candidate
-                    if debug_level >= 1:
-                        print(f"root_scalar succeeded with bracket {bracket}")
-                    break
-            except Exception as e:
-                if debug_level >= 1:
-                    print(f"root_scalar failed with bracket {bracket}: {e}")
-                continue
-    
-    # Strategy 3: If still no solution, try global optimization
-    if theta_opt is None:
-        if debug_level >= 1:
-            print("All root-finding methods failed, trying global optimization...")
+        delta_F = (R1 * dR2_dtheta - R2 * dR1_dtheta) / denominator
+        delta_theta = (R2 * dR1_dF - R1 * dR2_dF) / denominator
         
-        try:
-            # Use minimize_scalar to find the minimum of |fs_difference|
-            result = minimize_scalar(
-                lambda theta: abs(fs_difference(theta)), 
-                bounds=(-60, 60), 
-                method='bounded', 
-                options={'xatol': tol}
-            )
+        # Check if we should switch to extended Newton method
+        if abs(delta_F) < 0.5 and abs(delta_theta) < 0.15:
+
+            if debug_level >= 1 and not extended:
+                print(f"*** Switching to extended Newton method ***")
+            extended = True
+
+            # Extended Newton method (Equations 33-34)
+            d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2 = compute_second_derivatives(F, theta_rad, Q, y_q)
             
-            if result.success and abs(fs_difference(result.x)) <= 0.01:
-                theta_opt = result.x
-                if debug_level >= 1:
-                    print(f"Global optimization succeeded with theta = {theta_opt:.6f} deg")
-            else:
-                convergence_error = f"Global optimization failed: {result.message}"
-                
-        except Exception as e:
-            convergence_error = f"Global optimization failed: {e}"
+            # Build coefficient matrix for extended Newton
+            A11 = dR1_dF + 0.5 * delta_F * d2R1_dF2 + 0.5 * delta_theta * d2R1_dFdtheta
+            A12 = dR1_dtheta + 0.5 * delta_F * d2R1_dFdtheta + 0.5 * delta_theta * d2R1_dtheta2
+            A21 = dR2_dF + 0.5 * delta_F * d2R2_dF2 + 0.5 * delta_theta * d2R2_dFdtheta
+            A22 = dR2_dtheta + 0.5 * delta_F * d2R2_dFdtheta + 0.5 * delta_theta * d2R2_dtheta2
+            
+            # Solve extended Newton system
+            A = np.array([[A11, A12], [A21, A22]])
+            b = np.array([-R1, -R2])
+            
+            try:
+                delta_solution = np.linalg.solve(A, b)
+                delta_F = delta_solution[0]
+                delta_theta = delta_solution[1]
+            except np.linalg.LinAlgError:
+                # Fall back to basic Newton if extended method fails
+                pass
+
+        if debug_level >= 1:
+            print(f"Iteration {iteration + 1}: delta_F = {delta_F:.3f}, delta_theta = {delta_theta:.3f}")
+
+        # Update values
+        F += delta_F
+        theta_rad += delta_theta
+        
+        # Ensure F stays positive
+        if F <= 0:
+            F = 0.1
+        
+        # Limit theta to reasonable range
+        theta_rad = np.clip(theta_rad, -np.pi/2, np.pi/2)
     
-    # Check if we found a solution
-    if theta_opt is None:
-        if convergence_error:
-            return False, f"Spencer's method failed to converge: {convergence_error}"
-        else:
-            return False, "Spencer's method: No valid solution found with any method."
+    # Check if we converged
+    if iteration >= max_iter - 1:
+        return False, "Spencer's method did not converge within the maximum number of iterations."
+    
+    # Final computation of Q and y_q
+    Q, y_q = compute_Q_and_yQ(F, theta_rad)
+    
+    # Convert theta to degrees for output
+    theta_opt = np.degrees(theta_rad)
+    
+    # ========== END SOLUTION ==========
 
-    theta_rad = np.radians(theta_opt)
-    FS_force = fs_force(theta_rad)
-    FS_moment = fs_moment(theta_rad)
+    # Store theta in df
+    df['theta'] = theta_opt
 
-    df['theta'] = theta_opt  # store theta in df.
+    # --- Compute N_eff using Equation (18) ---
+    N_eff = - Fv * cos_a + Fh * sin_a + Q * np.sin(alpha - theta_rad) - u * dl
 
-    # --- Compute N_eff ---
-    Q, y_q = compute_Q(FS_force, theta_rad)
-    N_eff = - Fv * cos_a + Fh * sin_a + Q * np.sin(alpha - theta_rad) - u * dl   # Equation (18)
-
-    # ---  compute interslice forces Z  ---
+    # --- Compute interslice forces Z using Equation (67) ---
     n = len(Q)
     Z = np.zeros(n+1)
     for i in range(n):
         Z[i+1] = Z[i] - Q[i] 
 
-    # --- store back into df ---
-    df['z']     = Z[:-1]        # Z_i acting on slice i's left face
+    # --- Store back into df ---
+    df['z'] = Z[:-1]        # Z_i acting on slice i's left face
     df['n_eff'] = N_eff
 
-    # --- compute line of thrust ---
+    # --- Compute line of thrust using Equation (69) ---
     yt_l = np.zeros(n)  # the y-coordinate of the line of thrust on the left side of the slice.
     yt_r = np.zeros(n)  # the y-coordinate of the line of thrust on the right side of the slice.
     yt_l[0] = y_lb[0]  
@@ -822,27 +883,23 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
         if i == n - 1:
             yt_r[i] = y_rb[i]
         else:
-            yt_r[i] = y_b[i] - ((Mo[i] - Z[i] * sin_theta * dx[i] / 2 - Z[i+1] * sin_theta * dx[i] / 2 - Z[i] * cos_theta * (yt_l[i] - y_b[i])) / (Z[i+1] * cos_theta))  # Equation (30)
+            yt_r[i] = y_b[i] - ((Mo[i] - Z[i] * sin_theta * dx[i] / 2 - Z[i+1] * sin_theta * dx[i] / 2 - Z[i] * cos_theta * (yt_l[i] - y_b[i])) / (Z[i+1] * cos_theta))
             yt_l[i+1] = yt_r[i]
     df['yt_l'] = yt_l
     df['yt_r'] = yt_r
     
-    # --- Check convergence ---
-    converged = abs(FS_force - FS_moment) < tol
-    if not converged:
-        return False, "Spencer's method did not converge within the maximum number of iterations."
-    else:
-        results = {}
-        results['method'] = 'spencer'
-        results['FS'] = FS_force
-        results['theta'] = theta_opt
+    # --- Return results ---
+    results = {}
+    results['method'] = 'spencer'
+    results['FS'] = F
+    results['theta'] = theta_opt
 
-        # debug print values per slice
-        if debug_level >= 2:
-            for i in range(len(Q)):
-                print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
+    # Debug print values per slice
+    if debug_level >= 2:
+        for i in range(len(Q)):
+            print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
 
-        return True, results
+    return True, results
 
 def rapid_drawdown(df, method_func, debug_level=1):
     """

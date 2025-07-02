@@ -36,7 +36,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_rapid2.xlsx")
+data = load_globals("docs/input_template_lface2.xlsx")
 
 # plot_inputs(data)
 
@@ -52,7 +52,7 @@ else:
     print(result)
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df, rapid=True)
+results = solve_selected(spencer, df, rapid=False)
 
 # export df to excel
 df.to_excel("slices.xlsx", index=False)

@@ -166,21 +166,146 @@ Solving for $y_Q$ gives:
 
 >>$y_Q = y_b + \dfrac{M_o}{Q \cos \theta}  \qquad (26)$
 
-## Solution of Equations
+## Solution of Equilibrium Equations
 
-To solve the equations, we can use a numerical method such as the Newton-Raphson method. The steps are as follows:
+The expressions for $Q$ (from the force derivation) and $y_Q$ (the line of action coordinate) are substituted into the equations of equilibrium to produce two equations in two unknowns ($F$ and $θ$) which must be satisfied to satisfy static equilibrium. The solution for the factor of safety and side-force inclination is accomplished using an iterative procedure based on Newton's method for solving two equations in two unknowns.
 
-1. **Initial Guess**: Start with an initial guess for the inclination angle $\theta$.
-2. **Calculate Forces and Moments**: For each slice, calculate the forces and moments using equations (1) to (3).
-3. **Calculate $Q$ and $y_Q$**: Use equations (23) and (26) to calculate $Q$ and $y_Q$ for each slice.
-4. **Calculate F - Forces**: For the candidate $\theta$, solve for a factor of safety that satisfies force equilibrium ($F_{force}$) using equation 15. 
-5. **Calcualte F - Moments**: For the candidate $\theta$, solve for a factor of safety that satisfies moment equilibrium ($F_{moment}$) using equation 16.
-6. **Calculate F - Differences**: Calculate the difference between the two factors of safety ($F_{diff} = F_{force} - F_{moment}$).
-4. **Find optimal $\theta$**: Using a numerical method such as the Newton-Raphson method, repeat steps 2-6 and find a value of $\theta$ that results in $|F_{diff}| < tol$. 
+For assumed values of the factor of safety F₀ and side-force inclination θ₀, it is convenient to write the two equilibrium equations in the form:
 
-Once the solution converges, we can use equation (18) to calculate the normal force $N$. The effective normal force $N'$ can be calculated as:
+>>$R_1 = \sum Q_0   \quad(27)$
 
->>$N' = N - u \Delta \ell  \qquad (27)$
+>>$R_2 = \sum Q_0(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0)  \qquad (28)$
+
+where:
+
+>>$Q_0$ = value of $Q$ based on the assumed values $F_0$ and $\theta_0$
+
+>>$R_1, R_2$ = force and moment imbalances, respectively, based on the assumed values $F_0$ and $\theta_0$
+
+Application of Newton's method to find the roots corresponding to R₁ = R₂ = 0 gives the following for the new estimates:
+
+>>$F_1 = F_0 + \Delta F   \qquad (29)$
+
+>>$\theta_1 = \theta_0 + \Delta \theta  \qquad (30)$
+
+where ΔF and Δθ represent adjustments to the assumed values to be used for the next iteration.
+
+### Basic Newton Method
+
+The expressions for ΔF and Δθ are:
+
+>>$\Delta F = \dfrac{R_1 \dfrac{\partial R_2}{\partial \theta} - R_2 \dfrac{\partial R_1}{\partial \theta}}{\dfrac{\partial R_1}{\partial F} \dfrac{\partial R_2}{\partial \theta} - \dfrac{\partial R_1}{\partial \theta} \dfrac{\partial R_2}{\partial F}}  \qquad (31)$
+
+
+>>$\Delta \theta = \dfrac{R_2 \dfrac{\partial R_1}{\partial F} - R_1 \dfrac{\partial R_2}{\partial F}}{\dfrac{\partial R_1}{\partial F} \dfrac{\partial R_2}{\partial \theta} - \dfrac{\partial R_1}{\partial \theta} \dfrac{\partial R_2}{\partial F}}  \qquad (32)$
+
+### Extended Newton Method
+
+When the values become less than certain limits (ΔF = 0.5, Δθ = 0.15 radians), an "extended" form of Newton's method is used based on Taylor series expansions including second-order terms:
+
+>>$R_1 + \Delta F \dfrac{\partial R_1}{\partial F} + \Delta \theta \dfrac{\partial R_1}{\partial \theta} + \dfrac{1}{2} \Delta F^2 \dfrac{\partial^2 R_1}{\partial F^2} + \Delta F \Delta \theta \dfrac{\partial^2 R_1}{\partial F \partial \theta} + \dfrac{1}{2} \Delta \theta^2 \dfrac{\partial^2 R_1}{\partial \theta^2} = 0  \qquad (33)$
+
+>>$R_2 + \Delta F \dfrac{\partial R_2}{\partial F} + \Delta \theta \dfrac{\partial R_2}{\partial \theta} + \dfrac{1}{2} \Delta F^2 \dfrac{\partial^2 R_2}{\partial F^2} + \Delta F \Delta \theta \dfrac{\partial^2 R_2}{\partial F \partial \theta} + \dfrac{1}{2} \Delta \theta^2 \dfrac{\partial^2 R_2}{\partial \theta^2} = 0  \qquad (34)$
+
+Estimates of new trial values are obtained by solving these two equations simultaneously for ΔF and Δθ.
+
+### Required Partial Derivatives
+
+First-Order Partial Derivatives of R₁
+
+>>$\dfrac{\partial R_1}{\partial F} = \sum \dfrac{\partial Q}{\partial F}  \qquad (35)$
+
+>>$\dfrac{\partial R_1}{\partial \theta} = \sum \dfrac{\partial Q}{\partial \theta}  \qquad (36)$
+
+Second-Order Partial Derivatives of R₁
+
+>>$\dfrac{\partial^2 R_1}{\partial F^2} = \sum \dfrac{\partial^2 Q}{\partial F^2}  \qquad (37)$
+
+>>$\dfrac{\partial^2 R_1}{\partial F \partial \theta} = \sum \dfrac{\partial^2 Q}{\partial F \partial \theta}  \qquad (38)$
+
+>>$\dfrac{\partial^2 R_1}{\partial \theta^2} = \sum \dfrac{\partial^2 Q}{\partial \theta^2}  \qquad (39)$
+
+First-Order Partial Derivatives of R₂
+
+>>$\dfrac{\partial R_2}{\partial F} = \sum \dfrac{\partial Q}{\partial F}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - \sum Q_0 \dfrac{\partial y_Q}{\partial F} \cos \theta_0  \qquad (40)$
+
+>>$\dfrac{\partial R_2}{\partial \theta} = \sum \dfrac{\partial Q}{\partial \theta}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + \sum Q_0(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0) - \sum Q_0 \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0  \qquad (41)$
+
+Second-Order Partial Derivatives of R₂
+
+>>$\dfrac{\partial^2 R_2}{\partial F^2} = \sum \dfrac{\partial^2 Q}{\partial F^2}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - 2\sum \dfrac{\partial Q}{\partial F} \dfrac{\partial y_Q}{\partial F} \cos \theta_0 - \sum Q_0 \dfrac{\partial^2 y_Q}{\partial F^2} \cos \theta_0  \qquad (42)$
+
+>>$\dfrac{\partial^2 R_2}{\partial F \partial \theta} = \sum \dfrac{\partial^2 Q}{\partial F \partial \theta}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + \sum \dfrac{\partial Q}{\partial F}(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0) - \sum \dfrac{\partial Q}{\partial F} \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0 + \sum \dfrac{\partial Q}{\partial \theta} \dfrac{\partial y_Q}{\partial F} \cos \theta_0 - \sum Q_0 \dfrac{\partial y_Q}{\partial F} \sin \theta_0 - \sum Q_0 \dfrac{\partial^2 y_Q}{\partial F \partial \theta} \cos \theta_0  \qquad (43)$
+
+>>$\dfrac{\partial^2 R_2}{\partial \theta^2} = \sum \dfrac{\partial^2 Q}{\partial \theta^2}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + 2\sum \dfrac{\partial Q}{\partial \theta}(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0) - 2\sum Q_0(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - 2\sum \dfrac{\partial Q}{\partial \theta} \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0 - 2\sum Q_0 \dfrac{\partial y_Q}{\partial \theta} \sin \theta_0 - \sum Q_0 \dfrac{\partial^2 y_Q}{\partial \theta^2} \cos \theta_0  \qquad (44)$
+
+### Partial Derivative Equations
+
+In evaluating the various partial derivatives, it is convenient to write the expression for Q as:
+
+>>$Q = \dfrac{C_1 + \dfrac{C_2}{F}}{C_3 + \dfrac{C_4}{F}}  \qquad (45)$
+
+where:
+
+>>$C_1 = -F_v \sin \alpha - F_h \cos \alpha  \qquad (46)$
+
+>>$C_2 = -c \Delta x \sec \alpha + (F_v \cos \alpha - F_h \sin \alpha + u \Delta x \sec \alpha) \tan \phi  \qquad (47)$
+
+>>$C_3 = \cos(\alpha - \theta)  \qquad (48)$
+
+>>$C_4 = \sin(\alpha - \theta) \tan \phi  \qquad (49)$
+
+First-Order Partial Derivatives of Q
+
+>>$\dfrac{\partial Q}{\partial F} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^2} \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]  \qquad (50)$
+
+>>$\dfrac{\partial Q}{\partial \theta} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^2} \left(C_1 + \dfrac{C_2}{F}\right) \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right)  \qquad (51)$
+
+Second-Order Partial Derivatives of Q
+
+>>$\dfrac{\partial^2 Q}{\partial F^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left[\left(C_3 + \dfrac{C_4}{F}\right) \left[2\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^3} - 2\left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^3}\right] - 2 \dfrac{C_4}{F^2} \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]\right]  \qquad (52)$
+
+>>$\dfrac{\partial^2 Q}{\partial F \partial \theta} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left[\left(C_3 + \dfrac{C_4}{F}\right) \left[\dfrac{C_2}{F^2} \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{1}{F^2} \dfrac{\partial C_4}{\partial \theta}\right] - 2 \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]\right]  \qquad (53)$
+
+>>$\dfrac{\partial^2 Q}{\partial \theta^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^2} (x_b \sin \theta_0 - y_{Q_0} \cos \theta_0)$
+>>$+ 2\sum \dfrac{\partial Q}{\partial \theta} (x_b \cos \theta_0 + y_{Q_0} \sin \theta_0 - \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0)$
+>>$- 2Q(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0 - 2 \dfrac{\partial y_Q}{\partial \theta} \sin \theta_0 + \dfrac{\partial^2 y_Q}{\partial \theta^2} \cos \theta)  \qquad (54)$
+
+where:
+
+>>$\dfrac{\partial C_3}{\partial \theta} = \sin(\alpha - \theta)  \qquad (55)$
+
+>>$\dfrac{\partial C_4}{\partial \theta} = -\cos(\alpha - \theta) \tan \phi  \qquad (56)$
+
+>>$\dfrac{\partial^2 C_3}{\partial \theta^2} = -\cos(\alpha - \theta)  \qquad (57)$
+
+>>$\dfrac{\partial^2 C_4}{\partial \theta^2} = -\sin(\alpha - \theta) \tan \phi  \qquad (58)$
+
+### Partial Derivatives of $y_Q$
+
+The coordinate $y_Q$ is given by:
+
+>>$y_Q = y_b + \dfrac{M_0}{Q \cos \theta}  \qquad (59)$
+
+The partial derivatives of $y_Q$ are:
+
+>>$\dfrac{\partial y_Q}{\partial F} = \dfrac{-1}{(Q_0 \cos \theta_0)^2} M_0 \dfrac{\partial Q}{\partial F} \cos \theta_0  \qquad (60)$
+
+>>$\dfrac{\partial y_Q}{\partial \theta} = \dfrac{-1}{(Q_0 \cos \theta_0)^2} M_0 \left(\dfrac{\partial Q}{\partial \theta} \cos \theta_0 - Q_0 \sin \theta_0\right)  \qquad (61)$
+
+>>$\dfrac{\partial^2 y_Q}{\partial F^2} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial F^2} - \dfrac{2}{Q_0} \left(\dfrac{\partial Q}{\partial F}\right)^2\right]  \qquad (62)$
+
+>>$\dfrac{\partial^2 y_Q}{\partial F \partial \theta} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial F \partial \theta} \cos \theta_0 - \dfrac{\partial Q}{\partial F} \sin \theta_0 - \dfrac{2}{Q_0} \dfrac{\partial Q}{\partial F} \dfrac{\partial Q}{\partial \theta} \cos \theta_0 + \dfrac{2}{Q_0} \dfrac{\partial Q}{\partial F} Q_0 \tan \theta_0\right]  \qquad (63)$
+
+>>$\dfrac{\partial^2 y_Q}{\partial \theta^2} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial \theta^2} \tan \theta_0 - \dfrac{\partial Q}{\partial \theta}^2 + Q_0 + \dfrac{2}{Q_0} \left(\dfrac{\partial Q}{\partial \theta} - Q_0 \tan \theta_0\right)^2\right]  \qquad (64)$
+
+This iterative solution continues until the residuals R₁ and R₂ converge to within acceptable tolerance, providing the factor of safety F and interslice force inclination θ that satisfy both force and moment equilibrium simultaneously.
+
+## Effective Normal Forces and Interslice Forces
+
+After solving for the factor of safety $F$ and the inclination angle $\theta$, we can calculate the effective normal force $N$ on the base of each slice. The normal force is calculated using equation (18). The effective normal force $N'$ can be calculated as:
+
+>>$N' = N - u \Delta \ell  \qquad (65)$
 
 For the side forces, we note that the interslice forces $E_i$ and $X_i$ can be expressed in terms of a resultant force 
 $Z$ acting at  
@@ -188,22 +313,22 @@ $\theta$ as follows:
 
 ![spencer2_ztheta.png](images/spencer2_ztheta.png)
 
-After solving for $Q$, we note that $Q_i$ can be expressed in terms of the interslice forces $Z_i$ and $Z_{i+1} as 
+After solving for $Q$, we note that $Q_i$ can be expressed in terms of the interslice forces $Z_i$ and $Z_{i+1}$ as 
 follows:
 
->>$Q_i = Z_i - Z_{i+1}$
+>>$Q_i = Z_i - Z_{i+1}  \qquad (66)$
 
 Starting from the left side, we can calculate the interslice forces iteratively. For the first slice, we 
- set $Z_1 = 0$. For each subsequent slice, we  calculate the interslice forces as:
+ set $Z_1 = 0$. For each subsequent slice, we calculate the interslice forces as:
 
->>$Z_{i+1} = Z_i - Q_i  \qquad (28)$
+>>$Z_{i+1} = Z_i - Q_i  \qquad (67)$
 
 ## Line of Thrust
 
 The line of thrust is the line along which the side forces $Z$ act on the slice. It is calculated by starting from 
 the left side and summing moments about the center of the base of the slice. The moments are calculated as follows:
 
->>$M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}{2} - Z_i \cos \theta (y_{t,i} - y_b) + Z_{i+1} \cos \theta (y_{t,i+1} - y_b) = 0   \qquad (29)$
+>>$M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}{2} - Z_i \cos \theta (y_{t,i} - y_b) + Z_{i+1} \cos \theta (y_{t,i+1} - y_b) = 0   \qquad (68)$
 
 
 where $y_{t,i}$ and $y_{t,i+1}$ are y coordinates of the line of thrust of the left and right side, respectively. If 
@@ -211,8 +336,11 @@ $y_{t,i}$ is known, we can solve for $y_{t,i+1}$ as follows:
 
 >>>$y_{t,i+1} = y_b - \left[ \dfrac{M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}
 > {2} - 
-> Z_i \cos \theta (y_{t,i} - y_b)}{Z_{i+1} \cos \theta} \right]  \qquad (30)$
+> Z_i \cos \theta (y_{t,i} - y_b)}{Z_{i+1} \cos \theta} \right]  \qquad (69)$
 
 For the first slice, we can set $y_{t,1} = y_{lb}$ where $y_{lb}$ is the lower left corner of the slice. For each 
 subsequent slice,  $y_{t,i}$ is equal to $y_{t,i+1}$ from the previous slice. We can use that in equation (30) to 
 calculate $y_{t,i+1}$. We repeat this process for all slices until we reach the right side of the slope.
+
+
+

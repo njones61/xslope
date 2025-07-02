@@ -6,15 +6,15 @@ from solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
 from search import circular_search, noncircular_search
 
 
-data = load_globals("docs/input_template_lface.xlsx")
+data = load_globals("docs/input_template_lface2.xlsx")
 
 # Run non-circular search
-fs_cache, converged, search_path = noncircular_search(data, corps_engineers, diagnostic=False)
-plot_noncircular_search_results(data, fs_cache, search_path)
+# fs_cache, converged, search_path = noncircular_search(data, corps_engineers, diagnostic=False)
+# plot_noncircular_search_results(data, fs_cache, search_path)
 
 # For circular search:
-# fs_cache, converged, search_path = circular_search(data, oms, diagnostic=False)
-# plot_circular_search_results(data, fs_cache, search_path)
+fs_cache, converged, search_path = circular_search(data, spencer, diagnostic=False)
+plot_circular_search_results(data, fs_cache, search_path)
 
 
 # import cProfile

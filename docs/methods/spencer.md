@@ -170,7 +170,7 @@ Solving for $y_Q$ gives:
 
 The expressions for $Q$ (from the force derivation) and $y_Q$ (the line of action coordinate) are substituted into the equations of equilibrium to produce two equations in two unknowns ($F$ and $θ$) which must be satisfied to satisfy static equilibrium. The solution for the factor of safety and side-force inclination is accomplished using an iterative procedure based on Newton's method for solving two equations in two unknowns.
 
-For assumed values of the factor of safety F₀ and side-force inclination θ₀, it is convenient to write the two equilibrium equations in the form:
+For assumed values of the factor of safety $F_0$ and side-force inclination $\theta_0$, it is convenient to write the two equilibrium equations in the form:
 
 >>$R_1 = \sum Q_0   \quad(27)$
 
@@ -182,32 +182,32 @@ where:
 
 >>$R_1, R_2$ = force and moment imbalances, respectively, based on the assumed values $F_0$ and $\theta_0$
 
-Application of Newton's method to find the roots corresponding to R₁ = R₂ = 0 gives the following for the new estimates:
+Application of Newton's method to find the roots corresponding to $R_1 = R_2 = 0$ gives the following for the new estimates:
 
 >>$F_1 = F_0 + \Delta F   \qquad (29)$
 
 >>$\theta_1 = \theta_0 + \Delta \theta  \qquad (30)$
 
-where ΔF and Δθ represent adjustments to the assumed values to be used for the next iteration.
+where $\Delta F$ and $\Delta \theta$ represent adjustments to the assumed values to be used for the next iteration.
 
 ### Basic Newton Method
 
-The expressions for ΔF and Δθ are:
+The expressions for $\Delta F$ and $\Delta \theta$ are:
 
->>$\Delta F = \dfrac{R_1 \dfrac{\partial R_2}{\partial \theta} - R_2 \dfrac{\partial R_1}{\partial \theta}}{\dfrac{\partial R_1}{\partial F} \dfrac{\partial R_2}{\partial \theta} - \dfrac{\partial R_1}{\partial \theta} \dfrac{\partial R_2}{\partial F}}  \qquad (31)$
+>>$\Delta F = \dfrac{R_1 \dfrac{\partial R_2}{\partial \theta} - R_2 \dfrac{\partial R_1}{\partial \theta}}{\dfrac{\partial R_1}{\partial \theta} \dfrac{\partial R_2}{\partial F} - \dfrac{\partial R_1}{\partial F} \dfrac{\partial R_2}{\partial \theta}}  \qquad (31)$
 
 
->>$\Delta \theta = \dfrac{R_2 \dfrac{\partial R_1}{\partial F} - R_1 \dfrac{\partial R_2}{\partial F}}{\dfrac{\partial R_1}{\partial F} \dfrac{\partial R_2}{\partial \theta} - \dfrac{\partial R_1}{\partial \theta} \dfrac{\partial R_2}{\partial F}}  \qquad (32)$
+>>$\Delta \theta = \dfrac{R_2 \dfrac{\partial R_1}{\partial F} - R_1 \dfrac{\partial R_2}{\partial F}}{\dfrac{\partial R_1}{\partial \theta} \dfrac{\partial R_2}{\partial F} - \dfrac{\partial R_1}{\partial F} \dfrac{\partial R_2}{\partial \theta}}  \qquad (32)$
 
 ### Extended Newton Method
 
-When the values become less than certain limits (ΔF = 0.5, Δθ = 0.15 radians), an "extended" form of Newton's method is used based on Taylor series expansions including second-order terms:
+Equations (31) and (32) are applied iteratively until the values become less than certain limits ($\Delta F = 0.5, \Delta \theta = 0.15$ radians). At that point, an "extended" form of Newton's method is used based on Taylor series expansions including second-order terms:
 
 >>$R_1 + \Delta F \dfrac{\partial R_1}{\partial F} + \Delta \theta \dfrac{\partial R_1}{\partial \theta} + \dfrac{1}{2} \Delta F^2 \dfrac{\partial^2 R_1}{\partial F^2} + \Delta F \Delta \theta \dfrac{\partial^2 R_1}{\partial F \partial \theta} + \dfrac{1}{2} \Delta \theta^2 \dfrac{\partial^2 R_1}{\partial \theta^2} = 0  \qquad (33)$
 
 >>$R_2 + \Delta F \dfrac{\partial R_2}{\partial F} + \Delta \theta \dfrac{\partial R_2}{\partial \theta} + \dfrac{1}{2} \Delta F^2 \dfrac{\partial^2 R_2}{\partial F^2} + \Delta F \Delta \theta \dfrac{\partial^2 R_2}{\partial F \partial \theta} + \dfrac{1}{2} \Delta \theta^2 \dfrac{\partial^2 R_2}{\partial \theta^2} = 0  \qquad (34)$
 
-Estimates of new trial values are obtained by solving these two equations simultaneously for ΔF and Δθ.
+Estimates of new trial values are obtained by solving these two equations simultaneously for $\Delta F$ and $\Delta \theta$.
 
 ### Required Partial Derivatives
 
@@ -227,17 +227,17 @@ Second-Order Partial Derivatives of R₁
 
 First-Order Partial Derivatives of R₂
 
->>$\dfrac{\partial R_2}{\partial F} = \sum \dfrac{\partial Q}{\partial F}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - \sum Q_0 \dfrac{\partial y_Q}{\partial F} \cos \theta_0  \qquad (40)$
+>>$\dfrac{\partial R_2}{\partial F} = \sum \dfrac{\partial Q}{\partial F} \left( x_b \sin \theta_0 - y_{Q_0} \cos \theta_0 \right) - \sum Q_0 \left(\dfrac{\partial y_Q}{\partial F} \cos \theta_0 \right)  \qquad (40)$
 
->>$\dfrac{\partial R_2}{\partial \theta} = \sum \dfrac{\partial Q}{\partial \theta}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + \sum Q_0(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0) - \sum Q_0 \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0  \qquad (41)$
+>>$\dfrac{\partial R_2}{\partial \theta} = \sum \dfrac{\partial Q}{\partial \theta}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + \sum Q_0  \left( x_b \cos \theta_0 + y_{Q_0} \sin \theta_0 - \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0 \right)  \qquad (41)$
 
 Second-Order Partial Derivatives of R₂
 
->>$\dfrac{\partial^2 R_2}{\partial F^2} = \sum \dfrac{\partial^2 Q}{\partial F^2}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - 2\sum \dfrac{\partial Q}{\partial F} \dfrac{\partial y_Q}{\partial F} \cos \theta_0 - \sum Q_0 \dfrac{\partial^2 y_Q}{\partial F^2} \cos \theta_0  \qquad (42)$
+>>$\dfrac{\partial^2 R_2}{\partial F^2} = \sum \dfrac{\partial^2 Q}{\partial F^2}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - 2\sum \dfrac{\partial Q}{\partial F} \left( \dfrac{\partial y_Q}{\partial F} \cos \theta_0 \right) - \sum Q_0 \left( \dfrac{\partial^2 y_Q}{\partial F^2} \cos \theta_0 \right)  \qquad (42)$
 
->>$\dfrac{\partial^2 R_2}{\partial F \partial \theta} = \sum \dfrac{\partial^2 Q}{\partial F \partial \theta}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + \sum \dfrac{\partial Q}{\partial F}(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0) - \sum \dfrac{\partial Q}{\partial F} \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0 + \sum \dfrac{\partial Q}{\partial \theta} \dfrac{\partial y_Q}{\partial F} \cos \theta_0 - \sum Q_0 \dfrac{\partial y_Q}{\partial F} \sin \theta_0 - \sum Q_0 \dfrac{\partial^2 y_Q}{\partial F \partial \theta} \cos \theta_0  \qquad (43)$
+>>$\dfrac{\partial^2 R_2}{\partial F \partial \theta} = \sum \dfrac{\partial^2 Q}{\partial F \partial \theta}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + \sum \dfrac{\partial Q}{\partial F} \left(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0 -  \dfrac{\partial y_Q}{\partial \theta}  \cos \theta_0 \right) - \sum \dfrac{\partial Q}{\partial \theta} \left( \dfrac{\partial y_Q}{\partial F} \cos \theta_0 \right) - \sum Q_0 \left( \dfrac{\partial^2 y_Q}{\partial F \partial \theta} \cos \theta_0 - \dfrac{\partial y_Q}{\partial F} \sin \theta_0 \right) \qquad (43)$
 
->>$\dfrac{\partial^2 R_2}{\partial \theta^2} = \sum \dfrac{\partial^2 Q}{\partial \theta^2}(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) + 2\sum \dfrac{\partial Q}{\partial \theta}(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0) - 2\sum Q_0(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0) - 2\sum \dfrac{\partial Q}{\partial \theta} \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0 - 2\sum Q_0 \dfrac{\partial y_Q}{\partial \theta} \sin \theta_0 - \sum Q_0 \dfrac{\partial^2 y_Q}{\partial \theta^2} \cos \theta_0  \qquad (44)$
+>>$\dfrac{\partial^2 R_2}{\partial \theta^2} = \sum \dfrac{\partial^2 Q}{\partial \theta^2}\left(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0\right) + 2\sum \dfrac{\partial Q}{\partial \theta}\left(x_b \cos \theta_0 + y_{Q_0} \sin \theta_0 - \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0\right) - \sum Q\left(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0 - 2 \dfrac{\partial y_Q}{\partial \theta} \sin \theta_0 + \dfrac{\partial^2 y_Q}{\partial \theta^2} \cos \theta\right)  \qquad (44)$
 
 ### Partial Derivative Equations
 
@@ -263,13 +263,13 @@ First-Order Partial Derivatives of Q
 
 Second-Order Partial Derivatives of Q
 
->>$\dfrac{\partial^2 Q}{\partial F^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left[\left(C_3 + \dfrac{C_4}{F}\right) \left[2\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^3} - 2\left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^3}\right] - 2 \dfrac{C_4}{F^2} \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]\right]  \qquad (52)$
+>>$\dfrac{\partial^2 Q}{\partial F^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left \{ \left(C_3 + \dfrac{C_4}{F}\right) \left[2\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^3} - 2\left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^3}\right] - 2 \dfrac{C_4}{F^2} \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right] \right \}  \qquad (52)$
 
->>$\dfrac{\partial^2 Q}{\partial F \partial \theta} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left[\left(C_3 + \dfrac{C_4}{F}\right) \left[\dfrac{C_2}{F^2} \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{1}{F^2} \dfrac{\partial C_4}{\partial \theta}\right] - 2 \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]\right]  \qquad (53)$
+>>$\dfrac{\partial^2 Q}{\partial F \partial \theta} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left \{ \left(C_3 + \dfrac{C_4}{F}\right) \left[\dfrac{C_2}{F^2} \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{1}{F^2} \dfrac{\partial C_4}{\partial \theta}\right] - 2 \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right] \right \}  \qquad (53)$
 
->>$\dfrac{\partial^2 Q}{\partial \theta^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^2} (x_b \sin \theta_0 - y_{Q_0} \cos \theta_0)$
->>$+ 2\sum \dfrac{\partial Q}{\partial \theta} (x_b \cos \theta_0 + y_{Q_0} \sin \theta_0 - \dfrac{\partial y_Q}{\partial \theta} \cos \theta_0)$
->>$- 2Q(x_b \sin \theta_0 - y_{Q_0} \cos \theta_0 - 2 \dfrac{\partial y_Q}{\partial \theta} \sin \theta_0 + \dfrac{\partial^2 y_Q}{\partial \theta^2} \cos \theta)  \qquad (54)$
+>>$\dfrac{\partial^2 Q}{\partial \theta^2} = \dfrac{1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left \{ \left(C_3 + \dfrac{C_4}{F}\right) \left[\dfrac{C_2}{F^2}\left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{1}{F^2}\right] - 2 \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right) \left[\left(C_3 + \dfrac{C_4}{F}\right) \dfrac{C_2}{F^2} - \left(C_1 + \dfrac{C_2}{F}\right) \dfrac{C_4}{F^2}\right]\right \}   \qquad (54)$
+
+>>$\dfrac{\partial^2 Q}{\partial \theta^2} = \dfrac{-1}{\left(C_3 + \dfrac{C_4}{F}\right)^3} \left[ \left(C_3 + \dfrac{C_4}{F}\right) \left(C_1 + \dfrac{C_2}{F}\right)\left(\dfrac{\partial^2 C_3}{\partial \theta^2} + \dfrac{1}{F} \dfrac{\partial^2 C_4}{\partial \theta^2}\right) - 2 \left(C_1 + \dfrac{C_2}{F}\right) \left(\dfrac{\partial C_3}{\partial \theta} + \dfrac{1}{F} \dfrac{\partial C_4}{\partial \theta}\right)^2\right]    \qquad (54)$
 
 where:
 
@@ -283,23 +283,19 @@ where:
 
 ### Partial Derivatives of $y_Q$
 
-The coordinate $y_Q$ is given by:
-
->>$y_Q = y_b + \dfrac{M_0}{Q \cos \theta}  \qquad (59)$
-
 The partial derivatives of $y_Q$ are:
 
->>$\dfrac{\partial y_Q}{\partial F} = \dfrac{-1}{(Q_0 \cos \theta_0)^2} M_0 \dfrac{\partial Q}{\partial F} \cos \theta_0  \qquad (60)$
+>>$\dfrac{\partial y_Q}{\partial F} = \dfrac{-1}{(Q_0 \cos \theta_0)^2} M_0 \dfrac{\partial Q}{\partial F} \cos \theta_0  \qquad (59)$
 
->>$\dfrac{\partial y_Q}{\partial \theta} = \dfrac{-1}{(Q_0 \cos \theta_0)^2} M_0 \left(\dfrac{\partial Q}{\partial \theta} \cos \theta_0 - Q_0 \sin \theta_0\right)  \qquad (61)$
+>>$\dfrac{\partial y_Q}{\partial \theta} = \dfrac{-1}{(Q_0 \cos \theta_0)^2} M_0 \left(\dfrac{\partial Q}{\partial \theta} \cos \theta_0 - Q_0 \sin \theta_0\right)  \qquad (60)$
 
->>$\dfrac{\partial^2 y_Q}{\partial F^2} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial F^2} - \dfrac{2}{Q_0} \left(\dfrac{\partial Q}{\partial F}\right)^2\right]  \qquad (62)$
+>>$\dfrac{\partial^2 y_Q}{\partial F^2} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial F^2} - \dfrac{2}{Q_0} \left(\dfrac{\partial Q}{\partial F}\right)^2\right]  \qquad (61)$
 
->>$\dfrac{\partial^2 y_Q}{\partial F \partial \theta} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial F \partial \theta} \cos \theta_0 - \dfrac{\partial Q}{\partial F} \sin \theta_0 - \dfrac{2}{Q_0} \dfrac{\partial Q}{\partial F} \dfrac{\partial Q}{\partial \theta} \cos \theta_0 + \dfrac{2}{Q_0} \dfrac{\partial Q}{\partial F} Q_0 \tan \theta_0\right]  \qquad (63)$
+>>$\dfrac{\partial^2 y_Q}{\partial F \partial \theta} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial F \partial \theta} + \dfrac{\partial Q}{\partial F} \tan \theta_0 - 2 \dfrac{\partial Q}{\partial F} \dfrac{\partial Q}{\partial \theta} \dfrac{1}{Q_0}\right]  \qquad (62)$
 
->>$\dfrac{\partial^2 y_Q}{\partial \theta^2} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[\dfrac{\partial^2 Q}{\partial \theta^2} \tan \theta_0 - \dfrac{\partial Q}{\partial \theta}^2 + Q_0 + \dfrac{2}{Q_0} \left(\dfrac{\partial Q}{\partial \theta} - Q_0 \tan \theta_0\right)^2\right]  \qquad (64)$
+>>$\dfrac{\partial^2 y_Q}{\partial \theta^2} = \dfrac{-1}{Q_0^2 \cos \theta_0} M_0 \left[2 \dfrac{\partial^2 Q}{\partial \theta^2} \tan \theta_0 - \dfrac{\partial^2 Q}{\partial \theta^2} + Q_0 + \dfrac{2}{Q_0} \left(\dfrac{\partial Q}{\partial \theta} - Q_0 \tan \theta_0\right)^2\right]  \qquad (63)$
 
-This iterative solution continues until the residuals R₁ and R₂ converge to within acceptable tolerance, providing the factor of safety F and interslice force inclination θ that satisfy both force and moment equilibrium simultaneously.
+This iterative solution continues until the residuals $R_1$ and $R_2$ converge to within acceptable tolerance, providing the factor of safety $F$ and interslice force inclination $\theta$ that satisfy both force and moment equilibrium simultaneously.
 
 ## Effective Normal Forces and Interslice Forces
 

@@ -36,9 +36,9 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_lface2.xlsx")
+data = load_globals("docs/input_template_dam2.xlsx")
 
-plot_inputs(data)
+# plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if data['non_circ'] else None
@@ -53,9 +53,10 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df, rapid=False)
+results = solve_selected(oms, df, rapid=False)
 
-# export df to excel
+# solve_all(df)
+
 df.to_excel("slices.xlsx", index=False)
 
 plot_solution(data, df, failure_surface, results, slice_numbers=True)

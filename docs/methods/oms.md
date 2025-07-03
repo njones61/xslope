@@ -27,7 +27,7 @@ The general expression for the factor of safety $FS$ is:
 
 >$FS = \dfrac{\sum (c \Delta \ell + N \tan \phi)}{\sum W \sin \alpha}  \qquad (1)$
 
-The normal force on the base is:
+Summing forces perpendicular to the base, the normal force on the base is:
 
 >$N = W \cos \alpha$
 
@@ -42,6 +42,12 @@ If $\phi = 0$, the expression simplifies to:
 which is the same equation used in the Swedish method and the log-spiral method under the same assumptions.
 
 To use effective stress parameters $c', \phi'$, and effective normal stress $\sigma'$, the expression becomes:
+
+>$S = c' \Delta \ell + N' \tan \phi$
+
+>$N' = N - u \Delta \ell = W \cos \alpha - u \Delta \ell$
+
+>$S = c' \Delta \ell + (W \cos \alpha - u \Delta \ell) \tan \phi$
 
 >$FS = \dfrac{\sum (c' \Delta \ell + (W \cos \alpha - u \Delta \ell) \tan \phi')}{\sum W \sin \alpha}  \qquad (2)$
 
@@ -106,11 +112,11 @@ and the effective normal force is:
 
 This effective normal force is used in the shear force equation in the numerator of the factor of safety equation. The shear force on the base of the slice was originally defined as:
 
->$S = c \Delta \ell + N \tan \phi$
+>$S = c' \Delta \ell + N' \tan \phi$
 
 Substituting the new normal force from (4) into this gives:
 
->$S = c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi    \qquad (5)$
+>$S = c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi    \qquad (5)$
 
 ### Moments
 
@@ -134,7 +140,7 @@ Notice that for the distributed load, $D$, because the load is at an oblique ang
 
 We can now add these moments to the limit equilibrium equation (6). To do this, we put resisting moments in the numerator and driving moments in the denominator. The new equation is:
 
->$F = \dfrac{R \sum (S + P)}{R \sum W sin \alpha + \sum  D \cos \beta a_{dx} - \sum  D \sin \beta a_{dy} + k\sum W a_s  + T a_t }   \qquad (7)$
+>$F = \dfrac{R \sum (S + P) + \sum  D \sin \beta a_{dy}}{R \sum W sin \alpha + \sum  D \cos \beta a_{dx}  + k\sum W a_s  + T a_t }   \qquad (7)$
 
 There is no summation for the term involving $T$ because it only applies to the uppermost slice. 
 
@@ -142,11 +148,11 @@ There is no summation for the term involving $T$ because it only applies to the 
 
 Combining (5) and (7), we get:
 
->$F = \dfrac{R \sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{R \sum W sin \alpha  + \sum  D \cos \beta a_{dx} - \sum  D \sin \beta a_{dy} + k\sum W a_s  + T a_t }   \qquad (8)$
+>$F = \dfrac{R \sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right] + \sum  D \sin \beta a_{dy}}{R \sum W sin \alpha  + \sum  D \cos \beta a_{dx}  + k\sum W a_s  + T a_t }   \qquad (8)$
 
 If we divide everything by R, we get:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right]}{\sum W sin \alpha + \frac{1}{R}\sum  D \cos \beta a_{dx} - \frac{1}{R}\sum  D \sin \beta a_{dy}  + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (9)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi + P \right] + \frac{1}{R}\sum  D \sin \beta a_{dy} }{\sum W sin \alpha + \frac{1}{R}\sum  D \cos \beta a_{dx}  + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t}   \qquad (9)$
 
 Remember that the water force only applies to the side of the uppermost slice, so for the summation in the numerator, the $T$ value is zero for all other slices.
 

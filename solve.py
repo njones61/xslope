@@ -37,17 +37,6 @@ def oms(df, debug=False):
       • If success: (True, {'method':'oms', 'FS': <computed value>})
       • If denominator → 0 or other fatal error: (False, "<error message>")
 
-    NOTES
-    -----
-    Implements exactly:
-      FS
-      = [ Σ { cᵢ·Δℓᵢ
-            + [ Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ ]·tanφᵢ
-            + pᵢ } ]
-        / [  Σ(Wᵢ·sinαᵢ)
-           + (1/R)·Σ[ Dᵢ·cosβᵢ·(Xo - d_{x,i})  −  Dᵢ·sinβᵢ·(Yo - d_{y,i}) ]
-           + (1/R)·Σ[ kWᵢ·(Yo - y_{cg,i}) ]
-           + (1/R)·Σ[ Tᵢ·(Yo - y_{t,i}) ]  ].
 
     """
     if 'r' not in df.columns:
@@ -91,18 +80,24 @@ def oms(df, debug=False):
     # ————————————————————————————————————————————————————————
     # 5) Build the NUMERATOR = Σᵢ [  cᵢ·Δℓᵢ
     #                               + (Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ )·tanφᵢ
-    #                               + pᵢ  ]
+    #                               + pᵢ  ] + Σ  Dᵢ·sinβᵢ·(Yo - d_{y,i}) 
     #
 
+
+    # N′ᵢ = Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ
     N_eff = (
         W * cos_alpha
       + D * cos_ab
       - kw * sin_alpha
       - T * sin_alpha
       - (u * dl)
-    )  # N′ᵢ = Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ
+    )  
 
-    numerator = np.sum(c * dl + N_eff * tan_phi + P)
+    #   Σ  Dᵢ·sinβᵢ·(Yo - d_{y,i}) 
+    a_dy = Yo - d_y
+    sum_Dy = np.sum(D * np.sin(beta) * a_dy)
+
+    numerator = np.sum(c * dl + N_eff * tan_phi + P)+ (1.0 / R) * sum_Dy
 
     # ————————————————————————————————————————————————————————
     # 6) Build each piece of the DENOMINATOR exactly as Eqn 9:
@@ -110,11 +105,9 @@ def oms(df, debug=False):
     #  (A) = Σ [ Wᵢ · sinαᵢ ]
     sum_W = np.sum(W * sin_alpha)
 
-    #  (B) = Σ [ Dᵢ·cosβᵢ·(Xo - d_{x,i})  −  Dᵢ·sinβᵢ·(Yo - d_{y,i}) ]
+    #  (B) = Σ  Dᵢ·cosβᵢ·(Xo - d_{x,i}) 
     a_dx = d_x - Xo
-    a_dy = Yo - d_y
     sum_Dx = np.sum(D * np.cos(beta) * a_dx)
-    sum_Dy = np.sum(D * np.sin(beta) * a_dy)
 
     #  (C) = Σ [ kWᵢ * (Yo - y_{cg,i}) ]
     a_s = Yo - y_cg
@@ -125,7 +118,7 @@ def oms(df, debug=False):
     sum_T = np.sum(T * a_t)
 
     # Put them together with their 1/R factors:
-    denominator = sum_W + (1.0 / R) * (sum_Dx - sum_Dy + sum_kw + sum_T)
+    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T)
 
     # 7) Finally compute FS = (numerator)/(denominator)
     FS = numerator / denominator
@@ -569,7 +562,7 @@ def lowe_karafiath(df, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
+def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     

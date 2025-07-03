@@ -667,9 +667,11 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         R2 = np.sum(Q * (x_b * np.sin(theta_rad) - y_q * np.cos(theta_rad)))
         
         return R1, R2, Q, y_q
-    
-    def compute_partial_derivatives(F, theta_rad, Q, y_q):
-        """Compute all partial derivatives needed for Newton's method."""
+
+
+    def compute_derivatives(F, theta_rad, Q, y_q):
+
+        """Compute all derivatives needed for Newton's method."""
         # Precompute trigonometric terms
         cos_alpha_theta = np.cos(alpha - theta_rad)
         sin_alpha_theta = np.sin(alpha - theta_rad)
@@ -703,31 +705,6 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         # First-order partial derivatives of R2 (Equations 40-41)
         dR2_dF = np.sum(dQ_dF * (x_b * sin_theta - y_q * cos_theta)) - np.sum(Q * dyQ_dF * cos_theta)
         dR2_dtheta = np.sum(dQ_dtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(Q * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta))
-        
-        return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta
-    
-    def compute_second_derivatives(F, theta_rad, Q, y_q):
-        """Compute second-order partial derivatives for extended Newton method."""
-        # Precompute trigonometric terms
-        cos_alpha_theta = np.cos(alpha - theta_rad)
-        sin_alpha_theta = np.sin(alpha - theta_rad)
-        cos_theta = np.cos(theta_rad)
-        sin_theta = np.sin(theta_rad)
-        
-        # Constants for Q expression
-        C1 = -Fv * sin_a - Fh * cos_a
-        C2 = -c * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p
-        C3 = cos_alpha_theta
-        C4 = sin_alpha_theta * tan_p
-        
-        # Denominator for Q
-        denom_Q = C3 + C4 / F
-        
-        # First derivatives (needed for second derivatives)
-        dQ_dF = (-1 / denom_Q**2) * ((denom_Q * C2 / F**2) - (C1 + C2 / F) * C4 / F**2)
-        dC3_dtheta = sin_alpha_theta
-        dC4_dtheta = -cos_alpha_theta * tan_p
-        dQ_dtheta = (-1 / denom_Q**2) * (C1 + C2 / F) * (dC3_dtheta + dC4_dtheta / F)
         
         # Second derivatives of C3 and C4 (Equations 57-58)
         d2C3_dtheta2 = -cos_alpha_theta
@@ -767,7 +744,8 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         d2R2_dFdtheta = np.sum(d2Q_dFdtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(dQ_dF * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta)) - np.sum(dQ_dtheta * dyQ_dF * cos_theta) - np.sum(Q * (d2yQ_dFdtheta * cos_theta - dyQ_dF * sin_theta))
         d2R2_dtheta2 = np.sum(d2Q_dtheta2 * (x_b * sin_theta - y_q * cos_theta)) + 2 * np.sum(dQ_dtheta * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta)) - np.sum(Q * (x_b * sin_theta - y_q * cos_theta - 2 * dyQ_dtheta * sin_theta + d2yQ_dtheta2 * cos_theta))
         
-        return d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2
+        return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta, d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2
+
     
     # Initial guesses
     F0 = 1.5
@@ -794,8 +772,8 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
                 print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
             break
         
-        # Compute first-order partial derivatives
-        dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_partial_derivatives(F, theta_rad, Q, y_q)
+        # Compute  derivatives
+        dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta, d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2 = compute_derivatives(F, theta_rad, Q, y_q)
         
         # Basic Newton method (Equations 31-32)
         # denominator = dR1_dF * dR2_dtheta - dR1_dtheta * dR2_dF  # this seems wrong
@@ -808,7 +786,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         delta_theta = (R2 * dR1_dF - R1 * dR2_dF) / denominator
 
         if debug_level >= 1 and not extended:
-            print(f"Iteration {iteration + 1} - Basic: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
+            print(f"          Basic: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
         
         # Check if we should switch to extended Newton method
         if abs(delta_F) < 0.5 and abs(delta_theta) < 0.15:
@@ -816,9 +794,6 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
             if debug_level >= 1 and not extended:
                 print(f"*** Switching to extended Newton method ***")
             extended = True
-
-            # Extended Newton method (Equations 33-34)
-            d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2 = compute_second_derivatives(F, theta_rad, Q, y_q)
             
             # Build coefficient matrix for extended Newton
             A11 = dR1_dF + 0.5 * delta_F * d2R1_dF2 + 0.5 * delta_theta * d2R1_dFdtheta
@@ -839,7 +814,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
                 pass
 
         if debug_level >= 1:
-            print(f"Iteration {iteration + 1} - Extended: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
+            print(f"          Extended: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
 
         # Update values
         F += delta_F

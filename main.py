@@ -53,7 +53,7 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(oms, df, rapid=False)
+results = solve_selected(bishop, df, rapid=False)
 
 # solve_all(df)
 

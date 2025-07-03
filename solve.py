@@ -199,7 +199,7 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
     sum_Dy = np.sum(D * sin_beta * a_dy)
     sum_kw = np.sum(kw * a_s)
     sum_T = np.sum(T * a_t)
-    denominator = sum_W + (1.0 / R) * (sum_Dx - sum_Dy + sum_kw + sum_T)
+    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T)
 
     # Iterative solution
     F = 1.0
@@ -219,14 +219,14 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
             + (W + D * cos_beta - P * sin_alpha - u * dl * cos_alpha) * tan_phi
             + P
         )
-        numer_slice = shear / denom_N
-        F_new = np.sum(numer_slice) / denominator
+        numerator = np.sum(shear / denom_N) + (1.0 / R) * sum_Dy
+        F_new = numerator / denominator
 
         if abs(F_new - F) < tol:
             df['n_eff'] = N_eff
             if debug:
                 print(f"FS = {F_new:.6f}")
-                print(f"Numerator = {np.sum(numer_slice):.6f}")
+                print(f"Numerator = {numerator:.6f}")
                 print(f"Denominator = {denominator:.6f}")
                 print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
             return True, {'method': 'bishop', 'FS': F_new}

@@ -1,6 +1,7 @@
 import pandas as pd
 from shapely.geometry import LineString, Point
 import numpy as np
+import pickle
 
 def build_ground_surface(profile_lines):
     """
@@ -356,3 +357,55 @@ def load_globals(filepath):
     globals_data["reinforce_lines"] = reinforce_lines
 
     return globals_data
+
+def save_data_to_pickle(data, filepath):
+    """
+    Save a data object to a pickle file.
+    
+    This function serializes the data object and saves it to the specified filepath.
+    Useful for saving processed data from Excel templates for later use.
+    
+    Parameters:
+        data: The data object to save (typically a dictionary from load_globals)
+        filepath (str): The file path where the pickle file should be saved
+        
+    Returns:
+        None
+        
+    Raises:
+        IOError: If the file cannot be written
+        PickleError: If the data cannot be serialized
+    """
+    try:
+        with open(filepath, 'wb') as f:
+            pickle.dump(data, f)
+    except Exception as e:
+        raise IOError(f"Failed to save data to pickle file '{filepath}': {e}")
+
+
+def load_data_from_pickle(filepath):
+    """
+    Load a data object from a pickle file.
+    
+    This function deserializes a data object from the specified pickle file.
+    Useful for loading previously saved data without re-processing Excel templates.
+    
+    Parameters:
+        filepath (str): The file path of the pickle file to load
+        
+    Returns:
+        The deserialized data object (typically a dictionary)
+        
+    Raises:
+        FileNotFoundError: If the pickle file doesn't exist
+        IOError: If the file cannot be read
+        PickleError: If the data cannot be deserialized
+    """
+    try:
+        with open(filepath, 'rb') as f:
+            data = pickle.load(f)
+        return data
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Pickle file not found: '{filepath}'")
+    except Exception as e:
+        raise IOError(f"Failed to load data from pickle file '{filepath}': {e}")

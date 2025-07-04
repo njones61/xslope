@@ -1,6 +1,6 @@
 from global_config import non_circ
 from slice import generate_slices
-from fileio import load_globals
+from fileio import load_globals, load_data_from_pickle
 from plot import plot_solution, plot_inputs
 from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, rapid_drawdown
 
@@ -36,13 +36,13 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("docs/input_template_dam2.xlsx")
+# data = load_globals("docs/input_template_dam2.xlsx")
+data = load_data_from_pickle("docs/input_template_lface2.pkl")
 
 # plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if data['non_circ'] else None
-
 
 success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=30)
 
@@ -53,7 +53,7 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(bishop, df, rapid=False)
+results = solve_selected(spencer, df, rapid=False)
 
 # solve_all(df)
 

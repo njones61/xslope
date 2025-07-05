@@ -29,28 +29,30 @@ nav:
   - Usage Guide:
     - General Features: usage/features.md
     - Code Structure: usage/structure.md
-  - Solution Techniques:
-    - Ordinary Method of Slices: methods/oms.md
-    - Bishop's Simplified Method: methods/bishop.md
-    - Janbu Method: methods/janbu.md
-    - Force Equilibrium Methods: methods/force_eq.md
-    - Spencer's Method: methods/spencer.md
-  - Advanced Techniques:
-    - Rapid Drawdown Analysis: advanced/rapid.md
-    - Reliability Analysis: advanced/reliability.md
-    - Tension Crack Optimization: advanced/tcrackopt.md
+  - Limit Equilibrium Method:
+    - Overview: limit_equilibrium/overview.md
+    - Ordinary Method of Slices: limit_equilibrium/oms.md
+    - Bishop's Simplified Method: limit_equilibrium/bishop.md
+    - Janbu Method: limit_equilibrium/janbu.md
+    - Force Equilibrium Methods: limit_equilibrium/force_eq.md
+    - Spencer's Method: limit_equilibrium/spencer.md
+    - Rapid Drawdown Analysis: limit_equilibrium/rapid.md
+    - Automated Search Algorithms: limit_equilibrium/search.md
+    - Reliability Analysis: limit_equilibrium/reliability.md
+    - Sample Problems: limit_equilibrium/samples.md
+  - Seepage Analysis:
+    - Overview: seepage/overview.md
+    - Problem Setup: seepage/setup.md
+    - Pore pressures: seepage/pore.md
+    - Sample Problems: seepage/samples.md
+  - Finite Element Method:
+    - Overview: finite_element/overview.md
+    - Problem Setup: finite_element/setup.md
+    - Sample Problems: finite_element/samples.md
   - API:
       - File I/O: api/fileio.md
       - Slice: api/slice.md
       - Solve: api/solve.md
+      - Search: api/search.md
       - Plot: api/plot.md
-  - Sample Problems:
-    - Simple Slopes: samples/simple.md
-    - Distributed Loads: samples/dloads.md
-    - Submerged Slopes: samples/submerged.md
-    - Non-Circular Surfaces: samples/non_circ.md
-    - Reinforcement: samples/reinforce.md
-    - Rapid Drawdown: samples/rapid.md
-    - Reliability Analysis: samples/reliability.md
-    - Tension Cracks: samples/tcracks.md
-    - Slope Design: samples/design.md
+

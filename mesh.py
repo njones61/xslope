@@ -138,28 +138,28 @@ def reorder_mesh(nodes, elements):
     return new_nodes, new_elements
 
 
-def plot_mesh(nodes, elements):
-    for tri in elements:
-        tri_pts = nodes[np.append(tri, tri[0])]
-        xs, ys = tri_pts[:, 0], tri_pts[:, 1]
-        plt.plot(xs, ys, 'k-')
-
-    plt.gca().set_aspect('equal')
-    plt.show()
-
-
 # Simple plot showing material regions
-def plot_mesh_with_materials(nodes, elements, mat_ids):
+def plot_mesh_with_materials(nodes, elements, mat_ids, figsize=(14, 4), pad_frac=0.03):
     import matplotlib.pyplot as plt
     from matplotlib.cm import tab10
 
+    fig, ax = plt.subplots(figsize=figsize)
     for tri, mid in zip(elements, mat_ids):
         pts = nodes[np.append(tri, tri[0])]
         xs, ys = pts[:, 0], pts[:, 1]
-        plt.fill(xs, ys, color=tab10(mid % 10), edgecolor='k', alpha=0.6)
+        ax.fill(xs, ys, color=tab10(mid % 10), edgecolor='k', alpha=0.6, linewidth=0.5)
+    ax.set_aspect('equal')
+    ax.set_title("Finite Element Mesh with Material IDs")
 
-    plt.gca().set_aspect('equal')
-    plt.title("Two-Region Mesh with Material IDs")
+    # Add cushion
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
+    x_pad = (x_max - x_min) * pad_frac
+    y_pad = (y_max - y_min) * pad_frac
+    ax.set_xlim(x_min - x_pad, x_max + x_pad)
+    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+
+    plt.tight_layout()
     plt.show()
 
 def build_polygons(profile_lines, max_depth=None):

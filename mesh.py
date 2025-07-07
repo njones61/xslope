@@ -161,3 +161,156 @@ def plot_mesh_with_materials(nodes, elements, mat_ids):
     plt.gca().set_aspect('equal')
     plt.title("Two-Region Mesh with Material IDs")
     plt.show()
+
+def build_polygons(profile_lines, max_depth=None):
+    import numpy as np
+
+    if not profile_lines or len(profile_lines) < 2:
+        raise ValueError("Need at least 2 profile lines to create material zones")
+
+    def get_avg_y(line):
+        return sum(y for _, y in line) / len(line)
+    # Top to bottom
+    sorted_lines = sorted(profile_lines, key=get_avg_y, reverse=True)
+    n = len(sorted_lines)
+
+    def highest_lower_y(x, lower_lines):
+        ys = []
+        for line in lower_lines:
+            xs, ys_line = zip(*line)
+            if min(xs) <= x <= max(xs):
+                y = np.interp(x, xs, ys_line)
+                ys.append(y)
+        return max(ys) if ys else None
+
+    polygons = []
+    for i, top in enumerate(sorted_lines):
+        lower_lines = sorted_lines[i+1:] if i+1 < n else []
+        is_last = (i == n-1)
+        xs_top, ys_top = zip(*top)
+        xs_top = list(xs_top)
+        ys_top = list(ys_top)
+        # Only endpoints
+        left_x, left_y = xs_top[0], ys_top[0]
+        right_x, right_y = xs_top[-1], ys_top[-1]
+        # Project endpoints down
+        if not is_last:
+            left_y_low = highest_lower_y(left_x, lower_lines)
+            right_y_low = highest_lower_y(right_x, lower_lines)
+        else:
+            left_y_low = right_y_low = max_depth
+        # Skip if no lower boundary
+        if left_y_low is None or right_y_low is None:
+            continue
+        # Build polygon: walk top line left to right, project right endpoint down, walk lower boundary right to left, project left endpoint up
+        poly = []
+        # Top line
+        for x, y in zip(xs_top, ys_top):
+            poly.append((x, y))
+        # Project right endpoint down if not coincident
+        if abs(right_y - right_y_low) > 1e-8:
+            poly.append((right_x, right_y_low))
+        # Walk lower boundary right to left
+        if not is_last:
+            # Find which lower line is highest at each endpoint
+            right_y_low_line = None
+            left_y_low_line = None
+            for line in lower_lines:
+                xs, ys_line = zip(*line)
+                if min(xs) <= right_x <= max(xs) and np.isclose(np.interp(right_x, xs, ys_line), right_y_low):
+                    right_y_low_line = line
+                if min(xs) <= left_x <= max(xs) and np.isclose(np.interp(left_x, xs, ys_line), left_y_low):
+                    left_y_low_line = line
+            # Walk along the lower line from right_x to left_x
+            if right_y_low_line is not None:
+                xs, ys_line = zip(*right_y_low_line)
+                # Get all xs between left_x and right_x (inclusive), in reverse order
+                xs_between = [x for x in xs if left_x < x < right_x]
+                xs_between = sorted(xs_between, reverse=True)
+                for x in xs_between:
+                    y = np.interp(x, xs, ys_line)
+                    poly.append((x, y))
+            # Project left endpoint up if not coincident
+            if abs(left_y - left_y_low) > 1e-8:
+                poly.append((left_x, left_y_low))
+        else:
+            # For the last region, walk along the base (max_depth)
+            if right_x != left_x:
+                xs_between = [x for x in np.linspace(right_x, left_x, num=10)][1:-1]
+                for x in xs_between:
+                    poly.append((x, max_depth))
+            if abs(left_y - left_y_low) > 1e-8:
+                poly.append((left_x, left_y_low))
+        # Close polygon
+        if poly[0] != poly[-1]:
+            poly.append(poly[0])
+        polygons.append(poly)
+    return polygons
+
+
+def print_polygon_summary(polygons):
+    """
+    Prints a summary of the generated polygons for diagnostic purposes.
+    
+    Parameters:
+        polygons: List of polygon coordinate lists
+    """
+    print("=== POLYGON SUMMARY ===")
+    print(f"Number of material zones: {len(polygons)}")
+    print()
+    
+    for i, polygon in enumerate(polygons):
+        print(f"Material Zone {i+1} (Material ID: {i}):")
+        print(f"  Number of vertices: {len(polygon)}")
+        
+        # Calculate area (simple shoelace formula)
+        area = 0
+        for j in range(len(polygon) - 1):
+            x1, y1 = polygon[j]
+            x2, y2 = polygon[j + 1]
+            area += (x2 - x1) * (y2 + y1) / 2
+        area = abs(area)
+        
+        print(f"  Approximate area: {area:.2f} square units")
+        
+        # Print bounding box
+        xs = [x for x, y in polygon]
+        ys = [y for x, y in polygon]
+        print(f"  Bounding box: x=[{min(xs):.2f}, {max(xs):.2f}], y=[{min(ys):.2f}, {max(ys):.2f}]")
+        print()
+
+
+def plot_polygons(polygons, title="Material Zone Polygons"):
+    """
+    Plots the generated polygons to visualize the material zones.
+    
+    Parameters:
+        polygons: List of polygon coordinate lists
+        title: Plot title
+    """
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Use a colormap for different materials
+    colors = plt.cm.tab10(np.linspace(0, 1, len(polygons)))
+    
+    for i, polygon in enumerate(polygons):
+        # Extract x and y coordinates
+        xs = [x for x, y in polygon]
+        ys = [y for x, y in polygon]
+        
+        # Plot filled polygon
+        ax.fill(xs, ys, color=colors[i], alpha=0.6, 
+                label=f'Material {i}')
+        
+        # Plot polygon boundary
+        ax.plot(xs, ys, 'k-', linewidth=1)
+    
+    ax.set_xlabel('X Coordinate')
+    ax.set_ylabel('Y Coordinate')
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+    
+    plt.tight_layout()
+    plt.show()

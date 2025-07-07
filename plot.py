@@ -5,6 +5,10 @@ from shapely.geometry import LineString
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
 
+# Consistent color for materials (Tableau tab10)
+def get_material_color(idx):
+    tableau_colors = plt.get_cmap('tab10').colors  # 10 distinct colors
+    return tableau_colors[idx % len(tableau_colors)]
 
 def get_dload_legend_handler():
     """
@@ -39,7 +43,7 @@ def plot_profile_lines(ax, profile_lines):
     """
     for i, line in enumerate(profile_lines):
         xs, ys = zip(*line)
-        ax.plot(xs, ys, label=f'Profile {i+1}')
+        ax.plot(xs, ys, color=get_material_color(i), linewidth=1, label=f'Profile {i+1}')
 
 def plot_max_depth(ax, profile_lines, max_depth):
     """

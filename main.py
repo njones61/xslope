@@ -36,14 +36,14 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("inputs/slopes/input_template_lface3.xlsx")
+data = load_globals("inputs/slopes/input_template_rface3.xlsx")
 
 # plot_inputs(data)
 
 circle = data['circles'][0] if data['circular'] else None
 non_circ = data['non_circ'] if data['non_circ'] else None
 
-success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=30)
+success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=20)
 
 if success:
     df, failure_surface = result
@@ -52,11 +52,11 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-# results = solve_selected(janbu, df, rapid=False)
+results = solve_selected(spencer, df, rapid=False)
 
-solve_all(df)
+# solve_all(df)
 
-# df.to_excel("slices.xlsx", index=False)
+df.to_excel("slices.xlsx", index=False)
 
-# plot_solution(data, df, failure_surface, results, slice_numbers=True)
+plot_solution(data, df, failure_surface, results, slice_numbers=True)
 

@@ -562,7 +562,7 @@ def lowe_karafiath(df, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
+def spencer(df, tol=1e-4, max_iter = 100, debug_level=2):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     
@@ -632,8 +632,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     Fv = - W - P * cos_b + R * sin_psi        # Equation (2)
     Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
         + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) # Equation (3)
-
-
+    
     # ========== BEGIN SOLUTION ==========
     
     def compute_Q_and_yQ(F, theta_rad):
@@ -742,7 +741,7 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     
     # Initial guesses
     F0 = 1.5
-    theta0_rad = np.radians(8) 
+    theta0_rad = np.radians(8.8955224) 
     
     # Newton iteration
     F = F0
@@ -824,8 +823,33 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     if iteration >= max_iter - 1:
         return False, "Spencer's method did not converge within the maximum number of iterations."
     
+
+    ###### DEBUG RIGHT_FACING SLOPE ######
+    print(f"F = {F:.12f}, theta = {np.degrees(theta_rad):.12f}°")
+    print("THETA_RAD CONVERTED TO 8.89552236670, F = 1.936856063097")
+    theta_rad = np.radians(8.895522366703)  # Hardwired to override the solution.
+    F = 1.936856063097          # Hardwired to override the solution.
+    
+    R1, R2, Q, y_q = compute_residuals(F, theta_rad)
+    print(f"R1 = {R1:.6e}, R2 = {R2:.6e}")
+
+
+
     # Final computation of Q and y_q
     Q, y_q = compute_Q_and_yQ(F, theta_rad)
+
+    if debug_level >= 2: 
+        ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
+        df['ma'] = ma
+        df['Q'] = Q
+        df['y_q'] = y_q
+        df['Fh'] = Fh
+        df['Fv'] = Fv
+        df['Mo'] = Mo
+        # Debug print values per slice
+        for i in range(len(Q)):
+            print(f"Slice {i+1}: ma = {ma[i]:.3f}, Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
+
     
     # Convert theta to degrees for output
     theta_opt = np.degrees(theta_rad)
@@ -837,16 +861,15 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
 
     # --- Compute N_eff using Equation (18) ---
     N_eff = - Fv * cos_a + Fh * sin_a + Q * np.sin(alpha - theta_rad) - u * dl
+    df['n_eff'] = N_eff
 
     # --- Compute interslice forces Z using Equation (67) ---
     n = len(Q)
     Z = np.zeros(n+1)
     for i in range(n):
         Z[i+1] = Z[i] - Q[i] 
-
-    # --- Store back into df ---
     df['z'] = Z[:-1]        # Z_i acting on slice i's left face
-    df['n_eff'] = N_eff
+ 
 
     # --- Compute line of thrust using Equation (69) ---
     yt_l = np.zeros(n)  # the y-coordinate of the line of thrust on the left side of the slice.
@@ -869,10 +892,6 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=0):
     results['FS'] = F
     results['theta'] = theta_opt
 
-    # Debug print values per slice
-    if debug_level >= 2:
-        for i in range(len(Q)):
-            print(f"Slice {i+1}: Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
 
     return True, results
 

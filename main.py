@@ -36,7 +36,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_data_from_pickle("inputs/slopes/input_template_lface2.pkl")
+data = load_globals("inputs/slopes/input_template_lface3.xlsx")
 
 # plot_inputs(data)
 
@@ -52,11 +52,11 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df, rapid=False)
+# results = solve_selected(janbu, df, rapid=False)
 
-# solve_all(df)
+solve_all(df)
 
-df.to_excel("slices.xlsx", index=False)
+# df.to_excel("slices.xlsx", index=False)
 
-plot_solution(data, df, failure_surface, results, slice_numbers=True)
+# plot_solution(data, df, failure_surface, results, slice_numbers=True)
 

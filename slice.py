@@ -878,13 +878,27 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
         
         hw = 0
         hw2 = 0
-        if not np.isnan(piezo_y) and piezo_y > y_cb:
-            hw = piezo_y - y_cb
-        if not np.isnan(piezo_y2) and piezo_y2 > y_cb:
-            hw2 = piezo_y2 - y_cb
-            
-        u = hw * gamma_w if not np.isnan(piezo_y) else 0
-        u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
+        u = 0
+        u2 = 0
+        # Determine pore pressure method from material property
+        mat_u = materials[base_material_idx]['u'] if base_material_idx is not None else 'none'
+        if mat_u == 'none':
+            u = 0
+            u2 = 0
+        elif mat_u == 'piezo':
+            if not np.isnan(piezo_y) and piezo_y > y_cb:
+                hw = piezo_y - y_cb
+            if not np.isnan(piezo_y2) and piezo_y2 > y_cb:
+                hw2 = piezo_y2 - y_cb
+            u = hw * gamma_w if not np.isnan(piezo_y) else 0
+            u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
+        elif mat_u == 'seep':
+            # TODO: Implement seepage-based pore pressure calculation
+            u = 0
+            u2 = 0
+        else:
+            u = 0
+            u2 = 0
 
         # Calculate alpha (slope angle of the failure surface) more efficiently
         delta = 0.01

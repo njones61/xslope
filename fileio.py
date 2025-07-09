@@ -107,21 +107,24 @@ def load_globals(filepath):
 
     try:
         template_version = main_df.iloc[4, 3]  # Excel row 5, column D
-        gamma_water = float(main_df.iloc[17, 3])  # Excel row 18, column D
-        tcrack_depth = float(main_df.iloc[18, 3])  # Excel row 19, column D
-        tcrack_water = float(main_df.iloc[19, 3])  # Excel row 20, column D
-        k_seismic = float(main_df.iloc[20, 3])  # Excel row 21, column D
+        gamma_water = float(main_df.iloc[18, 3])  # Excel row 19, column D
+        tcrack_depth = float(main_df.iloc[19, 3])  # Excel row 20, column D
+        tcrack_water = float(main_df.iloc[20, 3])  # Excel row 21, column D
+        k_seismic = float(main_df.iloc[21, 3])  # Excel row 22, column D
     except Exception as e:
         raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
 
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
+
+    max_depth = float(profile_df.iloc[1, 1])  # Excel B2 = row 1, column 1
+
     profile_lines = []
 
     profile_data_blocks = [
-        {"header_row": 2, "data_start": 3, "data_end": 18},
-        {"header_row": 20, "data_start": 21, "data_end": 36}
+        {"header_row": 4, "data_start": 5, "data_end": 20},
+        {"header_row": 22, "data_start": 23, "data_end": 38}
     ]
     profile_block_width = 3
 
@@ -151,7 +154,6 @@ def load_globals(filepath):
 
     ground_surface = build_ground_surface(profile_lines)
 
-
     # === BUILD TENSILE CRACK LINE ===
 
     tcrack_surface = None
@@ -159,14 +161,14 @@ def load_globals(filepath):
         tcrack_surface = LineString([(x, y - tcrack_depth) for (x, y) in ground_surface.coords])
 
     # === MATERIALS (Optimized Parsing) ===
-    mat_df = xls.parse('mat', header=2)
+    mat_df = xls.parse('mat', header=2)  # header=2 because the header row is row 3 in Excel
     materials = []
 
-    for _, row in mat_df.iterrows():
-        # Check if the row is blank (columns 2-17, which are indices 1-16)
-        if row.iloc[1:17].isna().all():
+    # Only process rows 4-15 (Excel), which are 0-indexed 0-11 in pandas 
+    for _, row in mat_df.iloc[0:12].iterrows():
+        # Check if the row is blank (columns 2-22, which are indices 1-21)
+        if row.iloc[1:22].isna().all():
             continue
-            
         materials.append({
             "name": row.get('name', ''),
             "gamma": float(row.get('g', 0) or 0),
@@ -177,13 +179,18 @@ def load_globals(filepath):
             "r_elev": float(row.get('r-elev', 0) or 0),
             "d": float(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
             "psi": float(row.get('ψ', 0)) if pd.notna(row.get('ψ')) else 0,
-            "piezo": float(row.get('piezo', 1.0) or 1.0),
+            "u": str(row.get('u', 'none')).strip().lower(),
             "sigma_gamma": float(row.get('s(g)', 0) or 0),
             "sigma_c": float(row.get('s(c)', 0) or 0),
             "sigma_phi": float(row.get('s(f)', 0) or 0),
             "sigma_cp": float(row.get('s(cp)', 0) or 0),
             "sigma_d": float(row.get('s(d)', 0) or 0),
             "sigma_psi": float(row.get('s(ψ)', 0) or 0),
+            "k1": float(row.get('k1', 0) or 0),
+            "k2": float(row.get('k2', 0) or 0),
+            "alpha": float(row.get('alpha', 0) or 0),
+            "kr0" : float(row.get('kr0', 0) or 0),
+            "h0" : float(row.get('h0', 0) or 0)
         })
 
     # === PIEZOMETRIC LINE ===
@@ -252,10 +259,9 @@ def load_globals(filepath):
 
     # Read the first 3 rows to get the max depth
     raw_df = xls.parse('circles', header=None)  # No header, get full sheet
-    max_depth = float(raw_df.iloc[1, 2])  # Excel C2 = row 1, column 2
 
-    # Read the circles data starting from row 4 (index 3)
-    circles_df = xls.parse('circles', header=3)
+    # Read the circles data starting from row 2 (index 1)
+    circles_df = xls.parse('circles', header=1)
     raw = circles_df.dropna(subset=['Xo', 'Yo'], how='any')
     circles = []
     for _, row in raw.iterrows():
@@ -323,6 +329,61 @@ def load_globals(filepath):
             elif len(section) == 1:
                 raise ValueError("Each reinforcement line must contain at least two points.")
 
+
+    # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===
+    seep_df = xls.parse('seep bc', header=None)
+    seepage_bc = {"specified_heads": [], "exit_face": []}
+
+    # Specified Head #1
+    head1 = seep_df.iloc[2, 2] if seep_df.shape[1] > 2 and seep_df.shape[0] > 2 else None
+    coords1 = []
+    for i in range(4, 12):  # rows 5-12 (0-indexed 4-11)
+        if i >= seep_df.shape[0]:
+            break
+        x = seep_df.iloc[i, 1] if seep_df.shape[1] > 1 else None
+        y = seep_df.iloc[i, 2] if seep_df.shape[1] > 2 else None
+        if pd.notna(x) and pd.notna(y):
+            coords1.append((float(x), float(y)))
+    if head1 is not None and coords1:
+        seepage_bc["specified_heads"].append({"head": float(head1), "coords": coords1})
+
+    # Specified Head #2
+    head2 = seep_df.iloc[2, 5] if seep_df.shape[1] > 5 and seep_df.shape[0] > 2 else None
+    coords2 = []
+    for i in range(4, 12):
+        if i >= seep_df.shape[0]:
+            break
+        x = seep_df.iloc[i, 4] if seep_df.shape[1] > 4 else None
+        y = seep_df.iloc[i, 5] if seep_df.shape[1] > 5 else None
+        if pd.notna(x) and pd.notna(y):
+            coords2.append((float(x), float(y)))
+    if head2 is not None and coords2:
+        seepage_bc["specified_heads"].append({"head": float(head2), "coords": coords2})
+
+    # Specified Head #3
+    head3 = seep_df.iloc[2, 8] if seep_df.shape[1] > 8 and seep_df.shape[0] > 2 else None
+    coords3 = []
+    for i in range(4, 12):
+        if i >= seep_df.shape[0]:
+            break
+        x = seep_df.iloc[i, 7] if seep_df.shape[1] > 7 else None
+        y = seep_df.iloc[i, 8] if seep_df.shape[1] > 8 else None
+        if pd.notna(x) and pd.notna(y):
+            coords3.append((float(x), float(y)))
+    if head3 is not None and coords3:
+        seepage_bc["specified_heads"].append({"head": float(head3), "coords": coords3})
+
+    # Exit Face
+    exit_coords = []
+    for i in range(15, 23):  # rows 16-23 (0-indexed 15-22)
+        if i >= seep_df.shape[0]:
+            break
+        x = seep_df.iloc[i, 1] if seep_df.shape[1] > 1 else None
+        y = seep_df.iloc[i, 2] if seep_df.shape[1] > 2 else None
+        if pd.notna(x) and pd.notna(y):
+            exit_coords.append((float(x), float(y)))
+    seepage_bc["exit_face"] = exit_coords
+
     # === VALIDATION ===
  
     circular = len(circles) > 0
@@ -333,7 +394,7 @@ def load_globals(filepath):
     if not materials:
         raise ValueError("Materials sheet is empty.")
     if len(materials) != len(profile_lines):
-        raise ValueError("Each profile line must have a corresponding material.")
+        raise ValueError("Each profile line must have a corresponding material. You have " + str(len(materials)) + " materials and " + str(len(profile_lines)) + " profile lines.")
         
 
     # Add everything to globals_data
@@ -342,6 +403,7 @@ def load_globals(filepath):
     globals_data["tcrack_depth"] = tcrack_depth
     globals_data["tcrack_water"] = tcrack_water
     globals_data["k_seismic"] = k_seismic
+    globals_data["max_depth"] = max_depth
     globals_data["profile_lines"] = profile_lines
     globals_data["ground_surface"] = ground_surface
     globals_data["tcrack_surface"] = tcrack_surface
@@ -349,12 +411,12 @@ def load_globals(filepath):
     globals_data["piezo_line"] = piezo_line
     globals_data["piezo_line2"] = piezo_line2
     globals_data["circular"] = circular # True if circles are present
-    globals_data["max_depth"] = max_depth
     globals_data["circles"] = circles
     globals_data["non_circ"] = non_circ
     globals_data["dloads"] = dloads
     globals_data["dloads2"] = dloads2
     globals_data["reinforce_lines"] = reinforce_lines
+    globals_data["seepage_bc"] = seepage_bc
 
     return globals_data
 

@@ -1,7 +1,7 @@
 
 from fileio import load_globals
 
-filepath = "docs/input_template_lface2.xlsx"  # Replace with full path if needed
+filepath = "inputs/slopes/input_template_MASTER.xlsx"  # Replace with full path if needed
 globals_data = load_globals(filepath)
 
 for key, value in globals_data.items():

@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_globals, load_data_from_pickle
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, rapid_drawdown
+from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, rapid_drawdown, spencer_OLD
 
 
 def solve_selected(func, df, rapid=False):

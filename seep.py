@@ -8,6 +8,7 @@ from scipy.sparse.linalg import spsolve
 def import_seep2d(filepath):
     """
     Reads SEEP2D .s2d input file and returns mesh, materials, and BC data.
+    Supports both triangular and quadrilateral elements.
 
     Returns:
         {
@@ -15,7 +16,8 @@ def import_seep2d(filepath):
             "node_ids": np.ndarray (n_nodes,),
             "nbc": np.ndarray (n_nodes,),   # boundary condition flags
             "fx": np.ndarray (n_nodes,),    # boundary condition values (head or elevation)
-            "elements": np.ndarray (n_elements, 3),
+            "elements": np.ndarray (n_elements, 3 or 4),  # triangle or quad node indices
+            "element_types": np.ndarray (n_elements,),    # 3 for triangles, 4 for quads
             "element_materials": np.ndarray (n_elements,)
         }
     """
@@ -88,12 +90,23 @@ def import_seep2d(filepath):
 
     elements = []
     element_mats = []
+    element_types = []
 
     for line in element_lines:
         nums = [int(n) for n in re.findall(r'\d+', line)]
         if len(nums) >= 6:
-            _, n1, n2, n3, _, mat = nums[:6]
-            elements.append([n1, n2, n3])
+            _, n1, n2, n3, n4, mat = nums[:6]
+            
+            # Check if this is a triangle (n3 == n4) or quad (n3 != n4)
+            if n3 == n4:
+                # Triangle: repeat the last node to create 4-node format
+                elements.append([n1, n2, n3, n3])
+                element_types.append(3)
+            else:
+                # Quadrilateral: use all 4 nodes
+                elements.append([n1, n2, n3, n4])
+                element_types.append(4)
+            
             element_mats.append(mat)
 
     return {
@@ -101,7 +114,8 @@ def import_seep2d(filepath):
         "node_ids": np.array(node_ids, dtype=int),
         "nbc": np.array(nbc_flags, dtype=int),
         "fx": np.array(fx_vals),
-        "elements": np.array(elements, dtype=int) - 1,
+        "elements": np.array(elements, dtype=int) - 1,  # Convert to 0-based indexing
+        "element_types": np.array(element_types, dtype=int),
         "element_materials": np.array(element_mats),
         "k1_by_mat": k1_array,
         "k2_by_mat": k2_array,
@@ -112,55 +126,78 @@ def import_seep2d(filepath):
     }
 
 
-def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angles=None):
+def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angles=None, element_types=None):
     """
     FEM solver for confined seepage with anisotropic conductivity.
+    Supports both triangular and quadrilateral elements.
     Parameters:
         coords : (n_nodes, 2) array of node coordinates
-        elements : (n_elements, 3) triangle node indices
+        elements : (n_elements, 3 or 4) triangle or quad node indices
         dirichlet_bcs : list of (node_id, head_value)
         k1_vals : (n_elements,) or scalar, major axis conductivity
         k2_vals : (n_elements,) or scalar, minor axis conductivity
         angles : (n_elements,) or scalar, angle in degrees (from x-axis)
+        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
     Returns:
         head : (n_nodes,) array of nodal heads
     """
 
-
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
 
     n_nodes = coords.shape[0]
     A = lil_matrix((n_nodes, n_nodes))
     b = np.zeros(n_nodes)
 
-    for idx, tri in enumerate(elements):
-        i, j, k = tri
-        xi, yi = coords[i]
-        xj, yj = coords[j]
-        xk, yk = coords[k]
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: use first 3 nodes (4th node is repeated)
+            i, j, k = element_nodes[:3]
+            xi, yi = coords[i]
+            xj, yj = coords[j]
+            xk, yk = coords[k]
 
-        area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
-        if area <= 0:
-            continue
+            area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
+            if area <= 0:
+                continue
 
-        beta = np.array([yj - yk, yk - yi, yi - yj])
-        gamma = np.array([xk - xj, xi - xk, xj - xi])
-        grad = np.array([beta, gamma]) / (2 * area)
+            beta = np.array([yj - yk, yk - yi, yi - yj])
+            gamma = np.array([xk - xj, xi - xk, xj - xi])
+            grad = np.array([beta, gamma]) / (2 * area)
 
-        # Get anisotropic conductivity
-        k1 = k1_vals[idx]
-        k2 = k2_vals[idx]
-        theta = angles[idx]
+            # Get anisotropic conductivity
+            k1 = k1_vals[idx]
+            k2 = k2_vals[idx]
+            theta = angles[idx]
 
-        theta_rad = np.radians(theta)
-        c, s = np.cos(theta_rad), np.sin(theta_rad)
-        R = np.array([[c, s], [-s, c]])
-        Kmat = R.T @ np.diag([k1, k2]) @ R
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
 
-        ke = area * grad.T @ Kmat @ grad
+            ke = area * grad.T @ Kmat @ grad
 
-        for a in range(3):
-            for b_ in range(3):
-                A[tri[a], tri[b_]] += ke[a, b_]
+            for a in range(3):
+                for b_ in range(3):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+        elif element_type == 4:
+            # Quadrilateral: use all 4 nodes
+            i, j, k, l = element_nodes
+            coords_elem = coords[[i, j, k, l], :]
+            k1 = k1_vals[idx]
+            k2 = k2_vals[idx]
+            theta = angles[idx]
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            ke = quad4_stiffness_matrix(coords_elem, Kmat)
+            for a in range(4):
+                for b_ in range(4):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
     A_full = A.copy()  # Keep original matrix for computing q
 
@@ -172,23 +209,26 @@ def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angle
     head = spsolve(A.tocsr(), b)
     q = A_full.tocsr() @ head
 
-
     total_flow = 0.0
 
     for node_idx in range(len(nbc)):
         if q[node_idx] > 0:  # Positive flow
             total_flow += q[node_idx]
 
-    return head, A, q, total_flow   
+    return head, A, q, total_flow
 
 
 def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
-                      max_iter=200, tol=1e-4):
+                      max_iter=200, tol=1e-4, element_types=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
+    Supports both triangular and quadrilateral elements.
     """
 
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
 
     n_nodes = coords.shape[0]
     y = coords[:, 1]
@@ -241,55 +281,77 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
         p_nodes = h - y
 
         # Element assembly with element-wise kr computation
-        for idx, tri in enumerate(elements):
-            i, j, k = tri
-            xi, yi = coords[i]
-            xj, yj = coords[j]
-            xk, yk = coords[k]
+        for idx, element_nodes in enumerate(elements):
+            element_type = element_types[idx]
+            
+            if element_type == 3:
+                # Triangle: use first 3 nodes (4th node is repeated)
+                i, j, k = element_nodes[:3]
+                xi, yi = coords[i]
+                xj, yj = coords[j]
+                xk, yk = coords[k]
 
-            # Element area
-            area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
-            if area <= 0:
-                continue
+                # Element area
+                area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
+                if area <= 0:
+                    continue
 
-            # Shape function derivatives
-            beta = np.array([yj - yk, yk - yi, yi - yj])
-            gamma = np.array([xk - xj, xi - xk, xj - xi])
-            grad = np.array([beta, gamma]) / (2 * area)
+                # Shape function derivatives
+                beta = np.array([yj - yk, yk - yi, yi - yj])
+                gamma = np.array([xk - xj, xi - xk, xj - xi])
+                grad = np.array([beta, gamma]) / (2 * area)
 
-            # Get material properties for this element
-            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
-            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
-            theta = angles[idx] if hasattr(angles, '__len__') else angles
+                # Get material properties for this element
+                k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+                k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+                theta = angles[idx] if hasattr(angles, '__len__') else angles
 
-            # Anisotropic conductivity matrix
-            theta_rad = np.radians(theta)
-            c, s = np.cos(theta_rad), np.sin(theta_rad)
-            R = np.array([[c, s], [-s, c]])
-            Kmat = R.T @ np.diag([k1, k2]) @ R
+                # Anisotropic conductivity matrix
+                theta_rad = np.radians(theta)
+                c, s = np.cos(theta_rad), np.sin(theta_rad)
+                R = np.array([[c, s], [-s, c]])
+                Kmat = R.T @ np.diag([k1, k2]) @ R
 
-            # Compute element pressure (centroid)
-            p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
+                # Compute element pressure (centroid)
+                p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
 
-            # Get kr for this element based on its material properties
-            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+                # Get kr for this element based on its material properties
+                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
-            # Element stiffness matrix with kr
-            ke = kr_elem * area * grad.T @ Kmat @ grad
+                # Element stiffness matrix with kr
+                ke = kr_elem * area * grad.T @ Kmat @ grad
 
-            # Inside the element assembly loop, after kr_elem is computed:
-            kr_diagnostics.append({
-                'element': idx,
-                'p_elem': p_elem,
-                'kr_elem': kr_elem,
-                'y_centroid': (yi + yj + yk) / 3.0,
-                'h_centroid': (h[i] + h[j] + h[k]) / 3.0
-            })
+                # Inside the element assembly loop, after kr_elem is computed:
+                kr_diagnostics.append({
+                    'element': idx,
+                    'p_elem': p_elem,
+                    'kr_elem': kr_elem,
+                    'y_centroid': (yi + yj + yk) / 3.0,
+                    'h_centroid': (h[i] + h[j] + h[k]) / 3.0
+                })
 
-            # Assembly
-            for row in range(3):
-                for col in range(3):
-                    A[tri[row], tri[col]] += ke[row, col]
+                # Assembly
+                for row in range(3):
+                    for col in range(3):
+                        A[element_nodes[row], element_nodes[col]] += ke[row, col]
+            elif element_type == 4:
+                # Quadrilateral: use all 4 nodes
+                i, j, k, l = element_nodes
+                coords_elem = coords[[i, j, k, l], :]
+                k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+                k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+                theta = angles[idx] if hasattr(angles, '__len__') else angles
+                theta_rad = np.radians(theta)
+                c, s = np.cos(theta_rad), np.sin(theta_rad)
+                R = np.array([[c, s], [-s, c]])
+                Kmat = R.T @ np.diag([k1, k2]) @ R
+                # Compute element pressure (centroid)
+                p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
+                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+                ke = kr_elem * quad4_stiffness_matrix(coords_elem, Kmat)
+                for a in range(4):
+                    for b_ in range(4):
+                        A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
         # Store unmodified matrix for flow computation
         A_full = A.tocsr()
@@ -402,7 +464,7 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
         print("  - Numerical issues in the flow solution")
 
 
-    return h, A_csr, q_final, total_inflow
+    return h, A, q_final, total_inflow
 
 def kr_frontal(p, kr0, h0):
     """
@@ -462,18 +524,20 @@ def diagnose_exit_face(coords, nbc, h, q, fx):
             print(f"Approximate exit elevation: {y_intersect:.3f}")
             break
 
-def create_flow_potential_bc(coords, elements, q, debug=False):
+def create_flow_potential_bc(coords, elements, q, debug=False, element_types=None):
     """
     Generates Dirichlet BCs for flow potential φ by marching around the boundary
     and accumulating q to assign φ, ensuring closed-loop conservation.
 
     Improved version that handles numerical noise and different boundary types.
+    Supports both triangular and quadrilateral elements.
 
     Parameters:
         coords : (n_nodes, 2) array of node coordinates
-        elements : (n_elements, 3) triangle node indices
+        elements : (n_elements, 3 or 4) triangle or quad node indices
         q : (n_nodes,) nodal flow vector
         debug : bool, if True prints detailed diagnostic information
+        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
 
     Returns:
         List of (node_id, phi_value) tuples
@@ -481,13 +545,29 @@ def create_flow_potential_bc(coords, elements, q, debug=False):
 
     from collections import defaultdict
 
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+
     if debug:
         print("=== FLOW POTENTIAL BC DEBUG ===")
 
     # Step 1: Build edge dictionary and count how many times each edge appears
     edge_counts = defaultdict(list)
-    for idx, (i, j, k) in enumerate(elements):
-        edges = [(i, j), (j, k), (k, i)]
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: 3 edges (use first 3 nodes, 4th is repeated)
+            i, j, k = element_nodes[:3]
+            edges = [(i, j), (j, k), (k, i)]
+        elif element_type == 4:
+            # Quadrilateral: 4 edges (use all 4 nodes)
+            i, j, k, l = element_nodes
+            edges = [(i, j), (j, k), (k, l), (l, i)]
+        else:
+            continue  # Skip unknown element types
+            
         for a, b in edges:
             edge = tuple(sorted((a, b)))
             edge_counts[edge].append(idx)
@@ -622,57 +702,82 @@ def create_flow_potential_bc(coords, elements, q, debug=False):
 
     return list(phi.items())
 
-def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dirichlet_nodes):
+def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dirichlet_nodes, element_types=None):
     """
     Solves Laplace equation for flow function Phi on the same mesh,
     assigning Dirichlet values along no-flow boundaries.
     Assembles the element matrix using the inverse of Kmat for each element.
+    Supports both triangular and quadrilateral elements.
     
     Parameters:
         coords : (n_nodes, 2) array of node coordinates
-        elements : (n_elements, 3) triangle node indices
+        elements : (n_elements, 3 or 4) triangle or quad node indices
         k1_vals : (n_elements,) or scalar, major axis conductivity
         k2_vals : (n_elements,) or scalar, minor axis conductivity
         angles : (n_elements,) or scalar, angle in degrees (from x-axis)
         dirichlet_nodes : list of (node_id, phi_value)
+        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
     Returns:
         phi : (n_nodes,) stream function (flow function) values
     """
+
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
 
     n_nodes = coords.shape[0]
     A = lil_matrix((n_nodes, n_nodes))
     b = np.zeros(n_nodes)
 
-    for idx, tri in enumerate(elements):
-        i, j, k = tri
-        xi, yi = coords[i]
-        xj, yj = coords[j]
-        xk, yk = coords[k]
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: use first 3 nodes (4th node is repeated)
+            i, j, k = element_nodes[:3]
+            xi, yi = coords[i]
+            xj, yj = coords[j]
+            xk, yk = coords[k]
 
-        area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
-        if area <= 0:
-            continue
+            area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
+            if area <= 0:
+                continue
 
-        beta = np.array([yj - yk, yk - yi, yi - yj])
-        gamma = np.array([xk - xj, xi - xk, xj - xi])
-        grad = np.array([beta, gamma]) / (2 * area)
+            beta = np.array([yj - yk, yk - yi, yi - yj])
+            gamma = np.array([xk - xj, xi - xk, xj - xi])
+            grad = np.array([beta, gamma]) / (2 * area)
 
-        # Get anisotropic conductivity for this element
-        k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
-        k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
-        theta = angles[idx] if hasattr(angles, '__len__') else angles
+            # Get anisotropic conductivity for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
 
-        theta_rad = np.radians(theta)
-        c, s = np.cos(theta_rad), np.sin(theta_rad)
-        R = np.array([[c, s], [-s, c]])
-        Kmat = R.T @ np.diag([k1, k2]) @ R
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
 
-        # Assemble using the inverse of Kmat
-        ke = area * grad.T @ np.linalg.inv(Kmat) @ grad
+            # Assemble using the inverse of Kmat
+            ke = area * grad.T @ np.linalg.inv(Kmat) @ grad
 
-        for a in range(3):
-            for b_ in range(3):
-                A[tri[a], tri[b_]] += ke[a, b_]
+            for a in range(3):
+                for b_ in range(3):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+        elif element_type == 4:
+            # Quadrilateral: use all 4 nodes
+            i, j, k, l = element_nodes
+            coords_elem = coords[[i, j, k, l], :]
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            ke = quad4_stiffness_matrix(coords_elem, np.linalg.inv(Kmat))
+            for a in range(4):
+                for b_ in range(4):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
     for node, phi_value in dirichlet_nodes:
         A[node, :] = 0
@@ -682,11 +787,16 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
     phi = spsolve(A.tocsr(), b)
     return phi
 
-def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes):
+def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes, element_types=None):
     """
     Solves the flow function Phi using the correct ke for unsaturated flow.
     For flowlines, assemble the element matrix using the inverse of kr_elem and Kmat, matching the FORTRAN logic.
+    Supports both triangular and quadrilateral elements.
     """
+
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
 
     n_nodes = coords.shape[0]
     A = lil_matrix((n_nodes, n_nodes))
@@ -695,44 +805,70 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
     y = coords[:, 1]
     p_nodes = head - y
 
-    for idx, tri in enumerate(elements):
-        i, j, k = tri
-        xi, yi = coords[i]
-        xj, yj = coords[j]
-        xk, yk = coords[k]
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: use first 3 nodes (4th node is repeated)
+            i, j, k = element_nodes[:3]
+            xi, yi = coords[i]
+            xj, yj = coords[j]
+            xk, yk = coords[k]
 
-        area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
-        if area <= 0:
-            continue
+            area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
+            if area <= 0:
+                continue
 
-        beta = np.array([yj - yk, yk - yi, yi - yj])
-        gamma = np.array([xk - xj, xi - xk, xj - xi])
-        grad = np.array([beta, gamma]) / (2 * area)  # grad is (2,3)
+            beta = np.array([yj - yk, yk - yi, yi - yj])
+            gamma = np.array([xk - xj, xi - xk, xj - xi])
+            grad = np.array([beta, gamma]) / (2 * area)  # grad is (2,3)
 
-        # Get material properties for this element
-        k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
-        k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
-        theta = angles[idx] if hasattr(angles, '__len__') else angles
+            # Get material properties for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
 
-        theta_rad = np.radians(theta)
-        c, s = np.cos(theta_rad), np.sin(theta_rad)
-        R = np.array([[c, s], [-s, c]])
-        Kmat = R.T @ np.diag([k1, k2]) @ R  # Kmat is (2,2)
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R  # Kmat is (2,2)
 
-        # Compute element pressure (centroid)
-        p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
-        kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+            # Compute element pressure (centroid)
+            p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
+            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
-        # Assemble using the inverse of kr_elem and Kmat
-        # If kr_elem is very small, avoid division by zero
-        if kr_elem > 1e-12:
-            ke = (1.0 / kr_elem) * area * grad.T @ np.linalg.inv(Kmat) @ grad
-        else:
-            ke = 1e12 * area * grad.T @ np.linalg.inv(Kmat) @ grad  # Large value for near-zero kr
+            # Assemble using the inverse of kr_elem and Kmat
+            # If kr_elem is very small, avoid division by zero
+            if kr_elem > 1e-12:
+                ke = (1.0 / kr_elem) * area * grad.T @ np.linalg.inv(Kmat) @ grad
+            else:
+                ke = 1e12 * area * grad.T @ np.linalg.inv(Kmat) @ grad  # Large value for near-zero kr
 
-        for a in range(3):
-            for b_ in range(3):
-                A[tri[a], tri[b_]] += ke[a, b_]
+            for a in range(3):
+                for b_ in range(3):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+        elif element_type == 4:
+            # Quadrilateral: use all 4 nodes
+            i, j, k, l = element_nodes
+            coords_elem = coords[[i, j, k, l], :]
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R  # Kmat is (2,2)
+            # Get kr for this element based on its material properties (use centroid)
+            p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
+            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+            # Assemble using the inverse of kr_elem and Kmat
+            if kr_elem > 1e-12:
+                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(coords_elem, np.linalg.inv(Kmat))
+            else:
+                ke = 1e12 * quad4_stiffness_matrix(coords_elem, np.linalg.inv(Kmat))
+            for a in range(4):
+                for b_ in range(4):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
     for node, phi_value in dirichlet_nodes:
         A[node, :] = 0
@@ -743,22 +879,29 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
     return phi
 
 
-def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None):
+def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None, element_types=None):
     """
     Compute nodal velocities by averaging element-wise Darcy velocities.
     If kr0 and h0 are provided, compute kr_elem using kr_frontal; otherwise, kr_elem = 1.0.
+    Supports both triangular and quadrilateral elements.
+    For quads, velocity is computed at Gauss points and averaged to nodes.
     
     Parameters:
         coords : (n_nodes, 2) array of node coordinates
-        elements : (n_elements, 3) triangle node indices
+        elements : (n_elements, 3 or 4) triangle or quad node indices
         head : (n_nodes,) nodal head solution
         k1_vals, k2_vals, angles : per-element anisotropic properties (or scalar)
         kr0 : (n_elements,) or scalar, relative permeability parameter (optional)
         h0 : (n_elements,) or scalar, pressure head parameter (optional)
+        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
     
     Returns:
         velocity : (n_nodes, 2) array of nodal velocity vectors [vx, vy]
     """
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+
     n_nodes = coords.shape[0]
     velocity = np.zeros((n_nodes, 2))
     count = np.zeros(n_nodes)
@@ -769,53 +912,159 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
     y = coords[:, 1]
     p_nodes = head - y
 
-    for idx, tri in enumerate(elements):
-        i, j, k = tri
-        xi, yi = coords[i]
-        xj, yj = coords[j]
-        xk, yk = coords[k]
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: use first 3 nodes (4th node is repeated)
+            i, j, k = element_nodes[:3]
+            xi, yi = coords[i]
+            xj, yj = coords[j]
+            xk, yk = coords[k]
 
-        area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
-        if area <= 0:
-            continue
+            area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
+            if area <= 0:
+                continue
 
-        beta = np.array([yj - yk, yk - yi, yi - yj])
-        gamma = np.array([xk - xj, xi - xk, xj - xi])
-        grad = np.array([beta, gamma]) / (2 * area)
+            beta = np.array([yj - yk, yk - yi, yi - yj])
+            gamma = np.array([xk - xj, xi - xk, xj - xi])
+            grad = np.array([beta, gamma]) / (2 * area)
 
-        h_vals = head[[i, j, k]]
-        grad_h = grad @ h_vals
+            h_vals = head[[i, j, k]]
+            grad_h = grad @ h_vals
 
-        if scalar_k:
-            k1 = k1_vals
-            k2 = k2_vals
-            theta = angles
-        else:
-            k1 = k1_vals[idx]
-            k2 = k2_vals[idx]
-            theta = angles[idx]
+            if scalar_k:
+                k1 = k1_vals
+                k2 = k2_vals
+                theta = angles
+            else:
+                k1 = k1_vals[idx]
+                k2 = k2_vals[idx]
+                theta = angles[idx]
 
-        theta_rad = np.radians(theta)
-        c, s = np.cos(theta_rad), np.sin(theta_rad)
-        R = np.array([[c, s], [-s, c]])
-        K = R.T @ np.diag([k1, k2]) @ R
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            K = R.T @ np.diag([k1, k2]) @ R
 
-        # Compute kr_elem if kr0 and h0 are provided
-        if kr0 is not None and h0 is not None:
-            p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
-            kr_elem = kr_frontal(p_elem, kr0[idx] if not scalar_kr else kr0, h0[idx] if not scalar_kr else h0)
-        else:
-            kr_elem = 1.0
+            # Compute kr_elem if kr0 and h0 are provided
+            if kr0 is not None and h0 is not None:
+                p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
+                kr_elem = kr_frontal(p_elem, kr0[idx] if not scalar_kr else kr0, h0[idx] if not scalar_kr else h0)
+            else:
+                kr_elem = 1.0
 
-        v_elem = -kr_elem * K @ grad_h
+            v_elem = -kr_elem * K @ grad_h
 
-        for node in tri:
-            velocity[node] += v_elem
-            count[node] += 1
+            for node in element_nodes[:3]:  # Only use first 3 nodes for triangles
+                velocity[node] += v_elem
+                count[node] += 1
+        elif element_type == 4:
+            # Quadrilateral: use all 4 nodes
+            i, j, k, l = element_nodes
+            coords_elem = coords[[i, j, k, l], :]
+            h_elem = head[[i, j, k, l]]
+            if scalar_k:
+                k1 = k1_vals
+                k2 = k2_vals
+                theta = angles
+            else:
+                k1 = k1_vals[idx]
+                k2 = k2_vals[idx]
+                theta = angles[idx]
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            K = R.T @ np.diag([k1, k2]) @ R
+            if kr0 is not None and h0 is not None:
+                p_elem = np.mean(p_nodes[[i, j, k, l]])
+                kr_elem = kr_frontal(p_elem, kr0[idx] if not scalar_kr else kr0, h0[idx] if not scalar_kr else h0)
+            else:
+                kr_elem = 1.0
+            # 2x2 Gauss points and weights
+            gauss_pts = [(-1/np.sqrt(3), -1/np.sqrt(3)),
+                         (1/np.sqrt(3), -1/np.sqrt(3)),
+                         (1/np.sqrt(3), 1/np.sqrt(3)),
+                         (-1/np.sqrt(3), 1/np.sqrt(3))]
+            Nvals = [
+                lambda xi, eta: np.array([(1-xi)*(1-eta), (1+xi)*(1-eta), (1+xi)*(1+eta), (1-xi)*(1+eta)]) * 0.25
+                for _ in range(4)
+            ]
+            for (xi, eta) in gauss_pts:
+                # Shape function derivatives w.r.t. natural coords
+                dN_dxi = np.array([-(1-eta), (1-eta), (1+eta), -(1+eta)]) * 0.25
+                dN_deta = np.array([-(1-xi), -(1+xi), (1+xi), (1-xi)]) * 0.25
+                # Jacobian
+                J = np.zeros((2,2))
+                for a in range(4):
+                    J[0,0] += dN_dxi[a] * coords_elem[a,0]
+                    J[0,1] += dN_dxi[a] * coords_elem[a,1]
+                    J[1,0] += dN_deta[a] * coords_elem[a,0]
+                    J[1,1] += dN_deta[a] * coords_elem[a,1]
+                detJ = np.linalg.det(J)
+                if detJ <= 0:
+                    continue
+                Jinv = np.linalg.inv(J)
+                # Shape function derivatives w.r.t. x,y
+                dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+                dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+                gradN = np.vstack((dN_dx, dN_dy))  # shape (2,4)
+                # Compute grad(h) at this Gauss point
+                grad_h = gradN @ h_elem
+                v_gp = -kr_elem * K @ grad_h  # Darcy velocity at Gauss point
+                # Distribute/average to nodes (simple: add to all 4 nodes)
+                for node in element_nodes:
+                    velocity[node] += v_gp
+                    count[node] += 1
 
     count[count == 0] = 1  # Avoid division by zero
     velocity /= count[:, None]
     return velocity
+
+def quad4_stiffness_matrix(coords_elem, Kmat):
+    """
+    Compute the 4x4 local stiffness matrix for a 4-node quadrilateral element
+    using 2x2 Gauss quadrature and bilinear shape functions.
+    coords_elem: (4,2) array of nodal coordinates (in order: [i,j,k,l])
+    Kmat: (2,2) conductivity matrix for the element
+    Returns:
+        ke: (4,4) element stiffness matrix
+    """
+    # 2x2 Gauss points and weights
+    gauss_pts = [(-1/np.sqrt(3), -1/np.sqrt(3)),
+                 (1/np.sqrt(3), -1/np.sqrt(3)),
+                 (1/np.sqrt(3), 1/np.sqrt(3)),
+                 (-1/np.sqrt(3), 1/np.sqrt(3))]
+    weights = [1, 1, 1, 1]
+    ke = np.zeros((4, 4))
+    for (xi, eta), w in zip(gauss_pts, weights):
+        # Shape function derivatives w.r.t. natural coords
+        dN_dxi = np.array([
+            [-(1-eta),  (1-eta),  (1+eta), -(1+eta)]
+        ]) * 0.25
+        dN_deta = np.array([
+            [-(1-xi), -(1+xi),  (1+xi),  (1-xi)]
+        ]) * 0.25
+        dN_dxi = dN_dxi.flatten()
+        dN_deta = dN_deta.flatten()
+        # Jacobian
+        J = np.zeros((2,2))
+        for a in range(4):
+            J[0,0] += dN_dxi[a] * coords_elem[a,0]
+            J[0,1] += dN_dxi[a] * coords_elem[a,1]
+            J[1,0] += dN_deta[a] * coords_elem[a,0]
+            J[1,1] += dN_deta[a] * coords_elem[a,1]
+        detJ = np.linalg.det(J)
+        if detJ <= 0:
+            continue
+        Jinv = np.linalg.inv(J)
+        # Shape function derivatives w.r.t. x,y
+        dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+        dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+        gradN = np.vstack((dN_dx, dN_dy))  # shape (2,4)
+        # Element stiffness contribution at this Gauss point
+        ke += (gradN.T @ Kmat @ gradN) * detJ * w
+    return ke
 
 def run_analysis(seep_data):
     """
@@ -833,6 +1082,7 @@ def run_analysis(seep_data):
     nbc = seep_data["nbc"]
     fx = seep_data["fx"]
     element_materials = seep_data["element_materials"]
+    element_types = seep_data.get("element_types", None)  # New field for element types
     k1_by_mat = seep_data["k1_by_mat"]
     k2_by_mat = seep_data["k2_by_mat"]
     angle_by_mat = seep_data["angle_by_mat"]
@@ -873,22 +1123,23 @@ def run_analysis(seep_data):
             k2_vals=k2,
             angles=angle,
             max_iter=200,
-            tol=1e-4
+            tol=1e-4,
+            element_types=element_types
         )
         # Solve for potential function φ for flow lines
-        dirichlet_phi_bcs = create_flow_potential_bc(coords, elements, q)
-        phi = solve_flow_function_unsaturated(coords, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs)
+        dirichlet_phi_bcs = create_flow_potential_bc(coords, elements, q, element_types=element_types)
+        phi = solve_flow_function_unsaturated(coords, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         # Compute velocity, pass element-level kr0 and h0
-        velocity = compute_velocity(coords, elements, head, k1, k2, angle, kr0_per_element, h0_per_element)
+        velocity = compute_velocity(coords, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
     else:
-        head, A, q, total_flow = solve_confined(coords, elements, nbc, bcs, k1, k2, angle)
+        head, A, q, total_flow = solve_confined(coords, elements, nbc, bcs, k1, k2, angle, element_types)
         # Solve for potential function φ for flow lines
-        dirichlet_phi_bcs = create_flow_potential_bc(coords, elements, q)
-        phi = solve_flow_function_confined(coords, elements, k1, k2, angle, dirichlet_phi_bcs)
+        dirichlet_phi_bcs = create_flow_potential_bc(coords, elements, q, element_types=element_types)
+        phi = solve_flow_function_confined(coords, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         # Compute velocity, don't pass kr0 and h0
-        velocity = compute_velocity(coords, elements, head, k1, k2, angle)
+        velocity = compute_velocity(coords, elements, head, k1, k2, angle, element_types=element_types)
 
     gamma_w = unit_weight
     u = gamma_w * (head - coords[:, 1])
@@ -946,6 +1197,15 @@ def print_seep_data_diagnostics(seep_data):
     print(f"Number of elements: {len(seep_data['elements'])}")
     print(f"Number of materials: {len(seep_data['k1_by_mat'])}")
     print(f"Unit weight of water: {seep_data['unit_weight']}")
+    
+    # Element type information
+    element_types = seep_data.get('element_types', None)
+    if element_types is not None:
+        num_triangles = np.sum(element_types == 3)
+        num_quads = np.sum(element_types == 4)
+        print(f"Element types: {num_triangles} triangles, {num_quads} quadrilaterals")
+    else:
+        print("Element types: All triangles (legacy format)")
     
     # Coordinate ranges
     coords = seep_data['coords']

@@ -7,6 +7,7 @@ import numpy as np
 def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
     """
     Plots a mesh colored by material zone.
+    Supports both triangular and quadrilateral elements.
     
     Args:
         seep_data: Dictionary containing seepage data from import_seep2d
@@ -14,11 +15,13 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
         show_bc: If True, plot boundary condition nodes
     """
     import matplotlib.pyplot as plt
+    from matplotlib.patches import Polygon
 
     # Extract data from seep_data
     coords = seep_data["coords"]
     elements = seep_data["elements"]
     element_materials = seep_data["element_materials"]
+    element_types = seep_data.get("element_types", None)  # New field for element types
     nbc = seep_data["nbc"]
 
     fig, ax = plt.subplots(figsize=(12, 5))
@@ -26,10 +29,25 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
     cmap = plt.get_cmap("tab10", len(materials))
     mat_to_color = {mat: cmap(i) for i, mat in enumerate(materials)}
 
-    for idx, tri_nodes in enumerate(elements):
-        polygon = coords[tri_nodes]
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: use first 3 nodes (4th node is repeated)
+            polygon_coords = coords[element_nodes[:3]]
+        else:
+            # Quad: use all 4 nodes
+            polygon_coords = coords[element_nodes]
+            
         color = mat_to_color[element_materials[idx]]
-        ax.fill(*zip(*polygon), edgecolor='k', facecolor=color, linewidth=0.5)
+        
+        # Create polygon patch
+        polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5)
+        ax.add_patch(polygon)
 
     if show_nodes:
         ax.plot(coords[:, 0], coords[:, 1], 'k.', markersize=2)
@@ -58,7 +76,18 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
         frameon=False
     )
     ax.set_aspect("equal")
-    ax.set_title("SEEP2D Mesh with Material Zones")
+    
+    # Count element types for title
+    num_triangles = np.sum(element_types == 3)
+    num_quads = np.sum(element_types == 4)
+    if num_triangles > 0 and num_quads > 0:
+        title = f"SEEP2D Mesh with Material Zones ({num_triangles} triangles, {num_quads} quads)"
+    elif num_quads > 0:
+        title = f"SEEP2D Mesh with Material Zones ({num_quads} quadrilaterals)"
+    else:
+        title = f"SEEP2D Mesh with Material Zones ({num_triangles} triangles)"
+    
+    ax.set_title(title)
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
     plt.tight_layout()
     plt.show()
@@ -68,6 +97,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     """
     Plots head contours and optionally overlays flowlines (phi) based on flow function.
     Fixed version that properly handles mesh aspect ratio and doesn't clip the plot.
+    Supports both triangular and quadrilateral elements.
 
     Arguments:
         seep_data: Dictionary containing seepage data from import_seep2d
@@ -80,16 +110,22 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     import matplotlib.pyplot as plt
     import matplotlib.tri as tri
     from matplotlib.ticker import MaxNLocator
+    from matplotlib.patches import Polygon
     import numpy as np
 
     # Extract data from seep_data and solution
     coords = seep_data["coords"]
     elements = seep_data["elements"]
     element_materials = seep_data["element_materials"]
+    element_types = seep_data.get("element_types", None)  # New field for element types
     k1_by_mat = seep_data["k1_by_mat"]
     head = solution["head"]
     phi = solution.get("phi")
     flowrate = solution.get("flowrate")
+
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
 
     # Calculate proper figure size based on mesh aspect ratio
     x_min, x_max = coords[:, 0].min(), coords[:, 0].max()
@@ -117,8 +153,16 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     print(f"Mesh bounds: x=[{x_min:.1f}, {x_max:.1f}], y=[{y_min:.1f}, {y_max:.1f}]")
     print(f"Mesh aspect ratio: {mesh_aspect:.2f}, Figure size: {fig_width:.1f} x {fig_height:.1f}")
 
-    triang = tri.Triangulation(coords[:, 0], coords[:, 1], elements)
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+    # Separate triangles and quads
+    triangle_mask = element_types == 3
+    quad_mask = element_types == 4
+    
+    triangle_elements = elements[triangle_mask]
+    quad_elements = elements[quad_mask]
+    
+    print(f"Plotting {len(triangle_elements)} triangles and {len(quad_elements)} quadrilaterals")
 
     # Plot material zones first (if element_materials provided)
     if element_materials is not None:
@@ -126,15 +170,54 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
         cmap = plt.get_cmap("tab10", len(materials))
         mat_to_color = {mat: cmap(i) for i, mat in enumerate(materials)}
 
-        for idx, tri_nodes in enumerate(elements):
-            polygon = coords[tri_nodes]
-            color = mat_to_color[element_materials[idx]]
+        # Plot triangles
+        for idx, element_nodes in enumerate(triangle_elements):
+            element_type = element_types[np.where(triangle_mask)[0][idx]]
+            if element_type == 3:
+                # Triangle: use first 3 nodes (4th node is repeated)
+                polygon = coords[element_nodes[:3]]
+            else:
+                # Quad: use all 4 nodes
+                polygon = coords[element_nodes]
+            color = mat_to_color[element_materials[np.where(triangle_mask)[0][idx]]]
             ax.fill(*zip(*polygon), edgecolor='none', facecolor=color, alpha=0.5)
+        
+        # Plot quads
+        for idx, element_nodes in enumerate(quad_elements):
+            element_type = element_types[np.where(quad_mask)[0][idx]]
+            if element_type == 3:
+                # Triangle: use first 3 nodes (4th node is repeated)
+                polygon_coords = coords[element_nodes[:3]]
+            else:
+                # Quad: use all 4 nodes
+                polygon_coords = coords[element_nodes]
+            color = mat_to_color[element_materials[np.where(quad_mask)[0][idx]]]
+            polygon = Polygon(polygon_coords, edgecolor='none', facecolor=color, alpha=0.5)
+            ax.add_patch(polygon)
 
     vmin = np.min(head)
     vmax = np.max(head)
     hdrop = vmax - vmin
     contour_levels = np.linspace(vmin, vmax, levels)
+
+    # For contouring, we need to create triangulations
+    # For triangles, use the first 3 nodes (4th node is repeated)
+    # For quads, we need to split them into triangles for contouring
+    all_triangles_for_contouring = []
+    
+    # Add original triangles (use first 3 nodes)
+    for tri_nodes in triangle_elements:
+        all_triangles_for_contouring.append(tri_nodes[:3])
+    
+    # Split quads into triangles (diagonal from node 0 to node 2)
+    for quad_nodes in quad_elements:
+        # Split quad into two triangles: [0,1,2] and [0,2,3]
+        tri1 = [quad_nodes[0], quad_nodes[1], quad_nodes[2]]
+        tri2 = [quad_nodes[0], quad_nodes[2], quad_nodes[3]]
+        all_triangles_for_contouring.extend([tri1, tri2])
+    
+    # Create triangulation for contouring
+    triang = tri.Triangulation(coords[:, 0], coords[:, 1], all_triangles_for_contouring)
 
     # Filled contours (only if fill_contours=True)
     if fill_contours:
@@ -166,7 +249,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
 
     # Plot the mesh boundary
     try:
-        boundary = get_ordered_mesh_boundary(coords, elements)
+        boundary = get_ordered_mesh_boundary(coords, elements, element_types)
         ax.plot(boundary[:, 0], boundary[:, 1], color="black", linewidth=1.0, label="Mesh Boundary")
     except Exception as e:
         print(f"Warning: Could not plot mesh boundary: {e}")
@@ -195,9 +278,10 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     plt.tight_layout()
     plt.show()
 
-def get_ordered_mesh_boundary(coords, elements):
+def get_ordered_mesh_boundary(coords, elements, element_types=None):
     """
     Extracts the outer boundary of the mesh and returns it as an ordered array of points.
+    Supports both triangular and quadrilateral elements.
 
     Returns:
         np.ndarray of shape (N, 2): boundary coordinates in order (closed loop)
@@ -205,15 +289,29 @@ def get_ordered_mesh_boundary(coords, elements):
     import numpy as np
     from collections import defaultdict, deque
 
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+
     # Step 1: Count all edges
     edge_count = defaultdict(int)
     edge_to_nodes = {}
 
-    for tri in elements:
-        for i in range(3):
-            a, b = sorted((tri[i], tri[(i + 1) % 3]))
-            edge_count[(a, b)] += 1
-            edge_to_nodes[(a, b)] = (tri[i], tri[(i + 1) % 3])  # preserve direction
+    for i, element_nodes in enumerate(elements):
+        element_type = element_types[i]
+        
+        if element_type == 3:
+            # Triangle: 3 edges
+            for j in range(3):
+                a, b = sorted((element_nodes[j], element_nodes[(j + 1) % 3]))
+                edge_count[(a, b)] += 1
+                edge_to_nodes[(a, b)] = (element_nodes[j], element_nodes[(j + 1) % 3])  # preserve direction
+        elif element_type == 4:
+            # Quadrilateral: 4 edges
+            for j in range(4):
+                a, b = sorted((element_nodes[j], element_nodes[(j + 1) % 4]))
+                edge_count[(a, b)] += 1
+                edge_to_nodes[(a, b)] = (element_nodes[j], element_nodes[(j + 1) % 4])  # preserve direction
 
     # Step 2: Keep only boundary edges (appear once)
     boundary_edges = [edge_to_nodes[e] for e, count in edge_count.items() if count == 1]

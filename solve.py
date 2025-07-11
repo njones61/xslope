@@ -562,7 +562,7 @@ def lowe_karafiath(df, debug=False):
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-4, max_iter = 100, debug_level=2):
+def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     
@@ -619,10 +619,27 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=2):
     x_b = x_c  # center of base x-coordinate
     y_b = y_cb  # center of base y-coordinate
 
+
+    tan_p = np.tan(phi)  # tan(phi)
+
+    y_ct = df['y_ct'].values
+    right_facing = (y_ct[0] > y_ct[-1])
+    # If right facing, swap angles and strengths. For most methods, you can use the normal angle conventions
+    # and get the right answer. But for Spencer, due to the way that the moment equation is written,
+    # you need to swap the angles and strengths if the slope is right facing.
+    if right_facing:
+        alpha = -alpha
+        beta = -beta
+        psi = -psi
+        R = -R
+        c = -c
+        kw = -kw
+        tan_p = -tan_p
+
     # pre-compute the trigonometric functions
     cos_a = np.cos(alpha)  # cos(alpha)
     sin_a = np.sin(alpha)  # sin(alpha)
-    tan_p = np.tan(phi)  # tan(phi)
+    #tan_p = np.tan(phi)  # tan(phi)    # moved above
     cos_b = np.cos(beta)  # cos(beta)
     sin_b = np.sin(beta)  # sin(beta)
     sin_psi = np.sin(psi)  # sin(psi)
@@ -741,7 +758,10 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=2):
     
     # Initial guesses
     F0 = 1.5
-    theta0_rad = np.radians(-8.0) 
+    if right_facing:
+        theta0_rad = np.radians(-8.0) 
+    else:
+        theta0_rad = np.radians(8.0) 
     
     # Newton iteration
     F = F0
@@ -823,19 +843,8 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=2):
     if iteration >= max_iter - 1:
         return False, "Spencer's method did not converge within the maximum number of iterations."
     
-
-    ###### DEBUG RIGHT_FACING SLOPE ######
-    print(f"F = {F:.12f}, theta = {np.degrees(theta_rad):.12f}°")
-    # print("THETA_RAD CONVERTED TO 8.89552236670, F = 1.936856063097")
-    # theta_rad = np.radians(8.895522366703)  # Hardwired to override the solution.
-    # F = 1.936856063097          # Hardwired to override the solution.
-    R1, R2, Q, y_q = compute_residuals(F, theta_rad)
-    print(f"R1 = {R1:.6e}, R2 = {R2:.6e}")
-
-
-
     # Final computation of Q and y_q
-    Q, y_q = compute_Q_and_yQ(F, theta_rad)
+    R1, R2, Q, y_q = compute_residuals(F, theta_rad)
 
     if debug_level >= 2: 
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
@@ -845,6 +854,10 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=2):
         df['Fh'] = Fh
         df['Fv'] = Fv
         df['Mo'] = Mo
+        # Print F and theta to 12 decimal places
+        print(f"F = {F:.12f}, theta = {np.degrees(theta_rad):.12f}°")
+        # Report the residuals
+        print(f"R1 = {R1:.6e}, R2 = {R2:.6e}")
         # Debug print values per slice
         for i in range(len(Q)):
             print(f"Slice {i+1}: ma = {ma[i]:.3f}, Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")

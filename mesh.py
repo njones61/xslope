@@ -5,161 +5,9 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from plot import get_material_color
 
-def build_tri_mesh(points, target_size):
 
-    gmsh.initialize()
-    gmsh.model.add("paving_mesh")
 
-    # Add points to Gmsh with target size
-    point_tags = [gmsh.model.geo.addPoint(x, y, 0, target_size) for x, y in points]
-
-    # Create lines between consecutive points (wrap last to first)
-    line_tags = [
-        gmsh.model.geo.addLine(point_tags[i], point_tags[(i + 1) % len(point_tags)])
-        for i in range(len(point_tags))
-    ]
-
-    # Create loop and surface
-    loop = gmsh.model.geo.addCurveLoop(line_tags)
-    gmsh.model.geo.addPlaneSurface([loop])
-
-    gmsh.model.geo.synchronize()
-    gmsh.model.mesh.generate(2)
-
-    # Extract nodes and triangles
-    node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-    nodes = np.array(node_coords).reshape(-1, 3)[:, :2]
-    elements = gmsh.model.mesh.getElementsByType(2)[1].reshape(-1, 3) - 1  # zero-based
-
-    gmsh.finalize()
-    return nodes, elements
-
-def build_mesh_with_regions_OLD(polygons, region_ids, target_size, element_type='tri', debug=False):
-    """
-    Build a finite element mesh with material regions using Gmsh.
-    
-    Parameters:
-        polygons     : List of lists of (x, y) tuples defining material boundaries
-        region_ids   : List of material IDs (one per polygon)
-        target_size  : Desired element size
-        element_type : 'tri' for triangles or 'quad' for quadrilaterals (may include a few triangles)
-
-    Returns:
-        nodes        : np.ndarray of node coordinates (n_nodes, 2)
-        elements     : list of element vertex indices (each element is a list of 3 or 4 ints)
-        mat_ids      : list of material ID for each element
-    """
-    import gmsh
-    import numpy as np
-
-    if element_type not in ['tri', 'quad']:
-        raise ValueError("element_type must be 'tri' or 'quad'")
-
-    gmsh.initialize()
-    gmsh.model.add("multi_region_mesh")
-    point_map = {}  # maps (x, y) to Gmsh point tag
-
-    def add_point(x, y):
-        key = (x, y)
-        if key not in point_map:
-            tag = gmsh.model.geo.addPoint(x, y, 0, target_size)
-            point_map[key] = tag
-        return point_map[key]
-
-    # Create geometry for all regions
-    surface_tags = []
-    region_to_physical = {region_id: idx + 1 for idx, region_id in enumerate(region_ids)}
-    for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
-        poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))  # make a copy
-        pt_tags = [add_point(x, y) for x, y in poly_pts_clean]
-        line_tags = [gmsh.model.geo.addLine(pt_tags[i], pt_tags[(i + 1) % len(pt_tags)])
-                     for i in range(len(pt_tags))]
-        loop = gmsh.model.geo.addCurveLoop(line_tags)
-        surface = gmsh.model.geo.addPlaneSurface([loop])
-        surface_tags.append(surface)
-        
-        # Add physical group for this region
-        physical_tag = region_to_physical[region_id]
-        gmsh.model.addPhysicalGroup(2, [surface], physical_tag)
-
-    # Synchronize geometry
-    gmsh.model.geo.synchronize()
-    
-    # Set mesh algorithm and recombination options BEFORE generating mesh
-
-    if element_type == 'quad':
-        # Set global options for quad meshing
-        gmsh.option.setNumber("Mesh.Algorithm", 8)  # Frontal-Delaunay for quads
-        gmsh.option.setNumber("Mesh.RecombineAll", 1)  # Recombine triangles into quads
-        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)  # Simple recombination
-        gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)  # All quads
-        
-        # Set recombination for each surface
-        for surface in surface_to_region.keys():
-            gmsh.model.mesh.setRecombine(2, surface)
-
-    else:
-        gmsh.option.setNumber("Mesh.Algorithm", 6)  # Frontal-Delaunay for triangles
-    
-    # Generate mesh
-    gmsh.model.mesh.generate(2)
-
-    # Get nodes
-    node_tags, coords, _ = gmsh.model.mesh.getNodes()
-    nodes = np.array(coords).reshape(-1, 3)[:, :2]
-    
-    # Create node tag to index mapping
-    node_tag_to_index = {tag: i for i, tag in enumerate(node_tags)}
-
-    elements = []
-    mat_ids = []
-
-    # Extract elements for each region
-    for region_id in region_ids:
-        try:
-            # Get surfaces for this physical group
-            physical_tag = region_to_physical[region_id]
-            phys_group_surfaces = gmsh.model.getEntitiesForPhysicalGroup(2, physical_tag)
-            
-            for surface in phys_group_surfaces:
-                # Get all elements for this surface
-                elem_types, elem_tags_list, node_tags_list = gmsh.model.mesh.getElements(2, surface)
-                
-                for elem_type, elem_tags, node_tags in zip(elem_types, elem_tags_list, node_tags_list):
-                    if elem_type == 2:  # 3-node triangle
-                        elements_array = np.array(node_tags).reshape(-1, 3)
-                        for element in elements_array:
-                            idxs = [node_tag_to_index[tag] for tag in element]
-                            elements.append(idxs)
-                            mat_ids.append(region_id)
-                    elif elem_type == 3:  # 4-node quadrilateral
-                        elements_array = np.array(node_tags).reshape(-1, 4)
-                        for element in elements_array:
-                            idxs = [node_tag_to_index[tag] for tag in element]
-                            elements.append(idxs)
-                            mat_ids.append(region_id)
-                    elif elem_type == 9:  # 6-node triangle (second-order)
-                        elements_array = np.array(node_tags).reshape(-1, 6)
-                        for element in elements_array:
-                            # Take only the first 3 nodes (corner nodes)
-                            idxs = [node_tag_to_index[tag] for tag in element[:3]]
-                            elements.append(idxs)
-                            mat_ids.append(region_id)
-                    elif elem_type == 10:  # 9-node quadrilateral (second-order)
-                        elements_array = np.array(node_tags).reshape(-1, 9)
-                        for element in elements_array:
-                            # Take only the first 4 nodes (corner nodes)
-                            idxs = [node_tag_to_index[tag] for tag in element[:4]]
-                            elements.append(idxs)
-                            mat_ids.append(region_id)
-        except Exception as e:
-            print(f"Warning: Could not extract elements for region {region_id}: {e}")
-            continue
-    
-    gmsh.finalize()
-    return nodes, elements, mat_ids
-
-def build_mesh_with_regions(polygons, region_ids, target_size, element_type='tri', debug=False):
+def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tri', debug=False):
     """
     Build a finite element mesh with material regions using Gmsh.
     Alternative approach that doesn't use physical groups to avoid warnings.
@@ -287,60 +135,48 @@ def build_mesh_with_regions(polygons, region_ids, target_size, element_type='tri
             continue
     
     gmsh.finalize()
-    return nodes, elements, mat_ids
 
-def reorder_mesh(nodes, elements):
-    from scipy.sparse import coo_matrix
-    from scipy.sparse.csgraph import reverse_cuthill_mckee
+    # Standardize elements and set element_types based on element_type parameter
+    if element_type == 'tri':
+        # All elements should be triangles (3 nodes), pad to 4 columns
+        elements_array = np.array(elements, dtype=int)
+        if elements_array.shape[1] == 3:
+            # Pad triangles by repeating the third node
+            elements_array = np.column_stack([elements_array, elements_array[:, 2]])
+        element_types = np.full(len(elements), 3, dtype=int)
+    else:  # element_type == 'quad'
+        # All elements should be quadrilaterals (4 nodes)
+        elements_array = np.array(elements, dtype=int)
+        element_types = np.full(len(elements), 4, dtype=int)
+    
+    element_materials = np.array(mat_ids, dtype=int)
 
-    n_nodes = nodes.shape[0]
-    rows, cols = [], []
+    mesh = {
+        "nodes": nodes,
+        "elements": elements_array,
+        "element_types": element_types,
+        "element_materials": element_materials,
+    }
 
-    for tri in elements:
-        for i in range(3):
-            for j in range(i + 1, 3):
-                rows.append(tri[i])
-                cols.append(tri[j])
-                rows.append(tri[j])
-                cols.append(tri[i])
-
-    adj = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(n_nodes, n_nodes))
-
-    def bandwidth(el):
-        if len(el) == 0:
-            return 0
-        return max(abs(int(i) - int(j)) for tri in el for i in tri for j in tri)
-
-    bw_before = bandwidth(elements)
-
-    # RCM reordering
-    perm = reverse_cuthill_mckee(adj.tocsr())
-    inverse_perm = np.zeros_like(perm)
-    inverse_perm[perm] = np.arange(len(perm))
-
-    new_nodes = nodes[perm]
-    new_elements = np.array([[inverse_perm[i] for i in tri] for tri in elements])
-
-    # Bandwidth after
-    bw_after = bandwidth(new_elements)
-
-    print(f"Bandwidth before reordering: {bw_before}")
-    print(f"Bandwidth after reordering:  {bw_after}")
-
-    return new_nodes, new_elements
+    return mesh
 
 
 # Simple plot showing material regions
-def plot_mesh_with_materials(nodes, elements, mat_ids, materials=None, figsize=(14, 6), pad_frac=0.05):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from matplotlib.collections import PolyCollection
+    
+    # Extract mesh data from dictionary
+    nodes = mesh["nodes"]
+    elements = mesh["elements"]
+    element_materials = mesh["element_materials"]
     
     fig, ax = plt.subplots(figsize=figsize)
     
     # Group elements by material ID for efficient plotting
     material_elements = {}
-    for element, mid in zip(elements, mat_ids):
+    for element, mid in zip(elements, element_materials):
         if mid not in material_elements:
             material_elements[mid] = []
         # Get element vertices
@@ -585,6 +421,42 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone'):
         ax.legend()
     plt.tight_layout()
     plt.show()
+
+def save_mesh_to_json(mesh, filename):
+    """Save mesh dictionary to JSON file."""
+    import json
+    import numpy as np
+    
+    # Convert numpy arrays to lists for JSON serialization
+    mesh_json = {}
+    for key, value in mesh.items():
+        if isinstance(value, np.ndarray):
+            mesh_json[key] = value.tolist()
+        else:
+            mesh_json[key] = value
+    
+    with open(filename, 'w') as f:
+        json.dump(mesh_json, f, indent=2)
+    
+    print(f"Mesh saved to {filename}")
+
+def load_mesh_from_json(filename):
+    """Load mesh dictionary from JSON file."""
+    import json
+    import numpy as np
+    
+    with open(filename, 'r') as f:
+        mesh_json = json.load(f)
+    
+    # Convert lists back to numpy arrays
+    mesh = {}
+    for key, value in mesh_json.items():
+        if isinstance(value, list):
+            mesh[key] = np.array(value)
+        else:
+            mesh[key] = value
+    
+    return mesh
 
 def remove_duplicate_endpoint(poly, tol=1e-8):
     if len(poly) > 1 and abs(poly[0][0] - poly[-1][0]) < tol and abs(poly[0][1] - poly[-1][1]) < tol:

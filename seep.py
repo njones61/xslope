@@ -9,16 +9,19 @@ def import_seep2d(filepath):
     """
     Reads SEEP2D .s2d input file and returns mesh, materials, and BC data.
     Supports both triangular and quadrilateral elements.
+    Uses implicit numbering (0-based array indices) instead of explicit node IDs.
+    
+    Note: All node indices in elements are converted to 0-based indexing during import.
+    Material IDs remain 1-based as they appear in the SEEP2D file.
 
     Returns:
         {
-            "coords": np.ndarray (n_nodes, 2),
-            "node_ids": np.ndarray (n_nodes,),
-            "nbc": np.ndarray (n_nodes,),   # boundary condition flags
-            "fx": np.ndarray (n_nodes,),    # boundary condition values (head or elevation)
-            "elements": np.ndarray (n_elements, 3 or 4),  # triangle or quad node indices
+            "nodes": np.ndarray (n_nodes, 2),
+            "bc_type": np.ndarray (n_nodes,),   # boundary condition flags
+            "bc_values": np.ndarray (n_nodes,),    # boundary condition values (head or elevation)
+            "elements": np.ndarray (n_elements, 3 or 4),  # triangle or quad node indices (0-based)
             "element_types": np.ndarray (n_elements,),    # 3 for triangles, 4 for quads
-            "element_materials": np.ndarray (n_elements,)
+            "element_materials": np.ndarray (n_elements,) # material IDs (1-based)
         }
     """
     import re
@@ -62,27 +65,25 @@ def import_seep2d(filepath):
     element_lines = lines[line_offset + num_nodes:]
 
     coords = []
-    node_ids = []
-    nbc_flags = []
-    fx_vals = []
+    bc_type = []
+    bc_values = []
 
     for line in node_lines:
         try:
             node_id = int(line[0:5])
-            bc_type = int(line[7:10])
+            bc_type_val = int(line[7:10])
             x = float(line[10:25])
             y = float(line[25:40])
 
-            if bc_type == 1 and len(line) >= 41:
-                fx_val = float(line[40:55])
-            elif bc_type == 2:
-                fx_val = y
+            if bc_type_val == 1 and len(line) >= 41:
+                bc_value = float(line[40:55])
+            elif bc_type_val == 2:
+                bc_value = y
             else:
-                fx_val = 0.0
+                bc_value = 0.0
 
-            node_ids.append(node_id)
-            nbc_flags.append(bc_type)
-            fx_vals.append(fx_val)
+            bc_type.append(bc_type_val)
+            bc_values.append(bc_value)
             coords.append((x, y))
 
         except Exception as e:
@@ -97,6 +98,9 @@ def import_seep2d(filepath):
         if len(nums) >= 6:
             _, n1, n2, n3, n4, mat = nums[:6]
             
+            # Convert to 0-based indexing during reading
+            n1, n2, n3, n4 = n1 - 1, n2 - 1, n3 - 1, n4 - 1
+            
             # Check if this is a triangle (n3 == n4) or quad (n3 != n4)
             if n3 == n4:
                 # Triangle: repeat the last node to create 4-node format
@@ -110,11 +114,10 @@ def import_seep2d(filepath):
             element_mats.append(mat)
 
     return {
-        "coords": np.array(coords),
-        "node_ids": np.array(node_ids, dtype=int),
-        "nbc": np.array(nbc_flags, dtype=int),
-        "fx": np.array(fx_vals),
-        "elements": np.array(elements, dtype=int) - 1,  # Convert to 0-based indexing
+        "nodes": np.array(coords),
+        "bc_type": np.array(bc_type, dtype=int),
+        "bc_values": np.array(bc_values),
+        "elements": np.array(elements, dtype=int),  # Already 0-based
         "element_types": np.array(element_types, dtype=int),
         "element_materials": np.array(element_mats),
         "k1_by_mat": k1_array,
@@ -126,13 +129,14 @@ def import_seep2d(filepath):
     }
 
 
-def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angles=None, element_types=None):
+def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, angles=None, element_types=None):
     """
     FEM solver for confined seepage with anisotropic conductivity.
     Supports both triangular and quadrilateral elements.
     Parameters:
-        coords : (n_nodes, 2) array of node coordinates
+        nodes : (n_nodes, 2) array of node coordinates
         elements : (n_elements, 3 or 4) triangle or quad node indices
+        bc_type : (n_nodes,) array of boundary condition flags
         dirichlet_bcs : list of (node_id, head_value)
         k1_vals : (n_elements,) or scalar, major axis conductivity
         k2_vals : (n_elements,) or scalar, minor axis conductivity
@@ -146,7 +150,7 @@ def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angle
     if element_types is None:
         element_types = np.full(len(elements), 3)
 
-    n_nodes = coords.shape[0]
+    n_nodes = nodes.shape[0]
     A = lil_matrix((n_nodes, n_nodes))
     b = np.zeros(n_nodes)
 
@@ -156,9 +160,9 @@ def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angle
         if element_type == 3:
             # Triangle: use first 3 nodes (4th node is repeated)
             i, j, k = element_nodes[:3]
-            xi, yi = coords[i]
-            xj, yj = coords[j]
-            xk, yk = coords[k]
+            xi, yi = nodes[i]
+            xj, yj = nodes[j]
+            xk, yk = nodes[k]
 
             area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
             if area <= 0:
@@ -186,7 +190,7 @@ def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angle
         elif element_type == 4:
             # Quadrilateral: use all 4 nodes
             i, j, k, l = element_nodes
-            coords_elem = coords[[i, j, k, l], :]
+            nodes_elem = nodes[[i, j, k, l], :]
             k1 = k1_vals[idx]
             k2 = k2_vals[idx]
             theta = angles[idx]
@@ -194,7 +198,7 @@ def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angle
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            ke = quad4_stiffness_matrix(coords_elem, Kmat)
+            ke = quad4_stiffness_matrix(nodes_elem, Kmat)
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -211,14 +215,14 @@ def solve_confined(coords, elements, nbc, dirichlet_bcs, k1_vals, k2_vals, angle
 
     total_flow = 0.0
 
-    for node_idx in range(len(nbc)):
+    for node_idx in range(len(bc_type)):
         if q[node_idx] > 0:  # Positive flow
             total_flow += q[node_idx]
 
     return head, A, q, total_flow
 
 
-def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
+def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
                       max_iter=200, tol=1e-4, element_types=None):
     """
@@ -230,23 +234,23 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
     if element_types is None:
         element_types = np.full(len(elements), 3)
 
-    n_nodes = coords.shape[0]
-    y = coords[:, 1]
+    n_nodes = nodes.shape[0]
+    y = nodes[:, 1]
 
     # Initialize heads
     h = np.zeros(n_nodes)
     for node_idx in range(n_nodes):
-        if nbc[node_idx] == 1:
-            h[node_idx] = fx[node_idx]
-        elif nbc[node_idx] == 2:
+        if bc_type[node_idx] == 1:
+            h[node_idx] = bc_values[node_idx]
+        elif bc_type[node_idx] == 2:
             h[node_idx] = y[node_idx]
         else:
-            fixed_heads = fx[nbc == 1]
+            fixed_heads = bc_values[bc_type == 1]
             h[node_idx] = np.mean(fixed_heads) if len(fixed_heads) > 0 else np.mean(y)
 
     # Track which exit face nodes are active (saturated)
     exit_face_active = np.ones(n_nodes, dtype=bool)
-    exit_face_active[nbc != 2] = False
+    exit_face_active[bc_type != 2] = False
 
     # Store previous iteration values
     h_last = h.copy()
@@ -287,9 +291,9 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
             if element_type == 3:
                 # Triangle: use first 3 nodes (4th node is repeated)
                 i, j, k = element_nodes[:3]
-                xi, yi = coords[i]
-                xj, yj = coords[j]
-                xk, yk = coords[k]
+                xi, yi = nodes[i]
+                xj, yj = nodes[j]
+                xk, yk = nodes[k]
 
                 # Element area
                 area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
@@ -337,7 +341,7 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
             elif element_type == 4:
                 # Quadrilateral: use all 4 nodes
                 i, j, k, l = element_nodes
-                coords_elem = coords[[i, j, k, l], :]
+                nodes_elem = nodes[[i, j, k, l], :]
                 k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
                 k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
                 theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -348,7 +352,7 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
                 # Compute element pressure (centroid)
                 p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
                 kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-                ke = kr_elem * quad4_stiffness_matrix(coords_elem, Kmat)
+                ke = kr_elem * quad4_stiffness_matrix(nodes_elem, Kmat)
                 for a in range(4):
                     for b_ in range(4):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -358,11 +362,11 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
 
         # Apply boundary conditions
         for node_idx in range(n_nodes):
-            if nbc[node_idx] == 1:
+            if bc_type[node_idx] == 1:
                 A[node_idx, :] = 0
                 A[node_idx, node_idx] = 1
-                b[node_idx] = fx[node_idx]
-            elif nbc[node_idx] == 2 and exit_face_active[node_idx]:
+                b[node_idx] = bc_values[node_idx]
+            elif bc_type[node_idx] == 2 and exit_face_active[node_idx]:
                 A[node_idx, :] = 0
                 A[node_idx, node_idx] = 1
                 b[node_idx] = y[node_idx]
@@ -396,7 +400,7 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
         hyst = 0.001 * (ymax - ymin)  # Hysteresis threshold
 
         for node_idx in range(n_nodes):
-            if nbc[node_idx] == 2:
+            if bc_type[node_idx] == 2:
                 if exit_face_active[node_idx]:
                     # Check if node should become inactive
                     if h_new[node_idx] < y[node_idx] - hyst or q[node_idx] > 0:
@@ -415,8 +419,8 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
 
         # Print detailed iteration info
         if iteration <= 3 or iteration % 5 == 0 or n_active_before != n_active_after:
-            print(f"Iteration {iteration}: residual = {residual:.6e}, relax = {relax:.3f}, {n_active_after}/{np.sum(nbc == 2)} exit face active")
-            #print(f"  BCs: {np.sum(nbc == 1)} fixed head, {n_active_after}/{np.sum(nbc == 2)} exit face active")
+            print(f"Iteration {iteration}: residual = {residual:.6e}, relax = {relax:.3f}, {n_active_after}/{np.sum(bc_type == 2)} exit face active")
+            #print(f"  BCs: {np.sum(bc_type == 1)} fixed head, {n_active_after}/{np.sum(bc_type == 2)} exit face active")
 
         # Check convergence
         if residual < eps:
@@ -442,12 +446,12 @@ def solve_unsaturated(coords, elements, nbc, fx, kr0=0.001, h0=-1.0,
     total_outflow = 0.0
     
     for node_idx in range(n_nodes):
-        if nbc[node_idx] == 1:  # Fixed head boundary
+        if bc_type[node_idx] == 1:  # Fixed head boundary
             if q_final[node_idx] > 0:
                 total_inflow += q_final[node_idx]
             elif q_final[node_idx] < 0:
                 total_outflow -= q_final[node_idx]
-        elif nbc[node_idx] == 2 and exit_face_active[node_idx]:  # Active exit face
+        elif bc_type[node_idx] == 2 and exit_face_active[node_idx]:  # Active exit face
             if q_final[node_idx] < 0:
                 total_outflow -= q_final[node_idx]
 
@@ -479,21 +483,21 @@ def kr_frontal(p, kr0, h0):
         return kr0
 
 
-def diagnose_exit_face(coords, nbc, h, q, fx):
+def diagnose_exit_face(nodes, bc_type, h, q, bc_values):
     """
     Diagnostic function to understand exit face behavior
     """
 
     print("\n=== Exit Face Diagnostics ===")
-    exit_nodes = np.where(nbc == 2)[0]
-    y = coords[:, 1]
+    exit_nodes = np.where(bc_type == 2)[0]
+    y = nodes[:, 1]
 
     print(f"Total exit face nodes: {len(exit_nodes)}")
     print("\nNode | x      | y      | h      | h-y    | q        | Status")
     print("-" * 65)
 
     for node in exit_nodes:
-        x_coord = coords[node, 0]
+        x_coord = nodes[node, 0]
         y_coord = y[node]
         head = h[node]
         pressure = head - y_coord
@@ -524,7 +528,7 @@ def diagnose_exit_face(coords, nbc, h, q, fx):
             print(f"Approximate exit elevation: {y_intersect:.3f}")
             break
 
-def create_flow_potential_bc(coords, elements, q, debug=False, element_types=None):
+def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None):
     """
     Generates Dirichlet BCs for flow potential φ by marching around the boundary
     and accumulating q to assign φ, ensuring closed-loop conservation.
@@ -533,7 +537,7 @@ def create_flow_potential_bc(coords, elements, q, debug=False, element_types=Non
     Supports both triangular and quadrilateral elements.
 
     Parameters:
-        coords : (n_nodes, 2) array of node coordinates
+        nodes : (n_nodes, 2) array of node coordinates
         elements : (n_elements, 3 or 4) triangle or quad node indices
         q : (n_nodes,) nodal flow vector
         debug : bool, if True prints detailed diagnostic information
@@ -702,7 +706,7 @@ def create_flow_potential_bc(coords, elements, q, debug=False, element_types=Non
 
     return list(phi.items())
 
-def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dirichlet_nodes, element_types=None):
+def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, dirichlet_nodes, element_types=None):
     """
     Solves Laplace equation for flow function Phi on the same mesh,
     assigning Dirichlet values along no-flow boundaries.
@@ -710,7 +714,7 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
     Supports both triangular and quadrilateral elements.
     
     Parameters:
-        coords : (n_nodes, 2) array of node coordinates
+        nodes : (n_nodes, 2) array of node coordinates
         elements : (n_elements, 3 or 4) triangle or quad node indices
         k1_vals : (n_elements,) or scalar, major axis conductivity
         k2_vals : (n_elements,) or scalar, minor axis conductivity
@@ -725,7 +729,7 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
     if element_types is None:
         element_types = np.full(len(elements), 3)
 
-    n_nodes = coords.shape[0]
+    n_nodes = nodes.shape[0]
     A = lil_matrix((n_nodes, n_nodes))
     b = np.zeros(n_nodes)
 
@@ -735,9 +739,9 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
         if element_type == 3:
             # Triangle: use first 3 nodes (4th node is repeated)
             i, j, k = element_nodes[:3]
-            xi, yi = coords[i]
-            xj, yj = coords[j]
-            xk, yk = coords[k]
+            xi, yi = nodes[i]
+            xj, yj = nodes[j]
+            xk, yk = nodes[k]
 
             area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
             if area <= 0:
@@ -766,7 +770,7 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
         elif element_type == 4:
             # Quadrilateral: use all 4 nodes
             i, j, k, l = element_nodes
-            coords_elem = coords[[i, j, k, l], :]
+            nodes_elem = nodes[[i, j, k, l], :]
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -774,7 +778,7 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            ke = quad4_stiffness_matrix(coords_elem, np.linalg.inv(Kmat))
+            ke = quad4_stiffness_matrix(nodes_elem, np.linalg.inv(Kmat))
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -787,7 +791,7 @@ def solve_flow_function_confined(coords, elements, k1_vals, k2_vals, angles, dir
     phi = spsolve(A.tocsr(), b)
     return phi
 
-def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes, element_types=None):
+def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes, element_types=None):
     """
     Solves the flow function Phi using the correct ke for unsaturated flow.
     For flowlines, assemble the element matrix using the inverse of kr_elem and Kmat, matching the FORTRAN logic.
@@ -798,11 +802,11 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
     if element_types is None:
         element_types = np.full(len(elements), 3)
 
-    n_nodes = coords.shape[0]
+    n_nodes = nodes.shape[0]
     A = lil_matrix((n_nodes, n_nodes))
     b = np.zeros(n_nodes)
 
-    y = coords[:, 1]
+    y = nodes[:, 1]
     p_nodes = head - y
 
     for idx, element_nodes in enumerate(elements):
@@ -811,9 +815,9 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
         if element_type == 3:
             # Triangle: use first 3 nodes (4th node is repeated)
             i, j, k = element_nodes[:3]
-            xi, yi = coords[i]
-            xj, yj = coords[j]
-            xk, yk = coords[k]
+            xi, yi = nodes[i]
+            xj, yj = nodes[j]
+            xk, yk = nodes[k]
 
             area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
             if area <= 0:
@@ -850,7 +854,7 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
         elif element_type == 4:
             # Quadrilateral: use all 4 nodes
             i, j, k, l = element_nodes
-            coords_elem = coords[[i, j, k, l], :]
+            nodes_elem = nodes[[i, j, k, l], :]
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -863,9 +867,9 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
             # Assemble using the inverse of kr_elem and Kmat
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(coords_elem, np.linalg.inv(Kmat))
+                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(nodes_elem, np.linalg.inv(Kmat))
             else:
-                ke = 1e12 * quad4_stiffness_matrix(coords_elem, np.linalg.inv(Kmat))
+                ke = 1e12 * quad4_stiffness_matrix(nodes_elem, np.linalg.inv(Kmat))
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -879,7 +883,7 @@ def solve_flow_function_unsaturated(coords, elements, head, k1_vals, k2_vals, an
     return phi
 
 
-def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None, element_types=None):
+def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, h0=None, element_types=None):
     """
     Compute nodal velocities by averaging element-wise Darcy velocities.
     If kr0 and h0 are provided, compute kr_elem using kr_frontal; otherwise, kr_elem = 1.0.
@@ -887,7 +891,7 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
     For quads, velocity is computed at Gauss points and averaged to nodes.
     
     Parameters:
-        coords : (n_nodes, 2) array of node coordinates
+        nodes : (n_nodes, 2) array of node coordinates
         elements : (n_elements, 3 or 4) triangle or quad node indices
         head : (n_nodes,) nodal head solution
         k1_vals, k2_vals, angles : per-element anisotropic properties (or scalar)
@@ -902,14 +906,14 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
     if element_types is None:
         element_types = np.full(len(elements), 3)
 
-    n_nodes = coords.shape[0]
+    n_nodes = nodes.shape[0]
     velocity = np.zeros((n_nodes, 2))
     count = np.zeros(n_nodes)
 
     scalar_k = np.isscalar(k1_vals)
     scalar_kr = kr0 is not None and np.isscalar(kr0)
 
-    y = coords[:, 1]
+    y = nodes[:, 1]
     p_nodes = head - y
 
     for idx, element_nodes in enumerate(elements):
@@ -918,9 +922,9 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
         if element_type == 3:
             # Triangle: use first 3 nodes (4th node is repeated)
             i, j, k = element_nodes[:3]
-            xi, yi = coords[i]
-            xj, yj = coords[j]
-            xk, yk = coords[k]
+            xi, yi = nodes[i]
+            xj, yj = nodes[j]
+            xk, yk = nodes[k]
 
             area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
             if area <= 0:
@@ -962,7 +966,7 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
         elif element_type == 4:
             # Quadrilateral: use all 4 nodes
             i, j, k, l = element_nodes
-            coords_elem = coords[[i, j, k, l], :]
+            nodes_elem = nodes[[i, j, k, l], :]
             h_elem = head[[i, j, k, l]]
             if scalar_k:
                 k1 = k1_vals
@@ -997,10 +1001,10 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
                 # Jacobian
                 J = np.zeros((2,2))
                 for a in range(4):
-                    J[0,0] += dN_dxi[a] * coords_elem[a,0]
-                    J[0,1] += dN_dxi[a] * coords_elem[a,1]
-                    J[1,0] += dN_deta[a] * coords_elem[a,0]
-                    J[1,1] += dN_deta[a] * coords_elem[a,1]
+                    J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+                    J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+                    J[1,0] += dN_deta[a] * nodes_elem[a,0]
+                    J[1,1] += dN_deta[a] * nodes_elem[a,1]
                 detJ = np.linalg.det(J)
                 if detJ <= 0:
                     continue
@@ -1021,11 +1025,11 @@ def compute_velocity(coords, elements, head, k1_vals, k2_vals, angles, kr0=None,
     velocity /= count[:, None]
     return velocity
 
-def quad4_stiffness_matrix(coords_elem, Kmat):
+def quad4_stiffness_matrix(nodes_elem, Kmat):
     """
     Compute the 4x4 local stiffness matrix for a 4-node quadrilateral element
     using 2x2 Gauss quadrature and bilinear shape functions.
-    coords_elem: (4,2) array of nodal coordinates (in order: [i,j,k,l])
+    nodes_elem: (4,2) array of nodal coordinates (in order: [i,j,k,l])
     Kmat: (2,2) conductivity matrix for the element
     Returns:
         ke: (4,4) element stiffness matrix
@@ -1050,10 +1054,10 @@ def quad4_stiffness_matrix(coords_elem, Kmat):
         # Jacobian
         J = np.zeros((2,2))
         for a in range(4):
-            J[0,0] += dN_dxi[a] * coords_elem[a,0]
-            J[0,1] += dN_dxi[a] * coords_elem[a,1]
-            J[1,0] += dN_deta[a] * coords_elem[a,0]
-            J[1,1] += dN_deta[a] * coords_elem[a,1]
+            J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+            J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+            J[1,0] += dN_deta[a] * nodes_elem[a,0]
+            J[1,1] += dN_deta[a] * nodes_elem[a,1]
         detJ = np.linalg.det(J)
         if detJ <= 0:
             continue
@@ -1077,10 +1081,10 @@ def run_analysis(seep_data):
         Dictionary containing solution results
     """
     # Extract data from seep_data
-    coords = seep_data["coords"]
+    nodes = seep_data["nodes"]
     elements = seep_data["elements"]
-    nbc = seep_data["nbc"]
-    fx = seep_data["fx"]
+    bc_type = seep_data["bc_type"]
+    bc_values = seep_data["bc_values"]
     element_materials = seep_data["element_materials"]
     element_types = seep_data.get("element_types", None)  # New field for element types
     k1_by_mat = seep_data["k1_by_mat"]
@@ -1091,14 +1095,14 @@ def run_analysis(seep_data):
     unit_weight = seep_data["unit_weight"]
     
     # Determine if unconfined flow
-    is_unconfined = np.any(nbc == 2)
+    is_unconfined = np.any(bc_type == 2)
     flow_type = "unconfined" if is_unconfined else "confined"
     print(f"Solving {flow_type.upper()} seepage problem...")
-    print("Number of fixed-head nodes:", np.sum(nbc == 1))
-    print("Number of exit face nodes:", np.sum(nbc == 2))
+    print("Number of fixed-head nodes:", np.sum(bc_type == 1))
+    print("Number of exit face nodes:", np.sum(bc_type == 2))
 
-    # Dirichlet BCs: fixed head (nbc == 1) and possibly exit face (nbc == 2)
-    bcs = [(i, fx[i]) for i in range(len(nbc)) if nbc[i] in (1, 2)]
+    # Dirichlet BCs: fixed head (bc_type == 1) and possibly exit face (bc_type == 2)
+    bcs = [(i, bc_values[i]) for i in range(len(bc_type)) if bc_type[i] in (1, 2)]
 
     # Material properties (per element)
     mat_ids = element_materials - 1
@@ -1113,10 +1117,10 @@ def run_analysis(seep_data):
         h0_per_element = h0_by_mat[mat_ids]
 
         head, A, q, total_flow = solve_unsaturated(
-            coords=coords,
+            nodes=nodes,
             elements=elements,
-            nbc=nbc,
-            fx=fx,
+            bc_type=bc_type,
+            bc_values=bc_values,
             kr0=kr0_per_element,
             h0=h0_per_element,
             k1_vals=k1,
@@ -1127,22 +1131,22 @@ def run_analysis(seep_data):
             element_types=element_types
         )
         # Solve for potential function φ for flow lines
-        dirichlet_phi_bcs = create_flow_potential_bc(coords, elements, q, element_types=element_types)
-        phi = solve_flow_function_unsaturated(coords, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
+        dirichlet_phi_bcs = create_flow_potential_bc(nodes, elements, q, element_types=element_types)
+        phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         # Compute velocity, pass element-level kr0 and h0
-        velocity = compute_velocity(coords, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
+        velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
     else:
-        head, A, q, total_flow = solve_confined(coords, elements, nbc, bcs, k1, k2, angle, element_types)
+        head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)
         # Solve for potential function φ for flow lines
-        dirichlet_phi_bcs = create_flow_potential_bc(coords, elements, q, element_types=element_types)
-        phi = solve_flow_function_confined(coords, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
+        dirichlet_phi_bcs = create_flow_potential_bc(nodes, elements, q, element_types=element_types)
+        phi = solve_flow_function_confined(nodes, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         # Compute velocity, don't pass kr0 and h0
-        velocity = compute_velocity(coords, elements, head, k1, k2, angle, element_types=element_types)
+        velocity = compute_velocity(nodes, elements, head, k1, k2, angle, element_types=element_types)
 
     gamma_w = unit_weight
-    u = gamma_w * (head - coords[:, 1])
+    u = gamma_w * (head - nodes[:, 1])
 
     solution = {
         "head": head,
@@ -1164,8 +1168,9 @@ def export_solution_csv(filename, seep_data, solution):
         solution: Dictionary containing solution results from run_analysis
     """
     import pandas as pd
+    n_nodes = len(seep_data["nodes"])
     df = pd.DataFrame({
-        "node_id": seep_data["node_ids"],
+        "node_id": np.arange(1, n_nodes + 1),  # Generate 1-based node IDs for output
         "head": solution["head"],
         "u": solution["u"],
         "v_x": solution["velocity"][:, 0],
@@ -1193,7 +1198,7 @@ def print_seep_data_diagnostics(seep_data):
     print("="*60)
     
     # Basic problem information
-    print(f"Number of nodes: {len(seep_data['coords'])}")
+    print(f"Number of nodes: {len(seep_data['nodes'])}")
     print(f"Number of elements: {len(seep_data['elements'])}")
     print(f"Number of materials: {len(seep_data['k1_by_mat'])}")
     print(f"Unit weight of water: {seep_data['unit_weight']}")
@@ -1208,26 +1213,26 @@ def print_seep_data_diagnostics(seep_data):
         print("Element types: All triangles (legacy format)")
     
     # Coordinate ranges
-    coords = seep_data['coords']
+    coords = seep_data['nodes']
     print(f"\nCoordinate ranges:")
     print(f"  X: {coords[:, 0].min():.3f} to {coords[:, 0].max():.3f}")
     print(f"  Y: {coords[:, 1].min():.3f} to {coords[:, 1].max():.3f}")
     
     # Boundary conditions
-    nbc = seep_data['nbc']
-    fx = seep_data['fx']
+    bc_type = seep_data['bc_type']
+    bc_values = seep_data['bc_values']
     print(f"\nBoundary conditions:")
-    print(f"  Fixed head nodes (nbc=1): {np.sum(nbc == 1)}")
-    print(f"  Exit face nodes (nbc=2): {np.sum(nbc == 2)}")
-    print(f"  Free nodes (nbc=0): {np.sum(nbc == 0)}")
+    print(f"  Fixed head nodes (bc_type=1): {np.sum(bc_type == 1)}")
+    print(f"  Exit face nodes (bc_type=2): {np.sum(bc_type == 2)}")
+    print(f"  Free nodes (bc_type=0): {np.sum(bc_type == 0)}")
     
-    if np.sum(nbc == 1) > 0:
-        fixed_head_nodes = np.where(nbc == 1)[0]
-        print(f"  Fixed head values: {fx[fixed_head_nodes]}")
+    if np.sum(bc_type == 1) > 0:
+        fixed_head_nodes = np.where(bc_type == 1)[0]
+        print(f"  Fixed head values: {bc_values[fixed_head_nodes]}")
     
-    if np.sum(nbc == 2) > 0:
-        exit_face_nodes = np.where(nbc == 2)[0]
-        print(f"  Exit face elevations: {fx[exit_face_nodes]}")
+    if np.sum(bc_type == 2) > 0:
+        exit_face_nodes = np.where(bc_type == 2)[0]
+        print(f"  Exit face elevations: {bc_values[exit_face_nodes]}")
     
     # Material properties
     print(f"\nMaterial properties:")
@@ -1256,7 +1261,7 @@ def print_seep_data_diagnostics(seep_data):
         print("  WARNING: Some k1 values are less than k2 (should be major >= minor)")
     
     # Flow type determination
-    is_unconfined = np.any(nbc == 2)
+    is_unconfined = np.any(bc_type == 2)
     flow_type = "unconfined" if is_unconfined else "confined"
     print(f"  Flow type: {flow_type}")
     

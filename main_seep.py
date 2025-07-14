@@ -4,7 +4,7 @@ import numpy as np
 
 
 # Load input
-seep_data = import_seep2d("inputs/seep/s2unc_quad.s2d")
+seep_data = import_seep2d("inputs/seep/s2con_quad.s2d")
 
 # Print diagnostics
 # print_seep_data_diagnostics(seep_data)
@@ -19,4 +19,4 @@ solution = run_analysis(seep_data)
 # export_solution_csv("seep_solution.csv", seep_data, solution)
 
 # # Plot solution
-plot_seep_solution(seep_data, solution, base_mat=2, fill_contours=True, phreatic=True) 
+plot_seep_solution(seep_data, solution, base_mat=1, fill_contours=True, phreatic=True) 

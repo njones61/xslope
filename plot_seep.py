@@ -18,11 +18,11 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
     from matplotlib.patches import Polygon
 
     # Extract data from seep_data
-    coords = seep_data["coords"]
+    nodes = seep_data["nodes"]
     elements = seep_data["elements"]
     element_materials = seep_data["element_materials"]
     element_types = seep_data.get("element_types", None)  # New field for element types
-    nbc = seep_data["nbc"]
+    bc_type = seep_data["bc_type"]
 
     fig, ax = plt.subplots(figsize=(12, 5))
     materials = np.unique(element_materials)
@@ -38,10 +38,10 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
         
         if element_type == 3:
             # Triangle: use first 3 nodes (4th node is repeated)
-            polygon_coords = coords[element_nodes[:3]]
+            polygon_coords = nodes[element_nodes[:3]]
         else:
             # Quad: use all 4 nodes
-            polygon_coords = coords[element_nodes]
+            polygon_coords = nodes[element_nodes]
             
         color = mat_to_color[element_materials[idx]]
         
@@ -50,7 +50,7 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
         ax.add_patch(polygon)
 
     if show_nodes:
-        ax.plot(coords[:, 0], coords[:, 1], 'k.', markersize=2)
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
 
     legend_handles = [
         plt.Line2D([0], [0], color=cmap(i), lw=4, label=f"Material {mat}")
@@ -58,13 +58,13 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
     ]
 
     if show_bc:
-        bc1 = coords[nbc == 1]
-        bc2 = coords[nbc == 2]
+        bc1 = nodes[bc_type == 1]
+        bc2 = nodes[bc_type == 2]
         if len(bc1) > 0:
-            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'ro', label="Fixed Head (nbc=1)")
+            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'ro', label="Fixed Head (bc_type=1)")
             legend_handles.append(h1)
         if len(bc2) > 0:
-            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'bs', label="Exit Face (nbc=2)")
+            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'bs', label="Exit Face (bc_type=2)")
             legend_handles.append(h2)
 
     # Single combined legend outside the plot
@@ -114,11 +114,11 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     import numpy as np
 
     # Extract data from seep_data and solution
-    coords = seep_data["coords"]
+    nodes = seep_data["nodes"]
     elements = seep_data["elements"]
     element_materials = seep_data["element_materials"]
     element_types = seep_data.get("element_types", None)  # New field for element types
-    k1_by_mat = seep_data["k1_by_mat"]
+    k1_by_mat = seep_data.get("k1_by_mat")  # Use .get() in case it's not present
     head = solution["head"]
     phi = solution.get("phi")
     flowrate = solution.get("flowrate")
@@ -128,8 +128,8 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
         element_types = np.full(len(elements), 3)
 
     # Calculate proper figure size based on mesh aspect ratio
-    x_min, x_max = coords[:, 0].min(), coords[:, 0].max()
-    y_min, y_max = coords[:, 1].min(), coords[:, 1].max()
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
 
     x_range = x_max - x_min
     y_range = y_max - y_min
@@ -175,10 +175,10 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
             element_type = element_types[np.where(triangle_mask)[0][idx]]
             if element_type == 3:
                 # Triangle: use first 3 nodes (4th node is repeated)
-                polygon = coords[element_nodes[:3]]
+                polygon = nodes[element_nodes[:3]]
             else:
                 # Quad: use all 4 nodes
-                polygon = coords[element_nodes]
+                polygon = nodes[element_nodes]
             color = mat_to_color[element_materials[np.where(triangle_mask)[0][idx]]]
             ax.fill(*zip(*polygon), edgecolor='none', facecolor=color, alpha=0.5)
         
@@ -187,10 +187,10 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
             element_type = element_types[np.where(quad_mask)[0][idx]]
             if element_type == 3:
                 # Triangle: use first 3 nodes (4th node is repeated)
-                polygon_coords = coords[element_nodes[:3]]
+                polygon_coords = nodes[element_nodes[:3]]
             else:
                 # Quad: use all 4 nodes
-                polygon_coords = coords[element_nodes]
+                polygon_coords = nodes[element_nodes]
             color = mat_to_color[element_materials[np.where(quad_mask)[0][idx]]]
             polygon = Polygon(polygon_coords, edgecolor='none', facecolor=color, alpha=0.5)
             ax.add_patch(polygon)
@@ -217,7 +217,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
         all_triangles_for_contouring.extend([tri1, tri2])
     
     # Create triangulation for contouring
-    triang = tri.Triangulation(coords[:, 0], coords[:, 1], all_triangles_for_contouring)
+    triang = tri.Triangulation(nodes[:, 0], nodes[:, 1], all_triangles_for_contouring)
 
     # Filled contours (only if fill_contours=True)
     if fill_contours:
@@ -232,13 +232,16 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
 
     # Phreatic surface (pressure head = 0)
     if phreatic:
-        elevation = coords[:, 1]  # y-coordinate is elevation
+        elevation = nodes[:, 1]  # y-coordinate is elevation
         pressure_head = head - elevation
         ax.tricontour(triang, pressure_head, levels=[0], colors="red", linewidths=2.0)
 
     # Overlay flowlines if phi is available
     if phi is not None and flowrate is not None and base_mat is not None and k1_by_mat is not None:
         # Materials are 1-based, so adjust index
+        if base_mat > len(k1_by_mat):
+            print(f"Warning: base_mat={base_mat} is larger than number of materials ({len(k1_by_mat)}). Using material 1.")
+            base_mat = 1
         base_k = k1_by_mat[base_mat - 1]
         ne = levels - 1
         nf = (flowrate * ne) / (base_k * hdrop)
@@ -249,7 +252,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
 
     # Plot the mesh boundary
     try:
-        boundary = get_ordered_mesh_boundary(coords, elements, element_types)
+        boundary = get_ordered_mesh_boundary(nodes, elements, element_types)
         ax.plot(boundary[:, 0], boundary[:, 1], color="black", linewidth=1.0, label="Mesh Boundary")
     except Exception as e:
         print(f"Warning: Could not plot mesh boundary: {e}")
@@ -278,7 +281,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     plt.tight_layout()
     plt.show()
 
-def get_ordered_mesh_boundary(coords, elements, element_types=None):
+def get_ordered_mesh_boundary(nodes, elements, element_types=None):
     """
     Extracts the outer boundary of the mesh and returns it as an ordered array of points.
     Supports both triangular and quadrilateral elements.
@@ -342,4 +345,4 @@ def get_ordered_mesh_boundary(coords, elements, element_types=None):
         if current == start:
             break
 
-    return coords[boundary_loop]
+    return nodes[boundary_loop]

@@ -19,9 +19,20 @@ region_ids = [i for i in range(len(polygons))]
 x_range = [min(x for x, _ in data['ground_surface'].coords), max(x for x, _ in data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 150
 
+target_size = 10
+
 # Build triangular mesh
 print("Building triangular mesh...")
 nodes_tri, elements_tri, mat_ids_tri = build_mesh_with_regions(polygons, region_ids, target_size, 'tri')
+
+mesh_data = {
+    'nodes': nodes_tri,
+    'elements': elements_tri,
+    'element_types': np.full(len(elements_tri), 3)
+    'mat_ids': mat_ids_tri,
+}
+
+print(mesh_data)
 
 # reorder the mesh
 nodes_tri, elements_tri = reorder_mesh(nodes_tri, elements_tri)

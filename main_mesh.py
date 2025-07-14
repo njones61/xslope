@@ -1,6 +1,7 @@
 from fileio import load_globals
 
-from mesh import build_polygons, build_mesh_with_regions, plot_mesh_with_materials, plot_polygons, plot_polygons_separately, reorder_mesh
+from mesh import build_polygons, build_mesh_from_polygons, plot_mesh, plot_polygons, plot_polygons_separately
+from mesh import save_mesh_to_json, load_mesh_from_json
 from plot import plot_inputs
 import numpy as np
 
@@ -19,32 +20,20 @@ region_ids = [i for i in range(len(polygons))]
 x_range = [min(x for x, _ in data['ground_surface'].coords), max(x for x, _ in data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 150
 
-target_size = 10
+# target_size = 10
 
 # Build triangular mesh
 print("Building triangular mesh...")
-nodes_tri, elements_tri, mat_ids_tri = build_mesh_with_regions(polygons, region_ids, target_size, 'tri')
+mesh_tri = build_mesh_from_polygons(polygons, region_ids, target_size, 'tri')
 
-mesh_data = {
-    'nodes': nodes_tri,
-    'elements': elements_tri,
-    'element_types': np.full(len(elements_tri), 3)
-    'mat_ids': mat_ids_tri,
-}
+save_mesh_to_json(mesh_tri, "mesh_tri.json")
 
-print(mesh_data)
-
-# reorder the mesh
-nodes_tri, elements_tri = reorder_mesh(nodes_tri, elements_tri)
-
-plot_mesh_with_materials(nodes_tri, elements_tri, mat_ids_tri, materials=data['materials'])
+plot_mesh(mesh_tri, materials=data['materials'])
 
 # Build quadrilateral mesh
 print("\nBuilding quadrilateral mesh...")
-nodes_quad, elements_quad, mat_ids_quad = build_mesh_with_regions(polygons, region_ids, target_size, 'quad')
+mesh_quad = build_mesh_from_polygons(polygons, region_ids, target_size, 'quad')
 
+save_mesh_to_json(mesh_quad, "mesh_quad.json")
 
-# reorder the mesh
-nodes_quad, elements_quad = reorder_mesh(nodes_quad, elements_quad)
-
-plot_mesh_with_materials(nodes_quad, elements_quad, mat_ids_quad, materials=data['materials'])
+plot_mesh(mesh_quad, materials=data['materials'])

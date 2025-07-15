@@ -3,7 +3,7 @@ from fileio import load_globals
 from mesh import build_polygons, build_mesh_from_polygons, plot_mesh, plot_polygons, plot_polygons_separately
 from mesh import save_mesh_to_json, load_mesh_from_json
 from plot import plot_inputs
-from seep import build_seep_data, run_seepage_analysis
+from seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json
 from plot_seep import plot_seep_mesh, plot_seep_solution
 import numpy as np
 
@@ -23,20 +23,17 @@ target_size = (x_range[1] - x_range[0]) / 150
 target_size = 10
 
 # Build triangular mesh
-print("Building mesh...")
-mesh = build_mesh_from_polygons(polygons, target_size, 'tri')
+mesh = build_mesh_from_polygons(polygons, target_size, 'quad')
 
-# save_mesh_to_json(mesh_tri, "mesh.json")
 
-# plot_mesh(mesh, materials=data['materials'])
+plot_mesh(mesh, materials=data['materials'])
 
 seep_data = build_seep_data(mesh, data)
 
-# print(seep_data)
 
 # Plot mesh
-plot_seep_mesh(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=True)
+# plot_seep_mesh(seep_data, show_nodes=True, show_bc=True, material_table=True)
 
 solution = run_seepage_analysis(seep_data)
 
-plot_seep_solution(seep_data, solution, levels=20, base_mat=2, fill_contours=True, phreatic=True)
+plot_seep_solution(seep_data, solution, levels=30, base_mat=2, fill_contours=True, phreatic=True)

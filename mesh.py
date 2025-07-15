@@ -193,9 +193,6 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
     
     gmsh.finalize()
 
-    # Reorder mesh
-    nodes, elements, mat_ids = raster_renumber_mesh(nodes, elements, mat_ids)
-
     # Standardize elements and set element_types based on element_type parameter
     if element_type == 'tri':
         # All elements should be triangles (3 nodes), pad to 4 columns
@@ -211,6 +208,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
     
     element_materials = np.array(mat_ids, dtype=int)
 
+    # the material list is 1-based, but the element_materials array is 0-based. Adjust to be 1-based
+    element_materials = element_materials + 1
+
     mesh = {
         "nodes": nodes,
         "elements": elements_array,
@@ -219,214 +219,6 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
     }
 
     return mesh
-
-def reorder_mesh(nodes, elements, element_materials=None, element_types=None):
-    """
-    Reorder mesh nodes and elements using RCM and then renumber elements in a clockwise sweep.
-    Also reorders element_materials and element_types if provided.
-    Returns reordered nodes, elements, element_materials, element_types (if provided).
-    """
-    from scipy.sparse import coo_matrix
-    from scipy.sparse.csgraph import reverse_cuthill_mckee
-    import numpy as np
-
-    print("Reordering mesh...")
-    
-    n_nodes = nodes.shape[0]
-    rows, cols = [], []
-
-    # Build adjacency for all unique pairs in each element (tri or quad)
-    for elem in elements:
-        n = len(elem)
-        for i in range(n):
-            for j in range(i + 1, n):
-                rows.append(elem[i])
-                cols.append(elem[j])
-                rows.append(elem[j])
-                cols.append(elem[i])
-
-    adj = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(n_nodes, n_nodes))
-
-    def bandwidth(el):
-        if len(el) == 0:
-            return 0
-        return max(abs(int(i) - int(j)) for elem in el for i in elem for j in elem)
-
-    bw_before = bandwidth(elements)
-
-    # RCM reordering
-    perm = reverse_cuthill_mckee(adj.tocsr())
-    inverse_perm = np.zeros_like(perm)
-    inverse_perm[perm] = np.arange(len(perm))
-
-    new_nodes = nodes[perm]
-    new_elements = np.array([[inverse_perm[i] for i in elem] for elem in elements])
-    if element_materials is not None:
-        element_materials = np.array(element_materials)
-    if element_types is not None:
-        element_types = np.array(element_types)
-
-    # Bandwidth after
-    bw_after = bandwidth(new_elements)
-
-    print(f"Bandwidth before reordering: {bw_before}")
-    print(f"Bandwidth after reordering:  {bw_after}")
-
-    # --- Begin element renumbering section ---
-    # 1. Find the node with minimum x and y
-    min_idx = np.lexsort((new_nodes[:, 1], new_nodes[:, 0]))[0]
-    origin = new_nodes[min_idx]
-
-    # 2. Build a mapping from node to attached elements
-    node_to_elements = {i: [] for i in range(len(new_nodes))}
-    for e_idx, elem in enumerate(new_elements):
-        for n in elem:
-            node_to_elements[n].append(e_idx)
-
-    # 3. Start at the origin node, pick the first attached element
-    visited = set()
-    renum_order = []
-
-    # Find all elements attached to the origin node
-    attached = node_to_elements[min_idx]
-    if not attached:
-        print("No elements attached to origin node!")
-        if element_materials is not None and element_types is not None:
-            return new_nodes, new_elements, element_materials, element_types
-        elif element_materials is not None:
-            return new_nodes, new_elements, element_materials
-        else:
-            return new_nodes, new_elements
-
-    # Pick the attached element whose centroid is most 'down and right' from the origin
-    def centroid(elem):
-        return np.mean(new_nodes[elem], axis=0)
-
-    def angle_from_origin(elem):
-        c = centroid(elem)
-        dx, dy = c - origin
-        return np.arctan2(dy, dx)
-
-    attached_sorted = sorted(attached, key=lambda e_idx: angle_from_origin(new_elements[e_idx]))
-    current_elem_idx = attached_sorted[0]
-    renum_order.append(current_elem_idx)
-    visited.add(current_elem_idx)
-
-    # 4. Progressive clockwise sweep
-    while len(renum_order) < len(new_elements):
-        # Find all unvisited elements sharing a node with the current element
-        current_elem = new_elements[current_elem_idx]
-        neighbor_elems = set()
-        for n in current_elem:
-            neighbor_elems.update(node_to_elements[n])
-        neighbor_elems = [e for e in neighbor_elems if e not in visited]
-        if not neighbor_elems:
-            # If no unvisited neighbors, pick any remaining unvisited element
-            remaining = [i for i in range(len(new_elements)) if i not in visited]
-            if not remaining:
-                break
-            current_elem_idx = remaining[0]
-            renum_order.append(current_elem_idx)
-            visited.add(current_elem_idx)
-            continue
-
-        # Choose the neighbor whose centroid is most clockwise from the previous direction
-        prev_centroid = centroid(current_elem)
-        prev_angle = angle_from_origin(current_elem)
-        def clockwise_angle(e_idx):
-            c = centroid(new_elements[e_idx])
-            dx, dy = c - prev_centroid
-            angle = np.arctan2(dy, dx) - prev_angle
-            # Normalize to [0, 2pi)
-            return (angle + 2 * np.pi) % (2 * np.pi)
-        next_elem_idx = min(neighbor_elems, key=clockwise_angle)
-        renum_order.append(next_elem_idx)
-        visited.add(next_elem_idx)
-        current_elem_idx = next_elem_idx
-
-    # 5. Renumber elements in the new order
-    new_elements = new_elements[renum_order]
-    if element_materials is not None:
-        element_materials = element_materials[renum_order]
-    if element_types is not None:
-        element_types = element_types[renum_order]
-
-    # Return all relevant arrays
-    if element_materials is not None and element_types is not None:
-        return new_nodes, new_elements, element_materials, element_types
-    elif element_materials is not None:
-        return new_nodes, new_elements, element_materials
-    else:
-        return new_nodes, new_elements
-
-def raster_renumber_mesh(nodes, elements, element_materials=None, element_types=None, ytol=1e-6):
-    """
-    Renumber nodes row-wise: bottom row (min y) left to right, then next row up, etc.
-    Elements are renumbered by the average y (row) and then average x (left to right).
-    Also reorders element_materials and element_types if provided.
-    Returns reordered nodes, elements, element_materials, element_types (if provided).
-    ytol: tolerance for grouping nodes into the same row.
-    """
-    import numpy as np
-
-    nodes = np.asarray(nodes)
-    elements = np.asarray(elements)
-    n_nodes = nodes.shape[0]
-    n_elements = elements.shape[0]
-
-    # 1. Group nodes by y (rows)
-    yvals = nodes[:, 1]
-    unique_y = []
-    node_rows = np.zeros(n_nodes, dtype=int)
-    for i, y in enumerate(yvals):
-        found = False
-        for j, uy in enumerate(unique_y):
-            if abs(y - uy) < ytol:
-                node_rows[i] = j
-                found = True
-                break
-        if not found:
-            node_rows[i] = len(unique_y)
-            unique_y.append(y)
-    unique_y = np.array(unique_y)
-    # Sort rows from bottom to top
-    row_order = np.argsort(unique_y)
-    row_map = {old: new for new, old in enumerate(row_order)}
-    node_rows = np.array([row_map[r] for r in node_rows])
-
-    # 2. For each row, sort nodes left to right
-    node_order = []
-    for row in range(len(unique_y)):
-        idxs = np.where(node_rows == row)[0]
-        xs = nodes[idxs, 0]
-        sorted_in_row = idxs[np.argsort(xs)]
-        node_order.extend(sorted_in_row)
-    node_order = np.array(node_order)
-
-    # 3. Build new node index mapping
-    old_to_new = np.zeros(n_nodes, dtype=int)
-    old_to_new[node_order] = np.arange(n_nodes)
-    new_nodes = nodes[node_order]
-
-    # 4. Update elements to use new node indices
-    new_elements = np.array([[old_to_new[i] for i in elem] for elem in elements])
-
-    # 5. Renumber elements by the average of their node numbers (after node renumbering)
-    elem_avg_node = np.mean(new_elements, axis=1)
-    elem_order = np.argsort(elem_avg_node)
-    new_elements = new_elements[elem_order]
-    if element_materials is not None:
-        element_materials = np.array(element_materials)[elem_order]
-    if element_types is not None:
-        element_types = np.array(element_types)[elem_order]
-
-    if element_materials is not None and element_types is not None:
-        return new_nodes, new_elements, element_materials, element_types
-    elif element_materials is not None:
-        return new_nodes, new_elements, element_materials
-    else:
-        return new_nodes, new_elements
-
 
 # Simple plot showing material regions
 def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):

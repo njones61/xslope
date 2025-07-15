@@ -1,8 +1,8 @@
 site_name: Slope Tools
-site_url: https://slopetools.readthedocs.io/en/latest/
-site_description: Documentation for the SlopeTools Python Package
+site_url: https://xslope.readthedocs.io/en/latest/
+site_description: Documentation for the xslope Python Package
 site_author: Norm Jones
-repo_url: https://github.com/njones61/slopetools/
+repo_url: https://github.com/njones61/xslope/
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js
   - js/mathjax-config.js

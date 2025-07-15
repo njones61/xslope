@@ -35,7 +35,7 @@ where:
 > $\Delta \ell$ = length of the base of the slice<br>
 > $\Delta x$ = width of the slice<br>
 
-**Note**: In the current implementation of spencer's method in slopetools, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. All of the other forces are included. 
+**Note**: In the current implementation of spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. All of the other forces are included. 
 
 ## General Equations
 
@@ -47,7 +47,7 @@ The equations for Spencer's method are derived from the equilibrium of forces an
 
 Likewise, summing moments about the center of the base of the slice gives:
 
-$\begin{aligned}
+>>$\begin{aligned}
 M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p - y_b) \\
 &\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) + V (y_v - y_b) - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b)
 \end{aligned}   \qquad (3)$
@@ -328,7 +328,7 @@ the left side and summing moments about the center of the base of the slice. The
 where $y_{t,i}$ and $y_{t,i+1}$ are y coordinates of the line of thrust of the left and right side, respectively. If 
 $y_{t,i}$ is known, we can solve for $y_{t,i+1}$ as follows:
 
->>>$y_{t,i+1} = y_b - \left[ \dfrac{M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}
+>>$y_{t,i+1} = y_b - \left[ \dfrac{M_o - Z_i \sin \theta \dfrac{\Delta x}{2} - Z_{i+1} \sin \theta \dfrac{\Delta x}
 > {2} - 
 > Z_i \cos \theta (y_{t,i} - y_b)}{Z_{i+1} \cos \theta} \right]  \qquad (69)$
 

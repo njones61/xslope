@@ -257,8 +257,8 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
         ax.add_collection(poly_collection)
         
         # Add to legend
-        if materials and mid < len(materials) and materials[mid].get('name'):
-            label = materials[mid]['name']
+        if materials and mid <= len(materials) and materials[mid-1].get('name'):
+            label = materials[mid-1]['name']  # Convert to 0-based indexing
         else:
             label = f'Material {mid}'
         

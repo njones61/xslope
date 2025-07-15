@@ -15,21 +15,18 @@ polygons = build_polygons(data['profile_lines'], max_depth=data['max_depth'])
 
 # plot_polygons_separately(polygons)
 
-
 # find the x-range of the ground_surface and use it to set the target size
 x_range = [min(x for x, _ in data['ground_surface'].coords), max(x for x, _ in data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 150
 
 target_size = 10
 
-# Build triangular mesh
+# Build quadrilateral mesh
 mesh = build_mesh_from_polygons(polygons, target_size, 'quad')
-
 
 plot_mesh(mesh, materials=data['materials'])
 
 seep_data = build_seep_data(mesh, data)
-
 
 # Plot mesh
 # plot_seep_mesh(seep_data, show_nodes=True, show_bc=True, material_table=True)

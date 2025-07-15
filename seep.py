@@ -467,15 +467,6 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 # Element stiffness matrix with kr
                 ke = kr_elem * area * grad.T @ Kmat @ grad
 
-                # Inside the element assembly loop, after kr_elem is computed:
-                kr_diagnostics.append({
-                    'element': idx,
-                    'p_elem': p_elem,
-                    'kr_elem': kr_elem,
-                    'y_centroid': (yi + yj + yk) / 3.0,
-                    'h_centroid': (h[i] + h[j] + h[k]) / 3.0
-                })
-
                 # Assembly
                 for row in range(3):
                     for col in range(3):
@@ -494,7 +485,9 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 # Compute element pressure (centroid)
                 p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
                 kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+                
                 ke = kr_elem * quad4_stiffness_matrix(nodes_elem, Kmat)
+                
                 for a in range(4):
                     for b_ in range(4):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1183,7 +1176,8 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
                  (-1/np.sqrt(3), 1/np.sqrt(3))]
     weights = [1, 1, 1, 1]
     ke = np.zeros((4, 4))
-    for (xi, eta), w in zip(gauss_pts, weights):
+    
+    for gp_idx, ((xi, eta), w) in enumerate(zip(gauss_pts, weights)):
         # Shape function derivatives w.r.t. natural coords
         dN_dxi = np.array([
             [-(1-eta),  (1-eta),  (1+eta), -(1+eta)]
@@ -1193,6 +1187,7 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
         ]) * 0.25
         dN_dxi = dN_dxi.flatten()
         dN_deta = dN_deta.flatten()
+        
         # Jacobian
         J = np.zeros((2,2))
         for a in range(4):
@@ -1200,6 +1195,7 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
             J[0,1] += dN_dxi[a] * nodes_elem[a,1]
             J[1,0] += dN_deta[a] * nodes_elem[a,0]
             J[1,1] += dN_deta[a] * nodes_elem[a,1]
+        
         detJ = np.linalg.det(J)
         if detJ <= 0:
             continue
@@ -1210,6 +1206,7 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
         gradN = np.vstack((dN_dx, dN_dy))  # shape (2,4)
         # Element stiffness contribution at this Gauss point
         ke += (gradN.T @ Kmat @ gradN) * detJ * w
+    
     return ke
 
 def run_seepage_analysis(seep_data):

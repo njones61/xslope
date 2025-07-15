@@ -185,6 +185,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
                         elements_array = np.array(node_tags).reshape(-1, 4)
                         for element in elements_array:
                             idxs = [node_tag_to_index[tag] for tag in element]
+                            # Fix node ordering for quadrilateral elements
+                            if element_type == 'quad':
+                                idxs = idxs[::-1] # Simple reversal of node order
                             elements.append(idxs)
                             mat_ids.append(region_id)
         except Exception as e:

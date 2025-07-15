@@ -3,7 +3,7 @@
 The force equilibrium method is a common method used to analyze the stability of slopes. It works for both circular 
 and non-circular surfaces. It satisfies the force equilibrium equations for each slice, but it does not satisfy the 
 moment equilibrium equations. There are several variations of the force equilibrium method, depending on the 
-assumptions used for the side force inclination. In slope tools, two variations of the force equilibrium method are 
+assumptions used for the side force inclination. In ******xslope******, two variations of the force equilibrium method are 
 supported: the **Lowe and 
 Karafaith** method and the **US Army Corps of Engineers** method. Both methods use the same equations, but they differ in 
 the side force assumptions.
@@ -213,7 +213,7 @@ Once again, care must be taken to ensure that the tension crack water force ($T$
 ## Side Force Inclination Assumptions
 
 The side force inclination is a critical parameter in the force equilibrium method. Two solution methods are 
-supported in slope tools:
+supported in **xslope**:
 
 ### Lowe and Karafaith
 
@@ -227,5 +227,5 @@ using one of the following methods:
 
 ![uscoe_theta.png](images/uscoe_theta.png){width=500px }
 
-In slope tools, first method shown above is used. That is, all interslice forces are parallel to a line connecting the 
+In xslope, first method shown above is used. That is, all interslice forces are parallel to a line connecting the 
 bottom of the failure surface to the top of the failure surface. 

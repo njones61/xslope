@@ -4,7 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=False, label_elements=False, label_nodes=False):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, material_table=False, label_elements=False, label_nodes=False, alpha=0.4):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -17,7 +17,7 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=Fa
         label_elements: If True, label each element with its number at its centroid
         label_nodes: If True, label each node with its number just above and to the right
     """
-    import matplotlib.pyplot as plt
+
     from matplotlib.patches import Polygon
 
     # Extract data from seep_data
@@ -27,10 +27,12 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=Fa
     element_types = seep_data.get("element_types", None)  # New field for element types
     bc_type = seep_data["bc_type"]
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=figsize)
     materials = np.unique(element_materials)
-    cmap = plt.get_cmap("tab10", len(materials))
-    mat_to_color = {mat: cmap(i) for i, mat in enumerate(materials)}
+    
+    # Import get_material_color to ensure consistent colors with plot_mesh
+    from plot import get_material_color
+    mat_to_color = {mat: get_material_color(mat) for mat in materials}
 
     # If element_types is not provided, assume all triangles (backward compatibility)
     if element_types is None:
@@ -49,14 +51,14 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=Fa
         color = mat_to_color[element_materials[idx]]
         
         # Create polygon patch
-        polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5)
+        polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
         ax.add_patch(polygon)
 
         # Label element number at centroid if requested
         if label_elements:
             centroid = np.mean(polygon_coords, axis=0)
             ax.text(centroid[0], centroid[1], str(idx+1),
-                    ha='center', va='center', fontsize=6, color='black', alpha=0.7,
+                    ha='center', va='center', fontsize=6, color='black', alpha=0.4,
                     zorder=10)
 
     if show_nodes:
@@ -68,10 +70,20 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=Fa
             ax.text(x + 0.5, y + 0.5, str(i+1), fontsize=6, color='blue', alpha=0.7,
                     ha='left', va='bottom', zorder=11)
 
-    legend_handles = [
-        plt.Line2D([0], [0], color=cmap(i), lw=4, label=f"Material {mat}")
-        for i, mat in enumerate(materials)
-    ]
+    # Get material names if available
+    material_names = seep_data.get("material_names", [])
+    
+    legend_handles = []
+    for mat in materials:
+        # Use material name if available, otherwise use "Material {mat}"
+        if material_names and mat <= len(material_names):
+            label = material_names[mat - 1]  # Convert to 0-based index
+        else:
+            label = f"Material {mat}"
+        
+        legend_handles.append(
+            plt.Line2D([0], [0], color=mat_to_color[mat], lw=4, label=label)
+        )
 
     if show_bc:
         bc1 = nodes[bc_type == 1]
@@ -113,7 +125,7 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=Fa
     plt.show()
 
 
-def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours=True, phreatic=True):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05):
     """
     Plots head contours and optionally overlays flowlines (phi) based on flow function.
     Fixed version that properly handles mesh aspect ratio and doesn't clip the plot.
@@ -143,38 +155,9 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours
     phi = solution.get("phi")
     flowrate = solution.get("flowrate")
 
-    # If element_types is not provided, assume all triangles (backward compatibility)
-    if element_types is None:
-        element_types = np.full(len(elements), 3)
-
-    # Calculate proper figure size based on mesh aspect ratio
-    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
-    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
-
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-    mesh_aspect = x_range / y_range if y_range > 0 else 1.0
-
-    # Set figure size to accommodate the mesh properly
-    if mesh_aspect > 2.0:  # Wide mesh
-        fig_width = 12
-        fig_height = 12 / mesh_aspect
-    elif mesh_aspect < 0.5:  # Tall mesh
-        fig_height = 10
-        fig_width = 10 * mesh_aspect
-    else:  # Roughly square mesh
-        fig_width = 10
-        fig_height = 10 / mesh_aspect
-
-    # Ensure minimum size
-    fig_width = max(fig_width, 6)
-    fig_height = max(fig_height, 4)
-
-    print(f"Mesh bounds: x=[{x_min:.1f}, {x_max:.1f}], y=[{y_min:.1f}, {y_max:.1f}]")
-    print(f"Mesh aspect ratio: {mesh_aspect:.2f}, Figure size: {fig_width:.1f} x {fig_height:.1f}")
 
     # Use constrained_layout for best layout
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
 
     # Separate triangles and quads
     triangle_mask = element_types == 3
@@ -188,8 +171,10 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours
     # Plot material zones first (if element_materials provided)
     if element_materials is not None:
         materials = np.unique(element_materials)
-        cmap = plt.get_cmap("tab10", len(materials))
-        mat_to_color = {mat: cmap(i) for i, mat in enumerate(materials)}
+        
+        # Import get_material_color to ensure consistent colors with plot_mesh
+        from plot import get_material_color
+        mat_to_color = {mat: get_material_color(mat) for mat in materials}
 
         # Plot triangles
         for idx, element_nodes in enumerate(triangle_elements):
@@ -201,7 +186,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours
                 # Quad: use all 4 nodes
                 polygon = nodes[element_nodes]
             color = mat_to_color[element_materials[np.where(triangle_mask)[0][idx]]]
-            ax.fill(*zip(*polygon), edgecolor='none', facecolor=color, alpha=0.5)
+            ax.fill(*zip(*polygon), edgecolor='none', facecolor=color, alpha=alpha)
         
         # Plot quads
         for idx, element_nodes in enumerate(quad_elements):
@@ -213,7 +198,7 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours
                 # Quad: use all 4 nodes
                 polygon_coords = nodes[element_nodes]
             color = mat_to_color[element_materials[np.where(quad_mask)[0][idx]]]
-            polygon = Polygon(polygon_coords, edgecolor='none', facecolor=color, alpha=0.5)
+            polygon = Polygon(polygon_coords, edgecolor='none', facecolor=color, alpha=alpha)
             ax.add_patch(polygon)
 
     vmin = np.min(head)
@@ -270,14 +255,13 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours
     except Exception as e:
         print(f"Warning: Could not plot mesh boundary: {e}")
 
-    # Calculate margins as before
-    margin = 0.10  # 10% margin
-    x_margin = x_range * margin
-    y_margin = y_range * margin
-
-    # Set y-limits: more space above, less below
-    ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_ylim(y_min - y_margin, y_max + y_margin * 0.3)  # Only 30% of margin above
+    # Add cushion around the mesh
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
+    x_pad = (x_max - x_min) * pad_frac
+    y_pad = (y_max - y_min) * pad_frac
+    ax.set_xlim(x_min - x_pad, x_max + x_pad)
+    ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
     title = "Flow Net: Head Contours"
     if phi is not None:
@@ -406,21 +390,52 @@ def get_ordered_mesh_boundary(nodes, elements, element_types=None):
         adj[a].append(b)
         adj[b].append(a)
 
-    # Step 4: Walk the boundary in order
-    start = boundary_edges[0][0]
-    boundary_loop = [start]
-    visited = set([start])
-    current = start
-
-    while True:
-        neighbors = [n for n in adj[current] if n not in visited]
-        if not neighbors:
-            break
-        next_node = neighbors[0]
-        boundary_loop.append(next_node)
-        visited.add(next_node)
-        current = next_node
-        if current == start:
-            break
-
-    return nodes[boundary_loop]
+    # Step 4: Walk all boundary segments
+    all_boundary_nodes = []
+    remaining_edges = set(boundary_edges)
+    
+    while remaining_edges:
+        # Start a new boundary segment
+        start_edge = remaining_edges.pop()
+        start_node = start_edge[0]
+        current_node = start_edge[1]
+        
+        segment = [start_node, current_node]
+        remaining_edges.discard((current_node, start_node))  # Remove reverse edge if present
+        
+        # Walk this segment until we can't continue
+        while True:
+            # Find next edge from current node
+            next_edge = None
+            for edge in remaining_edges:
+                if edge[0] == current_node:
+                    next_edge = edge
+                    break
+                elif edge[1] == current_node:
+                    next_edge = (edge[1], edge[0])  # Reverse the edge
+                    break
+            
+            if next_edge is None:
+                break
+                
+            next_node = next_edge[1]
+            segment.append(next_node)
+            remaining_edges.discard(next_edge)
+            remaining_edges.discard((next_node, current_node))  # Remove reverse edge if present
+            current_node = next_node
+            
+            # Check if we've closed the loop
+            if current_node == start_node:
+                break
+        
+        all_boundary_nodes.extend(segment)
+    
+    # If we have multiple segments, we need to handle them properly
+    # For now, just return the first complete segment
+    if all_boundary_nodes:
+        # Ensure the boundary is closed
+        if all_boundary_nodes[0] != all_boundary_nodes[-1]:
+            all_boundary_nodes.append(all_boundary_nodes[0])
+        return nodes[all_boundary_nodes]
+    else:
+        raise ValueError("No boundary nodes found.")

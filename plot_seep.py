@@ -4,7 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
+def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False, material_table=False, label_elements=False, label_nodes=False):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -13,6 +13,9 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
         seep_data: Dictionary containing seepage data from import_seep2d
         show_nodes: If True, plot node points
         show_bc: If True, plot boundary condition nodes
+        material_table: If True, show material table
+        label_elements: If True, label each element with its number at its centroid
+        label_nodes: If True, label each node with its number just above and to the right
     """
     import matplotlib.pyplot as plt
     from matplotlib.patches import Polygon
@@ -49,8 +52,21 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
         polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5)
         ax.add_patch(polygon)
 
+        # Label element number at centroid if requested
+        if label_elements:
+            centroid = np.mean(polygon_coords, axis=0)
+            ax.text(centroid[0], centroid[1], str(idx+1),
+                    ha='center', va='center', fontsize=6, color='black', alpha=0.7,
+                    zorder=10)
+
     if show_nodes:
         ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
+
+    # Label node numbers if requested
+    if label_nodes:
+        for i, (x, y) in enumerate(nodes):
+            ax.text(x + 0.5, y + 0.5, str(i+1), fontsize=6, color='blue', alpha=0.7,
+                    ha='left', va='bottom', zorder=11)
 
     legend_handles = [
         plt.Line2D([0], [0], color=cmap(i), lw=4, label=f"Material {mat}")
@@ -87,13 +103,17 @@ def plot_seep_mesh(seep_data, show_nodes=False, show_bc=False):
     else:
         title = f"SEEP2D Mesh with Material Zones ({num_triangles} triangles)"
     
+    # Place the table in the upper left
+    if material_table:
+        plot_seep_material_table(ax, seep_data, xloc=0.3, yloc=1.1)  # upper left
+    
     ax.set_title(title)
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
     plt.tight_layout()
     plt.show()
 
 
-def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_contours=True, phreatic=True):
+def plot_seep_solution(seep_data, solution, levels=20, base_mat=1, fill_contours=True, phreatic=True):
     """
     Plots head contours and optionally overlays flowlines (phi) based on flow function.
     Fixed version that properly handles mesh aspect ratio and doesn't clip the plot.
@@ -153,7 +173,8 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     print(f"Mesh bounds: x=[{x_min:.1f}, {x_max:.1f}], y=[{y_min:.1f}, {y_max:.1f}]")
     print(f"Mesh aspect ratio: {mesh_aspect:.2f}, Figure size: {fig_width:.1f} x {fig_height:.1f}")
 
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    # Use constrained_layout for best layout
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
 
     # Separate triangles and quads
     triangle_mask = element_types == 3
@@ -201,29 +222,19 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     contour_levels = np.linspace(vmin, vmax, levels)
 
     # For contouring, we need to create triangulations
-    # For triangles, use the first 3 nodes (4th node is repeated)
-    # For quads, we need to split them into triangles for contouring
     all_triangles_for_contouring = []
-    
-    # Add original triangles (use first 3 nodes)
     for tri_nodes in triangle_elements:
         all_triangles_for_contouring.append(tri_nodes[:3])
-    
-    # Split quads into triangles (diagonal from node 0 to node 2)
     for quad_nodes in quad_elements:
-        # Split quad into two triangles: [0,1,2] and [0,2,3]
         tri1 = [quad_nodes[0], quad_nodes[1], quad_nodes[2]]
         tri2 = [quad_nodes[0], quad_nodes[2], quad_nodes[3]]
         all_triangles_for_contouring.extend([tri1, tri2])
-    
-    # Create triangulation for contouring
     triang = tri.Triangulation(nodes[:, 0], nodes[:, 1], all_triangles_for_contouring)
 
     # Filled contours (only if fill_contours=True)
     if fill_contours:
-        contourf = ax.tricontourf(triang, head, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax,
-                                  alpha=0.5)
-        cbar = plt.colorbar(contourf, ax=ax, label="Total Head")
+        contourf = ax.tricontourf(triang, head, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax, alpha=0.5)
+        cbar = plt.colorbar(contourf, ax=ax, label="Total Head", shrink=0.8, pad=0.02)
         cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
         cbar.update_ticks()
 
@@ -237,16 +248,18 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
         ax.tricontour(triang, pressure_head, levels=[0], colors="red", linewidths=2.0)
 
     # Overlay flowlines if phi is available
-    if phi is not None and flowrate is not None and base_mat is not None and k1_by_mat is not None:
-        # Materials are 1-based, so adjust index
+    if phi is not None and flowrate is not None and k1_by_mat is not None:
         if base_mat > len(k1_by_mat):
             print(f"Warning: base_mat={base_mat} is larger than number of materials ({len(k1_by_mat)}). Using material 1.")
+            base_mat = 1
+        elif base_mat < 1:
+            print(f"Warning: base_mat={base_mat} is less than 1. Using material 1.")
             base_mat = 1
         base_k = k1_by_mat[base_mat - 1]
         ne = levels - 1
         nf = (flowrate * ne) / (base_k * hdrop)
         phi_levels = round(nf) + 1
-        print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (base k={base_k}, head drop={hdrop:.3f})")
+        print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (flowrate={flowrate:.3f}, base k={base_k}, head drop={hdrop:.3f})")
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
         ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
 
@@ -257,13 +270,14 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     except Exception as e:
         print(f"Warning: Could not plot mesh boundary: {e}")
 
-    # Set explicit axis limits to ensure full mesh is shown
+    # Calculate margins as before
     margin = 0.10  # 10% margin
     x_margin = x_range * margin
     y_margin = y_range * margin
 
+    # Set y-limits: more space above, less below
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_ylim(y_min - y_margin, y_max + y_margin)
+    ax.set_ylim(y_min - y_margin, y_max + y_margin * 0.3)  # Only 30% of margin above
 
     title = "Flow Net: Head Contours"
     if phi is not None:
@@ -277,9 +291,73 @@ def plot_seep_solution(seep_data, solution, levels=20, base_mat=None, fill_conto
     # Set equal aspect ratio AFTER setting limits
     ax.set_aspect("equal")
 
-    # Adjust layout to prevent clipping
-    plt.tight_layout()
+    # Remove tight_layout and subplots_adjust for best constrained layout
+    # plt.tight_layout()
+    # plt.subplots_adjust(top=0.78)
     plt.show()
+
+
+def plot_seep_material_table(ax, seep_data, xloc=0.6, yloc=0.7):
+    """
+    Adds a seepage material properties table to the plot.
+
+    Parameters:
+        ax: matplotlib Axes object
+        seep_data: Dictionary containing seepage data with material properties
+        xloc: x-location of table (0-1)
+        yloc: y-location of table (0-1)
+
+    Returns:
+        None
+    """
+    # Extract material properties from seep_data
+    k1_by_mat = seep_data.get("k1_by_mat")
+    k2_by_mat = seep_data.get("k2_by_mat")
+    angle_by_mat = seep_data.get("angle_by_mat")
+    kr0_by_mat = seep_data.get("kr0_by_mat")
+    h0_by_mat = seep_data.get("h0_by_mat")
+    material_names = seep_data.get("material_names", [])
+    
+    if k1_by_mat is None or len(k1_by_mat) == 0:
+        return
+
+    # Column headers for seepage properties
+    col_labels = ["Mat", "Name", "k₁", "k₂", "Angle", "kr₀", "h₀"]
+
+    # Build table rows
+    table_data = []
+    for idx in range(len(k1_by_mat)):
+        k1 = k1_by_mat[idx]
+        k2 = k2_by_mat[idx] if k2_by_mat is not None else 0.0
+        angle = angle_by_mat[idx] if angle_by_mat is not None else 0.0
+        kr0 = kr0_by_mat[idx] if kr0_by_mat is not None else 0.0
+        h0 = h0_by_mat[idx] if h0_by_mat is not None else 0.0
+        
+        # Get material name, use default if not available
+        material_name = material_names[idx] if idx < len(material_names) else f"Material {idx+1}"
+        
+        # Format values with appropriate precision
+        row = [
+            idx + 1,  # Material number (1-based)
+            material_name,  # Material name
+            f"{k1:.3f}",  # k1 in scientific notation
+            f"{k2:.3f}",  # k2 in scientific notation
+            f"{angle:.1f}",  # angle in degrees
+            f"{kr0:.3f}",  # kr0
+            f"{h0:.2f}"   # h0
+        ]
+        table_data.append(row)
+
+    # Add the table
+    table = ax.table(cellText=table_data,
+                     colLabels=col_labels,
+                     loc='upper right',
+                     colLoc='center',
+                     cellLoc='center',
+                     bbox=[xloc, yloc, 0.45, 0.25])  # Increased width to accommodate name column
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+
 
 def get_ordered_mesh_boundary(nodes, elements, element_types=None):
     """

@@ -1,22 +1,42 @@
-from seep import import_seep2d, run_analysis, print_seep_data_diagnostics, export_solution_csv
+from fileio import load_globals
+
+from mesh import build_polygons, build_mesh_from_polygons, plot_mesh, plot_polygons, plot_polygons_separately
+from mesh import save_mesh_to_json, load_mesh_from_json
+from plot import plot_inputs
+from seep import build_seep_data, run_seepage_analysis
 from plot_seep import plot_seep_mesh, plot_seep_solution
 import numpy as np
 
+data = load_globals("inputs/slopes/input_template_lface3.xlsx")
 
-# Load input
-seep_data = import_seep2d("inputs/seep/s2con_quad.s2d")
+# plot_inputs(data)
 
-# Print diagnostics
-# print_seep_data_diagnostics(seep_data)
+polygons = build_polygons(data['profile_lines'], max_depth=data['max_depth'])
+
+# plot_polygons_separately(polygons)
+
+
+# find the x-range of the ground_surface and use it to set the target size
+x_range = [min(x for x, _ in data['ground_surface'].coords), max(x for x, _ in data['ground_surface'].coords)]
+target_size = (x_range[1] - x_range[0]) / 150
+
+target_size = 10
+
+# Build triangular mesh
+print("Building mesh...")
+mesh = build_mesh_from_polygons(polygons, target_size, 'tri')
+
+# save_mesh_to_json(mesh_tri, "mesh.json")
+
+# plot_mesh(mesh, materials=data['materials'])
+
+seep_data = build_seep_data(mesh, data)
+
+# print(seep_data)
 
 # Plot mesh
-plot_seep_mesh(seep_data, show_nodes=True, show_bc=True)
+plot_seep_mesh(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=True)
 
-# Run analysis
-solution = run_analysis(seep_data)
+solution = run_seepage_analysis(seep_data)
 
-# # Export solution to CSV
-# export_solution_csv("seep_solution.csv", seep_data, solution)
-
-# # Plot solution
-plot_seep_solution(seep_data, solution, base_mat=1, fill_contours=True, phreatic=True) 
+plot_seep_solution(seep_data, solution, levels=20, base_mat=2, fill_contours=True, phreatic=True)

@@ -3,6 +3,148 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import spsolve
+from shapely.geometry import LineString, Point
+
+
+def build_seep_data(mesh, data):
+    """
+    Build a seep_data dictionary from a mesh and data dictionary.
+    
+    This function takes a mesh dictionary (from build_mesh_from_polygons) and a data dictionary
+    (from load_globals) and constructs a seep_data dictionary suitable for seepage analysis.
+    
+    The function:
+    1. Extracts mesh information (nodes, elements, element types, element materials)
+    2. Builds material property arrays (k1, k2, alpha, kr0, h0) from the materials table
+    3. Constructs boundary conditions by finding nodes that intersect with specified head
+       and seepage face lines from the data dictionary
+    
+    Parameters:
+        mesh (dict): Mesh dictionary from build_mesh_from_polygons containing:
+            - nodes: np.ndarray (n_nodes, 2) of node coordinates
+            - elements: np.ndarray (n_elements, 3 or 4) of element node indices
+            - element_types: np.ndarray (n_elements,) indicating 3 for triangles, 4 for quads
+            - element_materials: np.ndarray (n_elements,) of material IDs (1-based)
+        data (dict): Data dictionary from load_globals containing:
+            - materials: list of material dictionaries with k1, k2, alpha, kr0, h0 properties
+            - seepage_bc: dictionary with "specified_heads" and "exit_face" boundary conditions
+            - gamma_water: unit weight of water
+    
+    Returns:
+        dict: seep_data dictionary with the following structure:
+            - nodes: np.ndarray (n_nodes, 2) of node coordinates
+            - elements: np.ndarray (n_elements, 3 or 4) of element node indices
+            - element_types: np.ndarray (n_elements,) indicating 3 for triangles, 4 for quads
+            - element_materials: np.ndarray (n_elements,) of material IDs (1-based)
+            - bc_type: np.ndarray (n_nodes,) of boundary condition flags (0=free, 1=fixed head, 2=exit face)
+            - bc_values: np.ndarray (n_nodes,) of boundary condition values
+            - k1_by_mat: np.ndarray (n_materials,) of major conductivity values
+            - k2_by_mat: np.ndarray (n_materials,) of minor conductivity values
+            - angle_by_mat: np.ndarray (n_materials,) of angle values (degrees)
+            - kr0_by_mat: np.ndarray (n_materials,) of relative conductivity values
+            - h0_by_mat: np.ndarray (n_materials,) of suction head values
+            - unit_weight: float, unit weight of water
+    """
+    
+    # Extract mesh data
+    nodes = mesh["nodes"]
+    elements = mesh["elements"]
+    element_types = mesh["element_types"]
+    element_materials = mesh["element_materials"]
+    
+    # Initialize boundary condition arrays
+    n_nodes = len(nodes)
+    bc_type = np.zeros(n_nodes, dtype=int)  # 0 = free, 1 = fixed head, 2 = exit face
+    bc_values = np.zeros(n_nodes)
+    
+    # Build material property arrays
+    materials = data["materials"]
+    n_materials = len(materials)
+    
+    k1_by_mat = np.zeros(n_materials)
+    k2_by_mat = np.zeros(n_materials)
+    angle_by_mat = np.zeros(n_materials)
+    kr0_by_mat = np.zeros(n_materials)
+    h0_by_mat = np.zeros(n_materials)
+    material_names = []
+    
+    for i, material in enumerate(materials):
+        k1_by_mat[i] = material.get("k1", 1.0)
+        k2_by_mat[i] = material.get("k2", 1.0)
+        angle_by_mat[i] = material.get("alpha", 0.0)
+        kr0_by_mat[i] = material.get("kr0", 0.001)
+        h0_by_mat[i] = material.get("h0", -1.0)
+        material_names.append(material.get("name", f"Material {i+1}"))
+    
+    # Process boundary conditions
+    seepage_bc = data.get("seepage_bc", {})
+    
+    # Calculate appropriate tolerance based on mesh size
+    # Use a fraction of the typical element size
+    x_range = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
+    y_range = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+    typical_element_size = min(x_range, y_range) / np.sqrt(len(nodes))  # Approximate element size
+    tolerance = typical_element_size * 0.1  # 10% of typical element size
+    
+    print(f"Mesh tolerance for boundary conditions: {tolerance:.6f}")
+    
+    # Process specified head boundary conditions
+    specified_heads = seepage_bc.get("specified_heads", [])
+    for bc in specified_heads:
+        head_value = bc["head"]
+        coords = bc["coords"]
+        
+        if len(coords) < 2:
+            continue
+            
+        # Create LineString from boundary condition coordinates
+        bc_line = LineString(coords)
+        
+        # Find nodes that are close to this line (within tolerance)
+        for i, node_coord in enumerate(nodes):
+            node_point = Point(node_coord)
+            
+            # Check if node is on or very close to the boundary condition line
+            if bc_line.distance(node_point) <= tolerance:
+                bc_type[i] = 1  # Fixed head
+                bc_values[i] = head_value
+    
+    # Process seepage face (exit face) boundary conditions
+    exit_face_coords = seepage_bc.get("exit_face", [])
+    if len(exit_face_coords) >= 2:
+        # Create LineString from exit face coordinates
+        exit_face_line = LineString(exit_face_coords)
+        
+        # Find nodes that are close to this line
+        for i, node_coord in enumerate(nodes):
+            node_point = Point(node_coord)
+            
+            # Check if node is on or very close to the exit face line
+            if exit_face_line.distance(node_point) <= tolerance:
+                bc_type[i] = 2  # Exit face
+                bc_values[i] = node_coord[1]  # Use node's y-coordinate as elevation
+    
+    # Get unit weight of water
+    unit_weight = data.get("gamma_water", 9.81)
+    
+    # Construct seep_data dictionary
+    seep_data = {
+        "nodes": nodes,
+        "elements": elements,
+        "element_types": element_types,
+        "element_materials": element_materials,
+        "bc_type": bc_type,
+        "bc_values": bc_values,
+        "k1_by_mat": k1_by_mat,
+        "k2_by_mat": k2_by_mat,
+        "angle_by_mat": angle_by_mat,
+        "kr0_by_mat": kr0_by_mat,
+        "h0_by_mat": h0_by_mat,
+        "material_names": material_names,
+        "unit_weight": unit_weight
+    }
+    
+    return seep_data
 
 
 def import_seep2d(filepath):
@@ -1070,7 +1212,7 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
         ke += (gradN.T @ Kmat @ gradN) * detJ * w
     return ke
 
-def run_analysis(seep_data):
+def run_seepage_analysis(seep_data):
     """
     Standalone function to run seepage analysis.
     

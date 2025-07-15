@@ -5,16 +5,13 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 from plot import get_material_color
 
-
-
-def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tri', debug=False):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=False):
     """
     Build a finite element mesh with material regions using Gmsh.
-    Alternative approach that doesn't use physical groups to avoid warnings.
+    Fixed version that properly handles shared boundaries between polygons.
     
     Parameters:
         polygons     : List of lists of (x, y) tuples defining material boundaries
-        region_ids   : List of material IDs (one per polygon)
         target_size  : Desired element size
         element_type : 'tri' for triangles or 'quad' for quadrilaterals (may include a few triangles)
 
@@ -25,14 +22,16 @@ def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tr
     """
     import gmsh
     import numpy as np
+    from collections import defaultdict
+
+    # build a list of region ids (list of material IDs - one per polygon)
+    region_ids = [i for i in range(len(polygons))]
 
     if element_type not in ['tri', 'quad']:
         raise ValueError("element_type must be 'tri' or 'quad'")
 
     # Adjust target_size for quads to compensate for recombination creating finer meshes
     if element_type == 'quad':
-        # Increase target_size by ~1.4 (sqrt(2)) to get similar element count as triangles
-        # You can adjust this factor based on your needs
         adjusted_target_size = target_size * 1.4
     else:
         adjusted_target_size = target_size
@@ -40,8 +39,14 @@ def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tr
     gmsh.initialize()
     gmsh.option.setNumber("General.Verbosity", 4)  # Reduce verbosity
     gmsh.model.add("multi_region_mesh")
+    
+    # Global point map to ensure shared boundaries use the same points
     point_map = {}  # maps (x, y) to Gmsh point tag
-
+    
+    # Track all unique edges and their usage
+    edge_map = {}  # maps (pt1, pt2) tuple to line tag
+    edge_usage = defaultdict(list)  # maps edge to list of (region_id, orientation)
+    
     def add_point(x, y):
         key = (x, y)
         if key not in point_map:
@@ -49,22 +54,82 @@ def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tr
             point_map[key] = tag
         return point_map[key]
 
-    # Create geometry for all regions and track surface -> region mapping
-    surface_to_region = {}
+    def get_edge_key(pt1, pt2):
+        """Get canonical edge key (always smaller point first)"""
+        return (min(pt1, pt2), max(pt1, pt2))
+
+    # First pass: Create all points and identify all unique edges
+    polygon_data = []
     
     for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
         poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))  # make a copy
         pt_tags = [add_point(x, y) for x, y in poly_pts_clean]
-        line_tags = [gmsh.model.geo.addLine(pt_tags[i], pt_tags[(i + 1) % len(pt_tags)])
-                     for i in range(len(pt_tags))]
-        loop = gmsh.model.geo.addCurveLoop(line_tags)
-        surface = gmsh.model.geo.addPlaneSurface([loop])
         
-        # Map surface tag directly to region ID (no physical groups needed)
-        surface_to_region[surface] = region_id
+        # Track edges for this polygon
+        edges = []
+        for i in range(len(pt_tags)):
+            pt1 = pt_tags[i]
+            pt2 = pt_tags[(i + 1) % len(pt_tags)]
+            
+            edge_key = get_edge_key(pt1, pt2)
+            
+            # Determine orientation: True if pt1 < pt2, False otherwise
+            forward = (pt1 < pt2)
+            
+            # Store edge usage
+            edge_usage[edge_key].append((region_id, forward))
+            edges.append((pt1, pt2, edge_key, forward))
+        
+        polygon_data.append({
+            'region_id': region_id,
+            'pt_tags': pt_tags,
+            'edges': edges
+        })
+
+    # Second pass: Create all unique lines
+    for edge_key in edge_usage.keys():
+        pt1, pt2 = edge_key
+        line_tag = gmsh.model.geo.addLine(pt1, pt2)
+        edge_map[edge_key] = line_tag
+
+    # Third pass: Create surfaces using the shared lines
+    surface_to_region = {}
+    
+    for poly_data in polygon_data:
+        region_id = poly_data['region_id']
+        edges = poly_data['edges']
+        
+        line_tags = []
+        for pt1, pt2, edge_key, forward in edges:
+            line_tag = edge_map[edge_key]
+            
+            # Use positive or negative line tag based on orientation
+            if forward:
+                line_tags.append(line_tag)
+            else:
+                line_tags.append(-line_tag)
+        
+        # Create curve loop and surface
+        try:
+            loop = gmsh.model.geo.addCurveLoop(line_tags)
+            surface = gmsh.model.geo.addPlaneSurface([loop])
+            surface_to_region[surface] = region_id
+        except Exception as e:
+            print(f"Warning: Could not create surface for region {region_id}: {e}")
+            continue
 
     # Synchronize geometry
     gmsh.model.geo.synchronize()
+    
+    # CRITICAL: Set mesh coherence to ensure shared nodes along boundaries
+    # This forces Gmsh to use the same nodes for shared geometric entities
+    gmsh.model.mesh.removeDuplicateNodes()
+    
+    # Create physical groups for material regions (this helps with mesh consistency)
+    physical_surfaces = []
+    for surface, region_id in surface_to_region.items():
+        physical_tag = gmsh.model.addPhysicalGroup(2, [surface])
+        physical_surfaces.append((physical_tag, region_id))
     
     # Set mesh algorithm and recombination options BEFORE generating mesh
     if element_type == 'quad':
@@ -74,18 +139,20 @@ def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tr
         gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)  # Simple recombination
         gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)  # All quads
         
-        # Alternative: Use more aggressive recombination to reduce element count
-        # gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 2)  # Blossom recombination
-        # gmsh.option.setNumber("Mesh.RecombineOptimize", 1)  # Optimize recombination
-        
         # Set recombination for each surface
         for surface in surface_to_region.keys():
             gmsh.model.mesh.setRecombine(2, surface)
     else:
         gmsh.option.setNumber("Mesh.Algorithm", 6)  # Frontal-Delaunay for triangles
     
+    # Force mesh coherence before generation
+    gmsh.option.setNumber("Mesh.ToleranceInitialDelaunay", 1e-12)
+    
     # Generate mesh
     gmsh.model.mesh.generate(2)
+    
+    # Remove duplicate nodes again after mesh generation (belt and suspenders)
+    gmsh.model.mesh.removeDuplicateNodes()
 
     # Get nodes
     node_tags, coords, _ = gmsh.model.mesh.getNodes()
@@ -97,44 +164,37 @@ def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tr
     elements = []
     mat_ids = []
 
-    # Extract elements directly from surfaces (no physical groups)
-    for surface, region_id in surface_to_region.items():
+    # Extract elements using physical groups for better region identification
+    for physical_tag, region_id in physical_surfaces:
         try:
-            # Get all elements for this surface directly
-            elem_types, elem_tags_list, node_tags_list = gmsh.model.mesh.getElements(2, surface)
+            # Get entities in this physical group
+            entities = gmsh.model.getEntitiesForPhysicalGroup(2, physical_tag)
             
-            for elem_type, elem_tags, node_tags in zip(elem_types, elem_tags_list, node_tags_list):
-                if elem_type == 2:  # 3-node triangle
-                    elements_array = np.array(node_tags).reshape(-1, 3)
-                    for element in elements_array:
-                        idxs = [node_tag_to_index[tag] for tag in element]
-                        elements.append(idxs)
-                        mat_ids.append(region_id)
-                elif elem_type == 3:  # 4-node quadrilateral
-                    elements_array = np.array(node_tags).reshape(-1, 4)
-                    for element in elements_array:
-                        idxs = [node_tag_to_index[tag] for tag in element]
-                        elements.append(idxs)
-                        mat_ids.append(region_id)
-                elif elem_type == 9:  # 6-node triangle (second-order)
-                    elements_array = np.array(node_tags).reshape(-1, 6)
-                    for element in elements_array:
-                        # Take only the first 3 nodes (corner nodes)
-                        idxs = [node_tag_to_index[tag] for tag in element[:3]]
-                        elements.append(idxs)
-                        mat_ids.append(region_id)
-                elif elem_type == 10:  # 9-node quadrilateral (second-order)
-                    elements_array = np.array(node_tags).reshape(-1, 9)
-                    for element in elements_array:
-                        # Take only the first 4 nodes (corner nodes)
-                        idxs = [node_tag_to_index[tag] for tag in element[:4]]
-                        elements.append(idxs)
-                        mat_ids.append(region_id)
+            for entity in entities:
+                # Get all elements for this entity
+                elem_types, elem_tags_list, node_tags_list = gmsh.model.mesh.getElements(2, entity)
+                
+                for elem_type, elem_tags, node_tags in zip(elem_types, elem_tags_list, node_tags_list):
+                    if elem_type == 2:  # 3-node triangle
+                        elements_array = np.array(node_tags).reshape(-1, 3)
+                        for element in elements_array:
+                            idxs = [node_tag_to_index[tag] for tag in element]
+                            elements.append(idxs)
+                            mat_ids.append(region_id)
+                    elif elem_type == 3:  # 4-node quadrilateral
+                        elements_array = np.array(node_tags).reshape(-1, 4)
+                        for element in elements_array:
+                            idxs = [node_tag_to_index[tag] for tag in element]
+                            elements.append(idxs)
+                            mat_ids.append(region_id)
         except Exception as e:
-            print(f"Warning: Could not extract elements for surface {surface} (region {region_id}): {e}")
+            print(f"Warning: Could not extract elements for physical group {physical_tag} (region {region_id}): {e}")
             continue
     
     gmsh.finalize()
+
+    # Reorder mesh
+    nodes, elements, mat_ids = raster_renumber_mesh(nodes, elements, mat_ids)
 
     # Standardize elements and set element_types based on element_type parameter
     if element_type == 'tri':
@@ -159,6 +219,213 @@ def build_mesh_from_polygons(polygons, region_ids, target_size, element_type='tr
     }
 
     return mesh
+
+def reorder_mesh(nodes, elements, element_materials=None, element_types=None):
+    """
+    Reorder mesh nodes and elements using RCM and then renumber elements in a clockwise sweep.
+    Also reorders element_materials and element_types if provided.
+    Returns reordered nodes, elements, element_materials, element_types (if provided).
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import reverse_cuthill_mckee
+    import numpy as np
+
+    print("Reordering mesh...")
+    
+    n_nodes = nodes.shape[0]
+    rows, cols = [], []
+
+    # Build adjacency for all unique pairs in each element (tri or quad)
+    for elem in elements:
+        n = len(elem)
+        for i in range(n):
+            for j in range(i + 1, n):
+                rows.append(elem[i])
+                cols.append(elem[j])
+                rows.append(elem[j])
+                cols.append(elem[i])
+
+    adj = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(n_nodes, n_nodes))
+
+    def bandwidth(el):
+        if len(el) == 0:
+            return 0
+        return max(abs(int(i) - int(j)) for elem in el for i in elem for j in elem)
+
+    bw_before = bandwidth(elements)
+
+    # RCM reordering
+    perm = reverse_cuthill_mckee(adj.tocsr())
+    inverse_perm = np.zeros_like(perm)
+    inverse_perm[perm] = np.arange(len(perm))
+
+    new_nodes = nodes[perm]
+    new_elements = np.array([[inverse_perm[i] for i in elem] for elem in elements])
+    if element_materials is not None:
+        element_materials = np.array(element_materials)
+    if element_types is not None:
+        element_types = np.array(element_types)
+
+    # Bandwidth after
+    bw_after = bandwidth(new_elements)
+
+    print(f"Bandwidth before reordering: {bw_before}")
+    print(f"Bandwidth after reordering:  {bw_after}")
+
+    # --- Begin element renumbering section ---
+    # 1. Find the node with minimum x and y
+    min_idx = np.lexsort((new_nodes[:, 1], new_nodes[:, 0]))[0]
+    origin = new_nodes[min_idx]
+
+    # 2. Build a mapping from node to attached elements
+    node_to_elements = {i: [] for i in range(len(new_nodes))}
+    for e_idx, elem in enumerate(new_elements):
+        for n in elem:
+            node_to_elements[n].append(e_idx)
+
+    # 3. Start at the origin node, pick the first attached element
+    visited = set()
+    renum_order = []
+
+    # Find all elements attached to the origin node
+    attached = node_to_elements[min_idx]
+    if not attached:
+        print("No elements attached to origin node!")
+        if element_materials is not None and element_types is not None:
+            return new_nodes, new_elements, element_materials, element_types
+        elif element_materials is not None:
+            return new_nodes, new_elements, element_materials
+        else:
+            return new_nodes, new_elements
+
+    # Pick the attached element whose centroid is most 'down and right' from the origin
+    def centroid(elem):
+        return np.mean(new_nodes[elem], axis=0)
+
+    def angle_from_origin(elem):
+        c = centroid(elem)
+        dx, dy = c - origin
+        return np.arctan2(dy, dx)
+
+    attached_sorted = sorted(attached, key=lambda e_idx: angle_from_origin(new_elements[e_idx]))
+    current_elem_idx = attached_sorted[0]
+    renum_order.append(current_elem_idx)
+    visited.add(current_elem_idx)
+
+    # 4. Progressive clockwise sweep
+    while len(renum_order) < len(new_elements):
+        # Find all unvisited elements sharing a node with the current element
+        current_elem = new_elements[current_elem_idx]
+        neighbor_elems = set()
+        for n in current_elem:
+            neighbor_elems.update(node_to_elements[n])
+        neighbor_elems = [e for e in neighbor_elems if e not in visited]
+        if not neighbor_elems:
+            # If no unvisited neighbors, pick any remaining unvisited element
+            remaining = [i for i in range(len(new_elements)) if i not in visited]
+            if not remaining:
+                break
+            current_elem_idx = remaining[0]
+            renum_order.append(current_elem_idx)
+            visited.add(current_elem_idx)
+            continue
+
+        # Choose the neighbor whose centroid is most clockwise from the previous direction
+        prev_centroid = centroid(current_elem)
+        prev_angle = angle_from_origin(current_elem)
+        def clockwise_angle(e_idx):
+            c = centroid(new_elements[e_idx])
+            dx, dy = c - prev_centroid
+            angle = np.arctan2(dy, dx) - prev_angle
+            # Normalize to [0, 2pi)
+            return (angle + 2 * np.pi) % (2 * np.pi)
+        next_elem_idx = min(neighbor_elems, key=clockwise_angle)
+        renum_order.append(next_elem_idx)
+        visited.add(next_elem_idx)
+        current_elem_idx = next_elem_idx
+
+    # 5. Renumber elements in the new order
+    new_elements = new_elements[renum_order]
+    if element_materials is not None:
+        element_materials = element_materials[renum_order]
+    if element_types is not None:
+        element_types = element_types[renum_order]
+
+    # Return all relevant arrays
+    if element_materials is not None and element_types is not None:
+        return new_nodes, new_elements, element_materials, element_types
+    elif element_materials is not None:
+        return new_nodes, new_elements, element_materials
+    else:
+        return new_nodes, new_elements
+
+def raster_renumber_mesh(nodes, elements, element_materials=None, element_types=None, ytol=1e-6):
+    """
+    Renumber nodes row-wise: bottom row (min y) left to right, then next row up, etc.
+    Elements are renumbered by the average y (row) and then average x (left to right).
+    Also reorders element_materials and element_types if provided.
+    Returns reordered nodes, elements, element_materials, element_types (if provided).
+    ytol: tolerance for grouping nodes into the same row.
+    """
+    import numpy as np
+
+    nodes = np.asarray(nodes)
+    elements = np.asarray(elements)
+    n_nodes = nodes.shape[0]
+    n_elements = elements.shape[0]
+
+    # 1. Group nodes by y (rows)
+    yvals = nodes[:, 1]
+    unique_y = []
+    node_rows = np.zeros(n_nodes, dtype=int)
+    for i, y in enumerate(yvals):
+        found = False
+        for j, uy in enumerate(unique_y):
+            if abs(y - uy) < ytol:
+                node_rows[i] = j
+                found = True
+                break
+        if not found:
+            node_rows[i] = len(unique_y)
+            unique_y.append(y)
+    unique_y = np.array(unique_y)
+    # Sort rows from bottom to top
+    row_order = np.argsort(unique_y)
+    row_map = {old: new for new, old in enumerate(row_order)}
+    node_rows = np.array([row_map[r] for r in node_rows])
+
+    # 2. For each row, sort nodes left to right
+    node_order = []
+    for row in range(len(unique_y)):
+        idxs = np.where(node_rows == row)[0]
+        xs = nodes[idxs, 0]
+        sorted_in_row = idxs[np.argsort(xs)]
+        node_order.extend(sorted_in_row)
+    node_order = np.array(node_order)
+
+    # 3. Build new node index mapping
+    old_to_new = np.zeros(n_nodes, dtype=int)
+    old_to_new[node_order] = np.arange(n_nodes)
+    new_nodes = nodes[node_order]
+
+    # 4. Update elements to use new node indices
+    new_elements = np.array([[old_to_new[i] for i in elem] for elem in elements])
+
+    # 5. Renumber elements by the average of their node numbers (after node renumbering)
+    elem_avg_node = np.mean(new_elements, axis=1)
+    elem_order = np.argsort(elem_avg_node)
+    new_elements = new_elements[elem_order]
+    if element_materials is not None:
+        element_materials = np.array(element_materials)[elem_order]
+    if element_types is not None:
+        element_types = np.array(element_types)[elem_order]
+
+    if element_materials is not None and element_types is not None:
+        return new_nodes, new_elements, element_materials, element_types
+    elif element_materials is not None:
+        return new_nodes, new_elements, element_materials
+    else:
+        return new_nodes, new_elements
 
 
 # Simple plot showing material regions
@@ -462,3 +729,110 @@ def remove_duplicate_endpoint(poly, tol=1e-8):
     if len(poly) > 1 and abs(poly[0][0] - poly[-1][0]) < tol and abs(poly[0][1] - poly[-1][1]) < tol:
         return poly[:-1]
     return poly
+
+def verify_mesh_connectivity(mesh, tolerance=1e-8):
+    """
+    Verify that the mesh is properly connected by checking for duplicate nodes at shared boundaries.
+    
+    Parameters:
+        mesh: Mesh dictionary with 'nodes' and 'elements' keys
+        tolerance: Tolerance for considering nodes as duplicates
+    
+    Returns:
+        dict: Connectivity verification results
+    """
+    import numpy as np
+    from collections import defaultdict
+    
+    nodes = mesh["nodes"]
+    elements = mesh["elements"]
+    
+    # Find duplicate nodes (nodes at same location)
+    duplicate_groups = []
+    used_indices = set()
+    
+    for i in range(len(nodes)):
+        if i in used_indices:
+            continue
+            
+        duplicates = [i]
+        for j in range(i + 1, len(nodes)):
+            if j in used_indices:
+                continue
+                
+            if np.linalg.norm(nodes[i] - nodes[j]) < tolerance:
+                duplicates.append(j)
+                used_indices.add(j)
+        
+        if len(duplicates) > 1:
+            duplicate_groups.append(duplicates)
+            used_indices.add(i)
+    
+    # Check element connectivity
+    element_connectivity = defaultdict(set)
+    for elem_idx, element in enumerate(elements):
+        for node_idx in element:
+            element_connectivity[node_idx].add(elem_idx)
+    
+    # Find isolated nodes (nodes not used by any element)
+    isolated_nodes = []
+    for i in range(len(nodes)):
+        if i not in element_connectivity:
+            isolated_nodes.append(i)
+    
+    # Find elements with duplicate nodes
+    elements_with_duplicates = []
+    for elem_idx, element in enumerate(elements):
+        unique_nodes = set(element)
+        if len(unique_nodes) != len(element):
+            elements_with_duplicates.append(elem_idx)
+    
+    results = {
+        "total_nodes": len(nodes),
+        "total_elements": len(elements),
+        "duplicate_node_groups": duplicate_groups,
+        "isolated_nodes": isolated_nodes,
+        "elements_with_duplicates": elements_with_duplicates,
+        "is_connected": len(duplicate_groups) == 0 and len(isolated_nodes) == 0
+    }
+    
+    return results
+
+def print_mesh_connectivity_report(mesh, tolerance=1e-8):
+    """
+    Print a detailed report about mesh connectivity.
+    
+    Parameters:
+        mesh: Mesh dictionary
+        tolerance: Tolerance for considering nodes as duplicates
+    """
+    results = verify_mesh_connectivity(mesh, tolerance)
+    
+    print("=== MESH CONNECTIVITY REPORT ===")
+    print(f"Total nodes: {results['total_nodes']}")
+    print(f"Total elements: {results['total_elements']}")
+    print(f"Mesh is properly connected: {results['is_connected']}")
+    print()
+    
+    if results['duplicate_node_groups']:
+        print(f"WARNING: Found {len(results['duplicate_node_groups'])} groups of duplicate nodes:")
+        for i, group in enumerate(results['duplicate_node_groups']):
+            print(f"  Group {i+1}: Nodes {group} at position {mesh['nodes'][group[0]]}")
+        print()
+    
+    if results['isolated_nodes']:
+        print(f"WARNING: Found {len(results['isolated_nodes'])} isolated nodes:")
+        for node_idx in results['isolated_nodes']:
+            print(f"  Node {node_idx} at position {mesh['nodes'][node_idx]}")
+        print()
+    
+    if results['elements_with_duplicates']:
+        print(f"WARNING: Found {len(results['elements_with_duplicates'])} elements with duplicate nodes:")
+        for elem_idx in results['elements_with_duplicates']:
+            print(f"  Element {elem_idx}: {mesh['elements'][elem_idx]}")
+        print()
+    
+    if results['is_connected']:
+        print("✓ Mesh connectivity is good - no duplicate nodes or isolated nodes found.")
+    else:
+        print("✗ Mesh connectivity issues detected. Consider regenerating the mesh.")

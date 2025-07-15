@@ -1,4 +1,4 @@
-from seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics, export_solution_csv
+from seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics, export_solution_csv, save_seep_data_to_json
 from plot_seep import plot_seep_mesh, plot_seep_solution
 import numpy as np
 

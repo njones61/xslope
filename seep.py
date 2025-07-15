@@ -1409,3 +1409,39 @@ def print_seep_data_diagnostics(seep_data):
     
     print("="*60 + "\n")
 
+def save_seep_data_to_json(seep_data, filename):
+    """Save seep_data dictionary to JSON file."""
+    import json
+    import numpy as np
+    
+    # Convert numpy arrays to lists for JSON serialization
+    seep_data_json = {}
+    for key, value in seep_data.items():
+        if isinstance(value, np.ndarray):
+            seep_data_json[key] = value.tolist()
+        else:
+            seep_data_json[key] = value
+    
+    with open(filename, 'w') as f:
+        json.dump(seep_data_json, f, indent=2)
+    
+    print(f"Seepage data saved to {filename}")
+
+def load_seep_data_from_json(filename):
+    """Load seep_data dictionary from JSON file."""
+    import json
+    import numpy as np
+    
+    with open(filename, 'r') as f:
+        seep_data_json = json.load(f)
+    
+    # Convert lists back to numpy arrays
+    seep_data = {}
+    for key, value in seep_data_json.items():
+        if isinstance(value, list):
+            seep_data[key] = np.array(value)
+        else:
+            seep_data[key] = value
+    
+    return seep_data
+

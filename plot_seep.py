@@ -343,7 +343,7 @@ def plot_seep_material_table(ax, seep_data, xloc=0.6, yloc=0.7):
             f"{k1:.3f}",  # k1 in scientific notation
             f"{k2:.3f}",  # k2 in scientific notation
             f"{angle:.1f}",  # angle in degrees
-            f"{kr0:.3f}",  # kr0
+            f"{kr0:.4f}",  # kr0
             f"{h0:.2f}"   # h0
         ]
         table_data.append(row)

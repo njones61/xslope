@@ -1,5 +1,5 @@
-# Slope Tools
+# XSLOPE
 
-Documentation for the **slopetools** Python package for slope stability analysis using the limit equilibrium method.
+Documentation for the **xslope** Python package for slope stability analysis using the limit equilibrium method.
 
-![slopetools_main.png](slopetools_main.png)
+![xslope_main.png](xslope_main.png)

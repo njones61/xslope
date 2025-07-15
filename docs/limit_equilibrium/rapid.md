@@ -6,7 +6,7 @@ When designing a dam or levee, it is crucial to consider the potential for rapid
 
 ![pool_lowered.png](rapid_images/pool_lowered.png)
 
-To simulate this scenario, we utilize a "multi-stage" approach in our analysis. In the first stage, we apply the initial conditions with the water level at its full height and use the consolidation stresses resulting from these conditions to determine the undrained strength of the soils. In the second stage, we use these undrained strengths and the loading conditions corresponding to the lowered water level and determine the factor of safety for rapid drawdown conditions. The **slopetools** package provides a convenient way to perform this analysis using the `rapid_drawdown` function. The equations and methodology used in this function are described in the following sections.
+To simulate this scenario, we utilize a "multi-stage" approach in our analysis. In the first stage, we apply the initial conditions with the water level at its full height and use the consolidation stresses resulting from these conditions to determine the undrained strength of the soils. In the second stage, we use these undrained strengths and the loading conditions corresponding to the lowered water level and determine the factor of safety for rapid drawdown conditions. The **xslope** package provides a convenient way to perform this analysis using the `rapid_drawdown` function. The equations and methodology used in this function are described in the following sections.
 
 ## When Does Rapid Drawdown Apply?
 
@@ -54,7 +54,7 @@ In this case T for the core = 0.5 < 3.0, so we assume rapid drawdown applies to 
 
 ## Three-Stage Analysis
 
-In slopetools, we use the three-stage analysis method developed by Duncan, Wright, and Wong (1990) to analyze rapid drawdown conditions. This technique is described in detail in Soil Strength and Slope Stability, 2nd Edition, Duncan, Wright, and Brandon. The three stages are:
+In xslope, we use the three-stage analysis method developed by Duncan, Wright, and Wong (1990) to analyze rapid drawdown conditions. This technique is described in detail in Soil Strength and Slope Stability, 2nd Edition, Duncan, Wright, and Brandon. The three stages are:
 
 >>1) Compute effective stresses based on pre-drawdown conditions<br>
 2) Compute FS for post-drawdown conditions using total stress analysis. Undrained strength is a function of effective stress from stage 1.<br>
@@ -106,7 +106,7 @@ The $\tau_{ff}$ is the shear stress on the failure plane at failure. $\sigma'_{1
 
 These two curves are function of the stress anisotropy during the consolidation stage. The $K_c = K_f$ curve with $c'$ and $\phi'$ corresponds to the case where the ratio of $\sigma'_1$ and $\sigma'_3$ is on the verge of failure. The other curve with $d$ and $\psi$ corresponds to the case where $\sigma'_1 = \sigma'_3$ during the consolidation stage. Note that the $c'$ and $\phi'$ values for the $K_c = K_f$ curve can be obtained from a $CU$ triaxial test or they can be obtained from a $CD$ or $\overline{CU}$ triaxial test. The $K_c = 1$ line represents $\tau_{ff}$ vs. $\sigma'_3$ from $CU$ triaxial tests. The $\tau_{ff}$ values are found using the equation in the previous figure above. Thus, both lines can be obtained from one set of $\overline{CU}$ triaxial tests.
 
-When performing rapid drawdown analysis with the **slopetools** package, a set of $d$ and $\psi$ values should be entered in the material properties table for each soil with poor drainage and assumed to apply to rapid drawdown conditions. The more freely draining soils are not included in the analysis, and the $d$ and $\psi$ values should be left blank.
+When performing rapid drawdown analysis with the **xslope** package, a set of $d$ and $\psi$ values should be entered in the material properties table for each soil with poor drainage and assumed to apply to rapid drawdown conditions. The more freely draining soils are not included in the analysis, and the $d$ and $\psi$ values should be left blank.
 
 ### Anisotropy and K Interpolation
 

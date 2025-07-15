@@ -1,10 +1,10 @@
 # Code Structure
 
-The **slopetools** python package is designed to be modular and easy to use. The following sections outline the main components of the package and how they can be used to perform slope stability analysis. Each of these components can be used independently or in combination to achieve the desired results. The following sections provide a brief overview of each component, along with example code snippets to illustrate their usage. The features are described in more detail in the other sections of the documentation.
+The **xslope** python package is designed to be modular and easy to use. The following sections outline the main components of the package and how they can be used to perform slope stability analysis. Each of these components can be used independently or in combination to achieve the desired results. The following sections provide a brief overview of each component, along with example code snippets to illustrate their usage. The features are described in more detail in the other sections of the documentation.
 
 ## Loading the Input File
 
-The first step in using slopetools is to load the input file. The input file contains all the necessary information about the slope, including the geometry, material properties, and loading conditions. The input file is an Excel file with a specific structure. A template for the Excel file can be downloaded here:
+The first step in using xslope is to load the input file. The input file contains all the necessary information about the slope, including the geometry, material properties, and loading conditions. The input file is an Excel file with a specific structure. A template for the Excel file can be downloaded here:
 
 [input_template.xlsx](../input_template.xlsx)
 
@@ -64,7 +64,7 @@ returns a dictionary containing the data from each sheet. The data can then be a
 key. For example:
 
 ```python
-from slopetools import load_globals
+from fileio import load_globals
 
 data = load_globals("input_template.xlsx")
 profile_lines = data["profile_lines"]

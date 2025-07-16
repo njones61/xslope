@@ -484,7 +484,7 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone'):
     plt.tight_layout()
     plt.show()
 
-def save_mesh_to_json(mesh, filename):
+def export_mesh_to_json(mesh, filename):
     """Save mesh dictionary to JSON file."""
     import json
     import numpy as np
@@ -502,7 +502,7 @@ def save_mesh_to_json(mesh, filename):
     
     print(f"Mesh saved to {filename}")
 
-def load_mesh_from_json(filename):
+def import_mesh_from_json(filename):
     """Load mesh dictionary from JSON file."""
     import json
     import numpy as np

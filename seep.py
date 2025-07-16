@@ -1298,7 +1298,7 @@ def run_seepage_analysis(seep_data):
 
     return solution
 
-def export_solution_csv(filename, seep_data, solution):
+def export_seep_solution(seep_data, solution, filename):
     """Exports nodal results to a CSV file.
     
     Args:

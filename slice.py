@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
-from math import sin, tan, atan, atan2, degrees, sqrt, cos, radians
-
+from math import sin, cos, tan, radians, atan, atan2, degrees, sqrt
+from mesh import find_element_containing_point, interpolate_at_point
 
 def get_circular_y_coordinates(x_coords, Xo, Yo, R):
     """
@@ -893,9 +893,39 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
             u = hw * gamma_w if not np.isnan(piezo_y) else 0
             u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
         elif mat_u == 'seep':
-            # TODO: Implement seepage-based pore pressure calculation
-            u = 0
-            u2 = 0
+            # Seepage-based pore pressure calculation using mesh interpolation
+            if 'seep_mesh' in data and 'seep_u' in data:
+                seep_mesh = data['seep_mesh']
+                seep_u = data['seep_u']
+                
+                # Interpolate pore pressure at the slice center base point
+                point = (x_c, y_cb)
+                u = interpolate_at_point(
+                    seep_mesh['nodes'], 
+                    seep_mesh['elements'], 
+                    seep_mesh['element_types'], 
+                    seep_u, 
+                    point
+                )
+            else:
+                u = 0
+                
+            # Check for second seepage solution (rapid drawdown)
+            if 'seep_u2' in data:
+                seep_mesh = data['seep_mesh']
+                seep_u2 = data['seep_u2']
+                
+                # Interpolate pore pressure at the slice center base point
+                point = (x_c, y_cb)
+                u2 = interpolate_at_point(
+                    seep_mesh['nodes'], 
+                    seep_mesh['elements'], 
+                    seep_mesh['element_types'], 
+                    seep_u2, 
+                    point
+                )
+            else:
+                u2 = 0
         else:
             u = 0
             u2 = 0

@@ -1,9 +1,9 @@
 import numpy as np
 import gmsh
-import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
-from plot import get_material_color
+
+
 
 def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=False):
     """
@@ -223,70 +223,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
 
     return mesh
 
-# Simple plot showing material regions
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Patch
-    from matplotlib.collections import PolyCollection
-    
-    # Extract mesh data from dictionary
-    nodes = mesh["nodes"]
-    elements = mesh["elements"]
-    element_materials = mesh["element_materials"]
-    
-    fig, ax = plt.subplots(figsize=figsize)
-    
-    # Group elements by material ID for efficient plotting
-    material_elements = {}
-    for element, mid in zip(elements, element_materials):
-        if mid not in material_elements:
-            material_elements[mid] = []
-        # Get element vertices
-        pts = nodes[element]
-        material_elements[mid].append(pts)
-    
-    # Plot each material's elements as a single collection
-    legend_elements = []
-    for mid, elements_list in material_elements.items():
-        # Create polygon collection for this material
-        poly_collection = PolyCollection(elements_list, 
-                                       facecolor=get_material_color(mid),
-                                       edgecolor='k',
-                                       alpha=0.4,
-                                       linewidth=0.5)
-        ax.add_collection(poly_collection)
-        
-        # Add to legend
-        if materials and mid <= len(materials) and materials[mid-1].get('name'):
-            label = materials[mid-1]['name']  # Convert to 0-based indexing
-        else:
-            label = f'Material {mid}'
-        
-        legend_elements.append(Patch(facecolor=get_material_color(mid), 
-                                   edgecolor='k', 
-                                   alpha=0.4, 
-                                   label=label))
-    
-    ax.set_aspect('equal')
-    ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
-    
-    # Add legend if we have materials
-    if legend_elements:
-        ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=min(len(legend_elements), 4))
 
-    # Add cushion
-    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
-    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
-    x_pad = (x_max - x_min) * pad_frac
-    y_pad = (y_max - y_min) * pad_frac
-    ax.set_xlim(x_min - x_pad, x_max + x_pad)
-    ax.set_ylim(y_min - y_pad, y_max + y_pad)
-    
-    # Add extra cushion for legend space
-    ax.set_ylim(y_min - y_pad, y_max + y_pad)
-
-    plt.tight_layout()
-    plt.show()
 
 def build_polygons(profile_lines, max_depth=None):
     """
@@ -443,46 +380,7 @@ def print_polygon_summary(polygons):
         print()
 
 
-def plot_polygons(polygons, title="Material Zone Polygons"):
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(12, 8))
-    for i, polygon in enumerate(polygons):
-        xs = [x for x, y in polygon]
-        ys = [y for x, y in polygon]
-        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=f'Material {i}')
-        ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
-    ax.set_xlabel('X Coordinate')
-    ax.set_ylabel('Y Coordinate')
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
 
-def plot_polygons_separately(polygons, title_prefix='Material Zone'):
-    """
-    Plot each polygon in a separate matplotlib frame (subplot), with vertices as round dots.
-    """
-    import matplotlib.pyplot as plt
-    from plot import get_material_color
-    n = len(polygons)
-    fig, axes = plt.subplots(n, 1, figsize=(8, 3 * n), squeeze=False)
-    for i, polygon in enumerate(polygons):
-        xs = [x for x, y in polygon]
-        ys = [y for x, y in polygon]
-        ax = axes[i, 0]
-        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=f'Material {i}')
-        ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
-        ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3, label='Vertices')
-        ax.set_xlabel('X Coordinate')
-        ax.set_ylabel('Y Coordinate')
-        ax.set_title(f'{title_prefix} {i}')
-        ax.grid(True, alpha=0.3)
-        ax.set_aspect('equal')
-        ax.legend()
-    plt.tight_layout()
-    plt.show()
 
 def export_mesh_to_json(mesh, filename):
     """Save mesh dictionary to JSON file."""
@@ -631,3 +529,245 @@ def print_mesh_connectivity_report(mesh, tolerance=1e-8):
         print("✓ Mesh connectivity is good - no duplicate nodes or isolated nodes found.")
     else:
         print("✗ Mesh connectivity issues detected. Consider regenerating the mesh.")
+
+def find_element_containing_point(nodes, elements, element_types, point):
+    """
+    Find which element contains the given point using spatial indexing for efficiency.
+    
+    Parameters:
+        nodes: np.ndarray of node coordinates (n_nodes, 2)
+        elements: np.ndarray of element vertex indices (n_elements, 4) - 4th node may be repeated for triangles
+        element_types: np.ndarray indicating element type (3 for triangle, 4 for quadrilateral)
+        point: tuple (x, y) coordinates of the point to find
+        
+    Returns:
+        int: Index of the element containing the point, or -1 if not found
+    """
+    x, y = point
+    
+    # Use spatial indexing to find candidate elements quickly
+    # Build spatial hash grid if not already built
+    if not hasattr(find_element_containing_point, '_spatial_grid'):
+        find_element_containing_point._spatial_grid = _build_spatial_grid(nodes, elements, element_types)
+    
+    spatial_grid = find_element_containing_point._spatial_grid
+    
+    # Find grid cell containing the point
+    grid_x = int((x - spatial_grid['x_min']) / spatial_grid['cell_size'])
+    grid_y = int((y - spatial_grid['y_min']) / spatial_grid['cell_size'])
+    
+    # Get candidate elements from this cell and neighboring cells
+    candidate_elements = set()
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            cell_key = (grid_x + dx, grid_y + dy)
+            if cell_key in spatial_grid['cells']:
+                candidate_elements.update(spatial_grid['cells'][cell_key])
+    
+    # Check only the candidate elements
+    for elem_idx in candidate_elements:
+        element = elements[elem_idx]
+        elem_type = element_types[elem_idx]
+        
+        if elem_type == 3:  # Triangle
+            # Get triangle vertices
+            x1, y1 = nodes[element[0]]
+            x2, y2 = nodes[element[1]]
+            x3, y3 = nodes[element[2]]
+            
+            # Calculate barycentric coordinates
+            det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+            if abs(det) < 1e-12:  # Degenerate triangle
+                continue
+                
+            lambda1 = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / det
+            lambda2 = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / det
+            lambda3 = 1.0 - lambda1 - lambda2
+            
+            # Check if point is inside triangle (all barycentric coordinates >= 0)
+            if lambda1 >= -1e-12 and lambda2 >= -1e-12 and lambda3 >= -1e-12:
+                return elem_idx
+                
+        elif elem_type == 4:  # Quadrilateral
+            # Get quadrilateral vertices
+            x1, y1 = nodes[element[0]]
+            x2, y2 = nodes[element[1]]
+            x3, y3 = nodes[element[2]]
+            x4, y4 = nodes[element[3]]
+            
+            # Use point-in-polygon test for quadrilaterals
+            # Check if point is inside by counting crossings
+            vertices = [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
+            inside = False
+            
+            for j in range(len(vertices)):
+                xi, yi = vertices[j]
+                xj, yj = vertices[(j + 1) % len(vertices)]
+                
+                if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+                    inside = not inside
+            
+            if inside:
+                return elem_idx
+    
+    return -1  # Point not found in any element
+
+
+def _build_spatial_grid(nodes, elements, element_types):
+    """
+    Build a spatial hash grid for efficient element searching.
+    
+    Parameters:
+        nodes: np.ndarray of node coordinates (n_nodes, 2)
+        elements: np.ndarray of element vertex indices (n_elements, 4)
+        element_types: np.ndarray indicating element type (3 for triangle, 4 for quadrilateral)
+        
+    Returns:
+        dict: Spatial grid data structure
+    """
+    # Calculate bounding box
+    x_coords = nodes[:, 0]
+    y_coords = nodes[:, 1]
+    x_min, x_max = x_coords.min(), x_coords.max()
+    y_min, y_max = y_coords.min(), y_coords.max()
+    
+    # Determine optimal cell size based on average element size
+    total_area = 0
+    for i, (element, elem_type) in enumerate(zip(elements, element_types)):
+        if elem_type == 3:  # Triangle
+            x1, y1 = nodes[element[0]]
+            x2, y2 = nodes[element[1]]
+            x3, y3 = nodes[element[2]]
+            area = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
+        else:  # Quadrilateral
+            x1, y1 = nodes[element[0]]
+            x2, y2 = nodes[element[1]]
+            x3, y3 = nodes[element[2]]
+            x4, y4 = nodes[element[3]]
+            area = 0.5 * abs((x2 - x1) * (y4 - y1) - (x4 - x1) * (y2 - y1))
+        total_area += area
+    
+    avg_element_area = total_area / len(elements)
+    # Cell size should be roughly 2-3 times the square root of average element area
+    cell_size = max(0.1, 2.5 * np.sqrt(avg_element_area))
+    
+    # Build grid
+    grid = {
+        'x_min': x_min,
+        'y_min': y_min,
+        'cell_size': cell_size,
+        'cells': {}
+    }
+    
+    # Assign elements to grid cells
+    for elem_idx, (element, elem_type) in enumerate(zip(elements, element_types)):
+        # Calculate element bounding box
+        if elem_type == 3:  # Triangle
+            x_coords = [nodes[element[0]][0], nodes[element[1]][0], nodes[element[2]][0]]
+            y_coords = [nodes[element[0]][1], nodes[element[1]][1], nodes[element[2]][1]]
+        else:  # Quadrilateral
+            x_coords = [nodes[element[0]][0], nodes[element[1]][0], nodes[element[2]][0], nodes[element[3]][0]]
+            y_coords = [nodes[element[0]][1], nodes[element[1]][1], nodes[element[2]][1], nodes[element[3]][1]]
+        
+        elem_x_min, elem_x_max = min(x_coords), max(x_coords)
+        elem_y_min, elem_y_max = min(y_coords), max(y_coords)
+        
+        # Find grid cells that overlap with this element
+        start_x = int((elem_x_min - x_min) / cell_size)
+        end_x = int((elem_x_max - x_min) / cell_size) + 1
+        start_y = int((elem_y_min - y_min) / cell_size)
+        end_y = int((elem_y_max - y_min) / cell_size) + 1
+        
+        # Add element to all overlapping cells
+        for grid_x in range(start_x, end_x + 1):
+            for grid_y in range(start_y, end_y + 1):
+                cell_key = (grid_x, grid_y)
+                if cell_key not in grid['cells']:
+                    grid['cells'][cell_key] = set()
+                grid['cells'][cell_key].add(elem_idx)
+    
+    return grid
+
+
+def interpolate_at_point(nodes, elements, element_types, values, point):
+    """
+    Interpolate values at a given point using the mesh.
+    
+    Parameters:
+        nodes: np.ndarray of node coordinates (n_nodes, 2)
+        elements: np.ndarray of element vertex indices (n_elements, 4)
+        element_types: np.ndarray indicating element type (3 for triangle, 4 for quadrilateral)
+        values: np.ndarray of values at nodes (n_nodes,)
+        point: tuple (x, y) coordinates of the point to interpolate at
+        
+    Returns:
+        float: Interpolated value at the point, or 0.0 if point not found
+    """
+    # Find the element containing the point
+    element_idx = find_element_containing_point(nodes, elements, element_types, point)
+    
+    if element_idx == -1:
+        return 0.0  # Point not found in any element
+    
+    element = elements[element_idx]
+    elem_type = element_types[element_idx]
+    x, y = point
+    
+    if elem_type == 3:  # Triangle
+        # Get triangle vertices and values
+        x1, y1 = nodes[element[0]]
+        x2, y2 = nodes[element[1]]
+        x3, y3 = nodes[element[2]]
+        v1 = values[element[0]]
+        v2 = values[element[1]]
+        v3 = values[element[2]]
+        
+        # Calculate barycentric coordinates
+        det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+        lambda1 = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / det
+        lambda2 = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / det
+        lambda3 = 1.0 - lambda1 - lambda2
+        
+        # Interpolate using barycentric coordinates
+        interpolated_value = lambda1 * v1 + lambda2 * v2 + lambda3 * v3
+        
+    elif elem_type == 4:  # Quadrilateral
+        # Get quadrilateral vertices and values
+        x1, y1 = nodes[element[0]]
+        x2, y2 = nodes[element[1]]
+        x3, y3 = nodes[element[2]]
+        x4, y4 = nodes[element[3]]
+        v1 = values[element[0]]
+        v2 = values[element[1]]
+        v3 = values[element[2]]
+        v4 = values[element[3]]
+        
+        # Use bilinear interpolation for quadrilaterals
+        # First, find natural coordinates (xi, eta) in [-1, 1] x [-1, 1]
+        # This is an approximation - for exact mapping we'd need to solve a nonlinear system
+        
+        # Simple bilinear interpolation using area ratios
+        # Calculate areas of sub-triangles
+        A_total = abs((x2 - x1) * (y4 - y1) - (x4 - x1) * (y2 - y1)) / 2
+        A1 = abs((x - x1) * (y2 - y1) - (x2 - x1) * (y - y1)) / 2
+        A2 = abs((x - x2) * (y3 - y2) - (x3 - x2) * (y - y2)) / 2
+        A3 = abs((x - x3) * (y4 - y3) - (x4 - x3) * (y - y3)) / 2
+        A4 = abs((x - x4) * (y1 - y4) - (x1 - x4) * (y - y4)) / 2
+        
+        # Normalize areas
+        if A_total > 1e-12:
+            w1 = A1 / A_total
+            w2 = A2 / A_total
+            w3 = A3 / A_total
+            w4 = A4 / A_total
+        else:
+            w1 = w2 = w3 = w4 = 0.25
+        
+        # Interpolate using area weights
+        interpolated_value = w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4
+    
+    else:
+        return 0.0  # Unknown element type
+    
+    # Return zero if interpolated value is negative (pore pressure cannot be negative)
+    return max(0.0, interpolated_value)

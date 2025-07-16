@@ -977,3 +977,136 @@ def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_
 
     plt.tight_layout()
     plt.show()
+
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
+    """
+    Plot the finite element mesh with material regions.
+    
+    Parameters:
+        mesh: Mesh dictionary with 'nodes', 'elements', 'element_types', and 'mat_ids' keys
+        materials: Optional list of material dictionaries for legend labels
+        figsize: Figure size tuple
+        pad_frac: Fraction of mesh size to use for padding around plot
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+    from matplotlib.collections import PolyCollection
+    
+    nodes = mesh["nodes"]
+    elements = mesh["elements"]
+    element_types = mesh["element_types"]
+    mat_ids = mesh["mat_ids"]
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Group elements by material ID
+    material_elements = {}
+    for i, (element, elem_type, mid) in enumerate(zip(elements, element_types, mat_ids)):
+        if mid not in material_elements:
+            material_elements[mid] = []
+        
+        # Convert element to polygon coordinates
+        if elem_type == 3:  # Triangle
+            element_coords = [nodes[element[0]], nodes[element[1]], nodes[element[2]]]
+        else:  # Quadrilateral
+            element_coords = [nodes[element[0]], nodes[element[1]], nodes[element[2]], nodes[element[3]]]
+        
+        material_elements[mid].append(element_coords)
+    
+    # Plot each material
+    legend_elements = []
+    for mid, elements_list in material_elements.items():
+        # Create polygon collection for this material
+        poly_collection = PolyCollection(elements_list, 
+                                       facecolor=get_material_color(mid),
+                                       edgecolor='k',
+                                       alpha=0.4,
+                                       linewidth=0.5)
+        ax.add_collection(poly_collection)
+        
+        # Add to legend
+        if materials and mid <= len(materials) and materials[mid-1].get('name'):
+            label = materials[mid-1]['name']  # Convert to 0-based indexing
+        else:
+            label = f'Material {mid}'
+        
+        legend_elements.append(Patch(facecolor=get_material_color(mid), 
+                                   edgecolor='k', 
+                                   alpha=0.4, 
+                                   label=label))
+    
+    ax.set_aspect('equal')
+    ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
+    
+    # Add legend if we have materials
+    if legend_elements:
+        ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=min(len(legend_elements), 4))
+
+    # Add cushion
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
+    x_pad = (x_max - x_min) * pad_frac
+    y_pad = (y_max - y_min) * pad_frac
+    ax.set_xlim(x_min - x_pad, x_max + x_pad)
+    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+    
+    # Add extra cushion for legend space
+    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_polygons(polygons, title="Material Zone Polygons"):
+    """
+    Plot all material zone polygons in a single figure.
+    
+    Parameters:
+        polygons: List of polygon coordinate lists
+        title: Plot title
+    """
+    import matplotlib.pyplot as plt
+    
+    fig, ax = plt.subplots(figsize=(12, 8))
+    for i, polygon in enumerate(polygons):
+        xs = [x for x, y in polygon]
+        ys = [y for x, y in polygon]
+        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=f'Material {i}')
+        ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
+    ax.set_xlabel('X Coordinate')
+    ax.set_ylabel('Y Coordinate')
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_polygons_separately(polygons, title_prefix='Material Zone'):
+    """
+    Plot each polygon in a separate matplotlib frame (subplot), with vertices as round dots.
+    
+    Parameters:
+        polygons: List of polygon coordinate lists
+        title_prefix: Prefix for each subplot title
+    """
+    import matplotlib.pyplot as plt
+    
+    n = len(polygons)
+    fig, axes = plt.subplots(n, 1, figsize=(8, 3 * n), squeeze=False)
+    for i, polygon in enumerate(polygons):
+        xs = [x for x, y in polygon]
+        ys = [y for x, y in polygon]
+        ax = axes[i, 0]
+        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=f'Material {i}')
+        ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
+        ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3, label='Vertices')
+        ax.set_xlabel('X Coordinate')
+        ax.set_ylabel('Y Coordinate')
+        ax.set_title(f'{title_prefix} {i}')
+        ax.grid(True, alpha=0.3)
+        ax.set_aspect('equal')
+        ax.legend()
+    plt.tight_layout()
+    plt.show()

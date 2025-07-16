@@ -36,7 +36,7 @@ def solve_all(df):
     solve_selected(lowe_karafiath, df)
     solve_selected(spencer, df)
 
-data = load_globals("inputs/slopes/input_template_rface3.xlsx")
+data = load_globals("inputs/slope/input_template_lface4.xlsx")
 
 # plot_inputs(data)
 

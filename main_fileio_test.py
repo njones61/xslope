@@ -1,10 +1,10 @@
 
-from fileio import load_globals
+from fileio import load_slope_data
 
 filepath = "inputs/slope/input_template_lface4.xlsx"  # Replace with full path if needed
-globals_data = load_globals(filepath)
+slope_data = load_slope_data(filepath)
 
-for key, value in globals_data.items():
+for key, value in slope_data.items():
     print(f"\n=== {key} ===")
     if isinstance(value, list):
         for item in value:

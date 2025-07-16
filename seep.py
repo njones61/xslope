@@ -6,12 +6,12 @@ from scipy.sparse.linalg import spsolve
 from shapely.geometry import LineString, Point
 
 
-def build_seep_data(mesh, data):
+def build_seep_data(mesh, slope_data):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
     
     This function takes a mesh dictionary (from build_mesh_from_polygons) and a data dictionary
-    (from load_globals) and constructs a seep_data dictionary suitable for seepage analysis.
+    (from load_slope_data) and constructs a seep_data dictionary suitable for seepage analysis.
     
     The function:
     1. Extracts mesh information (nodes, elements, element types, element materials)
@@ -25,7 +25,7 @@ def build_seep_data(mesh, data):
             - elements: np.ndarray (n_elements, 3 or 4) of element node indices
             - element_types: np.ndarray (n_elements,) indicating 3 for triangles, 4 for quads
             - element_materials: np.ndarray (n_elements,) of material IDs (1-based)
-        data (dict): Data dictionary from load_globals containing:
+        data (dict): Data dictionary from load_slope_data containing:
             - materials: list of material dictionaries with k1, k2, alpha, kr0, h0 properties
             - seepage_bc: dictionary with "specified_heads" and "exit_face" boundary conditions
             - gamma_water: unit weight of water
@@ -58,7 +58,7 @@ def build_seep_data(mesh, data):
     bc_values = np.zeros(n_nodes)
     
     # Build material property arrays
-    materials = data["materials"]
+    materials = slope_data["materials"]
     n_materials = len(materials)
     
     k1_by_mat = np.zeros(n_materials)
@@ -77,7 +77,7 @@ def build_seep_data(mesh, data):
         material_names.append(material.get("name", f"Material {i+1}"))
     
     # Process boundary conditions
-    seepage_bc = data.get("seepage_bc", {})
+    seepage_bc = slope_data.get("seepage_bc", {})
     
     # Calculate appropriate tolerance based on mesh size
     # Use a fraction of the typical element size
@@ -125,7 +125,7 @@ def build_seep_data(mesh, data):
                 bc_values[i] = node_coord[1]  # Use node's y-coordinate as elevation
     
     # Get unit weight of water
-    unit_weight = data.get("gamma_water", 9.81)
+    unit_weight = slope_data.get("gamma_water", 9.81)
     
     # Construct seep_data dictionary
     seep_data = {

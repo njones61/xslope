@@ -59,14 +59,14 @@ The input file is designed to be easy to use and can be modified using any sprea
   </table>
 </div>
 
-The table can be loaded into Python using the 'load_globals' function. This function loads the input file and 
+The table can be loaded into Python using the 'load_slope_data' function. This function loads the input file and 
 returns a dictionary containing the data from each sheet. The data can then be accessed using the sheet name as the 
 key. For example:
 
 ```python
-from fileio import load_globals
+from fileio import load_slope_data
 
-data = load_globals("input_template.xlsx")
+data = load_slope_data("input_template.xlsx")
 profile_lines = data["profile_lines"]
 materials = data["materials"]
 piezo_line = data["piezo_line"]
@@ -192,10 +192,10 @@ functions for rendering the slope geometry, failure surface, and slice data usin
 how to call the `plot_inputs` function after loading the input file. 
 
 ```python
-from fileio import load_globals
+from fileio import load_slope_data
 from plot import plot_inputs
 
-data = load_globals("docs/input_template.xlsx")
+data = load_slope_data("docs/input_template.xlsx")
 
 plot_inputs(data)
 ```

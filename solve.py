@@ -6,7 +6,7 @@ from scipy.optimize import minimize_scalar, root_scalar, newton
 from tabulate import tabulate
 
 
-def oms(df, debug=False):
+def oms(slice_df, debug=False):
     """
     Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
 
@@ -39,31 +39,31 @@ def oms(df, debug=False):
 
 
     """
-    if 'r' not in df.columns:
+    if 'r' not in slice_df.columns:
         return False, "Circle is required for OMS method."
 
     # 1) Unpack circle‐center and radius as single values
-    Xo = df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
-    Yo = df['yo'].iloc[0]    # Yoᵢ (y-coordinate of circle center)
-    R  = df['r'].iloc[0]     # Rᵢ (radius of circular failure surface)
+    Xo = slice_df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
+    Yo = slice_df['yo'].iloc[0]    # Yoᵢ (y-coordinate of circle center)
+    R  = slice_df['r'].iloc[0]     # Rᵢ (radius of circular failure surface)
 
-    # 2) Pull arrays directly from df
-    alpha_deg = df['alpha'].values    # αᵢ in degrees
-    phi_deg   = df['phi'].values      # φᵢ in degrees
-    c     = df['c'].values        # cᵢ
-    W     = df['w'].values        # Wᵢ
-    u     = df['u'].values        # uᵢ (pore‐force per unit length)
-    dl     = df['dl'].values       # Δℓᵢ
-    D     = df['dload'].values        # Dᵢ
-    d_x    = df['d_x'].values      # d_{x,i}
-    d_y    = df['d_y'].values      # d_{y,i}
-    beta_deg  = df['beta'].values     # βᵢ in degrees
-    kw    = df['kw'].values       # kWᵢ
-    T     = df['t'].values        # Tᵢ (zero except one slice)
-    y_t    = df['y_t'].values      # y_{t,i} (zero except one slice)
-    P     = df['p'].values        # pᵢ
-    x_c    = df['x_c'].values      # x_{c,i}
-    y_cg = df['y_cg'].values       # y_{cg,i} coordinate of slice centroid
+    # 2) Pull arrays directly from slice_df
+    alpha_deg = slice_df['alpha'].values    # αᵢ in degrees
+    phi_deg   = slice_df['phi'].values      # φᵢ in degrees
+    c     = slice_df['c'].values        # cᵢ
+    W     = slice_df['w'].values        # Wᵢ
+    u     = slice_df['u'].values        # uᵢ (pore‐force per unit length)
+    dl     = slice_df['dl'].values       # Δℓᵢ
+    D     = slice_df['dload'].values        # Dᵢ
+    d_x    = slice_df['d_x'].values      # d_{x,i}
+    d_y    = slice_df['d_y'].values      # d_{y,i}
+    beta_deg  = slice_df['beta'].values     # βᵢ in degrees
+    kw    = slice_df['kw'].values       # kWᵢ
+    T     = slice_df['t'].values        # Tᵢ (zero except one slice)
+    y_t    = slice_df['y_t'].values      # y_{t,i} (zero except one slice)
+    P     = slice_df['p'].values        # pᵢ
+    x_c    = slice_df['x_c'].values      # x_{c,i}
+    y_cg = slice_df['y_cg'].values       # y_{cg,i} coordinate of slice centroid
 
     # 3) Convert angles to radians
     alpha = np.radians(alpha_deg)   # αᵢ [rad]
@@ -124,7 +124,7 @@ def oms(df, debug=False):
     FS = numerator / denominator
 
     # 8) Store effective normal forces in the DataFrame
-    df['n_eff'] = N_eff
+    slice_df['n_eff'] = N_eff
 
     if debug==True:
         print(f'numerator = {numerator:.4f}')
@@ -139,7 +139,7 @@ def oms(df, debug=False):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(df, debug=False, tol=1e-6, max_iter=100):
+def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     """
     Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
     Requires circular slip surface and full input data structure consistent with OMS.
@@ -154,31 +154,31 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
         (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
     """
 
-    if 'r' not in df.columns:
+    if 'r' not in slice_df.columns:
         return False, "Circle is required for Bishop method."
 
     # 1) Unpack circle‐center and radius as single values
-    Xo = df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
-    Yo = df['yo'].iloc[0]    # Yoᵢ (y-coordinate of circle center)
-    R  = df['r'].iloc[0]     # Rᵢ (radius of circular failure surface)
+    Xo = slice_df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
+    Yo = slice_df['yo'].iloc[0]    # Yoᵢ (y-coordinate of circle center)
+    R  = slice_df['r'].iloc[0]     # Rᵢ (radius of circular failure surface)
 
     # Load input arrays
-    alpha = np.radians(df['alpha'].values)
-    phi   = np.radians(df['phi'].values)
-    c     = df['c'].values
-    W     = df['w'].values
-    u     = df['u'].values
-    dl    = df['dl'].values
-    D     = df['dload'].values
-    d_x   = df['d_x'].values
-    d_y   = df['d_y'].values
-    beta  = np.radians(df['beta'].values)
-    kw    = df['kw'].values
-    T     = df['t'].values
-    y_t   = df['y_t'].values
-    P     = df['p'].values
-    x_c   = df['x_c'].values
-    y_cg  = df['y_cg'].values
+    alpha = np.radians(slice_df['alpha'].values)
+    phi   = np.radians(slice_df['phi'].values)
+    c     = slice_df['c'].values
+    W     = slice_df['w'].values
+    u     = slice_df['u'].values
+    dl    = slice_df['dl'].values
+    D     = slice_df['dload'].values
+    d_x   = slice_df['d_x'].values
+    d_y   = slice_df['d_y'].values
+    beta  = np.radians(slice_df['beta'].values)
+    kw    = slice_df['kw'].values
+    T     = slice_df['t'].values
+    y_t   = slice_df['y_t'].values
+    P     = slice_df['p'].values
+    x_c   = slice_df['x_c'].values
+    y_cg  = slice_df['y_cg'].values
 
     # Trigonometric terms
     sin_alpha = np.sin(alpha)
@@ -223,7 +223,7 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
         F_new = numerator / denominator
 
         if abs(F_new - F) < tol:
-            df['n_eff'] = N_eff
+            slice_df['n_eff'] = N_eff
             if debug:
                 print(f"FS = {F_new:.6f}")
                 print(f"Numerator = {numerator:.6f}")
@@ -235,7 +235,7 @@ def bishop(df, debug=False, tol=1e-6, max_iter=100):
 
     return False, "Bishop method did not converge within the maximum number of iterations."
 
-def janbu(df, debug=False):
+def janbu(slice_df, debug=False):
     """
     Computes FS using Janbu's Simplified Method with correction factor (Equation 7).
 
@@ -253,17 +253,17 @@ def janbu(df, debug=False):
     """
 
     # Load input arrays
-    alpha = np.radians(df['alpha'].values)
-    phi = np.radians(df['phi'].values)
-    c = df['c'].values
-    W = df['w'].values
-    u = df['u'].values
-    dl = df['dl'].values
-    D = df['dload'].values
-    beta = np.radians(df['beta'].values)
-    kw = df['kw'].values
-    T = df['t'].values
-    P = df['p'].values
+    alpha = np.radians(slice_df['alpha'].values)
+    phi = np.radians(slice_df['phi'].values)
+    c = slice_df['c'].values
+    W = slice_df['w'].values
+    u = slice_df['u'].values
+    dl = slice_df['dl'].values
+    D = slice_df['dload'].values
+    beta = np.radians(slice_df['beta'].values)
+    kw = slice_df['kw'].values
+    T = slice_df['t'].values
+    P = slice_df['p'].values
 
     # Trigonometric terms
     sin_alpha = np.sin(alpha)
@@ -290,17 +290,17 @@ def janbu(df, debug=False):
     # === Compute Janbu correction factor ===
 
     # Get failure surface endpoints
-    x_l = df['x_l'].iloc[0]  # leftmost x
-    y_lt = df['y_lt'].iloc[0]  # leftmost top y
-    x_r = df['x_r'].iloc[-1]  # rightmost x
-    y_rt = df['y_rt'].iloc[-1]  # rightmost top y
+    x_l = slice_df['x_l'].iloc[0]  # leftmost x
+    y_lt = slice_df['y_lt'].iloc[0]  # leftmost top y
+    x_r = slice_df['x_r'].iloc[-1]  # rightmost x
+    y_rt = slice_df['y_rt'].iloc[-1]  # rightmost top y
 
     # Length of failure surface (straight line approximation)
     L = np.hypot(x_r - x_l, y_rt - y_lt)
 
     # Calculate perpendicular distance from each slice center to failure surface line
-    x0 = df['x_c'].values
-    y0 = df['y_cb'].values
+    x0 = slice_df['x_c'].values
+    y0 = slice_df['y_cb'].values
 
     # Distance from point to line formula: |ax + by + c| / sqrt(a² + b²)
     # Line equation: (y_rt - y_lt)x - (x_r - x_l)y + (x_r * y_lt - y_rt * x_l) = 0
@@ -311,8 +311,8 @@ def janbu(df, debug=False):
     dL_ratio = d / L
 
     # Determine b1 factor based on soil type
-    phi_sum = df['phi'].sum()
-    c_sum = df['c'].sum()
+    phi_sum = slice_df['phi'].sum()
+    c_sum = slice_df['c'].sum()
 
     if phi_sum == 0:  # c-only soil (undrained, φ = 0)
         b1 = 0.67
@@ -328,7 +328,7 @@ def janbu(df, debug=False):
     FS = FS_base * fo
 
     # Store effective normal forces in DataFrame
-    df['n_eff'] = N_eff
+    slice_df['n_eff'] = N_eff
 
     if debug:
         print(f"FS_base = {FS_base:.6f}")
@@ -347,7 +347,7 @@ def janbu(df, debug=False):
     }
 
 
-def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False):
+def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
 
@@ -378,22 +378,22 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
     """
     import numpy as np
 
-    n = len(df)
+    n = len(slice_df)
     if len(theta_list) != n+1:
         return False, f"theta_list length ({len(theta_list)}) must be n+1 ({n+1})"
 
     # extract and convert to radians
-    alpha   = np.radians(df['alpha'].values)
-    phi     = np.radians(df['phi'].values)
-    c       = df['c'].values
-    w       = df['w'].values
-    u       = df['u'].values
-    dl      = df['dl'].values
-    D       = df['dload'].values
-    beta    = np.radians(df['beta'].values)
-    kw      = df['kw'].values
-    T       = df['t'].values
-    P       = df['p'].values
+    alpha   = np.radians(slice_df['alpha'].values)
+    phi     = np.radians(slice_df['phi'].values)
+    c       = slice_df['c'].values
+    w       = slice_df['w'].values
+    u       = slice_df['u'].values
+    dl      = slice_df['dl'].values
+    D       = slice_df['dload'].values
+    beta    = np.radians(slice_df['beta'].values)
+    kw      = slice_df['kw'].values
+    T       = slice_df['t'].values
+    P       = slice_df['p'].values
     theta   = np.radians(np.asarray(theta_list))
     N = np.zeros(n)  # normal forces on slice bases
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
@@ -447,8 +447,8 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
     except Exception as e:
         return False, f"force_equilibrium failed to converge: {e}"
 
-    df['n_eff'] = N  # store effective normal forces in df
-    df['z'] = Z[:-1]  # store interslice forces in df, adjust length to n slices
+    slice_df['n_eff'] = N  # store effective normal forces in slice_df
+    slice_df['z'] = Z[:-1]  # store interslice forces in slice_df, adjust length to n slices
 
     if debug:
         r_opt = residual(FS_opt)
@@ -456,7 +456,7 @@ def force_equilibrium(df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(df, debug=False):
+def corps_engineers(slice_df, debug=False):
     """
     Corps of Engineers style force equilibrium solver.
 
@@ -474,8 +474,8 @@ def corps_engineers(df, debug=False):
         Tuple(bool, dict or str): Whatever force_equilibrium returns.
     """
     # endpoints of the slip surface
-    x0, y0 = df['x_l'].iat[0], df['y_lt'].iat[0]
-    x1, y1 = df['x_r'].iat[-1], df['y_rt'].iat[-1]
+    x0, y0 = slice_df['x_l'].iat[0], slice_df['y_lt'].iat[0]
+    x1, y1 = slice_df['x_r'].iat[-1], slice_df['y_rt'].iat[-1]
 
     # compute positive slope‐angle
     dx = x1 - x0
@@ -486,13 +486,13 @@ def corps_engineers(df, debug=False):
         theta_deg = abs(np.degrees(np.arctan2(dy, dx)))
 
     # one theta per slice boundary
-    n = len(df)
+    n = len(slice_df)
     theta_list = np.full(n+1, theta_deg)
 
-    df['theta'] = theta_list[:-1]  # store theta in df. Adjust length to n slices.
+    slice_df['theta'] = theta_list[:-1]  # store theta in slice_df. Adjust length to n slices.
 
     # delegate to your force_equilibrium solver
-    success, results = force_equilibrium(df, theta_list, debug=debug)
+    success, results = force_equilibrium(slice_df, theta_list, debug=debug)
     if not success:
         return success, results
     else:
@@ -500,21 +500,21 @@ def corps_engineers(df, debug=False):
         results['theta'] = theta_deg           # append theta
         return success, results
 
-def lowe_karafiath(df, debug=False):
+def lowe_karafiath(slice_df, debug=False):
     """
     Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
     the average of the top‐and bottom‐surface slopes of the two adjacent slices
     at each boundary.
     """
-    n = len(df)
+    n = len(slice_df)
 
     # grab boundary coords
-    x_l = df['x_l'].values
-    y_lt = df['y_lt'].values
-    y_lb = df['y_lb'].values
-    x_r = df['x_r'].values
-    y_rt = df['y_rt'].values
-    y_rb = df['y_rb'].values
+    x_l = slice_df['x_l'].values
+    y_lt = slice_df['y_lt'].values
+    y_lb = slice_df['y_lb'].values
+    x_r = slice_df['x_r'].values
+    y_rt = slice_df['y_rt'].values
+    y_rb = slice_df['y_rb'].values
 
     # determine facing
     right_facing = (y_lt[0] > y_rt[-1])
@@ -552,17 +552,17 @@ def lowe_karafiath(df, debug=False):
         if debug:
             print(f"  j={j:2d}: st={st:.3f}, sb={sb:.3f}, θ={theta:.3f}°")
 
-    df['theta'] = theta_list[:-1]  # store theta in df. Adjust length to n slices.
+    slice_df['theta'] = theta_list[:-1]  # store theta in slice_df. Adjust length to n slices.
 
     # call your force_equilibrium solver
-    success, results = force_equilibrium(df, theta_list, debug=debug)
+    success, results = force_equilibrium(slice_df, theta_list, debug=debug)
     if not success:
         return success, results
     else:
         results['method'] = 'lowe_karafiath'  # append method
         return success, results
 
-def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
+def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=1):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
     
@@ -587,23 +587,23 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         bool: converged flag
     """
 
-    alpha = np.radians(df['alpha'].values)  # slice base inclination, degrees
-    phi   = np.radians(df['phi'].values)  # slice friction angle, degrees  
-    c     = df['c'].values  # cohesion
-    dx    = df['dx'].values  # slice width
-    dl    = df['dl'].values  # slice base length
-    W     = df['w'].values  # slice weight
-    u     = df['u'].values  # pore presssure
-    x_c   = df['x_c'].values  # center of base x-coordinate
-    y_cb  = df['y_cb'].values  # center of base y-coordinate
-    y_lb   = df['y_lb'].values  # left side base y-coordinate
-    y_rb   = df['y_rb'].values  # right side base y-coordinate
-    P     = df['dload'].values  # distributed load resultant 
-    beta  = np.radians(df['beta'].values)  # distributed load inclination, degrees
-    kw    = df['kw'].values  # seismic force
-    V     = df['t'].values  # tension crack water force
-    y_v   = df['y_t'].values  # tension crack water force y-coordinate
-    R     = df['p'].values  # reinforcement force
+    alpha = np.radians(slice_df['alpha'].values)  # slice base inclination, degrees
+    phi   = np.radians(slice_df['phi'].values)  # slice friction angle, degrees  
+    c     = slice_df['c'].values  # cohesion
+    dx    = slice_df['dx'].values  # slice width
+    dl    = slice_df['dl'].values  # slice base length
+    W     = slice_df['w'].values  # slice weight
+    u     = slice_df['u'].values  # pore presssure
+    x_c   = slice_df['x_c'].values  # center of base x-coordinate
+    y_cb  = slice_df['y_cb'].values  # center of base y-coordinate
+    y_lb   = slice_df['y_lb'].values  # left side base y-coordinate
+    y_rb   = slice_df['y_rb'].values  # right side base y-coordinate
+    P     = slice_df['dload'].values  # distributed load resultant 
+    beta  = np.radians(slice_df['beta'].values)  # distributed load inclination, degrees
+    kw    = slice_df['kw'].values  # seismic force
+    V     = slice_df['t'].values  # tension crack water force
+    y_v   = slice_df['y_t'].values  # tension crack water force y-coordinate
+    R     = slice_df['p'].values  # reinforcement force
 
     # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
     # at the bottom of the slice. Therefore, the psi value used in the derivation is set to alpha, 
@@ -613,16 +613,16 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     x_r = x_c  # x_r is the x-coordinate of the point of action of the reinforcement
 
     # use variable names to match the derivation.
-    x_p = df['d_x'].values  # distributed load x-coordinate
-    y_p = df['d_y'].values  # distributed load y-coordinate
-    y_k = df['y_cg'].values  # seismic force y-coordinate
+    x_p = slice_df['d_x'].values  # distributed load x-coordinate
+    y_p = slice_df['d_y'].values  # distributed load y-coordinate
+    y_k = slice_df['y_cg'].values  # seismic force y-coordinate
     x_b = x_c  # center of base x-coordinate
     y_b = y_cb  # center of base y-coordinate
 
 
     tan_p = np.tan(phi)  # tan(phi)
 
-    y_ct = df['y_ct'].values
+    y_ct = slice_df['y_ct'].values
     right_facing = (y_ct[0] > y_ct[-1])
     # If right facing, swap angles and strengths. For most methods, you can use the normal angle conventions
     # and get the right answer. But for Spencer, due to the way that the moment equation is written,
@@ -848,12 +848,12 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
 
     if debug_level >= 2: 
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
-        df['ma'] = ma
-        df['Q'] = Q
-        df['y_q'] = y_q
-        df['Fh'] = Fh
-        df['Fv'] = Fv
-        df['Mo'] = Mo
+        slice_df['ma'] = ma
+        slice_df['Q'] = Q
+        slice_df['y_q'] = y_q
+        slice_df['Fh'] = Fh
+        slice_df['Fv'] = Fv
+        slice_df['Mo'] = Mo
         # Print F and theta to 12 decimal places
         print(f"F = {F:.12f}, theta = {np.degrees(theta_rad):.12f}°")
         # Report the residuals
@@ -869,18 +869,18 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
     # ========== END SOLUTION ==========
 
     # Store theta in df
-    df['theta'] = theta_opt
+    slice_df['theta'] = theta_opt
 
     # --- Compute N_eff using Equation (18) ---
     N_eff = - Fv * cos_a + Fh * sin_a + Q * np.sin(alpha - theta_rad) - u * dl
-    df['n_eff'] = N_eff
+    slice_df['n_eff'] = N_eff
 
     # --- Compute interslice forces Z using Equation (67) ---
     n = len(Q)
     Z = np.zeros(n+1)
     for i in range(n):
         Z[i+1] = Z[i] - Q[i] 
-    df['z'] = Z[:-1]        # Z_i acting on slice i's left face
+    slice_df['z'] = Z[:-1]        # Z_i acting on slice i's left face
  
 
     # --- Compute line of thrust using Equation (69) ---
@@ -895,8 +895,8 @@ def spencer(df, tol=1e-4, max_iter = 100, debug_level=1):
         else:
             yt_r[i] = y_b[i] - ((Mo[i] - Z[i] * sin_theta * dx[i] / 2 - Z[i+1] * sin_theta * dx[i] / 2 - Z[i] * cos_theta * (yt_l[i] - y_b[i])) / (Z[i+1] * cos_theta))
             yt_l[i+1] = yt_r[i]
-    df['yt_l'] = yt_l
-    df['yt_r'] = yt_r
+    slice_df['yt_l'] = yt_l
+    slice_df['yt_r'] = yt_r
     
     # --- Return results ---
     results = {}

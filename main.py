@@ -1,15 +1,15 @@
 from global_config import non_circ
 from slice import generate_slices
-from fileio import load_globals, load_data_from_pickle
+from fileio import load_slope_data, load_data_from_pickle
 from plot import plot_solution, plot_inputs
 from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, rapid_drawdown, spencer_OLD
 
 
-def solve_selected(func, df, rapid=False):
+def solve_selected(func, slice_df, rapid=False):
     if rapid:
-        success, result = rapid_drawdown(df, func)
+        success, result = rapid_drawdown(slice_df, func)
     else:
-        success, result = func(df)
+        success, result = func(slice_df)
     if not success:
         print(f'Error: {result}')
         return result
@@ -28,35 +28,35 @@ def solve_selected(func, df, rapid=False):
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
     return result
 
-def solve_all(df):
-    solve_selected(oms, df)
-    solve_selected(bishop, df)
-    solve_selected(janbu, df)
-    solve_selected(corps_engineers, df)
-    solve_selected(lowe_karafiath, df)
-    solve_selected(spencer, df)
+def solve_all(slice_df):
+    solve_selected(oms, slice_df)
+    solve_selected(bishop, slice_df)
+    solve_selected(janbu, slice_df)
+    solve_selected(corps_engineers, slice_df)
+    solve_selected(lowe_karafiath, slice_df)
+    solve_selected(spencer, slice_df)
 
-data = load_globals("inputs/slope/input_template_lface4.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_lface4.xlsx")
 
-# plot_inputs(data)
+# plot_inputs(slope_data)
 
-circle = data['circles'][0] if data['circular'] else None
-non_circ = data['non_circ'] if data['non_circ'] else None
+circle = slope_data['circles'][0] if slope_data['circular'] else None
+non_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
 
-success, result = generate_slices(data, circle=circle, non_circ=None, num_slices=20)
+success, result = generate_slices(slope_data, circle=circle, non_circ=None, num_slices=20)
 
 if success:
-    df, failure_surface = result
+    slice_df, failure_surface = result
 else:
     print(result)
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, df, rapid=False)
+# results = solve_selected(spencer, slice_df, rapid=False)
 
-# solve_all(df)
+solve_all(slice_df)
 
-df.to_excel("slices.xlsx", index=False)
+# slice_df.to_excel("slices.xlsx", index=False)
 
-plot_solution(data, df, failure_surface, results, slice_numbers=True)
+# plot_solution(slope_data, slice_df, failure_surface, results, slice_numbers=True)
 

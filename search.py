@@ -4,7 +4,7 @@ from slice import generate_slices, get_y_from_intersection
 from shapely.geometry import LineString, Point
 import time
 
-def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
+def circular_search(slope_data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
                     fs_fail=9999, depth_tol_frac=0.03, diagnostic=False):
     """
     Global 9-point circular search with adaptive grid refinement.
@@ -17,15 +17,15 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
 
     start_time = time.time()  # Start timing
 
-    ground_surface = data['ground_surface']
+    ground_surface = slope_data['ground_surface']
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
     y_max = max(y for _, y in ground_surface.coords)
-    y_min = data['max_depth']
+    y_min = slope_data['max_depth']
     delta_y = y_max - y_min
     tol = delta_y * depth_tol_frac
 
-    circles = data['circles']
-    max_depth = data['max_depth']
+    circles = slope_data['circles']
+    max_depth = slope_data['max_depth']
 
     def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
@@ -44,7 +44,7 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
             fs_results = []
             for d in depths:
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
-                success, result = generate_slices(data, circle=test_circle)
+                success, result = generate_slices(slope_data, circle=test_circle)
                 if not success:
                     FS = fs_fail
                     df_slices = None
@@ -79,7 +79,7 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
 
         return best_depth, best_fs, best_df, best_surface, best_solver_result
 
-    def evaluate_grid(x0, y0, grid_size, depth_guess, data, diagnostic=False, fs_cache=None):
+    def evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=False, fs_cache=None):
         if fs_cache is None:
             fs_cache = {}
 
@@ -132,7 +132,7 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
             print(f"\n[⏱ starting circle {i+1}] x={x0:.2f}, y={y0:.2f}, r={r0:.2f}")
         grid_size = r0 * 0.15
         depth_guess = start_circle['Depth']
-        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, data, diagnostic=diagnostic)
+        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic)
         all_starts.append((start_circle, best_point, fs_cache))
 
     all_starts.sort(key=lambda t: t[1]['FS'])
@@ -155,7 +155,7 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
 
     for iteration in range(max_iter):
         print(f"[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
-        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, data, diagnostic=diagnostic, fs_cache=fs_cache)
+        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache)
 
         if best_point['FS'] < best_fs:
             best_fs = best_point['FS']
@@ -179,7 +179,7 @@ def circular_search(data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_fac
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path
 
-def noncircular_search(data, solver, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
+def noncircular_search(slope_data, solver, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
     """
     Non-circular search using the specified solver.
     
@@ -253,7 +253,7 @@ def noncircular_search(data, solver, rapid=False, diagnostic=True, movement_dist
         non_circ = [{'X': x, 'Y': y, 'Movement': movements[i]} for i, (x, y) in enumerate(points)]
         
         # Generate slices and compute FS
-        success, result = generate_slices(data, non_circ=non_circ)
+        success, result = generate_slices(slope_data, non_circ=non_circ)
         if not success:
             return float('inf'), None, None, None, fs_cache
             
@@ -277,10 +277,10 @@ def noncircular_search(data, solver, rapid=False, diagnostic=True, movement_dist
         return FS, df_slices, failure_surface, solver_result, fs_cache
 
     # Get initial surface from non_circ data
-    non_circ = data['non_circ']
+    non_circ = slope_data['non_circ']
     points = np.array([[p['X'], p['Y']] for p in non_circ])
     movements = [p['Movement'] for p in non_circ]
-    ground_surface = data['ground_surface']
+    ground_surface = slope_data['ground_surface']
     
     # Initialize cache and search path
     fs_cache = {}
@@ -349,7 +349,7 @@ def noncircular_search(data, solver, rapid=False, diagnostic=True, movement_dist
                     continue
                 
                 # Try to move the point
-                if move_point(test_points, i, dx, dy, movements[i], ground_surface, data['max_depth']):
+                if move_point(test_points, i, dx, dy, movements[i], ground_surface, slope_data['max_depth']):
                     # Evaluate new surface
                     FS, df_slices, failure_surface, solver_result, fs_cache = evaluate_surface(
                         test_points, movement_distance, fs_cache)

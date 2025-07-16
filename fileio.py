@@ -81,7 +81,7 @@ def build_ground_surface(profile_lines):
 
 
 
-def load_globals(filepath):
+def load_slope_data(filepath):
     """
     This function reads input data from various Excel sheets and parses it into
     structured components used throughout the slope stability analysis framework.
@@ -492,7 +492,7 @@ def save_data_to_pickle(data, filepath):
     Useful for saving processed data from Excel templates for later use.
     
     Parameters:
-        data: The data object to save (typically a dictionary from load_globals)
+        data: The data object to save (typically a dictionary from load_slope_data)
         filepath (str): The file path where the pickle file should be saved
         
     Returns:

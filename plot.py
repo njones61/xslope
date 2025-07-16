@@ -88,20 +88,20 @@ def plot_failure_surface(ax, failure_surface):
         x_clip, y_clip = zip(*failure_surface.coords)
         ax.plot(x_clip, y_clip, 'k-', linewidth=2, label="Failure Surface")
 
-def plot_slices(ax, df, fill=True):
+def plot_slices(ax, slice_df, fill=True):
     """
     Plots the slices used in the analysis.
 
     Parameters:
         ax: matplotlib Axes object
-        df: DataFrame containing slice data
+        slice_df: DataFrame containing slice data
         fill: Boolean indicating whether to fill the slices with color
 
     Returns:
         None
     """
-    if df is not None:
-        for _, row in df.iterrows():
+    if slice_df is not None:
+        for _, row in slice_df.iterrows():
             if fill:
                 xs = [row['x_l'], row['x_l'], row['x_r'], row['x_r'], row['x_l']]
                 ys = [row['y_lb'], row['y_lt'], row['y_rt'], row['y_rb'], row['y_lb']]
@@ -111,20 +111,20 @@ def plot_slices(ax, df, fill=True):
                 ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5)
                 ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5)
 
-def plot_slice_numbers(ax, df):
+def plot_slice_numbers(ax, slice_df):
     """
     Plots the slice number in the middle of each slice at the middle height.
     Numbers are 1-indexed.
 
     Parameters:
         ax: matplotlib Axes object
-        df: DataFrame containing slice data
+        slice_df: DataFrame containing slice data
 
     Returns:
         None
     """
-    if df is not None:
-        for _, row in df.iterrows():
+    if slice_df is not None:
+        for _, row in slice_df.iterrows():
             # Calculate middle x-coordinate of the slice
             x_middle = row['x_c']
             
@@ -137,7 +137,7 @@ def plot_slice_numbers(ax, df):
                    ha='center', va='center', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
 
-def plot_piezo_line(ax, data):
+def plot_piezo_line(ax, slope_data):
     """
     Plots the piezometric line(s) with markers at their midpoints.
 
@@ -169,8 +169,8 @@ def plot_piezo_line(ax, data):
             ax.plot(mid_x, mid_y + 6, marker='v', color=color, markersize=8)
     
     # Plot both piezometric lines
-    plot_single_piezo_line(ax, data.get('piezo_line'), 'b', "Piezometric Line")
-    plot_single_piezo_line(ax, data.get('piezo_line2'), 'skyblue', "Piezometric Line 2")
+    plot_single_piezo_line(ax, slope_data.get('piezo_line'), 'b', "Piezometric Line")
+    plot_single_piezo_line(ax, slope_data.get('piezo_line2'), 'skyblue', "Piezometric Line 2")
 
 def plot_tcrack_surface(ax, tcrack_surface):
     """
@@ -189,26 +189,18 @@ def plot_tcrack_surface(ax, tcrack_surface):
     x_vals, y_vals = tcrack_surface.xy
     ax.plot(x_vals, y_vals, linestyle='--', color='red', linewidth=1.0, label='Tension Crack Depth')
 
-def plot_dloads(ax, data):
+def plot_dloads(ax, slope_data):
     """
     Plots distributed loads as arrows along the surface.
-
-    Parameters:
-        ax: matplotlib Axes object
-        data: Dictionary containing plot data with 'dloads' and optionally 'dloads2'
-
-    Returns:
-        None
     """
-    
+    gamma_w = slope_data['gamma_water']
+    ground_surface = slope_data['ground_surface']
+
     def plot_single_dload_set(ax, dloads, color, label):
         """Internal function to plot a single set of distributed loads"""
         if not dloads:
             return
             
-        gamma_w = data['gamma_water']
-        ground_surface = data['ground_surface']
-
         # find the max horizontal length of the ground surface
         max_horizontal_length_ground = 0
         for pt in ground_surface.coords:
@@ -332,11 +324,12 @@ def plot_dloads(ax, data):
             # Draw the surface line itself
             ax.plot(xs, ys, color=color, linewidth=1.5, alpha=0.8, label=label)
     
-    # Plot both sets of distributed loads
-    plot_single_dload_set(ax, data.get('dloads'), 'purple', 'Distributed Load')
-    plot_single_dload_set(ax, data.get('dloads2'), 'orange', 'Distributed Load 2')
+    dloads = slope_data['dloads']
+    dloads2 = slope_data.get('dloads2', [])
+    plot_single_dload_set(ax, dloads, 'purple', 'Distributed Load')
+    plot_single_dload_set(ax, dloads2, 'orange', 'Distributed Load 2')
 
-def plot_circles(ax, data):
+def plot_circles(ax, slope_data):
     """
     Plots starting circles with center markers and arrows.
 
@@ -347,7 +340,7 @@ def plot_circles(ax, data):
     Returns:
         None
     """
-    circles = data['circles']
+    circles = slope_data['circles']
     for circle in circles:
         Xo = circle['Xo']
         Yo = circle['Yo']
@@ -358,7 +351,7 @@ def plot_circles(ax, data):
         # ax.plot(x_circle, y_circle, 'r--', label='Circle')
 
         # Plot the portion of the circle in the slope
-        ground_surface = data['ground_surface']
+        ground_surface = slope_data['ground_surface']
         success, result = generate_failure_surface(ground_surface, circular=True, circle=circle)
         if not success:
             continue  # or handle error
@@ -496,39 +489,37 @@ def plot_material_table(ax, materials, xloc=0.6, yloc=0.7):
     table.auto_set_font_size(False)
     table.set_fontsize(8)
 
-def plot_base_stresses(ax, df, scale_frac=0.5, alpha=0.3):
+def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
     """
-    Plots the effective normal stresses and pore pressures on the base of each slice.
+    Plots base normal stresses for each slice as bars.
 
     Parameters:
         ax: matplotlib Axes object
-        df: DataFrame containing slice data
-        scale_frac: Scaling factor for stress visualization
-        alpha: Transparency value for filled areas
+        slice_df: DataFrame containing slice data
+        scale_frac: Fraction of plot height for bar scaling
+        alpha: Transparency for bars
 
     Returns:
         None
     """
-    u = df['u'].values
-    n_eff = df['n_eff'].values
-    dl = df['dl'].values
-    sigma_eff = n_eff / dl
-
-    heights = df['y_ct'] - df['y_cb']
+    u = slice_df['u'].values
+    n_eff = slice_df['n_eff'].values
+    dl = slice_df['dl'].values
+    heights = slice_df['y_ct'] - slice_df['y_cb']
     max_ht = heights.max() if not heights.empty else 1.0
     max_bar_len = max_ht * scale_frac
 
-    max_stress = np.max(np.abs(sigma_eff)) if len(sigma_eff) > 0 else 1.0
+    max_stress = np.max(np.abs(n_eff)) if len(n_eff) > 0 else 1.0
     max_u = np.max(u) if len(u) > 0 else 1.0
 
-    for i, (index, row) in enumerate(df.iterrows()):
-        if i >= len(sigma_eff):
+    for i, (index, row) in enumerate(slice_df.iterrows()):
+        if i >= len(n_eff):
             break
 
         x1, y1 = row['x_l'], row['y_lb']
         x2, y2 = row['x_r'], row['y_rb']
 
-        stress = sigma_eff[i]
+        stress = n_eff[i]
         pore = u[i]
 
         dx = x2 - x1
@@ -570,17 +561,17 @@ def plot_base_stresses(ax, df, scale_frac=0.5, alpha=0.3):
         ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
 
 
-def plot_thrust_line_from_df(ax, df,
+def plot_thrust_line_from_df(ax, slice_df,
                             color: str = 'red',
                             linestyle: str = '--',
                             linewidth: float = 1,
                             label: str = 'Line of Thrust'):
     """
-    Plots the line of thrust on the slope using DataFrame data.
+    Plots the line of thrust from the slice dataframe.
 
     Parameters:
         ax: matplotlib Axes object
-        df: DataFrame containing slice data with 'yt_l' and 'yt_r' columns
+        slice_df: DataFrame containing slice data with 'yt_l' and 'yt_r' columns
         color: Color of the line
         linestyle: Style of the line
         linewidth: Width of the line
@@ -590,14 +581,14 @@ def plot_thrust_line_from_df(ax, df,
         None
     """
     # Check if required columns exist
-    if 'yt_l' not in df.columns or 'yt_r' not in df.columns:
+    if 'yt_l' not in slice_df.columns or 'yt_r' not in slice_df.columns:
         return
     
     # Create thrust line coordinates from slice data
     thrust_xs = []
     thrust_ys = []
     
-    for _, row in df.iterrows():
+    for _, row in slice_df.iterrows():
         # Add left point of current slice
         thrust_xs.append(row['x_l'])
         thrust_ys.append(row['yt_l'])
@@ -613,17 +604,13 @@ def plot_thrust_line_from_df(ax, df,
             linewidth=linewidth,
             label=label)
 
-def compute_ylim(data, df, scale_frac=0.5, pad_fraction=0.1):
+def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
     """
-    Computes y‐axis limits for the solution plot, ensuring that:
-      • All profile_lines are included,
-      • The max_depth (toe) is included below,
-      • Stress bars (length = max slice height * scale_frac) fit inside,
-      • And an extra pad_fraction of breathing‐room is added.
+    Computes y-limits for plotting based on slice data.
 
     Parameters:
-        data: dict containing at least 'profile_lines' and 'max_depth'
-        df: pandas.DataFrame with slice data, must have 'y_lt' and 'y_lb' for stress‐bar sizing
+        data: Input data
+        slice_df: pandas.DataFrame with slice data, must have 'y_lt' and 'y_lb' for stress‐bar sizing
         scale_frac: fraction of max slice height used when drawing stress bars
         pad_fraction: fraction of total range to pad above/below finally
 
@@ -654,7 +641,7 @@ def compute_ylim(data, df, scale_frac=0.5, pad_fraction=0.1):
 
     # 3) ensure the largest stress bar will fit
     #    stress‐bar length = scale_frac * slice height
-    heights = df["y_lt"] - df["y_lb"]
+    heights = slice_df["y_lt"] - slice_df["y_lb"]
     if not heights.empty:
         max_bar = heights.max() * scale_frac
         y_min -= max_bar
@@ -666,7 +653,7 @@ def compute_ylim(data, df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
+def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=6):
     """
     Creates a plot showing the slope geometry and input parameters.
 
@@ -682,18 +669,18 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     fig, ax = plt.subplots(figsize=(width, height))
 
     # Plot contents
-    plot_profile_lines(ax, data['profile_lines'])
-    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_piezo_line(ax, data)
-    plot_dloads(ax, data)
-    plot_tcrack_surface(ax, data['tcrack_surface'])
+    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_piezo_line(ax, slope_data)
+    plot_dloads(ax, slope_data)
+    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
 
-    if data['circular']:
-        plot_circles(ax, data)
+    if slope_data['circular']:
+        plot_circles(ax, slope_data)
     else:
-        plot_non_circ(ax, data['non_circ'])
+        plot_non_circ(ax, slope_data['non_circ'])
 
-    plot_material_table(ax, data['materials'], xloc=0.62) # Adjust this so that it fits with the legend
+    plot_material_table(ax, slope_data['materials'], xloc=0.62) # Adjust this so that it fits with the legend
 
     ax.set_aspect('equal')  # ✅ Equal aspect
     ax.set_xlabel("x")
@@ -704,7 +691,7 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
     handles, labels = ax.get_legend_handles_labels()
     
     # Add distributed load to legend if present
-    if data['dloads']:
+    if slope_data['dloads']:
         handler_class, dummy_line = get_dload_legend_handler()
         handles.append(dummy_line)
         labels.append('Distributed Load')
@@ -724,15 +711,15 @@ def plot_inputs(data, title="Slope Geometry and Inputs", width=12, height=6):
 
 # ========== Main Plotting Function =========
 
-def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_numbers=False):
+def plot_solution(slope_data, slice_df, failure_surface, results, width=12, height=7, slice_numbers=False):
     """
-    Creates a plot showing the slope stability analysis solution.
+    Plots the full solution including slices, numbers, thrust line, and base stresses.
 
     Parameters:
-        data: Dictionary containing plot data
-        df: DataFrame containing slice data
-        failure_surface: Shapely LineString representing the failure surface
-        results: Dictionary containing analysis results
+        data: Input data
+        slice_df: DataFrame containing slice data
+        failure_surface: Failure surface geometry
+        results: Solution results
         width: Width of the plot in inches
         height: Height of the plot in inches
 
@@ -744,22 +731,22 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     ax.set_ylabel("y")
     ax.grid(False)
 
-    plot_profile_lines(ax, data['profile_lines'])
-    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_slices(ax, df, fill=False)
+    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    plot_piezo_line(ax, data)
-    plot_dloads(ax, data)
-    plot_tcrack_surface(ax, data['tcrack_surface'])
+    plot_piezo_line(ax, slope_data)
+    plot_dloads(ax, slope_data)
+    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
     if slice_numbers:
-        plot_slice_numbers(ax, df)
+        plot_slice_numbers(ax, slice_df)
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
 
     alpha = 0.3
     if results['method'] == 'spencer':
-        plot_thrust_line_from_df(ax, df)
+        plot_thrust_line_from_df(ax, slice_df)
 
-    plot_base_stresses(ax, df, alpha=alpha)
+    plot_base_stresses(ax, slice_df, alpha=alpha)
 
     import matplotlib.patches as mpatches
     normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....', label="Eff Normal Stress (σ')")
@@ -771,7 +758,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     labels.extend(["Eff Normal Stress (σ')", 'Pore Pressure (u)'])
     
     # Add distributed load to legend if present
-    if data['dloads']:
+    if slope_data['dloads']:
         handler_class, dummy_line = get_dload_legend_handler()
         handles.append(dummy_line)
         labels.append('Distributed Load')
@@ -808,7 +795,7 @@ def plot_solution(data, df, failure_surface, results, width=12, height=7, slice_
     ax.set_title(title)
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
-    ymin, ymax = compute_ylim(data, df, pad_fraction=0.05)
+    ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
     ax.set_ylim(ymin, ymax)
 
     plt.tight_layout()
@@ -872,7 +859,7 @@ def plot_search_path(ax, search_path):
         ax.arrow(start['x'], start['y'], dx, dy,
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
 
-def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -889,11 +876,11 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     """
     fig, ax = plt.subplots(figsize=(width, height))
 
-    plot_profile_lines(ax, data['profile_lines'])
-    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_piezo_line(ax, data)
-    plot_dloads(ax, data)
-    plot_tcrack_surface(ax, data['tcrack_surface'])
+    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_piezo_line(ax, slope_data)
+    plot_dloads(ax, slope_data)
+    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
 
     plot_failure_surfaces(ax, fs_cache)
     plot_circle_centers(ax, fs_cache)
@@ -913,7 +900,7 @@ def plot_circular_search_results(data, fs_cache, search_path=None, highlight_fs=
     plt.tight_layout()
     plt.show()
 
-def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -931,11 +918,11 @@ def plot_noncircular_search_results(data, fs_cache, search_path=None, highlight_
     fig, ax = plt.subplots(figsize=(width, height))
 
     # Plot basic profile elements
-    plot_profile_lines(ax, data['profile_lines'])
-    plot_max_depth(ax, data['profile_lines'], data['max_depth'])
-    plot_piezo_line(ax, data)
-    plot_dloads(ax, data)
-    plot_tcrack_surface(ax, data['tcrack_surface'])
+    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_piezo_line(ax, slope_data)
+    plot_dloads(ax, slope_data)
+    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
 
     # Plot all failure surfaces from cache
     for i, result in reversed(list(enumerate(fs_cache))):

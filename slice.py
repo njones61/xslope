@@ -441,7 +441,7 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl):
     return D, d_x, d_y
 
 
-def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True):
+def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -470,18 +470,18 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
     """
 
     # Unpack data
-    profile_lines = data["profile_lines"]
-    ground_surface = data["ground_surface"]
-    materials = data["materials"]
-    piezo_line = data["piezo_line"]
-    piezo_line2 = data.get("piezo_line2", [])  # Second piezometric line
-    gamma_w = data["gamma_water"]
-    tcrack_depth = data["tcrack_depth"]
-    tcrack_water = data["tcrack_water"]
-    k_seismic = data['k_seismic']
-    dloads = data["dloads"]
-    dloads2 = data.get("dloads2", [])
-    max_depth = data["max_depth"]
+    profile_lines = slope_data["profile_lines"]
+    ground_surface = slope_data["ground_surface"]
+    materials = slope_data["materials"]
+    piezo_line = slope_data["piezo_line"]
+    piezo_line2 = slope_data.get("piezo_line2", [])  # Second piezometric line
+    gamma_w = slope_data["gamma_water"]
+    tcrack_depth = slope_data["tcrack_depth"]
+    tcrack_water = slope_data["tcrack_water"]
+    k_seismic = slope_data['k_seismic']
+    dloads = slope_data["dloads"]
+    dloads2 = slope_data.get("dloads2", [])
+    max_depth = slope_data["max_depth"]
 
     # Determine failure surface type
     if circle is not None:
@@ -492,8 +492,8 @@ def generate_slices(data, circle=None, non_circ=None, num_slices=40, debug=True)
 
     # Prepare reinforcement lines data
     reinf_lines_data = []
-    if data.get("reinforce_lines"):
-        for line in data["reinforce_lines"]:
+    if slope_data.get("reinforce_lines"):
+        for line in slope_data["reinforce_lines"]:
             xs = [pt["X"] for pt in line]
             fls = [pt["FL"] for pt in line]
             geom = LineString([(pt["X"], pt["Y"]) for pt in line])

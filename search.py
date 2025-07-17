@@ -1,5 +1,5 @@
 import numpy as np
-from solve import rapid_drawdown
+from advanced import rapid_drawdown
 from slice import generate_slices, get_y_from_intersection
 from shapely.geometry import LineString, Point
 import time

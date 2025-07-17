@@ -19,10 +19,10 @@ polygons = build_polygons(slope_data['profile_lines'], max_depth=slope_data['max
 x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 150
 
-target_size = 10
+# target_size = 10
 
 # Build quadrilateral mesh
-mesh = build_mesh_from_polygons(polygons, target_size, 'tri')
+mesh = build_mesh_from_polygons(polygons, target_size, 'quad')
 
 plot_mesh(mesh, materials=slope_data['materials'])
 

@@ -715,45 +715,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=1):
         dR2_dF = np.sum(dQ_dF * (x_b * sin_theta - y_q * cos_theta)) - np.sum(Q * dyQ_dF * cos_theta)
         dR2_dtheta = np.sum(dQ_dtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(Q * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta))
         
-        # Second derivatives of C3 and C4 (Equations 57-58)
-        d2C3_dtheta2 = -cos_alpha_theta
-        d2C4_dtheta2 = -sin_alpha_theta * tan_p
-        
-        # Second-order partial derivatives of Q (Equations 52-54)
-        d2Q_dF2 = (1 / denom_Q**3) * (
-            denom_Q * (2 * denom_Q * C2 / F**3 - 2 * (C1 + C2 / F) * C4 / F**3) -
-            2 * C4 / F**2 * (denom_Q * C2 / F**2 - (C1 + C2 / F) * C4 / F**2)
-        )
-        
-        d2Q_dFdtheta = (-1 / denom_Q**3) * (
-            denom_Q * (C2 / F**2 * (dC3_dtheta + dC4_dtheta / F) - (C1 + C2 / F) * dC4_dtheta / F**2) -
-            2 * (dC3_dtheta + dC4_dtheta / F) * (denom_Q * C2 / F**2 - (C1 + C2 / F) * C4 / F**2)
-        )
-        
-        d2Q_dtheta2 = (-1 / denom_Q**3) * (
-            denom_Q * (C1 + C2 / F) * (d2C3_dtheta2 + d2C4_dtheta2 / F) -
-            2 * (C1 + C2 / F) * (dC3_dtheta + dC4_dtheta / F)**2
-        )
-        
-        # Second-order partial derivatives of y_Q (Equations 61-63)
-        dyQ_dF = (-1 / (Q * cos_theta)**2) * Mo * dQ_dF * cos_theta
-        dyQ_dtheta = (-1 / (Q * cos_theta)**2) * Mo * (dQ_dtheta * cos_theta - Q * sin_theta)
-        
-        d2yQ_dF2 = (-1 / (Q**2 * cos_theta)) * Mo * (d2Q_dF2 - 2 / Q * dQ_dF**2)
-        d2yQ_dFdtheta = (-1 / (Q**2 * cos_theta)) * Mo * (d2Q_dFdtheta + dQ_dF * np.tan(theta_rad) - 2 * dQ_dF * dQ_dtheta / Q)
-        d2yQ_dtheta2 = (-1 / (Q**2 * cos_theta)) * Mo * (2 * d2Q_dtheta2 * np.tan(theta_rad) - d2Q_dtheta2 + Q + 2 / Q * (dQ_dtheta - Q * np.tan(theta_rad))**2)
-        
-        # Second-order partial derivatives of R1 (Equations 37-39)
-        d2R1_dF2 = np.sum(d2Q_dF2)
-        d2R1_dFdtheta = np.sum(d2Q_dFdtheta)
-        d2R1_dtheta2 = np.sum(d2Q_dtheta2)
-        
-        # Second-order partial derivatives of R2 (Equations 42-44)
-        d2R2_dF2 = np.sum(d2Q_dF2 * (x_b * sin_theta - y_q * cos_theta)) - 2 * np.sum(dQ_dF * dyQ_dF * cos_theta) - np.sum(Q * d2yQ_dF2 * cos_theta)
-        d2R2_dFdtheta = np.sum(d2Q_dFdtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(dQ_dF * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta)) - np.sum(dQ_dtheta * dyQ_dF * cos_theta) - np.sum(Q * (d2yQ_dFdtheta * cos_theta - dyQ_dF * sin_theta))
-        d2R2_dtheta2 = np.sum(d2Q_dtheta2 * (x_b * sin_theta - y_q * cos_theta)) + 2 * np.sum(dQ_dtheta * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta)) - np.sum(Q * (x_b * sin_theta - y_q * cos_theta - 2 * dyQ_dtheta * sin_theta + d2yQ_dtheta2 * cos_theta))
-        
-        return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta, d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2
+        return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta
 
     
     # Initial guesses
@@ -783,8 +745,8 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=1):
                 print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
             break
         
-        # Compute  derivatives
-        dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta, d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2 = compute_derivatives(F, theta_rad, Q, y_q)
+        # Compute derivatives
+        dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_derivatives(F, theta_rad, Q, y_q)
         
         # Basic Newton method (Equations 31-32)
         # Build Jacobian matrix

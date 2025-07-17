@@ -970,7 +970,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
     Plot the finite element mesh with material regions.
     
     Parameters:
-        mesh: Mesh dictionary with 'nodes', 'elements', 'element_types', and 'mat_ids' keys
+        mesh: Mesh dictionary with 'nodes', 'elements', 'element_types', and 'element_materials' keys
         materials: Optional list of material dictionaries for legend labels
         figsize: Figure size tuple
         pad_frac: Fraction of mesh size to use for padding around plot
@@ -982,7 +982,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
     nodes = mesh["nodes"]
     elements = mesh["elements"]
     element_types = mesh["element_types"]
-    mat_ids = mesh["mat_ids"]
+    mat_ids = mesh["element_materials"]
     
     fig, ax = plt.subplots(figsize=figsize)
     

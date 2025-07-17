@@ -170,7 +170,7 @@ def circular_search(slope_data, solver, rapid=False, tol=1e-2, max_iter=50, shri
             converged = True
             end_time = time.time()
             elapsed = end_time - start_time
-            print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}), elapsed time={elapsed:.2f} seconds")
+            print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
             break
 
     if not converged and diagnostic:

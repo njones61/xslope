@@ -6,7 +6,7 @@ from solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
 from search import circular_search, noncircular_search
 
 
-slope_data = load_slope_data("docs/input_template_lface2.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_lface4.xlsx")
 
 # Run non-circular search
 # fs_cache, converged, search_path = noncircular_search(slope_data, corps_engineers, diagnostic=False)

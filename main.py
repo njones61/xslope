@@ -36,7 +36,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_lface4.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_lface4_TEST.xlsx")
 
 # plot_inputs(slope_data)
 
@@ -52,11 +52,11 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-# results = solve_selected(spencer, slice_df, rapid=False)
+results = solve_selected(spencer, slice_df, rapid=False)
 
-solve_all(slice_df)
+# solve_all(slice_df)
 
 # slice_df.to_excel("slices.xlsx", index=False)
 
-# plot_solution(slope_data, slice_df, failure_surface, results, slice_numbers=True)
+plot_solution(slope_data, slice_df, failure_surface, results, slice_numbers=True)
 

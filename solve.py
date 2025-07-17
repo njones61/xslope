@@ -761,12 +761,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=1):
     if right_facing:
         theta0_rad = np.radians(-8.0) 
     else:
-        theta0_rad = np.radians(8.0) 
+        theta0_rad = np.radians(8) 
     
     # Newton iteration
     F = F0
     theta_rad = theta0_rad
-    extended = False
     
     for iteration in range(max_iter):
         # Compute residuals
@@ -788,45 +787,43 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=1):
         dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta, d2R1_dF2, d2R1_dFdtheta, d2R1_dtheta2, d2R2_dF2, d2R2_dFdtheta, d2R2_dtheta2 = compute_derivatives(F, theta_rad, Q, y_q)
         
         # Basic Newton method (Equations 31-32)
-        # denominator = dR1_dF * dR2_dtheta - dR1_dtheta * dR2_dF  # this seems wrong
-        denominator = dR1_dtheta * dR2_dF - dR1_dF * dR2_dtheta
+        # Build Jacobian matrix
+        J = np.array([[dR1_dF, dR1_dtheta], 
+                      [dR2_dF, dR2_dtheta]])
         
-        if abs(denominator) < 1e-12:
+        # Check condition number for numerical stability
+        try:
+            cond_num = np.linalg.cond(J)
+            if cond_num > 1e12:
+                return False, f"Ill-conditioned Jacobian matrix (condition number: {cond_num:.2e})"
+        except:
+            return False, "Unable to compute Jacobian condition number"
+        
+        # Solve using matrix form for better numerical stability
+        try:
+            delta_solution = np.linalg.solve(J, np.array([-R1, -R2]))
+            delta_F = delta_solution[0]
+            delta_theta = delta_solution[1]
+        except np.linalg.LinAlgError:
             return False, "Singular Jacobian matrix in Newton iteration"
-        
-        delta_F = (R1 * dR2_dtheta - R2 * dR1_dtheta) / denominator
-        delta_theta = (R2 * dR1_dF - R1 * dR2_dF) / denominator
-
-        if debug_level >= 1 and not extended:
-            print(f"          Basic: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
-        
-        # Check if we should switch to extended Newton method
-        if abs(delta_F) < 0.5 and abs(delta_theta) < 0.15:
-
-            if debug_level >= 1 and not extended:
-                print(f"*** Switching to extended Newton method ***")
-            extended = True
-            
-            # Build coefficient matrix for extended Newton
-            A11 = dR1_dF + 0.5 * delta_F * d2R1_dF2 + 0.5 * delta_theta * d2R1_dFdtheta
-            A12 = dR1_dtheta + 0.5 * delta_F * d2R1_dFdtheta + 0.5 * delta_theta * d2R1_dtheta2
-            A21 = dR2_dF + 0.5 * delta_F * d2R2_dF2 + 0.5 * delta_theta * d2R2_dFdtheta
-            A22 = dR2_dtheta + 0.5 * delta_F * d2R2_dFdtheta + 0.5 * delta_theta * d2R2_dtheta2
-            
-            # Solve extended Newton system
-            A = np.array([[A11, A12], [A21, A22]])
-            b = np.array([-R1, -R2])
-            
-            try:
-                delta_solution = np.linalg.solve(A, b)
-                delta_F = delta_solution[0]
-                delta_theta = delta_solution[1]
-            except np.linalg.LinAlgError:
-                # Fall back to basic Newton if extended method fails
-                pass
 
         if debug_level >= 1:
-            print(f"          Extended: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
+            print(f"          Newton: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
+
+        # Add step size control to prevent large jumps
+        max_delta_F = 0.5  # Maximum allowed change in F per iteration
+        max_delta_theta = np.radians(20)  # Maximum allowed change in theta per iteration (20 degrees)
+        
+        # Apply step size limiting
+        if abs(delta_F) > max_delta_F:
+            delta_F = np.sign(delta_F) * max_delta_F
+            if debug_level >= 1:
+                print(f"          Step limited: delta_F clamped to {delta_F:.3f}")
+                
+        if abs(delta_theta) > max_delta_theta:
+            delta_theta = np.sign(delta_theta) * max_delta_theta
+            if debug_level >= 1:
+                print(f"          Step limited: delta_theta clamped to {np.degrees(delta_theta):.3f}°")
 
         # Update values
         F += delta_F

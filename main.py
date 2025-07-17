@@ -2,7 +2,7 @@ from global_config import non_circ
 from slice import generate_slices
 from fileio import load_slope_data, load_data_from_pickle
 from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, rapid_drawdown, spencer_OLD
+from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer_OLD
 
 
 def solve_selected(func, slice_df, rapid=False):
@@ -36,7 +36,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_lface4_TEST.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_reliability4.xlsx")
 
 # plot_inputs(slope_data)
 

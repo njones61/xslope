@@ -5,6 +5,13 @@ from shapely.geometry import LineString
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
 
+# Configure matplotlib for better text rendering
+plt.rcParams.update({
+    "text.usetex": False,
+    "font.family": "sans-serif",
+    "font.size": 10
+})
+
 # Consistent color for materials (Tableau tab10)
 def get_material_color(idx):
     tableau_colors = plt.get_cmap('tab10').colors  # 10 distinct colors
@@ -961,6 +968,89 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_reliability_results(slope_data, reliability_data, width=12, height=7):
+    """
+    Creates a plot showing the results of reliability analysis.
+    
+    Parameters:
+        slope_data: Dictionary containing plot data
+        reliability_data: Dictionary containing reliability analysis results
+        width: Width of the plot in inches
+        height: Height of the plot in inches
+    
+    Returns:
+        None
+    """
+    fig, ax = plt.subplots(figsize=(width, height))
+
+    # Plot basic slope elements (same as other search functions)
+    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_piezo_line(ax, slope_data)
+    plot_dloads(ax, slope_data)
+    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+
+    # Plot reliability-specific failure surfaces
+    fs_cache = reliability_data['fs_cache']
+    
+    # Plot all failure surfaces
+    for i, fs_data in enumerate(fs_cache):
+        result = fs_data['result']
+        name = fs_data['name']
+        failure_surface = result['failure_surface']
+        
+        # Convert failure surface to coordinates
+        if hasattr(failure_surface, 'coords'):
+            coords = list(failure_surface.coords)
+        else:
+            coords = failure_surface
+        
+        x_coords = [pt[0] for pt in coords]
+        y_coords = [pt[1] for pt in coords]
+        
+        # Color and styling based on surface type
+        if name == "MLV":
+            # Highlight the MLV (critical) surface in red
+            ax.plot(x_coords, y_coords, color='red', linewidth=3, 
+                   label=f'$F_{{MLV}}$ Surface (FS={result["FS"]:.3f})', zorder=10)
+        else:
+            # Other surfaces in different colors
+            if '+' in name:
+                color = 'blue'
+                alpha = 0.7
+                label = f'$F^+$ ({name}) (FS={result["FS"]:.3f})'
+            else:  # '-' in name
+                color = 'green'
+                alpha = 0.7
+                label = f'$F^-$ ({name}) (FS={result["FS"]:.3f})'
+            
+            ax.plot(x_coords, y_coords, color=color, linewidth=1.5, 
+                   alpha=alpha, label=label, zorder=5)
+
+
+
+    # Standard finalization
+    ax.set_aspect('equal')
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.grid(False)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # Title with reliability statistics using mathtext
+    F_MLV = reliability_data['F_MLV']
+    sigma_F = reliability_data['sigma_F']
+    COV_F = reliability_data['COV_F']
+    reliability = reliability_data['reliability']
+    prob_failure = reliability_data['prob_failure']
+    
+    ax.set_title(f"Reliability Analysis Results\n"
+                f"$F_{{MLV}}$ = {F_MLV:.3f}, $\\sigma_F$ = {sigma_F:.3f}, "
+                f"$COV_F$ = {COV_F:.3f}\n"
+                f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
 
     plt.tight_layout()
     plt.show()

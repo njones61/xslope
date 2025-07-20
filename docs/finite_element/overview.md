@@ -42,6 +42,36 @@ The elastic constitutive matrix $[D_e]$ for plane strain conditions, which is mo
 
 This formulation requires several fundamental material properties that must be determined through laboratory testing or empirical correlations. Young's modulus $E$ governs the stiffness of the soil under loading, while Poisson's ratio $\nu$ controls the relationship between axial and lateral strains. For slope stability analysis, additional strength parameters are critical: the cohesion $c$ and friction angle $\phi$ define the failure envelope, while the unit weight $\gamma$ determines the gravitational body forces. The coefficient of earth pressure at rest $K_0$ is often needed to establish initial stress conditions, particularly for natural slopes that have developed under gravitational loading over geological time.
 
+#### Typical Material Properties for Finite Element Analysis
+
+The following table provides typical ranges of elastic parameters for common soil types. These values should be used as initial estimates and refined based on site-specific testing when available.
+
+| Soil Type | Young's Modulus $E$ (MPa) | Poisson's Ratio $\\nu$ | Typical Range Notes |
+|-----------|---------------------------|----------------------|-------------------|
+| **Soft Clay** | 2 - 15 | 0.40 - 0.50 | Use lower E values for very soft clays |
+| **Medium Clay** | 15 - 50 | 0.35 - 0.45 | Plasticity index affects stiffness |
+| **Stiff Clay** | 50 - 200 | 0.20 - 0.40 | Overconsolidated clays have higher E |
+| **Loose Sand** | 10 - 25 | 0.25 - 0.35 | Depends on relative density |
+| **Medium Sand** | 25 - 75 | 0.30 - 0.40 | Well-graded sands toward upper range |
+| **Dense Sand** | 75 - 200 | 0.25 - 0.35 | Angular particles give higher stiffness |
+| **Loose Silt** | 5 - 20 | 0.30 - 0.45 | Non-plastic silts toward lower ν |
+| **Dense Silt** | 20 - 100 | 0.25 - 0.40 | Cementation increases stiffness |
+| **Gravel** | 100 - 500 | 0.15 - 0.30 | Well-graded, dense materials |
+| **Rock Fill** | 50 - 300 | 0.20 - 0.35 | Depends on gradation and compaction |
+| **Soft Rock** | 1,000 - 10,000 | 0.15 - 0.30 | Weathered or fractured rock |
+
+**Important Considerations:**
+
+- **Stress Level Dependency**: Soil stiffness typically increases with confining stress. The values above represent typical ranges for moderate stress levels (50-200 kPa effective stress).
+
+- **Strain Level**: These modulus values are appropriate for small to medium strain levels (< 1%). For large strain analysis, secant or degraded modulus values may be more appropriate.
+
+- **Drainage Conditions**: For undrained analysis of saturated soils, use undrained modulus $E_u$ and Poisson's ratio approaches 0.5. For drained analysis, use drained parameters with $\\nu < 0.5$.
+
+- **Laboratory vs. Field Values**: Laboratory-derived moduli are often higher than field values due to sample disturbance and scale effects. Field moduli (from pressuremeter, plate load tests) may be more representative.
+
+- **Empirical Correlations**: When direct testing is unavailable, Young's modulus can be estimated from standard penetration test (SPT) or cone penetration test (CPT) data using published correlations.
+
 ### Mohr-Coulomb Failure Criterion
 
 The Mohr-Coulomb failure criterion forms the theoretical foundation for determining when soil failure occurs in finite element slope stability analysis. This criterion, developed from extensive experimental observations of soil behavior, recognizes that soil failure is fundamentally a shear phenomenon that depends on both the normal stress acting on the failure plane and the inherent strength properties of the material.
@@ -52,9 +82,23 @@ The basic form of the Mohr-Coulomb criterion expresses the relationship between 
 
 In this formulation, $\tau_f$ represents the shear strength available to resist failure, $c$ is the cohesion representing the portion of strength that is independent of normal stress, $\sigma_n'$ is the effective normal stress acting perpendicular to the failure plane, and $\phi$ is the angle of internal friction that governs how strength increases with normal stress.
 
+**[GRAPHIC PLACEHOLDER: Mohr-Coulomb Failure Envelope]**
+*Suggested source: Classic Mohr circle diagram showing failure envelope*
+- [Wikipedia: Mohr-Coulomb theory](https://en.wikipedia.org/wiki/Mohr%E2%80%93Coulomb_theory){:target="_blank"} - Contains multiple diagrams
+- [Wikipedia Mohr-Coulomb SVG](https://upload.wikimedia.org/wikipedia/commons/8/8f/Mohr_Coulomb.svg){:target="_blank"} - Direct image
+- [MIT OCW: Soil Mechanics Course](https://ocw.mit.edu/courses/1-37-introduction-to-soil-mechanics-fall-2006/){:target="_blank"}
+- Budhu "Soil Mechanics and Foundations" textbook figures
+
 For computational implementation in finite element analysis, it is more convenient to express the failure criterion in terms of principal stresses. This transformation yields:
 
 >>$\dfrac{\sigma_1' - \sigma_3'}{2} = \dfrac{\sigma_1' + \sigma_3'}{2} \sin \phi + c \cos \phi$
+
+**[GRAPHIC PLACEHOLDER: Principal Stress Formulation]**
+*Suggested source: Comparison between traditional Mohr circle and principal stress space*
+- Potts & Zdravkovic "Finite Element Analysis in Geotechnical Engineering" Vol. 1
+- [Wikipedia: Principal stress](https://en.wikipedia.org/wiki/Principal_stress){:target="_blank"} - Contains stress space diagrams
+- [Wolfram MathWorld: Stress tensor](https://mathworld.wolfram.com/StressTensor.html){:target="_blank"}
+- Search textbooks: "Soil Mechanics" by Lambe & Whitman
 
 This principal stress formulation allows direct evaluation of the yield function using the principal stresses computed at each integration point within the finite element mesh.
 
@@ -76,15 +120,159 @@ For coupled seepage-stability analysis, where the interaction between groundwate
 
 In this equation, $h$ represents the hydraulic head (the sum of elevation head and pressure head), while $k_x$ and $k_y$ are the hydraulic conductivities in the x and y directions respectively. The solution of this equation provides the pore pressure distribution that is then used to compute effective stresses throughout the slope domain.
 
-### Pseudo-Static Seismic Analysis
+## Finite Element Formulation
+
+### Discretization
+
+The transformation from continuous domain to discrete finite element system begins with dividing the slope domain into a collection of simple geometric elements, typically triangles or quadrilaterals. This discretization process is fundamental to the finite element method because it allows the complex, continuous displacement field throughout the slope to be approximated using simple polynomial functions defined over each element.
+
+Within each element, the displacement field is interpolated from the nodal displacement values using shape functions. For a typical two-dimensional element, the horizontal and vertical displacements at any point within the element are expressed as:
+
+>>$u = [N] \{u_e\}$
+
+>>$v = [N] \{v_e\}$
+
+The shape function matrix $[N]$ contains the interpolation functions that define how displacements vary spatially within the element, while $\{u_e\}$ and $\{v_e\}$ are vectors containing the nodal displacement values. For linear triangular elements, the shape functions are simply the area coordinates that ensure displacement compatibility between adjacent elements and provide a linear variation of displacement within each element.
+
+The choice of element type significantly impacts both accuracy and computational efficiency. Triangular elements with linear shape functions are particularly well-suited for slope stability problems because they can easily conform to irregular slope geometries and provide adequate accuracy for capturing the stress distributions that govern failure development. The linear displacement variation within each element leads to constant strain and stress fields, which is appropriate for modeling the elastic-perfectly plastic soil behavior typically assumed in slope stability analysis.
+
+### Element Stiffness Matrix
+
+The element stiffness matrix represents the fundamental relationship between nodal forces and nodal displacements for each finite element. This matrix is derived through application of the principle of virtual work, which states that for a system in equilibrium, the virtual work done by external forces must equal the virtual work done by internal stresses for any kinematically admissible virtual displacement field.
+
+The mathematical expression for the element stiffness matrix emerges from this principle as:
+
+>>$[K_e] = \int_{A_e} [B]^T [D] [B] \, dA$
+
+This elegant formulation embodies the essential physics of the problem. The strain-displacement matrix $[B]$ transforms nodal displacements into strains throughout the element, while the constitutive matrix $[D]$ relates these strains to stresses according to the material's stress-strain behavior. The integration over the element area $A_e$ ensures that the stiffness contribution from every point within the element is properly accounted for.
+
+For the commonly used linear triangular elements, the strain-displacement matrix takes the specific form:
+
+>>$[B] = \dfrac{1}{2A} \begin{bmatrix}
+b_1 & 0 & b_2 & 0 & b_3 & 0 \\
+0 & c_1 & 0 & c_2 & 0 & c_3 \\
+c_1 & b_1 & c_2 & b_2 & c_3 & b_3
+\end{bmatrix}$
+
+The coefficients $b_i$ and $c_i$ are geometric constants determined by the nodal coordinates of the triangle, and $A$ represents the triangle area. This matrix remains constant throughout the element because of the linear nature of the shape functions, which simplifies the integration process and leads to computational efficiency.
+
+### Global System Assembly
+
+The transition from individual element stiffness matrices to the global system of equations represents one of the most elegant aspects of the finite element method. Each element contributes to the overall structural behavior according to its connectivity with other elements, creating a sparse but symmetric global stiffness matrix that captures the mechanical interaction throughout the entire slope domain.
+
+The global system of equations takes the familiar form:
+
+>>$[K] \{U\} = \{F\}$
+
+The global stiffness matrix $[K]$ is assembled by systematically adding each element's stiffness contribution to the appropriate locations corresponding to the degrees of freedom associated with that element's nodes. This assembly process ensures displacement compatibility between adjacent elements and force equilibrium at every node in the mesh.
+
+The global displacement vector $\{U\}$ contains the unknown nodal displacements for the entire mesh, while the global force vector $\{F\}$ represents the applied loads including both external forces and body forces due to gravity. The sparsity of the global stiffness matrix, where most entries are zero due to the local connectivity of finite elements, allows efficient solution algorithms to be employed even for large-scale slope stability problems.
+
+**[GRAPHIC PLACEHOLDER: Stress Distribution in Slope]**
+*Suggested source: Contour plots showing stress distribution*
+- [ANSYS Learning Hub](https://www.ansys.com/academic/learning-resources){:target="_blank"} - Contains FE examples
+- [Autodesk FEA examples](https://www.autodesk.com/solutions/finite-element-analysis){:target="_blank"}
+- [SimScale Public Projects](https://www.simscale.com/projects/){:target="_blank"} - Browse stress analysis examples
+- Commercial software examples (Abaqus, ANSYS, etc.)
+
+The solution of this global system provides the displacement field throughout the slope under the applied loading conditions. From these displacements, the strain and stress fields can be computed at every point in the domain, enabling assessment of the proximity to failure according to the chosen yield criterion.
+
+## Boundary Conditions
+
+The proper specification of boundary conditions is crucial for obtaining physically meaningful solutions in finite element slope stability analysis. Boundary conditions define how the slope interacts with its surroundings and constrain the displacement field to reflect realistic physical constraints. The choice of boundary conditions significantly affects both the stress distribution within the slope and the computed factor of safety.
+
+### Displacement Boundary Conditions
+
+Displacement boundary conditions are applied where the motion of the soil mass is constrained by physical limitations or where the model boundaries must represent the behavior of the extended soil mass beyond the computational domain.
+
+Fixed supports represent locations where both horizontal and vertical displacements are completely prevented, typically expressed as $u = 0$ and $v = 0$. These conditions are most commonly applied at the base of the finite element model when the analysis extends to sufficient depth that the displacement of deep soil layers has negligible effect on slope stability. The depth required for this assumption depends on the slope geometry and soil properties, but generally the model should extend at least one slope height below the toe and preferably to bedrock or very stiff soil layers.
+
+Roller supports constrain displacement in only one direction while allowing free movement in the perpendicular direction. Along vertical side boundaries, horizontal displacement is typically prevented ($u = 0$) while vertical movement is allowed, reflecting the assumption that the slope extends laterally beyond the model boundaries with similar geometry and loading conditions. At the model base, vertical displacement may be prevented ($v = 0$) while allowing horizontal movement, which is appropriate when the analysis does not extend to truly fixed boundary conditions.
+
+Free boundaries occur along the ground surface and slope face where no external constraints are applied. These boundaries represent the natural boundary condition of zero traction, meaning that no external forces act normal or tangential to these surfaces except for applied loads such as surcharge loads or foundation pressures.
+
+### Force Boundary Conditions
+
+Force boundary conditions specify the external loads acting on the slope. The key difference between limit equilibrium and finite element methods is how these loads are applied to the analysis.
+
+#### Distributed Loads in XSLOPE
+
+In XSLOPE, distributed loads are defined as line loads with a sequence of coordinates and corresponding load values (force per unit length). These can represent:
+
+- **Traffic loads** (vehicles, equipment)
+- **Structural loads** (buildings, foundations)  
+- **Hydrostatic pressure** (water on slope face)
+
+**Limit Equilibrium Treatment:**
+For limit equilibrium analysis, each distributed load is converted to a resultant force applied at the top of each slice. The total load on each slice is calculated by integrating the distributed load over the slice width.
+
+**Finite Element Treatment:**
+For finite element analysis, the same distributed loads are converted to equivalent nodal forces using:
+
+>>$\{F_s\} = \int_{\Gamma} [N]^T \{q\} \, d\Gamma$
+
+where $\{q\}$ is the distributed load intensity (force per unit length), $[N]$ are the shape functions, and $\Gamma$ represents the loaded boundary. The shape functions distribute the load to the nodes along the boundary, ensuring that the total applied load is correctly represented while maintaining consistency with the finite element approximation.
+
+#### Special Case: Hydrostatic Pressure
+
+Hydrostatic pressure is a common distributed load that varies linearly with depth:
+
+>>$p = \\gamma_w h$
+
+where $p$ is pressure, $\\gamma_w$ is unit weight of water (9.81 kN/m³), and $h$ is depth below water surface.
+
+For a slope face with inclination $\\beta$:
+- **Normal component**: $p \\cos \\beta$ (acts into slope)
+- **Tangential component**: $p \\sin \\beta$ (acts downslope)
+
+Both components are treated as distributed loads using the same conversion process described above.
+
+#### Point Loads
+
+Point loads represent concentrated forces:
+- **Limit Equilibrium**: Applied to the slice containing the load point
+- **Finite Element**: Applied directly to nodes or distributed to nearby nodes
+
+#### Integration with XSLOPE Workflow
+
+The finite element implementation leverages XSLOPE's existing distributed load input system:
+
+1. **Common Input Format**: Same distributed load definitions used for both limit equilibrium and finite element analysis
+2. **Automatic Conversion**: The analysis engine automatically converts loads to appropriate format (slice forces vs. nodal forces)  
+3. **Load Combination**: Multiple distributed loads are superimposed using the same algorithms
+4. **Verification**: Total applied load magnitude is conserved between analysis methods
+
+
+#### Body Forces
+
+Body forces act throughout the volume of soil elements, primarily gravitational forces (self-weight of soil). For gravitational loading, the body force components are:
+
+>>$b_x = 0$<br>
+$b_y = -\gamma$
+
+where $\gamma$ is the unit weight of the soil. These body forces are incorporated into the equilibrium equations:
+
+>>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + b_x = 0$
+
+>>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
+
+In the finite element formulation, body forces are converted to equivalent nodal forces using:
+
+>>$\{F\}_b = \sum_{e=1}^{N_{elem}} \int_{A_e} [N]^T \{b\} \, dA$
+
+where $[N]$ are the shape functions and the integration is performed over each element area $A_e$, then summed over all elements in the mesh. This integration distributes the self-weight of the soil to the nodes of each element, ensuring that the gravitational loading is properly represented throughout the slope domain.
+
+## Seismic Analysis
+
+### Pseudo-Static Method
 
 Seismic loading represents one of the most critical loading conditions for slope stability analysis, as earthquake ground motions can trigger catastrophic slope failures even in slopes that are stable under static conditions. The pseudo-static method provides a simplified but widely accepted approach for incorporating seismic effects into slope stability analysis by representing the complex dynamic response with equivalent static forces.
 
-The pseudo-static approach assumes that the earthquake ground acceleration can be represented by a constant horizontal acceleration applied throughout the slope mass. This acceleration generates inertial forces that act on every element of soil, creating additional driving forces that tend to destabilize the slope. While this method cannot capture the full complexity of dynamic soil response, frequency effects, or amplification phenomena, it provides a conservative and practical assessment of seismic slope stability that is widely accepted in engineering practice.
+The pseudo-static approach assumes that the earthquake ground acceleration can be represented by a constant horizontal acceleration applied throughout the slope mass. This acceleration generates inertial forces that act on every element of soil, creating additional driving forces that tend to destabilize the slope.
 
 #### Seismic Body Forces
 
-In the finite element formulation, seismic loading is incorporated by modifying the body force vector to include both gravitational and seismic components. The total body force acting on each element becomes:
+In the finite element formulation, seismic loading is incorporated by modifying the body force vector to include both gravitational and seismic components:
 
 >>$\{b\}_{total} = \{b\}_{gravity} + \{b\}_{seismic}$
 
@@ -93,9 +281,14 @@ For a horizontal seismic coefficient $k$, representing the ratio of horizontal a
 >>$b_{x,seismic} = k \gamma$<br>
 $b_{y,seismic} = 0$
 
-The direction of the horizontal seismic force is chosen to maximize the driving forces that promote slope failure. For typical left-facing slopes, this corresponds to a rightward (positive x-direction) seismic acceleration that increases the shear stresses along potential failure surfaces.
+The direction of the horizontal seismic force is chosen to maximize the driving forces that promote slope failure. For typical left-facing slopes, this corresponds to a leftward (negative x-direction) seismic acceleration that increases the shear stresses along potential failure surfaces.
 
-#### Modified Equilibrium Equations
+**[GRAPHIC PLACEHOLDER: Pseudo-Static Seismic Analysis]**
+*Suggested source: Diagram showing seismic force application in slopes*
+- Kramer "Geotechnical Earthquake Engineering" textbook
+- [USGS: Landslide hazards](https://www.usgs.gov/natural-hazards/landslide-hazards){:target="_blank"} - Contains slope analysis diagrams
+- [FEMA: Seismic design guidelines](https://www.fema.gov/emergency-managers/risk-management/earthquake){:target="_blank"}
+- Shows horizontal acceleration and resulting forces
 
 The equilibrium equations are modified to include seismic body forces:
 
@@ -148,89 +341,14 @@ For critical projects or complex seismic conditions, more sophisticated approach
 
 The seismic analysis capability integrates naturally with the existing XSLOPE framework by extending the input templates to include seismic coefficients and modifying the body force calculations in the finite element solver. The same mesh generation, boundary condition specification, and result visualization tools can be used for both static and seismic analyses, providing a seamless workflow for comprehensive slope stability assessment.
 
-## Finite Element Formulation
-
-### Discretization
-
-The transformation from continuous domain to discrete finite element system begins with dividing the slope domain into a collection of simple geometric elements, typically triangles or quadrilaterals. This discretization process is fundamental to the finite element method because it allows the complex, continuous displacement field throughout the slope to be approximated using simple polynomial functions defined over each element.
-
-Within each element, the displacement field is interpolated from the nodal displacement values using shape functions. For a typical two-dimensional element, the horizontal and vertical displacements at any point within the element are expressed as:
-
->>$u = [N] \{u_e\}$
-
->>$v = [N] \{v_e\}$
-
-The shape function matrix $[N]$ contains the interpolation functions that define how displacements vary spatially within the element, while $\{u_e\}$ and $\{v_e\}$ are vectors containing the nodal displacement values. For linear triangular elements, the shape functions are simply the area coordinates that ensure displacement compatibility between adjacent elements and provide a linear variation of displacement within each element.
-
-The choice of element type significantly impacts both accuracy and computational efficiency. Triangular elements with linear shape functions are particularly well-suited for slope stability problems because they can easily conform to irregular slope geometries and provide adequate accuracy for capturing the stress distributions that govern failure development. The linear displacement variation within each element leads to constant strain and stress fields, which is appropriate for modeling the elastic-perfectly plastic soil behavior typically assumed in slope stability analysis.
-
-### Element Stiffness Matrix
-
-The element stiffness matrix represents the fundamental relationship between nodal forces and nodal displacements for each finite element. This matrix is derived through application of the principle of virtual work, which states that for a system in equilibrium, the virtual work done by external forces must equal the virtual work done by internal stresses for any kinematically admissible virtual displacement field.
-
-The mathematical expression for the element stiffness matrix emerges from this principle as:
-
->>$[K_e] = \int_{A_e} [B]^T [D] [B] \, dA$
-
-This elegant formulation embodies the essential physics of the problem. The strain-displacement matrix $[B]$ transforms nodal displacements into strains throughout the element, while the constitutive matrix $[D]$ relates these strains to stresses according to the material's stress-strain behavior. The integration over the element area $A_e$ ensures that the stiffness contribution from every point within the element is properly accounted for.
-
-For the commonly used linear triangular elements, the strain-displacement matrix takes the specific form:
-
->>$[B] = \dfrac{1}{2A} \begin{bmatrix}
-b_1 & 0 & b_2 & 0 & b_3 & 0 \\
-0 & c_1 & 0 & c_2 & 0 & c_3 \\
-c_1 & b_1 & c_2 & b_2 & c_3 & b_3
-\end{bmatrix}$
-
-The coefficients $b_i$ and $c_i$ are geometric constants determined by the nodal coordinates of the triangle, and $A$ represents the triangle area. This matrix remains constant throughout the element because of the linear nature of the shape functions, which simplifies the integration process and leads to computational efficiency.
-
-### Global System Assembly
-
-The transition from individual element stiffness matrices to the global system of equations represents one of the most elegant aspects of the finite element method. Each element contributes to the overall structural behavior according to its connectivity with other elements, creating a sparse but symmetric global stiffness matrix that captures the mechanical interaction throughout the entire slope domain.
-
-The global system of equations takes the familiar form:
-
->>$[K] \{U\} = \{F\}$
-
-The global stiffness matrix $[K]$ is assembled by systematically adding each element's stiffness contribution to the appropriate locations corresponding to the degrees of freedom associated with that element's nodes. This assembly process ensures displacement compatibility between adjacent elements and force equilibrium at every node in the mesh.
-
-The global displacement vector $\{U\}$ contains the unknown nodal displacements for the entire mesh, while the global force vector $\{F\}$ represents the applied loads including both external forces and body forces due to gravity. The sparsity of the global stiffness matrix, where most entries are zero due to the local connectivity of finite elements, allows efficient solution algorithms to be employed even for large-scale slope stability problems.
-
-The solution of this global system provides the displacement field throughout the slope under the applied loading conditions. From these displacements, the strain and stress fields can be computed at every point in the domain, enabling assessment of the proximity to failure according to the chosen yield criterion.
-
-## Boundary Conditions
-
-The proper specification of boundary conditions is crucial for obtaining physically meaningful solutions in finite element slope stability analysis. Boundary conditions define how the slope interacts with its surroundings and constrain the displacement field to reflect realistic physical constraints. The choice of boundary conditions significantly affects both the stress distribution within the slope and the computed factor of safety.
-
-### Displacement Boundary Conditions
-
-Displacement boundary conditions are applied where the motion of the soil mass is constrained by physical limitations or where the model boundaries must represent the behavior of the extended soil mass beyond the computational domain.
-
-Fixed supports represent locations where both horizontal and vertical displacements are completely prevented, typically expressed as $u = 0$ and $v = 0$. These conditions are most commonly applied at the base of the finite element model when the analysis extends to sufficient depth that the displacement of deep soil layers has negligible effect on slope stability. The depth required for this assumption depends on the slope geometry and soil properties, but generally the model should extend at least one slope height below the toe and preferably to bedrock or very stiff soil layers.
-
-Roller supports constrain displacement in only one direction while allowing free movement in the perpendicular direction. Along vertical side boundaries, horizontal displacement is typically prevented ($u = 0$) while vertical movement is allowed, reflecting the assumption that the slope extends laterally beyond the model boundaries with similar geometry and loading conditions. At the model base, vertical displacement may be prevented ($v = 0$) while allowing horizontal movement, which is appropriate when the analysis does not extend to truly fixed boundary conditions.
-
-Free boundaries occur along the ground surface and slope face where no external constraints are applied. These boundaries represent the natural boundary condition of zero traction, meaning that no external forces act normal or tangential to these surfaces except for applied loads such as surcharge loads or foundation pressures.
-
-### Force Boundary Conditions
-
-Force boundary conditions specify the external loads acting on the slope, including both surface loads and body forces. These conditions are essential for representing realistic loading scenarios such as structural loads, traffic loads, or earthquake forces.
-
-Distributed loads acting on boundary surfaces are incorporated through surface integrals that transform the distributed loading into equivalent nodal forces:
-
->>$\{F_s\} = \int_{\Gamma} [N]^T \{t\} \, d\Gamma$
-
-The traction vector $\{t\}$ represents the distributed force per unit area acting on the boundary $\Gamma$, while the shape function matrix $[N]$ distributes this loading to the nodes along the loaded boundary. This formulation ensures that the total applied load is correctly represented while maintaining consistency with the finite element approximation.
-
-Point loads can be applied directly to specific nodes in the mesh, representing concentrated forces such as those from foundations, retaining structures, or equipment. These are simply added to the global force vector as $F_i = P$ where $P$ is the applied load magnitude.
-
-Body forces, primarily gravitational loading, are incorporated throughout the volume of each element using:
-
->>$\{F_b\} = \int_{A_e} [N]^T \{b\} \, dA$
-
-The body force vector $\{b\}$ typically contains the gravitational acceleration components, with $b_x = 0$ and $b_y = -\gamma$ where $\gamma$ is the unit weight of the soil. This integration distributes the self-weight of the soil to the nodes of each element, ensuring that the gravitational loading is properly represented throughout the slope domain.
-
 ## Soil Reinforcement Integration
+
+**[GRAPHIC PLACEHOLDER: Reinforced Slope Overview]**
+*Suggested source: Typical reinforced slope with different reinforcement types*
+- Duncan & Wright "Soil Strength and Slope Stability" textbook
+- [FHWA: Geotechnical Engineering Circular No. 7](https://www.fhwa.dot.gov/engineering/geotech/pubs/gec007/){:target="_blank"} - Soil nail walls manual with diagrams
+- [FHWA: Mechanically Stabilized Earth](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi06103/){:target="_blank"} - Contains cross-sections
+- Shows geotextiles, soil nails, and anchors in slope
 
 The integration of soil reinforcement elements such as geotextiles, soil nails, and ground anchors into finite element slope stability analysis represents a significant advancement in modeling stabilized slopes. These reinforcement systems fundamentally alter the stress distribution and failure mechanisms within slopes, requiring sophisticated modeling approaches to capture their beneficial effects accurately (Duncan & Wright, 2005).
 
@@ -238,37 +356,161 @@ The modeling of reinforced slopes presents unique challenges because the reinfor
 
 ### Truss Element Approach
 
-The most straightforward method for modeling reinforcement involves representing reinforcement elements as one-dimensional truss elements embedded within the two-dimensional soil continuum. These truss elements are characterized by their axial stiffness $EA/L$, where $E$ is the elastic modulus of the reinforcement material, $A$ is the cross-sectional area, and $L$ is the element length.
+**[GRAPHIC PLACEHOLDER: 1D Truss Elements in 2D Mesh]**
+*Suggested source: Diagram showing truss elements embedded in 2D continuum*
+- Potts & Zdravkovic "Finite Element Analysis in Geotechnical Engineering" Vol. 2
+- [PLAXIS Manual](https://www.plaxis.com/support/manuals/plaxis-2d-reference-manual/){:target="_blank"} - Download reference manual
+- [Rocscience Phase2 Help](https://www.rocscience.com/help/phase2/phase2_model/){:target="_blank"} - Modeling section
+- [FEA-Opt: Truss elements](http://www.fea-opt.com/FEA_ELEM/truss_elem.htm){:target="_blank"}
+- Shows node connectivity and element orientation
+
+While there are numerous ways to simulate soil reinforcement in the finite element method including the equivalent force method and interface element modeling, the most straightforward method for modeling reinforcement involves representing reinforcement elements as one-dimensional truss elements embedded within the two-dimensional soil continuum. These truss elements are characterized by their axial stiffness $EA/L$, where $E$ is the elastic modulus of the reinforcement material, $A$ is the cross-sectional area, and $L$ is the element length.
 
 This approach is particularly effective for modeling geosynthetic reinforcement, soil nails, and tie-back anchors. The truss elements can only carry tension loads up to a specified tensile strength limit $T_{max}$, beyond which they either yield plastically or fail completely. The inability to carry compression loads accurately reflects the behavior of flexible reinforcement materials like geotextiles and ensures that the reinforcement cannot resist compressive buckling.
 
+**[GRAPHIC PLACEHOLDER: Reinforcement-Soil Connectivity]**
+*Suggested source: Detail showing how truss elements connect to soil mesh*
+- Commercial FE software manuals (PLAXIS, Phase2, Abaqus)
+- [Wikipedia: Finite element method](https://en.wikipedia.org/wiki/Finite_element_method){:target="_blank"} - Shows mesh concepts
+- [Codecogs: FEA fundamentals](https://www.codecogs.com/library/engineering/fem/){:target="_blank"}
+- Shows shared nodes and compatibility conditions
+
 The truss elements are typically oriented along the centerline of the physical reinforcement and connected to the surrounding soil elements through shared nodes or interface elements. This connection ensures that the reinforcement participates in the overall deformation pattern of the slope while contributing its tensile resistance to improve stability.
 
-### Interface Element Modeling
+The truss element approach provides an optimal balance of computational efficiency and physical realism for modeling reinforcement in XSLOPE. This method represents reinforcement as one-dimensional tension-only elements embedded within the two-dimensional soil continuum, making it particularly well-suited for modeling geosynthetic reinforcement, soil nails, and tie-back anchors.
 
-The interaction between reinforcement and soil often controls the effectiveness of reinforcement systems, making accurate modeling of this interface critical for realistic analysis. Interface elements are specialized finite elements that model the mechanical behavior along the reinforcement-soil boundary, capturing phenomena such as relative sliding, progressive debonding, and stress transfer mechanisms.
+### Integration with XSLOPE Reinforcement Lines
 
-The shear stress transfer along the interface is typically modeled using constitutive relationships of the form $\tau = f(\delta)$, where $\tau$ represents the shear stress and $\delta$ is the relative displacement between the reinforcement and soil. These relationships can range from simple linear elastic models to complex nonlinear functions that account for peak and residual interface strength, progressive softening, and the influence of normal stress on interface behavior.
+The truss element implementation builds directly upon XSLOPE's existing reinforcement input system, where users define reinforcement lines with varying tensile strength along their length. This natural integration provides several advantages:
 
-Normal stress effects play a crucial role in interface behavior, particularly for rough reinforcement surfaces or mechanically anchored systems. The normal stress acting on the interface affects both the maximum shear stress that can be transferred and the post-peak softening behavior. Progressive debonding can be modeled by tracking the accumulated plastic slip along the interface and reducing the interface strength accordingly.
+**Input Compatibility:** The existing reinforcement line definitions (coordinates and tensile strength values) map directly to truss element properties without requiring additional user input or workflow changes.
 
-### Equivalent Force Method
+**Pullout Resistance Modeling:** The user-specified tensile strength variation along each reinforcement line naturally captures pullout resistance buildup. Typically, strength transitions to zero at the ends because it takes distance to develop frictional resistance, then increases to peak values in the central embedded region.
 
-For situations where detailed interface modeling is not required or computationally feasible, reinforcement effects can be incorporated through equivalent nodal forces that represent the average influence of the reinforcement system. This approach distributes the reinforcement effects as:
+**Flexible Geometry:** The approach can handle any reinforcement geometry including straight soil nails, curved reinforcement paths, and complex geotextile layouts.
 
->>$\{F_{reinf}\} = [B_r]^T \{T\}$
+### Truss Element Construction and Mesh Integration
 
-The transformation matrix $[B_r]$ relates the reinforcement tension forces $\{T\}$ to equivalent nodal forces acting on the surrounding soil elements. This method is computationally efficient and can provide reasonable estimates of reinforcement effects when the detailed stress transfer mechanisms are not critical to the analysis objectives.
+**XSLOPE Meshing Strategy:** The optimal approach for XSLOPE is to include reinforcement lines as meshing constraints during the initial mesh generation process using gmsh. This ensures that the 2D soil mesh automatically conforms to the reinforcement geometry while maintaining optimal element quality.
 
-### Pullout Resistance Mechanisms
+**Constraint-Based Mesh Generation:**<br>
+1. **Reinforcement Line Definition:** XSLOPE reinforcement lines are parsed from the input Excel templates and converted to gmsh 1D geometric entities<br>
+2. **Embedded Constraints:** The reinforcement lines are embedded as constraints within the soil domain using gmsh's "Line-in-Surface" functionality<br>
+3. **Conforming Mesh Generation:** gmsh automatically generates a 2D triangular mesh that conforms to both the soil domain boundaries and the embedded reinforcement lines<br>
+4. **Unified Node Numbering:** Both soil elements and truss elements reference the same unified node numbering system generated by gmsh
 
-For soil nails and ground anchors, the pullout resistance represents the fundamental mechanism by which these reinforcement systems contribute to slope stability. The pullout capacity depends on the interface shear strength developed along the embedded length of the reinforcement:
+**Element Discretization:** The gmsh meshing algorithm automatically subdivides each reinforcement line into multiple 1D truss elements based on the specified mesh density. The discretization naturally aligns with the local 2D element size, typically producing truss element lengths of 0.5-1.0 times the characteristic soil element size.
 
->>$T_{pullout} = \alpha \pi D L \sigma_n' \tan \phi_{interface}$
+**Automatic Node Placement:** gmsh places nodes along the reinforcement lines as part of the mesh generation process. These nodes are automatically shared between the 1D truss elements and adjacent 2D soil elements, ensuring perfect displacement compatibility without requiring additional constraint equations or interpolation schemes.
 
-The surface roughness factor $\alpha$ accounts for the enhanced interface friction developed by surface texturing, ribs, or other mechanical features on the reinforcement surface. The reinforcement diameter $D$ and embedment length $L$ define the available interface area, while the effective normal stress $\sigma_n'$ and interface friction angle $\phi_{interface}$ control the unit interface resistance.
+**Mesh Quality Optimization:** The constraint-based approach allows gmsh to optimize element quality around the reinforcement lines, avoiding the poorly shaped elements that can result from post-processing insertion of reinforcement into an existing mesh.
 
-This formulation assumes uniform stress distribution along the reinforcement, which is reasonable for preliminary design but may underestimate the actual pullout capacity when stress concentrations occur near the loaded end. More sophisticated models can account for non-uniform stress distribution and progressive mobilization of interface resistance along the embedment length.
+**XSLOPE Implementation:** The mesh generation process in `mesh.py` is enhanced to:<br>
+1. **Parse Reinforcement:** Extract reinforcement line coordinates from XSLOPE input templates<br>
+2. **Generate gmsh Geometry:** Create gmsh geometry file including soil boundaries and embedded reinforcement constraints<br>
+3. **Unified Mesh Generation:** Call gmsh to generate a single conforming mesh containing both 2D and 1D elements<br>
+4. **Element Extraction:** Parse the gmsh output to separate soil elements, truss elements, and shared node connectivity<br>
+
+**[GRAPHIC PLACEHOLDER: Reinforcement-Soil Connectivity]**
+*Suggested source: Detail showing how truss elements connect to soil mesh*
+- Commercial FE software manuals (PLAXIS, Phase2, Abaqus)
+- [Wikipedia: Finite element method](https://en.wikipedia.org/wiki/Finite_element_method){:target="_blank"} - Shows mesh concepts
+- [Codecogs: FEA fundamentals](https://www.codecogs.com/library/engineering/fem/){:target="_blank"}
+- Shows shared nodes and compatibility conditions
+
+### Mathematical Formulation
+
+**Truss Element Stiffness Matrix:** Each 1D truss element contributes to the global stiffness matrix through its element stiffness matrix. For a truss element with nodes $i$ and $j$, the element stiffness matrix in local coordinates is:
+
+>>$[K_e]_{local} = \frac{AE}{L} \begin{bmatrix} 1 & -1 \\ -1 & 1 \end{bmatrix}$
+
+where $A$ is the cross-sectional area, $E$ is the elastic modulus, and $L$ is the element length.
+
+**Coordinate Transformation:** The local stiffness matrix must be transformed to global coordinates using the transformation matrix $[T]$:
+
+>>$[K_e]_{global} = [T]^T [K_e]_{local} [T]$
+
+For a truss element oriented at angle $\theta$ to the horizontal:
+
+>>$[T] = \begin{bmatrix} \cos\theta & \sin\theta & 0 & 0 \\ 0 & 0 & \cos\theta & \sin\theta \end{bmatrix}$
+
+**Assembly Process:** The global stiffness matrix combines contributions from both 2D soil elements and 1D truss elements:
+
+>>$[K]_{global} = \sum_{soil} [K_e]_{soil} + \sum_{truss} [K_e]_{truss}$
+
+**Force Vector Assembly:** The global force vector includes both soil body forces and any applied forces on reinforcement:
+
+>>$\{F\}_{global} = \{F\}_{soil} + \{F\}_{reinforcement}$
+
+**Tension-Only Behavior:** Truss elements are restricted to carry only tension forces. This is implemented by:
+- Checking element force after each iteration
+- If compression develops, remove the element's stiffness contribution
+- Reanalyze until equilibrium is achieved with only tension-carrying elements
+
+**Strength Limits:** Each truss element has a maximum tensile capacity $T_{max}$ derived from the user-specified reinforcement strength. When this limit is exceeded:
+- The element either yields plastically or fails completely
+- Failed elements are removed from the stiffness matrix
+- Progressive failure can propagate along the reinforcement line
+
+**XSLOPE Implementation Strategy:** The truss element approach integrates seamlessly with the existing XSLOPE framework:
+
+1. **Mesh Generation:** Extend existing mesh generation in `mesh.py` to create truss elements along reinforcement lines
+2. **Solver Integration:** Modify the finite element solver to handle mixed 2D/1D element systems
+3. **Input Processing:** Leverage existing reinforcement line parsing in `fileio.py`
+4. **Result Visualization:** Extend plotting capabilities in `plot.py` to display reinforcement forces and utilization
+
+### Determining Reinforcement Line Pullout Length
+
+The key to implementing truss element reinforcement in XSLOPE is properly specifying the tensile strength variation along each reinforcement line. This variation captures the physical reality that pullout resistance must develop over a finite distance from the reinforcement ends.
+
+
+**[GRAPHIC PLACEHOLDER: Pullout Resistance Development]**
+*Suggested source: Diagram showing stress buildup along reinforcement length*
+- [FHWA GEC-7: Soil Nail Walls](https://www.fhwa.dot.gov/engineering/geotech/pubs/gec007/){:target="_blank"} - Complete manual with diagrams
+- Shows stress development from zero at ends to full capacity
+
+The pullout length $L_p$ is the distance from each end of the reinforcement over which the full tensile strength is mobilized. Within this length, the available tensile strength increases from zero at the end to the full design capacity. Pullout resistance develops through interface friction between the reinforcement and surrounding soil. This friction cannot be mobilized instantaneously but requires relative displacement to develop, creating the gradual strength buildup characteristic of all reinforcement systems. Pullout length can be estimated as follows:
+
+**For Soil Nails:**
+>>$L_p = \frac{T_{design}}{\alpha \pi D \sigma_n' \tan \phi_{interface}}$
+
+where:
+- $T_{design}$ = design tensile capacity of the nail
+- $\alpha$ = surface roughness factor (0.5-1.0 for grouted nails)
+- $D$ = effective nail diameter 
+- $\sigma_n'$ = average effective normal stress along the nail
+- $\phi_{interface}$ = interface friction angle (typically 0.8-1.0 times soil friction angle)
+
+**For Geotextiles:**
+>>$L_p = \frac{T_{design}}{2 \alpha \sigma_n' \tan \phi_{interface}}$
+
+where the factor of 2 accounts for friction on both sides of the geotextile.
+
+**Typical Values:**<br>
+- **Grouted soil nails:** $L_p$ = 1.5-3.0 m depending on soil conditions<br>
+- **Geotextiles:** $L_p$ = 0.5-1.5 m depending on normal stress and surface texture<br>
+- **Geogrid:** $L_p$ = 1.0-2.0 m depending on aperture size and bearing resistance
+
+#### XSLOPE Implementation Strategy
+
+**Tensile Strength Profile:** For each reinforcement line, specify tensile strength as a function of distance along the line:
+
+- **End zones (0 to $L_p$):** Linear increase from 0 to $T_{design}$<br>
+- **Central zone:** Constant value equal to $T_{design}$<br>
+- **End zones ($L_{total} - L_p$ to $L_{total}$):** Linear decrease from $T_{design}$ to 0
+
+**Simplified Approach:** When detailed pullout analysis is not available, conservative estimates can be used:<br>
+- **Soil nails:** Use $L_p$ = 2.0 m for typical applications<br>
+- **Geotextiles:** Use $L_p$ = 1.0 m for typical applications<br>
+- **Adjust based on soil strength:** Increase $L_p$ by 50% for soft soils, decrease by 25% for dense soils
+
+**Input Template Enhancement:** The XSLOPE reinforcement input can be enhanced to include:<br>
+1. **Reinforcement type** (soil nail, geotextile, geogrid)<br>
+2. **Design tensile capacity** $T_{design}$<br>
+3. **Pullout length** $L_p$ (calculated or user-specified)<br>
+4. **Automatic profile generation** based on these parameters
+
+This approach provides the engineer with flexibility to use sophisticated pullout analysis when available while offering reasonable defaults for preliminary design.
 
 ## Shear Strength Reduction Method (SSRM)
 
@@ -277,6 +519,12 @@ The Shear Strength Reduction Method (SSRM) represents the most widely adopted ap
 The fundamental principle underlying SSRM is conceptually straightforward yet mathematically sophisticated. Rather than assuming a failure surface and checking equilibrium conditions, SSRM systematically reduces the soil's shear strength parameters until the finite element system can no longer maintain equilibrium under the applied loading conditions. The reduction factor required to bring the slope to the brink of failure represents the factor of safety, defined consistently with traditional limit equilibrium approaches.
 
 ### Methodology
+
+**[GRAPHIC PLACEHOLDER: SSRM Methodology Flowchart]**
+*Suggested source: Step-by-step flowchart showing SSRM process*
+- [J-STAGE: Matsui & San (1992)](https://www.jstage.jst.go.jp/article/jsf1995/32/1/32_1_59/_article){:target="_blank"} - Original SSRM paper
+- [PLAXIS Manuals](https://www.plaxis.com/support/manuals/){:target="_blank"} - Download material point methods
+- [Google Scholar](https://scholar.google.com/scholar?q="shear+strength+reduction+method"+flowchart){:target="_blank"} - Academic papers
 
 The SSRM procedure follows a systematic approach that progressively weakens the soil until failure occurs. The process begins by reducing both cohesion and friction angle by a trial factor $F$ according to the relationships:
 
@@ -333,6 +581,13 @@ The detection of yielding at each integration point within the finite element me
 
 >>$f(\sigma', c, \phi) = \dfrac{\sigma_1' - \sigma_3'}{2} - \dfrac{\sigma_1' + \sigma_3'}{2} \sin \phi - c \cos \phi$
 
+**[GRAPHIC PLACEHOLDER: Yield Surface in Principal Stress Space]**
+*Suggested source: 3D visualization of Mohr-Coulomb yield surface*
+- Chen & Han "Plasticity for Structural Engineers" textbook
+- [Wikipedia: Yield surface](https://en.wikipedia.org/wiki/Yield_surface){:target="_blank"} - Multiple yield criteria diagrams
+- [Continuum Mechanics: Plasticity](http://www.continuummechanics.org/plasticity.html){:target="_blank"}
+- Search: "Computational Plasticity" by Simo & Hughes
+
 This function represents the mathematical boundary between elastic and plastic behavior. When $f < 0$, the stress state lies within the elastic domain and the material response follows the linear elastic constitutive relationship. When $f = 0$, the stress state lies exactly on the yield surface, indicating incipient yielding. Most importantly, when $f > 0$, the stress state has exceeded the material's yield strength, indicating that plastic deformation must occur to return the stress to an admissible state.
 
 The evaluation of principal stresses $\sigma_1'$ and $\sigma_3'$ from the general stress tensor requires solution of the eigenvalue problem, which can be computationally intensive but is essential for accurate yield detection. Alternative formulations using stress invariants can provide computational advantages while maintaining the physical accuracy of the yield criterion.
@@ -340,6 +595,13 @@ The evaluation of principal stresses $\sigma_1'$ and $\sigma_3'$ from the genera
 ### Stress Return Algorithm
 
 When yielding is detected at an integration point, the stress state must be corrected to ensure that equilibrium is maintained while satisfying the yield criterion. This process is accomplished through a stress return algorithm that projects the inadmissible stress state back onto the yield surface.
+
+**[GRAPHIC PLACEHOLDER: Stress Return Algorithm]**
+*Suggested source: Diagram showing elastic predictor and plastic corrector*
+- Simo & Hughes "Computational Inelasticity" textbook
+- [Wikipedia: Plasticity (physics)](https://en.wikipedia.org/wiki/Plasticity_(physics)){:target="_blank"} - Contains stress-strain diagrams
+- [Continuum Mechanics](http://www.continuummechanics.org/plasticity.html){:target="_blank"} - Plasticity concepts
+- Shows return mapping to yield surface
 
 The elastic predictor step calculates the trial stress state assuming purely elastic behavior throughout the current load increment. This trial stress represents what the stress would be if no yielding occurred and provides the starting point for the plastic correction process.
 
@@ -355,6 +617,13 @@ This stress return process must be performed at every integration point where yi
 
 The evolution of plastic zones during the shear strength reduction process reveals the fundamental mechanisms by which slope failure develops. This progressive failure process typically follows a characteristic sequence that provides insight into both the failure mode and the factors controlling stability.
 
+**[GRAPHIC PLACEHOLDER: Progressive Plastic Zone Development]**
+*Suggested source: Sequence showing plastic zone evolution during SSRM*
+- [ICE Virtual Library: Dawson et al. (1999)](https://www.icevirtuallibrary.com/doi/10.1680/geot.1999.49.6.835){:target="_blank"} - Classic SSRM paper
+- [Springer Link](https://link.springer.com/search?query=plastic+zone+slope+stability){:target="_blank"} - Search academic papers
+- [Google Scholar](https://scholar.google.com/scholar?q=Dawson+plastic+zone+slope+stability){:target="_blank"} - Related research
+- Shows progression from initial yielding to failure mechanism
+
 Initial yielding occurs at locations where stress concentrations develop due to geometric irregularities, material property contrasts, or loading conditions. These initial plastic zones are typically isolated and small, representing local stress relief rather than global failure. Common locations for initial yielding include the slope toe, where stress concentrations develop due to the free surface boundary condition, and interfaces between materials with contrasting properties.
 
 As the reduction factor increases during SSRM analysis, load redistribution occurs around the initial plastic zones. The elements that have yielded can no longer carry additional load, forcing stress transfer to adjacent elastic elements. This redistribution can either stabilize the situation if sufficient elastic capacity remains, or it can trigger additional yielding if the redistributed stresses exceed the yield strength of the surrounding elements.
@@ -369,7 +638,20 @@ The successful implementation of finite element methods for slope stability anal
 
 ### Mesh Requirements
 
+**[GRAPHIC PLACEHOLDER: Finite Element Mesh for Slope Analysis]**
+*Suggested source: Typical slope discretization showing mesh refinement*
+- [ICE Virtual Library: Griffiths & Lane (1999)](https://www.icevirtuallibrary.com/doi/10.1680/geot.1999.49.3.387){:target="_blank"} - Seminal FE slope paper
+- [GeoStudio by Seequent](https://www.seequent.com/products-solutions/geostudio/){:target="_blank"} - Software examples
+- [Wikipedia: Finite element method](https://en.wikipedia.org/wiki/Finite_element_method){:target="_blank"} - Mesh examples
+
 The finite element mesh represents the foundation upon which all subsequent analysis rests, making mesh design one of the most critical aspects of successful implementation. The choice of element type must balance computational efficiency with accuracy requirements while accommodating the geometric complexity typical of slope stability problems.
+
+**[GRAPHIC PLACEHOLDER: Element Types Comparison]**
+*Suggested source: Triangular vs quadrilateral elements for slopes*
+- Zienkiewicz "The Finite Element Method" textbook
+- [SimScale: Meshing concepts](https://www.simscale.com/docs/simulation-setup/meshing/){:target="_blank"} - Element types and quality
+- [Wikipedia: Types of mesh](https://en.wikipedia.org/wiki/Types_of_mesh){:target="_blank"} - Mesh topology
+- Shows mesh adaptation to slope geometry
 
 Triangular elements provide exceptional flexibility for modeling complex slope geometries, irregular material boundaries, and varying boundary conditions. Their ability to conform to any geometric configuration makes them particularly valuable for slopes with irregular profiles, multiple soil layers, or complex geological structures. The linear strain variation within triangular elements provides adequate accuracy for most slope stability applications while maintaining computational efficiency. However, triangular elements may require finer mesh density to achieve the same accuracy as higher-order elements.
 
@@ -428,6 +710,13 @@ Comparative analysis capabilities allow engineers to run finite element analysis
 ### Seepage-Stability Coupling
 
 One of the most powerful aspects of integrating finite element slope stability analysis with the existing XSLOPE framework is the ability to seamlessly couple the established seepage analysis capabilities in `seep.py` with the structural finite element analysis. This coupling enables rigorous analysis of slopes under varying groundwater conditions, which is critical for understanding slope behavior during rainfall events, reservoir drawdown, or other transient groundwater conditions.
+
+**[GRAPHIC PLACEHOLDER: Coupled Seepage-Stability Analysis]**
+*Suggested source: Workflow diagram showing seepage to stability coupling*
+- Coupled analysis examples from geotechnical software
+- [ITASCA: FLAC Software](https://www.itascacg.com/software/flac){:target="_blank"} - Coupled hydro-mechanical analysis
+- [Rocscience: RS2 Groundwater](https://www.rocscience.com/software/rs2){:target="_blank"} - Seepage and stability
+- Shows mesh transfer and pore pressure interpolation
 
 #### Pore Pressure Field Transfer
 
@@ -494,6 +783,14 @@ The integration leverages existing XSLOPE computational infrastructure to mainta
 This comprehensive coupling capability represents a significant advancement in slope stability analysis, providing engineers with the tools to perform rigorous coupled analysis while maintaining the familiar XSLOPE workflow and interface.
 
 ### Visualization Integration
+
+**[GRAPHIC PLACEHOLDER: FE Results Visualization]**
+*Suggested source: Example FE output plots for slope analysis*
+- [PLAXIS Tutorials](https://www.plaxis.com/support/tutorials/){:target="_blank"} - Software examples
+- [Rocscience Examples](https://www.rocscience.com/learning/examples){:target="_blank"} - Phase2 and RS2 examples
+- [Seequent GeoStudio](https://www.seequent.com/products-solutions/geostudio/){:target="_blank"} - SLOPE/W and SIGMA examples
+- [ParaView](https://www.paraview.org/){:target="_blank"} - Open source visualization examples
+- Shows displacement vectors, stress contours, and plastic zones
 
 The existing plotting infrastructure in `plot.py` provides an excellent foundation for finite element result visualization. Extensions to display stress contours, displacement fields, and plastic zone development build naturally upon the current slope plotting capabilities while maintaining the familiar visual style and user interface.
 

@@ -337,7 +337,7 @@ During mesh generation, each reinforcement line is discretized into multiple tru
 2. **Material Property Assignment**: Each truss element along the line receives the same material properties:<br>
    - Cross-sectional area: $A$<br>
    - Elastic modulus: $E$  <br>
-   - Element stiffness: $K_e = AE/L$ (where $L$ varies based on actual element length)
+   - Element stiffness: $K_e = AE/L$ (where L varies based on element length)
 
 3. **Tensile Capacity Assignment**: Each truss element is assigned a maximum tensile capacity $T_{max}$ based on its distance from the nearest reinforcement end:
 

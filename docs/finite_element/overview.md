@@ -269,14 +269,6 @@ The integration of soil reinforcement elements such as geotextiles, soil nails, 
 
 The modeling of reinforced slopes presents unique challenges because the reinforcement elements typically have dramatically different mechanical properties compared to the surrounding soil. Reinforcement elements are usually much stiffer in tension and often have negligible compressive strength, creating a highly anisotropic composite material that requires specialized finite element formulations.
 
-For limit equlibrium analysis in XSLOPE, reinforcement lines are read from the input template and treated as 
-additional slices that contribute to the overall stability of the slope. Each line is designated by a series of 
-points and a tensile strength value at each point. Typically, the tensile strength is zero at the ends of the line 
-and linearly increases to a maximum value at a "pullout length" distance from the ends, reflecting the reality that 
-pullout resistance must develop over a finite distance from the reinforcement ends. This tensile strength profile is 
-critical for accurately modeling the contribution of reinforcement to slope stability. The same inputs are used for 
-the finite element analysis, where the reinforcement lines are converted to one-dimensional truss elements.
-
 ### Truss Element Approach
 
 While there are numerous ways to simulate soil reinforcement in the finite element method including the equivalent force method and interface element modeling, the most straightforward method for modeling reinforcement involves representing reinforcement elements as one-dimensional truss elements embedded within the two-dimensional soil continuum. These truss elements are characterized by their axial stiffness $EA/L$, where $E$ is the elastic modulus of the reinforcement material, $A$ is the cross-sectional area, and $L$ is the element length. 
@@ -319,10 +311,48 @@ For a truss element oriented at angle $\theta$ to the horizontal:
 - Failed elements are removed from the stiffness matrix
 - Progressive failure can propagate along the reinforcement line
 
+### Reinforcement Line Input Parameters
+
+For limit equlibrium analysis in XSLOPE, reinforcement lines are read from the input template and treated as 
+additional slices that contribute to the overall stability of the slope. Each line is designated by a series of 
+points and a tensile strength value at each point. Typically, the tensile strength is zero at the ends of the line 
+and linearly increases to a maximum value at a "pullout length" distance from the ends, reflecting the reality that 
+pullout resistance must develop over a finite distance from the reinforcement ends. This tensile strength profile is 
+critical for accurately modeling the contribution of reinforcement to slope stability. 
+
+For the finite element analysis, the same geometry is used, but the set of input parameters required for each line is different. For each reinforcement line to be modeled with truss elements in XSLOPE, the following parameters must be specified:
+
+**Material Properties:**<br>
+- **Cross-sectional area** $A$ (m²): Physical cross-sectional area of the reinforcement<br>
+- **Elastic modulus** $E$ (Pa): Stiffness of the reinforcement material
+
+**Design Parameters:**<br>
+- **Maximum tensile strength** $T_{design}$ (N): Ultimate tensile capacity of the reinforcement<br>
+- **Pullout length** $L_p$ (m): Distance from each end over which full strength develops
+
+During mesh generation, each reinforcement line is discretized into multiple truss elements based on the specified mesh density. The discretization process follows these steps:
+
+1. **Element Generation**: The reinforcement line is divided into truss elements with lengths typically 0.5-1.0 times the characteristic soil element size.
+
+2. **Material Property Assignment**: Each truss element along the line receives the same material properties:<br>
+   - Cross-sectional area: $A$<br>
+   - Elastic modulus: $E$  <br>
+   - Element stiffness: $K_e = AE/L$ (where $L$ varies based on actual element length)
+
+3. **Tensile Capacity Assignment**: Each truss element is assigned a maximum tensile capacity $T_{max}$ based on its distance from the nearest reinforcement end:
+
+>>For an element whose center is at distance $d$ from the nearest end:
+>>
+>>$T_{max} = \begin{cases}
+T_{design} \cdot \dfrac{d}{L_p} & \text{if } d < L_p \\
+T_{design} & \text{if } d \geq L_p
+\end{cases}$
+
+This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction.
+
 ### Determining Reinforcement Line Pullout Lengths
 
-The key to implementing truss element reinforcement in XSLOPE is properly specifying the tensile strength variation 
-along each reinforcement line. This variation captures the physical reality that pullout resistance must develop over a finite distance from the reinforcement ends. The pullout length $L_p$ is the distance from each end of the reinforcement over which the full tensile strength is mobilized. Within this length, the available tensile strength increases from zero at the end to the full design capacity. Pullout resistance develops through interface friction between the reinforcement and surrounding soil. This friction cannot be mobilized instantaneously but requires relative displacement to develop, creating the gradual strength buildup characteristic of all reinforcement systems. Pullout length can be estimated as follows:
+The pullout length $L_p$ represents the distance from each end of the reinforcement over which the full tensile strength is mobilized. This variation captures the physical reality that pullout resistance must develop over a finite distance from the reinforcement ends through interface friction between the reinforcement and surrounding soil. This friction cannot be mobilized instantaneously but requires relative displacement to develop, creating the gradual strength buildup characteristic of all reinforcement systems. Pullout length can be estimated as follows:
 
 **For Soil Nails:**
 >>$L_p = \dfrac{T_{design}}{\alpha \pi D \sigma_n' \tan \phi_{interface}}$

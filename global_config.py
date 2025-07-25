@@ -42,4 +42,4 @@ dloads = []
 
 #: List of reinforcement line dictionaries.
 reinforce_lines = []
-# Example: reinforce_lines = [{'X': 120, 'Y': 80, 'FL': 10, 'FT': 20}, {'X': 130, 'Y': 90, 'FL': 15, 'FT': 25}]
+# Example: reinforce_lines = [{'X': 120, 'Y': 80, 'T': 10, 'E': 200000, 'Area': 0.001}, {'X': 130, 'Y': 90, 'T': 15, 'E': 200000, 'Area': 0.001}]

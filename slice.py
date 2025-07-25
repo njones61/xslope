@@ -463,7 +463,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             - shapely.geometry.LineString: The clipped failure surface between the ground surface intersections.
 
     Notes:
-        - Supports Method A interpretation of reinforcement: FL reduces driving forces, FT adds to normal force.
+        - Supports Method A interpretation of reinforcement: T reduces driving forces.
         - Handles pore pressure and distributed loads using linear interpolation at slice centers.
         - Automatically includes all geometry breakpoints in slice generation.
         - Must specify exactly one of 'circle' or 'non_circ'.
@@ -495,9 +495,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     if slope_data.get("reinforce_lines"):
         for line in slope_data["reinforce_lines"]:
             xs = [pt["X"] for pt in line]
-            fls = [pt["FL"] for pt in line]
+            ts = [pt["T"] for pt in line]
             geom = LineString([(pt["X"], pt["Y"]) for pt in line])
-            reinf_lines_data.append({"xs": xs, "fls": fls, "geom": geom})
+            reinf_lines_data.append({"xs": xs, "ts": ts, "geom": geom})
 
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
@@ -861,15 +861,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             # Since we guarantee only one intersection point, it must be a Point:
             if isinstance(intersec, Point):
                 xi = intersec.x
-                # interpolated FL at xi
-                fl_i = np.interp(xi, rl["xs"], rl["fls"], left=0.0, right=0.0)
-                p_sum += fl_i
+                # interpolated T at xi
+                t_i = np.interp(xi, rl["xs"], rl["ts"], left=0.0, right=0.0)
+                p_sum += t_i
             else:
                 # (In the extremely unlikely case that intersection is not a Point,
                 #  skip it. Our assumption is only one Point per slice-base.)
                 continue
 
-        # Now p_sum is the TOTAL FL‐pull acting at this slice's base.
+        # Now p_sum is the TOTAL T‐pull acting at this slice's base.
         # === END: "Tension crack water force" ===
 
         # Process piezometric line and pore pressures using pre-computed coordinates
@@ -1014,7 +1014,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'kw': kw,   # seismic force
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
-            'p': p_sum,   # sum of reinforcement line FL values that intersect base of slice.
+            'p': p_sum,   # sum of reinforcement line T values that intersect base of slice.
             'n_eff': 0, # Placeholder for effective normal force
             'z': 0,     # Placeholder for interslice side forces
             'theta': 0, # Placeholder for interslice angles

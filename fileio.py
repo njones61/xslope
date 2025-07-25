@@ -194,7 +194,9 @@ def load_slope_data(filepath):
             "k2": float(row.get('k2', 0) or 0),
             "alpha": float(row.get('alpha', 0) or 0),
             "kr0" : float(row.get('kr0', 0) or 0),
-            "h0" : float(row.get('h0', 0) or 0)
+            "h0" : float(row.get('h0', 0) or 0),
+            "E": float(row.get('E', 0) or 0),
+            "nu": float(row.get('n', 0) or 0)
         })
 
     # === SEEPAGE ANALYSIS FILES ===
@@ -357,34 +359,137 @@ def load_slope_data(filepath):
         }, axis=1))
 
     # === REINFORCEMENT LINES ===
-    reinforce_df = xls.parse('reinforce', header=None)
+    reinforce_df = xls.parse('reinforce', header=1)  # Header in row 2 (0-indexed row 1)
     reinforce_lines = []
-    reinforce_data_blocks = [
-        {"start_row": 3, "end_row": 13},
-        {"start_row": 16, "end_row": 26},
-        {"start_row": 29, "end_row": 39}
-    ]
-    reinforce_block_starts = [1, 6, 11, 16]
-
-    for block in reinforce_data_blocks:
-        for col in reinforce_block_starts:
-            section = reinforce_df.iloc[block["start_row"]:block["end_row"], col:col + 4]
-            section = section.dropna(how='all')
-            section = section.dropna(subset=[col, col + 1], how='any')
-            if len(section) >= 2:
-                try:
-                    line_points = section.apply(
-                        lambda row: {
-                            "X": float(row.iloc[0]),
-                            "Y": float(row.iloc[1]),
-                            "FL": float(row.iloc[2]),
-                            "FT": float(row.iloc[3])
-                        }, axis=1).tolist()
-                    reinforce_lines.append(line_points)
-                except:
-                    raise ValueError("Invalid data format in reinforcement block.")
-            elif len(section) == 1:
-                raise ValueError("Each reinforcement line must contain at least two points.")
+    
+    # Process rows 3-22 (Excel) which are 0-indexed rows 0-19 in pandas after header=1
+    for i, row in reinforce_df.iloc[0:20].iterrows():
+        # Check if the row has coordinate data (x1, y1, x2, y2)
+        if pd.isna(row.iloc[1]) or pd.isna(row.iloc[2]) or pd.isna(row.iloc[3]) or pd.isna(row.iloc[4]):
+            continue  # Skip empty rows
+            
+        # If coordinates are present, check for required parameters (Tmax, Lp1, Lp2)
+        if pd.isna(row.iloc[5]) or pd.isna(row.iloc[6]) or pd.isna(row.iloc[7]):
+            raise ValueError(f"Reinforcement line in row {i + 3} has coordinates but missing required parameters (Tmax, Lp1, Lp2). All three must be specified.")
+            
+        try:
+            # Extract coordinates and parameters
+            x1, y1 = float(row.iloc[1]), float(row.iloc[2])  # Columns B, C
+            x2, y2 = float(row.iloc[3]), float(row.iloc[4])  # Columns D, E
+            Tmax = float(row.iloc[5])  # Column F
+            Lp1 = float(row.iloc[6]) if not pd.isna(row.iloc[6]) else 0.0  # Column G
+            Lp2 = float(row.iloc[7]) if not pd.isna(row.iloc[7]) else 0.0  # Column H
+            E = float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0  # Column I
+            Area = float(row.iloc[9]) if not pd.isna(row.iloc[9]) else 0.0  # Column J
+            
+            # Calculate line length and direction
+            import math
+            line_length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            if line_length == 0:
+                continue  # Skip zero-length lines
+                
+            # Unit vector from (x1,y1) to (x2,y2)
+            dx = (x2 - x1) / line_length
+            dy = (y2 - y1) / line_length
+            
+            line_points = []
+            
+            # Handle different cases based on pullout lengths
+            if Lp1 + Lp2 >= line_length:
+                # Line too short - create single interior point
+                if Lp1 == 0 and Lp2 == 0:
+                    # Both ends anchored - uniform tension
+                    line_points = [
+                        {"X": x1, "Y": y1, "T": Tmax, "E": E, "Area": Area},
+                        {"X": x2, "Y": y2, "T": Tmax, "E": E, "Area": Area}
+                    ]
+                else:
+                    # Find equilibrium point where tensions are equal
+                    # T1 = Tmax * d1/Lp1, T2 = Tmax * d2/Lp2
+                    # At equilibrium: d1/Lp1 = d2/Lp2 and d1 + d2 = line_length
+                    if Lp1 == 0:
+                        # End 1 anchored, all tension at end 1
+                        line_points = [
+                            {"X": x1, "Y": y1, "T": Tmax, "E": E, "Area": Area},
+                            {"X": x2, "Y": y2, "T": 0.0, "E": E, "Area": Area}
+                        ]
+                    elif Lp2 == 0:
+                        # End 2 anchored, all tension at end 2
+                        line_points = [
+                            {"X": x1, "Y": y1, "T": 0.0, "E": E, "Area": Area},
+                            {"X": x2, "Y": y2, "T": Tmax, "E": E, "Area": Area}
+                        ]
+                    else:
+                        # Both ends have pullout - find equilibrium point
+                        ratio_sum = 1.0/Lp1 + 1.0/Lp2
+                        d1 = line_length / (Lp2 * ratio_sum)
+                        d2 = line_length / (Lp1 * ratio_sum)
+                        T_eq = Tmax * d1 / Lp1  # = Tmax * d2 / Lp2
+                        
+                        # Interior point location
+                        x_int = x1 + d1 * dx
+                        y_int = y1 + d1 * dy
+                        
+                        line_points = [
+                            {"X": x1, "Y": y1, "T": 0.0, "E": E, "Area": Area},
+                            {"X": x_int, "Y": y_int, "T": T_eq, "E": E, "Area": Area},
+                            {"X": x2, "Y": y2, "T": 0.0, "E": E, "Area": Area}
+                        ]
+            else:
+                # Normal case - line long enough for 4 points
+                points_to_add = []
+                
+                # Point 1: Start point
+                points_to_add.append((x1, y1, 0.0))
+                
+                # Point 2: At distance Lp1 from start (if Lp1 > 0)
+                if Lp1 > 0:
+                    x_p2 = x1 + Lp1 * dx
+                    y_p2 = y1 + Lp1 * dy
+                    points_to_add.append((x_p2, y_p2, Tmax))
+                else:
+                    # Lp1 = 0, so start point gets Tmax tension
+                    points_to_add[0] = (x1, y1, Tmax)
+                
+                # Point 3: At distance Lp2 back from end (if Lp2 > 0)
+                if Lp2 > 0:
+                    x_p3 = x2 - Lp2 * dx
+                    y_p3 = y2 - Lp2 * dy
+                    points_to_add.append((x_p3, y_p3, Tmax))
+                else:
+                    # Lp2 = 0, so end point gets Tmax tension
+                    pass  # Will be handled when adding end point
+                
+                # Point 4: End point
+                if Lp2 > 0:
+                    points_to_add.append((x2, y2, 0.0))
+                else:
+                    points_to_add.append((x2, y2, Tmax))
+                
+                # Remove duplicate points (same x,y coordinates)
+                unique_points = []
+                tolerance = 1e-6
+                for x, y, T in points_to_add:
+                    is_duplicate = False
+                    for ux, uy, uT in unique_points:
+                        if abs(x - ux) < tolerance and abs(y - uy) < tolerance:
+                            # Update tension to maximum value at this location
+                            for i, (px, py, pT) in enumerate(unique_points):
+                                if abs(x - px) < tolerance and abs(y - py) < tolerance:
+                                    unique_points[i] = (px, py, max(pT, T))
+                            is_duplicate = True
+                            break
+                    if not is_duplicate:
+                        unique_points.append((x, y, T))
+                
+                # Convert to required format
+                line_points = [{"X": x, "Y": y, "T": T, "E": E, "Area": Area} for x, y, T in unique_points]
+            
+            if len(line_points) >= 2:
+                reinforce_lines.append(line_points)
+                
+        except Exception as e:
+            raise ValueError(f"Error processing reinforcement line in row {row.name + 3}: {e}")
 
 
     # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===

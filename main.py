@@ -36,7 +36,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_reliability4.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_rface5.xlsx")
 
 # plot_inputs(slope_data)
 
@@ -56,7 +56,7 @@ results = solve_selected(spencer, slice_df, rapid=False)
 
 # solve_all(slice_df)
 
-# slice_df.to_excel("slices.xlsx", index=False)
+slice_df.to_excel("slices.xlsx", index=False)
 
 plot_solution(slope_data, slice_df, failure_surface, results, slice_numbers=True)
 

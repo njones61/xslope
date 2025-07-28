@@ -391,7 +391,7 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
 
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
-                      max_iter=200, tol=1e-6, element_types=None):
+                      max_iter=200, tol=1e-4, element_types=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.

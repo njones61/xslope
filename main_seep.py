@@ -22,7 +22,7 @@ target_size = (x_range[1] - x_range[0]) / 100
 #target_size = 5
 
 # Build quadrilateral mesh
-mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
+mesh = build_mesh_from_polygons(polygons, target_size, 'quad4')
 
 plot_mesh(mesh, materials=slope_data['materials'])
 

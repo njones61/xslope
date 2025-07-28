@@ -391,7 +391,7 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
 
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
-                      max_iter=200, tol=1e-4, element_types=None):
+                      max_iter=200, tol=1e-6, element_types=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
@@ -439,7 +439,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     # Set convergence tolerance based on domain height
     ymin, ymax = np.min(y), np.max(y)
-    eps = (ymax - ymin) * 0.0001
+    eps = (ymax - ymin) * tol
 
     print("Starting unsaturated flow iteration...")
     print(f"Convergence tolerance: {eps:.6e}")
@@ -938,7 +938,9 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
             print(f"  Node {node}: φ = {phi[node]:.6f}, q = {q[node]:.6f}")
 
     # Check closure - should be close to zero for a proper flow field
-    closure_error = phi_val - q[ordered_nodes[start_idx]]
+    # After walking around the complete boundary, phi_val should equal the starting phi value
+    starting_phi = phi[ordered_nodes[start_idx]]
+    closure_error = phi_val - starting_phi
 
     if debug or abs(closure_error) > 1e-3:
         print(f"Flow potential closure check: error = {closure_error:.6e}")
@@ -1418,6 +1420,69 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
                 for node in element_nodes[:4]:  # Only use first 4 nodes for quad4
                     velocity[node] += v_gp
                     count[node] += 1
+        elif element_type == 6:
+            # 6-node triangle (quadratic): compute velocity using 3-point Gauss quadrature
+            nodes_elem = nodes[element_nodes[:6], :]
+            h_elem = head[element_nodes[:6]]
+            p_nodes = h_elem - nodes_elem[:, 1]  # pressure = head - y
+            
+            if scalar_k:
+                k1 = k1_vals
+                k2 = k2_vals
+                theta = angles
+            else:
+                k1 = k1_vals[idx]
+                k2 = k2_vals[idx]
+                theta = angles[idx]
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            K = R.T @ np.diag([k1, k2]) @ R
+            
+            if kr0 is not None and h0 is not None:
+                p_elem = compute_tri6_centroid_pressure(p_nodes, np.arange(6))  # Use local indices
+                kr_elem = kr_frontal(p_elem, kr0[idx] if not scalar_kr else kr0, h0[idx] if not scalar_kr else h0)
+            else:
+                kr_elem = 1.0
+
+            # 3-point Gauss quadrature for triangles (same as stiffness matrix)
+            gauss_pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
+            weights = [1/3, 1/3, 1/3]
+            
+            for (L1, L2, L3), w in zip(gauss_pts, weights):
+                # Shape function derivatives w.r.t. area coordinates
+                dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
+                dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
+                dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
+                
+                # Jacobian transformation (same as in stiffness matrix)
+                x0, y0 = nodes_elem[0]
+                x1, y1 = nodes_elem[1]
+                x2, y2 = nodes_elem[2]
+                
+                J = np.array([[x0 - x2, x1 - x2],
+                              [y0 - y2, y1 - y2]])
+                
+                detJ = np.linalg.det(J)
+                if abs(detJ) < 1e-10:
+                    continue
+                
+                Jinv = np.linalg.inv(J)
+                total_area = 0.5 * abs(detJ)
+                
+                # Transform derivatives to global coordinates
+                dN_dx = Jinv[0,0] * (dN_dL1 - dN_dL3) + Jinv[0,1] * (dN_dL2 - dN_dL3)
+                dN_dy = Jinv[1,0] * (dN_dL1 - dN_dL3) + Jinv[1,1] * (dN_dL2 - dN_dL3)
+                gradN = np.vstack((dN_dx, dN_dy))  # shape (2,6)
+                
+                # Compute grad(h) at this Gauss point
+                grad_h = gradN @ h_elem
+                v_gp = -kr_elem * K @ grad_h  # Darcy velocity at Gauss point
+                
+                # Distribute velocity to all 6 nodes of tri6 element
+                for node in element_nodes[:6]:
+                    velocity[node] += v_gp * w  # Weight by Gauss weight
+                    count[node] += w
 
     count[count == 0] = 1  # Avoid division by zero
     velocity /= count[:, None]
@@ -1806,8 +1871,6 @@ def run_seepage_analysis(seep_data):
             k1_vals=k1,
             k2_vals=k2,
             angles=angle,
-            max_iter=200,
-            tol=1e-4,
             element_types=element_types
         )
         # Solve for potential function φ for flow lines

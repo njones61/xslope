@@ -207,7 +207,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     plt.show()
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, show_mesh=True):
     """
     Plots head contours and optionally overlays flowlines (phi) based on flow function.
     Fixed version that properly handles mesh aspect ratio and doesn't clip the plot.
@@ -220,6 +220,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         base_mat: material ID (1-based) used to compute k for flow function
         fill_contours: bool, if True shows filled contours, if False only black solid lines
         phreatic: bool, if True plots phreatic surface (pressure head = 0) as thick red line
+        show_mesh: bool, if True overlays element edges in light gray
     """
     import matplotlib.pyplot as plt
     import matplotlib.tri as tri
@@ -395,6 +396,29 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
         ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
 
+    # Plot element edges if requested
+    if show_mesh:
+        # Draw all element edges
+        for element, elem_type in zip(elements, element_types if element_types is not None else [3]*len(elements)):
+            if elem_type == 3:
+                # Triangle: connect nodes 0-1-2-0
+                edge_nodes = [element[0], element[1], element[2], element[0]]
+            elif elem_type == 4:
+                # Quadrilateral: connect nodes 0-1-2-3-0
+                edge_nodes = [element[0], element[1], element[2], element[3], element[0]]
+            elif elem_type == 6:
+                # 6-node triangle: only connect corner nodes 0-1-2-0
+                edge_nodes = [element[0], element[1], element[2], element[0]]
+            elif elem_type in [8, 9]:
+                # Higher-order quads: only connect corner nodes 0-1-2-3-0
+                edge_nodes = [element[0], element[1], element[2], element[3], element[0]]
+            else:
+                continue  # Skip unknown element types
+                
+            # Get coordinates of edge nodes
+            edge_coords = nodes[edge_nodes]
+            ax.plot(edge_coords[:, 0], edge_coords[:, 1], color="darkgray", linewidth=0.5, alpha=0.7)
+
     # Plot the mesh boundary
     try:
         boundary = get_ordered_mesh_boundary(nodes, elements, element_types)
@@ -520,6 +544,18 @@ def get_ordered_mesh_boundary(nodes, elements, element_types=None):
                 edge_to_nodes[(a, b)] = (element_nodes[j], element_nodes[(j + 1) % 3])  # preserve direction
         elif element_type == 4:
             # Quadrilateral: 4 edges
+            for j in range(4):
+                a, b = sorted((element_nodes[j], element_nodes[(j + 1) % 4]))
+                edge_count[(a, b)] += 1
+                edge_to_nodes[(a, b)] = (element_nodes[j], element_nodes[(j + 1) % 4])  # preserve direction
+        elif element_type == 6:
+            # 6-node triangle: 3 edges (use only corner nodes 0,1,2)
+            for j in range(3):
+                a, b = sorted((element_nodes[j], element_nodes[(j + 1) % 3]))
+                edge_count[(a, b)] += 1
+                edge_to_nodes[(a, b)] = (element_nodes[j], element_nodes[(j + 1) % 3])  # preserve direction
+        elif element_type in [8, 9]:
+            # Higher-order quadrilaterals: 4 edges (use only corner nodes 0,1,2,3)
             for j in range(4):
                 a, b = sorted((element_nodes[j], element_nodes[(j + 1) % 4]))
                 edge_count[(a, b)] += 1

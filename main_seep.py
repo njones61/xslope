@@ -28,7 +28,7 @@ plot_mesh(mesh, materials=slope_data['materials'])
 
 seep_data = build_seep_data(mesh, slope_data)
 
-plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=True, label_nodes=True)
+plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
 
 solution = run_seepage_analysis(seep_data)
 

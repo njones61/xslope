@@ -1,5 +1,5 @@
-from seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics, export_solution_csv, save_seep_data_to_json
-from plot_seep import plot_seep_mesh, plot_seep_solution
+from seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics
+from plot_seep import plot_seep_data, plot_seep_solution
 import numpy as np
 
 
@@ -10,7 +10,7 @@ seep_data = import_seep2d("inputs/seep/lface.s2d")
 print_seep_data_diagnostics(seep_data)
 
 # Plot mesh
-plot_seep_mesh(seep_data, show_nodes=True, show_bc=True)
+plot_seep_data(seep_data, show_nodes=True, label_elements=True, label_nodes=True, show_bc=True)
 
 # Run analysis
 solution = run_seepage_analysis(seep_data)

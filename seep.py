@@ -274,16 +274,22 @@ def import_seep2d(filepath):
 def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, angles=None, element_types=None):
     """
     FEM solver for confined seepage with anisotropic conductivity.
-    Supports both triangular and quadrilateral elements.
+    Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
+    
     Parameters:
         nodes : (n_nodes, 2) array of node coordinates
-        elements : (n_elements, 3 or 4) triangle or quad node indices
+        elements : (n_elements, 9) element node indices (padded with zeros for unused nodes)
         bc_type : (n_nodes,) array of boundary condition flags
         dirichlet_bcs : list of (node_id, head_value)
         k1_vals : (n_elements,) or scalar, major axis conductivity
         k2_vals : (n_elements,) or scalar, minor axis conductivity
         angles : (n_elements,) or scalar, angle in degrees (from x-axis)
-        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
+        element_types : (n_elements,) array indicating:
+            3 = 3-node triangle (linear)
+            4 = 4-node quadrilateral (bilinear)  
+            6 = 6-node triangle (quadratic)
+            8 = 8-node quadrilateral (serendipity)
+            9 = 9-node quadrilateral (Lagrange)
     Returns:
         head : (n_nodes,) array of nodal heads
     """
@@ -299,8 +305,17 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
     for idx, element_nodes in enumerate(elements):
         element_type = element_types[idx]
         
+        # Get anisotropic conductivity for this element
+        k1 = k1_vals[idx]
+        k2 = k2_vals[idx]
+        theta = angles[idx]
+        theta_rad = np.radians(theta)
+        c, s = np.cos(theta_rad), np.sin(theta_rad)
+        R = np.array([[c, s], [-s, c]])
+        Kmat = R.T @ np.diag([k1, k2]) @ R
+        
         if element_type == 3:
-            # Triangle: use first 3 nodes (4th node is repeated)
+            # 3-node triangle (linear)
             i, j, k = element_nodes[:3]
             xi, yi = nodes[i]
             xj, yj = nodes[j]
@@ -314,36 +329,46 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
             gamma = np.array([xk - xj, xi - xk, xj - xi])
             grad = np.array([beta, gamma]) / (2 * area)
 
-            # Get anisotropic conductivity
-            k1 = k1_vals[idx]
-            k2 = k2_vals[idx]
-            theta = angles[idx]
-
-            theta_rad = np.radians(theta)
-            c, s = np.cos(theta_rad), np.sin(theta_rad)
-            R = np.array([[c, s], [-s, c]])
-            Kmat = R.T @ np.diag([k1, k2]) @ R
-
             ke = area * grad.T @ Kmat @ grad
 
             for a in range(3):
                 for b_ in range(3):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                    
         elif element_type == 4:
-            # Quadrilateral: use all 4 nodes
-            i, j, k, l = element_nodes
+            # 4-node quadrilateral (bilinear)
+            i, j, k, l = element_nodes[:4]
             nodes_elem = nodes[[i, j, k, l], :]
-            k1 = k1_vals[idx]
-            k2 = k2_vals[idx]
-            theta = angles[idx]
-            theta_rad = np.radians(theta)
-            c, s = np.cos(theta_rad), np.sin(theta_rad)
-            R = np.array([[c, s], [-s, c]])
-            Kmat = R.T @ np.diag([k1, k2]) @ R
             ke = quad4_stiffness_matrix(nodes_elem, Kmat)
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                    
+        elif element_type == 6:
+            # 6-node triangle (quadratic) - True quadratic shape functions
+            nodes_elem = nodes[element_nodes[:6], :]
+            ke = tri6_stiffness_matrix(nodes_elem, Kmat)
+            for a in range(6):
+                for b_ in range(6):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+            
+        elif element_type == 8:
+            # 8-node quadrilateral (serendipity) - True quadratic shape functions
+            nodes_elem = nodes[element_nodes[:8], :]
+            ke = quad8_stiffness_matrix(nodes_elem, Kmat)
+            for a in range(8):
+                for b_ in range(8):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+            
+        elif element_type == 9:
+            # 9-node quadrilateral (Lagrange) - True quadratic shape functions
+            nodes_elem = nodes[element_nodes[:9], :]
+            ke = quad9_stiffness_matrix(nodes_elem, Kmat)
+            for a in range(9):
+                for b_ in range(9):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+        else:
+            print(f"Warning: Unknown element type {element_type} for element {idx}, skipping")
 
     A_full = A.copy()  # Keep original matrix for computing q
 
@@ -369,7 +394,16 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       max_iter=200, tol=1e-4, element_types=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
-    Supports both triangular and quadrilateral elements.
+    Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
+    
+    Parameters:
+        element_types : (n_elements,) array indicating:
+            3 = 3-node triangle (linear)
+            4 = 4-node quadrilateral (bilinear)  
+            6 = 6-node triangle (quadratic)
+            8 = 8-node quadrilateral (serendipity)
+            9 = 9-node quadrilateral (Lagrange)
+    Note: Quadratic elements currently use linear/bilinear approximation pending full implementation.
     """
 
     # If element_types is not provided, assume all triangles (backward compatibility)
@@ -471,9 +505,35 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 for row in range(3):
                     for col in range(3):
                         A[element_nodes[row], element_nodes[col]] += ke[row, col]
+                        
+            elif element_type == 6:
+                # 6-node triangle (quadratic)
+                nodes_elem = nodes[element_nodes[:6], :]
+                
+                # Get material properties for this element
+                k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+                k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+                theta = angles[idx] if hasattr(angles, '__len__') else angles
+                theta_rad = np.radians(theta)
+                c, s = np.cos(theta_rad), np.sin(theta_rad)
+                R = np.array([[c, s], [-s, c]])
+                Kmat = R.T @ np.diag([k1, k2]) @ R
+                
+                # Compute element pressure (average of all 6 nodes)
+                p_elem = np.mean(p_nodes[element_nodes[:6]])
+                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+                
+                # Get stiffness matrix and scale by kr
+                ke = kr_elem * tri6_stiffness_matrix(nodes_elem, Kmat)
+                
+                # Assembly
+                for a in range(6):
+                    for b_ in range(6):
+                        A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                            
             elif element_type == 4:
                 # Quadrilateral: use all 4 nodes
-                i, j, k, l = element_nodes
+                i, j, k, l = element_nodes[:4]
                 nodes_elem = nodes[[i, j, k, l], :]
                 k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
                 k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -490,6 +550,35 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 
                 for a in range(4):
                     for b_ in range(4):
+                        A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                        
+            elif element_type == 8:
+                # 8-node quadrilateral (serendipity)
+                nodes_elem = nodes[element_nodes[:8], :]
+                
+                # Compute element pressure (average of all 8 nodes)
+                valid_nodes = element_nodes[:8][element_nodes[:8] != 0]
+                p_elem = np.mean(p_nodes[valid_nodes])
+                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+                
+                ke = kr_elem * quad8_stiffness_matrix(nodes_elem, Kmat)
+                
+                for a in range(8):
+                    for b_ in range(8):
+                        A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                            
+            elif element_type == 9:
+                # 9-node quadrilateral (Lagrange)
+                nodes_elem = nodes[element_nodes[:9], :]
+                
+                # Compute element pressure (average of all 9 nodes)
+                p_elem = np.mean(p_nodes[element_nodes[:9]])
+                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+                
+                ke = kr_elem * quad9_stiffness_matrix(nodes_elem, Kmat)
+                
+                for a in range(9):
+                    for b_ in range(9):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
         # Store unmodified matrix for flow computation
@@ -696,13 +785,13 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
     for idx, element_nodes in enumerate(elements):
         element_type = element_types[idx]
         
-        if element_type == 3:
-            # Triangle: 3 edges (use first 3 nodes, 4th is repeated)
+        if element_type in [3, 6]:
+            # Triangular elements: 3 edges (use corner nodes only for boundary detection)
             i, j, k = element_nodes[:3]
             edges = [(i, j), (j, k), (k, i)]
-        elif element_type == 4:
-            # Quadrilateral: 4 edges (use all 4 nodes)
-            i, j, k, l = element_nodes
+        elif element_type in [4, 8, 9]:
+            # Quadrilateral elements: 4 edges (use corner nodes only for boundary detection)
+            i, j, k, l = element_nodes[:4]
             edges = [(i, j), (j, k), (k, l), (l, i)]
         else:
             continue  # Skip unknown element types
@@ -769,56 +858,42 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
     if debug:
         print(f"Flow analysis: max |q| = {q_max:.3e}, threshold = {q_threshold:.3e}")
 
-    # Strategy 1: Look for transition from significant flow to near-zero flow
+    # Find the boundary node with maximum positive flow (main inlet)
+    max_positive_q = -float('inf')
+    max_positive_idx = None
+    
     for i in range(n):
-        current_q = abs(q[ordered_nodes[i]])
-        next_q = abs(q[ordered_nodes[(i + 1) % n]])
-
-        if current_q > q_threshold and next_q <= q_threshold:
-            start_idx = (i + 1) % n
-            if debug:
-                print(f"Found transition at node {ordered_nodes[i]} -> {ordered_nodes[start_idx]}")
-            break
-
-    # Strategy 2: If no clear transition, find the node with minimum |q|
-    if start_idx is None:
-        min_q_idx = min(range(n), key=lambda i: abs(q[ordered_nodes[i]]))
-        start_idx = min_q_idx
+        node = ordered_nodes[i]
+        if q[node] > max_positive_q:
+            max_positive_q = q[node]
+            max_positive_idx = i
+    
+    if max_positive_idx is not None and max_positive_q > q_threshold:
+        start_idx = max_positive_idx
         if debug:
-            print(
-                f"No clear transition found, starting at minimum |q| node {ordered_nodes[start_idx]} (|q|={abs(q[ordered_nodes[start_idx]]):.3e})")
-
-    # Strategy 3: If all flows are significant, look for flow direction changes
-    if start_idx is None or abs(q[ordered_nodes[start_idx]]) > q_threshold:
-        # Look for where flow changes sign (inflow vs outflow)
-        for i in range(n):
-            current_q = q[ordered_nodes[i]]
-            next_q = q[ordered_nodes[(i + 1) % n]]
-
-            if current_q * next_q < 0:  # Sign change
-                start_idx = i if abs(current_q) < abs(next_q) else (i + 1) % n
-                if debug:
-                    print(f"Found sign change, starting at node {ordered_nodes[start_idx]}")
-                break
-
-    # Strategy 4: Default fallback - start at node 0
-    if start_idx is None:
+            print(f"Starting at maximum inflow node {ordered_nodes[start_idx]} (q = {max_positive_q:.6f})")
+    else:
+        # Fallback: start at first node
         start_idx = 0
         if debug:
-            print(f"Using fallback: starting at first boundary node {ordered_nodes[start_idx]}")
+            print(f"No significant positive flow found, starting at first boundary node {ordered_nodes[start_idx]}")
 
-    # Step 6: Assign φ = 0 to the starting node, then accumulate q
+    # Step 6: Assign flow potential values by walking from inlet to exit
     phi = {}
-    phi_val = 0.0
-
+    
+    # Calculate total flow to determine starting phi value
+    total_q = sum(abs(q[node]) for node in ordered_nodes if q[node] > 0)
+    phi_val = total_q  # Start with total flow at inlet
+    
     if debug:
         print(f"Starting flow potential calculation at node {ordered_nodes[start_idx]}")
+        print(f"Total positive flow: {total_q:.6f}, starting phi: {phi_val:.6f}")
 
     for i in range(n):
         idx = (start_idx + i) % n
         node = ordered_nodes[idx]
         phi[node] = phi_val
-        phi_val += q[node]
+        phi_val -= q[node]  # Subtract flow as we move toward exit
 
         if debug and (i < 5 or i >= n - 5):  # Print first and last few for debugging
             print(f"  Node {node}: φ = {phi[node]:.6f}, q = {q[node]:.6f}")
@@ -902,10 +977,12 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             for a in range(3):
                 for b_ in range(3):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-        elif element_type == 4:
-            # Quadrilateral: use all 4 nodes
-            i, j, k, l = element_nodes
-            nodes_elem = nodes[[i, j, k, l], :]
+                    
+        elif element_type == 6:
+            # 6-node triangle (quadratic)
+            nodes_elem = nodes[element_nodes[:6], :]
+            
+            # Get anisotropic conductivity for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -913,9 +990,69 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            ke = quad4_stiffness_matrix(nodes_elem, np.linalg.inv(Kmat))
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            ke = tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            for a in range(6):
+                for b_ in range(6):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                        
+        elif element_type == 4:
+            # 4-node quadrilateral (bilinear)
+            i, j, k, l = element_nodes[:4]
+            nodes_elem = nodes[[i, j, k, l], :]
+            
+            # Get anisotropic conductivity for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            ke = quad4_stiffness_matrix(nodes_elem, Kmat_inv)
             for a in range(4):
                 for b_ in range(4):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                    
+        elif element_type == 8:
+            # 8-node quadrilateral (serendipity)
+            nodes_elem = nodes[element_nodes[:8], :]
+            
+            # Get anisotropic conductivity for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            ke = quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            for a in range(8):
+                for b_ in range(8):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                        
+        elif element_type == 9:
+            # 9-node quadrilateral (Lagrange)
+            nodes_elem = nodes[element_nodes[:9], :]
+            
+            # Get anisotropic conductivity for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            ke = quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            for a in range(9):
+                for b_ in range(9):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
     for node, phi_value in dirichlet_nodes:
@@ -986,27 +1123,116 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             for a in range(3):
                 for b_ in range(3):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-        elif element_type == 4:
-            # Quadrilateral: use all 4 nodes
-            i, j, k, l = element_nodes
-            nodes_elem = nodes[[i, j, k, l], :]
+                    
+        elif element_type == 6:
+            # 6-node triangle (quadratic)
+            nodes_elem = nodes[element_nodes[:6], :]
+            
+            # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
             theta_rad = np.radians(theta)
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
-            Kmat = R.T @ np.diag([k1, k2]) @ R  # Kmat is (2,2)
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            # Compute element pressure (average of all 6 nodes)
+            p_elem = np.mean(p_nodes[element_nodes[:6]])
+            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+
+            if kr_elem > 1e-12:
+                ke = (1.0 / kr_elem) * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            else:
+                ke = 1e12 * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+
+            for a in range(6):
+                for b_ in range(6):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                        
+        elif element_type == 4:
+            # 4-node quadrilateral (bilinear)
+            i, j, k, l = element_nodes[:4]
+            nodes_elem = nodes[[i, j, k, l], :]
+            
+            # Get material properties for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
             # Get kr for this element based on its material properties (use centroid)
             p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+            
             # Assemble using the inverse of kr_elem and Kmat
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(nodes_elem, np.linalg.inv(Kmat))
+                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(nodes_elem, Kmat_inv)
             else:
-                ke = 1e12 * quad4_stiffness_matrix(nodes_elem, np.linalg.inv(Kmat))
+                ke = 1e12 * quad4_stiffness_matrix(nodes_elem, Kmat_inv)
             for a in range(4):
                 for b_ in range(4):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                    
+        elif element_type == 8:
+            # 8-node quadrilateral (serendipity)
+            nodes_elem = nodes[element_nodes[:8], :]
+            
+            # Get material properties for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            # Compute element pressure (average of all 8 nodes)
+            valid_nodes = element_nodes[:8][element_nodes[:8] != 0]
+            p_elem = np.mean(p_nodes[valid_nodes])
+            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+
+            if kr_elem > 1e-12:
+                ke = (1.0 / kr_elem) * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            else:
+                ke = 1e12 * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+
+            for a in range(8):
+                for b_ in range(8):
+                    A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
+                        
+        elif element_type == 9:
+            # 9-node quadrilateral (Lagrange)
+            nodes_elem = nodes[element_nodes[:9], :]
+            
+            # Get material properties for this element
+            k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+            k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+            theta = angles[idx] if hasattr(angles, '__len__') else angles
+            theta_rad = np.radians(theta)
+            c, s = np.cos(theta_rad), np.sin(theta_rad)
+            R = np.array([[c, s], [-s, c]])
+            Kmat = R.T @ np.diag([k1, k2]) @ R
+            Kmat_inv = np.linalg.inv(Kmat)
+            
+            # Compute element pressure (average of all 9 nodes)
+            valid_nodes = element_nodes[:9][element_nodes[:9] != 0]
+            p_elem = np.mean(p_nodes[valid_nodes])
+            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+
+            if kr_elem > 1e-12:
+                ke = (1.0 / kr_elem) * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            else:
+                ke = 1e12 * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+
+            for a in range(9):
+                for b_ in range(9):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
 
     for node, phi_value in dirichlet_nodes:
@@ -1099,8 +1325,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
                 velocity[node] += v_elem
                 count[node] += 1
         elif element_type == 4:
-            # Quadrilateral: use all 4 nodes
-            i, j, k, l = element_nodes
+            # Quadrilateral: use first 4 nodes
+            i, j, k, l = element_nodes[:4]
             nodes_elem = nodes[[i, j, k, l], :]
             h_elem = head[[i, j, k, l]]
             if scalar_k:
@@ -1152,13 +1378,291 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
                 grad_h = gradN @ h_elem
                 v_gp = -kr_elem * K @ grad_h  # Darcy velocity at Gauss point
                 # Distribute/average to nodes (simple: add to all 4 nodes)
-                for node in element_nodes:
+                for node in element_nodes[:4]:  # Only use first 4 nodes for quad4
                     velocity[node] += v_gp
                     count[node] += 1
 
     count[count == 0] = 1  # Avoid division by zero
     velocity /= count[:, None]
     return velocity
+
+def tri3_stiffness_matrix(nodes_elem, Kmat):
+    """
+    Compute the 3x3 local stiffness matrix for a 3-node triangular element.
+    
+    Args:
+        nodes_elem: (3,2) array of nodal coordinates
+        Kmat: (2,2) conductivity matrix for the element
+    Returns:
+        ke: (3,3) element stiffness matrix
+    """
+    xi, yi = nodes_elem[0]
+    xj, yj = nodes_elem[1]
+    xk, yk = nodes_elem[2]
+    
+    area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
+    if area <= 0:
+        return np.zeros((3, 3))
+
+    beta = np.array([yj - yk, yk - yi, yi - yj])
+    gamma = np.array([xk - xj, xi - xk, xj - xi])
+    grad = np.array([beta, gamma]) / (2 * area)
+
+    ke = area * grad.T @ Kmat @ grad
+    return ke
+
+
+def tri6_stiffness_matrix(nodes_elem, Kmat):
+    """
+    Compute the 6x6 local stiffness matrix for a 6-node quadratic triangular element.
+    Uses 3-point Gaussian quadrature and quadratic shape functions.
+    
+    GMSH tri6 node ordering:
+    0,1,2: corner vertices
+    3: midpoint of edge 0-1
+    4: midpoint of edge 1-2  
+    5: midpoint of edge 2-0
+    
+    Args:
+        nodes_elem: (6,2) array of nodal coordinates
+        Kmat: (2,2) conductivity matrix for the element
+    Returns:
+        ke: (6,6) element stiffness matrix
+    """
+    # 3-point Gauss quadrature for triangles (exact for degree 2 polynomials)
+    gauss_pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
+    weights = [1/3, 1/3, 1/3]  # Standard weights for unit triangle
+    
+    ke = np.zeros((6, 6))
+    
+    for (L1, L2, L3), w in zip(gauss_pts, weights):
+        # Quadratic shape functions in area coordinates for standard GMSH tri6 ordering
+        # N0 = L1*(2*L1-1), N1 = L2*(2*L2-1), N2 = L3*(2*L3-1)
+        # N3 = 4*L1*L2 (edge 0-1), N4 = 4*L2*L3 (edge 1-2), N5 = 4*L3*L1 (edge 2-0)
+        
+        # Shape function derivatives w.r.t. area coordinates (standard GMSH ordering)
+        dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])  # dN/dL1
+        dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])  # dN/dL2
+        dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])  # dN/dL3
+        
+        # Transform from area coordinates to Cartesian coordinates
+        # We need the Jacobian: J = [dx/dL1, dx/dL2; dy/dL1, dy/dL2]
+        # where L3 = 1 - L1 - L2 is eliminated
+        
+        # Calculate coordinate derivatives directly from nodal coordinates (now properly oriented)
+        x0, y0 = nodes_elem[0]  # Vertex L1=1
+        x1, y1 = nodes_elem[1]  # Vertex L2=1  
+        x2, y2 = nodes_elem[2]  # Vertex L3=1
+        
+        # Jacobian matrix (from area to global coordinates)
+        # Since x = L1*x0 + L2*x1 + L3*x2 and L3 = 1-L1-L2:
+        # dx/dL1 = x0-x2, dx/dL2 = x1-x2, dy/dL1 = y0-y2, dy/dL2 = y1-y2  
+        J = np.array([[x0 - x2, x1 - x2],
+                      [y0 - y2, y1 - y2]])
+        
+        detJ = np.linalg.det(J)
+        if abs(detJ) < 1e-10:
+            continue
+        
+        # Handle clockwise node ordering by using signed determinant
+        # If detJ < 0, the nodes are ordered clockwise, but we still need proper transformation
+        Jinv = np.linalg.inv(J)
+        
+        # Transform shape function derivatives from area coordinates to global coordinates
+        # Use direct method based on area coordinate derivatives
+        
+        # Total triangle area
+        total_area = 0.5 * abs(detJ)
+        
+        # Direct computation of area coordinate derivatives (exact formulas)
+        dL1_dx = (y1 - y2) / (2 * total_area)
+        dL1_dy = (x2 - x1) / (2 * total_area)
+        dL2_dx = (y2 - y0) / (2 * total_area)
+        dL2_dy = (x0 - x2) / (2 * total_area)
+        dL3_dx = (y0 - y1) / (2 * total_area)
+        dL3_dy = (x1 - x0) / (2 * total_area)
+        
+        # Transform to global coordinates using chain rule:
+        # dNi/dx = (dNi/dL1)*(dL1/dx) + (dNi/dL2)*(dL2/dx) + (dNi/dL3)*(dL3/dx)
+        # dNi/dy = (dNi/dL1)*(dL1/dy) + (dNi/dL2)*(dL2/dy) + (dNi/dL3)*(dL3/dy)
+        
+        gradN = np.zeros((2, 6))  # [dN/dx; dN/dy] for 6 shape functions
+        
+        for i in range(6):
+            gradN[0, i] = dN_dL1[i]*dL1_dx + dN_dL2[i]*dL2_dx + dN_dL3[i]*dL3_dx  # dNi/dx
+            gradN[1, i] = dN_dL1[i]*dL1_dy + dN_dL2[i]*dL2_dy + dN_dL3[i]*dL3_dy  # dNi/dy
+        
+        # Element stiffness contribution at this Gauss point
+        # Scale by triangle area (detJ = 2 * area for area coordinate mapping)
+        triangle_area = 0.5 * abs(detJ)
+        ke += (gradN.T @ Kmat @ gradN) * triangle_area * w
+    
+    return ke
+
+
+def quad8_stiffness_matrix(nodes_elem, Kmat):
+    """
+    Compute the 8x8 local stiffness matrix for an 8-node serendipity quadrilateral element.
+    Uses 3x3 Gaussian quadrature and serendipity shape functions.
+    
+    Args:
+        nodes_elem: (8,2) array of nodal coordinates
+        Kmat: (2,2) conductivity matrix for the element
+    Returns:
+        ke: (8,8) element stiffness matrix
+    """
+    # 3x3 Gauss quadrature points and weights
+    pts_1d = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
+    wts_1d = [5/9, 8/9, 5/9]
+    
+    ke = np.zeros((8, 8))
+    
+    for i, xi in enumerate(pts_1d):
+        for j, eta in enumerate(pts_1d):
+            w = wts_1d[i] * wts_1d[j]
+            
+            # Serendipity shape function derivatives
+            dN_dxi = np.array([
+                -(1-eta)/4 + (xi*(1-eta))/4 + (eta*(1-eta))/4,  # Node 0
+                (1-eta)/4 + (xi*(1-eta))/4 - (eta*(1-eta))/4,   # Node 1  
+                (1+eta)/4 + (xi*(1+eta))/4 + (eta*(1+eta))/4,   # Node 2
+                -(1+eta)/4 + (xi*(1+eta))/4 - (eta*(1+eta))/4,  # Node 3
+                -xi*(1-eta)/2,                                   # Node 4
+                (1-eta*eta)/2,                                   # Node 5
+                -xi*(1+eta)/2,                                   # Node 6
+                -(1-eta*eta)/2                                   # Node 7
+            ])
+            
+            dN_deta = np.array([
+                -(1-xi)/4 + (xi*(1-xi))/4 + (eta*(1-xi))/4,    # Node 0
+                -(1+xi)/4 - (xi*(1+xi))/4 + (eta*(1+xi))/4,    # Node 1
+                (1+xi)/4 + (xi*(1+xi))/4 + (eta*(1+xi))/4,     # Node 2
+                (1-xi)/4 - (xi*(1-xi))/4 + (eta*(1-xi))/4,     # Node 3
+                -(1-xi*xi)/2,                                   # Node 4
+                -eta*(1+xi)/2,                                  # Node 5
+                (1-xi*xi)/2,                                    # Node 6
+                -eta*(1-xi)/2                                   # Node 7
+            ])
+            
+            # Jacobian
+            J = np.zeros((2, 2))
+            for a in range(8):
+                J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+                J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+                J[1,0] += dN_deta[a] * nodes_elem[a,0]
+                J[1,1] += dN_deta[a] * nodes_elem[a,1]
+            
+            detJ = np.linalg.det(J)
+            if detJ <= 0:
+                continue
+                
+            Jinv = np.linalg.inv(J)
+            
+            # Shape function derivatives w.r.t. x,y
+            dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+            dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+            gradN = np.vstack((dN_dx, dN_dy))  # shape (2,8)
+            
+            # Element stiffness contribution at this Gauss point
+            ke += (gradN.T @ Kmat @ gradN) * detJ * w
+    
+    return ke
+
+
+def tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv):
+    """
+    Compute the 6x6 local stiffness matrix for a 6-node quadratic triangular element
+    using the inverse conductivity matrix (for flow function computation).
+    """
+    return tri6_stiffness_matrix(nodes_elem, Kmat_inv)
+
+
+def quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv):
+    """
+    Compute the 8x8 local stiffness matrix for an 8-node serendipity quadrilateral element
+    using the inverse conductivity matrix (for flow function computation).
+    """
+    return quad8_stiffness_matrix(nodes_elem, Kmat_inv)
+
+
+def quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv):
+    """
+    Compute the 9x9 local stiffness matrix for a 9-node Lagrange quadrilateral element
+    using the inverse conductivity matrix (for flow function computation).
+    """
+    return quad9_stiffness_matrix(nodes_elem, Kmat_inv)
+
+
+def quad9_stiffness_matrix(nodes_elem, Kmat):
+    """
+    Compute the 9x9 local stiffness matrix for a 9-node Lagrange quadrilateral element.
+    Uses 3x3 Gaussian quadrature and biquadratic Lagrange shape functions.
+    
+    Args:
+        nodes_elem: (9,2) array of nodal coordinates
+        Kmat: (2,2) conductivity matrix for the element
+    Returns:
+        ke: (9,9) element stiffness matrix
+    """
+    # 3x3 Gauss quadrature points and weights
+    pts_1d = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
+    wts_1d = [5/9, 8/9, 5/9]
+    
+    ke = np.zeros((9, 9))
+    
+    for i, xi in enumerate(pts_1d):
+        for j, eta in enumerate(pts_1d):
+            w = wts_1d[i] * wts_1d[j]
+            
+            # Lagrange shape function derivatives (biquadratic)
+            dN_dxi = np.array([
+                eta*(eta-1)*xi/2 + eta*(eta-1)/4,              # Node 0
+                eta*(eta-1)*xi/2 - eta*(eta-1)/4,              # Node 1  
+                eta*(eta+1)*xi/2 - eta*(eta+1)/4,              # Node 2
+                eta*(eta+1)*xi/2 + eta*(eta+1)/4,              # Node 3
+                -xi*eta*(eta-1),                                # Node 4
+                (1-eta*eta)/2,                                  # Node 5
+                -xi*eta*(eta+1),                                # Node 6
+                -(1-eta*eta)/2,                                 # Node 7
+                -2*xi*(1-eta*eta)                               # Node 8
+            ])
+            
+            dN_deta = np.array([
+                xi*(xi-1)*eta/2 + xi*(xi-1)/4,                 # Node 0
+                xi*(xi+1)*eta/2 + xi*(xi+1)/4,                 # Node 1
+                xi*(xi+1)*eta/2 - xi*(xi+1)/4,                 # Node 2
+                xi*(xi-1)*eta/2 - xi*(xi-1)/4,                 # Node 3
+                -(1-xi*xi)/2,                                   # Node 4
+                -eta*xi*(xi+1),                                 # Node 5
+                (1-xi*xi)/2,                                    # Node 6
+                -eta*xi*(xi-1),                                 # Node 7
+                -2*eta*(1-xi*xi)                                # Node 8
+            ])
+            
+            # Jacobian
+            J = np.zeros((2, 2))
+            for a in range(9):
+                J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+                J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+                J[1,0] += dN_deta[a] * nodes_elem[a,0]
+                J[1,1] += dN_deta[a] * nodes_elem[a,1]
+            
+            detJ = np.linalg.det(J)
+            if detJ <= 0:
+                continue
+                
+            Jinv = np.linalg.inv(J)
+            
+            # Shape function derivatives w.r.t. x,y
+            dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+            dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+            gradN = np.vstack((dN_dx, dN_dy))  # shape (2,9)
+            
+            # Element stiffness contribution at this Gauss point
+            ke += (gradN.T @ Kmat @ gradN) * detJ * w
+    
+    return ke
+
 
 def quad4_stiffness_matrix(nodes_elem, Kmat):
     """

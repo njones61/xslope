@@ -5,7 +5,7 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=False):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', debug=False):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -13,12 +13,15 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
     Parameters:
         polygons     : List of lists of (x, y) tuples defining material boundaries
         target_size  : Desired element size
-        element_type : 'tri' for triangles or 'quad' for quadrilaterals (may include a few triangles)
+        element_type : 'tri3' (3-node triangles), 'tri6' (6-node triangles), 
+                      'quad4' (4-node quadrilaterals), 'quad8' (8-node quadrilaterals),
+                      'quad9' (9-node quadrilaterals)
 
     Returns:
         nodes        : np.ndarray of node coordinates (n_nodes, 2)
-        elements     : list of element vertex indices (each element is a list of 3 or 4 ints)
-        mat_ids      : list of material ID for each element
+        elements     : np.ndarray of element vertex indices (n_elements, 9) - unused nodes set to 0
+        element_types: np.ndarray indicating number of nodes per element (3, 4, 6, 8, or 9)
+        element_materials: np.ndarray of material ID for each element
     """
     import gmsh
     import numpy as np
@@ -27,11 +30,14 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
     # build a list of region ids (list of material IDs - one per polygon)
     region_ids = [i for i in range(len(polygons))]
 
-    if element_type not in ['tri', 'quad']:
-        raise ValueError("element_type must be 'tri' or 'quad'")
+    if element_type not in ['tri3', 'tri6', 'quad4', 'quad8', 'quad9']:
+        raise ValueError("element_type must be 'tri3', 'tri6', 'quad4', 'quad8', or 'quad9'")
 
+    # Determine if we need quadratic elements
+    quadratic = element_type in ['tri6', 'quad8', 'quad9']
+    
     # Adjust target_size for quads to compensate for recombination creating finer meshes
-    if element_type == 'quad':
+    if element_type.startswith('quad'):
         adjusted_target_size = target_size * 1.4
     else:
         adjusted_target_size = target_size
@@ -132,7 +138,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
         physical_surfaces.append((physical_tag, region_id))
     
     # Set mesh algorithm and recombination options BEFORE generating mesh
-    if element_type == 'quad':
+    if element_type.startswith('quad'):
         # Set global options for quad meshing
         gmsh.option.setNumber("Mesh.Algorithm", 8)  # Frontal-Delaunay for quads
         gmsh.option.setNumber("Mesh.RecombineAll", 1)  # Recombine triangles into quads
@@ -144,6 +150,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
             gmsh.model.mesh.setRecombine(2, surface)
     else:
         gmsh.option.setNumber("Mesh.Algorithm", 6)  # Frontal-Delaunay for triangles
+    
+    # Set element order for quadratic elements
+    if quadratic:
+        gmsh.option.setNumber("Mesh.ElementOrder", 2)
+        gmsh.option.setNumber("Mesh.HighOrderOptimize", 2)
     
     # Force mesh coherence before generation
     gmsh.option.setNumber("Mesh.ToleranceInitialDelaunay", 1e-12)
@@ -163,6 +174,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
 
     elements = []
     mat_ids = []
+    element_node_counts = []
 
     # Extract elements using physical groups for better region identification
     for physical_tag, region_id in physical_surfaces:
@@ -175,40 +187,89 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri', debug=Fa
                 elem_types, elem_tags_list, node_tags_list = gmsh.model.mesh.getElements(2, entity)
                 
                 for elem_type, elem_tags, node_tags in zip(elem_types, elem_tags_list, node_tags_list):
+                    # Gmsh element type mapping:
+                    # 2: 3-node triangle, 9: 6-node triangle
+                    # 3: 4-node quadrilateral, 10: 8-node quadrilateral
                     if elem_type == 2:  # 3-node triangle
                         elements_array = np.array(node_tags).reshape(-1, 3)
                         for element in elements_array:
                             idxs = [node_tag_to_index[tag] for tag in element]
-                            elements.append(idxs)
+                            
+                            # GMSH returns clockwise triangles - reorder to counter-clockwise
+                            idxs[1], idxs[2] = idxs[2], idxs[1]
+                            
+                            # Pad to 9 columns with zeros
+                            padded_idxs = idxs + [0] * (9 - len(idxs))
+                            elements.append(padded_idxs)
                             mat_ids.append(region_id)
+                            element_node_counts.append(3)
+                    elif elem_type == 9:  # 6-node triangle
+                        elements_array = np.array(node_tags).reshape(-1, 6)
+                        for element in elements_array:
+                            idxs = [node_tag_to_index[tag] for tag in element]
+                            
+                            # GMSH returns clockwise tri6 elements - reorder to counter-clockwise
+                            # Swap corner nodes 1 and 2
+                            idxs[1], idxs[2] = idxs[2], idxs[1]
+                            # Fix midpoint assignments after corner swap 1<->2:
+                            # GMSH gives: n3=edge(0-1), n4=edge(1-2), n5=edge(2-0)
+                            # After swap: n3=edge(0-2), n4=edge(2-1), n5=edge(1-0)
+                            # Standard requires: n3=edge(0-1), n4=edge(1-2), n5=edge(2-0)
+                            # So remap: new_n3=old_n5, new_n4=old_n4, new_n5=old_n3
+                            old_3, old_4, old_5 = idxs[3], idxs[4], idxs[5]
+                            idxs[3] = old_5  # standard edge(0-1) gets GMSH edge(2-0) midpoint
+                            idxs[4] = old_4  # standard edge(1-2) gets GMSH edge(1-2) midpoint  
+                            idxs[5] = old_3  # standard edge(2-0) gets GMSH edge(0-1) midpoint
+                            
+                            # Pad to 9 columns with zeros
+                            padded_idxs = idxs + [0] * (9 - len(idxs))
+                            elements.append(padded_idxs)
+                            mat_ids.append(region_id)
+                            element_node_counts.append(6)
                     elif elem_type == 3:  # 4-node quadrilateral
                         elements_array = np.array(node_tags).reshape(-1, 4)
                         for element in elements_array:
                             idxs = [node_tag_to_index[tag] for tag in element]
                             # Fix node ordering for quadrilateral elements
-                            if element_type == 'quad':
+                            if element_type.startswith('quad'):
                                 idxs = idxs[::-1] # Simple reversal of node order
-                            elements.append(idxs)
+                            # Pad to 9 columns with zeros
+                            padded_idxs = idxs + [0] * (9 - len(idxs))
+                            elements.append(padded_idxs)
                             mat_ids.append(region_id)
+                            element_node_counts.append(4)
+                    elif elem_type == 10:  # Quadratic quadrilateral (gmsh generates 9-node Lagrange)
+                        # Gmsh always generates 9-node Lagrange quads for order 2
+                        elements_array = np.array(node_tags).reshape(-1, 9)
+                        for element in elements_array:
+                            idxs = [node_tag_to_index[tag] for tag in element]
+                            
+                            if element_type == 'quad8':
+                                # For quad8, use first 8 nodes (corners + edge midpoints, skip center)
+                                # Gmsh 9-node ordering: 0-3 corners, 4-7 edge midpoints, 8 center
+                                padded_idxs = idxs[:8] + [0]  # Skip center node, pad to 9
+                                elements.append(padded_idxs)
+                                mat_ids.append(region_id)
+                                element_node_counts.append(8)
+                            elif element_type == 'quad9':
+                                # For quad9, use all 9 nodes
+                                elements.append(idxs)
+                                mat_ids.append(region_id)
+                                element_node_counts.append(9)
+                            else:
+                                # Default behavior - assume user wants what gmsh generated
+                                elements.append(idxs)
+                                mat_ids.append(region_id)
+                                element_node_counts.append(9)
         except Exception as e:
             print(f"Warning: Could not extract elements for physical group {physical_tag} (region {region_id}): {e}")
             continue
     
     gmsh.finalize()
 
-    # Standardize elements and set element_types based on element_type parameter
-    if element_type == 'tri':
-        # All elements should be triangles (3 nodes), pad to 4 columns
-        elements_array = np.array(elements, dtype=int)
-        if elements_array.shape[1] == 3:
-            # Pad triangles by repeating the third node
-            elements_array = np.column_stack([elements_array, elements_array[:, 2]])
-        element_types = np.full(len(elements), 3, dtype=int)
-    else:  # element_type == 'quad'
-        # All elements should be quadrilaterals (4 nodes)
-        elements_array = np.array(elements, dtype=int)
-        element_types = np.full(len(elements), 4, dtype=int)
-    
+    # Convert to numpy arrays
+    elements_array = np.array(elements, dtype=int)
+    element_types = np.array(element_node_counts, dtype=int)
     element_materials = np.array(mat_ids, dtype=int)
 
     # the material list is 1-based, but the element_materials array is 0-based. Adjust to be 1-based
@@ -536,8 +597,8 @@ def find_element_containing_point(nodes, elements, element_types, point):
     
     Parameters:
         nodes: np.ndarray of node coordinates (n_nodes, 2)
-        elements: np.ndarray of element vertex indices (n_elements, 4) - 4th node may be repeated for triangles
-        element_types: np.ndarray indicating element type (3 for triangle, 4 for quadrilateral)
+        elements: np.ndarray of element vertex indices (n_elements, 9) - unused nodes set to 0
+        element_types: np.ndarray indicating element type (3, 4, 6, 8, or 9 nodes)
         point: tuple (x, y) coordinates of the point to find
         
     Returns:
@@ -569,8 +630,8 @@ def find_element_containing_point(nodes, elements, element_types, point):
         element = elements[elem_idx]
         elem_type = element_types[elem_idx]
         
-        if elem_type == 3:  # Triangle
-            # Get triangle vertices
+        if elem_type in [3, 6]:  # Triangle (linear or quadratic)
+            # For point-in-element testing, use only corner nodes
             x1, y1 = nodes[element[0]]
             x2, y2 = nodes[element[1]]
             x3, y3 = nodes[element[2]]
@@ -588,8 +649,8 @@ def find_element_containing_point(nodes, elements, element_types, point):
             if lambda1 >= -1e-12 and lambda2 >= -1e-12 and lambda3 >= -1e-12:
                 return elem_idx
                 
-        elif elem_type == 4:  # Quadrilateral
-            # Get quadrilateral vertices
+        elif elem_type in [4, 8, 9]:  # Quadrilateral (linear or quadratic)
+            # For point-in-element testing, use only corner nodes
             x1, y1 = nodes[element[0]]
             x2, y2 = nodes[element[1]]
             x3, y3 = nodes[element[2]]
@@ -619,8 +680,8 @@ def _build_spatial_grid(nodes, elements, element_types):
     
     Parameters:
         nodes: np.ndarray of node coordinates (n_nodes, 2)
-        elements: np.ndarray of element vertex indices (n_elements, 4)
-        element_types: np.ndarray indicating element type (3 for triangle, 4 for quadrilateral)
+        elements: np.ndarray of element vertex indices (n_elements, 8)
+        element_types: np.ndarray indicating element type (3, 4, 6, or 8 nodes)
         
     Returns:
         dict: Spatial grid data structure
@@ -634,12 +695,12 @@ def _build_spatial_grid(nodes, elements, element_types):
     # Determine optimal cell size based on average element size
     total_area = 0
     for i, (element, elem_type) in enumerate(zip(elements, element_types)):
-        if elem_type == 3:  # Triangle
+        if elem_type in [3, 6]:  # Triangle
             x1, y1 = nodes[element[0]]
             x2, y2 = nodes[element[1]]
             x3, y3 = nodes[element[2]]
             area = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
-        else:  # Quadrilateral
+        else:  # Quadrilateral (4 or 8 nodes)
             x1, y1 = nodes[element[0]]
             x2, y2 = nodes[element[1]]
             x3, y3 = nodes[element[2]]
@@ -662,10 +723,10 @@ def _build_spatial_grid(nodes, elements, element_types):
     # Assign elements to grid cells
     for elem_idx, (element, elem_type) in enumerate(zip(elements, element_types)):
         # Calculate element bounding box
-        if elem_type == 3:  # Triangle
+        if elem_type in [3, 6]:  # Triangle
             x_coords = [nodes[element[0]][0], nodes[element[1]][0], nodes[element[2]][0]]
             y_coords = [nodes[element[0]][1], nodes[element[1]][1], nodes[element[2]][1]]
-        else:  # Quadrilateral
+        else:  # Quadrilateral (4 or 8 nodes)
             x_coords = [nodes[element[0]][0], nodes[element[1]][0], nodes[element[2]][0], nodes[element[3]][0]]
             y_coords = [nodes[element[0]][1], nodes[element[1]][1], nodes[element[2]][1], nodes[element[3]][1]]
         
@@ -695,8 +756,8 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
     
     Parameters:
         nodes: np.ndarray of node coordinates (n_nodes, 2)
-        elements: np.ndarray of element vertex indices (n_elements, 4)
-        element_types: np.ndarray indicating element type (3 for triangle, 4 for quadrilateral)
+        elements: np.ndarray of element vertex indices (n_elements, 8)
+        element_types: np.ndarray indicating element type (3, 4, 6, or 8 nodes)
         values: np.ndarray of values at nodes (n_nodes,)
         point: tuple (x, y) coordinates of the point to interpolate at
         
@@ -713,7 +774,7 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
     elem_type = element_types[element_idx]
     x, y = point
     
-    if elem_type == 3:  # Triangle
+    if elem_type == 3:  # Linear triangle
         # Get triangle vertices and values
         x1, y1 = nodes[element[0]]
         x2, y2 = nodes[element[1]]
@@ -731,7 +792,38 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
         # Interpolate using barycentric coordinates
         interpolated_value = lambda1 * v1 + lambda2 * v2 + lambda3 * v3
         
-    elif elem_type == 4:  # Quadrilateral
+    elif elem_type == 6:  # Quadratic triangle
+        # Get all 6 nodes: corners (0,1,2) and midpoints (3,4,5)
+        # Node ordering: 0-1-2 corners, 3 midpoint of 0-1, 4 midpoint of 1-2, 5 midpoint of 2-0
+        corner_nodes = [element[0], element[1], element[2]]
+        midpoint_nodes = [element[3], element[4], element[5]]
+        
+        # Get coordinates
+        x1, y1 = nodes[corner_nodes[0]]  # Node 0
+        x2, y2 = nodes[corner_nodes[1]]  # Node 1  
+        x3, y3 = nodes[corner_nodes[2]]  # Node 2
+        
+        # Calculate barycentric coordinates (L1, L2, L3)
+        det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+        L1 = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / det
+        L2 = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / det
+        L3 = 1.0 - L1 - L2
+        
+        # Quadratic shape functions for 6-node triangle
+        N = np.zeros(6)
+        N[0] = L1 * (2*L1 - 1)     # Corner node 0
+        N[1] = L2 * (2*L2 - 1)     # Corner node 1
+        N[2] = L3 * (2*L3 - 1)     # Corner node 2
+        N[3] = 4 * L1 * L2         # Midpoint node 0-1
+        N[4] = 4 * L2 * L3         # Midpoint node 1-2
+        N[5] = 4 * L3 * L1         # Midpoint node 2-0
+        
+        # Interpolate using quadratic shape functions
+        interpolated_value = 0.0
+        for i in range(6):
+            interpolated_value += N[i] * values[element[i]]
+        
+    elif elem_type == 4:  # Linear quadrilateral
         # Get quadrilateral vertices and values
         x1, y1 = nodes[element[0]]
         x2, y2 = nodes[element[1]]
@@ -765,6 +857,76 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
         
         # Interpolate using area weights
         interpolated_value = w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4
+        
+    elif elem_type == 8:  # Quadratic quadrilateral
+        # Get all 8 nodes: corners (0,1,2,3) and midpoints (4,5,6,7)
+        # Node ordering: 0-1-2-3 corners, 4 midpoint of 0-1, 5 midpoint of 1-2, 
+        #                6 midpoint of 2-3, 7 midpoint of 3-0
+        
+        # Get corner coordinates for mapping to natural coordinates
+        x1, y1 = nodes[element[0]]  # Node 0
+        x2, y2 = nodes[element[1]]  # Node 1
+        x3, y3 = nodes[element[2]]  # Node 2
+        x4, y4 = nodes[element[3]]  # Node 3
+        
+        # For quadratic quads, we need to map from physical (x,y) to natural coordinates (xi,eta)
+        # This is complex for general quadrilaterals, so use simplified approach:
+        # Map to unit square [-1,1] x [-1,1] using bilinear mapping of corners
+        
+        # Bilinear inverse mapping (approximate for general quads)
+        # Solve for natural coordinates xi, eta in [-1,1] x [-1,1]
+        
+        # For simplicity, use area coordinate method similar to linear quad
+        # but with quadratic shape functions
+        
+        # Calculate area coordinates (this is an approximation)
+        A_total = 0.5 * abs((x3-x1)*(y4-y2) - (x4-x2)*(y3-y1))
+        if A_total < 1e-12:
+            # Degenerate element, fall back to linear
+            A1 = abs((x - x1) * (y2 - y1) - (x2 - x1) * (y - y1)) / 2
+            A2 = abs((x - x2) * (y3 - y2) - (x3 - x2) * (y - y2)) / 2
+            A3 = abs((x - x3) * (y4 - y3) - (x4 - x3) * (y - y3)) / 2
+            A4 = abs((x - x4) * (y1 - y4) - (x1 - x4) * (y - y4)) / 2
+            A_sum = A1 + A2 + A3 + A4
+            if A_sum > 1e-12:
+                w1, w2, w3, w4 = A1/A_sum, A2/A_sum, A3/A_sum, A4/A_sum
+            else:
+                w1 = w2 = w3 = w4 = 0.25
+            
+            # Linear interpolation as fallback
+            interpolated_value = (w1 * values[element[0]] + w2 * values[element[1]] + 
+                                w3 * values[element[2]] + w4 * values[element[3]])
+        else:
+            # For proper quadratic interpolation, we need natural coordinates
+            # This is a simplified implementation - full implementation would solve
+            # the nonlinear system for xi,eta
+            
+            # Use parametric coordinates estimation
+            # Map point to approximate natural coordinates
+            xi_approx = 2 * (x - 0.5*(x1+x3)) / (x2+x3-x1-x4) if abs(x2+x3-x1-x4) > 1e-12 else 0
+            eta_approx = 2 * (y - 0.5*(y1+y3)) / (y2+y4-y1-y3) if abs(y2+y4-y1-y3) > 1e-12 else 0
+            
+            # Clamp to [-1,1]
+            xi = max(-1, min(1, xi_approx))
+            eta = max(-1, min(1, eta_approx))
+            
+            # Quadratic shape functions for 8-node quad in natural coordinates
+            N = np.zeros(8)
+            # Corner nodes
+            N[0] = 0.25 * (1-xi) * (1-eta) * (-xi-eta-1)   # Node 0
+            N[1] = 0.25 * (1+xi) * (1-eta) * (xi-eta-1)    # Node 1  
+            N[2] = 0.25 * (1+xi) * (1+eta) * (xi+eta-1)    # Node 2
+            N[3] = 0.25 * (1-xi) * (1+eta) * (-xi+eta-1)   # Node 3
+            # Midpoint nodes
+            N[4] = 0.5 * (1-xi*xi) * (1-eta)               # Node 4 (midpoint 0-1)
+            N[5] = 0.5 * (1+xi) * (1-eta*eta)              # Node 5 (midpoint 1-2)
+            N[6] = 0.5 * (1-xi*xi) * (1+eta)               # Node 6 (midpoint 2-3)
+            N[7] = 0.5 * (1-xi) * (1-eta*eta)              # Node 7 (midpoint 3-0)
+            
+            # Interpolate using quadratic shape functions
+            interpolated_value = 0.0
+            for i in range(8):
+                interpolated_value += N[i] * values[element[i]]
     
     else:
         return 0.0  # Unknown element type

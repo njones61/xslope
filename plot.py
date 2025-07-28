@@ -1055,7 +1055,7 @@ def plot_reliability_results(slope_data, reliability_data, width=12, height=7):
     plt.tight_layout()
     plt.show()
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True):
     """
     Plot the finite element mesh with material regions.
     
@@ -1064,6 +1064,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
         materials: Optional list of material dictionaries for legend labels
         figsize: Figure size tuple
         pad_frac: Fraction of mesh size to use for padding around plot
+        show_nodes: If True, plot points at node locations
     """
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
@@ -1082,11 +1083,13 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
         if mid not in material_elements:
             material_elements[mid] = []
         
-        # Convert element to polygon coordinates
-        if elem_type == 3:  # Triangle
+        # Use corner nodes to define element boundary (no subdivision needed)
+        if elem_type in [3, 6]:  # Triangular elements (linear or quadratic)
             element_coords = [nodes[element[0]], nodes[element[1]], nodes[element[2]]]
-        else:  # Quadrilateral
+        elif elem_type in [4, 8, 9]:  # Quadrilateral elements (linear or quadratic)
             element_coords = [nodes[element[0]], nodes[element[1]], nodes[element[2]], nodes[element[3]]]
+        else:
+            continue  # Skip unknown element types
         
         material_elements[mid].append(element_coords)
     
@@ -1111,6 +1114,39 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05):
                                    edgecolor='k', 
                                    alpha=0.4, 
                                    label=label))
+    
+    # Plot nodes if requested
+    if show_nodes:
+        # Collect actual nodes used by elements (excluding padding zeros)
+        used_nodes = set()
+        for elem, elem_type in zip(elements, element_types):
+            if elem_type == 3:  # 3-node triangle
+                for i in range(3):
+                    used_nodes.add(elem[i])
+            elif elem_type == 6:  # 6-node triangle
+                for i in range(6):
+                    if elem[i] != 0:
+                        used_nodes.add(elem[i])
+            elif elem_type == 4:  # 4-node quad
+                for i in range(4):
+                    used_nodes.add(elem[i])
+            elif elem_type == 8:  # 8-node quad (no center node)
+                for i in range(8):
+                    if elem[i] != 0:
+                        used_nodes.add(elem[i])
+            elif elem_type == 9:  # 9-node quad (with center node)
+                for i in range(9):
+                    if elem[i] != 0:
+                        used_nodes.add(elem[i])
+        
+        # Plot only the actually used nodes
+        if used_nodes:
+            used_coords = nodes[list(used_nodes)]
+            ax.plot(used_coords[:, 0], used_coords[:, 1], 'ko', markersize=3, alpha=0.7, zorder=10)
+            # Add to legend
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                            markerfacecolor='k', markersize=6, 
+                                            label=f'Nodes ({len(used_nodes)})', linestyle='None'))
     
     ax.set_aspect('equal')
     ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")

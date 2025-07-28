@@ -1,11 +1,11 @@
 from fileio import load_slope_data
 
-from mesh import build_polygons, build_mesh_from_polygons, plot_mesh, plot_polygons, plot_polygons_separately
-from mesh import save_mesh_to_json, load_mesh_from_json
-from plot import plot_inputs
+from mesh import build_polygons, build_mesh_from_polygons
+from mesh import export_mesh_to_json, import_mesh_from_json
+from plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 import numpy as np
 
-slope_data = load_slope_data("inputs/slopes/input_template_lface3.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
 
 # plot_inputs(slope_data)
 
@@ -20,20 +20,20 @@ region_ids = [i for i in range(len(polygons))]
 x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 150
 
-# target_size = 10
+target_size = 10
 
 # Build triangular mesh
 print("Building triangular mesh...")
-mesh_tri = build_mesh_from_polygons(polygons, region_ids, target_size, 'tri')
+mesh_tri = build_mesh_from_polygons(polygons, target_size, 'tri6')
 
-save_mesh_to_json(mesh_tri, "mesh_tri.json")
+export_mesh_to_json(mesh_tri, "mesh_tri.json")
 
 plot_mesh(mesh_tri, materials=slope_data['materials'])
 
 # Build quadrilateral mesh
 print("\nBuilding quadrilateral mesh...")
-mesh_quad = build_mesh_from_polygons(polygons, region_ids, target_size, 'quad')
+mesh_quad = build_mesh_from_polygons(polygons, target_size, 'quad8')
 
-save_mesh_to_json(mesh_quad, "mesh_quad.json")
+export_mesh_to_json(mesh_quad, "mesh_quad.json")
 
 plot_mesh(mesh_quad, materials=slope_data['materials'])

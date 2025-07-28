@@ -7,7 +7,7 @@ from seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, 
 from plot_seep import plot_seep_data, plot_seep_solution
 import numpy as np
 
-slope_data = load_slope_data("inputs/slope/input_template_lface4.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
 
 plot_inputs(slope_data)
 
@@ -19,16 +19,16 @@ polygons = build_polygons(slope_data['profile_lines'], max_depth=slope_data['max
 x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 150
 
-# target_size = 10
+target_size = 5
 
 # Build quadrilateral mesh
-mesh = build_mesh_from_polygons(polygons, target_size, 'quad')
+mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
 
 plot_mesh(mesh, materials=slope_data['materials'])
 
 seep_data = build_seep_data(mesh, slope_data)
 
-plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=False)
+plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=True, label_nodes=True)
 
 solution = run_seepage_analysis(seep_data)
 

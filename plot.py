@@ -1142,7 +1142,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         # Plot only the actually used nodes
         if used_nodes:
             used_coords = nodes[list(used_nodes)]
-            ax.plot(used_coords[:, 0], used_coords[:, 1], 'ko', markersize=3, alpha=0.7, zorder=10)
+            ax.plot(used_coords[:, 0], used_coords[:, 1], 'k.', markersize=2)
             # Add to legend
             legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
                                             markerfacecolor='k', markersize=6, 

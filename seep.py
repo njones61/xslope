@@ -519,8 +519,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 R = np.array([[c, s], [-s, c]])
                 Kmat = R.T @ np.diag([k1, k2]) @ R
                 
-                # Compute element pressure (average of all 6 nodes)
-                p_elem = np.mean(p_nodes[element_nodes[:6]])
+                # Compute element pressure using quadratic shape functions at centroid
+                p_elem = compute_tri6_centroid_pressure(p_nodes, element_nodes)
                 kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
                 
                 # Get stiffness matrix and scale by kr
@@ -556,9 +556,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 # 8-node quadrilateral (serendipity)
                 nodes_elem = nodes[element_nodes[:8], :]
                 
-                # Compute element pressure (average of all 8 nodes)
-                valid_nodes = element_nodes[:8][element_nodes[:8] != 0]
-                p_elem = np.mean(p_nodes[valid_nodes])
+                # Compute element pressure using serendipity shape functions at centroid
+                p_elem = compute_quad8_centroid_pressure(p_nodes, element_nodes)
                 kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
                 
                 ke = kr_elem * quad8_stiffness_matrix(nodes_elem, Kmat)
@@ -571,8 +570,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 # 9-node quadrilateral (Lagrange)
                 nodes_elem = nodes[element_nodes[:9], :]
                 
-                # Compute element pressure (average of all 9 nodes)
-                p_elem = np.mean(p_nodes[element_nodes[:9]])
+                # Compute element pressure using biquadratic shape functions at centroid
+                p_elem = compute_quad9_centroid_pressure(p_nodes, element_nodes)
                 kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
                 
                 ke = kr_elem * quad9_stiffness_matrix(nodes_elem, Kmat)
@@ -694,6 +693,46 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     return h, A, q_final, total_inflow
 
+def compute_tri6_centroid_pressure(p_nodes, element_nodes):
+    """
+    Compute pressure at the centroid of a tri6 element using quadratic shape functions.
+    
+    For GMSH tri6 ordering at centroid (L1=L2=L3=1/3):
+    - Corner nodes (0,1,2): N = L*(2*L-1) = 1/3*(2/3-1) = -1/9
+    - Edge midpoint nodes (3,4,5): N = 4*L1*L2 = 4*(1/3)*(1/3) = 4/9
+    """
+    p_elem_nodes = p_nodes[element_nodes[:6]]
+    # Shape function values at centroid for GMSH tri6 ordering
+    N_corner = -1.0/9.0  # For nodes 0, 1, 2
+    N_edge = 4.0/9.0     # For nodes 3, 4, 5
+    
+    p_centroid = (N_corner * (p_elem_nodes[0] + p_elem_nodes[1] + p_elem_nodes[2]) + 
+                  N_edge * (p_elem_nodes[3] + p_elem_nodes[4] + p_elem_nodes[5]))
+    return p_centroid
+
+def compute_quad8_centroid_pressure(p_nodes, element_nodes):
+    """
+    Compute pressure at the centroid of a quad8 element using serendipity shape functions.
+    At centroid (xi=0, eta=0), only corner nodes contribute equally.
+    """
+    valid_nodes = element_nodes[:8][element_nodes[:8] != 0]
+    p_elem_nodes = p_nodes[valid_nodes]
+    # For serendipity quad8 at center, corner nodes have N=1/4, edge nodes have N=0
+    if len(valid_nodes) == 8:
+        # Corner nodes (0,1,2,3) contribute 1/4 each, edge nodes (4,5,6,7) contribute 0
+        return 0.25 * (p_elem_nodes[0] + p_elem_nodes[1] + p_elem_nodes[2] + p_elem_nodes[3])
+    else:
+        return np.mean(p_elem_nodes)  # Fallback for incomplete elements
+
+def compute_quad9_centroid_pressure(p_nodes, element_nodes):
+    """
+    Compute pressure at the centroid of a quad9 element using biquadratic shape functions.
+    At centroid (xi=0, eta=0), only the center node contributes.
+    """
+    p_elem_nodes = p_nodes[element_nodes[:9]]
+    # For biquadratic quad9 at center, only center node (node 8) has N=1, all others have N=0
+    return p_elem_nodes[8]
+
 def kr_frontal(p, kr0, h0):
     """
     Fortran-compatible relative permeability function (front model).
@@ -701,8 +740,8 @@ def kr_frontal(p, kr0, h0):
     """
     if p >= 0.0:
         return 1.0
-    elif p > h0:
-        return kr0 + (1.0 - kr0) * p / h0
+    elif p > h0:  # when h0 < p < 0
+        return kr0 + (1.0 - kr0) * (p - h0) / (-h0)
     else:
         return kr0
 
@@ -1138,8 +1177,8 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             Kmat = R.T @ np.diag([k1, k2]) @ R
             Kmat_inv = np.linalg.inv(Kmat)
             
-            # Compute element pressure (average of all 6 nodes)
-            p_elem = np.mean(p_nodes[element_nodes[:6]])
+            # Compute element pressure using quadratic shape functions at centroid
+            p_elem = compute_tri6_centroid_pressure(p_nodes, element_nodes)
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
             if kr_elem > 1e-12:
@@ -1193,9 +1232,8 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             Kmat = R.T @ np.diag([k1, k2]) @ R
             Kmat_inv = np.linalg.inv(Kmat)
             
-            # Compute element pressure (average of all 8 nodes)
-            valid_nodes = element_nodes[:8][element_nodes[:8] != 0]
-            p_elem = np.mean(p_nodes[valid_nodes])
+            # Compute element pressure using serendipity shape functions at centroid
+            p_elem = compute_quad8_centroid_pressure(p_nodes, element_nodes)
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
             if kr_elem > 1e-12:
@@ -1221,9 +1259,8 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             Kmat = R.T @ np.diag([k1, k2]) @ R
             Kmat_inv = np.linalg.inv(Kmat)
             
-            # Compute element pressure (average of all 9 nodes)
-            valid_nodes = element_nodes[:9][element_nodes[:9] != 0]
-            p_elem = np.mean(p_nodes[valid_nodes])
+            # Compute element pressure using biquadratic shape functions at centroid
+            p_elem = compute_quad9_centroid_pressure(p_nodes, element_nodes)
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
             if kr_elem > 1e-12:

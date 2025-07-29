@@ -175,6 +175,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', debug=F
     elements = []
     mat_ids = []
     element_node_counts = []
+    
+    # For quad8: track center nodes to delete later
+    center_nodes_to_delete = set() if element_type == 'quad8' else None
 
     # Extract elements using physical groups for better region identification
     for physical_tag, region_id in physical_surfaces:
@@ -244,23 +247,42 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', debug=F
                         for element in elements_array:
                             idxs = [node_tag_to_index[tag] for tag in element]
                             
-                            if element_type == 'quad8':
-                                # For quad8, use first 8 nodes (corners + edge midpoints, skip center)
-                                # Gmsh 9-node ordering: 0-3 corners, 4-7 edge midpoints, 8 center
-                                padded_idxs = idxs[:8] + [0]  # Skip center node, pad to 9
-                                elements.append(padded_idxs)
-                                mat_ids.append(region_id)
-                                element_node_counts.append(8)
-                            elif element_type == 'quad9':
-                                # For quad9, use all 9 nodes
-                                elements.append(idxs)
-                                mat_ids.append(region_id)
-                                element_node_counts.append(9)
+                            if element_type in ['quad8', 'quad9']:
+                                # Both quad8 and quad9 need CW to CCW conversion for first 8 nodes
+                                # Convert from Gmsh CW to CCW ordering for quadrilateral
+                                # Corner nodes: reverse order (0,1,2,3) -> (0,3,2,1)
+                                # Midpoint nodes need to be reordered accordingly:
+                                # GMSH: n4=edge(0-1), n5=edge(1-2), n6=edge(2-3), n7=edge(3-0)
+                                # After corner reversal: need n4=edge(0-3), n5=edge(3-2), n6=edge(2-1), n7=edge(1-0)
+                                # So: new_n4=old_n7, new_n5=old_n6, new_n6=old_n5, new_n7=old_n4
+                                reordered_first8 = [
+                                    idxs[0],  # corner 0 stays
+                                    idxs[3],  # corner 1 -> corner 3  
+                                    idxs[2],  # corner 2 stays
+                                    idxs[1],  # corner 3 -> corner 1
+                                    idxs[7],  # edge(0-1) -> edge(0-3) = old edge(3-0)
+                                    idxs[6],  # edge(1-2) -> edge(3-2) = old edge(2-3)  
+                                    idxs[5],  # edge(2-3) -> edge(2-1) = old edge(1-2)
+                                    idxs[4]   # edge(3-0) -> edge(1-0) = old edge(0-1)
+                                ]
+                                
+                                if element_type == 'quad8':
+                                    # For quad8, skip center node and mark for deletion
+                                    center_node_idx = idxs[8]  # Mark center node for deletion
+                                    center_nodes_to_delete.add(center_node_idx)
+                                    padded_idxs = reordered_first8 + [0]  # Skip center node, pad to 9
+                                    elements.append(padded_idxs)
+                                    mat_ids.append(region_id)
+                                    element_node_counts.append(8)
+                                else:  # quad9
+                                    # For quad9, keep center node (9th node unchanged)
+                                    full_idxs = reordered_first8 + [idxs[8]]  # Add center node
+                                    elements.append(full_idxs)
+                                    mat_ids.append(region_id)
+                                    element_node_counts.append(9)
                             else:
-                                # Default behavior - assume user wants what gmsh generated
-                                elements.append(idxs)
-                                mat_ids.append(region_id)
-                                element_node_counts.append(9)
+                                # This should never happen since element_type is validated earlier
+                                raise ValueError(f"Unexpected element_type '{element_type}' for Gmsh elem_type {elem_type}")
         except Exception as e:
             print(f"Warning: Could not extract elements for physical group {physical_tag} (region {region_id}): {e}")
             continue
@@ -271,6 +293,41 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', debug=F
     elements_array = np.array(elements, dtype=int)
     element_types = np.array(element_node_counts, dtype=int)
     element_materials = np.array(mat_ids, dtype=int)
+
+    # Clean up center nodes for quad8 elements
+    if element_type == 'quad8' and center_nodes_to_delete:
+        print(f"Quad8 cleanup: removing {len(center_nodes_to_delete)} center nodes from {len(nodes)} total nodes")
+        
+        # c) Create array tracking original node numbering
+        original_node_count = len(nodes)
+        nodes_to_keep = [i for i in range(original_node_count) if i not in center_nodes_to_delete]
+        
+        # d) Delete center nodes - create new nodes array
+        new_nodes = nodes[nodes_to_keep]
+        
+        # e) Create mapping from old node indices to new node indices
+        old_to_new_mapping = {old_idx: new_idx for new_idx, old_idx in enumerate(nodes_to_keep)}
+        
+        # f) Update element topology to use new node numbering
+        new_elements = []
+        for element in elements_array:
+            new_element = []
+            for node_idx in element:
+                if node_idx == 0:  # Keep padding zeros
+                    new_element.append(0)
+                elif node_idx in center_nodes_to_delete:
+                    # This should not happen since we set center nodes to 0
+                    new_element.append(0)
+                else:
+                    # Map to new node index
+                    new_element.append(old_to_new_mapping[node_idx])
+            new_elements.append(new_element)
+        
+        # g) Replace arrays with consolidated versions
+        elements_array = np.array(new_elements, dtype=int)
+        nodes = new_nodes
+        
+        print(f"Quad8 cleanup complete: {len(nodes)} nodes, {len(elements_array)} elements")
 
     # the material list is 1-based, but the element_materials array is 0-based. Adjust to be 1-based
     element_materials = element_materials + 1

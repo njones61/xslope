@@ -94,10 +94,15 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
                 [n7, center, n6, n3]   # Sub-quad at corner 3
             ]
             
-            # Add all sub-quads
+            # Add all sub-quads without internal edges
             for sub_quad in sub_quads:
-                polygon = Polygon(sub_quad, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
+                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
                 ax.add_patch(polygon)
+            
+            # Add outer boundary of the quad8 element
+            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
+            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
+                   'k-', linewidth=0.5)
                 
         elif element_type == 9:  # 9-node quadrilateral - subdivide using actual center node
             # Corner nodes
@@ -115,10 +120,15 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
                 [n7, center, n6, n3]   # Sub-quad at corner 3
             ]
             
-            # Add all sub-quads
+            # Add all sub-quads without internal edges
             for sub_quad in sub_quads:
-                polygon = Polygon(sub_quad, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
+                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
                 ax.add_patch(polygon)
+            
+            # Add outer boundary of the quad9 element
+            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
+            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
+                   'k-', linewidth=0.5)
 
         # Label element number at centroid if requested
         if label_elements:

@@ -891,29 +891,80 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
         v3 = values[element[2]]
         v4 = values[element[3]]
         
-        # Use bilinear interpolation for quadrilaterals
-        # First, find natural coordinates (xi, eta) in [-1, 1] x [-1, 1]
-        # This is an approximation - for exact mapping we'd need to solve a nonlinear system
+        # Use proper bilinear shape functions for quadrilaterals
+        # Map to natural coordinates (xi, eta) in [-1, 1] x [-1, 1]
         
-        # Simple bilinear interpolation using area ratios
-        # Calculate areas of sub-triangles
-        A_total = abs((x2 - x1) * (y4 - y1) - (x4 - x1) * (y2 - y1)) / 2
-        A1 = abs((x - x1) * (y2 - y1) - (x2 - x1) * (y - y1)) / 2
-        A2 = abs((x - x2) * (y3 - y2) - (x3 - x2) * (y - y2)) / 2
-        A3 = abs((x - x3) * (y4 - y3) - (x4 - x3) * (y - y3)) / 2
-        A4 = abs((x - x4) * (y1 - y4) - (x1 - x4) * (y - y4)) / 2
+        # For bilinear quad4, use iterative Newton-Raphson to find natural coordinates
+        # Initial guess at element center
+        xi, eta = 0.0, 0.0
         
-        # Normalize areas
-        if A_total > 1e-12:
-            w1 = A1 / A_total
-            w2 = A2 / A_total
-            w3 = A3 / A_total
-            w4 = A4 / A_total
-        else:
-            w1 = w2 = w3 = w4 = 0.25
+        # Newton-Raphson iteration to find (xi, eta) such that physical coordinates match
+        for _ in range(10):  # Max 10 iterations
+            # Bilinear shape functions
+            N = np.array([
+                0.25 * (1-xi) * (1-eta),  # Node 0
+                0.25 * (1+xi) * (1-eta),  # Node 1
+                0.25 * (1+xi) * (1+eta),  # Node 2
+                0.25 * (1-xi) * (1+eta)   # Node 3
+            ])
+            
+            # Shape function derivatives
+            dN_dxi = np.array([
+                -0.25 * (1-eta),  # Node 0
+                 0.25 * (1-eta),  # Node 1
+                 0.25 * (1+eta),  # Node 2
+                -0.25 * (1+eta)   # Node 3
+            ])
+            
+            dN_deta = np.array([
+                -0.25 * (1-xi),   # Node 0
+                -0.25 * (1+xi),   # Node 1
+                 0.25 * (1+xi),   # Node 2
+                 0.25 * (1-xi)    # Node 3
+            ])
+            
+            # Current physical coordinates
+            x_curr = N[0]*x1 + N[1]*x2 + N[2]*x3 + N[3]*x4
+            y_curr = N[0]*y1 + N[1]*y2 + N[2]*y3 + N[3]*y4
+            
+            # Residual
+            fx = x_curr - x
+            fy = y_curr - y
+            
+            if abs(fx) < 1e-10 and abs(fy) < 1e-10:
+                break
+                
+            # Jacobian
+            dx_dxi = dN_dxi[0]*x1 + dN_dxi[1]*x2 + dN_dxi[2]*x3 + dN_dxi[3]*x4
+            dx_deta = dN_deta[0]*x1 + dN_deta[1]*x2 + dN_deta[2]*x3 + dN_deta[3]*x4
+            dy_dxi = dN_dxi[0]*y1 + dN_dxi[1]*y2 + dN_dxi[2]*y3 + dN_dxi[3]*y4
+            dy_deta = dN_deta[0]*y1 + dN_deta[1]*y2 + dN_deta[2]*y3 + dN_deta[3]*y4
+            
+            det_J = dx_dxi * dy_deta - dx_deta * dy_dxi
+            if abs(det_J) < 1e-12:
+                break
+            
+            # Newton-Raphson update
+            dxi = (dy_deta * fx - dx_deta * fy) / det_J
+            deta = (-dy_dxi * fx + dx_dxi * fy) / det_J
+            
+            xi -= dxi
+            eta -= deta
+            
+            # Clamp to [-1,1]
+            xi = max(-1, min(1, xi))
+            eta = max(-1, min(1, eta))
         
-        # Interpolate using area weights
-        interpolated_value = w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4
+        # Final bilinear shape functions
+        N = np.array([
+            0.25 * (1-xi) * (1-eta),  # Node 0
+            0.25 * (1+xi) * (1-eta),  # Node 1
+            0.25 * (1+xi) * (1+eta),  # Node 2
+            0.25 * (1-xi) * (1+eta)   # Node 3
+        ])
+        
+        # Interpolate using bilinear shape functions
+        interpolated_value = N[0]*v1 + N[1]*v2 + N[2]*v3 + N[3]*v4
         
     elif elem_type == 8:  # Quadratic quadrilateral
         # Get all 8 nodes: corners (0,1,2,3) and midpoints (4,5,6,7)
@@ -984,6 +1035,110 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
             interpolated_value = 0.0
             for i in range(8):
                 interpolated_value += N[i] * values[element[i]]
+    
+    elif elem_type == 9:  # Biquadratic quadrilateral (9-node Lagrange)
+        # Get all 9 nodes: corners (0,1,2,3), edges (4,5,6,7), and center (8)
+        # Node ordering: 0-1-2-3 corners, 4 midpoint of 0-1, 5 midpoint of 1-2,
+        #                6 midpoint of 2-3, 7 midpoint of 3-0, 8 center
+        
+        # Get corner coordinates for mapping to natural coordinates
+        x1, y1 = nodes[element[0]]  # Node 0
+        x2, y2 = nodes[element[1]]  # Node 1
+        x3, y3 = nodes[element[2]]  # Node 2
+        x4, y4 = nodes[element[3]]  # Node 3
+        
+        # Newton-Raphson iteration to find natural coordinates (xi, eta)
+        xi, eta = 0.0, 0.0  # Initial guess at element center
+        
+        for _ in range(10):  # Max 10 iterations
+            # Biquadratic Lagrange shape functions for all 9 nodes
+            N = np.zeros(9)
+            # Corner nodes
+            N[0] = 0.25 * xi * (xi-1) * eta * (eta-1)     # Node 0: (-1,-1)
+            N[1] = 0.25 * xi * (xi+1) * eta * (eta-1)     # Node 1: (1,-1)  
+            N[2] = 0.25 * xi * (xi+1) * eta * (eta+1)     # Node 2: (1,1)
+            N[3] = 0.25 * xi * (xi-1) * eta * (eta+1)     # Node 3: (-1,1)
+            # Edge nodes
+            N[4] = 0.5 * (1-xi*xi) * eta * (eta-1)        # Node 4: (0,-1)
+            N[5] = 0.5 * xi * (xi+1) * (1-eta*eta)        # Node 5: (1,0)
+            N[6] = 0.5 * (1-xi*xi) * eta * (eta+1)        # Node 6: (0,1)
+            N[7] = 0.5 * xi * (xi-1) * (1-eta*eta)        # Node 7: (-1,0)
+            # Center node
+            N[8] = (1-xi*xi) * (1-eta*eta)                # Node 8: (0,0)
+            
+            # Shape function derivatives w.r.t. xi
+            dN_dxi = np.zeros(9)
+            dN_dxi[0] = 0.25 * (2*xi-1) * eta * (eta-1)
+            dN_dxi[1] = 0.25 * (2*xi+1) * eta * (eta-1)
+            dN_dxi[2] = 0.25 * (2*xi+1) * eta * (eta+1)
+            dN_dxi[3] = 0.25 * (2*xi-1) * eta * (eta+1)
+            dN_dxi[4] = -xi * eta * (eta-1)
+            dN_dxi[5] = 0.5 * (2*xi+1) * (1-eta*eta)
+            dN_dxi[6] = -xi * eta * (eta+1)
+            dN_dxi[7] = 0.5 * (2*xi-1) * (1-eta*eta)
+            dN_dxi[8] = -2*xi * (1-eta*eta)
+            
+            # Shape function derivatives w.r.t. eta
+            dN_deta = np.zeros(9)
+            dN_deta[0] = 0.25 * xi * (xi-1) * (2*eta-1)
+            dN_deta[1] = 0.25 * xi * (xi+1) * (2*eta-1)
+            dN_deta[2] = 0.25 * xi * (xi+1) * (2*eta+1)
+            dN_deta[3] = 0.25 * xi * (xi-1) * (2*eta+1)
+            dN_deta[4] = 0.5 * (1-xi*xi) * (2*eta-1)
+            dN_deta[5] = -eta * xi * (xi+1)
+            dN_deta[6] = 0.5 * (1-xi*xi) * (2*eta+1)
+            dN_deta[7] = -eta * xi * (xi-1)
+            dN_deta[8] = -2*eta * (1-xi*xi)
+            
+            # Current physical coordinates using all 9 nodes
+            node_coords = nodes[element[:9]]
+            x_curr = np.sum(N * node_coords[:, 0])
+            y_curr = np.sum(N * node_coords[:, 1])
+            
+            # Residual
+            fx = x_curr - x
+            fy = y_curr - y
+            
+            if abs(fx) < 1e-10 and abs(fy) < 1e-10:
+                break
+                
+            # Jacobian
+            dx_dxi = np.sum(dN_dxi * node_coords[:, 0])
+            dx_deta = np.sum(dN_deta * node_coords[:, 0])
+            dy_dxi = np.sum(dN_dxi * node_coords[:, 1])
+            dy_deta = np.sum(dN_deta * node_coords[:, 1])
+            
+            det_J = dx_dxi * dy_deta - dx_deta * dy_dxi
+            if abs(det_J) < 1e-12:
+                break
+            
+            # Newton-Raphson update
+            dxi = (dy_deta * fx - dx_deta * fy) / det_J
+            deta = (-dy_dxi * fx + dx_dxi * fy) / det_J
+            
+            xi -= dxi
+            eta -= deta
+            
+            # Clamp to [-1,1]
+            xi = max(-1, min(1, xi))
+            eta = max(-1, min(1, eta))
+        
+        # Final biquadratic shape functions
+        N = np.zeros(9)
+        N[0] = 0.25 * xi * (xi-1) * eta * (eta-1)     # Node 0
+        N[1] = 0.25 * xi * (xi+1) * eta * (eta-1)     # Node 1
+        N[2] = 0.25 * xi * (xi+1) * eta * (eta+1)     # Node 2
+        N[3] = 0.25 * xi * (xi-1) * eta * (eta+1)     # Node 3
+        N[4] = 0.5 * (1-xi*xi) * eta * (eta-1)        # Node 4
+        N[5] = 0.5 * xi * (xi+1) * (1-eta*eta)        # Node 5
+        N[6] = 0.5 * (1-xi*xi) * eta * (eta+1)        # Node 6
+        N[7] = 0.5 * xi * (xi-1) * (1-eta*eta)        # Node 7
+        N[8] = (1-xi*xi) * (1-eta*eta)                # Node 8
+        
+        # Interpolate using biquadratic shape functions
+        interpolated_value = 0.0
+        for i in range(9):
+            interpolated_value += N[i] * values[element[i]]
     
     else:
         return 0.0  # Unknown element type

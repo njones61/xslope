@@ -555,6 +555,13 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             elif element_type == 8:
                 # 8-node quadrilateral (serendipity)
                 nodes_elem = nodes[element_nodes[:8], :]
+                k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+                k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+                theta = angles[idx] if hasattr(angles, '__len__') else angles
+                theta_rad = np.radians(theta)
+                c, s = np.cos(theta_rad), np.sin(theta_rad)
+                R = np.array([[c, s], [-s, c]])
+                Kmat = R.T @ np.diag([k1, k2]) @ R
                 
                 # Compute element pressure using serendipity shape functions at centroid
                 p_elem = compute_quad8_centroid_pressure(p_nodes, element_nodes)
@@ -569,6 +576,13 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             elif element_type == 9:
                 # 9-node quadrilateral (Lagrange)
                 nodes_elem = nodes[element_nodes[:9], :]
+                k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
+                k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
+                theta = angles[idx] if hasattr(angles, '__len__') else angles
+                theta_rad = np.radians(theta)
+                c, s = np.cos(theta_rad), np.sin(theta_rad)
+                R = np.array([[c, s], [-s, c]])
+                Kmat = R.T @ np.diag([k1, k2]) @ R
                 
                 # Compute element pressure using biquadratic shape functions at centroid
                 p_elem = compute_quad9_centroid_pressure(p_nodes, element_nodes)
@@ -1623,27 +1637,29 @@ def quad8_stiffness_matrix(nodes_elem, Kmat):
         for j, eta in enumerate(pts_1d):
             w = wts_1d[i] * wts_1d[j]
             
-            # Serendipity shape function derivatives
+            # Serendipity shape function derivatives for CCW node ordering
+            # Corner nodes: 0(-1,-1), 1(1,-1), 2(1,1), 3(-1,1) 
+            # Edge nodes: 4(0,-1), 5(1,0), 6(0,1), 7(-1,0)
             dN_dxi = np.array([
-                -(1-eta)/4 + (xi*(1-eta))/4 + (eta*(1-eta))/4,  # Node 0
-                (1-eta)/4 + (xi*(1-eta))/4 - (eta*(1-eta))/4,   # Node 1  
-                (1+eta)/4 + (xi*(1+eta))/4 + (eta*(1+eta))/4,   # Node 2
-                -(1+eta)/4 + (xi*(1+eta))/4 - (eta*(1+eta))/4,  # Node 3
-                -xi*(1-eta)/2,                                   # Node 4
-                (1-eta*eta)/2,                                   # Node 5
-                -xi*(1+eta)/2,                                   # Node 6
-                -(1-eta*eta)/2                                   # Node 7
+                -0.25*(1-eta)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta), # Node 0: corner (-1,-1)
+                0.25*(1-eta)*(xi-eta-1) + 0.25*(1+xi)*(1-eta),   # Node 1: corner (1,-1)
+                0.25*(1+eta)*(xi+eta-1) + 0.25*(1+xi)*(1+eta),   # Node 2: corner (1,1)
+                -0.25*(1+eta)*(-xi+eta-1) - 0.25*(1-xi)*(1+eta), # Node 3: corner (-1,1)
+                -xi*(1-eta),                                      # Node 4: edge (0,-1)
+                0.5*(1-eta*eta),                                  # Node 5: edge (1,0)
+                -xi*(1+eta),                                      # Node 6: edge (0,1)
+                -0.5*(1-eta*eta)                                  # Node 7: edge (-1,0)
             ])
             
             dN_deta = np.array([
-                -(1-xi)/4 + (xi*(1-xi))/4 + (eta*(1-xi))/4,    # Node 0
-                -(1+xi)/4 - (xi*(1+xi))/4 + (eta*(1+xi))/4,    # Node 1
-                (1+xi)/4 + (xi*(1+xi))/4 + (eta*(1+xi))/4,     # Node 2
-                (1-xi)/4 - (xi*(1-xi))/4 + (eta*(1-xi))/4,     # Node 3
-                -(1-xi*xi)/2,                                   # Node 4
-                -eta*(1+xi)/2,                                  # Node 5
-                (1-xi*xi)/2,                                    # Node 6
-                -eta*(1-xi)/2                                   # Node 7
+                -0.25*(1-xi)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta),  # Node 0: corner (-1,-1)
+                -0.25*(1+xi)*(xi-eta-1) - 0.25*(1+xi)*(1-eta),   # Node 1: corner (1,-1)
+                0.25*(1+xi)*(xi+eta-1) + 0.25*(1+xi)*(1+eta),    # Node 2: corner (1,1)
+                0.25*(1-xi)*(-xi+eta-1) + 0.25*(1-xi)*(1+eta),   # Node 3: corner (-1,1)
+                -0.5*(1-xi*xi),                                   # Node 4: edge (0,-1)
+                -eta*(1+xi),                                      # Node 5: edge (1,0)
+                0.5*(1-xi*xi),                                    # Node 6: edge (0,1)
+                -eta*(1-xi)                                       # Node 7: edge (-1,0)
             ])
             
             # Jacobian
@@ -1716,29 +1732,32 @@ def quad9_stiffness_matrix(nodes_elem, Kmat):
         for j, eta in enumerate(pts_1d):
             w = wts_1d[i] * wts_1d[j]
             
-            # Lagrange shape function derivatives (biquadratic)
+            # Lagrange shape function derivatives (biquadratic) for CCW node ordering
+            # Corner nodes: 0(-1,-1), 1(1,-1), 2(1,1), 3(-1,1)
+            # Edge nodes: 4(0,-1), 5(1,0), 6(0,1), 7(-1,0)
+            # Center node: 8(0,0)
             dN_dxi = np.array([
-                eta*(eta-1)*xi/2 + eta*(eta-1)/4,              # Node 0
-                eta*(eta-1)*xi/2 - eta*(eta-1)/4,              # Node 1  
-                eta*(eta+1)*xi/2 - eta*(eta+1)/4,              # Node 2
-                eta*(eta+1)*xi/2 + eta*(eta+1)/4,              # Node 3
-                -xi*eta*(eta-1),                                # Node 4
-                (1-eta*eta)/2,                                  # Node 5
-                -xi*eta*(eta+1),                                # Node 6
-                -(1-eta*eta)/2,                                 # Node 7
-                -2*xi*(1-eta*eta)                               # Node 8
+                0.25*(2*xi-1)*eta*(eta-1),                      # Node 0: corner (-1,-1)
+                0.25*(2*xi+1)*eta*(eta-1),                      # Node 1: corner (1,-1)
+                0.25*(2*xi+1)*eta*(eta+1),                      # Node 2: corner (1,1)
+                0.25*(2*xi-1)*eta*(eta+1),                      # Node 3: corner (-1,1)
+                -xi*eta*(eta-1),                                # Node 4: edge (0,-1)
+                0.5*(2*xi+1)*(1-eta*eta),                       # Node 5: edge (1,0)
+                -xi*eta*(eta+1),                                # Node 6: edge (0,1)
+                0.5*(2*xi-1)*(1-eta*eta),                       # Node 7: edge (-1,0)
+                -2*xi*(1-eta*eta)                               # Node 8: center (0,0)
             ])
             
             dN_deta = np.array([
-                xi*(xi-1)*eta/2 + xi*(xi-1)/4,                 # Node 0
-                xi*(xi+1)*eta/2 + xi*(xi+1)/4,                 # Node 1
-                xi*(xi+1)*eta/2 - xi*(xi+1)/4,                 # Node 2
-                xi*(xi-1)*eta/2 - xi*(xi-1)/4,                 # Node 3
-                -(1-xi*xi)/2,                                   # Node 4
-                -eta*xi*(xi+1),                                 # Node 5
-                (1-xi*xi)/2,                                    # Node 6
-                -eta*xi*(xi-1),                                 # Node 7
-                -2*eta*(1-xi*xi)                                # Node 8
+                0.25*xi*(xi-1)*(2*eta-1),                       # Node 0: corner (-1,-1)
+                0.25*xi*(xi+1)*(2*eta-1),                       # Node 1: corner (1,-1)
+                0.25*xi*(xi+1)*(2*eta+1),                       # Node 2: corner (1,1)
+                0.25*xi*(xi-1)*(2*eta+1),                       # Node 3: corner (-1,1)
+                0.5*(1-xi*xi)*(2*eta-1),                        # Node 4: edge (0,-1)
+                -eta*xi*(xi+1),                                 # Node 5: edge (1,0)
+                0.5*(1-xi*xi)*(2*eta+1),                        # Node 6: edge (0,1)
+                -eta*xi*(xi-1),                                 # Node 7: edge (-1,0)
+                -2*eta*(1-xi*xi)                                # Node 8: center (0,0)
             ])
             
             # Jacobian

@@ -19,7 +19,7 @@ polygons = build_polygons(slope_data['profile_lines'], max_depth=slope_data['max
 x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
 target_size = (x_range[1] - x_range[0]) / 100
 
-target_size = 20
+target_size = 5
 
 # Build quadrilateral mesh
 mesh = build_mesh_from_polygons(polygons, target_size, 'quad9')
@@ -28,11 +28,11 @@ plot_mesh(mesh, materials=slope_data['materials'])
 
 seep_data = build_seep_data(mesh, slope_data)
 
-plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=True, label_nodes=True)
+plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
 
-# solution = run_seepage_analysis(seep_data)
+solution = run_seepage_analysis(seep_data)
 
-# plot_seep_solution(seep_data, solution, levels=30, base_mat=2, fill_contours=False, phreatic=True)
+plot_seep_solution(seep_data, solution, levels=30, base_mat=2, fill_contours=False, phreatic=True)
 
-export_mesh_to_json(mesh, "inputs/slope/seep_mesh_lface3.json")
-# export_seep_solution(seep_data, solution, "inputs/slope/seep_solution_lface3.csv")
+export_mesh_to_json(mesh, "inputs/slope/seep_mesh_lface5.json")
+export_seep_solution(seep_data, solution, "inputs/slope/seep_solution_lface5.csv")

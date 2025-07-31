@@ -1055,7 +1055,7 @@ def plot_reliability_results(slope_data, reliability_data, width=12, height=7):
     plt.tight_layout()
     plt.show()
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False):
     """
     Plot the finite element mesh with material regions.
     
@@ -1065,10 +1065,13 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         figsize: Figure size tuple
         pad_frac: Fraction of mesh size to use for padding around plot
         show_nodes: If True, plot points at node locations
+        label_elements: If True, label each element with its number at its centroid
+        label_nodes: If True, label each node with its number
     """
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from matplotlib.collections import PolyCollection
+    import numpy as np
     
     nodes = mesh["nodes"]
     elements = mesh["elements"]
@@ -1093,8 +1096,49 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         
         material_elements[mid].append(element_coords)
     
-    # Plot each material
     legend_elements = []
+    
+    # Plot 1D elements FIRST (bottom layer) if present in mesh
+    if "elements_1d" in mesh and "element_types_1d" in mesh and "element_materials_1d" in mesh:
+        elements_1d = mesh["elements_1d"]
+        element_types_1d = mesh["element_types_1d"]
+        mat_ids_1d = mesh["element_materials_1d"]
+        
+        # Group 1D elements by material ID
+        material_lines = {}
+        for i, (element_1d, elem_type_1d, mid_1d) in enumerate(zip(elements_1d, element_types_1d, mat_ids_1d)):
+            if mid_1d not in material_lines:
+                material_lines[mid_1d] = []
+            
+            # Get line coordinates based on actual number of nodes
+            # elem_type_1d contains the number of nodes (2 for linear, 3 for quadratic)
+            if elem_type_1d == 2:  # Linear 1D element (2 nodes)
+                # Skip zero-padded elements
+                if element_1d[1] != 0:  # Valid second node
+                    line_coords = [nodes[element_1d[0]], nodes[element_1d[1]]]
+                else:
+                    continue  # Skip invalid element
+            elif elem_type_1d == 3:  # Quadratic 1D element (3 nodes)
+                # For visualization, connect all three nodes or just endpoints
+                line_coords = [nodes[element_1d[0]], nodes[element_1d[1]], nodes[element_1d[2]]]
+            else:
+                continue  # Skip unknown 1D element types
+            
+            material_lines[mid_1d].append(line_coords)
+        
+        # Plot 1D elements with distinctive style
+        for mid_1d, lines_list in material_lines.items():
+            for line_coords in lines_list:
+                xs = [coord[0] for coord in line_coords]
+                ys = [coord[1] for coord in line_coords]
+                ax.plot(xs, ys, color='red', linewidth=3, alpha=0.8, solid_capstyle='round')
+        
+        # Add 1D elements to legend
+        if material_lines:
+            legend_elements.append(plt.Line2D([0], [0], color='red', linewidth=3, 
+                                            alpha=0.8, label='1D Elements'))
+    
+    # Plot 2D elements SECOND (middle layer)
     for mid, elements_list in material_elements.items():
         # Create polygon collection for this material
         poly_collection = PolyCollection(elements_list, 
@@ -1115,38 +1159,65 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
                                    alpha=0.4, 
                                    label=label))
     
-    # Plot nodes if requested
-    if show_nodes:
-        # Collect actual nodes used by elements (excluding padding zeros)
-        used_nodes = set()
-        for elem, elem_type in zip(elements, element_types):
-            if elem_type == 3:  # 3-node triangle
-                for i in range(3):
-                    used_nodes.add(elem[i])
-            elif elem_type == 6:  # 6-node triangle
-                for i in range(6):
-                    if elem[i] != 0:
-                        used_nodes.add(elem[i])
-            elif elem_type == 4:  # 4-node quad
-                for i in range(4):
-                    used_nodes.add(elem[i])
-            elif elem_type == 8:  # 8-node quad (no center node)
-                for i in range(8):
-                    if elem[i] != 0:
-                        used_nodes.add(elem[i])
-            elif elem_type == 9:  # 9-node quad (with center node)
-                for i in range(9):
-                    if elem[i] != 0:
-                        used_nodes.add(elem[i])
+    # Label 2D elements if requested
+    if label_elements:
+        for idx, (element, element_type) in enumerate(zip(elements, element_types)):
+            # Calculate element centroid based on element type
+            if element_type == 3:  # 3-node triangle
+                element_coords = nodes[element[:3]]
+            elif element_type == 6:  # 6-node triangle
+                element_coords = nodes[element[:6]]
+            elif element_type == 4:  # 4-node quad
+                element_coords = nodes[element[:4]]
+            elif element_type == 8:  # 8-node quad
+                element_coords = nodes[element[:8]]
+            elif element_type == 9:  # 9-node quad
+                element_coords = nodes[element[:9]]
+            else:
+                continue  # Skip unknown element types
+            
+            centroid = np.mean(element_coords, axis=0)
+            ax.text(centroid[0], centroid[1], str(idx+1),
+                    ha='center', va='center', fontsize=6, color='black', alpha=0.7,
+                    zorder=12)
+    
+    # Label 1D elements if requested (with different color)
+    if label_elements and "elements_1d" in mesh:
+        elements_1d = mesh["elements_1d"]
+        element_types_1d = mesh["element_types_1d"]
         
-        # Plot only the actually used nodes
-        if used_nodes:
-            used_coords = nodes[list(used_nodes)]
-            ax.plot(used_coords[:, 0], used_coords[:, 1], 'k.', markersize=2)
-            # Add to legend
-            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
-                                            markerfacecolor='k', markersize=6, 
-                                            label=f'Nodes ({len(used_nodes)})', linestyle='None'))
+        for idx, (element_1d, elem_type_1d) in enumerate(zip(elements_1d, element_types_1d)):
+            # Skip zero-padded elements
+            if elem_type_1d == 2 and element_1d[1] != 0:  # Linear 1D element
+                # Calculate midpoint of line element
+                coord1 = nodes[element_1d[0]]
+                coord2 = nodes[element_1d[1]]
+                midpoint = (coord1 + coord2) / 2
+                ax.text(midpoint[0], midpoint[1], f"1D{idx+1}",
+                        ha='center', va='center', fontsize=6, color='black', alpha=0.9,
+                        zorder=13)
+            elif elem_type_1d == 3:  # Quadratic 1D element
+                # Use middle node as label position
+                midpoint = nodes[element_1d[1]]
+                ax.text(midpoint[0], midpoint[1], f"1D{idx+1}",
+                        ha='center', va='center', fontsize=6, color='black', alpha=0.9,
+                        zorder=13)
+    
+    # Plot nodes LAST (top layer) if requested
+    if show_nodes:
+        # Plot all nodes - if meshing is correct, all nodes should be used
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
+        # Add to legend
+        legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                        markerfacecolor='k', markersize=6, 
+                                        label=f'Nodes ({len(nodes)})', linestyle='None'))
+    
+    # Label nodes if requested
+    if label_nodes:
+        # Label all nodes
+        for i, (x, y) in enumerate(nodes):
+            ax.text(x + 0.5, y + 0.5, str(i+1), fontsize=6, color='blue', alpha=0.7,
+                    ha='left', va='bottom', zorder=14)
     
     ax.set_aspect('equal')
     ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")

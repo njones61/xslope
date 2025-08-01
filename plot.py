@@ -1086,6 +1086,10 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         if mid not in material_elements:
             material_elements[mid] = []
         
+        # Only process 2D elements (skip 1D elements which have elem_type 2)
+        if elem_type == 2:  # Skip 1D elements
+            continue
+        
         # Use corner nodes to define element boundary (no subdivision needed)
         if elem_type in [3, 6]:  # Triangular elements (linear or quadratic)
             element_coords = [nodes[element[0]], nodes[element[1]], nodes[element[2]]]
@@ -1196,8 +1200,8 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
                 ax.text(midpoint[0], midpoint[1], f"1D{idx+1}",
                         ha='center', va='center', fontsize=6, color='black', alpha=0.9,
                         zorder=13)
-            elif elem_type_1d == 3:  # Quadratic 1D element
-                # Use middle node as label position
+            elif elem_type_1d == 3 and element_1d[2] != 0:  # Quadratic 1D element
+                # Use middle node as label position (if it exists)
                 midpoint = nodes[element_1d[1]]
                 ax.text(midpoint[0], midpoint[1], f"1D{idx+1}",
                         ha='center', va='center', fontsize=6, color='black', alpha=0.9,

@@ -39,7 +39,7 @@ test_single_line = [test_lines[0]]  # Just the first line: [(0.0, 0.0), (4.0, 0.
 print(f"Testing with single line: {test_single_line[0]}")
 
 # Test 1D line meshing in isolation (without polygons)
-print("\\nTesting 1D line in isolation...")
+print("\nTesting 1D line in isolation...")
 mesh_1d_only = build_mesh_from_polygons(
     [],  # No polygons - just the 1D line
     target_size, 
@@ -48,17 +48,17 @@ mesh_1d_only = build_mesh_from_polygons(
     debug=True
 )
 
-print(f"\\n1D-only mesh: {len(mesh_1d_only.get('nodes', []))} nodes")
+print(f"\n1D-only mesh: {len(mesh_1d_only.get('nodes', []))} nodes")
 if 'elements_1d' in mesh_1d_only:
     print(f"1D-only mesh: {len(mesh_1d_only['elements_1d'])} 1D elements")
     # Show all node coordinates
-    print("\\nAll node coordinates:")
+    print("\nAll node coordinates:")
     nodes = mesh_1d_only['nodes']
     for i, node in enumerate(nodes):
         print(f"  Node {i}: {node}")
     
     # Show actual coordinates of 1D elements
-    print("\\n1D-only element coordinates:")
+    print("\n1D-only element coordinates:")
     elements_1d = mesh_1d_only['elements_1d']
     for i, element in enumerate(elements_1d):
         # Check if element has valid node indices (not zero-padded)
@@ -71,7 +71,7 @@ else:
     print("  No 1D elements found")
 
 # Test mesh generation with 1D lines and polygons
-print("\\nTesting 1D line with polygons...")
+print("\nTesting 1D line with polygons...")
 mesh_with_1d = build_mesh_from_polygons(
     polygons, 
     target_size, 
@@ -80,28 +80,33 @@ mesh_with_1d = build_mesh_from_polygons(
     debug=True
 )
 
-print(f"Generated mesh with {len(mesh_with_1d['nodes'])} nodes")
 if 'elements_1d' in mesh_with_1d:
+    print(f"Generated mesh with {len(mesh_with_1d['nodes'])} nodes")
     print(f"Generated {len(mesh_with_1d['elements_1d'])} 1D elements")
     print(f"1D element types: {mesh_with_1d['element_types_1d']}")
     print(f"1D material IDs: {mesh_with_1d['element_materials_1d']}")
-    
-    # Show actual coordinates of 1D elements
-    print("\nActual 1D element coordinates:")
-    nodes = mesh_with_1d['nodes']
-    elements_1d = mesh_with_1d['elements_1d']
-    for i, element in enumerate(elements_1d[:10]):  # Show first 10 elements
-        # Check if element has valid node indices (not zero-padded)
-        if len(element) >= 2 and element[1] != 0:  # Skip only if second index is 0 (padding)
-            coord1 = nodes[element[0]]
-            coord2 = nodes[element[1]]
-            print(f"  Element {i}: {coord1} -> {coord2}")
     
     print(f"\nExpected line path: {test_single_line[0]}")
     
     # Test 1D element alignment
     test_success = test_1d_element_alignment(mesh_with_1d, test_single_line, debug=True)
     print(f"1D element alignment test: {'PASSED' if test_success else 'FAILED'}")
+    
+    # Test with custom target_size_1d
+    print(f"\nTesting with custom target_size_1d = 3.0...")
+    mesh_custom_1d = build_mesh_from_polygons(
+        polygons, 
+        target_size, 
+        element_type='tri3', 
+        lines=test_single_line,
+        target_size_1d=3.0,
+        debug=True
+    )
+    
+    if 'elements_1d' in mesh_custom_1d:
+        print(f"Custom 1D mesh: {len(mesh_custom_1d['elements_1d'])} 1D elements")
+        print(f"Custom 1D element types: {mesh_custom_1d['element_types_1d']}")
+        print(f"Custom 1D material IDs: {mesh_custom_1d['element_materials_1d']}")
     
     # Plot the mesh with 1D elements
     plot_mesh(mesh_with_1d, materials=slope_data['materials'], label_elements=True, label_nodes=True)

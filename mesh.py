@@ -480,21 +480,45 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             physical_tag = gmsh.model.addPhysicalGroup(1, line_tags)
             physical_lines.append((physical_tag, line_idx))
     
+    # Check for potential quad4 + reinforcement line conflicts
+    has_reinforcement_lines = lines is not None and len(lines) > 0
+    wants_quads = element_type.startswith('quad')
+    
     # Set mesh algorithm and recombination options BEFORE generating mesh
     if element_type.startswith('quad'):
-        # Default quad meshing parameters (can be overridden)
-        default_params = {
-            "Mesh.Algorithm": 8,  # Frontal-Delaunay for quads (try 5, 6, 8)
-            "Mesh.RecombineAll": 1,  # Recombine triangles into quads
-            "Mesh.RecombinationAlgorithm": 1,  # Simple recombination (try 0, 1, 2, 3)
-            "Mesh.SubdivisionAlgorithm": 1,  # All quads (try 0, 1, 2)
-            "Mesh.RecombineOptimizeTopology": 5,  # Optimize topology (0-100)
-            "Mesh.RecombineNodeRepositioning": 1,  # Reposition nodes (0 or 1)
-            "Mesh.RecombineMinimumQuality": 0.01,  # Minimum quality threshold
-            "Mesh.Smoothing": 10,  # Number of smoothing steps (try 0-100)
-            "Mesh.SmoothNormals": 1,  # Smooth normals
-            "Mesh.SmoothRatio": 1.8,  # Smoothing ratio (1.0-3.0)
-        }
+        # Check if we need to use a more robust algorithm for reinforcement lines
+        if has_reinforcement_lines:
+            if debug:
+                print(f"Detected quad elements with reinforcement lines.")
+                print(f"Using robust recombination algorithm to handle embedded line constraints.")
+            
+            # Use 'fast' algorithm which is more robust with embedded constraints
+            default_params = {
+                "Mesh.Algorithm": 8,  # Frontal-Delaunay for quads
+                "Mesh.RecombineAll": 1,  # Recombine triangles into quads
+                "Mesh.RecombinationAlgorithm": 0,  # Standard (more robust than simple)
+                "Mesh.SubdivisionAlgorithm": 0,  # Mixed tri/quad where needed
+                "Mesh.RecombineOptimizeTopology": 0,  # Minimal optimization
+                "Mesh.RecombineNodeRepositioning": 1,  # Still reposition nodes
+                "Mesh.RecombineMinimumQuality": 0.01,  # Keep quality threshold
+                "Mesh.Smoothing": 5,  # Reduced smoothing
+                "Mesh.SmoothNormals": 1,  # Keep smooth normals
+                "Mesh.SmoothRatio": 1.8,  # Keep smoothing ratio
+            }
+        else:
+            # Standard quad meshing parameters for cases without reinforcement lines
+            default_params = {
+                "Mesh.Algorithm": 8,  # Frontal-Delaunay for quads (try 5, 6, 8)
+                "Mesh.RecombineAll": 1,  # Recombine triangles into quads
+                "Mesh.RecombinationAlgorithm": 1,  # Simple recombination (try 0, 1, 2, 3)
+                "Mesh.SubdivisionAlgorithm": 1,  # All quads (try 0, 1, 2)
+                "Mesh.RecombineOptimizeTopology": 5,  # Optimize topology (0-100)
+                "Mesh.RecombineNodeRepositioning": 1,  # Reposition nodes (0 or 1)
+                "Mesh.RecombineMinimumQuality": 0.01,  # Minimum quality threshold
+                "Mesh.Smoothing": 10,  # Number of smoothing steps (try 0-100)
+                "Mesh.SmoothNormals": 1,  # Smooth normals
+                "Mesh.SmoothRatio": 1.8,  # Smoothing ratio (1.0-3.0)
+            }
         
         # Override with user-provided parameters
         if mesh_params:

@@ -24,7 +24,7 @@ mesh = build_mesh_from_polygons(
     polygons, 
     target_size, 
     element_type='quad4', 
-    lines=test_lines,
+    lines=None,
     debug=True
 )
 

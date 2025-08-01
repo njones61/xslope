@@ -47,6 +47,7 @@ nav:
     - Sample Problems: seepage/samples.md
   - Finite Element Method:
     - Overview: finite_element/overview.md
+    - Mesh Generation: finite_element/mesh.md
     - Problem Setup: finite_element/setup.md
     - Sample Problems: finite_element/samples.md
   - API:

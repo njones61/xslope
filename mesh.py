@@ -20,7 +20,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
         control_short_edges : If True, prevents subdivision of edges shorter than target_size
-        target_size_1d : Optional target size for 1D elements (default None, which is set to target_size/2 if None)
+        target_size_1d : Optional target size for 1D elements (default None, which is set to target_size if None)
 
     Returns:
         mesh dict containing:
@@ -40,9 +40,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
 
     # Set default target_size_1d if None
     if target_size_1d is None:
-        target_size_1d = target_size / 2
+        target_size_1d = target_size
         if debug:
-            print(f"Using default target_size_1d = target_size/2 = {target_size_1d}")
+            print(f"Using default target_size_1d = target_size = {target_size_1d}")
 
     # build a list of region ids (list of material IDs - one per polygon)
     region_ids = [i for i in range(len(polygons))]
@@ -439,15 +439,16 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             line_pts = line_info['point_coords']
             
             # Set transfinite constraints to force mesh edges along each line segment
-            for i, line_tag in enumerate(line_tags):
-                try:
-                    # Force exactly 2 nodes (start and end) to prevent subdivision
-                    gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)
-                    if debug:
-                        print(f"Set transfinite constraint on line {line_idx} segment {i}: exactly 2 nodes")
-                except Exception as e:
-                    if debug:
-                        print(f"Warning: Could not set transfinite constraint on line {line_idx} segment {i}: {e}")
+            # REMOVED: This was conflicting with the target_size_1d calculations above
+            # for i, line_tag in enumerate(line_tags):
+            #     try:
+            #         # Force exactly 2 nodes (start and end) to prevent subdivision
+            #         gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)
+            #         if debug:
+            #             print(f"Set transfinite constraint on line {line_idx} segment {i}: exactly 2 nodes")
+            #     except Exception as e:
+            #         if debug:
+            #             print(f"Warning: Could not set transfinite constraint on line {line_idx} segment {i}: {e}")
             
             # Embed reinforcement lines in all surfaces to ensure they're part of the mesh
             for surface in surface_to_region.keys():

@@ -660,15 +660,59 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=6):
+def plot_reinforcement_lines(ax, slope_data):
+    """
+    Plots the reinforcement lines from slope_data.
+    
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: Dictionary containing slope data with 'reinforce_lines' key
+        
+    Returns:
+        None
+    """
+    if 'reinforce_lines' not in slope_data or not slope_data['reinforce_lines']:
+        return
+        
+    tension_points_plotted = False  # Track if tension points have been added to legend
+    
+    for i, line in enumerate(slope_data['reinforce_lines']):
+        # Extract x and y coordinates from the line points
+        xs = [point['X'] for point in line]
+        ys = [point['Y'] for point in line]
+        
+        # Plot the reinforcement line with a distinctive style
+        ax.plot(xs, ys, color='darkgray', linewidth=3, linestyle='-', 
+                alpha=0.8, label='Reinforcement Line' if i == 0 else "")
+        
+        # Add markers at each point to show tension values
+        for j, point in enumerate(line):
+            tension = point.get('T', 0.0)
+            if tension > 0:
+                # Use smaller marker size proportional to tension (normalized)
+                max_tension = max(p.get('T', 0.0) for p in line)
+                marker_size = 10 + 15 * (tension / max_tension) if max_tension > 0 else 10
+                ax.scatter(point['X'], point['Y'], s=marker_size, 
+                          color='red', alpha=0.7, zorder=5,
+                          label='Tension Points' if not tension_points_plotted else "")
+                tension_points_plotted = True
+
+
+def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=6, mat_table=True):
     """
     Creates a plot showing the slope geometry and input parameters.
 
     Parameters:
-        data: Dictionary containing plot data
+        slope_data: Dictionary containing plot data
         title: Title for the plot
         width: Width of the plot in inches
         height: Height of the plot in inches
+        mat_table: Controls material table display. Can be:
+            - True: Auto-position material table to avoid overlaps
+            - False: Don't show material table
+            - 'auto': Auto-position material table to avoid overlaps
+            - String: Specific location for material table ('upper left', 'upper right', 'upper center',
+                     'lower left', 'lower right', 'lower center', 'center left', 'center right', 'center')
 
     Returns:
         None
@@ -681,13 +725,39 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_reinforcement_lines(ax, slope_data)
 
     if slope_data['circular']:
         plot_circles(ax, slope_data)
     else:
         plot_non_circ(ax, slope_data['non_circ'])
 
-    plot_material_table(ax, slope_data['materials'], xloc=0.62) # Adjust this so that it fits with the legend
+    # Handle material table display
+    if mat_table:
+        if isinstance(mat_table, str) and mat_table != 'auto':
+            # Convert location string to xloc, yloc coordinates (inside plot area with margins)
+            location_map = {
+                'upper left': (0.05, 0.70),
+                'upper right': (0.70, 0.70),
+                'upper center': (0.35, 0.70),
+                'lower left': (0.05, 0.05),
+                'lower right': (0.70, 0.05),
+                'lower center': (0.35, 0.05),
+                'center left': (0.05, 0.35),
+                'center right': (0.70, 0.35),
+                'center': (0.35, 0.35)
+            }
+            if mat_table in location_map:
+                xloc, yloc = location_map[mat_table]
+                plot_material_table(ax, slope_data['materials'], xloc=xloc, yloc=yloc)
+            else:
+                # Default to upper right if invalid location
+                plot_material_table(ax, slope_data['materials'], xloc=0.75, yloc=0.75)
+        else:
+            # Auto-position or default: find best location
+            plot_elements_bounds = get_plot_elements_bounds(ax, slope_data)
+            xloc, yloc = find_best_table_position(ax, slope_data['materials'], plot_elements_bounds)
+            plot_material_table(ax, slope_data['materials'], xloc=xloc, yloc=yloc)
 
     ax.set_aspect('equal')  # ✅ Equal aspect
     ax.set_xlabel("x")
@@ -745,6 +815,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, width=12, heig
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_reinforcement_lines(ax, slope_data)
     if slice_numbers:
         plot_slice_numbers(ax, slice_df)
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
@@ -1298,3 +1369,101 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone'):
         ax.legend()
     plt.tight_layout()
     plt.show()
+
+
+def find_best_table_position(ax, materials, plot_elements_bounds):
+    """
+    Find the best position for the material table to avoid overlaps.
+    
+    Parameters:
+        ax: matplotlib Axes object
+        materials: List of materials to determine table size
+        plot_elements_bounds: List of (x_min, x_max, y_min, y_max) for existing elements
+        
+    Returns:
+        (xloc, yloc) coordinates for table placement
+    """
+    # Calculate table size based on number of materials and columns
+    num_materials = len(materials)
+    has_d_psi = any(mat.get('d', 0) > 0 or mat.get('psi', 0) > 0 for mat in materials)
+    table_height = 0.05 + 0.025 * num_materials  # Height per row
+    table_width = 0.25 if has_d_psi else 0.2
+    
+    # Define candidate positions (priority order) - with margins from borders
+    candidates = [
+        (0.05, 0.70),  # upper left
+        (0.70, 0.70),  # upper right  
+        (0.05, 0.05),  # lower left
+        (0.70, 0.05),  # lower right
+        (0.35, 0.70),  # upper center
+        (0.35, 0.05),  # lower center
+        (0.05, 0.35),  # center left
+        (0.70, 0.35),  # center right
+        (0.35, 0.35),  # center
+    ]
+    
+    # Check each candidate position for overlaps
+    for xloc, yloc in candidates:
+        table_bounds = (xloc, xloc + table_width, yloc - table_height, yloc)
+        
+        # Check if table overlaps with any plot elements
+        overlap = False
+        for elem_bounds in plot_elements_bounds:
+            elem_x_min, elem_x_max, elem_y_min, elem_y_max = elem_bounds
+            table_x_min, table_x_max, table_y_min, table_y_max = table_bounds
+            
+            # Check for overlap
+            if not (table_x_max < elem_x_min or table_x_min > elem_x_max or
+                   table_y_max < elem_y_min or table_y_min > elem_y_max):
+                overlap = True
+                break
+        
+        if not overlap:
+            return xloc, yloc
+    
+    # If all positions have overlap, return the first candidate
+    return candidates[0]
+
+
+def get_plot_elements_bounds(ax, slope_data):
+    """
+    Get bounding boxes of existing plot elements to avoid overlaps.
+    
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: Dictionary containing slope data
+        
+    Returns:
+        List of (x_min, x_max, y_min, y_max) tuples for plot elements
+    """
+    bounds = []
+    
+    # Get axis limits
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+    
+    # Profile lines bounds
+    if 'profile_lines' in slope_data:
+        for line in slope_data['profile_lines']:
+            if line:
+                xs = [p[0] for p in line]
+                ys = [p[1] for p in line]
+                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    
+    # Distributed loads bounds
+    if 'dloads' in slope_data and slope_data['dloads']:
+        for dload_set in slope_data['dloads']:
+            if dload_set:
+                xs = [p['X'] for p in dload_set]
+                ys = [p['Y'] for p in dload_set]
+                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    
+    # Reinforcement lines bounds
+    if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
+        for line in slope_data['reinforce_lines']:
+            if line:
+                xs = [p['X'] for p in line]
+                ys = [p['Y'] for p in line]
+                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    
+    return bounds

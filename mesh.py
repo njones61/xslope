@@ -5,7 +5,7 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, control_short_edges=True):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, control_short_edges=True, target_size_1d=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -20,6 +20,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
         control_short_edges : If True, prevents subdivision of edges shorter than target_size
+        target_size_1d : Optional target size for 1D elements (default None, which is set to target_size/2 if None)
 
     Returns:
         mesh dict containing:
@@ -36,6 +37,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     import gmsh
     import numpy as np
     from collections import defaultdict
+
+    # Set default target_size_1d if None
+    if target_size_1d is None:
+        target_size_1d = target_size / 2
+        if debug:
+            print(f"Using default target_size_1d = target_size/2 = {target_size_1d}")
 
     # build a list of region ids (list of material IDs - one per polygon)
     region_ids = [i for i in range(len(polygons))]
@@ -337,17 +344,52 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             line_tags = []
             for i in range(len(pt_tags) - 1):
                 pt1, pt2 = pt_tags[i], pt_tags[i + 1]
-                line_tag = gmsh.model.geo.addLine(pt1, pt2)
-                line_tags.append(line_tag)
                 
-                # Set transfinite constraint to preserve this exact segment (no subdivision)
-                try:
-                    gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)  # Exactly 2 nodes (start and end)
+                # Calculate segment length to determine number of subdivisions
+                coord1 = None
+                coord2 = None
+                for (x, y), tag in point_map.items():
+                    if tag == pt1:
+                        coord1 = (x, y)
+                    if tag == pt2:
+                        coord2 = (x, y)
+                
+                if coord1 and coord2:
+                    segment_length = ((coord2[0] - coord1[0])**2 + (coord2[1] - coord1[1])**2)**0.5
+                    # Calculate number of elements needed to achieve target_size_1d
+                    # For segments longer than target_size_1d, we want multiple elements
+                    # For segments shorter than target_size_1d, we still want at least 2 elements
+                    if segment_length > target_size_1d:
+                        num_elements = max(3, int(round(segment_length / target_size_1d)))
+                    else:
+                        num_elements = 2
+                    
                     if debug:
-                        print(f"  Set transfinite constraint on line segment {i}: nodes {pt1}->{pt2}")
-                except Exception as e:
-                    if debug:
-                        print(f"  Warning: Could not set transfinite constraint on segment {i}: {e}")
+                        print(f"  Segment {i}: length {segment_length:.2f}, creating {num_elements} elements")
+                    
+                    line_tag = gmsh.model.geo.addLine(pt1, pt2)
+                    line_tags.append(line_tag)
+                    
+                    # Set transfinite constraint to create appropriate number of nodes
+                    try:
+                        gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, num_elements)
+                        if debug:
+                            print(f"  Set transfinite constraint on line segment {i}: {num_elements} nodes")
+                    except Exception as e:
+                        if debug:
+                            print(f"  Warning: Could not set transfinite constraint on segment {i}: {e}")
+                else:
+                    # Fallback: create line with default 2 nodes
+                    line_tag = gmsh.model.geo.addLine(pt1, pt2)
+                    line_tags.append(line_tag)
+                    
+                    try:
+                        gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)
+                        if debug:
+                            print(f"  Set transfinite constraint on line segment {i}: 2 nodes (fallback)")
+                    except Exception as e:
+                        if debug:
+                            print(f"  Warning: Could not set transfinite constraint on segment {i}: {e}")
             
             # Store line data for later 1D element extraction
             # Use the enhanced line coordinates (which include intersection points)
@@ -611,80 +653,86 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     element_types = np.array(element_node_counts, dtype=int)
     element_materials = np.array(mat_ids, dtype=int)
 
-    # Create 1D elements directly from reinforcement line segments
+    # Extract 1D elements from Gmsh-generated 1D mesh along reinforcement lines
     elements_1d = []
     mat_ids_1d = []
     element_node_counts_1d = []
     
     if lines is not None:
-        for line_info in line_data:
-            line_idx = line_info['line_idx']
-            line_pts = line_info['point_coords']
-            
-            if debug:
-                print(f"Creating 1D elements for line {line_idx} with {len(line_pts)} points")
-            
-            # Create 1D elements for each segment of this reinforcement line
-            for i in range(len(line_pts) - 1):
-                start_pt = line_pts[i]
-                end_pt = line_pts[i + 1]
+        # Extract 1D elements from physical groups for each reinforcement line
+        for physical_tag, line_idx in physical_lines:
+            try:
+                # Get entities in this physical group
+                entities = gmsh.model.getEntitiesForPhysicalGroup(1, physical_tag)
                 
-                # Find the node indices for these points
-                start_idx = None
-                end_idx = None
+                if debug:
+                    print(f"  Physical group {physical_tag} (line {line_idx}): found {len(entities)} entities")
                 
-                # Search for nodes that match these coordinates (with tolerance)
-                tolerance = 1e-6
-                start_idx = None
-                end_idx = None
-                
-                # First try exact match
-                for node_idx, node_coords in enumerate(nodes):
-                    if (abs(node_coords[0] - start_pt[0]) < tolerance and 
-                        abs(node_coords[1] - start_pt[1]) < tolerance):
-                        start_idx = node_idx
-                    if (abs(node_coords[0] - end_pt[0]) < tolerance and 
-                        abs(node_coords[1] - end_pt[1]) < tolerance):
-                        end_idx = node_idx
-                
-                # If exact match failed, try finding closest nodes
-                if start_idx is None:
-                    min_dist = float('inf')
-                    for node_idx, node_coords in enumerate(nodes):
-                        dist = ((node_coords[0] - start_pt[0])**2 + (node_coords[1] - start_pt[1])**2)**0.5
-                        if dist < min_dist:
-                            min_dist = dist
-                            start_idx = node_idx
-                
-                if end_idx is None:
-                    min_dist = float('inf')
-                    for node_idx, node_coords in enumerate(nodes):
-                        dist = ((node_coords[0] - end_pt[0])**2 + (node_coords[1] - end_pt[1])**2)**0.5
-                        if dist < min_dist:
-                            min_dist = dist
-                            end_idx = node_idx
-                
-                if start_idx is not None and end_idx is not None and start_idx != end_idx:
-                    # Create 1D element for this segment (only if start and end are different)
-                    padded_idxs = [start_idx, end_idx, 0]
-                    elements_1d.append(padded_idxs)
-                    mat_ids_1d.append(line_idx)
-                    element_node_counts_1d.append(2)
+                for entity in entities:
+                    # Get all 1D elements for this entity
+                    elem_types, elem_tags_list, node_tags_list = gmsh.model.mesh.getElements(1, entity)
                     
-                    if debug:
-                        print(f"  Created 1D element {len(elements_1d)-1}: {start_pt} -> {end_pt} (nodes {start_idx} -> {end_idx})")
-                else:
-                    if start_idx == end_idx:
-                        if debug:
-                            print(f"  SKIPPED degenerate segment {i} of line {line_idx}: {start_pt} -> {end_pt} (both map to node {start_idx})")
-                    else:
-                        if debug:
-                            print(f"  WARNING: Could not find nodes for segment {i} of line {line_idx}: {start_pt} -> {end_pt}")
-                            if start_idx is None:
-                                print(f"    Start point {start_pt} not found in nodes")
-                            if end_idx is None:
-                                print(f"    End point {end_pt} not found in nodes")
-    
+                    for elem_type, elem_tags, node_tags in zip(elem_types, elem_tags_list, node_tags_list):
+                        # Gmsh 1D element type mapping:
+                        # 1: 2-node line (linear), 8: 3-node line (quadratic)
+                        if elem_type == 1:  # Linear 1D elements (2 nodes)
+                            elements_array = np.array(node_tags).reshape(-1, 2)
+                            for element in elements_array:
+                                try:
+                                    # Convert numpy arrays to regular Python scalars
+                                    element_list = element.tolist()  # Convert to Python list
+                                    if len(element_list) >= 2:
+                                        tag1 = int(element_list[0])
+                                        tag2 = int(element_list[1])
+                                        
+                                        # Get node indices
+                                        idx1 = node_tag_to_index[tag1]
+                                        idx2 = node_tag_to_index[tag2]
+                                        
+                                        # Create 1D element
+                                        padded_idxs = [idx1, idx2, 0]
+                                        elements_1d.append(padded_idxs)
+                                        mat_ids_1d.append(line_idx)
+                                        element_node_counts_1d.append(2)
+                                        
+                                        if debug:
+                                            coord1 = nodes[idx1]
+                                            coord2 = nodes[idx2]
+                                            print(f"    Created 1D element: {coord1} -> {coord2}")
+                                except (KeyError, TypeError, ValueError, IndexError) as e:
+                                    if debug:
+                                        print(f"    Skipping 1D element due to error: {e}")
+                                    continue
+                        elif elem_type == 8:  # Quadratic 1D elements (3 nodes)
+                            elements_array = np.array(node_tags).reshape(-1, 3)
+                            for element in elements_array:
+                                try:
+                                    # Convert numpy arrays to regular Python scalars
+                                    element_list = element.tolist()  # Convert to Python list
+                                    if len(element_list) >= 3:
+                                        tag1 = int(element_list[0])
+                                        tag2 = int(element_list[1])
+                                        tag3 = int(element_list[2])
+                                        
+                                        # Get node indices
+                                        idx1 = node_tag_to_index[tag1]
+                                        idx2 = node_tag_to_index[tag2]
+                                        idx3 = node_tag_to_index[tag3]
+                                        
+                                        # Create 1D element
+                                        padded_idxs = [idx1, idx2, idx3]
+                                        elements_1d.append(padded_idxs)
+                                        mat_ids_1d.append(line_idx)
+                                        element_node_counts_1d.append(3)
+                                except (KeyError, TypeError, ValueError, IndexError) as e:
+                                    if debug:
+                                        print(f"    Skipping quadratic 1D element due to error: {e}")
+                                    continue
+            except Exception as e:
+                if debug:
+                    print(f"  Error extracting 1D elements for line {line_idx}: {e}")
+                continue
+
     gmsh.finalize()
 
     # Clean up center nodes for quad8 elements
@@ -722,8 +770,10 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         
         print(f"Quad8 cleanup complete: {len(nodes)} nodes, {len(elements_array)} elements")
 
-    # the material list is 1-based, but the element_materials array is 0-based. Adjust to be 1-based
-    element_materials = element_materials + 1
+    # Convert lists to arrays
+    elements_array = np.array(elements, dtype=int)
+    element_types = np.array(element_node_counts, dtype=int)
+    element_materials = np.array(mat_ids, dtype=int) + 1  # Make 1-based
 
     mesh = {
         "nodes": nodes,

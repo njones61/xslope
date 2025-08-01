@@ -5,7 +5,7 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, control_short_edges=True, target_size_1d=None):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -19,7 +19,6 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
-        control_short_edges : If True, prevents subdivision of edges shorter than target_size
         target_size_1d : Optional target size for 1D elements (default None, which is set to target_size if None)
 
     Returns:
@@ -101,32 +100,31 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     short_edge_points = set()  # Points that are endpoints of short edges
     
     # Pre-pass to identify short edges - improved logic
-    if control_short_edges:
-        for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
-            poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
-            for i in range(len(poly_pts_clean)):
-                p1 = poly_pts_clean[i]
-                p2 = poly_pts_clean[(i + 1) % len(poly_pts_clean)]
-                edge_length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
-                
-                # Only mark as short edge if it's genuinely short AND not a major boundary
-                # Major boundaries should maintain consistent mesh sizing
-                is_major_boundary = False
-                
-                # Check if this edge is part of a major boundary (long horizontal or vertical edge)
-                if abs(p2[0] - p1[0]) > adjusted_target_size * 5:  # Long horizontal edge
-                    is_major_boundary = True
-                elif abs(p2[1] - p1[1]) > adjusted_target_size * 5:  # Long vertical edge
-                    is_major_boundary = True
-                
-                # Only apply short edge sizing if edge is genuinely short AND not a major boundary
-                if edge_length < adjusted_target_size and not is_major_boundary:
-                    short_edge_points.add(p1)
-                    short_edge_points.add(p2)
-                    if debug:
-                        print(f"Short edge found: {p1} to {p2}, length={edge_length:.2f}")
-                elif debug and edge_length < adjusted_target_size:
-                    print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
+    for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
+        poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
+        for i in range(len(poly_pts_clean)):
+            p1 = poly_pts_clean[i]
+            p2 = poly_pts_clean[(i + 1) % len(poly_pts_clean)]
+            edge_length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
+            
+            # Only mark as short edge if it's genuinely short AND not a major boundary
+            # Major boundaries should maintain consistent mesh sizing
+            is_major_boundary = False
+            
+            # Check if this edge is part of a major boundary (long horizontal or vertical edge)
+            if abs(p2[0] - p1[0]) > adjusted_target_size * 5:  # Long horizontal edge
+                is_major_boundary = True
+            elif abs(p2[1] - p1[1]) > adjusted_target_size * 5:  # Long vertical edge
+                is_major_boundary = True
+            
+            # Only apply short edge sizing if edge is genuinely short AND not a major boundary
+            if edge_length < adjusted_target_size and not is_major_boundary:
+                short_edge_points.add(p1)
+                short_edge_points.add(p2)
+                if debug:
+                    print(f"Short edge found: {p1} to {p2}, length={edge_length:.2f}")
+            elif debug and edge_length < adjusted_target_size:
+                print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
     
     # Main pass: Create points with appropriate sizes
     for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
@@ -194,10 +192,21 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                     if debug:
                         print(f"Warning: Could not set transfinite constraint on edge {pt1_coords} to {pt2_coords}: {e}")
             
+            # Add transfinite constraints for short edges to prevent subdivision
+            # This forces GMSH to use exactly 2 nodes (start and end) for short edges
+            elif edge_length < adjusted_target_size:
+                try:
+                    gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)  # Exactly 2 nodes
+                    if debug:
+                        print(f"Set transfinite constraint on short edge: {pt1_coords} to {pt2_coords}, length={edge_length:.2f}, exactly 2 nodes")
+                except Exception as e:
+                    if debug:
+                        print(f"Warning: Could not set transfinite constraint on short edge {pt1_coords} to {pt2_coords}: {e}")
+            
             # Short edges are now handled by point sizing, no need for transfinite curves
 
     # Preprocess polygons and reinforcement lines to add intersection points
-    if lines is not None and control_short_edges:
+    if lines is not None:
         if debug:
             print("Preprocessing polygons and reinforcement lines to add intersection points...")
         

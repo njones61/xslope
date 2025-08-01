@@ -2,7 +2,7 @@ from fileio import load_slope_data
 
 from mesh import build_polygons, build_mesh_from_polygons, get_quad_mesh_presets
 from mesh import export_mesh_to_json, import_mesh_from_json, test_1d_element_alignment
-from mesh import add_intersection_points_to_polygons, extract_reinforcement_line_geometry
+from mesh import extract_reinforcement_line_geometry
 from plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 import numpy as np
 
@@ -21,8 +21,7 @@ print(f"Total reinforcement lines for meshing: {len(test_lines)}")
 
 # plot_inputs(slope_data)
 
-polygons = build_polygons(slope_data)
-polygons = add_intersection_points_to_polygons(polygons, test_lines, debug=True)
+polygons = build_polygons(slope_data, reinf_lines=test_lines, debug=True)
 
 plot_polygons_separately(polygons)
 

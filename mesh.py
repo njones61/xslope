@@ -965,7 +965,7 @@ def get_quad_mesh_presets():
 
 
 
-def build_polygons(slope_data):
+def build_polygons(slope_data, reinf_lines=None, debug=False):
     """
     Build material zone polygons from slope_data.
     
@@ -1094,15 +1094,19 @@ def build_polygons(slope_data):
         poly = clean_polygon(poly)
         polygons.append(poly)
     
-    # Add distributed load points and reinforcement endpoints to polygon edges if coincident
-    polygons = add_coincident_points_to_polygons(polygons, slope_data)
+    # Add distributed load points to polygon edges if coincident
+    polygons = add_dload_points_to_polygons(polygons, slope_data)
+    
+    # Add intersection points with reinforcement lines if provided
+    if reinf_lines is not None:
+        polygons = add_intersection_points_to_polygons(polygons, reinf_lines, debug=debug)
     
     return polygons
 
-def add_coincident_points_to_polygons(polygons, slope_data):
+def add_dload_points_to_polygons(polygons, slope_data):
     """
-    Add distributed load points and reinforcement line endpoints to polygon edges
-    if they are coincident with edges but not existing vertices.
+    Add distributed load points to polygon edges if they are coincident with edges 
+    but not existing vertices.
     
     Parameters:
         polygons: List of polygons (lists of (x,y) tuples)
@@ -1114,7 +1118,7 @@ def add_coincident_points_to_polygons(polygons, slope_data):
     import numpy as np
     tol = 1e-8
     
-    # Collect all points to check
+    # Collect distributed load points to check
     points_to_check = []
     
     # Add distributed load points
@@ -1123,14 +1127,6 @@ def add_coincident_points_to_polygons(polygons, slope_data):
         if 'xy' in load:
             for point in load['xy']:
                 points_to_check.append(point)
-    
-    # Add reinforcement line endpoints
-    reinforcements = slope_data.get('reinforcements', [])
-    for reinforcement in reinforcements:
-        if 'xy' in reinforcement and len(reinforcement['xy']) >= 2:
-            # Add first and last points only
-            points_to_check.append(reinforcement['xy'][0])
-            points_to_check.append(reinforcement['xy'][-1])
     
     if not points_to_check:
         return polygons

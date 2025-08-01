@@ -20,28 +20,24 @@ polygons = build_polygons(slope_data, reinf_lines=test_lines, debug=True)
 # Use fixed target size that was working before
 target_size = 2
 
-print(f"\nGenerating triangular mesh with {len(test_lines)} reinforcement lines...")
-print(f"Target mesh size: {target_size:.2f}")
-
-# Build triangular mesh with 1D reinforcement elements
-mesh_tri = build_mesh_from_polygons(
+mesh = build_mesh_from_polygons(
     polygons, 
     target_size, 
-    element_type='tri3', 
+    element_type='quad4', 
     lines=test_lines,
     debug=True
 )
 
-print(f"Generated mesh with {len(mesh_tri['nodes'])} nodes")
-if 'elements_1d' in mesh_tri:
-    print(f"Generated {len(mesh_tri['elements_1d'])} 1D elements")
+print(f"Generated mesh with {len(mesh['nodes'])} nodes")
+if 'elements_1d' in mesh:
+    print(f"Generated {len(mesh['elements_1d'])} 1D elements")
     
     # Test reinforcement line alignment
-    test_success = test_1d_element_alignment(mesh_tri, test_lines, debug=True)
+    test_success = test_1d_element_alignment(mesh, test_lines, debug=True)
     print(f"1D element alignment test: {'PASSED' if test_success else 'FAILED'}")
 else:
     print("No 1D elements were generated")
 
 # Export and plot the final mesh
-export_mesh_to_json(mesh_tri, "mesh_tri.json")
-plot_mesh(mesh_tri, materials=slope_data['materials'])
+export_mesh_to_json(mesh, "mesh.json")
+plot_mesh(mesh, materials=slope_data['materials'])

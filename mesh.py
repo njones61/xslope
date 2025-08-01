@@ -49,8 +49,19 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     if element_type not in ['tri3', 'tri6', 'quad4', 'quad8', 'quad9']:
         raise ValueError("element_type must be 'tri3', 'tri6', 'quad4', 'quad8', or 'quad9'")
 
-    # Determine if we need quadratic elements
+    # Determine if we need quadratic elements - but always generate linear first
     quadratic = element_type in ['tri6', 'quad8', 'quad9']
+    
+    # For quadratic elements, always start with linear base element
+    if quadratic:
+        if element_type == 'tri6':
+            base_element_type = 'tri3'
+        elif element_type in ['quad8', 'quad9']:
+            base_element_type = 'quad4'
+        if debug:
+            print(f"Quadratic element '{element_type}' requested: generating '{base_element_type}' first, then post-processing")
+    else:
+        base_element_type = element_type
     
     # Adjust target_size for quads to compensate for recombination creating finer meshes
     if element_type.startswith('quad'):
@@ -519,10 +530,10 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     
     # Check for potential quad4 + reinforcement line conflicts
     has_reinforcement_lines = lines is not None and len(lines) > 0
-    wants_quads = element_type.startswith('quad')
+    wants_quads = base_element_type.startswith('quad')
     
     # Set mesh algorithm and recombination options BEFORE generating mesh
-    if element_type.startswith('quad'):
+    if base_element_type.startswith('quad'):
         # Check if we need to use a more robust algorithm for reinforcement lines
         if has_reinforcement_lines:
             if debug:
@@ -572,10 +583,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     else:
         gmsh.option.setNumber("Mesh.Algorithm", 6)  # Frontal-Delaunay for triangles
     
-    # Set element order for quadratic elements
-    if quadratic:
-        gmsh.option.setNumber("Mesh.ElementOrder", 2)
-        gmsh.option.setNumber("Mesh.HighOrderOptimize", 2)
+    # Always generate linear elements first - quadratic conversion is done in post-processing
+    # This avoids gmsh issues with quadratic elements and embedded 1D lines
+    gmsh.option.setNumber("Mesh.ElementOrder", 1)
     
     # Force mesh coherence before generation
     gmsh.option.setNumber("Mesh.ToleranceInitialDelaunay", 1e-12)
@@ -854,7 +864,190 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         mesh["element_types_1d"] = element_types_1d
         mesh["element_materials_1d"] = element_materials_1d
 
+    # Post-process to convert linear elements to quadratic if requested
+    if quadratic:
+        if debug:
+            print(f"Converting linear {base_element_type} mesh to quadratic {element_type}")
+        mesh = convert_linear_to_quadratic_mesh(mesh, element_type, debug=debug)
+
     return mesh
+
+
+def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
+    """
+    Convert a linear mesh (tri3/quad4) to quadratic (tri6/quad8/quad9) by adding midside nodes.
+    
+    This is much more robust than gmsh's built-in quadratic generation, especially 
+    when dealing with embedded 1D elements (reinforcement lines).
+    
+    Parameters:
+        mesh: Dictionary containing linear mesh data
+        target_element_type: 'tri6', 'quad8', or 'quad9'
+        debug: Enable debug output
+        
+    Returns:
+        Updated mesh dictionary with quadratic elements
+    """
+    if debug:
+        print(f"Converting to {target_element_type} elements...")
+    
+    nodes = mesh["nodes"].copy()
+    elements = mesh["elements"].copy()
+    element_types = mesh["element_types"].copy()
+    element_materials = mesh["element_materials"].copy()
+    
+    # Handle 1D elements if present
+    elements_1d = mesh.get("elements_1d")
+    element_types_1d = mesh.get("element_types_1d") 
+    element_materials_1d = mesh.get("element_materials_1d")
+    has_1d_elements = elements_1d is not None
+    
+    if has_1d_elements:
+        elements_1d = elements_1d.copy()
+        element_types_1d = element_types_1d.copy()
+        element_materials_1d = element_materials_1d.copy()
+    
+    # Dictionary to store midside nodes: (node1_idx, node2_idx) -> midside_node_idx
+    # Always store with node1_idx < node2_idx for consistency
+    midside_nodes = {}
+    next_node_idx = len(nodes)
+    
+    def get_or_create_midside_node(n1_idx, n2_idx):
+        """Get existing midside node or create new one between n1 and n2"""
+        nonlocal next_node_idx, nodes
+        
+        # Ensure consistent ordering
+        if n1_idx > n2_idx:
+            n1_idx, n2_idx = n2_idx, n1_idx
+            
+        edge_key = (n1_idx, n2_idx)
+        
+        if edge_key in midside_nodes:
+            return midside_nodes[edge_key]
+        
+        # Create new midside node at edge center
+        n1 = nodes[n1_idx]
+        n2 = nodes[n2_idx]
+        midside_coord = (n1 + n2) / 2.0
+        
+        # Add to nodes array
+        nodes_list = nodes.tolist()
+        nodes_list.append(midside_coord.tolist())
+        nodes = np.array(nodes_list)
+        
+        midside_idx = next_node_idx
+        midside_nodes[edge_key] = midside_idx
+        next_node_idx += 1
+        
+        if debug and len(midside_nodes) <= 10:  # Only print first few
+            print(f"  Created midside node {midside_idx} between {n1_idx}-{n2_idx} at {midside_coord}")
+        
+        return midside_idx
+    
+    # Convert 2D elements
+    new_elements = []
+    new_element_types = []
+    
+    for elem_idx, element in enumerate(elements):
+        elem_type = element_types[elem_idx]
+        
+        if target_element_type == 'tri6' and elem_type == 3:
+            # Convert tri3 to tri6
+            n0, n1, n2 = element[0], element[1], element[2]
+            
+            # Get/create midside nodes
+            n3 = get_or_create_midside_node(n0, n1)  # edge 0-1
+            n4 = get_or_create_midside_node(n1, n2)  # edge 1-2
+            n5 = get_or_create_midside_node(n2, n0)  # edge 2-0
+            
+            # tri6 node ordering: [corner_nodes, midside_nodes]
+            new_element = [n0, n1, n2, n3, n4, n5, 0, 0, 0]
+            new_elements.append(new_element)
+            new_element_types.append(6)
+            
+        elif target_element_type == 'quad8' and elem_type == 4:
+            # Convert quad4 to quad8
+            n0, n1, n2, n3 = element[0], element[1], element[2], element[3]
+            
+            # Get/create midside nodes on edges
+            n4 = get_or_create_midside_node(n0, n1)  # edge 0-1
+            n5 = get_or_create_midside_node(n1, n2)  # edge 1-2
+            n6 = get_or_create_midside_node(n2, n3)  # edge 2-3
+            n7 = get_or_create_midside_node(n3, n0)  # edge 3-0
+            
+            # quad8 node ordering: [corner_nodes, midside_nodes]
+            new_element = [n0, n1, n2, n3, n4, n5, n6, n7, 0]
+            new_elements.append(new_element)
+            new_element_types.append(8)
+            
+        elif target_element_type == 'quad9' and elem_type == 4:
+            # Convert quad4 to quad9
+            n0, n1, n2, n3 = element[0], element[1], element[2], element[3]
+            
+            # Get/create midside nodes on edges
+            n4 = get_or_create_midside_node(n0, n1)  # edge 0-1
+            n5 = get_or_create_midside_node(n1, n2)  # edge 1-2
+            n6 = get_or_create_midside_node(n2, n3)  # edge 2-3
+            n7 = get_or_create_midside_node(n3, n0)  # edge 3-0
+            
+            # Create center node
+            center_coord = (nodes[n0] + nodes[n1] + nodes[n2] + nodes[n3]) / 4.0
+            nodes_list = nodes.tolist()
+            nodes_list.append(center_coord.tolist())
+            nodes = np.array(nodes_list)
+            n8 = next_node_idx
+            next_node_idx += 1
+            
+            # quad9 node ordering: [corner_nodes, midside_nodes, center_node]
+            new_element = [n0, n1, n2, n3, n4, n5, n6, n7, n8]
+            new_elements.append(new_element)
+            new_element_types.append(9)
+            
+        else:
+            # Keep original element unchanged
+            new_elements.append(element.tolist())
+            new_element_types.append(elem_type)
+    
+    # Convert 1D elements to quadratic if present
+    new_elements_1d = []
+    new_element_types_1d = [] 
+    
+    if has_1d_elements:
+        for elem_idx, element in enumerate(elements_1d):
+            elem_type = element_types_1d[elem_idx]
+            
+            if elem_type == 2:  # Convert linear 1D to quadratic
+                n0, n1 = element[0], element[1]
+                
+                # Get/create midside node (reuse if already created for 2D elements)
+                n2 = get_or_create_midside_node(n0, n1)
+                
+                new_element = [n0, n1, n2]
+                new_elements_1d.append(new_element)
+                new_element_types_1d.append(3)  # quadratic 1D
+            else:
+                # Keep original element unchanged
+                new_elements_1d.append(element.tolist())
+                new_element_types_1d.append(elem_type)
+    
+    if debug:
+        print(f"  Added {len(midside_nodes)} midside nodes")
+        print(f"  Total nodes: {len(nodes)} (was {len(mesh['nodes'])})")
+    
+    # Create updated mesh
+    updated_mesh = {
+        "nodes": nodes,
+        "elements": np.array(new_elements, dtype=int),
+        "element_types": np.array(new_element_types, dtype=int),
+        "element_materials": element_materials
+    }
+    
+    if has_1d_elements:
+        updated_mesh["elements_1d"] = np.array(new_elements_1d, dtype=int)
+        updated_mesh["element_types_1d"] = np.array(new_element_types_1d, dtype=int)
+        updated_mesh["element_materials_1d"] = element_materials_1d
+    
+    return updated_mesh
 
 
 def line_segment_parameter(point, line_start, line_end):

@@ -18,18 +18,18 @@ polygons = build_polygons(slope_data, reinf_lines=test_lines, debug=True)
 # plot_polygons_separately(polygons)
 
 # Use fixed target size that was working before
-target_size = 2
+target_size = 5
 
 # Test the new linear-first approach with quadratic elements
-print("Testing tri6 with reinforcement lines:")
+print("Testing  with reinforcement lines:")
 mesh = build_mesh_from_polygons(
     polygons, 
     target_size, 
-    element_type='quad9', 
-    lines=test_lines,
+    element_type='tri6', 
+    lines=None,
     debug=True
 )
-print(f"Generated tri6 mesh with {len(mesh['nodes'])} nodes")
+print(f"Generated mesh with {len(mesh['nodes'])} nodes")
 if 'elements_1d' in mesh:
     print(f"Generated {len(mesh['elements_1d'])} 1D elements")
 print()

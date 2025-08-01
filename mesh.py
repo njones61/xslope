@@ -216,106 +216,60 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             
             # Short edges are now handled by point sizing, no need for transfinite curves
 
-    # Preprocess polygons and reinforcement lines to add intersection points
+    # Ensure all polygon points (including intersection points) are created as GMSH points
+    # The intersection points were already added to polygons in build_polygons(), 
+    # so we just need to ensure they exist as GMSH geometric entities
     if lines is not None:
         if debug:
-            print("Preprocessing polygons and reinforcement lines to add intersection points...")
+            print("Ensuring all polygon points (including intersections) are created as GMSH points...")
         
-        # First pass: Find all intersections and collect them
-        all_intersections = {}  # line_idx -> list of (intersection_point, polygon_idx, edge_info)
+        # Collect all points from all polygons to ensure they exist in GMSH
+        all_polygon_points = set()
+        for poly_data in polygon_data:
+            pt_tags = poly_data['pt_tags']
+            for tag in pt_tags:
+                # Find the coordinates for this point tag
+                for (x, y), point_tag in point_map.items():
+                    if point_tag == tag:
+                        all_polygon_points.add((x, y))
+                        break
         
-        for line_idx, line_pts in enumerate(lines):
-            line_pts_clean = remove_duplicate_endpoint(list(line_pts))
-            all_intersections[line_idx] = []
-            
-            # Check each segment of the 1D line
-            for i in range(len(line_pts_clean) - 1):
-                line_seg_start = line_pts_clean[i]
-                line_seg_end = line_pts_clean[i + 1]
-                
-                # Check intersection with each polygon edge
-                for poly_idx, poly_data in enumerate(polygon_data):
-                    pt_tags = poly_data['pt_tags']
-                    
-                    # Get polygon coordinates
-                    poly_coords = []
-                    for tag in pt_tags:
-                        for (x, y), point_tag in point_map.items():
-                            if point_tag == tag:
-                                poly_coords.append((x, y))
-                                break
-                    
-                    # Check each polygon edge for intersections
-                    for j in range(len(poly_coords)):
-                        poly_edge_start = poly_coords[j]
-                        poly_edge_end = poly_coords[(j + 1) % len(poly_coords)]
-                        
-                        # Find intersection point if it exists
-                        intersection = line_segment_intersection(
-                            line_seg_start, line_seg_end,
-                            poly_edge_start, poly_edge_end
-                        )
-                        
-                        if intersection:
-                            # Store intersection information
-                            all_intersections[line_idx].append({
-                                'point': intersection,
-                                'polygon_idx': poly_idx,
-                                'poly_edge_start': poly_edge_start,
-                                'poly_edge_end': poly_edge_end,
-                                'line_segment_idx': i,
-                                'line_seg_start': line_seg_start,
-                                'line_seg_end': line_seg_end
-                            })
-                            if debug:
-                                print(f"Found intersection {intersection} between line {line_idx} segment {i} and polygon {poly_idx} edge {j}")
+        # Create any missing GMSH points
+        for x, y in all_polygon_points:
+            key = (x, y)
+            if key not in point_map:
+                pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, adjusted_target_size * 0.5)
+                point_map[key] = pt_tag
+                if debug:
+                    print(f"Created GMSH point for polygon vertex {key}: tag {pt_tag}")
         
-        # Second pass: Add intersection points to polygons
-        for line_idx, intersections in all_intersections.items():
-            for intersection_info in intersections:
-                intersection = intersection_info['point']
-                poly_idx = intersection_info['polygon_idx']
-                poly_edge_start = intersection_info['poly_edge_start']
-                poly_edge_end = intersection_info['poly_edge_end']
-                
-                poly_data = polygon_data[poly_idx]
-                pt_tags = poly_data['pt_tags']
-                
-                # Get polygon coordinates
-                poly_coords = []
-                for tag in pt_tags:
-                    for (x, y), point_tag in point_map.items():
-                        if point_tag == tag:
-                            poly_coords.append((x, y))
-                            break
-                
-                # Add intersection point to polygon if not already a vertex
-                if not point_near_existing(intersection, poly_coords, tol=1e-8):
-                    # Insert the intersection point into the polygon
-                    insert_point_into_polygon_edge(
-                        intersection, poly_edge_start, poly_edge_end,
-                        poly_data, point_map, adjusted_target_size
-                    )
-                    if debug:
-                        print(f"Added intersection point {intersection} to polygon {poly_idx}")
+        if debug:
+            print(f"Ensured {len(all_polygon_points)} polygon points exist as GMSH entities")
         
-        # Third pass: Create enhanced reinforcement lines with intersection points
+        # Create enhanced reinforcement lines that include intersection points from polygons
+        # This is essential for proper mesh generation with embedded 1D elements
         enhanced_lines = []
         for line_idx, line_pts in enumerate(lines):
             line_pts_clean = remove_duplicate_endpoint(list(line_pts))
             
-            # Collect all points for this line: original + intersections
+            # Collect all points for this line: original + intersection points from polygons
             all_line_points = []
             
             # Add original line points
             for x, y in line_pts_clean:
                 all_line_points.append((x, y, 'original'))
             
-            # Add intersection points
-            if line_idx in all_intersections:
-                for intersection_info in all_intersections[line_idx]:
-                    intersection = intersection_info['point']
-                    all_line_points.append((intersection[0], intersection[1], 'intersection'))
+            # Add intersection points that are on this line (from polygon data)
+            for poly_data in polygon_data:
+                pt_tags = poly_data['pt_tags']
+                for tag in pt_tags:
+                    # Find the coordinates for this point tag
+                    for (x, y), point_tag in point_map.items():
+                        if point_tag == tag:
+                            # Check if this point is on the reinforcement line
+                            if is_point_on_line_segments((x, y), line_pts_clean, tolerance=1e-6):
+                                all_line_points.append((x, y, 'intersection'))
+                            break
             
             # Sort all points along the line to maintain proper order
             if len(all_line_points) > 1:
@@ -336,26 +290,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             
             if debug:
                 print(f"Enhanced line {line_idx}: {len(line_pts_clean)} original points -> {len(enhanced_line)} total points")
-                print(f"  Original: {line_pts_clean}")
-                print(f"  Enhanced: {enhanced_line}")
         
         # Replace original lines with enhanced lines
         lines = enhanced_lines
-        
-        # Fourth pass: Ensure all intersection points are created as Gmsh points
-        # This is critical to ensure they exist in the final mesh
-        for line_idx, intersections in all_intersections.items():
-            for intersection_info in intersections:
-                intersection = intersection_info['point']
-                x, y = intersection
-                key = (x, y)
-                
-                # Create the point in Gmsh if it doesn't exist
-                if key not in point_map:
-                    pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, adjusted_target_size * 0.5)
-                    point_map[key] = pt_tag
-                    if debug:
-                        print(f"Created Gmsh point for intersection {intersection}: tag {pt_tag}")
 
     # Create reinforcement lines as geometric constraints to force 2D mesh edges
     line_data = []

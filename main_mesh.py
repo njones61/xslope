@@ -2,7 +2,7 @@ from fileio import load_slope_data
 
 from mesh import build_polygons, build_mesh_from_polygons, get_quad_mesh_presets
 from mesh import export_mesh_to_json, import_mesh_from_json, test_1d_element_alignment
-from mesh import add_intersection_points_to_polygons
+from mesh import add_intersection_points_to_polygons, extract_reinforcement_line_geometry
 from plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 import numpy as np
 
@@ -11,15 +11,10 @@ slope_data = load_slope_data("inputs/slope/input_template_reinf5.xlsx")
 # plot_inputs(slope_data)
 
 # Extract reinforcement lines in the correct format
-test_lines = []
-if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
-    for line in slope_data['reinforce_lines']:
-        # Convert from dict format to tuple format
-        line_coords = [(point['X'], point['Y']) for point in line]
-        test_lines.append(line_coords)
-    print(f"Extracted {len(test_lines)} reinforcement lines")
-    for i, line in enumerate(test_lines):
-        print(f"Line {i}: {line}")
+test_lines = extract_reinforcement_line_geometry(slope_data)
+print(f"Extracted {len(test_lines)} reinforcement lines")
+for i, line in enumerate(test_lines):
+    print(f"Line {i}: {line}")
 
 # Note: Distributed loads are not part of the mesh - they are only for load application
 print(f"Total reinforcement lines for meshing: {len(test_lines)}")
@@ -123,13 +118,8 @@ x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, 
 target_size = (x_range[1] - x_range[0]) / 150
 
 # Check if we have reinforcement lines to test intersection preprocessing
-reinforcement_lines = []
-if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
-    for reinforcement in slope_data['reinforce_lines']:
-        # Convert from dict format to tuple format
-        line_coords = [(point['X'], point['Y']) for point in reinforcement]
-        if len(line_coords) >= 2:
-            reinforcement_lines.append(line_coords)
+reinforcement_lines = extract_reinforcement_line_geometry(slope_data)
+if reinforcement_lines:
     print(f"Found {len(reinforcement_lines)} reinforcement lines for testing")
 else:
     print("No reinforcement lines found in slope_data")

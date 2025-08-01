@@ -2477,3 +2477,21 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                                 print(f"Added intersection point {intersection} to polygon {poly_idx} at position {insert_idx}")
     
     return updated_polygons
+
+def extract_reinforcement_line_geometry(slope_data):
+    """
+    Extract reinforcement line geometry from slope_data in the format needed for mesh generation.
+    
+    Parameters:
+        slope_data: Dictionary containing slope data with 'reinforce_lines' key
+        
+    Returns:
+        List of reinforcement lines, where each line is a list of (x, y) coordinate tuples
+    """
+    lines = []
+    if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
+        for line in slope_data['reinforce_lines']:
+            # Convert from dict format to tuple format
+            line_coords = [(point['X'], point['Y']) for point in line]
+            lines.append(line_coords)
+    return lines

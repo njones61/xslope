@@ -2,12 +2,13 @@ from fileio import load_slope_data
 
 from mesh import build_polygons, build_mesh_from_polygons, get_quad_mesh_presets
 from mesh import export_mesh_to_json, import_mesh_from_json, test_1d_element_alignment
+from mesh import add_intersection_points_to_polygons
 from plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 import numpy as np
 
 slope_data = load_slope_data("inputs/slope/input_template_reinf5.xlsx")
 
-plot_inputs(slope_data)
+# plot_inputs(slope_data)
 
 # Extract reinforcement lines in the correct format
 test_lines = []
@@ -26,6 +27,9 @@ print(f"Total reinforcement lines for meshing: {len(test_lines)}")
 # plot_inputs(slope_data)
 
 polygons = build_polygons(slope_data)
+polygons = add_intersection_points_to_polygons(polygons, test_lines, debug=True)
+
+plot_polygons_separately(polygons)
 
 print(f"\nGenerating mesh with {len(test_lines)} 1D lines...")
 target_size = 10
@@ -185,8 +189,9 @@ print("\nBuilding quadrilateral mesh...")
 # Try different meshing presets
 presets = get_quad_mesh_presets()
 
-mesh_quad = build_mesh_from_polygons(polygons, target_size, element_type='quad4', mesh_params=presets['default'], lines=all_test_lines ,debug=True)
+# Temporarily comment out quadrilateral mesh generation to focus on triangular mesh
+# mesh_quad = build_mesh_from_polygons(polygons, target_size, element_type='quad4', mesh_params=presets['default'], lines=all_test_lines ,debug=True)
 
-export_mesh_to_json(mesh_quad, "mesh_quad.json")
+# export_mesh_to_json(mesh_quad, "mesh_quad.json")
 
-plot_mesh(mesh_quad, materials=slope_data['materials'])
+# plot_mesh(mesh_quad, materials=slope_data['materials'])

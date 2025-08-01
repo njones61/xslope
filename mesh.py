@@ -100,7 +100,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     polygon_data = []
     short_edge_points = set()  # Points that are endpoints of short edges
     
-    # Pre-pass to identify short edges
+    # Pre-pass to identify short edges - improved logic
     if control_short_edges:
         for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
             poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
@@ -108,11 +108,25 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                 p1 = poly_pts_clean[i]
                 p2 = poly_pts_clean[(i + 1) % len(poly_pts_clean)]
                 edge_length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
-                if edge_length < adjusted_target_size:
+                
+                # Only mark as short edge if it's genuinely short AND not a major boundary
+                # Major boundaries should maintain consistent mesh sizing
+                is_major_boundary = False
+                
+                # Check if this edge is part of a major boundary (long horizontal or vertical edge)
+                if abs(p2[0] - p1[0]) > adjusted_target_size * 5:  # Long horizontal edge
+                    is_major_boundary = True
+                elif abs(p2[1] - p1[1]) > adjusted_target_size * 5:  # Long vertical edge
+                    is_major_boundary = True
+                
+                # Only apply short edge sizing if edge is genuinely short AND not a major boundary
+                if edge_length < adjusted_target_size and not is_major_boundary:
                     short_edge_points.add(p1)
                     short_edge_points.add(p2)
                     if debug:
                         print(f"Short edge found: {p1} to {p2}, length={edge_length:.2f}")
+                elif debug and edge_length < adjusted_target_size:
+                    print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
     
     # Main pass: Create points with appropriate sizes
     for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
@@ -120,8 +134,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         pt_tags = []
         for x, y in poly_pts_clean:
             # Use larger size for points on short edges to discourage subdivision
+            # But be more conservative about when to apply this
             if (x, y) in short_edge_points:
-                point_size = adjusted_target_size * 3.0  # Much larger size
+                point_size = adjusted_target_size * 2.0  # Reduced from 3.0 to 2.0
                 pt_tags.append(add_point(x, y, point_size))
             else:
                 pt_tags.append(add_point(x, y))
@@ -165,6 +180,19 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         
         if pt1_coords and pt2_coords:
             edge_length = ((pt2_coords[0] - pt1_coords[0])**2 + (pt2_coords[1] - pt1_coords[1])**2)**0.5
+            
+            # Add transfinite constraints for long boundary edges to ensure consistent mesh sizing
+            # This prevents the creation of overly coarse elements along major boundaries
+            if edge_length > adjusted_target_size * 3:  # Long edge
+                # Calculate how many elements should be along this edge
+                num_elements = max(3, int(edge_length / adjusted_target_size))
+                try:
+                    gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, num_elements)
+                    if debug:
+                        print(f"Set transfinite constraint on long edge: {pt1_coords} to {pt2_coords}, length={edge_length:.2f}, num_elements={num_elements}")
+                except Exception as e:
+                    if debug:
+                        print(f"Warning: Could not set transfinite constraint on edge {pt1_coords} to {pt2_coords}: {e}")
             
             # Short edges are now handled by point sizing, no need for transfinite curves
 

@@ -660,15 +660,59 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=6):
+def plot_reinforcement_lines(ax, slope_data):
+    """
+    Plots the reinforcement lines from slope_data.
+    
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: Dictionary containing slope data with 'reinforce_lines' key
+        
+    Returns:
+        None
+    """
+    if 'reinforce_lines' not in slope_data or not slope_data['reinforce_lines']:
+        return
+        
+    tension_points_plotted = False  # Track if tension points have been added to legend
+    
+    for i, line in enumerate(slope_data['reinforce_lines']):
+        # Extract x and y coordinates from the line points
+        xs = [point['X'] for point in line]
+        ys = [point['Y'] for point in line]
+        
+        # Plot the reinforcement line with a distinctive style
+        ax.plot(xs, ys, color='darkgray', linewidth=3, linestyle='-', 
+                alpha=0.8, label='Reinforcement Line' if i == 0 else "")
+        
+        # Add markers at each point to show tension values
+        for j, point in enumerate(line):
+            tension = point.get('T', 0.0)
+            if tension > 0:
+                # Use smaller marker size proportional to tension (normalized)
+                max_tension = max(p.get('T', 0.0) for p in line)
+                marker_size = 10 + 15 * (tension / max_tension) if max_tension > 0 else 10
+                ax.scatter(point['X'], point['Y'], s=marker_size, 
+                          color='red', alpha=0.7, zorder=5,
+                          label='Tension Points' if not tension_points_plotted else "")
+                tension_points_plotted = True
+
+
+def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=6, mat_table=True):
     """
     Creates a plot showing the slope geometry and input parameters.
 
     Parameters:
-        data: Dictionary containing plot data
+        slope_data: Dictionary containing plot data
         title: Title for the plot
         width: Width of the plot in inches
         height: Height of the plot in inches
+        mat_table: Controls material table display. Can be:
+            - True: Auto-position material table to avoid overlaps
+            - False: Don't show material table
+            - 'auto': Auto-position material table to avoid overlaps
+            - String: Specific location for material table ('upper left', 'upper right', 'upper center',
+                     'lower left', 'lower right', 'lower center', 'center left', 'center right', 'center')
 
     Returns:
         None
@@ -681,13 +725,39 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_reinforcement_lines(ax, slope_data)
 
     if slope_data['circular']:
         plot_circles(ax, slope_data)
     else:
         plot_non_circ(ax, slope_data['non_circ'])
 
-    plot_material_table(ax, slope_data['materials'], xloc=0.62) # Adjust this so that it fits with the legend
+    # Handle material table display
+    if mat_table:
+        if isinstance(mat_table, str) and mat_table != 'auto':
+            # Convert location string to xloc, yloc coordinates (inside plot area with margins)
+            location_map = {
+                'upper left': (0.05, 0.70),
+                'upper right': (0.70, 0.70),
+                'upper center': (0.35, 0.70),
+                'lower left': (0.05, 0.05),
+                'lower right': (0.70, 0.05),
+                'lower center': (0.35, 0.05),
+                'center left': (0.05, 0.35),
+                'center right': (0.70, 0.35),
+                'center': (0.35, 0.35)
+            }
+            if mat_table in location_map:
+                xloc, yloc = location_map[mat_table]
+                plot_material_table(ax, slope_data['materials'], xloc=xloc, yloc=yloc)
+            else:
+                # Default to upper right if invalid location
+                plot_material_table(ax, slope_data['materials'], xloc=0.75, yloc=0.75)
+        else:
+            # Auto-position or default: find best location
+            plot_elements_bounds = get_plot_elements_bounds(ax, slope_data)
+            xloc, yloc = find_best_table_position(ax, slope_data['materials'], plot_elements_bounds)
+            plot_material_table(ax, slope_data['materials'], xloc=xloc, yloc=yloc)
 
     ax.set_aspect('equal')  # ✅ Equal aspect
     ax.set_xlabel("x")
@@ -745,6 +815,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, width=12, heig
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_reinforcement_lines(ax, slope_data)
     if slice_numbers:
         plot_slice_numbers(ax, slice_df)
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
@@ -1055,7 +1126,7 @@ def plot_reliability_results(slope_data, reliability_data, width=12, height=7):
     plt.tight_layout()
     plt.show()
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False):
     """
     Plot the finite element mesh with material regions.
     
@@ -1065,10 +1136,13 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         figsize: Figure size tuple
         pad_frac: Fraction of mesh size to use for padding around plot
         show_nodes: If True, plot points at node locations
+        label_elements: If True, label each element with its number at its centroid
+        label_nodes: If True, label each node with its number
     """
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from matplotlib.collections import PolyCollection
+    import numpy as np
     
     nodes = mesh["nodes"]
     elements = mesh["elements"]
@@ -1083,6 +1157,10 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         if mid not in material_elements:
             material_elements[mid] = []
         
+        # Only process 2D elements (skip 1D elements which have elem_type 2)
+        if elem_type == 2:  # Skip 1D elements
+            continue
+        
         # Use corner nodes to define element boundary (no subdivision needed)
         if elem_type in [3, 6]:  # Triangular elements (linear or quadratic)
             element_coords = [nodes[element[0]], nodes[element[1]], nodes[element[2]]]
@@ -1093,8 +1171,49 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         
         material_elements[mid].append(element_coords)
     
-    # Plot each material
     legend_elements = []
+    
+    # Plot 1D elements FIRST (bottom layer) if present in mesh
+    if "elements_1d" in mesh and "element_types_1d" in mesh and "element_materials_1d" in mesh:
+        elements_1d = mesh["elements_1d"]
+        element_types_1d = mesh["element_types_1d"]
+        mat_ids_1d = mesh["element_materials_1d"]
+        
+        # Group 1D elements by material ID
+        material_lines = {}
+        for i, (element_1d, elem_type_1d, mid_1d) in enumerate(zip(elements_1d, element_types_1d, mat_ids_1d)):
+            if mid_1d not in material_lines:
+                material_lines[mid_1d] = []
+            
+            # Get line coordinates based on actual number of nodes
+            # elem_type_1d contains the number of nodes (2 for linear, 3 for quadratic)
+            if elem_type_1d == 2:  # Linear 1D element (2 nodes)
+                # Skip zero-padded elements
+                if element_1d[1] != 0:  # Valid second node
+                    line_coords = [nodes[element_1d[0]], nodes[element_1d[1]]]
+                else:
+                    continue  # Skip invalid element
+            elif elem_type_1d == 3:  # Quadratic 1D element (3 nodes)
+                # For visualization, connect all three nodes or just endpoints
+                line_coords = [nodes[element_1d[0]], nodes[element_1d[1]], nodes[element_1d[2]]]
+            else:
+                continue  # Skip unknown 1D element types
+            
+            material_lines[mid_1d].append(line_coords)
+        
+        # Plot 1D elements with distinctive style
+        for mid_1d, lines_list in material_lines.items():
+            for line_coords in lines_list:
+                xs = [coord[0] for coord in line_coords]
+                ys = [coord[1] for coord in line_coords]
+                ax.plot(xs, ys, color='red', linewidth=3, alpha=0.8, solid_capstyle='round')
+        
+        # Add 1D elements to legend
+        if material_lines:
+            legend_elements.append(plt.Line2D([0], [0], color='red', linewidth=3, 
+                                            alpha=0.8, label='1D Elements'))
+    
+    # Plot 2D elements SECOND (middle layer)
     for mid, elements_list in material_elements.items():
         # Create polygon collection for this material
         poly_collection = PolyCollection(elements_list, 
@@ -1115,38 +1234,65 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
                                    alpha=0.4, 
                                    label=label))
     
-    # Plot nodes if requested
-    if show_nodes:
-        # Collect actual nodes used by elements (excluding padding zeros)
-        used_nodes = set()
-        for elem, elem_type in zip(elements, element_types):
-            if elem_type == 3:  # 3-node triangle
-                for i in range(3):
-                    used_nodes.add(elem[i])
-            elif elem_type == 6:  # 6-node triangle
-                for i in range(6):
-                    if elem[i] != 0:
-                        used_nodes.add(elem[i])
-            elif elem_type == 4:  # 4-node quad
-                for i in range(4):
-                    used_nodes.add(elem[i])
-            elif elem_type == 8:  # 8-node quad (no center node)
-                for i in range(8):
-                    if elem[i] != 0:
-                        used_nodes.add(elem[i])
-            elif elem_type == 9:  # 9-node quad (with center node)
-                for i in range(9):
-                    if elem[i] != 0:
-                        used_nodes.add(elem[i])
+    # Label 2D elements if requested
+    if label_elements:
+        for idx, (element, element_type) in enumerate(zip(elements, element_types)):
+            # Calculate element centroid based on element type
+            if element_type == 3:  # 3-node triangle
+                element_coords = nodes[element[:3]]
+            elif element_type == 6:  # 6-node triangle
+                element_coords = nodes[element[:6]]
+            elif element_type == 4:  # 4-node quad
+                element_coords = nodes[element[:4]]
+            elif element_type == 8:  # 8-node quad
+                element_coords = nodes[element[:8]]
+            elif element_type == 9:  # 9-node quad
+                element_coords = nodes[element[:9]]
+            else:
+                continue  # Skip unknown element types
+            
+            centroid = np.mean(element_coords, axis=0)
+            ax.text(centroid[0], centroid[1], str(idx+1),
+                    ha='center', va='center', fontsize=6, color='black', alpha=0.7,
+                    zorder=12)
+    
+    # Label 1D elements if requested (with different color)
+    if label_elements and "elements_1d" in mesh:
+        elements_1d = mesh["elements_1d"]
+        element_types_1d = mesh["element_types_1d"]
         
-        # Plot only the actually used nodes
-        if used_nodes:
-            used_coords = nodes[list(used_nodes)]
-            ax.plot(used_coords[:, 0], used_coords[:, 1], 'k.', markersize=2)
-            # Add to legend
-            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
-                                            markerfacecolor='k', markersize=6, 
-                                            label=f'Nodes ({len(used_nodes)})', linestyle='None'))
+        for idx, (element_1d, elem_type_1d) in enumerate(zip(elements_1d, element_types_1d)):
+            # Skip zero-padded elements
+            if elem_type_1d == 2 and element_1d[1] != 0:  # Linear 1D element
+                # Calculate midpoint of line element
+                coord1 = nodes[element_1d[0]]
+                coord2 = nodes[element_1d[1]]
+                midpoint = (coord1 + coord2) / 2
+                ax.text(midpoint[0], midpoint[1], f"1D{idx+1}",
+                        ha='center', va='center', fontsize=6, color='black', alpha=0.9,
+                        zorder=13)
+            elif elem_type_1d == 3 and element_1d[2] != 0:  # Quadratic 1D element
+                # Use middle node as label position (if it exists)
+                midpoint = nodes[element_1d[1]]
+                ax.text(midpoint[0], midpoint[1], f"1D{idx+1}",
+                        ha='center', va='center', fontsize=6, color='black', alpha=0.9,
+                        zorder=13)
+    
+    # Plot nodes LAST (top layer) if requested
+    if show_nodes:
+        # Plot all nodes - if meshing is correct, all nodes should be used
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
+        # Add to legend
+        legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                        markerfacecolor='k', markersize=6, 
+                                        label=f'Nodes ({len(nodes)})', linestyle='None'))
+    
+    # Label nodes if requested
+    if label_nodes:
+        # Label all nodes
+        for i, (x, y) in enumerate(nodes):
+            ax.text(x + 0.5, y + 0.5, str(i+1), fontsize=6, color='blue', alpha=0.7,
+                    ha='left', va='bottom', zorder=14)
     
     ax.set_aspect('equal')
     ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
@@ -1223,3 +1369,101 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone'):
         ax.legend()
     plt.tight_layout()
     plt.show()
+
+
+def find_best_table_position(ax, materials, plot_elements_bounds):
+    """
+    Find the best position for the material table to avoid overlaps.
+    
+    Parameters:
+        ax: matplotlib Axes object
+        materials: List of materials to determine table size
+        plot_elements_bounds: List of (x_min, x_max, y_min, y_max) for existing elements
+        
+    Returns:
+        (xloc, yloc) coordinates for table placement
+    """
+    # Calculate table size based on number of materials and columns
+    num_materials = len(materials)
+    has_d_psi = any(mat.get('d', 0) > 0 or mat.get('psi', 0) > 0 for mat in materials)
+    table_height = 0.05 + 0.025 * num_materials  # Height per row
+    table_width = 0.25 if has_d_psi else 0.2
+    
+    # Define candidate positions (priority order) - with margins from borders
+    candidates = [
+        (0.05, 0.70),  # upper left
+        (0.70, 0.70),  # upper right  
+        (0.05, 0.05),  # lower left
+        (0.70, 0.05),  # lower right
+        (0.35, 0.70),  # upper center
+        (0.35, 0.05),  # lower center
+        (0.05, 0.35),  # center left
+        (0.70, 0.35),  # center right
+        (0.35, 0.35),  # center
+    ]
+    
+    # Check each candidate position for overlaps
+    for xloc, yloc in candidates:
+        table_bounds = (xloc, xloc + table_width, yloc - table_height, yloc)
+        
+        # Check if table overlaps with any plot elements
+        overlap = False
+        for elem_bounds in plot_elements_bounds:
+            elem_x_min, elem_x_max, elem_y_min, elem_y_max = elem_bounds
+            table_x_min, table_x_max, table_y_min, table_y_max = table_bounds
+            
+            # Check for overlap
+            if not (table_x_max < elem_x_min or table_x_min > elem_x_max or
+                   table_y_max < elem_y_min or table_y_min > elem_y_max):
+                overlap = True
+                break
+        
+        if not overlap:
+            return xloc, yloc
+    
+    # If all positions have overlap, return the first candidate
+    return candidates[0]
+
+
+def get_plot_elements_bounds(ax, slope_data):
+    """
+    Get bounding boxes of existing plot elements to avoid overlaps.
+    
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: Dictionary containing slope data
+        
+    Returns:
+        List of (x_min, x_max, y_min, y_max) tuples for plot elements
+    """
+    bounds = []
+    
+    # Get axis limits
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+    
+    # Profile lines bounds
+    if 'profile_lines' in slope_data:
+        for line in slope_data['profile_lines']:
+            if line:
+                xs = [p[0] for p in line]
+                ys = [p[1] for p in line]
+                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    
+    # Distributed loads bounds
+    if 'dloads' in slope_data and slope_data['dloads']:
+        for dload_set in slope_data['dloads']:
+            if dload_set:
+                xs = [p['X'] for p in dload_set]
+                ys = [p['Y'] for p in dload_set]
+                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    
+    # Reinforcement lines bounds
+    if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:
+        for line in slope_data['reinforce_lines']:
+            if line:
+                xs = [p['X'] for p in line]
+                ys = [p['Y'] for p in line]
+                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    
+    return bounds

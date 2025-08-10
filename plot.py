@@ -342,7 +342,7 @@ def plot_circles(ax, slope_data):
 
     Parameters:
         ax (matplotlib axis): The plotting axis
-        circles (list of dicts): List of circles with 'Xo', 'Yo', 'R'
+        slope_data (dict): Slope data dictionary containing circles
 
     Returns:
         None
@@ -871,7 +871,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
     Creates a plot showing the results of a circular failure surface search.
 
     Parameters:
-        data: Dictionary containing plot data
+        slope_data: Dictionary containing plot data
         fs_cache: List of dictionaries containing failure surface data and FS values
         search_path: List of dictionaries containing search path coordinates
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
@@ -912,7 +912,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     Creates a plot showing the results of a non-circular failure surface search.
 
     Parameters:
-        data: Dictionary containing plot data
+        slope_data: Dictionary containing plot data
         fs_cache: List of dictionaries containing failure surface data and FS values
         search_path: List of dictionaries containing search path coordinates
         highlight_fs: Boolean indicating whether to highlight the critical failure surface

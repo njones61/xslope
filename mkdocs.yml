@@ -24,31 +24,32 @@ plugins:
           paths: ["."]
           options:
             docstring_style: google
+            show_signature_annotations: false
 nav:
   - Home: index.md
   - Usage Guide:
     - General Features: usage/features.md
     - Code Structure: usage/structure.md
   - Limit Equilibrium Method:
-    - Overview: limit_equilibrium/overview.md
-    - Ordinary Method of Slices: limit_equilibrium/oms.md
-    - Bishop's Simplified Method: limit_equilibrium/bishop.md
-    - Janbu Method: limit_equilibrium/janbu.md
-    - Force Equilibrium Methods: limit_equilibrium/force_eq.md
-    - Spencer's Method: limit_equilibrium/spencer.md
-    - Rapid Drawdown Analysis: limit_equilibrium/rapid.md
-    - Automated Search Algorithms: limit_equilibrium/search.md
-    - Reliability Analysis: limit_equilibrium/reliability.md
-    - Sample Problems: limit_equilibrium/samples.md
+    - Overview: lim_eq/overview.md
+    - Ordinary Method of Slices: lim_eq/oms.md
+    - Bishop's Simplified Method: lim_eq/bishop.md
+    - Janbu Method: lim_eq/janbu.md
+    - Force Equilibrium Methods: lim_eq/force_eq.md
+    - Spencer's Method: lim_eq/spencer.md
+    - Rapid Drawdown Analysis: lim_eq/rapid.md
+    - Automated Search Algorithms: lim_eq/search.md
+    - Reliability Analysis: lim_eq/reliability.md
+    - Sample Problems: lim_eq/samples.md
   - Seepage Analysis:
     - Overview: seepage/overview.md
     - Problem Setup: seepage/setup.md
     - Pore pressures: seepage/pore.md
     - Sample Problems: seepage/samples.md
   - Finite Element Method:
-    - Overview: finite_element/overview.md
-    - Problem Setup: finite_element/setup.md
-    - Sample Problems: finite_element/samples.md
+    - Overview: fem/overview.md
+    - Problem Setup: fem/setup.md
+    - Sample Problems: fem/samples.md
   - API:
       - File I/O: api/fileio.md
       - Slice: api/slice.md

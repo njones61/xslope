@@ -12,7 +12,7 @@ def oms(slice_df, debug=False):
 
     Inputs
     ------
-    df : pandas.DataFrame
+    slice_df : pandas.DataFrame
         Must contain exactly these columns (length = n slices):
           'alpha'   (deg)   = base inclination αᵢ
           'phi'     (deg)   = friction angle φᵢ
@@ -145,7 +145,7 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     Requires circular slip surface and full input data structure consistent with OMS.
 
     Parameters:
-        df : pandas.DataFrame with required columns (see OMS spec)
+        slice_df : pandas.DataFrame with required columns (see OMS spec)
         debug : bool, if True prints diagnostic info
         tol : float, convergence tolerance
         max_iter : int, maximum iteration steps
@@ -244,7 +244,7 @@ def janbu(slice_df, debug=False):
     based on d/L ratio and soil type.
 
     Parameters:
-        df : pandas.DataFrame with required columns (see OMS spec)
+        slice_df : pandas.DataFrame with required columns (see OMS spec)
         debug : bool, if True prints diagnostic info
 
     Returns:
@@ -352,7 +352,7 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
 
     Parameters:
-        df (pd.DataFrame): must contain columns
+        slice_df (pd.DataFrame): must contain columns
             'alpha' (slice base inclination, degrees),
             'phi'   (slice friction angle, degrees),
             'c'     (cohesion),
@@ -463,10 +463,10 @@ def corps_engineers(slice_df, debug=False):
     1. Computes a single θ from the slope between
        (x_l[0], y_lt[0]) and (x_r[-1], y_rt[-1]).
     2. Builds a constant θ array of length n+1.
-    3. Calls force_equilibrium(df, theta_array).
+    3. Calls force_equilibrium(slice_df, theta_array).
 
     Parameters:
-        df (pd.DataFrame): Must include at least ['x_l','y_lt','x_r','y_rt']
+        slice_df (pd.DataFrame): Must include at least ['x_l','y_lt','x_r','y_rt']
                            plus all the columns required by force_equilibrium:
                            ['alpha','phi','c','dl','w','u','dx'].
 
@@ -568,7 +568,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     
 
     Parameters:
-        df (pd.DataFrame): must contain columns
+        slice_df (pd.DataFrame): must contain columns
             'alpha' (slice base inclination, degrees),
             'phi'   (slice friction angle, degrees),
             'c'     (cohesion),

@@ -6,7 +6,7 @@ The **xslope** python package is designed to be modular and easy to use. The fol
 
 The first step in using xslope is to load the input file. The input file contains all the necessary information about the slope, including the geometry, material properties, and loading conditions. The input file is an Excel file with a specific structure. A template for the Excel file can be downloaded here:
 
-[input_template.xlsx](../input_template.xlsx)
+[input_template.xlsx](../../inputs/slope/input_template_lface5.xlsx)
 
 The input file is designed to be easy to use and can be modified using any spreadsheet software. The input file is divided into several tabs or sheets, each of which corresponds to a specific aspect of the slope stability analysis. The strucutre of each sheet is designed to be intuitive and easy to understand. The sheets are as follows:
 
@@ -167,7 +167,7 @@ for the factor of safety, including the following:
 | janbu_corrected | Janbu's Corrected Method    (force equilibrium) |
 
 
-Each of these methods is described in more detail in the [Solution Techniques](../methods) section of this documentation.
+Each of these methods is described in more detail in the Solution Techniques section of this documentation.
 
 Here is an example of how to call the bishop method:
 

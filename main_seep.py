@@ -11,7 +11,7 @@ slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
 
 plot_inputs(slope_data)
 
-polygons = build_polygons(slope_data['profile_lines'], max_depth=slope_data['max_depth'])
+polygons = build_polygons(slope_data)
 
 # plot_polygons_separately(polygons)
 
@@ -22,7 +22,7 @@ target_size = (x_range[1] - x_range[0]) / 100
 target_size = 5
 
 # Build quadrilateral mesh
-mesh = build_mesh_from_polygons(polygons, target_size, 'quad9')
+mesh = build_mesh_from_polygons(polygons, target_size, 'tri6')
 
 plot_mesh(mesh, materials=slope_data['materials'])
 

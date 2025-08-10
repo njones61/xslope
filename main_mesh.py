@@ -1,39 +1,50 @@
 from fileio import load_slope_data
 
-from mesh import build_polygons, build_mesh_from_polygons
-from mesh import export_mesh_to_json, import_mesh_from_json
+from mesh import build_polygons, build_mesh_from_polygons, get_quad_mesh_presets
+from mesh import export_mesh_to_json, import_mesh_from_json, test_1d_element_alignment
+from mesh import add_intersection_points_to_polygons, extract_reinforcement_line_geometry
 from plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 import numpy as np
 
-slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_reinf5.xlsx")
 
-# plot_inputs(slope_data)
+# Extract reinforcement lines in the correct format
+test_lines = extract_reinforcement_line_geometry(slope_data)
+print(f"Extracted {len(test_lines)} reinforcement lines")
 
-polygons = build_polygons(slope_data['profile_lines'], max_depth=slope_data['max_depth'])
+# Build polygons with reinforcement line intersections
+polygons = build_polygons(slope_data, reinf_lines=test_lines, debug=True)
 
 # plot_polygons_separately(polygons)
 
-# build a list of region ids
-region_ids = [i for i in range(len(polygons))]
+# Use fixed target size that was working before
+target_size = 5
 
-# find the x-range of the ground_surface and use it to set the target size
-x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
-target_size = (x_range[1] - x_range[0]) / 150
+# Test the new linear-first approach with quadratic elements
+print("Testing  with reinforcement lines:")
+mesh = build_mesh_from_polygons(
+    polygons, 
+    target_size, 
+    element_type='tri6', 
+    lines=None,
+    debug=True
+)
+print(f"Generated mesh with {len(mesh['nodes'])} nodes")
+if 'elements_1d' in mesh:
+    print(f"Generated {len(mesh['elements_1d'])} 1D elements")
+print()
 
-target_size = 10
 
-# Build triangular mesh
-print("Building triangular mesh...")
-mesh_tri = build_mesh_from_polygons(polygons, target_size, 'tri6')
+print(f"Generated mesh with {len(mesh['nodes'])} nodes")
+if 'elements_1d' in mesh:
+    print(f"Generated {len(mesh['elements_1d'])} 1D elements")
+    
+    # Test reinforcement line alignment
+    test_success = test_1d_element_alignment(mesh, test_lines, debug=True)
+    print(f"1D element alignment test: {'PASSED' if test_success else 'FAILED'}")
+else:
+    print("No 1D elements were generated")
 
-export_mesh_to_json(mesh_tri, "mesh_tri.json")
-
-plot_mesh(mesh_tri, materials=slope_data['materials'])
-
-# Build quadrilateral mesh
-print("\nBuilding quadrilateral mesh...")
-mesh_quad = build_mesh_from_polygons(polygons, target_size, 'quad8')
-
-export_mesh_to_json(mesh_quad, "mesh_quad.json")
-
-plot_mesh(mesh_quad, materials=slope_data['materials'])
+# Export and plot the final mesh
+export_mesh_to_json(mesh, "mesh.json")
+plot_mesh(mesh, materials=slope_data['materials'])

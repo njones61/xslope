@@ -132,7 +132,7 @@ The seismic force is assumped to act horizontally in a direction that causes sli
 **Reinforcement:** Reinforcement forces are used to represent the effects of geosynthetics, soil nails, or other 
 structural elements that provide additional stability to slopes. These forces can be modeled as tensile forces acting along the base of the slices, providing resistance to sliding and contributing to the overall stability of the slope.
 
-![geogrid_fig.png](images/geogrid_fig.png)
+![reinf_layers.png](images/reinf_layers.png)
 
 For the limit equilibrium methods in XSLOPE, the reinforcement is assumed to be flexible and therefore acts in a direction parallel to the base of the slice in a direciton that resists shear. More comprehensize treatment of reinforcement is included in the [finite element method](../fem/overview.md).
 

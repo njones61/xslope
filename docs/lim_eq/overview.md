@@ -24,7 +24,7 @@ where $c'$ is the effective cohesion, $\sigma'$ is the effective normal stress, 
 
 where $u$ is the pore pressure. In XSLOPE, pore pressures are defined by entering the geometry of a piezometric line and then for any point below the line, the pore pressure is calculated as:
 
-$u = \Delta y * \gamma_w$
+> $u = \Delta y * \gamma_w$
 
 where $\Delta y$ is the distance from the piezometric line to the point in question and $\gamma_w$ is the unit weight of water. 
 

@@ -1,40 +1,68 @@
 # The Limit Equilibrium Method
 
-## Introduction
-
 The Limit Equilibrium Method represents the fundamental approach to slope stability analysis, evaluating the stability of slopes by examining the equilibrium of forces acting on a potential failure mass. This method operates on the principle that a slope remains stable when the resisting forces, primarily the shear strength of the soil, exceed or equal the driving forces such as weight and other destabilizing influences.
 
-The limit equilibrium method operates under several key assumptions that form the foundation of the analysis. First, it assumes the soil mass is on the verge of failure, existing at what we call limiting equilibrium. The factor of safety (F) serves as our primary measure, defined as the ratio of available shear strength to required shear strength. The method also assumes that the failure surface is known or can be reasonably assumed, and that the soil behaves as a rigid-plastic material.
+The first step in a limit equilibrium analysis is to select a candidate failure surface which is typically circular. For slopes with narrow layers of weak soil, a non-circular failure surface may be used.
 
-The factor of safety is expressed mathematically as:
+![failure_surfaces.png](images/failure_surfaces.png)
 
-> $F = \dfrac{\text{Available Shear Strength}}{\text{Required Shear Strength}} = \dfrac{\sum \text{Resisting Forces}}{\sum \text{Driving Forces}}$
+The stresses along the failure surface are then calculated assuming the soil is at the limit of static equilibrium ($\tau$). Next, the total available strength along the failure surface is calculated ($s$).Then the factor of safety $F$ is expressed mathematically as:
 
-### Shear Strength
+> $F = \dfrac{s}{\tau}$
 
-The shear strength of soil follows the well-established Mohr-Coulomb failure criterion, which provides the theoretical basis for most slope stability analyses:
+The shear strength of soil is based on the Mohr-Coulomb failure criterion. For a total stress analysis:
+
+> $s = c + \sigma \tan \phi$
+
+Where $s$ represents the shear strength, $c$ is the  cohesion, $\sigma$ is the  normal stress, and $\phi$ is the angle of internal friction. For saturated soils, typically $\phi=0$ and $c = S_u$ where $S_u$ is the undrained shear strength. For an effective stress analysis:
 
 > $s = c' + \sigma' \tan \phi'$
 
-Where $s$ represents the shear strength, $c'$ is the effective cohesion, $\sigma'$ is the effective normal stress, and $\phi'$ is the effective angle of internal friction. This relationship forms the cornerstone of limit equilibrium analysis and appears in various forms throughout the different methods.
+where $c'$ is the effective cohesion, $\sigma'$ is the effective normal stress, and $\phi'$ is the effective angle of internal friction. This expression is typically written as:
 
-### Pore Water Pressure
+> $s = c' + (\sigma - u) \tan \phi'$
 
-![pore_pressure_effects.png](images/pore_pressure_effects.png)
+where $u$ is the pore pressure. In XSLOPE, pore pressures are defined by entering the geometry of a piezometric line and then for any point below the line, the pore pressure is calculated as:
 
-Pore water pressure effects play a critical role in accurate slope stability analysis. These pressures reduce the effective normal stress acting on the failure surface, which in turn decreases the available shear strength. Engineers can include these effects using either total or effective stress parameters, depending on the analysis requirements and available data.
+> $u = \Delta y * \gamma_w$
 
-The effect of pore water pressure on slope stability can be analyzed using several approaches:
+where $\Delta y$ is the distance from the piezometric line to the point in question and $\gamma_w$ is the unit weight of water. The pore pressures can also be derived from a 2D finite element seepage analysis of the slope using the [seepage tools](../seepage/overview.md) in XSLOPE. In this case, the pore pressure at a point is interpolated from the nodes of the element containing the point using the element basis functions. This is the most accurate way to obtain pore pressures.  
 
-**Effective Stress Analysis**: The most common approach uses effective stress parameters ($c'$ and $\phi'$) and explicitly includes pore water pressure in the calculations. This method provides the most accurate representation of soil behavior under drained conditions.
+## Developed Shear Strength
 
-**Total Stress Analysis**: For undrained conditions, total stress parameters ($c_u$ and $\phi_u$) can be used, with pore water pressure effects implicitly included in the soil strength parameters.
+When applying the limit equilibrium method, we often utilize what is called the "developed shear stregth". The main equation:
 
-**Seepage Analysis**: For complex groundwater conditions, separate seepage analysis can be performed to determine pore water pressure distributions, which are then used as input to the stability analysis.
+> $F = \dfrac{s}{\tau}$
+
+can be rewritten as:
+
+> $\tau = \dfrac{s}{F}$
+
+> $\tau = \dfrac{c + \sigma \tan \phi}{F}$
+
+> $\tau = \dfrac{c}{F} + \dfrac{\sigma \tan \phi}{F}$
+
+Then the two terms can be expressed as:
+
+> $c_d = \dfrac{c}{F}$
+
+> $\tan \phi_d = \dfrac{\tan \phi}{F}$
+
+where $c_d$ = the developed or mobilized cohesion and $\tan \phi_d$ = the developed or mobilized friction. For example, if $F = 2.0$, the mobilized cohesion and friction would be one half the total available strength values. 
+
+## Equilibrium Equations
+
+For equilibrium to be satisfied for a candidate failure surface, the following three conditions must be satisfied:
+
+>$\Sum F_x = 0$
+
+>$\Sum F_x = 0$
+
+>$\Sum M = 0$
+
+Typically the number of equations is less than the number of unknowns. Therefore simplifyings assumptions must be used. Some techniques satisfy only a portion of the equilibrium conditions. If all conditions are satisfied, it is called a complete equilibrium procedure. 
 
 ## Method of Slices
-
-### General Approach
 
 The Method of Slices represents a numerical technique that divides the potential failure mass into a series of vertical slices for analysis. Rather than analyzing the entire mass as a single unit, each slice is examined individually, with the overall stability determined by summing the forces and moments acting on all slices. This approach allows us to handle complex geometries and varying soil conditions that would be impossible to analyze using simpler methods.
 

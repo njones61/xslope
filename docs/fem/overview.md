@@ -726,11 +726,13 @@ take the 'fem_data' dictionary as input and return a solution dictionary. It wil
 which is the shear strength reduction factor (default = 1.0). It will reduce the mohr-coulomb shear strength parameters 
 (c and phi) by the factor F, and then solve the finite element system of equations to find the nodal displacements and stresses. 
 
-The solver will follow the steps outlines in the `Elastic-Plastic Solution Process` section above, which includes 
+The solver will follow the steps outlined in the `Elastic-Plastic Solution Process` section above, which includes 
 assembling the global stiffness matrix and force vector, applying boundary conditions, solving the system of 
-equations, and checking for convergence. The process will involve the integration of reinforcement lines into the 
-plasticity model, where the truss elements will contribute to the global stiffness matrix and force vector based on 
-their axial stiffness and tensile capacity.
+equations, and checking for convergence. Critical implementation details include:
+
+- **Yield detection and stress return**: Follow the elastic predictor-plastic corrector algorithm described in the `Elastic-Plastic Behavior` section
+- **Constitutive matrix switching**: Replace elastic matrix $[D_e]$ with elastic-plastic matrix $[D_{ep}]$ for yielded integration points as detailed in the `Elastic-Plastic Solution Process` 
+- **Reinforcement integration**: Truss elements contribute to the global stiffness matrix and force vector based on their axial stiffness and tensile capacity, with tension-only behavior enforced through iterative removal of compression-carrying elements
 
 The function will return a solution dictionary containing nodal displacements, stresses, strains, 
 and any other relevant quantities, including an indicator of whether the solution converged.
@@ -741,7 +743,7 @@ If debug_level = 1, only the main diagnostics will be printed, such as whether t
 convergence process, including the current iteration number, convergence criteria values, and any other relevant 
 information. If debug_level = 3, highly detailed diagnostics for debugging will be output.
 
-### Step 3: SSRM Implementation
+### Step 4: SSRM Implementation
 
 We will implement the strength reduction method (SSRM) in a new function called `solve_ssrm` in `fem.py`. This 
 function will take the `fem_data` dictionary as input and return a solution dictionary. It will repeatedly call the 
@@ -771,11 +773,10 @@ convergence process, including the current iteration number, convergence criteri
 any other relevant 
 information. If debug_level = 3, highly detailed diagnostics for debugging will be output.
 
-### Step 4: Output and Visualization
+### Step 5: Output and Visualization
 
-We will need to implement a new function called `plot_fem_results` in a new file called 'plot_fem.py` that will take 
-the 
-solution dictionary and the fem_data dictionary as inputs and generate plots of the results. This function will 
+We will need to implement some new functions in a new file called 'plot_fem.py` that will take 
+the solution dictionary and the fem_data dictionary as inputs and generate plots of the results. This functions will 
 create the following plots:
 
 1. **Displacement Contours**: A contour plot showing the nodal displacements in the x and y directions, with color 
@@ -791,6 +792,8 @@ create the following plots:
    vertical axis would be the tensile force and the horizontal axis would be the distance along the reinforcement 
    line. The vertical axis size would need to be carefully chosen to ensure that the forces are visible for all of 
    the reinforcement lines, but not so large that the chart is difficult to read.
+
+The first two items (displacement and stress) could perhaps be handled by passing arguments to a single function. Another option is to put the stress/strain contours in one axis on top and plot the deformation (item 3) in a second axis at the bottom. 
 
 ## References
 

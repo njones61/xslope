@@ -1,0 +1,14 @@
+xslope - Python package for limit equilibrium slope stability analysis
+
+Copyright 2025 Norman L. Jones
+
+This product includes software developed by Norman L. Jones.
+
+Additional third-party software and libraries used in this project:
+- NumPy: https://numpy.org/ (BSD License)
+- Pandas: https://pandas.pydata.org/ (BSD License)
+- Matplotlib: https://matplotlib.org/ (PSF License)
+- Shapely: https://shapely.readthedocs.io/ (BSD License)
+- GMSH: https://gmsh.info/ (GPL License)
+
+For full license information, see the LICENSE file.

@@ -407,7 +407,11 @@ The equilibrium equations are modified to include seismic body forces as follows
 
 >>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
 
-where $k\gamma$ represents the additional horizontal body force due to seismic loading, with $k$ being the seismic coefficient and $\gamma$ the unit weight of the soil.
+where $k\gamma$ represents the additional horizontal body force due to seismic loading, with $k$ being the seismic coefficient and $\gamma$ the unit weight of the soil. Since $b_x = 0$ and $b_y = \gamma$, the equations simplify to:
+
+>>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + k\gamma = 0$
+
+>>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + \gamma = 0$
 
 The seismic body forces are incorporated into the global force vector through element-level integration:
 

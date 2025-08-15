@@ -109,6 +109,7 @@ def build_fem_data(slope_data, mesh=None):
     E_by_mat = np.zeros(n_materials)
     nu_by_mat = np.zeros(n_materials)
     gamma_by_mat = np.zeros(n_materials)
+    material_names = []
     
     # Check for consistent pore pressure options
     pp_options = [mat.get("pp_option", "none") for mat in materials]
@@ -142,6 +143,7 @@ def build_fem_data(slope_data, mesh=None):
         E_by_mat[i] = material.get("E", 1e6)
         nu_by_mat[i] = material.get("nu", 0.3)
         gamma_by_mat[i] = material.get("gamma", 18.0)
+        material_names.append(material.get("name", f"Material {i+1}"))
     
     # Handle c/p strength option - compute actual cohesion per element
     c_by_elem = np.zeros(n_elements)
@@ -293,9 +295,9 @@ def build_fem_data(slope_data, mesh=None):
     # Step 3: Y-roller supports at left and right sides (type 3)  
     if "ground_surface" in slope_data:
         ground_surface = slope_data["ground_surface"]
-        if len(ground_surface) >= 2:
-            x_left = ground_surface[0][0]
-            x_right = ground_surface[-1][0]
+        if len(ground_surface.coords) >= 2:
+            x_left = ground_surface.coords[0][0]
+            x_right = ground_surface.coords[-1][0]
             tolerance = 1e-6
             
             left_nodes = np.abs(nodes[:, 0] - x_left) < tolerance
@@ -305,18 +307,36 @@ def build_fem_data(slope_data, mesh=None):
             bc_type[right_nodes] = 3  # Y-roller (u=free, v=0)
     
     # Step 4: Convert distributed loads to nodal forces (type 4)
-    if "distributed_loads" in slope_data:
-        distributed_loads = slope_data["distributed_loads"]
-        tolerance = 1e-3  # Tolerance for finding nodes on load lines
+    # Check for distributed loads (could be 'dloads', 'dloads2', or 'distributed_loads')
+    distributed_loads = []
+    if "dloads" in slope_data and slope_data["dloads"]:
+        distributed_loads.extend(slope_data["dloads"])
+    if "dloads2" in slope_data and slope_data["dloads2"]:
+        distributed_loads.extend(slope_data["dloads2"])
+    if "distributed_loads" in slope_data and slope_data["distributed_loads"]:
+        distributed_loads.extend(slope_data["distributed_loads"])
+    
+    if distributed_loads:
+        tolerance = 1e-1  # Tolerance for finding nodes on load lines (increased for better matching)
         
-        for load_line in distributed_loads:
-            load_coords = load_line["coords"]
-            load_values = load_line["loads"]
+        for load_idx, load_line in enumerate(distributed_loads):
+            # Handle different possible data structures
+            if isinstance(load_line, dict) and "coords" in load_line:
+                # Expected format: {"coords": [...], "loads": [...]}
+                load_coords = load_line["coords"]
+                load_values = load_line["loads"]
+            elif isinstance(load_line, list):
+                # Format from fileio: list of dicts with X, Y, Normal keys
+                load_coords = [(pt["X"], pt["Y"]) for pt in load_line]
+                load_values = [pt["Normal"] for pt in load_line]
+            else:
+                continue
             
             if len(load_coords) < 2 or len(load_values) < 2:
                 continue
                 
             load_linestring = LineString(load_coords)
+            nodes_found = 0
             
             # Find nodes that lie on or near the load line
             for i, node in enumerate(nodes):
@@ -325,6 +345,7 @@ def build_fem_data(slope_data, mesh=None):
                 
                 if distance_to_line <= tolerance:
                     # This node is on the load line
+                    nodes_found += 1
                     # Find position along line and interpolate load
                     projected_distance = load_linestring.project(node_point)
                     
@@ -358,6 +379,23 @@ def build_fem_data(slope_data, mesh=None):
                     bc_type[i] = 4  # Applied force
                     bc_values[i, 0] = 0.0  # No horizontal component
                     bc_values[i, 1] = -nodal_force_magnitude  # Downward
+            
+            pass
+    
+    # Print boundary condition summary
+    bc_summary = np.bincount(bc_type, minlength=5)
+    print(f"\nBoundary condition summary:")
+    print(f"  Type 0 (free): {bc_summary[0]} nodes")
+    print(f"  Type 1 (fixed): {bc_summary[1]} nodes") 
+    print(f"  Type 2 (x-roller): {bc_summary[2]} nodes")
+    print(f"  Type 3 (y-roller): {bc_summary[3]} nodes")
+    print(f"  Type 4 (force): {bc_summary[4]} nodes")
+    
+    # Count non-zero forces
+    force_nodes = np.where(bc_type == 4)[0]
+    if len(force_nodes) > 0:
+        max_force = np.max(np.abs(bc_values[force_nodes]))
+        print(f"  Maximum force magnitude: {max_force:.3f}")
     
     # Get other parameters
     unit_weight = slope_data.get("gamma_water", 9.81)
@@ -376,6 +414,7 @@ def build_fem_data(slope_data, mesh=None):
         "E_by_mat": E_by_mat,
         "nu_by_mat": nu_by_mat,
         "gamma_by_mat": gamma_by_mat,
+        "material_names": material_names,
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
         "u": u,

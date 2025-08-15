@@ -1,4 +1,4 @@
-from fileio import load_slope_data
+from fileio import load_slope_data, print_dictionary
 
 from mesh import build_polygons, build_mesh_from_polygons
 from mesh import export_mesh_to_json, import_mesh_from_json
@@ -7,7 +7,7 @@ from seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, 
 from plot_seep import plot_seep_data, plot_seep_solution
 import numpy as np
 
-slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_lface6.xlsx")
 
 plot_inputs(slope_data)
 
@@ -27,6 +27,8 @@ mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
 plot_mesh(mesh, materials=slope_data['materials'])
 
 seep_data = build_seep_data(mesh, slope_data)
+
+print_dictionary(seep_data)
 
 plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
 

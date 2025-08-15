@@ -21,6 +21,408 @@ from matplotlib.collections import LineCollection
 import warnings
 
 
+def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, material_table=False, 
+                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03):
+    """
+    Plots a FEM mesh colored by material zone with boundary conditions displayed.
+    
+    Args:
+        fem_data: Dictionary containing FEM data from build_fem_data
+        figsize: Figure size
+        show_nodes: If True, plot node points
+        show_bc: If True, plot boundary condition symbols
+        material_table: If True, show material table
+        label_elements: If True, label each element with its number at its centroid
+        label_nodes: If True, label each node with its number just above and to the right
+        alpha: Transparency for element faces
+        bc_symbol_size: Size factor for boundary condition symbols (as fraction of mesh size)
+    """
+    
+    # Extract data from fem_data
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_materials = fem_data["element_materials"]
+    element_types = fem_data.get("element_types", None)
+    bc_type = fem_data["bc_type"]
+    bc_values = fem_data["bc_values"]
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    materials = np.unique(element_materials)
+    
+    # Import get_material_color to ensure consistent colors with plot_mesh
+    from plot import get_material_color
+    mat_to_color = {mat: get_material_color(mat) for mat in materials}
+    
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+    
+    # Plot mesh elements with material colors
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        color = mat_to_color[element_materials[idx]]
+        
+        if element_type == 3:  # Linear triangle
+            polygon_coords = nodes[element_nodes[:3]]
+            polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
+            ax.add_patch(polygon)
+            
+        elif element_type == 6:  # Quadratic triangle - subdivide into 4 sub-triangles
+            # Corner nodes
+            n0, n1, n2 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]]
+            # Midpoint nodes - standard GMSH pattern: n3=edge 0-1, n4=edge 1-2, n5=edge 2-0
+            n3, n4, n5 = nodes[element_nodes[3]], nodes[element_nodes[4]], nodes[element_nodes[5]]
+            
+            # Create 4 sub-triangles with standard GMSH connectivity
+            sub_triangles = [
+                [n0, n3, n5],  # Corner triangle at node 0 (uses midpoints 0-1 and 2-0)
+                [n3, n1, n4],  # Corner triangle at node 1 (uses midpoints 0-1 and 1-2)
+                [n5, n4, n2],  # Corner triangle at node 2 (uses midpoints 2-0 and 1-2)
+                [n3, n4, n5]   # Center triangle (connects all midpoints)
+            ]
+            
+            # Add all sub-triangles without internal edges
+            for sub_tri in sub_triangles:
+                polygon = Polygon(sub_tri, edgecolor='none', facecolor=color, alpha=alpha)
+                ax.add_patch(polygon)
+            
+            # Add outer boundary of the tri6 element
+            outer_boundary = [n0, n1, n2, n0]  # Close the triangle
+            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
+                   'k-', linewidth=0.5)
+                
+        elif element_type == 4:  # Linear quadrilateral
+            polygon_coords = nodes[element_nodes[:4]]
+            polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
+            ax.add_patch(polygon)
+            
+        elif element_type == 8:  # Quadratic quadrilateral - subdivide into 4 sub-quads
+            # Corner nodes
+            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
+            # Midpoint nodes
+            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
+            
+            # Calculate center point (average of all 8 nodes)
+            center = ((n0[0] + n1[0] + n2[0] + n3[0] + n4[0] + n5[0] + n6[0] + n7[0]) / 8,
+                     (n0[1] + n1[1] + n2[1] + n3[1] + n4[1] + n5[1] + n6[1] + n7[1]) / 8)
+            
+            # Create 4 sub-quadrilaterals
+            sub_quads = [
+                [n0, n4, center, n7],  # Sub-quad at corner 0
+                [n4, n1, n5, center],  # Sub-quad at corner 1
+                [center, n5, n2, n6],  # Sub-quad at corner 2
+                [n7, center, n6, n3]   # Sub-quad at corner 3
+            ]
+            
+            # Add all sub-quads without internal edges
+            for sub_quad in sub_quads:
+                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
+                ax.add_patch(polygon)
+            
+            # Add outer boundary of the quad8 element
+            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
+            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
+                   'k-', linewidth=0.5)
+                
+        elif element_type == 9:  # 9-node quadrilateral - subdivide using actual center node
+            # Corner nodes
+            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
+            # Midpoint nodes
+            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
+            # Center node
+            center = nodes[element_nodes[8]]
+            
+            # Create 4 sub-quadrilaterals using the actual center node
+            sub_quads = [
+                [n0, n4, center, n7],  # Sub-quad at corner 0
+                [n4, n1, n5, center],  # Sub-quad at corner 1
+                [center, n5, n2, n6],  # Sub-quad at corner 2
+                [n7, center, n6, n3]   # Sub-quad at corner 3
+            ]
+            
+            # Add all sub-quads without internal edges
+            for sub_quad in sub_quads:
+                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
+                ax.add_patch(polygon)
+            
+            # Add outer boundary of the quad9 element
+            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
+            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
+                   'k-', linewidth=0.5)
+
+        # Label element number at centroid if requested
+        if label_elements:
+            # Calculate centroid based on element type
+            if element_type in [3, 4]:
+                # For linear elements, use the polygon_coords
+                if element_type == 3:
+                    element_coords = nodes[element_nodes[:3]]
+                else:
+                    element_coords = nodes[element_nodes[:4]]
+            else:
+                # For quadratic elements, use all nodes to calculate centroid
+                if element_type == 6:
+                    element_coords = nodes[element_nodes[:6]]
+                elif element_type == 8:
+                    element_coords = nodes[element_nodes[:8]]
+                else:  # element_type == 9
+                    element_coords = nodes[element_nodes[:9]]
+            
+            centroid = np.mean(element_coords, axis=0)
+            ax.text(centroid[0], centroid[1], str(idx+1),
+                    ha='center', va='center', fontsize=6, color='black', alpha=0.4,
+                    zorder=10)
+
+    if show_nodes:
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
+
+    # Label node numbers if requested
+    if label_nodes:
+        for i, (x, y) in enumerate(nodes):
+            ax.text(x + 0.5, y + 0.5, str(i+1), fontsize=6, color='blue', alpha=0.7,
+                    ha='left', va='bottom', zorder=11)
+
+    # Get material names if available
+    material_names = fem_data.get("material_names", [])
+    
+    legend_handles = []
+    for mat in materials:
+        # Use material name if available, otherwise use "Material {mat}"
+        if material_names and mat <= len(material_names):
+            label = material_names[mat - 1]  # Convert to 0-based index
+        else:
+            label = f"Material {mat}"
+        
+        legend_handles.append(
+            plt.Line2D([0], [0], color=mat_to_color[mat], lw=4, label=label)
+        )
+
+    # Plot boundary conditions
+    if show_bc:
+        _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size)
+
+    # Single combined legend outside the plot
+    ax.legend(
+        handles=legend_handles,
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.1),
+        ncol=3,  # or more, depending on how many items you have
+        frameon=False
+    )
+    # Adjust plot limits to accommodate force arrows
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
+    
+    # Add extra space for force arrows if they exist
+    force_nodes = np.where(bc_type == 4)[0]
+    if len(force_nodes) > 0:
+        # Find the extent of force arrows
+        mesh_size = min(x_max - x_min, y_max - y_min)
+        symbol_size = mesh_size * bc_symbol_size
+        
+        # Add padding for force arrows (they extend outward from nodes)
+        y_padding = symbol_size * 4  # Extra space above for upward arrows
+        x_padding = (x_max - x_min) * 0.05  # Standard padding
+        y_padding_bottom = (y_max - y_min) * 0.05
+    else:
+        # Standard padding
+        x_padding = (x_max - x_min) * 0.05
+        y_padding = (y_max - y_min) * 0.05
+        y_padding_bottom = y_padding
+    
+    ax.set_xlim(x_min - x_padding, x_max + x_padding)
+    ax.set_ylim(y_min - y_padding_bottom, y_max + y_padding)
+    ax.set_aspect("equal")
+    
+    # Count element types for title
+    num_triangles = np.sum(element_types == 3)
+    num_quads = np.sum(element_types == 4)
+    if num_triangles > 0 and num_quads > 0:
+        title = f"FEM Mesh with Material Zones ({num_triangles} triangles, {num_quads} quads)"
+    elif num_quads > 0:
+        title = f"FEM Mesh with Material Zones ({num_quads} quadrilaterals)"
+    else:
+        title = f"FEM Mesh with Material Zones ({num_triangles} triangles)"
+    
+    # Place the table in the upper left
+    if material_table:
+        _plot_fem_material_table(ax, fem_data, xloc=0.3, yloc=1.1)  # upper left
+    
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.show()
+
+
+def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size=0.03):
+    """
+    Plot boundary condition symbols on the mesh.
+    
+    BC types:
+    0 = free (do nothing)
+    1 = fixed (small triangle below node)
+    2 = x roller (shouldn't have any)
+    3 = y roller (small circle + line, left/right sides)
+    4 = specified force (vector arrow)
+    """
+    
+    # Get mesh bounds for symbol sizing
+    x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
+    y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
+    mesh_size = min(x_max - x_min, y_max - y_min)
+    symbol_size = mesh_size * bc_symbol_size  # Adjustable symbol size
+    
+    # Fixed boundary conditions (type 1) - triangle below node
+    fixed_nodes = np.where(bc_type == 1)[0]
+    if len(fixed_nodes) > 0:
+        for node_idx in fixed_nodes:
+            x, y = nodes[node_idx]
+            # Create small isosceles triangle below the node
+            triangle_height = symbol_size
+            triangle_width = symbol_size * 0.8
+            triangle = patches.Polygon([
+                [x - triangle_width/2, y - triangle_height],
+                [x + triangle_width/2, y - triangle_height],
+                [x, y]
+            ], closed=True, facecolor='none', edgecolor='red', linewidth=1.5)
+            ax.add_patch(triangle)
+        
+        # Add to legend
+        legend_handles.append(
+            plt.Line2D([0], [0], marker='^', color='red', linestyle='None', 
+                      markersize=8, label='Fixed (bc_type=1)')
+        )
+    
+    # Y-roller boundary conditions (type 3) - circle + line on left/right sides
+    y_roller_nodes = np.where(bc_type == 3)[0]
+    if len(y_roller_nodes) > 0:
+        for node_idx in y_roller_nodes:
+            x, y = nodes[node_idx]
+            
+            # Determine if node is on left or right side of mesh
+            is_left_side = x < (x_min + x_max) / 2
+            
+            circle_radius = symbol_size * 0.4
+            
+            if is_left_side:
+                # Put roller symbol on the left of node (circle touching node)
+                circle_center_x = x - circle_radius
+                line_x = circle_center_x - circle_radius
+            else:
+                # Put roller symbol on the right of node (circle touching node)
+                circle_center_x = x + circle_radius
+                line_x = circle_center_x + circle_radius
+            
+            # Create small hollow circle
+            circle = patches.Circle((circle_center_x, y), circle_radius, 
+                                  facecolor='none', edgecolor='blue', linewidth=1)
+            ax.add_patch(circle)
+            
+            # Create tangent line
+            line_length = symbol_size
+            ax.plot([line_x, line_x], [y - line_length/2, y + line_length/2], 
+                   'b-', linewidth=1)
+        
+        # Add to legend
+        legend_handles.append(
+            plt.Line2D([0], [0], marker='o', color='blue', linestyle='None', 
+                      markersize=6, markerfacecolor='none', markeredgewidth=1, label='Y-Roller (bc_type=3)')
+        )
+    
+    # Specified force boundary conditions (type 4) - vector arrows
+    force_nodes = np.where(bc_type == 4)[0]
+    if len(force_nodes) > 0:
+        # Find max force magnitude for scaling
+        force_magnitudes = []
+        for node_idx in force_nodes:
+            fx, fy = bc_values[node_idx]
+            force_magnitudes.append(np.sqrt(fx**2 + fy**2))
+        
+        if force_magnitudes:
+            max_force = max(force_magnitudes)
+            if max_force > 0:
+                scale = symbol_size * 3 / max_force  # Scale arrows to reasonable size
+                
+                for node_idx in force_nodes:
+                    x, y = nodes[node_idx]
+                    fx, fy = bc_values[node_idx]
+                    
+                    # Scale force components
+                    scaled_fx = fx * scale
+                    scaled_fy = fy * scale
+                    
+                    # Draw arrow from force end to node (so arrow points to node)
+                    ax.annotate('', xy=(x, y), xytext=(x - scaled_fx, y - scaled_fy),
+                               arrowprops=dict(arrowstyle='->', color='green', lw=2))
+        
+        # Add to legend
+        legend_handles.append(
+            plt.Line2D([0], [0], marker='>', color='green', linestyle='-', 
+                      markersize=8, label='Applied Force (bc_type=4)')
+        )
+
+
+def _plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7):
+    """
+    Adds a FEM material properties table to the plot.
+
+    Parameters:
+        ax: matplotlib Axes object
+        fem_data: Dictionary containing FEM data with material properties
+        xloc: x-location of table (0-1)
+        yloc: y-location of table (0-1)
+
+    Returns:
+        None
+    """
+    # Extract material properties from fem_data
+    c_by_mat = fem_data.get("c_by_mat")
+    phi_by_mat = fem_data.get("phi_by_mat")
+    E_by_mat = fem_data.get("E_by_mat")
+    nu_by_mat = fem_data.get("nu_by_mat")
+    gamma_by_mat = fem_data.get("gamma_by_mat")
+    material_names = fem_data.get("material_names", [])
+    
+    if c_by_mat is None or len(c_by_mat) == 0:
+        return
+
+    # Column headers for FEM properties
+    col_labels = ["Mat", "Name", "γ", "c", "φ", "E", "ν"]
+
+    # Build table rows
+    table_data = []
+    for idx in range(len(c_by_mat)):
+        c = c_by_mat[idx]
+        phi = phi_by_mat[idx] if phi_by_mat is not None else 0.0
+        E = E_by_mat[idx] if E_by_mat is not None else 0.0
+        nu = nu_by_mat[idx] if nu_by_mat is not None else 0.0
+        gamma = gamma_by_mat[idx] if gamma_by_mat is not None else 0.0
+        
+        # Get material name, use default if not available
+        material_name = material_names[idx] if idx < len(material_names) else f"Material {idx+1}"
+        
+        # Format values with appropriate precision
+        row = [
+            idx + 1,  # Material number (1-based)
+            material_name,  # Material name
+            f"{gamma:.1f}",   # unit weight
+            f"{c:.1f}",  # cohesion
+            f"{phi:.1f}",  # friction angle
+            f"{E:.0f}",  # Young's modulus
+            f"{nu:.2f}"  # Poisson's ratio
+        ]
+        table_data.append(row)
+
+    # Add the table
+    table = ax.table(cellText=table_data,
+                     colLabels=col_labels,
+                     loc='upper right',
+                     colLoc='center',
+                     cellLoc='center',
+                     bbox=[xloc, yloc, 0.45, 0.25])  # Increased width to accommodate name column
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+
+
 def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=1.0, 
                     show_mesh=True, show_reinforcement=True, figsize=(12, 8)):
     """

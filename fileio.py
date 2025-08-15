@@ -655,3 +655,17 @@ def load_data_from_pickle(filepath):
         raise FileNotFoundError(f"Pickle file not found: '{filepath}'")
     except Exception as e:
         raise IOError(f"Failed to load data from pickle file '{filepath}': {e}")
+    
+
+def print_dictionary(dictionary):
+    """
+    Print the contents of a dictionary to the console.
+    This can be used for slope_data, seep_data, or any other dictionary.
+    """
+    for key, value in dictionary.items():
+        print(f"\n=== {key} ===")
+        if isinstance(value, list):
+            for item in value:
+                print(item)
+        else:
+            print(value)

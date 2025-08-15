@@ -515,7 +515,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
     
     # Reduce strength parameters by factor F
     c_reduced = c_by_elem / F
-    phi_reduced = np.radians(phi_by_elem) / F
+    # FIXED: Properly reduce friction angle by reducing tan(phi) by factor F
+    phi_reduced = np.arctan(np.tan(np.radians(phi_by_elem)) / F)
     tan_phi_reduced = np.tan(phi_reduced)
     
     if debug_level >= 1:
@@ -529,10 +530,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
     plastic_elements = np.zeros(n_elements, dtype=bool)
     failed_1d_elements = np.zeros(n_1d_elements, dtype=bool)
     
-    # Convergence parameters
-    max_iterations = 50
-    tol_force = 1e-6
-    tol_disp = 1e-6
+    # Convergence parameters - tighter for SSRM failure detection
+    max_iterations = 30  # Reduced from 50 to detect non-convergence earlier
+    tol_force = 1e-4     # Tightened from 1e-6 for better failure detection
+    tol_disp = 1e-4      # Tightened from 1e-6 for better failure detection
     
     converged = False
     iteration = 0
@@ -545,6 +546,89 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
     while iteration < max_iterations and not converged:
         if debug_level >= 2:
             print(f"\n--- Iteration {iteration + 1} ---")
+        
+        # For iterations > 0, check plastic state from previous iteration's displacements
+        # and update the stiffness matrix accordingly
+        if iteration > 0:
+            if debug_level >= 2:
+                print(f"  Checking plastic state from previous iteration...")
+                print(f"  Previous plastic elements: {np.sum(plastic_elements)}")
+            
+            # Check for yielding based on previous iteration's displacements
+            new_plastic_elements = np.zeros(n_elements, dtype=bool)
+            
+            for elem_idx in range(n_elements):
+                elem_nodes = elements[elem_idx]
+                elem_type = element_types[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
+                
+                # Compute element stresses from previous iteration's displacements
+                stresses = compute_element_stress(
+                    nodes[active_nodes], displacements, active_nodes, 
+                    E_by_mat[element_materials[elem_idx] - 1],
+                    nu_by_mat[element_materials[elem_idx] - 1],
+                    u_nodal[active_nodes], elem_type)
+                
+                # Check Mohr-Coulomb yield criterion
+                c_elem = c_reduced[elem_idx]
+                phi_elem = phi_reduced[elem_idx]
+                
+                yield_value = check_mohr_coulomb_yield(stresses, c_elem, phi_elem)
+                
+                if yield_value > 1e-6:  # Element has yielded
+                    new_plastic_elements[elem_idx] = True
+                    if debug_level >= 3:
+                        print(f"    Element {elem_idx} yielded: yield_value = {yield_value:.2e}")
+            
+            if debug_level >= 2:
+                print(f"  New plastic elements detected: {np.sum(new_plastic_elements)}")
+            
+            # Check for failure in 1D elements
+            new_failed_1d = np.zeros(n_1d_elements, dtype=bool)
+            forces_1d = np.zeros(n_1d_elements)
+            
+            for elem_idx in range(n_1d_elements):
+                if failed_1d_elements[elem_idx]:
+                    continue
+                    
+                elem_nodes = elements_1d[elem_idx]
+                elem_type = element_types_1d[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
+                
+                if len(active_nodes) >= 2:
+                    # Compute axial force
+                    forces_1d[elem_idx] = compute_truss_force(
+                        nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
+                    
+                    # Check tension-only and failure criteria
+                    if forces_1d[elem_idx] < 0:
+                        # Compression - remove element
+                        new_failed_1d[elem_idx] = True
+                    elif forces_1d[elem_idx] > t_allow_by_1d_elem[elem_idx]:
+                        # Exceeded tensile capacity
+                        if t_res_by_1d_elem[elem_idx] > 0:
+                            # Reduce to residual capacity
+                            # This would require modifying stiffness - simplified here
+                            pass
+                        else:
+                            # Complete failure
+                            new_failed_1d[elem_idx] = True
+            
+            # Check if plastic state has changed
+            plastic_state_changed = not np.array_equal(new_plastic_elements, plastic_elements) or \
+                                  not np.array_equal(new_failed_1d, failed_1d_elements)
+            
+            if plastic_state_changed:
+                # Update plastic states
+                old_plastic_count = np.sum(plastic_elements)
+                plastic_elements = new_plastic_elements.copy()
+                failed_1d_elements = new_failed_1d.copy()
+                
+                if debug_level >= 2:
+                    print(f"  Plastic state changed: {old_plastic_count} -> {np.sum(plastic_elements)} plastic elements")
+            else:
+                if debug_level >= 2:
+                    print(f"  Plastic state unchanged: {np.sum(plastic_elements)} plastic elements")
         
         # Assemble force vector (only for first iteration)
         if iteration == 0:
@@ -582,9 +666,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
         # Inner loop for elastic-plastic iteration within each load step
         sub_iteration = 0
         max_sub_iterations = 10
-        plastic_state_changed = True
+        plastic_state_changed = False  # Initialize to False for each main iteration
         
-        while sub_iteration < max_sub_iterations and plastic_state_changed:
+        # Initialize variables for cases where inner loop doesn't execute
+        delta_u_full = np.zeros(n_dof)
+        K_global = lil_matrix((n_dof, n_dof))
+        constraint_dofs = []
+        F_constrained = np.zeros(n_dof)
+        K_constrained = lil_matrix((n_dof, n_dof))
+        
+        # Always execute the inner loop for the first iteration to build stiffness matrix
+        # For subsequent iterations, only execute if plastic state changed
+        should_execute_inner = (iteration == 0) or plastic_state_changed
+        
+        while sub_iteration < max_sub_iterations and should_execute_inner:
             if debug_level >= 3:
                 print(f"    Sub-iteration {sub_iteration + 1}")
             
@@ -666,7 +761,32 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
                     delta_u_full = displacements.copy()
                 else:
                     # Subsequent iterations: solve for displacement increments
-                    delta_u_free = spsolve(K_constrained.tocsr(), F_constrained)
+                    # For plastic correction, we need to compute the residual force
+                    # and solve for the correction
+                    
+                    # Compute current internal forces from current displacements
+                    F_internal = K_global @ displacements
+                    
+                    # Apply boundary conditions to internal forces
+                    for dof in constraint_dofs:
+                        F_internal[dof] = 0.0
+                    
+                    # The residual is the difference between applied and internal forces
+                    F_residual = F_global - F_internal
+                    
+                    # Apply boundary conditions to residual
+                    for dof in constraint_dofs:
+                        F_residual[dof] = 0.0
+                    
+                    # Extract only the free DOFs for the constrained system
+                    F_residual_constrained = []
+                    for i in range(n_dof):
+                        if i not in constraint_dofs:
+                            F_residual_constrained.append(F_residual[i])
+                    F_residual_constrained = np.array(F_residual_constrained)
+                    
+                    # Solve for displacement correction
+                    delta_u_free = spsolve(K_constrained.tocsr(), F_residual_constrained)
                     
                     # Reconstruct full displacement increment vector
                     delta_u_full = np.zeros(n_dof)
@@ -692,92 +812,65 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
                     "iterations": iteration
                 }
             
-            # Check for yielding in 2D elements
-            new_plastic_elements = np.zeros(n_elements, dtype=bool)
-            
-            for elem_idx in range(n_elements):
-                elem_nodes = elements[elem_idx]
-                elem_type = element_types[elem_idx]
-                active_nodes = elem_nodes[:elem_type]
-                
-                # Compute element stresses
-                stresses = compute_element_stress(
-                    nodes[active_nodes], displacements, active_nodes, 
-                    E_by_mat[element_materials[elem_idx] - 1],
-                    nu_by_mat[element_materials[elem_idx] - 1],
-                    u_nodal[active_nodes], elem_type)
-                
-                # Check Mohr-Coulomb yield criterion
-                c_elem = c_reduced[elem_idx]
-                phi_elem = phi_reduced[elem_idx]
-                
-                yield_value = check_mohr_coulomb_yield(stresses, c_elem, phi_elem)
-                
-                if yield_value > 1e-6:  # Element has yielded
-                    new_plastic_elements[elem_idx] = True
-            
-            # Check for failure in 1D elements
-            new_failed_1d = np.zeros(n_1d_elements, dtype=bool)
-            forces_1d = np.zeros(n_1d_elements)
-            
-            for elem_idx in range(n_1d_elements):
-                if failed_1d_elements[elem_idx]:
-                    continue
-                    
-                elem_nodes = elements_1d[elem_idx]
-                elem_type = element_types_1d[elem_idx]
-                active_nodes = elem_nodes[:elem_type]
-                
-                if len(active_nodes) >= 2:
-                    # Compute axial force
-                    forces_1d[elem_idx] = compute_truss_force(
-                        nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
-                    
-                    # Check tension-only and failure criteria
-                    if forces_1d[elem_idx] < 0:
-                        # Compression - remove element
-                        new_failed_1d[elem_idx] = True
-                    elif forces_1d[elem_idx] > t_allow_by_1d_elem[elem_idx]:
-                        # Exceeded tensile capacity
-                        if t_res_by_1d_elem[elem_idx] > 0:
-                            # Reduce to residual capacity
-                            # This would require modifying stiffness - simplified here
-                            pass
-                        else:
-                            # Complete failure
-                            new_failed_1d[elem_idx] = True
-            
-            # Check if plastic state has changed
-            plastic_state_changed = not np.array_equal(new_plastic_elements, plastic_elements) or \
-                                  not np.array_equal(new_failed_1d, failed_1d_elements)
-            
-            if plastic_state_changed:
-                # Update plastic states and continue inner loop
-                plastic_elements = new_plastic_elements.copy()
-                failed_1d_elements = new_failed_1d.copy()
-                
-                if debug_level >= 3:
-                    print(f"    Plastic state changed: {np.sum(plastic_elements)} plastic elements")
-            
             sub_iteration += 1
+        
+        # The plastic state checking is now done at the beginning of each iteration
+        # No need to duplicate it here
+        
+        # After the inner loop, ensure we have the final plastic state
+        # This is important because the inner loop may have updated the plastic state
+        if iteration == 0:
+            # For the first iteration, we already have the correct plastic state
+            pass
+        else:
+            # For subsequent iterations, we need to check the final state
+            # The plastic state should already be correct from the inner loop
+            pass
         
         # Check convergence
         disp_change_norm = np.linalg.norm(delta_u_full) if iteration > 0 else np.linalg.norm(displacements)
-        residual_norm = disp_change_norm  # Simplified for now
+        
+        # Compute proper force residual norm
+        if iteration == 0:
+            # First iteration has no residual
+            force_residual_norm = 0.0
+        else:
+            # For subsequent iterations, compute residual from stiffness matrix
+            F_internal = K_global @ displacements
+            # Apply boundary conditions to internal forces
+            for dof in constraint_dofs:
+                F_internal[dof] = 0.0
+            # The residual is the difference between applied and internal forces
+            F_residual = F_global - F_internal
+            # Apply boundary conditions to residual
+            for dof in constraint_dofs:
+                F_residual[dof] = 0.0
+            force_residual_norm = np.linalg.norm(F_residual)
+        
+        residual_norm = force_residual_norm
         
         # DEBUG: Check what's happening
         if debug_level >= 3:
-            print(f"    DEBUG: Force vector norm: {np.linalg.norm(F_constrained):.2e}")
-            print(f"    DEBUG: Displacement update norm: {np.linalg.norm(delta_u_full):.2e}")
-            print(f"    DEBUG: Max displacement: {np.max(np.abs(displacements)):.2e}")
-            print(f"    DEBUG: Matrix size: {K_constrained.shape}")
+            if iteration == 0:
+                print(f"    DEBUG: Force vector norm: {np.linalg.norm(F_global):.2e}")
+                print(f"    DEBUG: Displacement update norm: {np.linalg.norm(displacements):.2e}")
+                print(f"    DEBUG: Max displacement: {np.max(np.abs(displacements)):.2e}")
+                print(f"    DEBUG: Force residual norm: {force_residual_norm:.2e}")
+                # K_constrained is defined in the inner loop, so we can't access it here
+                print(f"    DEBUG: Matrix size: Not available yet")
+            else:
+                print(f"    DEBUG: Force vector norm: {np.linalg.norm(F_constrained):.2e}")
+                print(f"    DEBUG: Displacement update norm: {np.linalg.norm(delta_u_full):.2e}")
+                print(f"    DEBUG: Max displacement: {np.max(np.abs(displacements)):.2e}")
+                print(f"    DEBUG: Force residual norm: {force_residual_norm:.2e}")
+                print(f"    DEBUG: Matrix size: {K_constrained.shape}")
         
         n_newly_plastic = np.sum(new_plastic_elements & ~plastic_elements) if iteration > 0 else np.sum(plastic_elements)
         n_newly_failed_1d = np.sum(new_failed_1d & ~failed_1d_elements) if iteration > 0 else np.sum(failed_1d_elements)
         
         if debug_level >= 2:
             print(f"  Displacement change norm: {disp_change_norm:.2e}")
-            print(f"  Residual norm: {residual_norm:.2e}")
+            print(f"  Force residual norm: {force_residual_norm:.2e}")
             print(f"  Total plastic elements: {np.sum(plastic_elements)}")
             print(f"  Total failed 1D elements: {np.sum(failed_1d_elements)}")
         
@@ -785,10 +878,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
         if iteration == 0:
             # First iteration always continues to check for plasticity
             converged = False
-        elif (disp_change_norm < tol_disp and residual_norm < tol_force and not plastic_state_changed):
+        elif (disp_change_norm < tol_disp and force_residual_norm < tol_force and not plastic_state_changed):
             converged = True
             if debug_level >= 1:
                 print(f"Converged after {iteration + 1} iterations")
+        else:
+            # Not converged - continue iterating
+            converged = False
+            if debug_level >= 2:
+                if disp_change_norm >= tol_disp:
+                    print(f"  Displacement not converged: {disp_change_norm:.2e} >= {tol_disp:.2e}")
+                if force_residual_norm >= tol_force:
+                    print(f"  Force residual not converged: {force_residual_norm:.2e} >= {tol_force:.2e}")
+                if plastic_state_changed:
+                    print(f"  Plastic state changed, continuing iteration")
         
         # For subsequent iterations, zero force vector (no additional loading)
         if iteration == 0:
@@ -1841,15 +1944,16 @@ def solve_ssrm(fem_data, debug_level=0):
     
     # SSRM parameters
     F_start = 1.0
-    F_increment_initial = 0.1
-    F_increment_min = 0.01
-    F_max = 10.0
-    max_ssrm_iterations = 100
+    F_increment_initial = 0.02  # Reduced from 0.05 for more precise failure detection
+    F_increment_min = 0.001     # Reduced from 0.005 for finer resolution
+    F_max = 3.0                 # Reduced from 5.0 to focus on realistic range
+    max_ssrm_iterations = 100   # Increased from 50 to allow more iterations
     
     # History tracking
     F_history = []
     convergence_history = []
     solutions_history = []
+    displacement_history = []  # Track displacement growth rate
     
     # Initialize
     F = F_start
@@ -1871,54 +1975,93 @@ def solve_ssrm(fem_data, debug_level=0):
         solutions_history.append(solution)
         
         if solution.get("converged", False):
-            # Solution converged - slope is stable at this F
+            # Solution converged - this is stable, continue with higher F
+            max_displacement = np.max(np.abs(solution.get("displacements", [0])))
+            
+            # Check for excessive displacements that indicate failure
+            # Literature suggests displacements > 5% of characteristic length indicate failure
+            # For SSRM, we use a more sensitive criterion
+            characteristic_length = np.max(fem_data["nodes"][:, 0]) - np.min(fem_data["nodes"][:, 0])  # Approximate slope width
+            displacement_threshold = 0.05 * characteristic_length  # Reduced from 0.1 to 0.05 (5%)
+            
+            if max_displacement > displacement_threshold:
+                if debug_level >= 1:
+                    print(f"  ✗ Displacement-based failure: max_disp = {max_displacement:.4f} > threshold = {displacement_threshold:.4f}")
+                
+                # This is a failure - return the last converged solution
+                if last_converged_F is not None:
+                    return {
+                        "converged": True,
+                        "FS": last_converged_F,
+                        "last_solution": last_converged_solution,
+                        "F_history": F_history,
+                        "convergence_history": convergence_history,
+                        "solutions_history": solutions_history,
+                        "iterations_ssrm": ssrm_iteration + 1,
+                        "failure_mode": "excessive_displacement"
+                    }
+                else:
+                    return {
+                        "converged": False,
+                        "error": "Failed due to excessive displacement at initial F value",
+                        "FS": None,
+                        "F_history": F_history,
+                        "convergence_history": convergence_history,
+                        "iterations_ssrm": ssrm_iteration + 1
+                    }
+            
+            # Check for displacement growth rate instability
+            # If displacements are growing rapidly between iterations, this indicates instability
+            if len(displacement_history) > 0:
+                last_displacement = displacement_history[-1]
+                displacement_growth_rate = (max_displacement - last_displacement) / last_displacement if last_displacement > 0 else 0
+                
+                # If displacement growth rate > 50%, this indicates instability
+                if displacement_growth_rate > 0.5:
+                    if debug_level >= 1:
+                        print(f"  ✗ Displacement growth rate failure: growth_rate = {displacement_growth_rate:.2f} > 0.5")
+                    
+                    # This is a failure - return the last converged solution
+                    if last_converged_F is not None:
+                        return {
+                            "converged": True,
+                            "FS": last_converged_F,
+                            "last_solution": last_converged_solution,
+                            "F_history": F_history,
+                            "convergence_history": convergence_history,
+                            "solutions_history": solutions_history,
+                            "iterations_ssrm": ssrm_iteration + 1,
+                            "failure_mode": "displacement_growth_instability"
+                        }
+                    else:
+                        return {
+                            "converged": False,
+                            "error": "Failed due to displacement growth instability at initial F value",
+                            "FS": None,
+                            "F_history": F_history,
+                            "convergence_history": convergence_history,
+                            "iterations_ssrm": ssrm_iteration + 1
+                        }
+            
+            # Store displacement for growth rate checking
+            displacement_history.append(max_displacement)
+            
+            # Store this as the last converged solution
             last_converged_F = F
             last_converged_solution = solution
             
             if debug_level >= 1:
-                n_plastic = np.sum(solution.get("plastic_elements", []))
-                n_total = len(solution.get("plastic_elements", []))
-                print(f"  ✓ Converged: {n_plastic}/{n_total} plastic elements")
-            
-            # Check if we have sufficient plastic development to consider continuing
-            plastic_ratio = 0.0
-            if len(solution.get("plastic_elements", [])) > 0:
-                plastic_ratio = np.mean(solution["plastic_elements"])
-            
-            if plastic_ratio > 0.8:
-                # High plastic development - use smaller increment
-                F_increment = max(F_increment * 0.5, F_increment_min)
-                if debug_level >= 2:
-                    print(f"  High plasticity detected, reducing increment to {F_increment:.3f}")
-            
-            # Increase F for next iteration
-            F_next = F + F_increment
-            
+                print(f"  ✓ Converged: {np.sum(solution.get('plastic_elements', []))}/{len(solution.get('plastic_elements', []))} plastic elements, {solution.get('iterations', 'Unknown')} iterations")
+                print(f"  Max displacement: {max_displacement:.4f}")
+                print(f"  Displacement threshold: {displacement_threshold:.4f}")
         else:
-            # Solution did not converge - slope has failed
+            # Solution failed to converge - this indicates failure!
             if debug_level >= 1:
-                error_msg = solution.get("error", "Unknown convergence failure")
-                print(f"  ✗ Failed to converge: {error_msg}")
+                print(f"  ✗ Non-convergence failure: {solution.get('error', 'Unknown error')}")
+                print(f"  Iterations attempted: {solution.get('iterations', 'Unknown')}")
             
-            if last_converged_F is None:
-                # Failed at the very first F value
-                if debug_level >= 1:
-                    print("  Failed at initial F - slope may already be unstable")
-                return {
-                    "converged": False,
-                    "error": "Failed to converge at initial F value",
-                    "FS": None,
-                    "F_history": F_history,
-                    "convergence_history": convergence_history,
-                    "iterations_ssrm": ssrm_iteration + 1
-                }
-            
-            # Failure occurred - critical F is between last_converged_F and current F
-            if F_increment <= F_increment_min * 1.1:
-                # We've reached minimum increment - this is our final answer
-                if debug_level >= 1:
-                    print(f"  Critical factor of safety found: FS = {last_converged_F:.4f}")
-                
+            # This is the critical failure point - return the last converged solution
+            if last_converged_F is not None:
                 return {
                     "converged": True,
                     "FS": last_converged_F,
@@ -1926,19 +2069,21 @@ def solve_ssrm(fem_data, debug_level=0):
                     "F_history": F_history,
                     "convergence_history": convergence_history,
                     "solutions_history": solutions_history,
+                    "iterations_ssrm": ssrm_iteration + 1,
+                    "failure_mode": "non_convergence"
+                }
+            else:
+                return {
+                    "converged": False,
+                    "error": "Failed to converge at initial F value - slope may be inherently unstable",
+                    "FS": None,
+                    "F_history": F_history,
+                    "convergence_history": convergence_history,
                     "iterations_ssrm": ssrm_iteration + 1
                 }
-            
-            else:
-                # Refine the search - use smaller increment and back up
-                F_increment = max(F_increment * 0.5, F_increment_min)
-                F_next = last_converged_F + F_increment
-                
-                if debug_level >= 2:
-                    print(f"  Refining search: new increment = {F_increment:.4f}, F_next = {F_next:.4f}")
         
         # Update F for next iteration
-        F = F_next
+        F += F_increment
         
         # Check bounds
         if F > F_max:

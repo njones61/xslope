@@ -423,7 +423,7 @@ def _plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7):
     table.set_fontsize(8)
 
 
-def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=1.0, 
+def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=None, 
                     show_mesh=True, show_reinforcement=True, figsize=(12, 8)):
     """
     Plot FEM results with various visualization options.
@@ -431,14 +431,18 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     Parameters:
         fem_data (dict): FEM data dictionary
         solution (dict): FEM solution dictionary
-        plot_type (str): Type of plot - 'displacement', 'stress', or 'deformed_mesh'
-        deform_scale (float): Scale factor for deformed mesh visualization
+        plot_type (str): Type(s) of plot. Single type ('stress', 'displacement', 'deformation') 
+            or comma-separated multiple types ('stress,deformation', 'displacement,deformation').
+            Multiple types are stacked vertically in the order specified.
+        deform_scale (float or None): Scale factor for deformed mesh visualization.
+            If None, automatically calculates scale factor so max deformation is 10% of mesh size.
+            If 1.0, shows actual displacements (may be too small or too large to see).
         show_mesh (bool): Whether to show mesh lines
         show_reinforcement (bool): Whether to show reinforcement elements
         figsize (tuple): Figure size
     
     Returns:
-        matplotlib figure and axes
+        matplotlib figure and axes (or list of axes for multiple plots)
     """
     
     nodes = fem_data["nodes"]
@@ -446,28 +450,106 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
     
-    if plot_type in ['displacement', 'deformed_mesh']:
-        fig, ax = plt.subplots(figsize=figsize)
+    # Parse plot types (support comma-separated list)
+    plot_types = [pt.strip().lower() for pt in plot_type.split(',')]
+    valid_types = ['displacement', 'deformation', 'stress']
+    
+    # Validate plot types
+    for pt in plot_types:
+        if pt not in valid_types:
+            raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
+    
+    # Auto-calculate deformation scale if not provided and deformation plots are requested
+    needs_deform_scale = any(pt in ['deformation', 'stress'] for pt in plot_types)
+    if deform_scale is None and needs_deform_scale:
+        # Extract displacement components
+        u = displacements[0::2]  # x-displacements
+        v = displacements[1::2]  # y-displacements
+        max_disp_mag = np.max(np.sqrt(u**2 + v**2))
         
-        if plot_type == 'displacement':
-            plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement)
-        elif plot_type == 'deformed_mesh':
-            plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement)
+        if max_disp_mag > 0:
+            # Calculate mesh dimensions
+            mesh_x_size = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
+            mesh_y_size = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
             
-    elif plot_type == 'stress':
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(figsize[0], figsize[1]*1.2))
-        plot_stress_contours(ax1, fem_data, solution, show_mesh, show_reinforcement)
-        plot_deformed_mesh(ax2, fem_data, solution, deform_scale, show_mesh, show_reinforcement)
-        ax2.set_title('Deformed Mesh')
+            # Scale so max deformation is 10% of smallest mesh dimension
+            target_deform = min(mesh_x_size, mesh_y_size) * 0.1
+            deform_scale = target_deform / max_disp_mag
+            
+            print(f"Auto-calculated deformation scale factor: {deform_scale:.6f}")
+            print(f"  Max displacement: {max_disp_mag:.4f} units")
+            print(f"  Target visualization: {target_deform:.4f} units (10% of mesh size)")
+        else:
+            deform_scale = 1.0
+            print("No displacements detected, using scale factor 1.0")
+    elif deform_scale is None:
+        deform_scale = 1.0  # Default for non-deformation plots
+    
+    # Create subplots based on number of plot types
+    n_plots = len(plot_types)
+    if n_plots == 1:
+        fig, ax = plt.subplots(figsize=figsize)
+        axes = [ax]
     else:
-        raise ValueError(f"Unknown plot_type: {plot_type}")
+        # For multiple plots, adjust height scaling and use tighter spacing
+        height_factor = min(0.8, 1.2 / n_plots)  # Reduce height factor for more plots
+        fig, axes = plt.subplots(n_plots, 1, figsize=(figsize[0], figsize[1] * n_plots * height_factor))
+        if n_plots == 1:  # Handle case where subplots returns single axis for n=1
+            axes = [axes]
+        
+
+    
+    # Calculate overall mesh bounds for consistent axis limits
+    nodes = fem_data["nodes"]
+    x_min, x_max = np.min(nodes[:, 0]), np.max(nodes[:, 0])
+    y_min, y_max = np.min(nodes[:, 1]), np.max(nodes[:, 1])
+    
+    # Add small margin
+    x_margin = (x_max - x_min) * 0.05
+    y_margin = (y_max - y_min) * 0.05
+    
+    # Plot each type
+    for i, pt in enumerate(plot_types):
+        ax = axes[i]
+        
+        # Calculate colorbar parameters based on number of plots
+        if n_plots == 1:
+            cbar_shrink = 0.8
+            cbar_labelpad = 20
+        elif n_plots == 2:
+            cbar_shrink = 0.7  # Slightly larger than before
+            cbar_labelpad = 15
+        else:  # 3 or more plots
+            cbar_shrink = 0.5  # Slightly larger than before
+            cbar_labelpad = 12
+        
+        if pt == 'displacement':
+            plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement, 
+                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+        elif pt == 'deformation':
+            plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
+                             cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+        elif pt == 'stress':
+            plot_stress_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+        
+        # Set consistent axis limits for all plots (including single plots)
+        ax.set_xlim(x_min - x_margin, x_max + x_margin)
+        ax.set_ylim(y_min - y_margin, y_max + y_margin)
+        ax.set_aspect('equal')
     
     plt.tight_layout()
     plt.show()
-    return fig, ax if plot_type != 'stress' else (ax1, ax2)
+    
+    # Return appropriate values
+    if n_plots == 1:
+        return fig, axes[0]
+    else:
+        return fig, axes
 
 
-def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True):
+def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+                              cbar_shrink=0.8, cbar_labelpad=20):
     """
     Plot displacement magnitude contours.
     """
@@ -499,8 +581,8 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
                            levels=20, cmap='viridis', alpha=0.8)
         
         # Colorbar
-        cbar = plt.colorbar(tcf, ax=ax, shrink=0.8)
-        cbar.set_label('Displacement Magnitude', rotation=270, labelpad=20)
+        cbar = plt.colorbar(tcf, ax=ax, shrink=cbar_shrink)
+        cbar.set_label('Displacement Magnitude', rotation=270, labelpad=cbar_labelpad)
     
     # Plot mesh
     if show_mesh:
@@ -516,7 +598,8 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
     ax.set_ylabel('y')
 
 
-def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True):
+def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
+                        cbar_shrink=0.8, cbar_labelpad=20):
     """
     Plot von Mises stress contours.
     """
@@ -556,8 +639,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         ax.add_collection(p)
         
         # Colorbar
-        cbar = plt.colorbar(p, ax=ax, shrink=0.8)
-        cbar.set_label('von Mises Stress', rotation=270, labelpad=20)
+        cbar = plt.colorbar(p, ax=ax, shrink=cbar_shrink)
+        cbar.set_label('von Mises Stress', rotation=270, labelpad=cbar_labelpad)
     
     # Highlight plastic elements with thick boundary
     if np.any(plastic_elements):
@@ -587,7 +670,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     ax.set_ylabel('y')
 
 
-def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True):
+def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True, 
+                       cbar_shrink=0.8, cbar_labelpad=20):
     """
     Plot deformed mesh overlay on original mesh.
     """
@@ -615,12 +699,26 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
         plot_reinforcement_lines(ax, fem_data, solution, color='gray', alpha=0.5, linewidth=2, label='Original Reinforcement')
         plot_reinforcement_lines(ax, fem_data_deformed, solution, color='red', alpha=0.8, linewidth=2, label='Deformed Reinforcement')
     
-    ax.set_aspect('equal')
+    # Add a dummy colorbar to maintain consistent spacing with other plots
+    # This ensures the x-axis alignment is consistent across all subplots
+    dummy_data = np.array([[0, 1]])
+    dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
+    cbar = plt.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
+    cbar.set_label('Deformation Scale', rotation=270, labelpad=cbar_labelpad, color='white')
+    cbar.set_ticks([])  # Remove tick marks
+    cbar.set_ticklabels([])  # Remove tick labels
+    
+    # Make the colorbar completely invisible by setting colors to background
+    cbar.outline.set_color('white')  # Make the border invisible
+    cbar.outline.set_linewidth(0)    # Remove the border line
+    
+    # Note: Axis limits will be set by the calling function for consistent multi-plot alignment
+    # When used as a standalone plot, matplotlib will auto-scale appropriately
     ax.set_title(f'Mesh Deformation (Scale Factor = {deform_scale:.1f})')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     if show_mesh or show_reinforcement:
-        ax.legend()
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2)
 
 
 def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=1.0, label=None):

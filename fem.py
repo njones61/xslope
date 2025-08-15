@@ -308,7 +308,7 @@ def build_fem_data(slope_data, mesh=None):
         bottom_nodes = np.abs(nodes[:, 1] - max_depth) < tolerance
         bc_type[bottom_nodes] = 1  # Fixed (u=0, v=0)
     
-    # Step 3: Y-roller supports at left and right sides (type 3)  
+    # Step 3: X-roller supports at left and right sides (type 2)  
     if "ground_surface" in slope_data:
         ground_surface = slope_data["ground_surface"]
         if len(ground_surface.coords) >= 2:
@@ -319,8 +319,13 @@ def build_fem_data(slope_data, mesh=None):
             left_nodes = np.abs(nodes[:, 0] - x_left) < tolerance
             right_nodes = np.abs(nodes[:, 0] - x_right) < tolerance
             
-            bc_type[left_nodes] = 3   # Y-roller (u=free, v=0)
-            bc_type[right_nodes] = 3  # Y-roller (u=free, v=0)
+            # Apply X-roller but preserve existing fixed boundary conditions
+            # Fixed (type 1) takes precedence over X-roller (type 2)
+            left_not_fixed = left_nodes & (bc_type != 1)
+            right_not_fixed = right_nodes & (bc_type != 1)
+            
+            bc_type[left_not_fixed] = 2   # X-roller (u=0, v=free) - prevent horizontal movement
+            bc_type[right_not_fixed] = 2  # X-roller (u=0, v=free) - prevent horizontal movement
     
     # Step 4: Convert distributed loads to nodal forces (type 4)
     # Check for distributed loads (could be 'dloads', 'dloads2', or 'distributed_loads')
@@ -447,7 +452,7 @@ def build_fem_data(slope_data, mesh=None):
     return fem_data
 
 
-def solve_fem(fem_data, F=1.0, debug_level=0):
+def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
     """
     Solve finite element system for slope stability analysis with elastic-plastic behavior.
     
@@ -459,6 +464,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
         fem_data (dict): FEM data dictionary from build_fem_data
         F (float): Shear strength reduction factor (default 1.0)
         debug_level (int): Verbosity level (0=quiet, 1=basic, 2=detailed, 3=debug)
+        plastic_stiffness_reduction (float): Stiffness reduction factor for plastic elements
+            Literature ranges:
+            - Conservative: 0.1 to 0.5 (10% to 50% of original stiffness - less reduction)
+            - Aggressive: 0.01 to 0.1 (1% to 10% of original stiffness - more reduction)
+            - Default: 0.1 (reduces plastic element stiffness to 10% of elastic value)
     
     Returns:
         dict: Solution dictionary containing:
@@ -594,9 +604,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
                 
                 # Build element stiffness matrix with current plastic state
                 if elem_type in [3, 6]:  # Triangular elements
-                    K_elem = build_triangle_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type)
+                    K_elem = build_triangle_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type, plastic_stiffness_reduction)
                 elif elem_type in [4, 8, 9]:  # Quadrilateral elements
-                    K_elem = build_quad_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type)
+                    K_elem = build_quad_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type, plastic_stiffness_reduction)
                 else:
                     if debug_level >= 1:
                         print(f"Warning: Element type {elem_type} not supported, skipping element {elem_idx}")
@@ -650,6 +660,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
                             displacements[i] = u_free[free_dof_idx]
                             free_dof_idx += 1
                     
+                    # Boundary conditions are automatically enforced since we only assign free DOFs
+                    # and constrained DOFs remain at their initialized value of 0.0
+                    
                     delta_u_full = displacements.copy()
                 else:
                     # Subsequent iterations: solve for displacement increments
@@ -665,6 +678,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
                     
                     # Update total displacements
                     displacements += delta_u_full
+                    
+                    # Enforce boundary conditions on total displacements
+                    for dof in constraint_dofs:
+                        displacements[dof] = 0.0
                     
             except Exception as e:
                 if debug_level >= 1:
@@ -831,7 +848,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
     }
 
 
-def build_triangle_stiffness(coords, E, nu, is_plastic=False, elem_type=3):
+def build_triangle_stiffness(coords, E, nu, is_plastic=False, elem_type=3, plastic_stiffness_reduction=0.1):
     """
     Build stiffness matrix for triangular elements (tri3 or tri6).
     
@@ -841,6 +858,13 @@ def build_triangle_stiffness(coords, E, nu, is_plastic=False, elem_type=3):
         nu: Poisson's ratio
         is_plastic: boolean indicating if element is plastic
         elem_type: element type (3 for tri3, 6 for tri6)
+        plastic_stiffness_reduction: float - stiffness reduction factor for plastic elements
+            Literature ranges:
+            - Conservative: 0.1 to 0.5 (10% to 50% of original stiffness - less reduction)
+            - Aggressive: 0.01 to 0.1 (1% to 10% of original stiffness - more reduction)
+            - Default: 0.1 (reduces plastic element stiffness to 10% of elastic value)
+            - Values too small (< 0.01) can cause excessive deformations
+            - Values too large (> 0.5) may not capture plastic behavior adequately
     
     Returns:
         np.ndarray - element stiffness matrix (6x6 for tri3, 12x12 for tri6)
@@ -856,7 +880,7 @@ def build_triangle_stiffness(coords, E, nu, is_plastic=False, elem_type=3):
     
     # Reduce stiffness if plastic (simplified approach)
     if is_plastic:
-        D *= 0.001  # Very significant stiffness reduction for plastic elements
+        D *= plastic_stiffness_reduction
     
     if elem_type == 3:  # Linear triangle (tri3)
         return build_tri3_stiffness(coords, D)
@@ -990,7 +1014,7 @@ def build_tri6_stiffness(coords, D):
     return K
 
 
-def build_quad_stiffness(coords, E, nu, is_plastic=False, elem_type=4):
+def build_quad_stiffness(coords, E, nu, is_plastic=False, elem_type=4, plastic_stiffness_reduction=0.1):
     """
     Build stiffness matrix for quadrilateral elements (quad4, quad8, quad9).
     
@@ -1000,6 +1024,11 @@ def build_quad_stiffness(coords, E, nu, is_plastic=False, elem_type=4):
         nu: Poisson's ratio
         is_plastic: boolean indicating if element is plastic
         elem_type: element type (4 for quad4, 8 for quad8, 9 for quad9)
+        plastic_stiffness_reduction: float - stiffness reduction factor for plastic elements
+            Literature ranges:
+            - Conservative: 0.1 to 0.5 (10% to 50% of original stiffness - less reduction)
+            - Aggressive: 0.01 to 0.1 (1% to 10% of original stiffness - more reduction)
+            - Default: 0.1 (reduces plastic element stiffness to 10% of elastic value)
     
     Returns:
         np.ndarray - element stiffness matrix (8x8 for quad4, 16x16 for quad8, 18x18 for quad9)
@@ -1015,7 +1044,7 @@ def build_quad_stiffness(coords, E, nu, is_plastic=False, elem_type=4):
     
     # Reduce stiffness if plastic (simplified approach)
     if is_plastic:
-        D *= 0.001  # Very significant stiffness reduction for plastic elements
+        D *= plastic_stiffness_reduction
     
     if elem_type == 4:  # Linear quadrilateral (quad4)
         return build_quad4_stiffness(coords, D)

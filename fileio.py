@@ -391,10 +391,11 @@ def load_slope_data(filepath):
             x1, y1 = float(row.iloc[1]), float(row.iloc[2])  # Columns B, C
             x2, y2 = float(row.iloc[3]), float(row.iloc[4])  # Columns D, E
             Tmax = float(row.iloc[5])  # Column F
-            Lp1 = float(row.iloc[6]) if not pd.isna(row.iloc[6]) else 0.0  # Column G
-            Lp2 = float(row.iloc[7]) if not pd.isna(row.iloc[7]) else 0.0  # Column H
-            E = float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0  # Column I
-            Area = float(row.iloc[9]) if not pd.isna(row.iloc[9]) else 0.0  # Column J
+            Tres = float(row.iloc[6])  # Column G
+            Lp1 = float(row.iloc[7]) if not pd.isna(row.iloc[7]) else 0.0   # Column H
+            Lp2 = float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0   # Column I
+            E = float(row.iloc[9])     # Column J
+            Area = float(row.iloc[10]) # Column K
             
             # Calculate line length and direction
             import math
@@ -414,8 +415,8 @@ def load_slope_data(filepath):
                 if Lp1 == 0 and Lp2 == 0:
                     # Both ends anchored - uniform tension
                     line_points = [
-                        {"X": x1, "Y": y1, "T": Tmax, "E": E, "Area": Area},
-                        {"X": x2, "Y": y2, "T": Tmax, "E": E, "Area": Area}
+                        {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
+                        {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
                     ]
                 else:
                     # Find equilibrium point where tensions are equal
@@ -424,14 +425,14 @@ def load_slope_data(filepath):
                     if Lp1 == 0:
                         # End 1 anchored, all tension at end 1
                         line_points = [
-                            {"X": x1, "Y": y1, "T": Tmax, "E": E, "Area": Area},
-                            {"X": x2, "Y": y2, "T": 0.0, "E": E, "Area": Area}
+                            {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
+                            {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
                         ]
                     elif Lp2 == 0:
                         # End 2 anchored, all tension at end 2
                         line_points = [
-                            {"X": x1, "Y": y1, "T": 0.0, "E": E, "Area": Area},
-                            {"X": x2, "Y": y2, "T": Tmax, "E": E, "Area": Area}
+                            {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
+                            {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
                         ]
                     else:
                         # Both ends have pullout - find equilibrium point
@@ -445,9 +446,9 @@ def load_slope_data(filepath):
                         y_int = y1 + d1 * dy
                         
                         line_points = [
-                            {"X": x1, "Y": y1, "T": 0.0, "E": E, "Area": Area},
-                            {"X": x_int, "Y": y_int, "T": T_eq, "E": E, "Area": Area},
-                            {"X": x2, "Y": y2, "T": 0.0, "E": E, "Area": Area}
+                            {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
+                            {"X": x_int, "Y": y_int, "T": T_eq, "Tres": Tres, "E": E, "Area": Area},
+                            {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
                         ]
             else:
                 # Normal case - line long enough for 4 points
@@ -460,16 +461,16 @@ def load_slope_data(filepath):
                 if Lp1 > 0:
                     x_p2 = x1 + Lp1 * dx
                     y_p2 = y1 + Lp1 * dy
-                    points_to_add.append((x_p2, y_p2, Tmax))
+                    points_to_add.append((x_p2, y_p2, Tmax, Tres))
                 else:
                     # Lp1 = 0, so start point gets Tmax tension
-                    points_to_add[0] = (x1, y1, Tmax)
+                    points_to_add[0] = (x1, y1, Tmax, Tres)
                 
                 # Point 3: At distance Lp2 back from end (if Lp2 > 0)
                 if Lp2 > 0:
                     x_p3 = x2 - Lp2 * dx
                     y_p3 = y2 - Lp2 * dy
-                    points_to_add.append((x_p3, y_p3, Tmax))
+                    points_to_add.append((x_p3, y_p3, Tmax, Tres))
                 else:
                     # Lp2 = 0, so end point gets Tmax tension
                     pass  # Will be handled when adding end point
@@ -478,26 +479,26 @@ def load_slope_data(filepath):
                 if Lp2 > 0:
                     points_to_add.append((x2, y2, 0.0))
                 else:
-                    points_to_add.append((x2, y2, Tmax))
+                    points_to_add.append((x2, y2, Tmax, Tres))
                 
                 # Remove duplicate points (same x,y coordinates)
                 unique_points = []
                 tolerance = 1e-6
-                for x, y, T in points_to_add:
+                for x, y, T, Tres in points_to_add:
                     is_duplicate = False
-                    for ux, uy, uT in unique_points:
+                    for ux, uy in unique_points:
                         if abs(x - ux) < tolerance and abs(y - uy) < tolerance:
                             # Update tension to maximum value at this location
-                            for i, (px, py, pT) in enumerate(unique_points):
+                            for i, (px, py, pT, pTres) in enumerate(unique_points):
                                 if abs(x - px) < tolerance and abs(y - py) < tolerance:
-                                    unique_points[i] = (px, py, max(pT, T))
+                                    unique_points[i] = (px, py, max(pT, T), max(pTres, Tres))
                             is_duplicate = True
                             break
                     if not is_duplicate:
-                        unique_points.append((x, y, T))
+                        unique_points.append((x, y, T, Tres))
                 
                 # Convert to required format
-                line_points = [{"X": x, "Y": y, "T": T, "E": E, "Area": Area} for x, y, T in unique_points]
+                line_points = [{"X": x, "Y": y, "T": T, "Tres": Tres, "E": E, "Area": Area} for x, y, T, Tres in unique_points]
             
             if len(line_points) >= 2:
                 reinforce_lines.append(line_points)

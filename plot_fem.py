@@ -463,6 +463,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         raise ValueError(f"Unknown plot_type: {plot_type}")
     
     plt.tight_layout()
+    plt.show()
     return fig, ax if plot_type != 'stress' else (ax1, ax2)
 
 

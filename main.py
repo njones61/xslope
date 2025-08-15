@@ -15,8 +15,9 @@
 from global_config import non_circ
 from slice import generate_slices
 from fileio import load_slope_data, load_data_from_pickle
-from plot import plot_solution, plot_inputs
-from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer, spencer_OLD
+from plot import plot_circular_search_results, plot_inputs
+from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
+from search import circular_search, noncircular_search
 
 
 def solve_selected(func, slice_df, rapid=False):
@@ -50,7 +51,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_rface5.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_simple1_6.xlsx")
 
 # plot_inputs(slope_data)
 
@@ -70,7 +71,7 @@ results = solve_selected(spencer, slice_df, rapid=False)
 
 # solve_all(slice_df)
 
-slice_df.to_excel("slices.xlsx", index=False)
 
-plot_solution(slope_data, slice_df, failure_surface, results, slice_numbers=True)
+fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
+plot_circular_search_results(slope_data, fs_cache, search_path)
 

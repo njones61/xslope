@@ -140,9 +140,25 @@ def build_fem_data(slope_data, mesh=None):
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
             
-        E_by_mat[i] = material.get("E", 1e6)
-        nu_by_mat[i] = material.get("nu", 0.3)
-        gamma_by_mat[i] = material.get("gamma", 18.0)
+        # Require critical material properties to be explicitly specified
+        if "E" not in material:
+            raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Young's modulus (E) is required but not specified")
+        if "nu" not in material:
+            raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Poisson's ratio (nu) is required but not specified")
+        if "gamma" not in material:
+            raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Unit weight (gamma) is required but not specified")
+            
+        E_by_mat[i] = material["E"]
+        nu_by_mat[i] = material["nu"]
+        gamma_by_mat[i] = material["gamma"]
+        
+        # Validate material property ranges
+        if E_by_mat[i] <= 0:
+            raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Young's modulus (E) must be positive, got {E_by_mat[i]}")
+        if nu_by_mat[i] < 0 or nu_by_mat[i] >= 0.5:
+            raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Poisson's ratio (nu) must be in range [0, 0.5), got {nu_by_mat[i]}")
+        if gamma_by_mat[i] <= 0:
+            raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Unit weight (gamma) must be positive, got {gamma_by_mat[i]}")
         material_names.append(material.get("name", f"Material {i+1}"))
     
     # Handle c/p strength option - compute actual cohesion per element
@@ -512,55 +528,79 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
     iteration = 0
     residual_norm = np.inf
     
-    # Iteration loop
-    for iteration in range(max_iterations):
+    # Initial elastic solution (first iteration only)
+    iteration = 0
+    converged = False
+    
+    while iteration < max_iterations and not converged:
         if debug_level >= 2:
             print(f"\n--- Iteration {iteration + 1} ---")
         
-        # Assemble global stiffness matrix
-        K_global = lil_matrix((n_dof, n_dof))
-        
-        # Assemble 2D elements
-        for elem_idx in range(n_elements):
-            elem_nodes = elements[elem_idx]
-            elem_type = element_types[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
+        # Assemble force vector (only for first iteration)
+        if iteration == 0:
+            F_global = np.zeros(n_dof)
             
-            # Get material properties
-            mat_id = element_materials[elem_idx] - 1
-            E = E_by_mat[mat_id]
-            nu = nu_by_mat[mat_id]
-            
-            # Build element stiffness matrix
-            if elem_type in [3, 6]:  # Triangular elements
-                K_elem = build_triangle_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type)
-            elif elem_type in [4, 8, 9]:  # Quadrilateral elements
-                K_elem = build_quad_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type)
-            else:
-                if debug_level >= 1:
-                    print(f"Warning: Element type {elem_type} not supported, skipping element {elem_idx}")
-                continue
-            
-            # Assemble into global matrix
-            dofs = []
-            for node_id in active_nodes:
-                dofs.extend([2*node_id, 2*node_id + 1])
-            
-            for i in range(len(dofs)):
-                for j in range(len(dofs)):
-                    K_global[dofs[i], dofs[j]] += K_elem[i, j]
-        
-        # Assemble 1D truss elements
-        for elem_idx in range(n_1d_elements):
-            if failed_1d_elements[elem_idx]:
-                continue  # Skip failed elements
+            # Body forces (gravity + seismic)
+            for elem_idx in range(n_elements):
+                elem_nodes = elements[elem_idx]
+                elem_type = element_types[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
                 
-            elem_nodes = elements_1d[elem_idx]
-            elem_type = element_types_1d[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
+                mat_id = element_materials[elem_idx] - 1
+                gamma = gamma_by_mat[mat_id]
+                
+                # Body force components
+                b_x = k_seismic * gamma  # Horizontal seismic force
+                b_y = -gamma             # Gravity (downward)
+                
+                F_body = compute_body_forces(nodes[active_nodes], elem_type, b_x, b_y)
+                
+                # Assemble into global vector
+                dofs = []
+                for node_id in active_nodes:
+                    dofs.extend([2*node_id, 2*node_id + 1])
+                
+                for i, dof in enumerate(dofs):
+                    F_global[dof] += F_body[i]
             
-            if len(active_nodes) >= 2:
-                K_truss = build_truss_stiffness(nodes[active_nodes], k_by_1d_elem[elem_idx])
+            # Applied loads from boundary conditions
+            for i in range(n_nodes):
+                if bc_type[i] == 4:  # Applied force
+                    F_global[2*i] += bc_values[i, 0]      # F_x
+                    F_global[2*i + 1] += bc_values[i, 1]  # F_y
+        
+        # Inner loop for elastic-plastic iteration within each load step
+        sub_iteration = 0
+        max_sub_iterations = 10
+        plastic_state_changed = True
+        
+        while sub_iteration < max_sub_iterations and plastic_state_changed:
+            if debug_level >= 3:
+                print(f"    Sub-iteration {sub_iteration + 1}")
+            
+            # Assemble global stiffness matrix with current plastic state
+            K_global = lil_matrix((n_dof, n_dof))
+            
+            # Assemble 2D elements
+            for elem_idx in range(n_elements):
+                elem_nodes = elements[elem_idx]
+                elem_type = element_types[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
+                
+                # Get material properties
+                mat_id = element_materials[elem_idx] - 1
+                E = E_by_mat[mat_id]
+                nu = nu_by_mat[mat_id]
+                
+                # Build element stiffness matrix with current plastic state
+                if elem_type in [3, 6]:  # Triangular elements
+                    K_elem = build_triangle_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type)
+                elif elem_type in [4, 8, 9]:  # Quadrilateral elements
+                    K_elem = build_quad_stiffness(nodes[active_nodes], E, nu, plastic_elements[elem_idx], elem_type)
+                else:
+                    if debug_level >= 1:
+                        print(f"Warning: Element type {elem_type} not supported, skipping element {elem_idx}")
+                    continue
                 
                 # Assemble into global matrix
                 dofs = []
@@ -569,146 +609,175 @@ def solve_fem(fem_data, F=1.0, debug_level=0):
                 
                 for i in range(len(dofs)):
                     for j in range(len(dofs)):
-                        K_global[dofs[i], dofs[j]] += K_truss[i, j]
-        
-        # Assemble force vector
-        F_global = np.zeros(n_dof)
-        
-        # Body forces (gravity + seismic)
-        for elem_idx in range(n_elements):
-            elem_nodes = elements[elem_idx]
-            elem_type = element_types[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
+                        K_global[dofs[i], dofs[j]] += K_elem[i, j]
             
-            mat_id = element_materials[elem_idx] - 1
-            gamma = gamma_by_mat[mat_id]
-            
-            # Body force components
-            b_x = k_seismic * gamma  # Horizontal seismic force
-            b_y = -gamma             # Gravity (downward)
-            
-            F_body = compute_body_forces(nodes[active_nodes], elem_type, b_x, b_y)
-            
-            # Assemble into global vector
-            dofs = []
-            for node_id in active_nodes:
-                dofs.extend([2*node_id, 2*node_id + 1])
-            
-            for i, dof in enumerate(dofs):
-                F_global[dof] += F_body[i]
-        
-        # Applied loads from boundary conditions
-        for i in range(n_nodes):
-            if bc_type[i] == 4:  # Applied force
-                F_global[2*i] += bc_values[i, 0]      # F_x
-                F_global[2*i + 1] += bc_values[i, 1]  # F_y
-        
-        # Apply boundary conditions
-        K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
-            K_global, F_global, bc_type, nodes)
-        
-        # Solve system
-        try:
-            delta_u_free = spsolve(K_constrained.tocsr(), F_constrained)
-        except Exception as e:
-            if debug_level >= 1:
-                print(f"Linear solver failed: {e}")
-            return {
-                "converged": False,
-                "error": f"Linear solver failed: {e}",
-                "iterations": iteration
-            }
-        
-        # Reconstruct full displacement vector
-        delta_u_full = np.zeros(n_dof)
-        free_dof_idx = 0
-        for i in range(n_dof):
-            if i not in constraint_dofs:
-                delta_u_full[i] = delta_u_free[free_dof_idx]
-                free_dof_idx += 1
-        
-        # Update displacements
-        displacements += delta_u_full
-        
-        # Check for yielding in 2D elements
-        new_plastic_elements = np.zeros(n_elements, dtype=bool)
-        
-        for elem_idx in range(n_elements):
-            elem_nodes = elements[elem_idx]
-            elem_type = element_types[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
-            
-            # Compute element stresses
-            stresses = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes, 
-                E_by_mat[element_materials[elem_idx] - 1],
-                nu_by_mat[element_materials[elem_idx] - 1],
-                u_nodal[active_nodes], elem_type)
-            
-            # Check Mohr-Coulomb yield criterion
-            c_elem = c_reduced[elem_idx]
-            phi_elem = phi_reduced[elem_idx]
-            
-            yield_value = check_mohr_coulomb_yield(stresses, c_elem, phi_elem)
-            
-            if yield_value > 1e-6:  # Element has yielded
-                new_plastic_elements[elem_idx] = True
-        
-        # Check for failure in 1D elements
-        new_failed_1d = np.zeros(n_1d_elements, dtype=bool)
-        forces_1d = np.zeros(n_1d_elements)
-        
-        for elem_idx in range(n_1d_elements):
-            if failed_1d_elements[elem_idx]:
-                continue
+            # Assemble 1D truss elements
+            for elem_idx in range(n_1d_elements):
+                if failed_1d_elements[elem_idx]:
+                    continue  # Skip failed elements
+                    
+                elem_nodes = elements_1d[elem_idx]
+                elem_type = element_types_1d[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
                 
-            elem_nodes = elements_1d[elem_idx]
-            elem_type = element_types_1d[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
+                if len(active_nodes) >= 2:
+                    K_truss = build_truss_stiffness(nodes[active_nodes], k_by_1d_elem[elem_idx])
+                    
+                    # Assemble into global matrix
+                    dofs = []
+                    for node_id in active_nodes:
+                        dofs.extend([2*node_id, 2*node_id + 1])
+                    
+                    for i in range(len(dofs)):
+                        for j in range(len(dofs)):
+                            K_global[dofs[i], dofs[j]] += K_truss[i, j]
             
-            if len(active_nodes) >= 2:
-                # Compute axial force
-                forces_1d[elem_idx] = compute_truss_force(
-                    nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
+            # Apply boundary conditions
+            K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
+                K_global, F_global, bc_type, nodes)
+            
+            # Solve system
+            try:
+                if iteration == 0:
+                    # First iteration: solve for total displacements
+                    u_free = spsolve(K_constrained.tocsr(), F_constrained)
+                    
+                    # Reconstruct full displacement vector
+                    displacements = np.zeros(n_dof)
+                    free_dof_idx = 0
+                    for i in range(n_dof):
+                        if i not in constraint_dofs:
+                            displacements[i] = u_free[free_dof_idx]
+                            free_dof_idx += 1
+                    
+                    delta_u_full = displacements.copy()
+                else:
+                    # Subsequent iterations: solve for displacement increments
+                    delta_u_free = spsolve(K_constrained.tocsr(), F_constrained)
+                    
+                    # Reconstruct full displacement increment vector
+                    delta_u_full = np.zeros(n_dof)
+                    free_dof_idx = 0
+                    for i in range(n_dof):
+                        if i not in constraint_dofs:
+                            delta_u_full[i] = delta_u_free[free_dof_idx]
+                            free_dof_idx += 1
+                    
+                    # Update total displacements
+                    displacements += delta_u_full
+                    
+            except Exception as e:
+                if debug_level >= 1:
+                    print(f"Linear solver failed: {e}")
+                return {
+                    "converged": False,
+                    "error": f"Linear solver failed: {e}",
+                    "iterations": iteration
+                }
+            
+            # Check for yielding in 2D elements
+            new_plastic_elements = np.zeros(n_elements, dtype=bool)
+            
+            for elem_idx in range(n_elements):
+                elem_nodes = elements[elem_idx]
+                elem_type = element_types[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
                 
-                # Check tension-only and failure criteria
-                if forces_1d[elem_idx] < 0:
-                    # Compression - remove element
-                    new_failed_1d[elem_idx] = True
-                elif forces_1d[elem_idx] > t_allow_by_1d_elem[elem_idx]:
-                    # Exceeded tensile capacity
-                    if t_res_by_1d_elem[elem_idx] > 0:
-                        # Reduce to residual capacity
-                        # This would require modifying stiffness - simplified here
-                        pass
-                    else:
-                        # Complete failure
+                # Compute element stresses
+                stresses = compute_element_stress(
+                    nodes[active_nodes], displacements, active_nodes, 
+                    E_by_mat[element_materials[elem_idx] - 1],
+                    nu_by_mat[element_materials[elem_idx] - 1],
+                    u_nodal[active_nodes], elem_type)
+                
+                # Check Mohr-Coulomb yield criterion
+                c_elem = c_reduced[elem_idx]
+                phi_elem = phi_reduced[elem_idx]
+                
+                yield_value = check_mohr_coulomb_yield(stresses, c_elem, phi_elem)
+                
+                if yield_value > 1e-6:  # Element has yielded
+                    new_plastic_elements[elem_idx] = True
+            
+            # Check for failure in 1D elements
+            new_failed_1d = np.zeros(n_1d_elements, dtype=bool)
+            forces_1d = np.zeros(n_1d_elements)
+            
+            for elem_idx in range(n_1d_elements):
+                if failed_1d_elements[elem_idx]:
+                    continue
+                    
+                elem_nodes = elements_1d[elem_idx]
+                elem_type = element_types_1d[elem_idx]
+                active_nodes = elem_nodes[:elem_type]
+                
+                if len(active_nodes) >= 2:
+                    # Compute axial force
+                    forces_1d[elem_idx] = compute_truss_force(
+                        nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
+                    
+                    # Check tension-only and failure criteria
+                    if forces_1d[elem_idx] < 0:
+                        # Compression - remove element
                         new_failed_1d[elem_idx] = True
+                    elif forces_1d[elem_idx] > t_allow_by_1d_elem[elem_idx]:
+                        # Exceeded tensile capacity
+                        if t_res_by_1d_elem[elem_idx] > 0:
+                            # Reduce to residual capacity
+                            # This would require modifying stiffness - simplified here
+                            pass
+                        else:
+                            # Complete failure
+                            new_failed_1d[elem_idx] = True
+            
+            # Check if plastic state has changed
+            plastic_state_changed = not np.array_equal(new_plastic_elements, plastic_elements) or \
+                                  not np.array_equal(new_failed_1d, failed_1d_elements)
+            
+            if plastic_state_changed:
+                # Update plastic states and continue inner loop
+                plastic_elements = new_plastic_elements.copy()
+                failed_1d_elements = new_failed_1d.copy()
+                
+                if debug_level >= 3:
+                    print(f"    Plastic state changed: {np.sum(plastic_elements)} plastic elements")
+            
+            sub_iteration += 1
         
         # Check convergence
-        disp_change_norm = np.linalg.norm(delta_u_full)
-        residual_norm = np.linalg.norm(F_constrained - K_constrained @ delta_u_free)
+        disp_change_norm = np.linalg.norm(delta_u_full) if iteration > 0 else np.linalg.norm(displacements)
+        residual_norm = disp_change_norm  # Simplified for now
         
-        n_newly_plastic = np.sum(new_plastic_elements & ~plastic_elements)
-        n_newly_failed_1d = np.sum(new_failed_1d & ~failed_1d_elements)
+        # DEBUG: Check what's happening
+        if debug_level >= 3:
+            print(f"    DEBUG: Force vector norm: {np.linalg.norm(F_constrained):.2e}")
+            print(f"    DEBUG: Displacement update norm: {np.linalg.norm(delta_u_full):.2e}")
+            print(f"    DEBUG: Max displacement: {np.max(np.abs(displacements)):.2e}")
+            print(f"    DEBUG: Matrix size: {K_constrained.shape}")
+        
+        n_newly_plastic = np.sum(new_plastic_elements & ~plastic_elements) if iteration > 0 else np.sum(plastic_elements)
+        n_newly_failed_1d = np.sum(new_failed_1d & ~failed_1d_elements) if iteration > 0 else np.sum(failed_1d_elements)
         
         if debug_level >= 2:
             print(f"  Displacement change norm: {disp_change_norm:.2e}")
             print(f"  Residual norm: {residual_norm:.2e}")
-            print(f"  Newly plastic elements: {n_newly_plastic}")
-            print(f"  Newly failed 1D elements: {n_newly_failed_1d}")
-        
-        # Update plastic state
-        plastic_elements = new_plastic_elements
-        failed_1d_elements = new_failed_1d
+            print(f"  Total plastic elements: {np.sum(plastic_elements)}")
+            print(f"  Total failed 1D elements: {np.sum(failed_1d_elements)}")
         
         # Check convergence criteria
-        if (disp_change_norm < tol_disp and residual_norm < tol_force and 
-            n_newly_plastic == 0 and n_newly_failed_1d == 0):
+        if iteration == 0:
+            # First iteration always continues to check for plasticity
+            converged = False
+        elif (disp_change_norm < tol_disp and residual_norm < tol_force and not plastic_state_changed):
             converged = True
             if debug_level >= 1:
                 print(f"Converged after {iteration + 1} iterations")
-            break
+        
+        # For subsequent iterations, zero force vector (no additional loading)
+        if iteration == 0:
+            F_global = np.zeros(n_dof)
+        
+        iteration += 1
     
     # Compute final stresses and strains
     stresses = np.zeros((n_elements, 4))  # sig_x, sig_y, tau_xy, von_mises
@@ -787,7 +856,7 @@ def build_triangle_stiffness(coords, E, nu, is_plastic=False, elem_type=3):
     
     # Reduce stiffness if plastic (simplified approach)
     if is_plastic:
-        D *= 0.1  # Significant stiffness reduction
+        D *= 0.001  # Very significant stiffness reduction for plastic elements
     
     if elem_type == 3:  # Linear triangle (tri3)
         return build_tri3_stiffness(coords, D)
@@ -946,7 +1015,7 @@ def build_quad_stiffness(coords, E, nu, is_plastic=False, elem_type=4):
     
     # Reduce stiffness if plastic (simplified approach)
     if is_plastic:
-        D *= 0.1  # Significant stiffness reduction
+        D *= 0.001  # Very significant stiffness reduction for plastic elements
     
     if elem_type == 4:  # Linear quadrilateral (quad4)
         return build_quad4_stiffness(coords, D)

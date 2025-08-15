@@ -1192,8 +1192,13 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
     profile_lines = slope_data.get('profile_lines', [])
     max_depth = slope_data.get('max_depth', None)
 
-    if not profile_lines or len(profile_lines) < 2:
-        raise ValueError("Need at least 2 profile lines to create material zones")
+    if not profile_lines:
+        raise ValueError("Need at least 1 profile line to create material zones")
+    
+    # For single profile line, max_depth serves as the bottom boundary
+    if len(profile_lines) == 1:
+        if max_depth is None:
+            raise ValueError("When using only 1 profile line, max_depth must be specified")
 
     def get_avg_y(line):
         return sum(y for _, y in line) / len(line)

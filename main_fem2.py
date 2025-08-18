@@ -6,7 +6,7 @@ from mesh import build_polygons, build_mesh_from_polygons
 from plot import plot_inputs, plot_mesh, plot_polygons
 import numpy as np
 
-slope_data = load_slope_data("inputs/slope/input_template_simple1_6.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
 
 #print_dictionary(slope_data)
 
@@ -16,9 +16,9 @@ polygons = build_polygons(slope_data)
 
 #plot_polygons(polygons)
 
-target_size = 2
+target_size = 8
 
-mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
+mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
 
 #plot_mesh(mesh, materials=slope_data['materials'])
 
@@ -26,7 +26,7 @@ fem_data = build_fem_data(slope_data, mesh)
 
 #print_dictionary(fem_data)
 
-#plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
+plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
 
 print("=== Testing New Improved FEM Solver ===")
 

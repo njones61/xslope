@@ -260,8 +260,8 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
     BC types:
     0 = free (do nothing)
     1 = fixed (small triangle below node)
-    2 = x roller (shouldn't have any)
-    3 = y roller (small circle + line, left/right sides)
+    2 = x roller (small circle + line, left/right sides)
+    3 = y roller (shouldn't have any)
     4 = specified force (vector arrow)
     """
     
@@ -292,10 +292,10 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                       markersize=8, label='Fixed (bc_type=1)')
         )
     
-    # Y-roller boundary conditions (type 3) - circle + line on left/right sides
-    y_roller_nodes = np.where(bc_type == 3)[0]
-    if len(y_roller_nodes) > 0:
-        for node_idx in y_roller_nodes:
+    # X-roller boundary conditions (type 3) - circle + line on left/right sides
+    x_roller_nodes = np.where(bc_type == 2)[0]
+    if len(x_roller_nodes) > 0:
+        for node_idx in x_roller_nodes:
             x, y = nodes[node_idx]
             
             # Determine if node is on left or right side of mesh

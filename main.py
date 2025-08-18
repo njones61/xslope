@@ -51,7 +51,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_simple1_6.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
 
 # plot_inputs(slope_data)
 

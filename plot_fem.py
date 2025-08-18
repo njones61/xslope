@@ -452,7 +452,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     
     # Parse plot types (support comma-separated list)
     plot_types = [pt.strip().lower() for pt in plot_type.split(',')]
-    valid_types = ['displacement', 'deformation', 'stress']
+    valid_types = ['displacement', 'deformation', 'stress', 'strain', 'shear_strain']
     
     # Validate plot types
     for pt in plot_types:
@@ -460,7 +460,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
     
     # Auto-calculate deformation scale if not provided and deformation plots are requested
-    needs_deform_scale = any(pt in ['deformation', 'stress'] for pt in plot_types)
+    needs_deform_scale = any(pt in ['deformation', 'stress', 'strain', 'shear_strain'] for pt in plot_types)
     if deform_scale is None and needs_deform_scale:
         # Extract displacement components
         u = displacements[0::2]  # x-displacements
@@ -532,6 +532,12 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
                                cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+        elif pt == 'strain':
+            plot_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+        elif pt == 'shear_strain':
+            plot_shear_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
         
         # Set consistent axis limits for all plots (including single plots)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
@@ -968,3 +974,222 @@ def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6)):
     
     plt.tight_layout()
     return fig, (ax1, ax2)
+
+
+def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+                        cbar_shrink=0.8, cbar_labelpad=20):
+    """
+    Plot equivalent strain contours (von Mises equivalent strain).
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    strains = solution.get("strains", np.zeros((len(elements), 4)))
+    
+    if strains.shape[1] < 3:
+        print("Warning: Strain data not available or incomplete")
+        return
+    
+    # Calculate equivalent strain (von Mises equivalent strain)
+    # For plane strain: equiv_strain = sqrt(2/3) * sqrt(eps_x^2 + eps_y^2 + eps_x*eps_y + 3/4*gamma_xy^2)
+    eps_x = strains[:, 0]
+    eps_y = strains[:, 1]
+    gamma_xy = strains[:, 2]
+    
+    equiv_strain = np.sqrt((2/3) * (eps_x**2 + eps_y**2 + eps_x*eps_y + 0.75*gamma_xy**2))
+    
+    # Plot contours
+    _plot_element_contours(ax, fem_data, equiv_strain, 'Equivalent Strain', 
+                          show_mesh, show_reinforcement, cbar_shrink, cbar_labelpad)
+
+
+def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+                              cbar_shrink=0.8, cbar_labelpad=20):
+    """
+    Plot maximum shear strain contours - key indicator for failure surfaces in slope stability.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    strains = solution.get("strains", np.zeros((len(elements), 4)))
+    
+    if strains.shape[1] < 4:
+        print("Warning: Maximum shear strain data not available")
+        return
+    
+    # Extract maximum shear strain (4th column)
+    max_shear_strain = strains[:, 3]
+    
+    # Plot contours with specialized colormap for shear strain (red=high, blue=low)
+    _plot_nodal_contours(ax, fem_data, max_shear_strain, 'Max Shear Strain', 
+                        False, show_reinforcement, cbar_shrink, cbar_labelpad,
+                        colormap='coolwarm')  # Coolwarm: red=high, blue=low
+    
+    # Add title indicating this shows failure zones
+    ax.set_title('Max Shear Strain (Failure Zone Indicator)', fontsize=12, pad=15)
+
+
+def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_reinforcement=True,
+                          cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis'):
+    """
+    Helper function to plot element-based contour data.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    
+    # For element-based values, we need to interpolate to nodes or use a different approach
+    # Let's use a simpler approach: plot each element as a colored patch
+    
+    # Create contour plot by directly coloring elements
+    if np.max(values) > np.min(values):  # Only plot if there's variation
+        # Normalize values for colormap
+        vmin, vmax = np.min(values), np.max(values)
+        norm = plt.Normalize(vmin=vmin, vmax=vmax)
+        cmap = plt.get_cmap(colormap)
+        
+        # Plot each element as colored patch
+        for i, elem in enumerate(elements):
+            elem_type = element_types[i]
+            color = cmap(norm(values[i]))
+            
+            if elem_type == 3:  # Triangle
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, facecolor=color, edgecolor='none', alpha=0.8)
+                ax.add_patch(triangle)
+            elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, facecolor=color, edgecolor='none', alpha=0.8)
+                ax.add_patch(quad)
+        
+        # Create colorbar using a ScalarMappable
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, shrink=cbar_shrink, pad=0.05)
+        cbar.set_label(label, rotation=270, labelpad=cbar_labelpad)
+    else:
+        # Uniform values - just color all elements the same
+        for i, elem in enumerate(elements):
+            elem_type = element_types[i]
+            if elem_type == 3:  # Triangle
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, facecolor='lightblue', edgecolor='none', alpha=0.7)
+                ax.add_patch(triangle)
+            elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, facecolor='lightblue', edgecolor='none', alpha=0.7)
+                ax.add_patch(quad)
+    
+    # Overlay mesh if requested
+    if show_mesh:
+        for i, elem in enumerate(elements):
+            elem_type = element_types[i]
+            if elem_type == 3:  # Triangle
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(triangle)
+            elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(quad)
+    
+    # Add reinforcement if requested
+    if show_reinforcement:
+        elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+        if len(elements_1d) > 0:
+            for elem in elements_1d:
+                if len(elem) >= 2:
+                    x_coords = [nodes[elem[0], 0], nodes[elem[1], 0]]
+                    y_coords = [nodes[elem[0], 1], nodes[elem[1], 1]]
+                    ax.plot(x_coords, y_coords, 'r-', linewidth=2, alpha=0.8)
+    
+    ax.set_aspect('equal')
+
+
+def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, show_reinforcement=True,
+                        cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis'):
+    """
+    Plot smooth contours by interpolating element values to nodes.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    
+    # Interpolate element values to nodes
+    nodal_values = np.zeros(len(nodes))
+    node_counts = np.zeros(len(nodes))  # For averaging
+    
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        elem_nodes = elem[:elem_type] if elem_type <= len(elem) else elem
+        
+        # Add this element's value to all its nodes
+        for node_id in elem_nodes:
+            if node_id < len(nodes):
+                nodal_values[node_id] += element_values[i]
+                node_counts[node_id] += 1
+    
+    # Average values at nodes (avoid division by zero)
+    valid_nodes = node_counts > 0
+    nodal_values[valid_nodes] /= node_counts[valid_nodes]
+    
+    # Create triangulation for smooth contouring
+    triangles = []
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        if elem_type == 3:  # Triangle
+            triangles.append([elem[0], elem[1], elem[2]])
+        elif elem_type == 4:  # Quad - split into triangles
+            triangles.append([elem[0], elem[1], elem[2]])
+            triangles.append([elem[0], elem[2], elem[3]])
+    
+    if not triangles:
+        print("No valid elements for contouring")
+        return
+    
+    import matplotlib.tri as tri
+    triangles = np.array(triangles)
+    
+    # Create triangulation
+    triang = tri.Triangulation(nodes[:, 0], nodes[:, 1], triangles)
+    
+    # Create smooth contour plot
+    if np.max(nodal_values) > np.min(nodal_values):  # Only plot if there's variation
+        levels = np.linspace(np.min(nodal_values), np.max(nodal_values), 20)
+        cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap)
+        
+        # Add colorbar
+        cbar = plt.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.05)
+        cbar.set_label(label, rotation=270, labelpad=cbar_labelpad)
+    else:
+        # Uniform values - just color all elements the same
+        uniform_color = plt.get_cmap(colormap)(0.5)
+        for triangle_nodes in triangles:
+            coords = nodes[triangle_nodes]
+            triangle = plt.Polygon(coords, facecolor=uniform_color, edgecolor='none', alpha=0.8)
+            ax.add_patch(triangle)
+    
+    # Overlay mesh if requested
+    if show_mesh:
+        for i, elem in enumerate(elements):
+            elem_type = element_types[i]
+            if elem_type == 3:  # Triangle
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(triangle)
+            elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(quad)
+    
+    # Add reinforcement if requested
+    if show_reinforcement:
+        elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+        if len(elements_1d) > 0:
+            for elem in elements_1d:
+                if len(elem) >= 2:
+                    x_coords = [nodes[elem[0], 0], nodes[elem[1], 0]]
+                    y_coords = [nodes[elem[0], 1], nodes[elem[1], 1]]
+                    ax.plot(x_coords, y_coords, 'r-', linewidth=2, alpha=0.8)
+    
+    ax.set_aspect('equal')

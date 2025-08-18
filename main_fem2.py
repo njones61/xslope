@@ -29,7 +29,7 @@ fem_data = build_fem_data(slope_data, mesh)
 #plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
 
 
-#solution = solve_fem(fem_data, F=1.0, debug_level=2)
+solution = solve_fem(fem_data, F=1.0, debug_level=2)
 
 # Test single FEM analysis first
 # print("Testing single FEM analysis with F=1.0...")
@@ -45,8 +45,8 @@ fem_data = build_fem_data(slope_data, mesh)
 #     print(f"Error: {solution.get('error', 'Unknown error')}")
 #     print(f"Iterations: {solution.get('iterations', 'Unknown')}")
 
-solution = solve_ssrm(fem_data, debug_level=2)
+# solution = solve_ssrm(fem_data, debug_level=2)
 
 # Plot multiple result types
 print("\n=== FEM Results Visualization ===")
-plot_fem_results(fem_data, solution, plot_type='stress, deformation')
+plot_fem_results(fem_data, solution, plot_type='stress, displacement, deformation')

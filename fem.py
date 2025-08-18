@@ -452,7 +452,7 @@ def build_fem_data(slope_data, mesh=None):
     return fem_data
 
 
-def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
+def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.01):
     """
     Solve finite element system for slope stability analysis with elastic-plastic behavior.
     
@@ -530,10 +530,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
     plastic_elements = np.zeros(n_elements, dtype=bool)
     failed_1d_elements = np.zeros(n_1d_elements, dtype=bool)
     
-    # Convergence parameters - tighter for SSRM failure detection
-    max_iterations = 30  # Reduced from 50 to detect non-convergence earlier
-    tol_force = 1e-4     # Tightened from 1e-6 for better failure detection
-    tol_disp = 1e-4      # Tightened from 1e-6 for better failure detection
+    # Convergence parameters - much stricter for SSRM failure detection
+    max_iterations = 10  # Reduced from 15 to detect non-convergence earlier
+    tol_force = 1e-5     # Much tighter from 1e-3 to require better convergence
+    tol_disp = 1e-5      # Much tighter from 1e-3 to require better convergence
     
     converged = False
     iteration = 0
@@ -882,6 +882,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.1):
             converged = True
             if debug_level >= 1:
                 print(f"Converged after {iteration + 1} iterations")
+        elif iteration >= max_iterations - 1:
+            # Maximum iterations reached - this indicates failure for SSRM
+            converged = False
+            if debug_level >= 1:
+                print(f"Failed to converge after {max_iterations} iterations - this indicates failure")
         else:
             # Not converged - continue iterating
             converged = False
@@ -1944,10 +1949,15 @@ def solve_ssrm(fem_data, debug_level=0):
     
     # SSRM parameters
     F_start = 1.0
-    F_increment_initial = 0.02  # Reduced from 0.05 for more precise failure detection
-    F_increment_min = 0.001     # Reduced from 0.005 for finer resolution
-    F_max = 3.0                 # Reduced from 5.0 to focus on realistic range
-    max_ssrm_iterations = 100   # Increased from 50 to allow more iterations
+    F_increment_initial = 0.1    # Larger initial steps to find failure region quickly
+    F_increment_min = 0.001      # Fine resolution for final refinement
+    F_max = 3.0                  # Maximum F to prevent excessive iterations
+    max_ssrm_iterations = 100    # Allow more iterations for adaptive search
+    
+    # Adaptive stepping parameters
+    F_increment = F_increment_initial
+    refinement_mode = False      # Whether we're in refinement mode
+    failure_interval = None      # Store the interval where failure occurs
     
     # History tracking
     F_history = []
@@ -2016,10 +2026,10 @@ def solve_ssrm(fem_data, debug_level=0):
                 last_displacement = displacement_history[-1]
                 displacement_growth_rate = (max_displacement - last_displacement) / last_displacement if last_displacement > 0 else 0
                 
-                # If displacement growth rate > 50%, this indicates instability
-                if displacement_growth_rate > 0.5:
+                # If displacement growth rate > 20%, this indicates instability (reduced from 50%)
+                if displacement_growth_rate > 0.2:
                     if debug_level >= 1:
-                        print(f"  ✗ Displacement growth rate failure: growth_rate = {displacement_growth_rate:.2f} > 0.5")
+                        print(f"  ✗ Displacement growth rate failure: growth_rate = {displacement_growth_rate:.2f} > 0.2")
                     
                     # This is a failure - return the last converged solution
                     if last_converged_F is not None:
@@ -2054,36 +2064,81 @@ def solve_ssrm(fem_data, debug_level=0):
                 print(f"  ✓ Converged: {np.sum(solution.get('plastic_elements', []))}/{len(solution.get('plastic_elements', []))} plastic elements, {solution.get('iterations', 'Unknown')} iterations")
                 print(f"  Max displacement: {max_displacement:.4f}")
                 print(f"  Displacement threshold: {displacement_threshold:.4f}")
+            
+            # In refinement mode, update the failure interval
+            if refinement_mode and failure_interval is not None:
+                # This F converged, so the failure point is between this F and the upper bound
+                failure_interval = (F, failure_interval[1])
+                
+                # Check if we've reached the desired precision
+                if (failure_interval[1] - failure_interval[0]) < F_increment_min:
+                    if debug_level >= 1:
+                        print(f"  🎯 Precision reached: critical FS = {F:.4f} ± {F_increment_min:.4f}")
+                    
+                    return {
+                        "converged": True,
+                        "FS": F,
+                        "last_solution": solution,
+                        "F_history": F_history,
+                        "convergence_history": convergence_history,
+                        "solutions_history": solutions_history,
+                        "iterations_ssrm": ssrm_iteration + 1,
+                        "failure_mode": "bisection_precision"
+                    }
         else:
             # Solution failed to converge - this indicates failure!
             if debug_level >= 1:
                 print(f"  ✗ Non-convergence failure: {solution.get('error', 'Unknown error')}")
                 print(f"  Iterations attempted: {solution.get('iterations', 'Unknown')}")
             
-            # This is the critical failure point - return the last converged solution
-            if last_converged_F is not None:
-                return {
-                    "converged": True,
-                    "FS": last_converged_F,
-                    "last_solution": last_converged_solution,
-                    "F_history": F_history,
-                    "convergence_history": convergence_history,
-                    "solutions_history": solutions_history,
-                    "iterations_ssrm": ssrm_iteration + 1,
-                    "failure_mode": "non_convergence"
-                }
-            else:
-                return {
-                    "converged": False,
-                    "error": "Failed to converge at initial F value - slope may be inherently unstable",
-                    "FS": None,
-                    "F_history": F_history,
-                    "convergence_history": convergence_history,
-                    "iterations_ssrm": ssrm_iteration + 1
-                }
+            # We've found the failure region! Now switch to refinement mode
+            if not refinement_mode:
+                refinement_mode = True
+                failure_interval = (last_converged_F, F)
+                F_increment = (failure_interval[1] - failure_interval[0]) / 2.0  # Start with bisection
+                
+                if debug_level >= 1:
+                    print(f"  🔍 Entering refinement mode: failure interval = [{failure_interval[0]:.4f}, {failure_interval[1]:.4f}]")
+                    print(f"  🔍 Next F = {failure_interval[0] + F_increment:.4f}")
+                
+                # Go back to the last converged F and refine
+                F = failure_interval[0]
+                continue  # Skip the increment and continue with refined F
+            
+            # In refinement mode, update the failure interval
+            if failure_interval is not None:
+                # This F failed to converge, so the failure point is between the lower bound and this F
+                failure_interval = (failure_interval[0], F)
+                
+                # Check if we've reached the desired precision
+                if (failure_interval[1] - failure_interval[0]) < F_increment_min:
+                    if debug_level >= 1:
+                        print(f"  🎯 Precision reached: critical FS = {failure_interval[0]:.4f} ± {F_increment_min:.4f}")
+                    
+                    return {
+                        "converged": True,
+                        "FS": failure_interval[0],
+                        "last_solution": last_converged_solution,
+                        "F_history": F_history,
+                        "convergence_history": convergence_history,
+                        "solutions_history": solutions_history,
+                        "iterations_ssrm": ssrm_iteration + 1,
+                        "failure_mode": "bisection_precision"
+                    }
         
         # Update F for next iteration
-        F += F_increment
+        if refinement_mode:
+            # In refinement mode, use bisection to hone in on critical F
+            if failure_interval is not None:
+                # Try the midpoint of the current interval
+                F_mid = (failure_interval[0] + failure_interval[1]) / 2.0
+                F = F_mid
+                
+                if debug_level >= 2:
+                    print(f"  🔍 Refinement: trying F = {F:.4f} (midpoint of [{failure_interval[0]:.4f}, {failure_interval[1]:.4f}])")
+        else:
+            # Normal mode: increment F
+            F += F_increment
         
         # Check bounds
         if F > F_max:

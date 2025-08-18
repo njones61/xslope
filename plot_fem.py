@@ -578,6 +578,11 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
         elif elem_type == 4:  # Quad - split into triangles
             triangles.append([elem[0], elem[1], elem[2]])
             triangles.append([elem[0], elem[2], elem[3]])
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            triangles.append([elem[0], elem[1], elem[2]])
+        elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
+            triangles.append([elem[0], elem[1], elem[2]])
+            triangles.append([elem[0], elem[2], elem[3]])
     
     if triangles:
         triangles = np.array(triangles)
@@ -634,6 +639,16 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
             patch = Polygon(coords, closed=True)
             patches_list.append(patch)
             stress_values.append(von_mises[i])
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            coords = nodes[elem[:3]]
+            patch = Polygon(coords, closed=True)
+            patches_list.append(patch)
+            stress_values.append(von_mises[i])
+        elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
+            coords = nodes[elem[:4]]
+            patch = Polygon(coords, closed=True)
+            patches_list.append(patch)
+            stress_values.append(von_mises[i])
     
     if patches_list:
         from matplotlib.collections import PatchCollection
@@ -658,6 +673,14 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
                     coords = np.vstack([coords, coords[0]])  # Close the polygon
                     ax.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, alpha=0.8)
                 elif elem_type == 4:  # Quadrilateral
+                    coords = nodes[elem[:4]]
+                    coords = np.vstack([coords, coords[0]])  # Close the polygon
+                    ax.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, alpha=0.8)
+                elif elem_type == 6:  # 6-node triangle - use corner nodes
+                    coords = nodes[elem[:3]]
+                    coords = np.vstack([coords, coords[0]])  # Close the polygon
+                    ax.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, alpha=0.8)
+                elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
                     coords = nodes[elem[:4]]
                     coords = np.vstack([coords, coords[0]])  # Close the polygon
                     ax.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, alpha=0.8)
@@ -743,6 +766,10 @@ def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=1.0, label
             edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[0])]
         elif elem_type == 4:  # Quadrilateral
             # Add quad edges
+            edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[3]), (elem[3], elem[0])]
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[0])]
+        elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
             edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[3]), (elem[3], elem[0])]
         else:
             continue
@@ -1061,6 +1088,14 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
                 coords = nodes[elem[:4]]
                 quad = plt.Polygon(coords, facecolor=color, edgecolor='none', alpha=0.8)
                 ax.add_patch(quad)
+            elif elem_type == 6:  # 6-node triangle - use corner nodes
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, facecolor=color, edgecolor='none', alpha=0.8)
+                ax.add_patch(triangle)
+            elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, facecolor=color, edgecolor='none', alpha=0.8)
+                ax.add_patch(quad)
         
         # Create colorbar using a ScalarMappable
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -1079,6 +1114,14 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
                 coords = nodes[elem[:4]]
                 quad = plt.Polygon(coords, facecolor='lightblue', edgecolor='none', alpha=0.7)
                 ax.add_patch(quad)
+            elif elem_type == 6:  # 6-node triangle - use corner nodes
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, facecolor='lightblue', edgecolor='none', alpha=0.7)
+                ax.add_patch(triangle)
+            elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, facecolor='lightblue', edgecolor='none', alpha=0.7)
+                ax.add_patch(quad)
     
     # Overlay mesh if requested
     if show_mesh:
@@ -1089,6 +1132,14 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
                 triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
                 ax.add_patch(triangle)
             elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(quad)
+            elif elem_type == 6:  # 6-node triangle - use corner nodes
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(triangle)
+            elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
                 coords = nodes[elem[:4]]
                 quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
                 ax.add_patch(quad)
@@ -1142,6 +1193,11 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
         elif elem_type == 4:  # Quad - split into triangles
             triangles.append([elem[0], elem[1], elem[2]])
             triangles.append([elem[0], elem[2], elem[3]])
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            triangles.append([elem[0], elem[1], elem[2]])
+        elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
+            triangles.append([elem[0], elem[1], elem[2]])
+            triangles.append([elem[0], elem[2], elem[3]])
     
     if not triangles:
         print("No valid elements for contouring")
@@ -1178,6 +1234,14 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
                 triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
                 ax.add_patch(triangle)
             elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+                quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(quad)
+            elif elem_type == 6:  # 6-node triangle - use corner nodes
+                coords = nodes[elem[:3]]
+                triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                ax.add_patch(triangle)
+            elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
                 coords = nodes[elem[:4]]
                 quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
                 ax.add_patch(quad)

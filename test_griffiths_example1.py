@@ -30,7 +30,7 @@ def test_griffiths_example1():
     target_size = 5  # Coarser mesh initially for testing
     
     print(f"\n=== Building Mesh with 8-node Quadrilaterals ===")
-    mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
+    mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
     fem_data = build_fem_data(slope_data, mesh)
 
     #print_dictionary(fem_data)
@@ -54,7 +54,7 @@ def test_griffiths_example1():
     print(f"c/γH: {c_gamma_H:.3f} (should be 0.05)")
     
     # Test single analysis near critical F (simplified for faster testing)
-    test_F_values = [1.0, 1.3]
+    test_F_values = [1.0, 1.2, 1.35, 1.38, 1.4]
     
     print(f"\n=== Testing Perzyna Algorithm at Various F Values ===")
     print(f"{'F':<6} {'Converged':<10} {'Iterations':<11} {'Max Disp':<12} {'Plastic Elem':<12}")
@@ -90,13 +90,21 @@ def test_griffiths_example1():
     critical_solution = None
     critical_F = None
     
-    # Find any converged solution from individual tests
+    # Find the best solution to plot (prefer higher F with more plastic elements)
+    best_solution = None
+    best_F = None
+    best_plastic_count = 0
+    
     for F, converged, iterations, max_disp, plastic_count, solution in results:
-        if converged and solution:
-            critical_solution = solution
-            critical_F = F
-            print(f"\n=== Plotting Individual Test Solution (F = {critical_F:.2f}) ===")
-            break
+        if solution and plastic_count > best_plastic_count:
+            best_solution = solution
+            best_F = F
+            best_plastic_count = plastic_count
+    
+    if best_solution:
+        print(f"\n=== Plotting Best Solution (F = {best_F:.2f}, {best_plastic_count} plastic elements) ===")
+        critical_solution = best_solution
+        critical_F = best_F
     
     if critical_solution:
         try:

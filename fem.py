@@ -448,2547 +448,107 @@ def build_fem_data(slope_data, mesh=None):
         "k_seismic": k_seismic
     }
     
-    # Compute geostatic initial stresses (K0 state) per element to avoid spurious base plasticity
-    # Temporarily disabled to test if initial stresses are preventing failure
-    sigma0_by_elem = np.zeros((n_elements, 3))  # [sig_x0, sig_y0, tau0]
-    # ground_surface = slope_data.get("ground_surface", None)
-    # if ground_surface is not None and hasattr(ground_surface, "project"):
-    #     line = ground_surface
-    #     for elem_idx in range(n_elements):
-    #         elem_nodes = elements[elem_idx]
-    #         elem_type = element_types[elem_idx]
-    #         active_nodes = elem_nodes[:elem_type]
-    #         elem_coords = nodes[active_nodes]
-    #         centroid = np.mean(elem_coords, axis=0)
-    #         # Find surface elevation directly above centroid x by projecting onto the ground_surface
-    #         pt_on_line = line.interpolate(line.project(Point(centroid[0], centroid[1])))
-    #         y_surface = pt_on_line.y
-    #         depth = max(0.0, y_surface - centroid[1])
-    #         mat_id = element_materials[elem_idx] - 1
-    #         gamma = gamma_by_mat[mat_id]
-    #         phi_deg = phi_by_elem[elem_idx]
-    #         # Jaky's K0 ~ 1 - sin(phi)
-    #         K0 = max(0.0, 1.0 - np.sin(np.radians(phi_deg)))
-    #         sigma_v0 = gamma * depth
-    #         sigma_h0 = K0 * sigma_v0
-    #         sigma0_by_elem[elem_idx, 0] = sigma_h0
-    #         sigma0_by_elem[elem_idx, 1] = sigma_v0
-    #         sigma0_by_elem[elem_idx, 2] = 0.0
-    
-    fem_data["sigma0_by_elem"] = sigma0_by_elem
-    
+   
     return fem_data
-
-
-def solve_fem(fem_data, F=1.0, debug_level=0, plastic_stiffness_reduction=0.01):
-    """
-    Solve finite element system for slope stability analysis with elastic-plastic behavior.
-    
-    This function performs finite element analysis with Mohr-Coulomb plasticity using an
-    elastic predictor-plastic corrector algorithm. It can handle both 2D soil elements
-    and 1D truss reinforcement elements.
-    
-    Parameters:
-        fem_data (dict): FEM data dictionary from build_fem_data
-        F (float): Shear strength reduction factor (default 1.0)
-        debug_level (int): Verbosity level (0=quiet, 1=basic, 2=detailed, 3=debug)
-        plastic_stiffness_reduction (float): Stiffness reduction factor for plastic elements
-            Literature ranges:
-            - Conservative: 0.1 to 0.5 (10% to 50% of original stiffness - less reduction)
-            - Aggressive: 0.01 to 0.1 (1% to 10% of original stiffness - more reduction)
-            - Default: 0.1 (reduces plastic element stiffness to 10% of elastic value)
-    
-    Returns:
-        dict: Solution dictionary containing:
-            - converged: bool, whether solution converged
-            - displacements: np.ndarray (n_nodes * 2,) nodal displacements [u1,v1,u2,v2,...]
-            - stresses: np.ndarray (n_elements, 4) element stresses [sig_x, sig_y, tau_xy, von_mises]
-            - strains: np.ndarray (n_elements, 4) element strains [eps_x, eps_y, gamma_xy, max_shear_strain]
-            - plastic_elements: np.ndarray boolean mask of yielded elements
-            - forces_1d: np.ndarray (n_1d_elements,) forces in 1D truss elements
-            - iterations: int, number of iterations to convergence
-            - residual_norm: float, final residual norm
-    """
-    
-    # Extract data
-    nodes = fem_data["nodes"]
-    elements = fem_data["elements"]
-    element_types = fem_data["element_types"]
-    element_materials = fem_data["element_materials"]
-    bc_type = fem_data["bc_type"]
-    bc_values = fem_data["bc_values"]
-    
-    # Material properties
-    c_by_elem = fem_data.get("c_by_elem", fem_data["c_by_mat"][element_materials - 1])
-    phi_by_elem = fem_data.get("phi_by_elem", fem_data["phi_by_mat"][element_materials - 1])
-    E_by_mat = fem_data["E_by_mat"]
-    nu_by_mat = fem_data["nu_by_mat"]
-    gamma_by_mat = fem_data["gamma_by_mat"]
-    u_nodal = fem_data["u"]
-    
-    # 1D elements
-    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
-    element_types_1d = fem_data.get("element_types_1d", np.array([]))
-    t_allow_by_1d_elem = fem_data.get("t_allow_by_1d_elem", np.array([]))
-    t_res_by_1d_elem = fem_data.get("t_res_by_1d_elem", np.array([]))
-    k_by_1d_elem = fem_data.get("k_by_1d_elem", np.array([]))
-    
-    # Seismic and other loads
-    k_seismic = fem_data.get("k_seismic", 0.0)
-    
-    n_nodes = len(nodes)
-    n_elements = len(elements)
-    n_1d_elements = len(elements_1d)
-    n_dof = 2 * n_nodes  # 2 DOF per node (u, v)
-    
-    # Reduce strength parameters by factor F
-    c_reduced = c_by_elem / F
-    # FIXED: Properly reduce friction angle by reducing tan(phi) by factor F
-    phi_reduced = np.arctan(np.tan(np.radians(phi_by_elem)) / F)
-    tan_phi_reduced = np.tan(phi_reduced)
-    
-    # Non-associated plasticity: dilation angle different from friction angle
-    # Typical relationship: psi = phi/3 for most soils (promotes slip surface localization)
-    psi_by_elem = phi_by_elem / 3.0  # Dilation angle (degrees)
-    psi_reduced = np.arctan(np.tan(np.radians(psi_by_elem)) / F)  # Reduce dilation angle by F too
-    
-    if debug_level >= 1:
-        print(f"Starting FEM analysis with F = {F:.3f}")
-        print(f"Mesh: {n_nodes} nodes, {n_elements} 2D elements, {n_1d_elements} 1D elements")
-    
-    # Initialize solution vectors
-    displacements = np.zeros(n_dof)
-    
-    # Track plastic state and strain softening
-    plastic_elements = np.zeros(n_elements, dtype=bool)
-    failed_1d_elements = np.zeros(n_1d_elements, dtype=bool)
-    accumulated_plastic_strain = np.zeros(n_elements)  # Track plastic strain for softening
-    
-    # Convergence parameters - allow more iterations for strain softening
-    max_iterations = 20  # More iterations to allow strain softening to develop
-    tol_force = 1e-4     # Slightly relaxed to allow softening process
-    tol_disp = 1e-4      # Slightly relaxed to allow softening process
-    
-    converged = False
-    iteration = 0
-    residual_norm = np.inf
-    
-    # Initial elastic solution (first iteration only)
-    iteration = 0
-    converged = False
-    
-    while iteration < max_iterations and not converged:
-        if debug_level >= 2:
-            print(f"\n--- Iteration {iteration + 1} ---")
-        
-        # Implement proper iterative elastic-plastic equilibrium
-        if iteration == 0:
-            # First iteration - solve elastically, then check for plasticity
-            plastic_state_changed = False
-        else:
-            # Check for plastic state changes and update stiffness accordingly
-            plastic_state_changed = check_and_update_plastic_state_with_softening(
-                nodes, elements, element_types, element_materials, displacements,
-                E_by_mat, nu_by_mat, u_nodal, c_reduced, phi_reduced, psi_reduced, 
-                plastic_elements, accumulated_plastic_strain, debug_level)
-        # Assemble force vector (only for first iteration)
-        if iteration == 0:
-            F_global = np.zeros(n_dof)
-            
-            # Body forces (gravity + seismic)
-            for elem_idx in range(n_elements):
-                elem_nodes = elements[elem_idx]
-                elem_type = element_types[elem_idx]
-                active_nodes = elem_nodes[:elem_type]
-                
-                mat_id = element_materials[elem_idx] - 1
-                gamma = gamma_by_mat[mat_id]
-                
-                # Body force components
-                b_x = k_seismic * gamma  # Horizontal seismic force
-                b_y = -gamma             # Gravity (downward)
-                
-                F_body = compute_body_forces(nodes[active_nodes], elem_type, b_x, b_y)
-                
-                # Assemble into global vector
-                dofs = []
-                for node_id in active_nodes:
-                    dofs.extend([2*node_id, 2*node_id + 1])
-                
-                for i, dof in enumerate(dofs):
-                    F_global[dof] += F_body[i]
-            
-            # Applied loads from boundary conditions
-            for i in range(n_nodes):
-                if bc_type[i] == 4:  # Applied force
-                    F_global[2*i] += bc_values[i, 0]      # F_x
-                    F_global[2*i + 1] += bc_values[i, 1]  # F_y
-        
-        # Inner loop for elastic-plastic iteration within each load step
-        sub_iteration = 0
-        max_sub_iterations = 10
-        plastic_state_changed = False  # Initialize to False for each main iteration
-        
-        # Initialize variables for cases where inner loop doesn't execute
-        delta_u_full = np.zeros(n_dof)
-        K_global = lil_matrix((n_dof, n_dof))
-        constraint_dofs = []
-        F_constrained = np.zeros(n_dof)
-        K_constrained = lil_matrix((n_dof, n_dof))
-        
-        # Always execute the inner loop for the first iteration to build stiffness matrix
-        # For subsequent iterations, only execute if plastic state changed
-        should_execute_inner = (iteration == 0) or plastic_state_changed
-        
-        while sub_iteration < max_sub_iterations and should_execute_inner:
-            if debug_level >= 3:
-                print(f"    Sub-iteration {sub_iteration + 1}")
-            
-            # Assemble global stiffness matrix with current plastic state
-            K_global = lil_matrix((n_dof, n_dof))
-            
-            # Assemble 2D elements
-            for elem_idx in range(n_elements):
-                elem_nodes = elements[elem_idx]
-                elem_type = element_types[elem_idx]
-                active_nodes = elem_nodes[:elem_type]
-                
-                # Get material properties
-                mat_id = element_materials[elem_idx] - 1
-                E = E_by_mat[mat_id]
-                nu = nu_by_mat[mat_id]
-                
-                # Build element stiffness matrix with proper plastic state consideration
-                # Use moderate stiffness reduction for plastic elements (research-based approach)
-                is_elem_plastic = plastic_elements[elem_idx]
-                if elem_type in [3, 6]:  # Triangular elements
-                    K_elem = build_triangle_stiffness(nodes[active_nodes], E, nu, is_elem_plastic, elem_type, 0.2)
-                elif elem_type in [4, 8, 9]:  # Quadrilateral elements
-                    K_elem = build_quad_stiffness(nodes[active_nodes], E, nu, is_elem_plastic, elem_type, 0.2)
-                else:
-                    if debug_level >= 1:
-                        print(f"Warning: Element type {elem_type} not supported, skipping element {elem_idx}")
-                    continue
-                
-                # Assemble into global matrix
-                dofs = []
-                for node_id in active_nodes:
-                    dofs.extend([2*node_id, 2*node_id + 1])
-                
-                for i in range(len(dofs)):
-                    for j in range(len(dofs)):
-                        K_global[dofs[i], dofs[j]] += K_elem[i, j]
-            
-            # Assemble 1D truss elements
-            for elem_idx in range(n_1d_elements):
-                if failed_1d_elements[elem_idx]:
-                    continue  # Skip failed elements
-                    
-                elem_nodes = elements_1d[elem_idx]
-                elem_type = element_types_1d[elem_idx]
-                active_nodes = elem_nodes[:elem_type]
-                
-                if len(active_nodes) >= 2:
-                    K_truss = build_truss_stiffness(nodes[active_nodes], k_by_1d_elem[elem_idx])
-                    
-                    # Assemble into global matrix
-                    dofs = []
-                    for node_id in active_nodes:
-                        dofs.extend([2*node_id, 2*node_id + 1])
-                    
-                    for i in range(len(dofs)):
-                        for j in range(len(dofs)):
-                            K_global[dofs[i], dofs[j]] += K_truss[i, j]
-            
-            # Apply boundary conditions
-            K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
-                K_global, F_global, bc_type, nodes)
-            
-            # Solve system
-            try:
-                if iteration == 0:
-                    # First iteration: solve for total displacements
-                    u_free = spsolve(K_constrained.tocsr(), F_constrained)
-                    
-                    # Reconstruct full displacement vector
-                    displacements = np.zeros(n_dof)
-                    free_dof_idx = 0
-                    for i in range(n_dof):
-                        if i not in constraint_dofs:
-                            displacements[i] = u_free[free_dof_idx]
-                            free_dof_idx += 1
-                    
-                    # Boundary conditions are automatically enforced since we only assign free DOFs
-                    # and constrained DOFs remain at their initialized value of 0.0
-                    
-                    delta_u_full = displacements.copy()
-                else:
-                    # Subsequent iterations: solve for displacement increments
-                    # For plastic correction, we need to compute the residual force
-                    # and solve for the correction
-                    
-                    # Compute current internal forces from current displacements
-                    F_internal = K_global @ displacements
-                    
-                    # Apply boundary conditions to internal forces
-                    for dof in constraint_dofs:
-                        F_internal[dof] = 0.0
-                    
-                    # The residual is the difference between applied and internal forces
-                    F_residual = F_global - F_internal
-                    
-                    # Apply boundary conditions to residual
-                    for dof in constraint_dofs:
-                        F_residual[dof] = 0.0
-                    
-                    # Extract only the free DOFs for the constrained system
-                    F_residual_constrained = []
-                    for i in range(n_dof):
-                        if i not in constraint_dofs:
-                            F_residual_constrained.append(F_residual[i])
-                    F_residual_constrained = np.array(F_residual_constrained)
-                    
-                    # Solve for displacement correction
-                    delta_u_free = spsolve(K_constrained.tocsr(), F_residual_constrained)
-                    
-                    # Reconstruct full displacement increment vector
-                    delta_u_full = np.zeros(n_dof)
-                    free_dof_idx = 0
-                    for i in range(n_dof):
-                        if i not in constraint_dofs:
-                            delta_u_full[i] = delta_u_free[free_dof_idx]
-                            free_dof_idx += 1
-                    
-                    # Update total displacements
-                    displacements += delta_u_full
-                    
-                    # Enforce boundary conditions on total displacements
-                    for dof in constraint_dofs:
-                        displacements[dof] = 0.0
-                    
-            except Exception as e:
-                if debug_level >= 1:
-                    print(f"Linear solver failed: {e}")
-                return {
-                    "converged": False,
-                    "error": f"Linear solver failed: {e}",
-                    "iterations": iteration
-                }
-            
-            sub_iteration += 1
-        
-        # The plastic state checking is now done at the beginning of each iteration
-        # No need to duplicate it here
-        
-        # After the inner loop, ensure we have the final plastic state
-        # This is important because the inner loop may have updated the plastic state
-        if iteration == 0:
-            # For the first iteration, we already have the correct plastic state
-            pass
-        else:
-            # For subsequent iterations, we need to check the final state
-            # The plastic state should already be correct from the inner loop
-            pass
-        
-        # Check convergence
-        disp_change_norm = np.linalg.norm(delta_u_full) if iteration > 0 else np.linalg.norm(displacements)
-        
-        # Compute proper force residual norm
-        if iteration == 0:
-            # First iteration has no residual
-            force_residual_norm = 0.0
-        else:
-            # For subsequent iterations, compute residual from stiffness matrix
-            F_internal = K_global @ displacements
-            # Apply boundary conditions to internal forces
-            for dof in constraint_dofs:
-                F_internal[dof] = 0.0
-            # The residual is the difference between applied and internal forces
-            F_residual = F_global - F_internal
-            # Apply boundary conditions to residual
-            for dof in constraint_dofs:
-                F_residual[dof] = 0.0
-            force_residual_norm = np.linalg.norm(F_residual)
-        
-        residual_norm = force_residual_norm
-        
-        # DEBUG: Check what's happening
-        if debug_level >= 3:
-            if iteration == 0:
-                print(f"    DEBUG: Force vector norm: {np.linalg.norm(F_global):.2e}")
-                print(f"    DEBUG: Displacement update norm: {np.linalg.norm(displacements):.2e}")
-                print(f"    DEBUG: Max displacement: {np.max(np.abs(displacements)):.2e}")
-                print(f"    DEBUG: Force residual norm: {force_residual_norm:.2e}")
-                # K_constrained is defined in the inner loop, so we can't access it here
-                print(f"    DEBUG: Matrix size: Not available yet")
-            else:
-                print(f"    DEBUG: Force vector norm: {np.linalg.norm(F_constrained):.2e}")
-                print(f"    DEBUG: Displacement update norm: {np.linalg.norm(delta_u_full):.2e}")
-                print(f"    DEBUG: Max displacement: {np.max(np.abs(displacements)):.2e}")
-                print(f"    DEBUG: Force residual norm: {force_residual_norm:.2e}")
-                print(f"    DEBUG: Matrix size: {K_constrained.shape}")
-        
-        # These variables are no longer needed with stress return mapping approach
-        n_newly_plastic = 0
-        n_newly_failed_1d = 0
-        
-        if debug_level >= 2:
-            print(f"  Displacement change norm: {disp_change_norm:.2e}")
-            print(f"  Force residual norm: {force_residual_norm:.2e}")
-            print(f"  Total plastic elements: {np.sum(plastic_elements)}")
-            print(f"  Total failed 1D elements: {np.sum(failed_1d_elements)}")
-        
-        # Check convergence criteria for elastic-plastic iteration
-        if iteration == 0:
-            # First iteration always continues to check for plasticity
-            converged = False
-        elif (disp_change_norm < tol_disp and force_residual_norm < tol_force and not plastic_state_changed):
-            converged = True
-            if debug_level >= 1:
-                print(f"Converged after {iteration + 1} iterations (elastic-plastic equilibrium achieved)")
-        elif iteration >= max_iterations - 1:
-            # Maximum iterations reached - this indicates failure for SSRM
-            converged = False
-            if debug_level >= 1:
-                print(f"Failed to converge after {max_iterations} iterations - slope failure detected")
-        else:
-            # Not converged - continue iterating
-            converged = False
-            if debug_level >= 2:
-                if disp_change_norm >= tol_disp:
-                    print(f"  Displacement not converged: {disp_change_norm:.2e} >= {tol_disp:.2e}")
-                if force_residual_norm >= tol_force:
-                    print(f"  Force residual not converged: {force_residual_norm:.2e} >= {tol_force:.2e}")
-                if plastic_state_changed:
-                    print(f"  Plastic state changed, re-solving with updated stiffness")
-        
-        # For subsequent iterations, zero force vector (no additional loading)
-        if iteration == 0:
-            F_global = np.zeros(n_dof)
-        
-        iteration += 1
-    
-    # Compute final stresses and strains
-    stresses = np.zeros((n_elements, 4))  # sig_x, sig_y, tau_xy, von_mises
-    strains = np.zeros((n_elements, 4))   # eps_x, eps_y, gamma_xy, max_shear_strain
-    
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        if elem_type in [3, 4, 6, 8, 9]:  # All supported element types
-            # Compute trial elastic stress (include initial stress if available)
-            sigma0_elem = fem_data.get("sigma0_by_elem", None)
-            sigma0 = None if sigma0_elem is None else sigma0_elem[elem_idx]
-            trial_stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                E_by_mat[element_materials[elem_idx] - 1],
-                nu_by_mat[element_materials[elem_idx] - 1],
-                u_nodal[active_nodes], elem_type, sigma0)
-            
-            # Apply non-associated return mapping for plasticity
-            c_elem = c_reduced[elem_idx]
-            phi_elem = phi_reduced[elem_idx]
-            psi_elem = psi_reduced[elem_idx]  # Use dilation angle
-            E_elem = E_by_mat[element_materials[elem_idx] - 1]
-            nu_elem = nu_by_mat[element_materials[elem_idx] - 1]
-            
-            corrected_stress, is_plastic = return_mapping_mohr_coulomb_stress_nonassociated(
-                trial_stress, c_elem, phi_elem, psi_elem, E_elem, nu_elem)
-            
-            stresses[elem_idx, :3] = corrected_stress
-            stresses[elem_idx, 3] = compute_von_mises(corrected_stress)
-            
-            # Update plastic element tracking
-            plastic_elements[elem_idx] = is_plastic
-            
-            # Compute strains
-            strain_vec = compute_element_strain(
-                nodes[active_nodes], displacements, active_nodes, elem_type)
-            strains[elem_idx, :3] = strain_vec
-            
-            # Compute maximum shear strain from principal strains
-            eps_x, eps_y, gamma_xy = strain_vec
-            
-            # Principal strains
-            eps_mean = 0.5 * (eps_x + eps_y)
-            R = np.sqrt(0.25 * (eps_x - eps_y)**2 + 0.25 * gamma_xy**2)
-            
-            eps_1 = eps_mean + R  # Major principal strain
-            eps_3 = eps_mean - R  # Minor principal strain
-            
-            # Maximum shear strain (engineering definition)
-            max_shear_strain = abs(eps_1 - eps_3)
-            strains[elem_idx, 3] = max_shear_strain
-    
-    # Final force computation for 1D elements
-    forces_1d = np.zeros(n_1d_elements)
-    for elem_idx in range(n_1d_elements):
-        if not failed_1d_elements[elem_idx]:
-            elem_nodes = elements_1d[elem_idx]
-            elem_type = element_types_1d[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
-            
-            if len(active_nodes) >= 2:
-                forces_1d[elem_idx] = compute_truss_force(
-                    nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
-    
-    if debug_level >= 1:
-        n_plastic = np.sum(plastic_elements)
-        n_failed_1d = np.sum(failed_1d_elements)
-        print(f"Final state: {n_plastic}/{n_elements} plastic elements, {n_failed_1d}/{n_1d_elements} failed reinforcement")
-    
-    return {
-        "converged": converged,
-        "displacements": displacements,
-        "stresses": stresses,
-        "strains": strains,
-        "plastic_elements": plastic_elements,
-        "forces_1d": forces_1d,
-        "failed_1d_elements": failed_1d_elements,
-        "iterations": iteration + 1,
-        "residual_norm": residual_norm
-    }
-
-
-def build_triangle_stiffness(coords, E, nu, is_plastic=False, elem_type=3, plastic_stiffness_reduction=0.1):
-    """
-    Build stiffness matrix for triangular elements (tri3 or tri6) using proper elastic-plastic constitutive model.
-    
-    This function now uses the consistent tangent stiffness approach instead of arbitrary
-    stiffness reduction, providing much better numerical stability and convergence.
-    
-    Parameters:
-        coords: np.ndarray - coordinates of triangle nodes (3x2 for tri3, 6x2 for tri6)
-        E: Young's modulus
-        nu: Poisson's ratio
-        is_plastic: boolean indicating if element is plastic
-        elem_type: element type (3 for tri3, 6 for tri6)
-        plastic_stiffness_reduction: float - DEPRECATED, kept for compatibility
-    
-    Returns:
-        np.ndarray - element stiffness matrix (6x6 for tri3, 12x12 for tri6)
-    """
-    
-    # For now, use elastic stiffness matrix
-    # The elastic-plastic behavior will be handled at the global assembly level
-    # where we can properly track stress states and apply return mapping
-    
-    # Constitutive matrix for plane strain
-    factor = E / ((1 + nu) * (1 - 2 * nu))
-    D = factor * np.array([
-        [1 - nu, nu,     0],
-        [nu,     1 - nu, 0],
-        [0,      0,      (1 - 2 * nu) / 2]
-    ])
-    
-    if elem_type == 3:  # Linear triangle (tri3)
-        return build_tri3_stiffness(coords, D)
-    elif elem_type == 6:  # Quadratic triangle (tri6)
-        return build_tri6_stiffness(coords, D)
-    else:
-        raise ValueError(f"Unsupported triangle element type: {elem_type}")
-
-
-def build_tri3_stiffness(coords, D):
-    """Build stiffness matrix for 3-node triangle."""
-    # Extract coordinates
-    x1, y1 = coords[0]
-    x2, y2 = coords[1] 
-    x3, y3 = coords[2]
-    
-    # Calculate area
-    area = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
-    
-    if area < 1e-12:
-        warnings.warn("Degenerate triangle detected")
-        return np.zeros((6, 6))
-    
-    # Build B matrix (strain-displacement matrix)
-    b1 = y2 - y3
-    b2 = y3 - y1
-    b3 = y1 - y2
-    c1 = x3 - x2
-    c2 = x1 - x3
-    c3 = x2 - x1
-    
-    B = (1.0 / (2.0 * area)) * np.array([
-        [b1, 0,  b2, 0,  b3, 0],
-        [0,  c1, 0,  c2, 0,  c3],
-        [c1, b1, c2, b2, c3, b3]
-    ])
-    
-    # Element stiffness matrix
-    K = B.T @ D @ B * area
-    
-    return K
-
-
-def build_tri6_stiffness(coords, D):
-    """Build stiffness matrix for 6-node triangle using numerical integration."""
-    # Gauss points for 6-point integration (exact for quadratic elements)
-    gauss_points = np.array([
-        [0.816847572980459, 0.091576213509771, 0.091576213509771],
-        [0.091576213509771, 0.816847572980459, 0.091576213509771],
-        [0.091576213509771, 0.091576213509771, 0.816847572980459],
-        [0.108103018168070, 0.445948490915965, 0.445948490915965],
-        [0.445948490915965, 0.108103018168070, 0.445948490915965],
-        [0.445948490915965, 0.445948490915965, 0.108103018168070]
-    ])
-    
-    weights = np.array([0.109951743655322, 0.109951743655322, 0.109951743655322,
-                       0.223381589678011, 0.223381589678011, 0.223381589678011])
-    
-    # Calculate triangle area for coordinate transformation
-    x1, y1 = coords[0]
-    x2, y2 = coords[1]
-    x3, y3 = coords[2]
-    area = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
-    
-    if area < 1e-12:
-        return np.zeros((12, 12))
-    
-    K = np.zeros((12, 12))
-    
-    # Numerical integration
-    for gp in range(len(gauss_points)):
-        L1, L2, L3 = gauss_points[gp]
-        w = weights[gp]
-        
-        # Shape functions for tri6 (quadratic)
-        N = np.array([
-            L1 * (2*L1 - 1),                    # N1
-            L2 * (2*L2 - 1),                    # N2
-            L3 * (2*L3 - 1),                    # N3
-            4 * L1 * L2,                        # N4 (midside 1-2)
-            4 * L2 * L3,                        # N5 (midside 2-3)
-            4 * L3 * L1                         # N6 (midside 3-1)
-        ])
-        
-        # Shape function derivatives in natural coordinates
-        dN_dL = np.array([
-            [4*L1 - 1, 0,       0],            # dN1/dL1, dN1/dL2, dN1/dL3
-            [0,        4*L2 - 1, 0],           # dN2/dL1, dN2/dL2, dN2/dL3
-            [0,        0,        4*L3 - 1],    # dN3/dL1, dN3/dL2, dN3/dL3
-            [4*L2,     4*L1,     0],           # dN4/dL1, dN4/dL2, dN4/dL3
-            [0,        4*L3,     4*L2],        # dN5/dL1, dN5/dL2, dN5/dL3
-            [4*L3,     0,        4*L1]         # dN6/dL1, dN6/dL2, dN6/dL3
-        ])
-        
-        # Jacobian transformation from natural to global coordinates
-        J = np.zeros((2, 2))
-        for i in range(6):
-            J[0, 0] += dN_dL[i, 0] * coords[i, 0] - dN_dL[i, 2] * coords[i, 0]  # dx/dL1
-            J[0, 1] += dN_dL[i, 1] * coords[i, 0] - dN_dL[i, 2] * coords[i, 0]  # dx/dL2
-            J[1, 0] += dN_dL[i, 0] * coords[i, 1] - dN_dL[i, 2] * coords[i, 1]  # dy/dL1
-            J[1, 1] += dN_dL[i, 1] * coords[i, 1] - dN_dL[i, 2] * coords[i, 1]  # dy/dL2
-        
-        det_J = np.linalg.det(J)
-        if abs(det_J) < 1e-12:
-            continue
-        
-        J_inv = np.linalg.inv(J)
-        
-        # Shape function derivatives in global coordinates
-        dN_dx = np.zeros(6)
-        dN_dy = np.zeros(6)
-        for i in range(6):
-            # Convert L1, L2, L3 derivatives to x, y derivatives
-            dN_dL1 = dN_dL[i, 0] - dN_dL[i, 2]
-            dN_dL2 = dN_dL[i, 1] - dN_dL[i, 2]
-            
-            dN_dx[i] = J_inv[0, 0] * dN_dL1 + J_inv[0, 1] * dN_dL2
-            dN_dy[i] = J_inv[1, 0] * dN_dL1 + J_inv[1, 1] * dN_dL2
-        
-        # Strain-displacement matrix B
-        B = np.zeros((3, 12))
-        for i in range(6):
-            B[0, 2*i]     = dN_dx[i]      # dN/dx for u
-            B[1, 2*i + 1] = dN_dy[i]      # dN/dy for v
-            B[2, 2*i]     = dN_dy[i]      # dN/dy for u
-            B[2, 2*i + 1] = dN_dx[i]      # dN/dx for v
-        
-        # Add to stiffness matrix
-        K += B.T @ D @ B * det_J * w
-    
-    return K
-
-
-def build_quad_stiffness(coords, E, nu, is_plastic=False, elem_type=4, plastic_stiffness_reduction=0.1):
-    """
-    Build stiffness matrix for quadrilateral elements (quad4, quad8, quad9).
-    
-    Parameters:
-        coords: np.ndarray - coordinates of quad nodes (4x2 for quad4, 8x2 for quad8, 9x2 for quad9)
-        E: Young's modulus
-        nu: Poisson's ratio
-        is_plastic: boolean indicating if element is plastic
-        elem_type: element type (4 for quad4, 8 for quad8, 9 for quad9)
-        plastic_stiffness_reduction: float - stiffness reduction factor for plastic elements
-            Literature ranges:
-            - Conservative: 0.1 to 0.5 (10% to 50% of original stiffness - less reduction)
-            - Aggressive: 0.01 to 0.1 (1% to 10% of original stiffness - more reduction)
-            - Default: 0.1 (reduces plastic element stiffness to 10% of elastic value)
-    
-    Returns:
-        np.ndarray - element stiffness matrix (8x8 for quad4, 16x16 for quad8, 18x18 for quad9)
-    """
-    
-    # Constitutive matrix for plane strain
-    factor = E / ((1 + nu) * (1 - 2 * nu))
-    D = factor * np.array([
-        [1 - nu, nu,     0],
-        [nu,     1 - nu, 0],
-        [0,      0,      (1 - 2 * nu) / 2]
-    ])
-    
-    # Reduce stiffness if plastic (simplified approach)
-    if is_plastic:
-        D *= plastic_stiffness_reduction
-    
-    if elem_type == 4:  # Linear quadrilateral (quad4)
-        return build_quad4_stiffness(coords, D)
-    elif elem_type == 8:  # 8-node quadrilateral (quad8)
-        return build_quad8_stiffness(coords, D)
-    elif elem_type == 9:  # 9-node quadrilateral (quad9)
-        return build_quad9_stiffness(coords, D)
-    else:
-        raise ValueError(f"Unsupported quadrilateral element type: {elem_type}")
-
-
-def build_quad4_stiffness(coords, D):
-    """Build stiffness matrix for 4-node quadrilateral using 2x2 Gauss integration."""
-    # 2x2 Gauss points and weights
-    xi_eta = np.array([[-1/np.sqrt(3), -1/np.sqrt(3)],
-                       [1/np.sqrt(3),  -1/np.sqrt(3)],
-                       [1/np.sqrt(3),   1/np.sqrt(3)],
-                       [-1/np.sqrt(3),  1/np.sqrt(3)]])
-    weights = np.array([1.0, 1.0, 1.0, 1.0])
-    
-    K = np.zeros((8, 8))
-    
-    for gp in range(4):
-        xi, eta = xi_eta[gp]
-        w = weights[gp]
-        
-        # Shape functions for quad4 (bilinear)
-        N = 0.25 * np.array([
-            (1 - xi) * (1 - eta),    # N1
-            (1 + xi) * (1 - eta),    # N2
-            (1 + xi) * (1 + eta),    # N3
-            (1 - xi) * (1 + eta)     # N4
-        ])
-        
-        # Shape function derivatives in natural coordinates
-        dN_dxi = 0.25 * np.array([
-            -(1 - eta),    # dN1/dxi
-            (1 - eta),     # dN2/dxi
-            (1 + eta),     # dN3/dxi
-            -(1 + eta)     # dN4/dxi
-        ])
-        
-        dN_deta = 0.25 * np.array([
-            -(1 - xi),     # dN1/deta
-            -(1 + xi),     # dN2/deta
-            (1 + xi),      # dN3/deta
-            (1 - xi)       # dN4/deta
-        ])
-        
-        # Jacobian matrix
-        J = np.zeros((2, 2))
-        for i in range(4):
-            J[0, 0] += dN_dxi[i] * coords[i, 0]   # dx/dxi
-            J[0, 1] += dN_deta[i] * coords[i, 0]  # dx/deta
-            J[1, 0] += dN_dxi[i] * coords[i, 1]   # dy/dxi
-            J[1, 1] += dN_deta[i] * coords[i, 1]  # dy/deta
-        
-        det_J = np.linalg.det(J)
-        if abs(det_J) < 1e-12:
-            continue
-        
-        J_inv = np.linalg.inv(J)
-        
-        # Shape function derivatives in global coordinates
-        dN_dx = np.zeros(4)
-        dN_dy = np.zeros(4)
-        for i in range(4):
-            dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
-            dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
-        
-        # Strain-displacement matrix B
-        B = np.zeros((3, 8))
-        for i in range(4):
-            B[0, 2*i]     = dN_dx[i]      # dN/dx for u
-            B[1, 2*i + 1] = dN_dy[i]      # dN/dy for v
-            B[2, 2*i]     = dN_dy[i]      # dN/dy for u
-            B[2, 2*i + 1] = dN_dx[i]      # dN/dx for v
-        
-        # Add to stiffness matrix
-        K += B.T @ D @ B * det_J * w
-    
-    return K
-
-
-def build_quad8_stiffness(coords, D):
-    """Build stiffness matrix for 8-node quadrilateral (serendipity) using 3x3 Gauss integration."""
-    # 3x3 Gauss points and weights
-    xi_points = np.array([-np.sqrt(3/5), 0, np.sqrt(3/5)])
-    eta_points = np.array([-np.sqrt(3/5), 0, np.sqrt(3/5)])
-    weights_1d = np.array([5/9, 8/9, 5/9])
-    
-    K = np.zeros((16, 16))
-    
-    for i in range(3):
-        for j in range(3):
-            xi, eta = xi_points[i], eta_points[j]
-            w = weights_1d[i] * weights_1d[j]
-            
-            # Shape functions for quad8 (serendipity)
-            N = np.zeros(8)
-            # Corner nodes
-            N[0] = 0.25 * (1 - xi) * (1 - eta) * (-xi - eta - 1)
-            N[1] = 0.25 * (1 + xi) * (1 - eta) * (xi - eta - 1)
-            N[2] = 0.25 * (1 + xi) * (1 + eta) * (xi + eta - 1)
-            N[3] = 0.25 * (1 - xi) * (1 + eta) * (-xi + eta - 1)
-            # Edge nodes
-            N[4] = 0.5 * (1 - xi**2) * (1 - eta)
-            N[5] = 0.5 * (1 + xi) * (1 - eta**2)
-            N[6] = 0.5 * (1 - xi**2) * (1 + eta)
-            N[7] = 0.5 * (1 - xi) * (1 - eta**2)
-            
-            # Shape function derivatives
-            dN_dxi = np.zeros(8)
-            dN_deta = np.zeros(8)
-            
-            # Corner derivatives
-            dN_dxi[0] = 0.25 * (1 - eta) * (2*xi + eta)
-            dN_dxi[1] = 0.25 * (1 - eta) * (2*xi - eta)
-            dN_dxi[2] = 0.25 * (1 + eta) * (2*xi + eta)
-            dN_dxi[3] = 0.25 * (1 + eta) * (2*xi - eta)
-            
-            dN_deta[0] = 0.25 * (1 - xi) * (xi + 2*eta)
-            dN_deta[1] = 0.25 * (1 + xi) * (-xi + 2*eta)
-            dN_deta[2] = 0.25 * (1 + xi) * (xi + 2*eta)
-            dN_deta[3] = 0.25 * (1 - xi) * (-xi + 2*eta)
-            
-            # Edge derivatives
-            dN_dxi[4] = -xi * (1 - eta)
-            dN_dxi[5] = 0.5 * (1 - eta**2)
-            dN_dxi[6] = -xi * (1 + eta)
-            dN_dxi[7] = -0.5 * (1 - eta**2)
-            
-            dN_deta[4] = -0.5 * (1 - xi**2)
-            dN_deta[5] = -(1 + xi) * eta
-            dN_deta[6] = 0.5 * (1 - xi**2)
-            dN_deta[7] = -(1 - xi) * eta
-            
-            # Jacobian matrix
-            J = np.zeros((2, 2))
-            for k in range(8):
-                J[0, 0] += dN_dxi[k] * coords[k, 0]   # dx/dxi
-                J[0, 1] += dN_deta[k] * coords[k, 0]  # dx/deta
-                J[1, 0] += dN_dxi[k] * coords[k, 1]   # dy/dxi
-                J[1, 1] += dN_deta[k] * coords[k, 1]  # dy/deta
-            
-            det_J = np.linalg.det(J)
-            if abs(det_J) < 1e-12:
-                continue
-            
-            J_inv = np.linalg.inv(J)
-            
-            # Shape function derivatives in global coordinates
-            dN_dx = np.zeros(8)
-            dN_dy = np.zeros(8)
-            for k in range(8):
-                dN_dx[k] = J_inv[0, 0] * dN_dxi[k] + J_inv[0, 1] * dN_deta[k]
-                dN_dy[k] = J_inv[1, 0] * dN_dxi[k] + J_inv[1, 1] * dN_deta[k]
-            
-            # Strain-displacement matrix B
-            B = np.zeros((3, 16))
-            for k in range(8):
-                B[0, 2*k]     = dN_dx[k]      # dN/dx for u
-                B[1, 2*k + 1] = dN_dy[k]      # dN/dy for v
-                B[2, 2*k]     = dN_dy[k]      # dN/dy for u
-                B[2, 2*k + 1] = dN_dx[k]      # dN/dx for v
-            
-            # Add to stiffness matrix
-            K += B.T @ D @ B * det_J * w
-    
-    return K
-
-
-def build_quad9_stiffness(coords, D):
-    """Build stiffness matrix for 9-node quadrilateral (Lagrangian) using 3x3 Gauss integration."""
-    # 3x3 Gauss points and weights
-    xi_points = np.array([-np.sqrt(3/5), 0, np.sqrt(3/5)])
-    eta_points = np.array([-np.sqrt(3/5), 0, np.sqrt(3/5)])
-    weights_1d = np.array([5/9, 8/9, 5/9])
-    
-    K = np.zeros((18, 18))
-    
-    for i in range(3):
-        for j in range(3):
-            xi, eta = xi_points[i], eta_points[j]
-            w = weights_1d[i] * weights_1d[j]
-            
-            # Shape functions for quad9 (Lagrangian)
-            N = np.zeros(9)
-            
-            # Corner nodes
-            N[0] = 0.25 * xi * (xi - 1) * eta * (eta - 1)
-            N[1] = 0.25 * xi * (xi + 1) * eta * (eta - 1)
-            N[2] = 0.25 * xi * (xi + 1) * eta * (eta + 1)
-            N[3] = 0.25 * xi * (xi - 1) * eta * (eta + 1)
-            
-            # Edge nodes
-            N[4] = 0.5 * (1 - xi**2) * eta * (eta - 1)
-            N[5] = 0.5 * xi * (xi + 1) * (1 - eta**2)
-            N[6] = 0.5 * (1 - xi**2) * eta * (eta + 1)
-            N[7] = 0.5 * xi * (xi - 1) * (1 - eta**2)
-            
-            # Center node
-            N[8] = (1 - xi**2) * (1 - eta**2)
-            
-            # Shape function derivatives (detailed implementation omitted for brevity)
-            # This would require computing all derivatives similar to quad8 but with 9 nodes
-            
-            # For now, use simplified approach - this should be fully implemented
-            # in a production system
-            dN_dx = np.zeros(9)
-            dN_dy = np.zeros(9)
-            
-            # Continue with Jacobian and B matrix calculation similar to quad8...
-            # (Implementation abbreviated for space)
-    
-    return K
-
-
-def build_truss_stiffness(coords, k_axial):
-    """
-    Build stiffness matrix for 2-node truss element.
-    
-    Parameters:
-        coords: np.ndarray (2, 2) - coordinates of truss endpoints
-        k_axial: axial stiffness (EA/L)
-    
-    Returns:
-        np.ndarray (4, 4) - element stiffness matrix in global coordinates
-    """
-    if len(coords) < 2:
-        return np.zeros((4, 4))
-    
-    # Element geometry
-    dx = coords[1, 0] - coords[0, 0]
-    dy = coords[1, 1] - coords[0, 1]
-    length = sqrt(dx**2 + dy**2)
-    
-    if length < 1e-12:
-        return np.zeros((4, 4))
-    
-    # Direction cosines
-    cos_theta = dx / length
-    sin_theta = dy / length
-    
-    # Local stiffness matrix
-    K_local = k_axial * np.array([
-        [1,  -1],
-        [-1,  1]
-    ])
-    
-    # Transformation matrix
-    T = np.array([
-        [cos_theta, sin_theta, 0, 0],
-        [0, 0, cos_theta, sin_theta]
-    ])
-    
-    # Transform to global coordinates
-    K_global = T.T @ K_local @ T
-    
-    return K_global
-
-
-def compute_body_forces(coords, elem_type, b_x, b_y):
-    """
-    Compute equivalent nodal forces for body forces (gravity, seismic).
-    
-    Parameters:
-        coords: element node coordinates
-        elem_type: element type (3 or 4)
-        b_x, b_y: body force components per unit volume
-    
-    Returns:
-        np.ndarray: nodal force vector
-    """
-    if elem_type == 3:  # Triangle
-        area = 0.5 * abs((coords[1, 0] - coords[0, 0]) * (coords[2, 1] - coords[0, 1]) - 
-                        (coords[2, 0] - coords[0, 0]) * (coords[1, 1] - coords[0, 1]))
-        
-        # For linear elements, distribute equally to nodes
-        nodal_force = area / 3.0
-        F = np.array([b_x * nodal_force, b_y * nodal_force] * 3)
-        
-    elif elem_type == 4:  # Quadrilateral (approximate)
-        # Compute area using shoelace formula
-        x = coords[:, 0]
-        y = coords[:, 1]
-        area = 0.5 * abs(sum(x[i]*y[i+1] - x[i+1]*y[i] for i in range(-1, len(x)-1)))
-        
-        # Distribute equally to nodes
-        nodal_force = area / 4.0
-        F = np.array([b_x * nodal_force, b_y * nodal_force] * 4)
-    else:
-        F = np.zeros(2 * elem_type)
-    
-    return F
 
 
 def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
     """
-    Apply boundary conditions to the global system.
+    Apply boundary conditions to global system using constraint elimination.
+    
+    This function applies boundary conditions by eliminating constrained degrees
+    of freedom from the global stiffness matrix and load vector.
     
     Parameters:
-        K_global: global stiffness matrix (lil_matrix)
-        F_global: global force vector
-        bc_type: boundary condition types per node
-        nodes: node coordinates
+        K_global: Global stiffness matrix (sparse or dense)
+        F_global: Global load vector
+        bc_type: Array of boundary condition types for each node:
+                 0 = free (both u and v free)
+                 1 = fixed (both u=0 and v=0) 
+                 2 = x-roller (u=0, v free)
+                 3 = y-roller (u free, v=0)
+                 4 = force (both u and v free, external forces applied)
+        nodes: Array of node coordinates (for reference)
     
     Returns:
-        K_constrained: constrained stiffness matrix
-        F_constrained: constrained force vector
-        constraint_dofs: list of constrained DOFs
+        K_constrained: Constrained stiffness matrix (only free DOFs)
+        F_constrained: Constrained load vector (only free DOFs)
+        constraint_dofs: List of constrained DOF indices
     """
+    
     n_nodes = len(nodes)
     n_dof = 2 * n_nodes
     
-    constraint_dofs = set()
+    # Identify constrained DOFs
+    constraint_dofs = []
     
     for i in range(n_nodes):
-        node_dof_x = 2 * i
-        node_dof_y = 2 * i + 1
-        
-        if bc_type[i] == 1:  # Fixed (u=0, v=0)
-            constraint_dofs.add(node_dof_x)
-            constraint_dofs.add(node_dof_y)
-        elif bc_type[i] == 2:  # X roller (u=0, v=free)
-            constraint_dofs.add(node_dof_x)
-        elif bc_type[i] == 3:  # Y roller (u=free, v=0)
-            constraint_dofs.add(node_dof_y)
-        # Type 4 (applied force) - no constraints, forces already added to F_global
+        if bc_type[i] == 1:  # Fixed: both u and v constrained
+            constraint_dofs.extend([2*i, 2*i+1])
+        elif bc_type[i] == 2:  # X-roller: u constrained, v free
+            constraint_dofs.append(2*i)
+        elif bc_type[i] == 3:  # Y-roller: u free, v constrained
+            constraint_dofs.append(2*i+1)
+        # bc_type 0 and 4 are free DOFs - no constraints
     
-    constraint_dofs = sorted(list(constraint_dofs))
+    # Get free DOFs
+    all_dofs = set(range(n_dof))
+    constraint_dofs_set = set(constraint_dofs)
+    free_dofs = sorted(all_dofs - constraint_dofs_set)
     
-    # Create free DOF list
-    free_dofs = [i for i in range(n_dof) if i not in constraint_dofs]
+    # Extract free DOF submatrices
+    if hasattr(K_global, 'toarray'):
+        # Sparse matrix
+        K_global_dense = K_global.toarray()
+    else:
+        K_global_dense = K_global
     
-    # Extract free system
-    K_constrained = K_global[np.ix_(free_dofs, free_dofs)]
+    # Extract submatrix for free DOFs only
+    K_constrained = K_global_dense[np.ix_(free_dofs, free_dofs)]
     F_constrained = F_global[free_dofs]
+    
+    # Convert back to sparse if original was sparse and matrix is large
+    if hasattr(K_global, 'toarray') and len(free_dofs) > 100:
+        K_constrained = csr_matrix(K_constrained)
     
     return K_constrained, F_constrained, constraint_dofs
 
 
-def compute_element_stress(coords, displacements, node_ids, E, nu, pore_pressures, elem_type, sigma0=None):
+# Implementation of Perzyna Visco-Plastic Algorithm for Slope Stability
+#
+# Based on:
+# - Griffiths & Lane (1999) "Slope stability analysis by finite elements"
+# - Perzyna (1966) "Fundamental problems in viscoplasticity"
+# - Zienkiewicz & Cormeau (1974) visco-plastic algorithm
+#
+# Key features:
+# - Pure non-convergence failure criterion
+# - Perzyna stress redistribution algorithm
+# - 8-node quadrilateral elements with reduced integration
+# - No plastic stiffness reduction
+
+def solve_fem_perzyna(fem_data, F=1.0, debug_level=0):
     """
-    Compute element stresses from nodal displacements.
+    Solve FEM using Perzyna visco-plastic algorithm exactly as in Griffiths & Lane (1999).
+    
+    This implements the exact algorithm from the 1999 Geotechnique paper:
+    - 8-node quadrilateral elements with reduced integration (4 Gauss points)
+    - Perzyna visco-plastic stress redistribution
+    - Non-convergence failure criterion (1000 iteration limit)
+    - No plastic stiffness reduction
     
     Parameters:
-        coords: element node coordinates
-        displacements: global displacement vector
-        node_ids: global node IDs for this element
-        E, nu: material properties
-        pore_pressures: nodal pore pressures
-        elem_type: element type
-    
+        fem_data (dict): FEM data dictionary
+        F (float): Shear strength reduction factor
+        debug_level (int): Verbosity level
+        
     Returns:
-        np.ndarray: stress vector [sig_x, sig_y, tau_xy]
-    """
-    # Constitutive matrix
-    factor = E / ((1 + nu) * (1 - 2 * nu))
-    D = factor * np.array([
-        [1 - nu, nu,     0],
-        [nu,     1 - nu, 0],
-        [0,      0,      (1 - 2 * nu) / 2]
-    ])
-    
-    if elem_type == 3:  # Linear triangle (tri3)
-        return compute_tri3_stress(coords, displacements, node_ids, D, pore_pressures, sigma0)
-    elif elem_type == 6:  # Quadratic triangle (tri6)
-        return compute_tri6_stress(coords, displacements, node_ids, D, pore_pressures)
-    elif elem_type == 4:  # Linear quadrilateral (quad4)
-        return compute_quad4_stress(coords, displacements, node_ids, D, pore_pressures)
-    elif elem_type in [8, 9]:  # Higher-order quadrilaterals
-        # For now, use quad4 stress calculation at element center
-        # In production, this should use proper integration
-        return compute_quad4_stress(coords[:4], displacements, node_ids[:4], D, pore_pressures[:4])
-    else:
-        return np.zeros(3)
-
-
-def compute_tri3_stress(coords, displacements, node_ids, D, pore_pressures, sigma0=None):
-    """Compute stress for 3-node triangle."""
-    # Extract nodal displacements
-    u = np.array([displacements[2*nid] for nid in node_ids])
-    v = np.array([displacements[2*nid + 1] for nid in node_ids])
-    
-    # Calculate area and B matrix
-    x1, y1 = coords[0]
-    x2, y2 = coords[1]
-    x3, y3 = coords[2]
-    
-    area = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
-    
-    if area < 1e-12:
-        return np.zeros(3)
-    
-    b1 = y2 - y3
-    b2 = y3 - y1
-    b3 = y1 - y2
-    c1 = x3 - x2
-    c2 = x1 - x3
-    c3 = x2 - x1
-    
-    B = (1.0 / (2.0 * area)) * np.array([
-        [b1, 0,  b2, 0,  b3, 0],
-        [0,  c1, 0,  c2, 0,  c3],
-        [c1, b1, c2, b2, c3, b3]
-    ])
-    
-    # Nodal displacement vector
-    u_elem = np.array([u[0], v[0], u[1], v[1], u[2], v[2]])
-    
-    # Strain vector
-    strain = B @ u_elem
-    
-    # Total stress increment from displacement
-    stress_inc = D @ strain
-
-    # Add initial geostatic stress if provided
-    if sigma0 is None:
-        sigma0 = np.zeros(3)
-    stress_total = stress_inc + sigma0
-    
-    # Average pore pressure
-    u_avg = np.mean(pore_pressures)
-    
-    # Effective stress (subtract pore pressure from normal stresses)
-    stress_eff = stress_total.copy()
-    stress_eff[0] -= u_avg  # sig_x'
-    stress_eff[1] -= u_avg  # sig_y'
-    # tau_xy unchanged
-    
-    return stress_eff
-
-
-def compute_tri6_stress(coords, displacements, node_ids, D, pore_pressures):
-    """Compute stress for 6-node triangle at element centroid."""
-    # For tri6, compute stress at the centroid (L1=L2=L3=1/3)
-    L1 = L2 = L3 = 1.0/3.0
-    
-    # Extract nodal displacements
-    u = np.array([displacements[2*nid] for nid in node_ids])
-    v = np.array([displacements[2*nid + 1] for nid in node_ids])
-    
-    # Shape function derivatives at centroid
-    dN_dL = np.array([
-        [4*L1 - 1, 0,       0],            # dN1/dL1, dN1/dL2, dN1/dL3
-        [0,        4*L2 - 1, 0],           # dN2/dL1, dN2/dL2, dN2/dL3
-        [0,        0,        4*L3 - 1],    # dN3/dL1, dN3/dL2, dN3/dL3
-        [4*L2,     4*L1,     0],           # dN4/dL1, dN4/dL2, dN4/dL3
-        [0,        4*L3,     4*L2],        # dN5/dL1, dN5/dL2, dN5/dL3
-        [4*L3,     0,        4*L1]         # dN6/dL1, dN6/dL2, dN6/dL3
-    ])
-    
-    # Jacobian transformation
-    J = np.zeros((2, 2))
-    for i in range(6):
-        J[0, 0] += dN_dL[i, 0] * coords[i, 0] - dN_dL[i, 2] * coords[i, 0]
-        J[0, 1] += dN_dL[i, 1] * coords[i, 0] - dN_dL[i, 2] * coords[i, 0]
-        J[1, 0] += dN_dL[i, 0] * coords[i, 1] - dN_dL[i, 2] * coords[i, 1]
-        J[1, 1] += dN_dL[i, 1] * coords[i, 1] - dN_dL[i, 2] * coords[i, 1]
-    
-    det_J = np.linalg.det(J)
-    if abs(det_J) < 1e-12:
-        return np.zeros(3)
-    
-    J_inv = np.linalg.inv(J)
-    
-    # Shape function derivatives in global coordinates
-    dN_dx = np.zeros(6)
-    dN_dy = np.zeros(6)
-    for i in range(6):
-        dN_dL1 = dN_dL[i, 0] - dN_dL[i, 2]
-        dN_dL2 = dN_dL[i, 1] - dN_dL[i, 2]
-        
-        dN_dx[i] = J_inv[0, 0] * dN_dL1 + J_inv[0, 1] * dN_dL2
-        dN_dy[i] = J_inv[1, 0] * dN_dL1 + J_inv[1, 1] * dN_dL2
-    
-    # Strain-displacement matrix B
-    B = np.zeros((3, 12))
-    for i in range(6):
-        B[0, 2*i]     = dN_dx[i]      # dN/dx for u
-        B[1, 2*i + 1] = dN_dy[i]      # dN/dy for v
-        B[2, 2*i]     = dN_dy[i]      # dN/dy for u
-        B[2, 2*i + 1] = dN_dx[i]      # dN/dx for v
-    
-    # Nodal displacement vector
-    u_elem = np.zeros(12)
-    for i in range(6):
-        u_elem[2*i] = u[i]
-        u_elem[2*i + 1] = v[i]
-    
-    # Strain vector
-    strain = B @ u_elem
-    
-    # Total stress increment from displacement
-    stress_inc = D @ strain
-    
-    # Average pore pressure
-    u_avg = np.mean(pore_pressures)
-    
-    # Effective stress
-    stress_eff = stress_inc.copy()
-    stress_eff[0] -= u_avg  # sig_x'
-    stress_eff[1] -= u_avg  # sig_y'
-    
-    return stress_eff
-
-
-def compute_quad4_stress(coords, displacements, node_ids, D, pore_pressures):
-    """Compute stress for 4-node quadrilateral at element center."""
-    # Extract nodal displacements
-    u = np.array([displacements[2*nid] for nid in node_ids])
-    v = np.array([displacements[2*nid + 1] for nid in node_ids])
-    
-    # At element center (xi=0, eta=0)
-    xi, eta = 0.0, 0.0
-    
-    # Shape function derivatives at center
-    dN_dxi = 0.25 * np.array([-(1 - eta), (1 - eta), (1 + eta), -(1 + eta)])
-    dN_deta = 0.25 * np.array([-(1 - xi), -(1 + xi), (1 + xi), (1 - xi)])
-    
-    # Jacobian matrix
-    J = np.zeros((2, 2))
-    for i in range(4):
-        J[0, 0] += dN_dxi[i] * coords[i, 0]
-        J[0, 1] += dN_deta[i] * coords[i, 0]
-        J[1, 0] += dN_dxi[i] * coords[i, 1]
-        J[1, 1] += dN_deta[i] * coords[i, 1]
-    
-    det_J = np.linalg.det(J)
-    if abs(det_J) < 1e-12:
-        return np.zeros(3)
-    
-    J_inv = np.linalg.inv(J)
-    
-    # Shape function derivatives in global coordinates
-    dN_dx = np.zeros(4)
-    dN_dy = np.zeros(4)
-    for i in range(4):
-        dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
-        dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
-    
-    # Strain-displacement matrix B
-    B = np.zeros((3, 8))
-    for i in range(4):
-        B[0, 2*i]     = dN_dx[i]
-        B[1, 2*i + 1] = dN_dy[i]
-        B[2, 2*i]     = dN_dy[i]
-        B[2, 2*i + 1] = dN_dx[i]
-    
-    # Nodal displacement vector
-    u_elem = np.zeros(8)
-    for i in range(4):
-        u_elem[2*i] = u[i]
-        u_elem[2*i + 1] = v[i]
-    
-    # Strain vector
-    strain = B @ u_elem
-    
-    # Total stress increment from displacement
-    stress_inc = D @ strain
-    
-    # Average pore pressure
-    u_avg = np.mean(pore_pressures)
-    
-    # Effective stress
-    stress_eff = stress_inc.copy()
-    stress_eff[0] -= u_avg
-    stress_eff[1] -= u_avg
-    
-    return stress_eff
-
-
-def compute_element_strain(coords, displacements, node_ids, elem_type):
-    """
-    Compute element strains from nodal displacements.
-    """
-    if elem_type == 3:  # Linear triangle (tri3)
-        return compute_tri3_strain(coords, displacements, node_ids)
-    elif elem_type == 6:  # Quadratic triangle (tri6)  
-        return compute_tri6_strain(coords, displacements, node_ids)
-    elif elem_type == 4:  # Linear quadrilateral (quad4)
-        return compute_quad4_strain(coords, displacements, node_ids)
-    elif elem_type in [8, 9]:  # Higher-order quadrilaterals
-        # For now, use quad4 strain calculation
-        return compute_quad4_strain(coords[:4], displacements, node_ids[:4])
-    else:
-        return np.zeros(3)
-
-
-def compute_tri3_strain(coords, displacements, node_ids):
-    """Compute strain for 3-node triangle."""
-    # Extract nodal displacements
-    u = np.array([displacements[2*nid] for nid in node_ids])
-    v = np.array([displacements[2*nid + 1] for nid in node_ids])
-    
-    # Calculate B matrix
-    x1, y1 = coords[0]
-    x2, y2 = coords[1]
-    x3, y3 = coords[2]
-    
-    area = 0.5 * abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
-    
-    if area < 1e-12:
-        return np.zeros(3)
-    
-    b1 = y2 - y3
-    b2 = y3 - y1
-    b3 = y1 - y2
-    c1 = x3 - x2
-    c2 = x1 - x3
-    c3 = x2 - x1
-    
-    B = (1.0 / (2.0 * area)) * np.array([
-        [b1, 0,  b2, 0,  b3, 0],
-        [0,  c1, 0,  c2, 0,  c3],
-        [c1, b1, c2, b2, c3, b3]
-    ])
-    
-    # Nodal displacement vector
-    u_elem = np.array([u[0], v[0], u[1], v[1], u[2], v[2]])
-    
-    # Strain vector
-    strain = B @ u_elem
-    
-    return strain
-
-
-def compute_tri6_strain(coords, displacements, node_ids):
-    """Compute strain for 6-node triangle at centroid."""
-    # Similar to compute_tri6_stress but only return strain
-    # (Implementation details similar to tri6_stress function)
-    L1 = L2 = L3 = 1.0/3.0
-    
-    u = np.array([displacements[2*nid] for nid in node_ids])
-    v = np.array([displacements[2*nid + 1] for nid in node_ids])
-    
-    # Use same B matrix computation as in tri6_stress
-    # (Abbreviated for space - would use same Jacobian transformation)
-    
-    # For now, return zeros - this should be fully implemented
-    return np.zeros(3)
-
-
-def compute_quad4_strain(coords, displacements, node_ids):
-    """Compute strain for 4-node quadrilateral at center."""
-    # Similar to compute_quad4_stress but only return strain
-    u = np.array([displacements[2*nid] for nid in node_ids])
-    v = np.array([displacements[2*nid + 1] for nid in node_ids])
-    
-    # At element center (xi=0, eta=0)
-    xi, eta = 0.0, 0.0
-    
-    dN_dxi = 0.25 * np.array([-(1 - eta), (1 - eta), (1 + eta), -(1 + eta)])
-    dN_deta = 0.25 * np.array([-(1 - xi), -(1 + xi), (1 + xi), (1 - xi)])
-    
-    # Jacobian and B matrix (same as in stress computation)
-    J = np.zeros((2, 2))
-    for i in range(4):
-        J[0, 0] += dN_dxi[i] * coords[i, 0]
-        J[0, 1] += dN_deta[i] * coords[i, 0]
-        J[1, 0] += dN_dxi[i] * coords[i, 1]
-        J[1, 1] += dN_deta[i] * coords[i, 1]
-    
-    det_J = np.linalg.det(J)
-    if abs(det_J) < 1e-12:
-        return np.zeros(3)
-    
-    J_inv = np.linalg.inv(J)
-    
-    dN_dx = np.zeros(4)
-    dN_dy = np.zeros(4)
-    for i in range(4):
-        dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
-        dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
-    
-    B = np.zeros((3, 8))
-    for i in range(4):
-        B[0, 2*i]     = dN_dx[i]
-        B[1, 2*i + 1] = dN_dy[i]
-        B[2, 2*i]     = dN_dy[i]
-        B[2, 2*i + 1] = dN_dx[i]
-    
-    u_elem = np.zeros(8)
-    for i in range(4):
-        u_elem[2*i] = u[i]
-        u_elem[2*i + 1] = v[i]
-    
-    strain = B @ u_elem
-    return strain
-
-
-def compute_truss_force(coords, displacements, node_ids, k_axial):
-    """
-    Compute axial force in truss element.
-    """
-    if len(node_ids) < 2:
-        return 0.0
-    
-    # Element geometry
-    dx = coords[1, 0] - coords[0, 0]
-    dy = coords[1, 1] - coords[0, 1]
-    length = sqrt(dx**2 + dy**2)
-    
-    if length < 1e-12:
-        return 0.0
-    
-    # Direction cosines
-    cos_theta = dx / length
-    sin_theta = dy / length
-    
-    # Nodal displacements
-    u1 = displacements[2 * node_ids[0]]
-    v1 = displacements[2 * node_ids[0] + 1]
-    u2 = displacements[2 * node_ids[1]]
-    v2 = displacements[2 * node_ids[1] + 1]
-    
-    # Axial displacement
-    u_axial = cos_theta * (u2 - u1) + sin_theta * (v2 - v1)
-    
-    # Axial force
-    force = k_axial * u_axial
-    
-    return force
-
-
-def check_mohr_coulomb_yield(stress, c, phi):
-    """
-    Check Mohr-Coulomb yield criterion.
-    
-    Parameters:
-        stress: stress vector [sig_x, sig_y, tau_xy]
-        c: cohesion
-        phi: friction angle (radians)
-    
-    Returns:
-        float: yield function value (>0 indicates yielding)
-    """
-    if len(stress) < 3:
-        return 0.0
-    
-    sig_x, sig_y, tau_xy = stress[:3]
-    
-    # Principal stresses
-    sig_mean = 0.5 * (sig_x + sig_y)
-    tau_max = sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-    
-    sig_1 = sig_mean + tau_max  # Major principal stress
-    sig_3 = sig_mean - tau_max  # Minor principal stress
-    
-    # Mohr-Coulomb yield function
-    if abs(phi) < 1e-6:  # Undrained case (phi = 0)
-        f = tau_max - c
-    else:
-        sin_phi = sin(phi)
-        f = 0.5 * (sig_1 - sig_3) - 0.5 * (sig_1 + sig_3) * sin_phi - c * cos(phi)
-    
-    return f
-
-
-def compute_von_mises(stress):
-    """
-    Compute von Mises equivalent stress.
-    """
-    if len(stress) < 3:
-        return 0.0
-    
-    sig_x, sig_y, tau_xy = stress[:3]
-    
-    von_mises = sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
-    
-    return von_mises
-
-
-def return_mapping_mohr_coulomb_stress_nonassociated(stress_trial, c, phi, psi, E, nu):
-    """
-    Return mapping algorithm for non-associated Mohr-Coulomb plasticity.
-    
-    This function implements non-associated plasticity where:
-    - Yield criterion uses friction angle phi
-    - Flow rule uses dilation angle psi (typically psi = phi/3)
-    - This promotes localization along slip surfaces (critical for slope stability)
-    
-    Parameters:
-        stress_trial: np.array - trial elastic stress [sig_x, sig_y, tau_xy]
-        c: float - cohesion
-        phi: float - friction angle (radians) - used for yield criterion
-        psi: float - dilation angle (radians) - used for flow rule  
-        E: float - Young's modulus
-        nu: float - Poisson's ratio
-    
-    Returns:
-        tuple: (stress_corrected, is_plastic)
-            stress_corrected: corrected stress on or within yield surface
-            is_plastic: boolean indicating if plastic correction was applied
-    """
-    
-    # Check yield criterion using friction angle phi
-    f_trial = check_mohr_coulomb_yield(stress_trial, c, phi)
-    
-    if f_trial <= 0.0:  # Elastic - no correction needed
-        return stress_trial.copy(), False
-    
-    # Plastic loading - implement non-associated return mapping
-    sig_x, sig_y, tau_xy = stress_trial
-    
-    # Principal stresses and directions
-    sig_mean = 0.5 * (sig_x + sig_y)
-    tau_max = np.sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-    
-    if tau_max < 1e-10:  # Hydrostatic stress state
-        return stress_trial.copy(), False
-    
-    if abs(phi) < 1e-6:  # Undrained case (phi = 0)
-        # Tresca criterion - no dilation effect
-        if tau_max > c:
-            scale_factor = c / tau_max
-            sig_x_corr = sig_mean + scale_factor * (sig_x - sig_mean)
-            sig_y_corr = sig_mean + scale_factor * (sig_y - sig_mean)
-            tau_xy_corr = scale_factor * tau_xy
-            return np.array([sig_x_corr, sig_y_corr, tau_xy_corr]), True
-    else:
-        # Non-associated Mohr-Coulomb case
-        sin_phi = np.sin(phi)
-        cos_phi = np.cos(phi)
-        sin_psi = np.sin(psi)  # Use dilation angle for flow rule
-        
-        # For non-associated plasticity, the flow rule uses psi instead of phi
-        # This creates different volumetric behavior and promotes localization
-        
-        # Simplified non-associated return: adjust mean stress based on dilation
-        # Full implementation would use proper flow rule mathematics
-        dilation_factor = sin_psi / sin_phi if sin_phi > 1e-10 else 0.0
-        
-        # Adjust mean stress based on dilation behavior
-        sig_mean_corrected = sig_mean * (1.0 - 0.1 * dilation_factor)  # Reduce volume expansion
-        
-        # Calculate allowable shear stress from yield criterion (using phi)
-        allowable_tau = c * cos_phi + sig_mean_corrected * sin_phi
-        
-        if allowable_tau > 0 and tau_max > allowable_tau:
-            # Scale down the deviatoric stress
-            scale_factor = allowable_tau / tau_max
-            
-            sig_x_corr = sig_mean_corrected + scale_factor * (sig_x - sig_mean)
-            sig_y_corr = sig_mean_corrected + scale_factor * (sig_y - sig_mean)
-            tau_xy_corr = scale_factor * tau_xy
-            
-            return np.array([sig_x_corr, sig_y_corr, tau_xy_corr]), True
-    
-    # If we get here, no correction was needed
-    return stress_trial.copy(), False
-
-
-def return_mapping_mohr_coulomb_stress(stress_trial, c, phi, E, nu):
-    """
-    Return mapping algorithm for Mohr-Coulomb plasticity - stress correction approach.
-    
-    This function corrects trial stresses to satisfy the yield criterion without
-    reducing element stiffness dramatically. This prevents the cascade failure
-    issues seen in traditional stiffness reduction approaches.
-    
-    Parameters:
-        stress_trial: np.array - trial elastic stress [sig_x, sig_y, tau_xy]
-        c: float - cohesion
-        phi: float - friction angle (radians)
-        E: float - Young's modulus (not used in stress-only correction)
-        nu: float - Poisson's ratio (not used in stress-only correction)
-    
-    Returns:
-        tuple: (stress_corrected, is_plastic)
-            stress_corrected: corrected stress on or within yield surface
-            is_plastic: boolean indicating if plastic correction was applied
-    """
-    
-    # Check yield criterion
-    f_trial = check_mohr_coulomb_yield(stress_trial, c, phi)
-    
-    if f_trial <= 0.0:  # Elastic - no correction needed
-        return stress_trial.copy(), False
-    
-    # Plastic - apply return mapping to bring stress back to yield surface
-    sig_x, sig_y, tau_xy = stress_trial
-    
-    # Principal stresses and directions
-    sig_mean = 0.5 * (sig_x + sig_y)
-    tau_max = np.sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-    
-    if tau_max < 1e-10:  # Hydrostatic stress state
-        return stress_trial.copy(), False
-    
-    sig_1 = sig_mean + tau_max  # Major principal stress
-    sig_3 = sig_mean - tau_max  # Minor principal stress
-    
-    if abs(phi) < 1e-6:  # Undrained case (phi = 0) - Tresca criterion
-        # Simply limit the maximum shear stress
-        if tau_max > c:
-            scale_factor = c / tau_max
-            sig_x_corr = sig_mean + scale_factor * (sig_x - sig_mean)
-            sig_y_corr = sig_mean + scale_factor * (sig_y - sig_mean)
-            tau_xy_corr = scale_factor * tau_xy
-            return np.array([sig_x_corr, sig_y_corr, tau_xy_corr]), True
-    else:
-        # General Mohr-Coulomb case
-        sin_phi = np.sin(phi)
-        cos_phi = np.cos(phi)
-        
-        # Calculate the stress point that satisfies yield criterion
-        # f = 0.5*(sig_1 - sig_3) - 0.5*(sig_1 + sig_3)*sin_phi - c*cos_phi = 0
-        
-        # For given mean stress, find allowable stress difference
-        sig_mean_eff = sig_mean  # Keep mean stress approximately same
-        
-        # From yield criterion: (sig_1 - sig_3) = 2*c*cos_phi + (sig_1 + sig_3)*sin_phi
-        # With sig_1 + sig_3 = 2*sig_mean: (sig_1 - sig_3) = 2*c*cos_phi + 2*sig_mean*sin_phi
-        allowable_tau = c * cos_phi + sig_mean_eff * sin_phi
-        
-        if allowable_tau > 0 and tau_max > allowable_tau:
-            # Scale down the deviatoric stress
-            scale_factor = allowable_tau / tau_max
-            
-            sig_x_corr = sig_mean_eff + scale_factor * (sig_x - sig_mean)
-            sig_y_corr = sig_mean_eff + scale_factor * (sig_y - sig_mean)
-            tau_xy_corr = scale_factor * tau_xy
-            
-            return np.array([sig_x_corr, sig_y_corr, tau_xy_corr]), True
-    
-    # If we get here, no correction was needed
-    return stress_trial.copy(), False
-
-
-def check_and_update_plastic_state(nodes, elements, element_types, element_materials, 
-                                  displacements, E_by_mat, nu_by_mat, u_nodal, 
-                                  c_reduced, phi_reduced, plastic_elements, debug_level):
-    """
-    Check for yielding and update plastic element state for iterative solution.
-    
-    This function implements proper elastic-plastic iteration by:
-    1. Computing current stresses from displacements
-    2. Checking yield criterion for each element
-    3. Updating plastic element flags
-    4. Returns True if plastic state changed (requiring stiffness update)
-    """
-    
-    n_elements = len(elements)
-    new_plastic_elements = np.zeros(n_elements, dtype=bool)
-    
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        if elem_type in [3, 4, 6, 8, 9]:  # All supported element types
-            # Compute current element stresses (with initial stress)
-            sigma0_elem = fem_data.get("sigma0_by_elem", None)
-            sigma0 = None if sigma0_elem is None else sigma0_elem[elem_idx]
-            trial_stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                E_by_mat[element_materials[elem_idx] - 1],
-                nu_by_mat[element_materials[elem_idx] - 1],
-                u_nodal[active_nodes], elem_type, sigma0)
-            
-            # Check Mohr-Coulomb yield criterion
-            c_elem = c_reduced[elem_idx]
-            phi_elem = phi_reduced[elem_idx]
-            
-            yield_value = check_mohr_coulomb_yield(trial_stress, c_elem, phi_elem)
-            
-            # Use realistic yield threshold (research-based)
-            yield_threshold = max(0.01 * c_elem, 50.0)  # 1% of cohesion or 50 Pa minimum
-            
-            if yield_value > yield_threshold:
-                new_plastic_elements[elem_idx] = True
-                if debug_level >= 3:
-                    print(f"    Element {elem_idx} yielded: yield_value = {yield_value:.2e}")
-    
-    # Check if plastic state has changed
-    plastic_state_changed = not np.array_equal(new_plastic_elements, plastic_elements)
-    
-    if plastic_state_changed:
-        old_plastic_count = np.sum(plastic_elements)
-        plastic_elements[:] = new_plastic_elements  # Update in-place
-        new_plastic_count = np.sum(plastic_elements)
-        
-        if debug_level >= 2:
-            print(f"  Plastic state changed: {old_plastic_count} -> {new_plastic_count} plastic elements")
-    else:
-        if debug_level >= 2:
-            print(f"  Plastic state unchanged: {np.sum(plastic_elements)} plastic elements")
-    
-    return plastic_state_changed
-
-
-def check_and_update_plastic_state_with_softening(nodes, elements, element_types, element_materials,
-                                                  displacements, E_by_mat, nu_by_mat, u_nodal,
-                                                  c_reduced, phi_reduced, psi_reduced, plastic_elements,
-                                                  accumulated_plastic_strain, debug_level):
-    """
-    Check for yielding and update plastic element state with strain softening.
-    
-    This implements strain softening where elements that accumulate plastic strain
-    gradually lose strength, promoting failure localization along slip surfaces.
-    """
-    
-    n_elements = len(elements)
-    new_plastic_elements = np.zeros(n_elements, dtype=bool)
-    
-    # Strain softening parameters - more aggressive to promote localization
-    softening_modulus = 5.0  # Rate of strength loss (aggressive softening)
-    max_softening = 0.7      # Maximum strength loss (retain at least 30% of original strength)
-    
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        if elem_type in [3, 4, 6, 8, 9]:  # All supported element types
-            # Compute current element stresses (with initial stress)
-            sigma0_elem = fem_data.get("sigma0_by_elem", None)
-            sigma0 = None if sigma0_elem is None else sigma0_elem[elem_idx]
-            trial_stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                E_by_mat[element_materials[elem_idx] - 1],
-                nu_by_mat[element_materials[elem_idx] - 1],
-                u_nodal[active_nodes], elem_type, sigma0)
-            
-            # Apply strain softening to strength parameters
-            softening_factor = min(softening_modulus * accumulated_plastic_strain[elem_idx], max_softening)
-            
-            # Reduce strength based on accumulated plastic strain
-            c_elem = c_reduced[elem_idx] * (1.0 - softening_factor)
-            phi_elem_reduced = phi_reduced[elem_idx] * (1.0 - softening_factor)
-            psi_elem_reduced = psi_reduced[elem_idx] * (1.0 - softening_factor)  # Also soften dilation angle
-            
-            # Update the reduced strength arrays (this affects future iterations)
-            c_reduced[elem_idx] = c_elem
-            phi_reduced[elem_idx] = phi_elem_reduced
-            psi_reduced[elem_idx] = psi_elem_reduced
-            
-            yield_value = check_mohr_coulomb_yield(trial_stress, c_elem, phi_elem_reduced)
-            
-            # Use realistic yield threshold
-            yield_threshold = max(0.01 * c_elem, 50.0)
-            
-            if yield_value > yield_threshold:
-                new_plastic_elements[elem_idx] = True
-                
-                # Accumulate plastic strain for elements that are yielding
-                # Use equivalent plastic strain increment (simplified)
-                strain_vec = compute_element_strain(nodes[active_nodes], displacements, active_nodes, elem_type)
-                eps_x, eps_y, gamma_xy = strain_vec[:3]
-                
-                # Compute equivalent plastic strain increment (von Mises type)
-                plastic_strain_increment = np.sqrt((2.0/3.0) * (eps_x**2 + eps_y**2 + eps_x*eps_y + 0.75*gamma_xy**2))
-                
-                # Accumulate plastic strain more aggressively for localization
-                accumulated_plastic_strain[elem_idx] += plastic_strain_increment * 0.1  # More aggressive increment
-                
-                if debug_level >= 3:
-                    print(f"    Element {elem_idx} yielded: yield_value = {yield_value:.2e}, plastic_strain = {accumulated_plastic_strain[elem_idx]:.4f}")
-    
-    # Check if plastic state has changed
-    plastic_state_changed = not np.array_equal(new_plastic_elements, plastic_elements)
-    
-    if plastic_state_changed:
-        old_plastic_count = np.sum(plastic_elements)
-        plastic_elements[:] = new_plastic_elements  # Update in-place
-        new_plastic_count = np.sum(plastic_elements)
-        
-        if debug_level >= 2:
-            max_plastic_strain = np.max(accumulated_plastic_strain)
-            mean_softening = np.mean([min(softening_modulus * ps, max_softening) for ps in accumulated_plastic_strain if ps > 0])
-            print(f"  Plastic state changed: {old_plastic_count} -> {new_plastic_count} plastic elements")
-            print(f"  Max plastic strain: {max_plastic_strain:.4f}, Mean softening: {mean_softening:.3f}")
-    else:
-        if debug_level >= 2:
-            print(f"  Plastic state unchanged: {np.sum(plastic_elements)} plastic elements")
-    
-    return plastic_state_changed
-
-
-def return_mapping_mohr_coulomb(stress_trial, c, phi, E, nu):
-    """
-    Return mapping algorithm for Mohr-Coulomb plasticity.
-    
-    This function implements proper elastic-plastic constitutive relations
-    using return mapping to ensure stresses remain on the yield surface.
-    
-    Parameters:
-        stress_trial: np.array - trial elastic stress [sig_x, sig_y, tau_xy]
-        c: float - cohesion
-        phi: float - friction angle (radians)
-        E: float - Young's modulus
-        nu: float - Poisson's ratio
-    
-    Returns:
-        tuple: (stress_corrected, D_ep, is_plastic)
-            stress_corrected: corrected stress on yield surface
-            D_ep: elastic-plastic tangent stiffness matrix
-            is_plastic: boolean indicating if plastic correction was applied
-    """
-    
-    # Check yield criterion
-    f_trial = check_mohr_coulomb_yield(stress_trial, c, phi)
-    
-    if f_trial <= 1e-9:  # Elastic loading
-        # Return elastic stiffness matrix
-        factor = E / ((1 + nu) * (1 - 2 * nu))
-        D_ep = factor * np.array([
-            [1 - nu, nu,     0],
-            [nu,     1 - nu, 0],
-            [0,      0,      (1 - 2 * nu) / 2]
-        ])
-        return stress_trial, D_ep, False
-    
-    # Plastic loading - implement return mapping
-    # For now, use a simplified approach: reduce stress proportionally to bring it to yield surface
-    # This is not optimal but better than arbitrary stiffness reduction
-    
-    if abs(phi) < 1e-6:  # Undrained case (phi = 0)
-        # Tresca/von Mises type yield - scale down deviatoric stress
-        sig_x, sig_y, tau_xy = stress_trial
-        sig_mean = 0.5 * (sig_x + sig_y)
-        tau_max = sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-        
-        if tau_max > c:
-            scale_factor = c / tau_max
-            sig_x = sig_mean + scale_factor * 0.5 * (sig_x - sig_y)
-            sig_y = sig_mean + scale_factor * 0.5 * (sig_y - sig_x)
-            tau_xy = scale_factor * tau_xy
-    else:
-        # General Mohr-Coulomb case
-        sig_x, sig_y, tau_xy = stress_trial
-        
-        # Principal stresses
-        sig_mean = 0.5 * (sig_x + sig_y)
-        tau_max = sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-        
-        sig_1 = sig_mean + tau_max
-        sig_3 = sig_mean - tau_max
-        
-        # Compute required reduction to satisfy yield criterion
-        sin_phi = sin(phi)
-        cos_phi = cos(phi)
-        
-        # Solve for new principal stresses on yield surface
-        # f = 0.5*(sig_1 - sig_3) - 0.5*(sig_1 + sig_3)*sin_phi - c*cos_phi = 0
-        # This gives: (sig_1 - sig_3)*(1 - sin_phi)/2 = c*cos_phi + (sig_1 + sig_3)*sin_phi/2
-        
-        # Simplified approach: scale down stress difference while maintaining mean stress
-        if tau_max > 0:
-            # Target stress difference from yield criterion
-            sig_m_target = sig_mean  # Keep mean stress roughly the same
-            
-            # From yield criterion: tau_max_new = c*cos_phi + sig_m_target*sin_phi
-            tau_max_new = c * cos_phi + sig_m_target * sin_phi
-            
-            if tau_max_new > 0:
-                scale_factor = tau_max_new / tau_max
-                
-                # Scale the deviatoric components
-                sig_x = sig_mean + scale_factor * 0.5 * (sig_x - sig_y)
-                sig_y = sig_mean + scale_factor * 0.5 * (sig_y - sig_x) 
-                tau_xy = scale_factor * tau_xy
-    
-    stress_corrected = np.array([sig_x, sig_y, tau_xy])
-    
-    # For plastic loading, use reduced stiffness matrix
-    # This is still simplified - proper implementation would compute elastic-plastic tangent
-    factor = E / ((1 + nu) * (1 - 2 * nu))
-    D_elastic = factor * np.array([
-        [1 - nu, nu,     0],
-        [nu,     1 - nu, 0],
-        [0,      0,      (1 - 2 * nu) / 2]
-    ])
-    
-    # Simple plastic stiffness reduction (can be improved)
-    plastic_stiffness_factor = 0.1  # 10% of elastic stiffness
-    D_ep = plastic_stiffness_factor * D_elastic
-    
-    return stress_corrected, D_ep, True
-
-
-def solve_ssrm(fem_data, debug_level=0):
-    """
-    Solve for factor of safety using Shear Strength Reduction Method (SSRM).
-    
-    This function performs SSRM by iteratively increasing the shear strength reduction
-    factor F until the finite element system fails to converge, indicating slope failure.
-    The critical factor of safety is the last F value for which convergence was achieved.
-    
-    Parameters:
-        fem_data (dict): FEM data dictionary from build_fem_data
-        debug_level (int): Verbosity level (0=quiet, 1=basic, 2=detailed, 3=debug)
-    
-    Returns:
-        dict: SSRM solution dictionary containing:
-            - converged: bool, whether SSRM procedure completed successfully
-            - FS: float, critical factor of safety
-            - last_solution: dict, final FEM solution at critical F
-            - F_history: list, history of F values tested
-            - convergence_history: list, convergence status for each F
-            - iterations_ssrm: int, number of SSRM iterations
+        dict: Solution dictionary with convergence status
     """
     
     if debug_level >= 1:
-        print("Starting Shear Strength Reduction Method (SSRM)")
+        print(f"=== Perzyna Visco-Plastic FEM Analysis (F={F:.3f}) ===")
     
-    # SSRM parameters
-    F_start = 1.0
-    F_increment_initial = 0.1    # Larger initial steps to find failure region quickly
-    F_increment_min = 0.001      # Fine resolution for final refinement
-    F_max = 3.0                  # Maximum F to prevent excessive iterations
-    max_ssrm_iterations = 100    # Allow more iterations for adaptive search
-    
-    # Adaptive stepping parameters
-    F_increment = F_increment_initial
-    refinement_mode = False      # Whether we're in refinement mode
-    failure_interval = None      # Store the interval where failure occurs
-    
-    # History tracking
-    F_history = []
-    convergence_history = []
-    solutions_history = []
-    displacement_history = []  # Track displacement growth rate
-    
-    # Initialize
-    F = F_start
-    F_increment = F_increment_initial
-    last_converged_F = None
-    last_converged_solution = None
-    
-    ssrm_iteration = 0
-    
-    for ssrm_iteration in range(max_ssrm_iterations):
-        if debug_level >= 1:
-            print(f"\n=== SSRM Iteration {ssrm_iteration + 1}: F = {F:.4f} ===")
-        
-        # Solve FEM with current F
-        solution = solve_fem(fem_data, F=F, debug_level=max(0, debug_level-1))
-        
-        F_history.append(F)
-        convergence_history.append(solution.get("converged", False))
-        solutions_history.append(solution)
-        
-        if solution.get("converged", False):
-            # Solution converged - this is stable, continue with higher F
-            max_displacement = np.max(np.abs(solution.get("displacements", [0])))
-            
-            # Check for excessive displacements that indicate failure
-            # Literature suggests displacements > 5% of characteristic length indicate failure
-            # For SSRM, we use a more sensitive criterion
-            characteristic_length = np.max(fem_data["nodes"][:, 0]) - np.min(fem_data["nodes"][:, 0])  # Approximate slope width
-            displacement_threshold = 0.05 * characteristic_length  # Reduced from 0.1 to 0.05 (5%)
-            
-            if max_displacement > displacement_threshold:
-                if debug_level >= 1:
-                    print(f"  ✗ Displacement-based failure: max_disp = {max_displacement:.4f} > threshold = {displacement_threshold:.4f}")
-                
-                # This is a failure - return the last converged solution
-                if last_converged_F is not None:
-                    return {
-                        "converged": True,
-                        "FS": last_converged_F,
-                        "last_solution": last_converged_solution,
-                        "F_history": F_history,
-                        "convergence_history": convergence_history,
-                        "solutions_history": solutions_history,
-                        "iterations_ssrm": ssrm_iteration + 1,
-                        "failure_mode": "excessive_displacement"
-                    }
-                else:
-                    return {
-                        "converged": False,
-                        "error": "Failed due to excessive displacement at initial F value",
-                        "FS": None,
-                        "F_history": F_history,
-                        "convergence_history": convergence_history,
-                        "iterations_ssrm": ssrm_iteration + 1
-                    }
-            
-            # Check for displacement growth rate instability
-            # If displacements are growing rapidly between iterations, this indicates instability
-            if len(displacement_history) > 0:
-                last_displacement = displacement_history[-1]
-                displacement_growth_rate = (max_displacement - last_displacement) / last_displacement if last_displacement > 0 else 0
-                
-                # If displacement growth rate > 20%, this indicates instability (reduced from 50%)
-                if displacement_growth_rate > 0.2:
-                    if debug_level >= 1:
-                        print(f"  ✗ Displacement growth rate failure: growth_rate = {displacement_growth_rate:.2f} > 0.2")
-                    
-                    # This is a failure - return the last converged solution
-                    if last_converged_F is not None:
-                        return {
-                            "converged": True,
-                            "FS": last_converged_F,
-                            "last_solution": last_converged_solution,
-                            "F_history": F_history,
-                            "convergence_history": convergence_history,
-                            "solutions_history": solutions_history,
-                            "iterations_ssrm": ssrm_iteration + 1,
-                            "failure_mode": "displacement_growth_instability"
-                        }
-                    else:
-                        return {
-                            "converged": False,
-                            "error": "Failed due to displacement growth instability at initial F value",
-                            "FS": None,
-                            "F_history": F_history,
-                            "convergence_history": convergence_history,
-                            "iterations_ssrm": ssrm_iteration + 1
-                        }
-            
-            # Store displacement for growth rate checking
-            displacement_history.append(max_displacement)
-            
-            # Store this as the last converged solution
-            last_converged_F = F
-            last_converged_solution = solution
-            
-            if debug_level >= 1:
-                print(f"  ✓ Converged: {np.sum(solution.get('plastic_elements', []))}/{len(solution.get('plastic_elements', []))} plastic elements, {solution.get('iterations', 'Unknown')} iterations")
-                print(f"  Max displacement: {max_displacement:.4f}")
-                print(f"  Displacement threshold: {displacement_threshold:.4f}")
-            
-            # In refinement mode, update the failure interval
-            if refinement_mode and failure_interval is not None:
-                # This F converged, so the failure point is between this F and the upper bound
-                failure_interval = (F, failure_interval[1])
-                
-                # Check if we've reached the desired precision
-                if (failure_interval[1] - failure_interval[0]) < F_increment_min:
-                    if debug_level >= 1:
-                        print(f"  🎯 Precision reached: critical FS = {F:.4f} ± {F_increment_min:.4f}")
-                    
-                    return {
-                        "converged": True,
-                        "FS": F,
-                        "last_solution": solution,
-                        "F_history": F_history,
-                        "convergence_history": convergence_history,
-                        "solutions_history": solutions_history,
-                        "iterations_ssrm": ssrm_iteration + 1,
-                        "failure_mode": "bisection_precision"
-                    }
-        else:
-            # Solution failed to converge - this indicates failure!
-            if debug_level >= 1:
-                print(f"  ✗ Non-convergence failure: {solution.get('error', 'Unknown error')}")
-                print(f"  Iterations attempted: {solution.get('iterations', 'Unknown')}")
-            
-            # We've found the failure region! Now switch to refinement mode
-            if not refinement_mode:
-                refinement_mode = True
-                failure_interval = (last_converged_F, F)
-                F_increment = (failure_interval[1] - failure_interval[0]) / 2.0  # Start with bisection
-                
-                if debug_level >= 1:
-                    print(f"  🔍 Entering refinement mode: failure interval = [{failure_interval[0]:.4f}, {failure_interval[1]:.4f}]")
-                    print(f"  🔍 Next F = {failure_interval[0] + F_increment:.4f}")
-                
-                # Go back to the last converged F and refine
-                F = failure_interval[0]
-                continue  # Skip the increment and continue with refined F
-            
-            # In refinement mode, update the failure interval
-            if failure_interval is not None:
-                # This F failed to converge, so the failure point is between the lower bound and this F
-                failure_interval = (failure_interval[0], F)
-                
-                # Check if we've reached the desired precision
-                if (failure_interval[1] - failure_interval[0]) < F_increment_min:
-                    if debug_level >= 1:
-                        print(f"  🎯 Precision reached: critical FS = {failure_interval[0]:.4f} ± {F_increment_min:.4f}")
-                    
-                    return {
-                        "converged": True,
-                        "FS": failure_interval[0],
-                        "last_solution": last_converged_solution,
-                        "F_history": F_history,
-                        "convergence_history": convergence_history,
-                        "solutions_history": solutions_history,
-                        "iterations_ssrm": ssrm_iteration + 1,
-                        "failure_mode": "bisection_precision"
-                    }
-        
-        # Update F for next iteration
-        if refinement_mode:
-            # In refinement mode, use bisection to hone in on critical F
-            if failure_interval is not None:
-                # Try the midpoint of the current interval
-                F_mid = (failure_interval[0] + failure_interval[1]) / 2.0
-                F = F_mid
-                
-                if debug_level >= 2:
-                    print(f"  🔍 Refinement: trying F = {F:.4f} (midpoint of [{failure_interval[0]:.4f}, {failure_interval[1]:.4f}])")
-        else:
-            # Normal mode: increment F
-            F += F_increment
-        
-        # Check bounds
-        if F > F_max:
-            if debug_level >= 1:
-                print(f"  Reached maximum F = {F_max}, slope appears very stable")
-            
-            return {
-                "converged": True,
-                "FS": last_converged_F if last_converged_F else F_max,
-                "last_solution": last_converged_solution,
-                "F_history": F_history,
-                "convergence_history": convergence_history,
-                "solutions_history": solutions_history,
-                "iterations_ssrm": ssrm_iteration + 1,
-                "note": f"Reached maximum F = {F_max} without failure"
-            }
-    
-    # Maximum SSRM iterations reached
-    if debug_level >= 1:
-        print(f"Maximum SSRM iterations ({max_ssrm_iterations}) reached")
-    
-    return {
-        "converged": bool(last_converged_F is not None),
-        "FS": last_converged_F,
-        "last_solution": last_converged_solution,
-        "F_history": F_history,
-        "convergence_history": convergence_history,
-        "solutions_history": solutions_history,
-        "iterations_ssrm": ssrm_iteration + 1,
-        "error": "Maximum SSRM iterations reached"
-    }
-
-
-def check_convergence(current_solution, previous_solution, tol_disp=1e-6, tol_force=1e-6):
-    """
-    Check convergence criteria for FEM solution.
-    
-    Parameters:
-        current_solution: current iteration solution
-        previous_solution: previous iteration solution  
-        tol_disp: displacement tolerance
-        tol_force: force residual tolerance
-    
-    Returns:
-        tuple: (converged: bool, disp_norm: float, force_norm: float)
-    """
-    if previous_solution is None:
-        return False, np.inf, np.inf
-    
-    # Displacement convergence check
-    u_current = current_solution.get("displacements", np.array([]))
-    u_previous = previous_solution.get("displacements", np.array([]))
-    
-    if len(u_current) != len(u_previous):
-        return False, np.inf, np.inf
-    
-    du = u_current - u_previous
-    disp_norm = np.linalg.norm(du) / max(np.linalg.norm(u_current), 1e-12)
-    
-    # Force convergence check (simplified - using residual norm from solution)
-    force_norm = current_solution.get("residual_norm", np.inf)
-    
-    # Both criteria must be satisfied
-    converged = (disp_norm < tol_disp and force_norm < tol_force)
-    
-    return converged, disp_norm, force_norm
-
-
-def compute_elastic_plastic_stiffness(stress, strain, material_props, plastic_state, accumulated_plastic_strain=0.0):
-    """
-    Compute proper elastic-plastic tangent stiffness matrix.
-    
-    This implements the consistent tangent stiffness approach for elastic-plastic materials
-    rather than arbitrary stiffness reduction. This is the foundation for robust
-    convergence in nonlinear FEM analysis.
-    
-    Parameters:
-        stress: np.ndarray - current stress state [sig_x, sig_y, tau_xy]
-        strain: np.ndarray - current strain state [eps_x, eps_y, gamma_xy]
-        material_props: dict - material properties (E, nu, c, phi, psi)
-        plastic_state: bool - whether element is currently plastic
-        accumulated_plastic_strain: float - accumulated plastic strain for softening
-    
-    Returns:
-        tuple: (D_ep, is_plastic, plastic_strain_increment)
-            D_ep: elastic-plastic tangent stiffness matrix
-            is_plastic: boolean indicating if element is plastic
-            plastic_strain_increment: incremental plastic strain
-    """
-    E = material_props['E']
-    nu = material_props['nu']
-    c = material_props['c']
-    phi = material_props['phi']
-    psi = material_props.get('psi', phi/3.0)  # Dilation angle, default to phi/3
-    
-    # Apply strain softening if accumulated plastic strain > 0
-    if accumulated_plastic_strain > 0.0:
-        softening_factor = min(0.7, 5.0 * accumulated_plastic_strain)  # Max 70% strength loss
-        c *= (1.0 - softening_factor)
-        phi *= (1.0 - softening_factor)
-        psi *= (1.0 - softening_factor)
-    
-    # Elastic constitutive matrix (plane strain)
-    factor = E / ((1 + nu) * (1 - 2 * nu))
-    D_e = factor * np.array([
-        [1 - nu, nu,     0],
-        [nu,     1 - nu, 0],
-        [0,      0,      (1 - 2 * nu) / 2]
-    ])
-    
-    # Check yield criterion
-    yield_value = check_mohr_coulomb_yield(stress, c, np.radians(phi))
-    
-    if yield_value <= 0.0 or not plastic_state:
-        # Elastic loading or unloading - return elastic stiffness
-        return D_e, False, 0.0
-    
-    # Plastic loading - compute elastic-plastic tangent stiffness
-    # This is the key improvement over the previous stiffness reduction approach
-    
-    # Compute stress gradients for yield function and flow rule
-    sig_x, sig_y, tau_xy = stress
-    
-    # Principal stresses and directions
-    sig_mean = 0.5 * (sig_x + sig_y)
-    tau_max = np.sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-    
-    if tau_max < 1e-10:
-        return D_e, False, 0.0
-    
-    # Yield function gradient (∂f/∂σ)
-    if abs(phi) < 1e-6:  # Undrained case
-        df_dsig = np.array([0.0, 0.0, 1.0])  # ∂f/∂τ_xy = 1
-    else:
-        # For Mohr-Coulomb, ∂f/∂σ depends on principal stress directions
-        # Simplified approach: use current stress state
-        df_dsig = np.array([
-            0.5 * (1.0 - np.sin(np.radians(phi))),  # ∂f/∂σ_x
-            0.5 * (1.0 + np.sin(np.radians(phi))),  # ∂f/∂σ_y
-            0.0  # ∂f/∂τ_xy (simplified)
-        ])
-    
-    # Flow rule gradient (∂g/∂σ) - non-associated plasticity
-    if abs(psi) < 1e-6:  # No dilation
-        dg_dsig = np.array([0.0, 0.0, 1.0])
-    else:
-        # Non-associated flow rule with dilation angle
-        dg_dsig = np.array([
-            0.5 * (1.0 - np.sin(np.radians(psi))),  # ∂g/∂σ_x
-            0.5 * (1.0 + np.sin(np.radians(psi))),  # ∂g/∂σ_y
-            0.0  # ∂g/∂τ_xy (simplified)
-        ])
-    
-    # Compute plastic multiplier increment
-    # Δλ = (∂f/∂σ)ᵀ D_e Δε / [(∂f/∂σ)ᵀ D_e (∂g/∂σ)]
-    numerator = df_dsig @ D_e @ strain
-    denominator = df_dsig @ D_e @ dg_dsig
-    
-    if abs(denominator) < 1e-12:
-        return D_e, False, 0.0
-    
-    delta_lambda = numerator / denominator
-    
-    # Elastic-plastic tangent stiffness matrix
-    # D_ep = D_e - (D_e ∂g/∂σ ⊗ ∂f/∂σ D_e) / [(∂f/∂σ)ᵀ D_e (∂g/∂σ)]
-    outer_product = np.outer(D_e @ dg_dsig, df_dsig @ D_e)
-    D_ep = D_e - outer_product / denominator
-    
-    # Ensure positive definiteness
-    eigenvals = np.linalg.eigvals(D_ep)
-    if np.any(eigenvals < 0):
-        # Fall back to elastic stiffness if D_ep becomes non-positive definite
-        return D_e, False, 0.0
-    
-    # Compute plastic strain increment
-    plastic_strain_increment = delta_lambda * dg_dsig
-    
-    return D_ep, True, np.linalg.norm(plastic_strain_increment)
-
-
-def mohr_coulomb_return_mapping(stress_trial, material_props, plastic_state, accumulated_plastic_strain=0.0):
-    """
-    Implement proper Mohr-Coulomb return mapping algorithm.
-    
-    This replaces the previous simplified stress correction with a rigorous
-    return mapping algorithm that correctly projects stresses back to the
-    yield surface while maintaining consistency with the constitutive model.
-    
-    Parameters:
-        stress_trial: np.ndarray - trial elastic stress [sig_x, sig_y, tau_xy]
-        material_props: dict - material properties (E, nu, c, phi, psi)
-        plastic_state: bool - whether element is currently plastic
-        accumulated_plastic_strain: float - accumulated plastic strain for softening
-    
-    Returns:
-        tuple: (stress_corrected, is_plastic, plastic_strain_increment)
-            stress_corrected: stress projected back to yield surface
-            is_plastic: boolean indicating if plastic correction was applied
-            plastic_strain_increment: incremental plastic strain
-    """
-    E = material_props['E']
-    nu = material_props['nu']
-    c = material_props['c']
-    phi = material_props['phi']
-    psi = material_props.get('psi', phi/3.0)  # Dilation angle
-    
-    # Apply strain softening if accumulated plastic strain > 0
-    if accumulated_plastic_strain > 0.0:
-        softening_factor = min(0.7, 5.0 * accumulated_plastic_strain)
-        c *= (1.0 - softening_factor)
-        phi *= (1.0 - softening_factor)
-        psi *= (1.0 - softening_factor)
-    
-    # Check yield criterion
-    yield_value = check_mohr_coulomb_yield(stress_trial, c, np.radians(phi))
-    
-    if yield_value <= 0.0 or not plastic_state:
-        # Elastic - no correction needed
-        return stress_trial.copy(), False, 0.0
-    
-    # Plastic loading - implement proper return mapping
-    sig_x, sig_y, tau_xy = stress_trial
-    
-    # Principal stresses and directions
-    sig_mean = 0.5 * (sig_x + sig_y)
-    tau_max = np.sqrt(0.25 * (sig_x - sig_y)**2 + tau_xy**2)
-    
-    if tau_max < 1e-10:
-        return stress_trial.copy(), False, 0.0
-    
-    # Compute principal stress directions
-    if abs(sig_x - sig_y) < 1e-10:
-        # Hydrostatic stress state
-        theta = np.pi/4.0
-    else:
-        theta = 0.5 * np.arctan2(2.0 * tau_xy, sig_x - sig_y)
-    
-    # Principal stresses
-    sig_1 = sig_mean + tau_max  # Major principal stress
-    sig_3 = sig_mean - tau_max  # Minor principal stress
-    
-    # Mohr-Coulomb return mapping
-    if abs(phi) < 1e-6:  # Undrained case (Tresca criterion)
-        # For Tresca, simply limit the maximum shear stress
-        if tau_max > c:
-            scale_factor = c / tau_max
-            
-            # Scale deviatoric stresses while maintaining mean stress
-            sig_x_corr = sig_mean + scale_factor * (sig_x - sig_mean)
-            sig_y_corr = sig_mean + scale_factor * (sig_y - sig_mean)
-            tau_xy_corr = scale_factor * tau_xy
-            
-            stress_corrected = np.array([sig_x_corr, sig_y_corr, tau_xy_corr])
-            
-            # Compute plastic strain increment (simplified)
-            plastic_strain_increment = (1.0 - scale_factor) * tau_max / (2.0 * E)
-            
-            return stress_corrected, True, plastic_strain_increment
-    else:
-        # General Mohr-Coulomb case
-        sin_phi = np.sin(np.radians(phi))
-        cos_phi = np.cos(np.radians(phi))
-        sin_psi = np.sin(np.radians(psi))  # Non-associated flow rule
-        
-        # From yield criterion: f = 0.5*(sig_1 - sig_3) - 0.5*(sig_1 + sig_3)*sin_phi - c*cos_phi = 0
-        # Solve for the corrected principal stresses that satisfy f = 0
-        
-        # For given mean stress, find allowable stress difference
-        # From yield criterion: (sig_1 - sig_3) = 2*c*cos_phi + (sig_1 + sig_3)*sin_phi
-        # With sig_1 + sig_3 = 2*sig_mean: (sig_1 - sig_3) = 2*c*cos_phi + 2*sig_mean*sin_phi
-        allowable_tau = c * cos_phi + sig_mean * sin_phi
-        
-        if allowable_tau > 0 and tau_max > allowable_tau:
-            # Scale down the deviatoric stress to satisfy yield criterion
-            scale_factor = allowable_tau / tau_max
-            
-            # Apply correction while maintaining mean stress
-            sig_x_corr = sig_mean + scale_factor * (sig_x - sig_mean)
-            sig_y_corr = sig_mean + scale_factor * (sig_y - sig_mean)
-            tau_xy_corr = scale_factor * tau_xy
-            
-            stress_corrected = np.array([sig_x_corr, sig_y_corr, tau_xy_corr])
-            
-            # Compute plastic strain increment using flow rule
-            # For non-associated plasticity, use dilation angle psi
-            if abs(psi) > 1e-6:
-                # Volumetric plastic strain increment
-                eps_v_p = (1.0 - scale_factor) * tau_max * sin_psi / E
-                # Deviatoric plastic strain increment
-                eps_d_p = (1.0 - scale_factor) * tau_max * (1.0 - sin_psi) / E
-                plastic_strain_increment = np.sqrt(eps_v_p**2 + eps_d_p**2)
-            else:
-                # No dilation - only deviatoric plastic strain
-                plastic_strain_increment = (1.0 - scale_factor) * tau_max / E
-            
-            return stress_corrected, True, plastic_strain_increment
-    
-    # If we get here, no correction was needed
-    return stress_trial.copy(), False, 0.0
-
-
-def assemble_global_stiffness_with_plasticity(nodes, elements, element_types, element_materials, 
-                                            displacements, material_props_by_mat, plastic_elements,
-                                            accumulated_plastic_strain, u_nodal, fem_data, debug_level=0):
-    """
-    Assemble global stiffness matrix using consistent tangent stiffness for plastic elements.
-    
-    This replaces the previous approach of arbitrary stiffness reduction with a proper
-    elastic-plastic constitutive model that provides much better numerical stability.
-    
-    Parameters:
-        nodes: np.ndarray - node coordinates
-        elements: np.ndarray - element connectivity
-        element_types: np.ndarray - element types
-        element_materials: np.ndarray - material IDs for each element
-        displacements: np.ndarray - current displacement field
-        material_props_by_mat: dict - material properties by material ID
-        plastic_elements: np.ndarray - boolean array indicating plastic elements
-        accumulated_plastic_strain: np.ndarray - accumulated plastic strain per element
-        u_nodal: np.ndarray - nodal pore pressures
-        fem_data: dict - FEM data dictionary containing initial stresses and other data
-        debug_level: int - verbosity level
-    
-    Returns:
-        tuple: (K_global, plastic_state_changed, new_plastic_elements)
-            K_global: global stiffness matrix
-            plastic_state_changed: boolean indicating if plastic state changed
-            new_plastic_elements: updated plastic element flags
-    """
-    n_nodes = len(nodes)
-    n_elements = len(elements)
-    n_dof = 2 * n_nodes
-    
-    K_global = lil_matrix((n_dof, n_dof))
-    new_plastic_elements = np.zeros(n_elements, dtype=bool)
-    plastic_state_changed = False
-    
-    if debug_level >= 2:
-        print(f"    Assembling global stiffness matrix with {n_elements} elements")
-    
-    # Assemble 2D elements
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        # Get material properties
-        mat_id = element_materials[elem_idx] - 1
-        material_props = material_props_by_mat[mat_id]
-        
-        # Check current plastic state
-        is_currently_plastic = plastic_elements[elem_idx]
-        
-        # Compute current element stress and strain
-        if elem_type in [3, 6]:  # Triangular elements
-            # Compute element stress from current displacements
-            # Include initial stress per element if available
-            sigma0_elem = fem_data.get("sigma0_by_elem", None)
-            sigma0 = None if sigma0_elem is None else sigma0_elem[elem_idx]
-            stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                material_props['E'], material_props['nu'],
-                u_nodal[active_nodes], elem_type, sigma0)
-            
-            # Compute element strain
-            strain = compute_element_strain(
-                nodes[active_nodes], displacements, active_nodes, elem_type)
-            
-            # Temporarily use elastic stiffness for all elements to debug constitutive model
-            # Apply stress return mapping and get constitutive matrix
-            stress_corrected, is_plastic, plastic_strain_increment = mohr_coulomb_return_mapping(
-                stress, material_props, is_currently_plastic, 
-                accumulated_plastic_strain[elem_idx])
-            
-            # Update plastic state
-            new_plastic_elements[elem_idx] = is_plastic
-            
-            # Update accumulated plastic strain
-            if is_plastic and plastic_strain_increment > 0:
-                accumulated_plastic_strain[elem_idx] += plastic_strain_increment
-            
-            # Temporarily use elastic stiffness to debug constitutive model
-            E = material_props['E']
-            nu = material_props['nu']
-            factor = E / ((1 + nu) * (1 - 2 * nu))
-            D_matrix = factor * np.array([
-                [1 - nu, nu,     0],
-                [nu,     1 - nu, 0],
-                [0,      0,      (1 - 2 * nu) / 2]
-            ])
-            
-            # Get constitutive matrix (elastic or elastic-plastic)
-            # D_matrix, _, _ = compute_elastic_plastic_stiffness(
-            #     stress_corrected, strain, material_props, is_plastic,
-            #     accumulated_plastic_strain[elem_idx])
-            
-            # Build element stiffness matrix
-            if elem_type == 3:
-                K_elem = build_tri3_stiffness(nodes[active_nodes], D_matrix)
-            else:  # elem_type == 6
-                K_elem = build_tri6_stiffness(nodes[active_nodes], D_matrix)
-                
-        elif elem_type in [4, 8, 9]:  # Quadrilateral elements
-            # Similar approach for quadrilateral elements
-            # For now, use elastic stiffness - can be extended later
-            E = material_props['E']
-            nu = material_props['nu']
-            
-            if elem_type == 4:
-                K_elem = build_quad4_stiffness(nodes[active_nodes], E, nu, is_plastic, elem_type)
-            elif elem_type == 8:
-                K_elem = build_quad8_stiffness(nodes[active_nodes], E, nu, is_plastic, elem_type)
-            else:  # elem_type == 9
-                K_elem = build_quad9_stiffness(nodes[active_nodes], E, nu, is_plastic, elem_type)
-        else:
-            if debug_level >= 1:
-                print(f"Warning: Element type {elem_type} not supported, skipping element {elem_idx}")
-            continue
-        
-        # Assemble into global matrix
-        dofs = []
-        for node_id in active_nodes:
-            dofs.extend([2*node_id, 2*node_id + 1])
-        
-        for i in range(len(dofs)):
-            for j in range(len(dofs)):
-                K_global[dofs[i], dofs[j]] += K_elem[i, j]
-    
-    # Check if plastic state has changed
-    plastic_state_changed = not np.array_equal(new_plastic_elements, plastic_elements)
-    
-    if plastic_state_changed and debug_level >= 2:
-        old_plastic_count = np.sum(plastic_elements)
-        new_plastic_count = np.sum(new_plastic_elements)
-        print(f"      Plastic state changed: {old_plastic_count} -> {new_plastic_count} plastic elements")
-    
-    return K_global, plastic_state_changed, new_plastic_elements
-
-
-def solve_fem_elastic_plastic(fem_data, F=1.0, debug_level=0):
-    """
-    Two-phase elastic-plastic FEM solver with proper constitutive modeling.
-    """
     # Extract data
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -2996,7 +556,7 @@ def solve_fem_elastic_plastic(fem_data, F=1.0, debug_level=0):
     element_materials = fem_data["element_materials"]
     bc_type = fem_data["bc_type"]
     bc_values = fem_data["bc_values"]
-
+    
     # Material properties
     c_by_elem = fem_data.get("c_by_elem", fem_data["c_by_mat"][element_materials - 1])
     phi_by_elem = fem_data.get("phi_by_elem", fem_data["phi_by_mat"][element_materials - 1])
@@ -3004,995 +564,1633 @@ def solve_fem_elastic_plastic(fem_data, F=1.0, debug_level=0):
     nu_by_mat = fem_data["nu_by_mat"]
     gamma_by_mat = fem_data["gamma_by_mat"]
     u_nodal = fem_data["u"]
-
-    # 1D elements
-    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
-    element_types_1d = fem_data.get("element_types_1d", np.array([]))
-    t_allow_by_1d_elem = fem_data.get("t_allow_by_1d_elem", np.array([]))
-    t_res_by_1d_elem = fem_data.get("t_res_by_1d_elem", np.array([]))
-    k_by_1d_elem = fem_data.get("k_by_1d_elem", np.array([]))
-
-    # Seismic and other loads
     k_seismic = fem_data.get("k_seismic", 0.0)
-
+    
     n_nodes = len(nodes)
     n_elements = len(elements)
-    n_1d_elements = len(elements_1d)
     n_dof = 2 * n_nodes
-
-    # Reduce strength parameters by factor F (per element)
+    
+    # Apply strength reduction (Griffiths & Lane 1999 approach)
     c_reduced = c_by_elem / F
-    phi_reduced = np.arctan(np.tan(np.radians(phi_by_elem)) / F)  # radians per element
-
-    # Non-associated plasticity (per element)
-    psi_by_elem = phi_by_elem / 3.0
-    psi_reduced = np.arctan(np.tan(np.radians(psi_by_elem)) / F)
-
-    if debug_level >= 1:
-        print(f"Starting two-phase FEM analysis with F = {F:.3f}")
-        print(f"Mesh: {n_nodes} nodes, {n_elements} 2D elements, {n_1d_elements} 1D elements")
-
-    displacements = np.zeros(n_dof)
-
-    plastic_elements = np.zeros(n_elements, dtype=bool)
-    failed_1d_elements = np.zeros(n_1d_elements, dtype=bool)
-    accumulated_plastic_strain = np.zeros(n_elements)
-
-    # Phase 1: Elastic solution
-    if debug_level >= 1:
-        print("  Phase 1: Elastic solution")
-
-    # Build material properties dict per material for elastic phase
-    material_props_by_mat = []
-    for i in range(len(E_by_mat)):
-        material_props_by_mat.append({
-            'E': E_by_mat[i],
-            'nu': nu_by_mat[i],
-            'c': None,
-            'phi': None,
-            'psi': None,
-            'gamma': gamma_by_mat[i]
-        })
-
-    # Build element-wise reduced strengths (arrays)
-    c_reduced_by_elem = c_reduced if isinstance(c_reduced, np.ndarray) else np.full(n_elements, c_reduced)
-    phi_reduced_by_elem = phi_reduced if isinstance(phi_reduced, np.ndarray) else np.full(n_elements, phi_reduced)
-
-    elastic_solution = solve_elastic_phase(
-        fem_data, material_props_by_mat, plastic_elements,
-        accumulated_plastic_strain, u_nodal, k_seismic,
-        c_reduced_by_elem, phi_reduced_by_elem, debug_level
-    )
-
-    if not elastic_solution["converged"]:
-        if debug_level >= 1:
-            print("  ✗ Elastic phase failed to converge")
-        return {
-            "converged": False,
-            "error": "Elastic phase failed to converge",
-            "phase": "elastic"
-        }
-
-    displacements = elastic_solution["displacements"]
-
-    # Determine plastic elements from elastic phase stresses
-    plastic_elements = elastic_solution.get("plastic_elements", plastic_elements)
-    n_plastic_after_elastic = np.sum(plastic_elements)
-
-    if n_plastic_after_elastic == 0:
-        if debug_level >= 1:
-            print("  ✓ Elastic solution sufficient - no yielding detected")
-        return {
-            "converged": True,
-            "displacements": displacements,
-            "stresses": elastic_solution["stresses"],
-            "strains": elastic_solution["strains"],
-            "plastic_elements": plastic_elements,
-            "forces_1d": elastic_solution.get("forces_1d", np.zeros(0)),
-            "iterations": elastic_solution["iterations"],
-            "residual_norm": elastic_solution["residual_norm"],
-            "phase": "elastic"
-        }
-
-    if debug_level >= 1:
-        print(f"  Phase 2: Plastic correction with {n_plastic_after_elastic} plastic elements")
-
-    # Build material properties dict per material (with reduced strengths)
-    material_props_by_mat_plastic = []
-    for i in range(len(E_by_mat)):
-        material_props_by_mat_plastic.append({
-            'E': E_by_mat[i],
-            'nu': nu_by_mat[i],
-            'c': c_reduced[i] if hasattr(c_reduced, '__getitem__') else c_reduced,
-            'phi': phi_reduced[i] if hasattr(phi_reduced, '__getitem__') else phi_reduced,
-            'psi': psi_reduced[i] if hasattr(psi_reduced, '__getitem__') else psi_reduced,
-            'gamma': gamma_by_mat[i]
-        })
-
-    plastic_solution = solve_plastic_phase(
-        fem_data, material_props_by_mat_plastic, plastic_elements,
-        accumulated_plastic_strain, u_nodal, displacements, debug_level
-    )
-
-    if not plastic_solution["converged"]:
-        if debug_level >= 1:
-            print("  ✗ Plastic phase failed to converge")
-            
-        if plastic_solution.get("failure_detected", False):
-            if debug_level >= 1:
-                print(f"  Slope failure detected: {plastic_solution.get('failure_reason', 'Unknown')}")
-            return {
-                "converged": False,
-                "error": f"Slope failure: {plastic_solution.get('failure_reason', 'Unknown')}",
-                "phase": "plastic",
-                "elastic_solution": elastic_solution,
-                "failure_detected": True,
-                "failure_reason": plastic_solution.get("failure_reason", "Unknown")
-            }
-        else:
-            return {
-                "converged": False,
-                "error": "Plastic phase failed to converge",
-                "phase": "plastic",
-                "elastic_solution": elastic_solution
-            }
-
-    final_solution = {
-        "converged": True,
-        "displacements": plastic_solution["displacements"],
-        "stresses": plastic_solution["stresses"],
-        "strains": plastic_solution["strains"],
-        "plastic_elements": plastic_solution.get("plastic_elements", plastic_elements),
-        "forces_1d": plastic_solution.get("forces_1d", np.zeros(0)),
-        "iterations": elastic_solution["iterations"] + plastic_solution["iterations"],
-        "residual_norm": plastic_solution["residual_norm"],
-        "phase": "plastic",
-        "elastic_iterations": elastic_solution["iterations"],
-        "plastic_iterations": plastic_solution["iterations"]
-    }
-
-    if debug_level >= 1:
-        n_plastic = np.sum(final_solution["plastic_elements"])
-        print(f"  ✓ Two-phase solution converged: {n_plastic}/{len(elements)} plastic elements")
-        print(f"  Total iterations: {final_solution['iterations']}")
-
-    return final_solution
-
-
-def solve_elastic_phase(fem_data, material_props_by_mat, plastic_elements, 
-                        accumulated_plastic_strain, u_nodal, k_seismic,
-                        c_reduced_by_elem, phi_reduced_by_elem, debug_level=0):
-    """
-    Solve the elastic phase of the two-phase FEM solver.
-    
-    This phase solves the system assuming purely elastic behavior to get
-    an initial displacement field and identify elements that may yield.
-    
-    Parameters:
-        fem_data (dict): FEM data dictionary
-        material_props_by_mat (list): Material properties for each material
-        plastic_elements (np.ndarray): Boolean array indicating plastic elements
-        accumulated_plastic_strain (np.ndarray): Accumulated plastic strain per element
-        u_nodal (np.ndarray): Nodal pore pressures
-        k_seismic (float): Seismic coefficient
-        debug_level (int): Verbosity level
-    
-    Returns:
-        dict: Elastic solution dictionary
-    """
-    
-    nodes = fem_data["nodes"]
-    elements = fem_data["elements"]
-    element_types = fem_data["element_types"]
-    element_materials = fem_data["element_materials"]
-    bc_type = fem_data["bc_type"]
-    bc_values = fem_data["bc_values"]
-    
-    n_nodes = len(nodes)
-    n_elements = len(elements)
-    n_dof = 2 * n_nodes
+    tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F
+    phi_reduced = np.arctan(tan_phi_reduced)  # Keep in radians for yield functions
     
     if debug_level >= 2:
-        print("    Solving elastic phase...")
+        print(f"Original c range: [{np.min(c_by_elem):.1f}, {np.max(c_by_elem):.1f}]")
+        print(f"Reduced c range: [{np.min(c_reduced):.1f}, {np.max(c_reduced):.1f}]")
+        print(f"Original phi: {phi_by_elem[0]:.1f}°")
+        print(f"Reduced phi: {np.degrees(phi_reduced[0]):.1f}°")
+        print(f"Original φ range: [{np.min(phi_by_elem):.1f}°, {np.max(phi_by_elem):.1f}°]")
+        print(f"Reduced φ range: [{np.min(np.degrees(phi_reduced)):.1f}°, {np.max(np.degrees(phi_reduced)):.1f}°]")
     
-    # Assemble global stiffness matrix (elastic only)
-    K_global = lil_matrix((n_dof, n_dof))
+    # Build global stiffness matrix (elastic, constant throughout)
+    K_global = build_global_stiffness_perzyna(nodes, elements, element_types, 
+                                             element_materials, E_by_mat, nu_by_mat)
     
-    # Assemble 2D elements with elastic stiffness
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        # Get material properties
-        mat_id = element_materials[elem_idx] - 1
-        material_props = material_props_by_mat[mat_id]
-        
-        E = material_props['E']
-        nu = material_props['nu']
-        
-        # Build element stiffness matrix (elastic only)
-        if elem_type in [3, 6]:  # Triangular elements
-            # Build constitutive matrix D
-            factor = E / ((1 + nu) * (1 - 2 * nu))
-            D = factor * np.array([
-                [1 - nu, nu,     0],
-                [nu,     1 - nu, 0],
-                [0,      0,      (1 - 2 * nu) / 2]
-            ])
-            
-            if elem_type == 3:
-                K_elem = build_tri3_stiffness(nodes[active_nodes], D)
-            else:  # elem_type == 6
-                K_elem = build_tri6_stiffness(nodes[active_nodes], D)
-        elif elem_type in [4, 8, 9]:  # Quadrilateral elements
-            if elem_type == 4:
-                K_elem = build_quad4_stiffness(nodes[active_nodes], E, nu, is_plastic=False, elem_type=elem_type)
-            elif elem_type == 8:
-                K_elem = build_quad8_stiffness(nodes[active_nodes], E, nu, is_plastic=False, elem_type=elem_type)
-            else:  # elem_type == 9
-                K_elem = build_quad9_stiffness(nodes[active_nodes], E, nu, is_plastic=False, elem_type=elem_type)
-        else:
-            if debug_level >= 1:
-                print(f"Warning: Element type {elem_type} not supported, skipping element {elem_idx}")
-            continue
-        
-        # Assemble into global matrix
-        dofs = []
-        for node_id in active_nodes:
-            dofs.extend([2*node_id, 2*node_id + 1])
-        
-        for i in range(len(dofs)):
-            for j in range(len(dofs)):
-                K_global[dofs[i], dofs[j]] += K_elem[i, j]
+    # Build gravity load vector
+    F_gravity = build_gravity_loads_perzyna(nodes, elements, element_types, 
+                                           element_materials, gamma_by_mat, k_seismic)
     
-    # Assemble 1D truss elements
-    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
-    element_types_1d = fem_data.get("element_types_1d", np.array([]))
-    k_by_1d_elem = fem_data.get("k_by_1d_elem", np.array([]))
+    # Boundary conditions will be applied in each iteration using apply_boundary_conditions
     
-    for elem_idx in range(len(elements_1d)):
-        elem_nodes = elements_1d[elem_idx]
-        elem_type = element_types_1d[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        if len(active_nodes) >= 2:
-            K_truss = build_truss_stiffness(nodes[active_nodes], k_by_1d_elem[elem_idx])
-            
-            # Assemble into global matrix
-            dofs = []
-            for node_id in active_nodes:
-                dofs.extend([2*node_id, 2*node_id + 1])
-            
-            for i in range(len(dofs)):
-                for j in range(len(dofs)):
-                    K_global[dofs[i], dofs[j]] += K_truss[i, j]
+    # Perzyna algorithm parameters (from Zienkiewicz & Cormeau 1974)
+    max_iterations = 500  # More iterations to allow proper localization
+    tolerance = 1e-5  # Tighter tolerance for better convergence
+    eta = 0.01  # Much lower viscosity for more localized plastic flow
     
-    # Assemble force vector
-    F_global = np.zeros(n_dof)
-    
-    # Body forces (gravity + seismic)
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        mat_id = element_materials[elem_idx] - 1
-        gamma = material_props_by_mat[mat_id]['gamma']
-        
-        # Body force components
-        b_x = k_seismic * gamma  # Horizontal seismic force
-        b_y = -gamma             # Gravity (downward)
-        
-        F_body = compute_body_forces(nodes[active_nodes], elem_type, b_x, b_y)
-        
-        # Assemble into global vector
-        dofs = []
-        for node_id in active_nodes:
-            dofs.extend([2*node_id, 2*node_id + 1])
-        
-        for i, dof in enumerate(dofs):
-            F_global[dof] += F_body[i]
-    
-    # Applied loads from boundary conditions
-    for i in range(n_nodes):
-        if bc_type[i] == 4:  # Applied force
-            F_global[2*i] += bc_values[i, 0]      # F_x
-            F_global[2*i + 1] += bc_values[i, 1]  # F_y
-    
-    # Apply boundary conditions
-    K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
-        K_global, F_global, bc_type, nodes)
-    
-    # Solve elastic system
-    try:
-        u_free = spsolve(K_constrained.tocsr(), F_constrained)
-        
-        # Reconstruct full displacement vector
-        displacements = np.zeros(n_dof)
-        free_dof_idx = 0
-        for i in range(n_dof):
-            if i not in constraint_dofs:
-                displacements[i] = u_free[free_dof_idx]
-                free_dof_idx += 1
-        
-        if debug_level >= 2:
-            print(f"    Elastic solution completed")
-            print(f"    Max displacement: {np.max(np.abs(displacements)):.6f}")
-        
-    except Exception as e:
-        if debug_level >= 1:
-            print(f"Elastic solver failed: {e}")
-        return {
-            "converged": False,
-            "error": f"Elastic solver failed: {e}",
-            "iterations": 0
-        }
-    
-    # Check for yielding and update plastic elements
-    plastic_elements[:] = False  # Reset plastic state
-    
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        if elem_type in [3, 4, 6, 8, 9]:
-            # Compute element stress
-            mat_id = element_materials[elem_idx] - 1
-            material_props = material_props_by_mat[mat_id]
-            
-            sigma0_elem = fem_data.get("sigma0_by_elem", None)
-            sigma0 = None if sigma0_elem is None else sigma0_elem[elem_idx]
-            stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                material_props['E'], material_props['nu'],
-                u_nodal[active_nodes], elem_type, sigma0)
-            
-            # Check yield criterion using reduced element strengths for this F value
-            elem_id = elem_idx
-            c_elem = c_reduced_by_elem[elem_id]
-            phi_elem = phi_reduced_by_elem[elem_id]  # already radians
-            yield_value = check_mohr_coulomb_yield(
-                stress, c_elem, phi_elem)
-            
-            if yield_value > 0.0:
-                plastic_elements[elem_idx] = True
-    
-    # Compute final stresses and strains
-    stresses = np.zeros((n_elements, 4))
-    strains = np.zeros((n_elements, 4))
-    
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
-        
-        if elem_type in [3, 4, 6, 8, 9]:
-            mat_id = element_materials[elem_idx] - 1
-            material_props = material_props_by_mat[mat_id]
-            
-            # Compute stress and strain
-            stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                material_props['E'], material_props['nu'],
-                u_nodal[active_nodes], elem_type)
-            
-            strain = compute_element_strain(
-                nodes[active_nodes], displacements, active_nodes, elem_type)
-            
-            stresses[elem_idx, :3] = stress
-            stresses[elem_idx, 3] = compute_von_mises(stress)
-            
-            strains[elem_idx, :3] = strain
-            
-            # Compute maximum shear strain
-            eps_x, eps_y, gamma_xy = strain
-            eps_mean = 0.5 * (eps_x + eps_y)
-            R = np.sqrt(0.25 * (eps_x - eps_y)**2 + 0.25 * gamma_xy**2)
-            eps_1 = eps_mean + R
-            eps_3 = eps_mean - R
-            max_shear_strain = abs(eps_1 - eps_3)
-            strains[elem_idx, 3] = max_shear_strain
-    
-    # Compute 1D element forces
-    forces_1d = np.zeros(len(elements_1d))
-    for elem_idx in range(len(elements_1d)):
-        if len(elements_1d[elem_idx]) >= 2:
-            elem_nodes = elements_1d[elem_idx]
-            active_nodes = elem_nodes[:element_types_1d[elem_idx]]
-            forces_1d[elem_idx] = compute_truss_force(
-                nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
-    
-    n_plastic = np.sum(plastic_elements)
+    # Phase 1: Establish K₀ initial stress state through elastic gravity loading
     if debug_level >= 1:
-        print(f"  Elastic phase completed: {n_plastic}/{n_elements} elements yielded")
+        print("Phase 1: Establishing K₀ initial stress state...")
     
-    return {
-        "converged": True,
-        "displacements": displacements,
-        "stresses": stresses,
-        "strains": strains,
-        "forces_1d": forces_1d,
-        "iterations": 1,
-        "residual_norm": 0.0,
-        "phase": "elastic"
-    }
-
-
-def solve_plastic_phase(fem_data, material_props_by_mat, plastic_elements, 
-                        accumulated_plastic_strain, u_nodal, initial_displacements, debug_level=0):
-    """
-    Solve the plastic phase of the two-phase FEM solver.
+    initial_displacements, stress_state = establish_k0_stress_state(
+        K_global, F_gravity, bc_type, nodes, elements, element_types, 
+        element_materials, E_by_mat, nu_by_mat, gamma_by_mat, u_nodal, debug_level)
     
-    This phase iteratively solves the system with elastic-plastic constitutive
-    behavior, using the consistent tangent stiffness approach for numerical stability.
+    # Phase 2: Initialize Perzyna iteration from K₀ state
+    # Debug gravity loads and element areas
+    if debug_level >= 1:
+        print(f"  Debug: Checking gravity load calculation")
+        sample_elem = 100
+        if sample_elem < len(elements):
+            elem_type = element_types[sample_elem]
+            elem_nodes = elements[sample_elem][:elem_type]
+            elem_coords = nodes[elem_nodes]
+            if elem_type == 8:
+                area = compute_quad_area(elem_coords)
+            else:
+                # Triangle area
+                x1, y1 = elem_coords[0]
+                x2, y2 = elem_coords[1] 
+                x3, y3 = elem_coords[2]
+                area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+            
+            gamma = gamma_by_mat[element_materials[sample_elem] - 1]
+            load_per_node = gamma * area / elem_type
+            print(f"    Element {sample_elem}: area={area:.2f}, gamma={gamma}, load_per_node={load_per_node:.1f}")
     
-    Parameters:
-        fem_data (dict): FEM data dictionary
-        material_props_by_mat (list): Material properties for each material
-        plastic_elements (np.ndarray): Boolean array indicating plastic elements
-        accumulated_plastic_strain (np.ndarray): Accumulated plastic strain per element
-        u_nodal (np.ndarray): Nodal pore pressures
-        initial_displacements (np.ndarray): Initial displacements from elastic phase
-        debug_level (int): Verbosity level
+    # Debug: Check yield states at different F values  
+    if debug_level >= 1:
+        print(f"  Checking yield at F=1.0 (original strength):")
+        c_original = fem_data["c_by_mat"][element_materials - 1]
+        phi_original = np.radians(fem_data["phi_by_mat"][element_materials - 1])
+        initial_yield_count = check_initial_yield_state(stress_state, c_original, phi_original)
+        print(f"    Elements yielding at F=1.0: {initial_yield_count}/{n_elements}")
+        
+        print(f"  Checking yield at F={F:.2f} (reduced strength):")
+        print(f"    c_reduced = {c_reduced[0]:.1f}, phi_reduced = {np.degrees(phi_reduced[0]):.1f}°")
+        reduced_yield_count = check_initial_yield_state(stress_state, c_reduced, phi_reduced)
+        print(f"    Elements yielding at F={F:.2f}: {reduced_yield_count}/{n_elements}")
+        
+        # Find elements near the slope face (high x, high y)
+        elem_centroids = []
+        for elem_idx in range(n_elements):
+            elem_type = element_types[elem_idx]
+            elem_nodes = elements[elem_idx][:elem_type]
+            centroid = np.mean(nodes[elem_nodes], axis=0)
+            elem_centroids.append((elem_idx, centroid[0], centroid[1]))
+        
+        # Find elements with x > 100 and y > 20 (near slope face)
+        face_elements = [e for e in elem_centroids if e[1] > 100 and e[2] > 20]
+        if face_elements:
+            face_elements.sort(key=lambda x: -x[2])  # Sort by y descending
+            sample_elem = face_elements[0][0]
+            print(f"  Checking element {sample_elem} near face (x={face_elements[0][1]:.1f}, y={face_elements[0][2]:.1f}):")
+            sample_stress = stress_state['element_stresses'][sample_elem, 0, :]
+            print(f"    Stress: σx={sample_stress[0]:.1f}, σy={sample_stress[1]:.1f}, τxy={sample_stress[2]:.1f}")
+            f_sample = check_mohr_coulomb_perzyna(sample_stress, c_reduced[sample_elem], phi_reduced[sample_elem])
+            print(f"    Yield function F = {f_sample:.3f}")
     
-    Returns:
-        dict: Plastic solution dictionary
-    """
-    
-    nodes = fem_data["nodes"]
-    elements = fem_data["elements"]
-    element_types = fem_data["element_types"]
-    element_materials = fem_data["element_materials"]
-    bc_type = fem_data["bc_type"]
-    bc_values = fem_data["bc_values"]
-    
-    n_nodes = len(nodes)
-    n_elements = len(elements)
-    n_dof = 2 * n_nodes
-    
-    if debug_level >= 2:
-        print("    Solving plastic phase...")
-    
-    # Initialize displacements from elastic phase
+    if debug_level >= 1:
+        print("Phase 2: Starting Perzyna strength reduction analysis...")
+        
     displacements = initial_displacements.copy()
+    displacements_prev = initial_displacements.copy()  # Track previous displacements
+    plastic_strains = {}  # Store plastic strains at each Gauss point
     
-    # Convergence parameters - tightened for better failure detection
-    max_iterations = 30  # Reduced to detect failure faster
-    tol_force = 1e-5     # Tightened
-    tol_disp = 1e-5      # Tightened
+    # Initialize total stress state from K₀ (this will be updated incrementally)
+    current_stress_state = {
+        'element_stresses': stress_state['element_stresses'].copy(),
+        'plastic_state': np.zeros((n_elements, 4), dtype=bool)
+    }
+    
+    # Initialize plastic strain storage
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        if elem_type == 8:  # 8-node quad
+            n_gauss = 4  # Reduced integration
+        elif elem_type == 3:  # 3-node triangle
+            n_gauss = 1
+        else:
+            n_gauss = 1
+        
+        plastic_strains[elem_idx] = np.zeros((n_gauss, 3))  # [eps_x, eps_y, gamma_xy] plastic
     
     converged = False
-    iteration = 0
-    residual_norm = np.inf
     
-    # Failure detection parameters - more sensitive for slope stability
-    max_displacement_threshold = 0.02  # 2% of characteristic length (more sensitive)
-    characteristic_length = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
-    displacement_threshold = max_displacement_threshold * characteristic_length
-    
-    # Plastic zone monitoring - more sensitive for slope stability
-    initial_plastic_count = np.sum(plastic_elements)
-    max_plastic_ratio = 0.3  # If >30% elements are plastic, consider it failure (more sensitive)
-    
-    while iteration < max_iterations and not converged:
+    for iteration in range(max_iterations):
         if debug_level >= 3:
-            print(f"      Plastic iteration {iteration + 1}")
+            print(f"\n--- Iteration {iteration + 1} ---")
         
-        # Assemble global stiffness matrix with current plastic state
-        K_global, plastic_state_changed, new_plastic_elements = assemble_global_stiffness_with_plasticity(
-            nodes, elements, element_types, element_materials, displacements,
-            material_props_by_mat, plastic_elements, accumulated_plastic_strain, u_nodal, fem_data, debug_level)
+        # Build load vector including plastic corrections
+        F_total = F_gravity.copy()
         
-        # Update plastic elements
-        plastic_elements[:] = new_plastic_elements
+        # Add plastic strain corrections (Perzyna stress redistribution)
+        F_plastic_correction = compute_plastic_load_correction_perzyna(
+            nodes, elements, element_types, element_materials, 
+            plastic_strains, E_by_mat, nu_by_mat, eta)
         
-        # Assemble 1D truss elements
-        elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
-        element_types_1d = fem_data.get("element_types_1d", np.array([]))
-        k_by_1d_elem = fem_data.get("k_by_1d_elem", np.array([]))
+        if debug_level >= 3:
+            print(f"Plastic correction norm: {np.linalg.norm(F_plastic_correction):.2e}")
         
-        for elem_idx in range(len(elements_1d)):
-            elem_nodes = elements_1d[elem_idx]
-            elem_type = element_types_1d[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
-            
-            if len(active_nodes) >= 2:
-                K_truss = build_truss_stiffness(nodes[active_nodes], k_by_1d_elem[elem_idx])
-                
-                # Assemble into global matrix
-                dofs = []
-                for node_id in active_nodes:
-                    dofs.extend([2*node_id, 2*node_id + 1])
-                
-                for i in range(len(dofs)):
-                    for j in range(len(dofs)):
-                        K_global[dofs[i], dofs[j]] += K_truss[i, j]
+        F_total += F_plastic_correction
         
-        # Assemble force vector (only body forces and applied loads, no additional loading)
-        F_global = np.zeros(n_dof)
-        
-        # Body forces (gravity + seismic)
-        k_seismic = fem_data.get("k_seismic", 0.0)
-        for elem_idx in range(n_elements):
-            elem_nodes = elements[elem_idx]
-            elem_type = element_types[elem_idx]
-            active_nodes = elem_nodes[:elem_type]
-            
-            mat_id = element_materials[elem_idx] - 1
-            gamma = material_props_by_mat[mat_id]['gamma']
-            
-            # Body force components
-            b_x = k_seismic * gamma  # Horizontal seismic force
-            b_y = -gamma             # Gravity (downward)
-            
-            F_body = compute_body_forces(nodes[active_nodes], elem_type, b_x, b_y)
-            
-            # Assemble into global vector
-            dofs = []
-            for node_id in active_nodes:
-                dofs.extend([2*node_id, 2*node_id + 1])
-            
-            for i, dof in enumerate(dofs):
-                F_global[dof] += F_body[i]
-        
-        # Applied loads from boundary conditions
+        # Add boundary condition loads
         for i in range(n_nodes):
-            if bc_type[i] == 4:  # Applied force
-                F_global[2*i] += bc_values[i, 0]      # F_x
-                F_global[2*i + 1] += bc_values[i, 1]  # F_y
+            if bc_type[i] == 4:  # Force boundary condition
+                F_total[2*i] += bc_values[i, 0]
+                F_total[2*i+1] += bc_values[i, 1]
         
-        # Apply boundary conditions
+        # Apply constraints using proper free DOF extraction
         K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
-            K_global, F_global, bc_type, nodes)
+            K_global, F_total, bc_type, nodes)
         
-        # Compute internal forces from current displacements
-        F_internal = K_global @ displacements
-        
-        # Apply boundary conditions to internal forces
-        for dof in constraint_dofs:
-            F_internal[dof] = 0.0
-        
-        # Compute residual force
-        F_residual = F_global - F_internal
-        
-        # Apply boundary conditions to residual
-        for dof in constraint_dofs:
-            F_residual[dof] = 0.0
-        
-        # Extract only the free DOFs for the constrained system
-        F_residual_constrained = []
-        for i in range(n_dof):
-            if i not in constraint_dofs:
-                F_residual_constrained.append(F_residual[i])
-        F_residual_constrained = np.array(F_residual_constrained)
-        
-        # Solve for displacement correction
+        # Solve for total displacements at equilibrium
         try:
-            delta_u_free = spsolve(K_constrained.tocsr(), F_residual_constrained)
+            if hasattr(K_constrained, 'toarray'):
+                K_constrained = K_constrained.tocsr()
+            displacements_free = spsolve(K_constrained, F_constrained)
             
-            # Reconstruct full displacement increment vector
-            delta_u_full = np.zeros(n_dof)
-            free_dof_idx = 0
-            for i in range(n_dof):
-                if i not in constraint_dofs:
-                    delta_u_full[i] = delta_u_free[free_dof_idx]
-                    free_dof_idx += 1
+            # Reconstruct full displacement vector
+            n_dof = 2 * n_nodes
+            displacements_new = np.zeros(n_dof)
             
-            # Update total displacements
-            displacements += delta_u_full
+            # Free DOFs
+            free_dofs = [i for i in range(n_dof) if i not in constraint_dofs]
+            displacements_new[free_dofs] = displacements_free
             
-            # Enforce boundary conditions on total displacements
-            for dof in constraint_dofs:
-                displacements[dof] = 0.0
-            
+            # Constrained DOFs remain zero (already initialized)
         except Exception as e:
             if debug_level >= 1:
-                print(f"Plastic solver failed at iteration {iteration + 1}: {e}")
+                print(f"Matrix solution failed: {e}")
             return {
                 "converged": False,
-                "error": f"Plastic solver failed: {e}",
+                "error": f"Matrix solution failed: {e}",
                 "iterations": iteration + 1,
-                "phase": "plastic"
+                "displacements": displacements,
+                "algorithm": "Perzyna"
             }
+        
+        # Update plastic strains using Perzyna algorithm with incremental approach
+        plastic_strains_new, total_plastic_increment, current_stress_state = update_plastic_strains_perzyna_incremental(
+            nodes, elements, element_types, element_materials,
+            displacements_new, displacements_prev, plastic_strains, current_stress_state,
+            c_reduced, phi_reduced, E_by_mat, nu_by_mat, eta)
         
         # Check convergence
-        disp_change_norm = np.linalg.norm(delta_u_full)
-        force_residual_norm = np.linalg.norm(F_residual_constrained)
-        
-        residual_norm = force_residual_norm
-        
-        # Check for slope failure conditions
-        max_displacement = np.max(np.abs(displacements))
-        current_plastic_count = np.sum(plastic_elements)
-        plastic_ratio = current_plastic_count / n_elements
+        disp_change = np.linalg.norm(displacements_new - displacements)
+        plastic_change = total_plastic_increment
         
         if debug_level >= 3:
-            print(f"        Displacement change norm: {disp_change_norm:.2e}")
-            print(f"        Force residual norm: {force_residual_norm:.2e}")
-            print(f"        Plastic elements: {current_plastic_count}/{n_elements} ({plastic_ratio:.1%})")
-            print(f"        Max displacement: {max_displacement:.6f}")
+            print(f"Displacement change norm: {disp_change:.2e}")
+            print(f"Plastic strain increment: {plastic_change:.2e}")
+            print(f"Max displacement: {np.max(np.abs(displacements_new)):.6f}")
         
-        # Failure detection criteria
-        failure_detected = False
-        failure_reason = ""
+        # Griffiths convergence criterion - check for equilibrium
+        # Converge if displacement change is small relative to current displacement magnitude
+        max_current_disp = np.max(np.abs(displacements_new))
+        relative_disp_change = disp_change / max(max_current_disp, 1e-6)
         
-        # 1. Excessive displacements (slope collapse)
-        if max_displacement > displacement_threshold:
-            failure_detected = True
-            failure_reason = f"excessive_displacement ({max_displacement:.6f} > {displacement_threshold:.6f})"
-        
-        # 2. Excessive plastic zone (widespread failure)
-        if plastic_ratio > max_plastic_ratio:
-            failure_detected = True
-            failure_reason = f"excessive_plastic_zone ({plastic_ratio:.1%} > {max_plastic_ratio:.1%})"
-        
-        # 3. Rapid plastic zone growth (instability)
-        if current_plastic_count > initial_plastic_count * 2:  # 2x growth (more sensitive)
-            failure_detected = True
-            failure_reason = f"rapid_plastic_growth ({current_plastic_count} vs {initial_plastic_count})"
-        
-        if failure_detected:
-            if debug_level >= 1:
-                print(f"      ✗ Slope failure detected: {failure_reason}")
-            return {
-                "converged": False,
-                "error": f"Slope failure: {failure_reason}",
-                "iterations": iteration + 1,
-                "phase": "plastic",
-                "failure_detected": True,
-                "failure_reason": failure_reason
-            }
-        
-        # Check convergence criteria
-        if (disp_change_norm < tol_disp and force_residual_norm < tol_force and not plastic_state_changed):
+        # Don't converge too early - ensure at least some iterations for plastic development
+        if iteration > 10 and relative_disp_change < tolerance and plastic_change < 0.01:
             converged = True
             if debug_level >= 2:
-                print(f"      Plastic phase converged after {iteration + 1} iterations")
-        elif iteration >= max_iterations - 1:
-            if debug_level >= 1:
-                print(f"      Plastic phase failed to converge after {max_iterations} iterations")
+                print(f"Converged after {iteration + 1} iterations")
             break
         
-        iteration += 1
-    
-    # Compute final stresses and strains
-    stresses = np.zeros((n_elements, 4))
-    strains = np.zeros((n_elements, 4))
-    
-    for elem_idx in range(n_elements):
-        elem_nodes = elements[elem_idx]
-        elem_type = element_types[elem_idx]
-        active_nodes = elem_nodes[:elem_type]
+        # Additional check: if displacements become very large, this indicates failure
+        max_disp = np.max(np.abs(displacements_new))
+        if max_disp > 50.0:  # Allow much larger displacements to test convergence
+            if debug_level >= 1:
+                print(f"Large displacements detected ({max_disp:.3f}) - slope failure")
+            converged = False
+            break
         
-        if elem_type in [3, 4, 6, 8, 9]:
-            mat_id = element_materials[elem_idx] - 1
-            material_props = material_props_by_mat[mat_id]
-            
-            # Compute trial elastic stress
-            trial_stress = compute_element_stress(
-                nodes[active_nodes], displacements, active_nodes,
-                material_props['E'], material_props['nu'],
-                u_nodal[active_nodes], elem_type)
-            
-            # Apply return mapping for plasticity
-            corrected_stress, is_plastic, _ = mohr_coulomb_return_mapping(
-                trial_stress, material_props, plastic_elements[elem_idx],
-                accumulated_plastic_strain[elem_idx])
-            
-            stresses[elem_idx, :3] = corrected_stress
-            stresses[elem_idx, 3] = compute_von_mises(corrected_stress)
-            
-            # Update plastic element tracking
-            plastic_elements[elem_idx] = is_plastic
-            
-            # Compute strains
-            strain_vec = compute_element_strain(
-                nodes[active_nodes], displacements, active_nodes, elem_type)
-            strains[elem_idx, :3] = strain_vec
-            
-            # Compute maximum shear strain
-            eps_x, eps_y, gamma_xy = strain_vec
-            eps_mean = 0.5 * (eps_x + eps_y)
-            R = np.sqrt(0.25 * (eps_x - eps_y)**2 + 0.25 * gamma_xy**2)
-            eps_1 = eps_mean + R
-            eps_3 = eps_mean - R
-            max_shear_strain = abs(eps_1 - eps_3)
-            strains[elem_idx, 3] = max_shear_strain
+        # Update for next iteration
+        displacements_prev = displacements.copy()  # Store previous displacements
+        displacements = displacements_new.copy()
+        plastic_strains = plastic_strains_new
+        
+        # Check for excessive displacements (numerical instability indicator)
+        max_disp = np.max(np.abs(displacements))
+        if max_disp > 1e6:  # Very large threshold - only for true instability
+            if debug_level >= 1:
+                print(f"Numerical instability detected: max displacement = {max_disp:.2e}")
+            break
     
-    # Compute final 1D element forces
-    forces_1d = np.zeros(len(elements_1d))
-    for elem_idx in range(len(elements_1d)):
-        if len(elements_1d[elem_idx]) >= 2:
-            elem_nodes = elements_1d[elem_idx]
-            active_nodes = elem_nodes[:element_types_1d[elem_idx]]
-            forces_1d[elem_idx] = compute_truss_force(
-                nodes[active_nodes], displacements, active_nodes, k_by_1d_elem[elem_idx])
+    # Compute final state
+    final_stresses, plastic_elements = compute_final_state_perzyna(
+        nodes, elements, element_types, element_materials,
+        displacements, plastic_strains, c_reduced, phi_reduced,
+        E_by_mat, nu_by_mat, u_nodal, stress_state)
     
-    if debug_level >= 1:
+    # Compute strains
+    strains = compute_strains_perzyna(nodes, elements, element_types, displacements)
+    
+    if debug_level >= 2:
         n_plastic = np.sum(plastic_elements)
-        print(f"  Plastic phase completed: {n_plastic}/{n_elements} plastic elements")
+        print(f"Final: {n_plastic}/{n_elements} plastic elements")
     
     return {
         "converged": converged,
-        "displacements": displacements,
-        "stresses": stresses,
-        "strains": strains,
-        "forces_1d": forces_1d,
         "iterations": iteration + 1,
-        "residual_norm": residual_norm,
-        "phase": "plastic"
+        "displacements": displacements,
+        "stresses": final_stresses,
+        "strains": strains,
+        "plastic_elements": plastic_elements,
+        "max_displacement": np.max(np.abs(displacements)),
+        "plastic_strains": plastic_strains,
+        "algorithm": "Perzyna Visco-Plastic"
     }
 
 
-def solve_ssrm_bisection(fem_data, F_min=1.0, F_max=3.0, tolerance=0.001, debug_level=0):
+def solve_ssrm_perzyna(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
     """
-    Solve for factor of safety using improved SSRM with bisection method.
-    
-    This implementation uses the bisection method to efficiently find the critical
-    factor of safety, providing much better convergence than the previous incremental
-    approach. It also uses the new two-phase elastic-plastic solver for better
-    numerical stability.
-    
-    Parameters:
-        fem_data (dict): FEM data dictionary from build_fem_data
-        F_min (float): Minimum reduction factor to test (default 1.0)
-        F_max (float): Maximum reduction factor to test (default 3.0)
-        tolerance (float): Tolerance for factor of safety determination (default 0.001)
-        debug_level (int): Verbosity level (0=quiet, 1=basic, 2=detailed, 3=debug)
-    
-    Returns:
-        dict: SSRM solution dictionary containing:
-            - converged: bool, whether SSRM procedure completed successfully
-            - FS: float, critical factor of safety
-            - last_solution: dict, final FEM solution at critical F
-            - F_history: list, history of F values tested
-            - convergence_history: list, convergence status for each F
-            - solutions_history: list, solutions for each F
-            - iterations_ssrm: int, number of SSRM iterations
-            - method: str, solution method used ('bisection')
+    SSRM using Perzyna algorithm with pure non-convergence failure criterion.
     """
     
     if debug_level >= 1:
-        print("Starting improved SSRM with bisection method")
-        print(f"Search range: F = [{F_min:.3f}, {F_max:.3f}]")
-        print(f"Tolerance: {tolerance:.4f}")
+        print("=== Perzyna SSRM Analysis ===")
+        print("Failure criterion: Pure non-convergence (Griffiths & Lane 1999)")
     
-    # Initialize bisection variables
     F_left = F_min
     F_right = F_max
-    F_mid = (F_left + F_right) / 2.0
     
-    # History tracking
-    F_history = []
-    convergence_history = []
-    solutions_history = []
-    
-    # Test initial bounds
-    if debug_level >= 1:
-        print(f"\nTesting initial bounds...")
-    
-    # Test left bound (F_min)
-    if debug_level >= 1:
-        print(f"  Testing F = {F_left:.4f} (left bound)")
-    
-    solution_left = solve_fem_elastic_plastic(fem_data, F=F_left, debug_level=max(0, debug_level-1))
-    
-    F_history.append(F_left)
-    convergence_history.append(solution_left.get("converged", False))
-    solutions_history.append(solution_left)
-    
-    if not solution_left.get("converged", False):
-        if debug_level >= 1:
-            print(f"  ✗ Left bound F = {F_left:.4f} failed to converge")
+    # Verify bounds
+    solution_min = solve_fem_perzyna(fem_data, F=F_min, debug_level=max(0, debug_level-1))
+    if not solution_min["converged"]:
         return {
             "converged": False,
-            "error": f"Left bound F = {F_left:.4f} failed to converge",
-            "FS": None,
-            "F_history": F_history,
-            "convergence_history": convergence_history,
-            "solutions_history": solutions_history,
-            "iterations_ssrm": 1,
-            "method": "bisection"
+            "error": f"F_min = {F_min} does not converge - slope unstable",
+            "FS": None
         }
     
-    # Test right bound (F_max)
-    if debug_level >= 1:
-        print(f"  Testing F = {F_right:.4f} (right bound)")
-    
-    solution_right = solve_fem_elastic_plastic(fem_data, F=F_right, debug_level=max(0, debug_level-1))
-    
-    F_history.append(F_right)
-    convergence_history.append(solution_right.get("converged", False))
-    solutions_history.append(solution_right)
-    
-    if solution_right.get("converged", False):
+    solution_max = solve_fem_perzyna(fem_data, F=F_max, debug_level=max(0, debug_level-1))
+    if solution_max["converged"]:
         if debug_level >= 1:
-            print(f"  ✓ Right bound F = {F_max:.4f} converged - slope appears very stable")
-            print(f"  Need to test higher F values to find failure point")
-        
-        # If right bound converges, we need to find a higher F that fails
-        # Let's try F = F_max + 1.0 to see if we can find failure
-        F_test = F_max + 1.0
-        if debug_level >= 1:
-            print(f"  Testing higher F = {F_test:.4f} to find failure point")
-        
-        solution_test = solve_fem_elastic_plastic(fem_data, F=F_test, debug_level=max(0, debug_level-1))
-        
-        F_history.append(F_test)
-        convergence_history.append(solution_test.get("converged", False))
-        solutions_history.append(solution_test)
-        
-        if not solution_test.get("converged", False):
-            # Now we have: F_left converges, F_test fails
-            F_right = F_test
-            solution_right = solution_test
-            if debug_level >= 1:
-                print(f"  ✗ F = {F_test:.4f} fails to converge")
-                print(f"  Critical FS lies in [{F_left:.4f}, {F_right:.4f}]")
-        else:
-            # Even F_test converges - slope is very stable
-            if debug_level >= 1:
-                print(f"  ✓ F = {F_test:.4f} still converges - slope appears extremely stable")
-            return {
-                "converged": True,
-                "FS": F_test,
-                "last_solution": solution_test,
-                "F_history": F_history,
-                "convergence_history": convergence_history,
-                "solutions_history": solutions_history,
-                "iterations_ssrm": 3,
-                "method": "bisection",
-                "note": f"Slope stable even at F = {F_test:.4f} - very stable slope"
-            }
-    else:
-        # Right bound failed to converge - this is what we want
-        if debug_level >= 1:
-            print(f"  ✗ Right bound F = {F_max:.4f} fails to converge")
+            print(f"Warning: F_max = {F_max} still converges - very stable slope")
+        return {
+            "converged": True,
+            "FS": F_max,
+            "last_solution": solution_max,
+            "note": f"Slope stable up to F = {F_max}"
+        }
     
-    # Now we know: F_left converges, F_right doesn't converge
-    # The critical factor of safety lies between F_left and F_right
-    if debug_level >= 1:
-        print(f"  ✓ Left bound F = {F_left:.4f} converges")
-        print(f"  ✗ Right bound F = {F_right:.4f} fails to converge")
-        print(f"  Critical FS lies in [{F_left:.4f}, {F_right:.4f}]")
+    iteration = 0
+    max_iterations = 50
+    last_converged_solution = solution_min  # Initialize with F_min solution
     
-    # Bisection loop
-    ssrm_iteration = 2  # We've already done 2 iterations above
-    max_bisection_iterations = 50
-    
-    for bisection_iter in range(max_bisection_iterations):
+    # Bisection search for critical F
+    while (F_right - F_left) > tolerance and iteration < max_iterations:
         F_mid = (F_left + F_right) / 2.0
         
         if debug_level >= 1:
-            print(f"\nBisection iteration {bisection_iter + 1}: F = {F_mid:.4f}")
-            print(f"  Current interval: [{F_left:.4f}, {F_right:.4f}]")
-            print(f"  Interval width: {F_right - F_left:.4f}")
+            print(f"\nSSRM Iteration {iteration + 1}: Testing F = {F_mid:.4f}")
+            print(f"Current interval: [{F_left:.4f}, {F_right:.4f}]")
         
-        # Test midpoint
-        solution_mid = solve_fem_elastic_plastic(fem_data, F=F_mid, debug_level=max(0, debug_level-1))
+        solution = solve_fem_perzyna(fem_data, F=F_mid, debug_level=max(0, debug_level-1))
         
-        F_history.append(F_mid)
-        convergence_history.append(solution_mid.get("converged", False))
-        solutions_history.append(solution_mid)
-        ssrm_iteration += 1
-        
-        if solution_mid.get("converged", False):
-            # F_mid converges - critical FS is between F_mid and F_right
-            if debug_level >= 1:
-                print(f"  ✓ F = {F_mid:.4f} converges")
-            
+        if solution["converged"]:
+            # F_mid is stable, critical F is higher
             F_left = F_mid
-            solution_left = solution_mid
+            last_converged_solution = solution
+            if debug_level >= 2:
+                print(f"F = {F_mid:.4f} converged (stable)")
         else:
-            # F_mid fails - critical FS is between F_left and F_mid
-            if debug_level >= 1:
-                print(f"  ✗ F = {F_mid:.4f} fails to converge")
-            
+            # F_mid failed, critical F is lower
             F_right = F_mid
-            solution_right = solution_mid
+            if debug_level >= 2:
+                print(f"F = {F_mid:.4f} failed to converge (unstable)")
         
-        # Check convergence
-        interval_width = F_right - F_left
-        if interval_width < tolerance:
-            if debug_level >= 1:
-                print(f"\n🎯 Bisection converged!")
-                print(f"  Critical FS = {F_left:.4f} ± {tolerance:.4f}")
-                print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
-            
-            return {
-                "converged": True,
-                "FS": F_left,
-                "last_solution": solution_left,
-                "F_history": F_history,
-                "convergence_history": convergence_history,
-                "solutions_history": solutions_history,
-                "iterations_ssrm": ssrm_iteration,
-                "method": "bisection",
-                "final_interval": (F_left, F_right),
-                "interval_width": interval_width
-            }
-        
-        if debug_level >= 2:
-            print(f"  New interval: [{F_left:.4f}, {F_right:.4f}]")
+        iteration += 1
     
-    # Maximum bisection iterations reached
+    critical_FS = F_left
+    
     if debug_level >= 1:
-        print(f"\nMaximum bisection iterations ({max_bisection_iterations}) reached")
-        print(f"Best estimate: FS = {F_left:.4f} ± {F_right - F_left:.4f}")
+        print(f"\nPerszyna SSRM completed: Critical FS = {critical_FS:.4f}")
+        print(f"Final interval: [{F_left:.4f}, {F_right:.4f}]")
+        print(f"Iterations: {iteration}")
     
     return {
         "converged": True,
-        "FS": F_left,
-        "last_solution": solution_left,
-        "F_history": F_history,
-        "convergence_history": convergence_history,
-        "solutions_history": solutions_history,
-        "iterations_ssrm": ssrm_iteration,
-        "method": "bisection",
-        "note": f"Maximum bisection iterations reached",
+        "FS": critical_FS,
+        "last_solution": last_converged_solution,
+        "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
-        "interval_width": F_right - F_left
+        "interval_width": F_right - F_left,
+        "method": "Perzyna Visco-Plastic (Griffiths & Lane 1999)"
     }
 
 
-def check_convergence_robust(current_solution, previous_solution, 
-                            plastic_state, material_props, tolerance_disp=1e-6, tolerance_force=1e-6):
+def build_global_stiffness_perzyna(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat):
     """
-    Robust convergence checking that considers multiple criteria.
-    
-    This function implements comprehensive convergence checking that considers:
-    - Displacement convergence
-    - Force equilibrium
-    - Plastic state stability
-    - Energy balance
-    
-    Parameters:
-        current_solution: current iteration solution
-        previous_solution: previous iteration solution  
-        plastic_state: current plastic element state
-        material_props: material properties
-        tolerance_disp: displacement tolerance
-        tolerance_force: force residual tolerance
-    
-    Returns:
-        tuple: (converged: bool, disp_norm: float, force_norm: float, plastic_stable: bool)
+    Build global stiffness matrix using existing FE implementation for proper 8-node quad support.
     """
-    if previous_solution is None:
-        return False, np.inf, np.inf, False
+    # Use existing stiffness functions (now they are in this same file after consolidation)
     
-    # 1. Displacement convergence check
-    u_current = current_solution.get("displacements", np.array([]))
-    u_previous = previous_solution.get("displacements", np.array([]))
+    n_nodes = len(nodes)
+    n_dof = 2 * n_nodes
     
-    if len(u_current) != len(u_previous):
-        return False, np.inf, np.inf, False
+    K_global = lil_matrix((n_dof, n_dof))
     
-    du = u_current - u_previous
-    disp_norm = np.linalg.norm(du) / max(np.linalg.norm(u_current), 1e-12)
-    
-    # 2. Force convergence check
-    force_norm = current_solution.get("residual_norm", np.inf)
-    
-    # 3. Plastic state stability check
-    # Check if plastic elements are still changing significantly
-    plastic_stable = True
-    if 'plastic_elements' in current_solution and 'plastic_elements' in previous_solution:
-        current_plastic = current_solution['plastic_elements']
-        previous_plastic = previous_solution['plastic_elements']
+    for elem_idx, element in enumerate(elements):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
         
-        if len(current_plastic) == len(previous_plastic):
-            plastic_change_ratio = np.sum(current_plastic != previous_plastic) / len(current_plastic)
-            plastic_stable = plastic_change_ratio < 0.01  # Less than 1% change
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        
+        # Get element coordinates
+        elem_nodes = element[:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Build element stiffness matrix using corrected implementation
+        try:
+            if elem_type == 3:  # Triangular elements
+                K_elem = build_triangle_stiffness_corrected(elem_coords, E, nu)
+            elif elem_type == 8:  # 8-node quadrilateral elements - use corrected Griffiths version
+                K_elem = build_quad8_stiffness_reduced_integration_corrected(elem_coords, E, nu)
+            elif elem_type in [4, 6, 9]:  # Other elements - use simple triangle implementation
+                K_elem = build_triangle_stiffness_corrected(elem_coords, E, nu)
+            else:
+                print(f"Warning: Element type {elem_type} not supported")
+                continue
+        except Exception as e:
+            print(f"Error building stiffness for element {elem_idx}, type {elem_type}: {e}")
+            continue
+        
+        # Assemble into global matrix
+        for i in range(elem_type):
+            for j in range(elem_type):
+                node_i = elem_nodes[i]
+                node_j = elem_nodes[j]
+                
+                for di in range(2):
+                    for dj in range(2):
+                        global_i = 2 * node_i + di
+                        global_j = 2 * node_j + dj
+                        local_i = 2 * i + di
+                        local_j = 2 * j + dj
+                        
+                        if local_i < K_elem.shape[0] and local_j < K_elem.shape[1]:
+                            K_global[global_i, global_j] += K_elem[local_i, local_j]
     
-    # 4. Energy-based convergence check (optional)
-    # This could be implemented to check if the total strain energy is stabilizing
+    return K_global.tocsr()
+
+
+def build_quad8_stiffness_reduced_integration(coords, E, nu):
+    """
+    Build stiffness matrix for 8-node quadrilateral with reduced integration (4 Gauss points).
+    This is the key element type used in Griffiths & Lane (1999).
+    """
+    # For now, use a simplified approach - proper implementation would use isoparametric mapping
+    # This is a placeholder that should be replaced with full 8-node quad implementation
     
-    # 5. Combined convergence criteria
-    # All criteria must be satisfied for convergence
-    converged = (disp_norm < tolerance_disp and 
-                 force_norm < tolerance_force and 
-                 plastic_stable)
+    # Simplified: use average coordinates to create an equivalent triangle
+    if len(coords) >= 4:
+        # Use first 4 corners for a quad approximation
+        quad_coords = coords[:4]
+        # Convert to equivalent triangle for now
+        tri_coords = np.array([
+            quad_coords[0],
+            quad_coords[1], 
+            quad_coords[2]
+        ])
+        return build_triangle_stiffness_perzyna(tri_coords, E, nu)
+    else:
+        return build_triangle_stiffness_perzyna(coords, E, nu)
+
+
+def build_triangle_stiffness_perzyna(coords, E, nu):
+    """
+    Build stiffness matrix for triangular element (plane strain).
+    """
+    x1, y1 = coords[0]
+    x2, y2 = coords[1] 
+    x3, y3 = coords[2]
     
-    return converged, disp_norm, force_norm, plastic_stable
+    # Area
+    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+    
+    if area < 1e-12:
+        print(f"Warning: Very small element area: {area}")
+        return np.zeros((6, 6))
+    
+    # Shape function derivatives
+    b1 = y2 - y3
+    b2 = y3 - y1  
+    b3 = y1 - y2
+    c1 = x3 - x2
+    c2 = x1 - x3
+    c3 = x2 - x1
+    
+    # B matrix (standard tension positive convention)
+    B = np.array([
+        [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
+        [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
+        [c1, b1, c2, b2, c3, b3]   # γxy = ∂u/∂y + ∂v/∂x
+    ]) / (2 * area)
+    
+    # Constitutive matrix (plane strain)
+    factor = E / ((1 + nu) * (1 - 2*nu))
+    D = factor * np.array([
+        [1-nu, nu,   0        ],
+        [nu,   1-nu, 0        ],
+        [0,    0,    (1-2*nu)/2]
+    ])
+    
+    # Element stiffness matrix
+    K_elem = area * B.T @ D @ B
+    
+    return K_elem
+
+
+def build_gravity_loads_perzyna(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic):
+    """
+    Build gravity load vector.
+    """
+    n_nodes = len(nodes)
+    F_gravity = np.zeros(2 * n_nodes)
+    
+    for elem_idx, element in enumerate(elements):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        gamma = gamma_by_mat[mat_id]
+        
+        elem_nodes = element[:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Calculate element area/volume
+        if elem_type >= 3:  # Triangle or higher
+            if elem_type == 8:  # 8-node quad
+                # Approximate area for 8-node quad
+                area = compute_quad_area(elem_coords)
+            else:
+                # Triangle area
+                x1, y1 = elem_coords[0]
+                x2, y2 = elem_coords[1]
+                x3, y3 = elem_coords[2]
+                area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+            
+            # Distribute loads to nodes
+            load_per_node = gamma * area / elem_type
+            
+            for i, node in enumerate(elem_nodes):
+                # Vertical gravity load (negative = downward)
+                F_gravity[2*node + 1] -= load_per_node
+                # Horizontal seismic load  
+                F_gravity[2*node] += k_seismic * load_per_node
+    
+    return F_gravity
+
+
+def compute_quad_area(coords):
+    """
+    Compute area of quadrilateral (approximate).
+    """
+    if len(coords) >= 4:
+        # Use shoelace formula for polygon area
+        x = coords[:4, 0]
+        y = coords[:4, 1]
+        return 0.5 * abs(sum(x[i]*y[i+1] - x[i+1]*y[i] for i in range(-1, 3)))
+    else:
+        return 0.0
+
+
+def compute_plastic_load_correction_perzyna(nodes, elements, element_types, element_materials, 
+                                           plastic_strains, E_by_mat, nu_by_mat, eta):
+    """
+    Compute plastic load correction vector using Perzyna algorithm.
+    
+    This computes the internal force vector due to plastic strains:
+    F_plastic = ∫ B^T D ε_plastic dV
+    """
+    n_nodes = len(nodes)
+    F_plastic = np.zeros(2 * n_nodes)
+    
+    for elem_idx in range(len(elements)):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        
+        # Get element data
+        elem_nodes = elements[elem_idx][:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        if elem_type == 8:
+            n_gauss = 4  # 8-node quad with reduced integration
+        else:
+            n_gauss = 1  # Triangle - single Gauss point
+        
+        # Element plastic force vector
+        elem_f_plastic = np.zeros(2 * elem_type)
+        
+        # For each Gauss point
+        for gp in range(n_gauss):
+            # Get plastic strains at this Gauss point
+            plastic_strain = plastic_strains[elem_idx][gp, :]
+            
+            # Skip if no plastic strain (but use much smaller threshold)
+            if np.linalg.norm(plastic_strain) < 1e-20:
+                continue
+            
+            # Compute plastic stress
+            D = build_constitutive_matrix_perzyna(E, nu)
+            plastic_stress = D @ plastic_strain
+            
+            # Compute B matrix for this element
+            if elem_type == 3:  # Triangle
+                B, area = compute_B_matrix_triangle(elem_coords)
+                weight = area  # Integration weight
+            elif elem_type == 8:  # 8-node quad
+                # For 8-node quad, use centroid for simplified integration
+                B, det_J = compute_B_matrix_quad8_centroid(elem_coords)
+                weight = det_J  # Integration weight (determinant of Jacobian)
+            else:
+                # Simplified for other elements
+                B = np.zeros((3, 2 * elem_type))
+                weight = 1.0
+            
+            # Add contribution to element force vector
+            # F_elem += B^T * σ_plastic * weight
+            if B.size > 0:
+                elem_f_plastic += B.T @ plastic_stress * weight
+        
+        # Assemble into global force vector
+        for i in range(elem_type):
+            node = elem_nodes[i]
+            F_plastic[2*node] += elem_f_plastic[2*i]
+            F_plastic[2*node + 1] += elem_f_plastic[2*i + 1]
+    
+    return F_plastic
+
+
+def compute_B_matrix_quad8_centroid(coords):
+    """Compute B matrix and determinant of Jacobian for 8-node quad at centroid."""
+    # Evaluate at centroid (xi=0, eta=0)
+    xi, eta = 0.0, 0.0
+    
+    # Shape function derivatives
+    dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta)
+    
+    # Jacobian matrix
+    J = np.zeros((2, 2))
+    for i in range(8):
+        x, y = coords[i]
+        J[0, 0] += dN_dxi[i] * x   # dx/dxi
+        J[0, 1] += dN_dxi[i] * y   # dy/dxi  
+        J[1, 0] += dN_deta[i] * x  # dx/deta
+        J[1, 1] += dN_deta[i] * y  # dy/deta
+    
+    det_J = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+    
+    if abs(det_J) < 1e-12:
+        return np.zeros((3, 16)), 0.0
+    
+    # Inverse Jacobian
+    J_inv = np.array([[J[1, 1], -J[0, 1]], [-J[1, 0], J[0, 0]]]) / det_J
+    
+    # Shape function derivatives in physical coordinates
+    dN_dx = np.zeros(8)
+    dN_dy = np.zeros(8)
+    for i in range(8):
+        dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
+        dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
+    
+    # B matrix (standard tension positive)
+    B = np.zeros((3, 16))  # 3 strains x 16 DOFs (8 nodes x 2 DOFs)
+    for i in range(8):
+        B[0, 2*i] = dN_dx[i]      # εx = ∂u/∂x
+        B[1, 2*i+1] = dN_dy[i]    # εy = ∂v/∂y
+        B[2, 2*i] = dN_dy[i]      # γxy = ∂u/∂y + ∂v/∂x
+        B[2, 2*i+1] = dN_dx[i]    # γxy = ∂u/∂y + ∂v/∂x
+    
+    return B, abs(det_J)
+
+
+def compute_B_matrix_triangle(coords):
+    """Compute B matrix and area for triangle element."""
+    
+    x1, y1 = coords[0]
+    x2, y2 = coords[1]
+    x3, y3 = coords[2]
+    
+    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+    
+    if area < 1e-12:
+        return np.zeros((3, 6)), 0.0
+    
+    # Shape function derivatives
+    b1 = y2 - y3
+    b2 = y3 - y1
+    b3 = y1 - y2
+    c1 = x3 - x2
+    c2 = x1 - x3
+    c3 = x2 - x1
+    
+    # B matrix (standard tension positive convention)
+    B = np.array([
+        [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
+        [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
+        [c1, b1, c2, b2, c3, b3]   # γxy = ∂u/∂y + ∂v/∂x
+    ]) / (2 * area)
+    
+    return B, area
+
+
+def get_gauss_points_2x2():
+    """Get 2x2 Gauss quadrature points and weights for reduced integration."""
+    # 2x2 Gauss points in natural coordinates
+    gp = 1.0 / np.sqrt(3.0)
+    gauss_points = [
+        (-gp, -gp),  # Gauss point 0
+        ( gp, -gp),  # Gauss point 1
+        ( gp,  gp),  # Gauss point 2
+        (-gp,  gp),  # Gauss point 3
+    ]
+    weights = [1.0, 1.0, 1.0, 1.0]  # Equal weights for 2x2
+    return gauss_points, weights
+
+
+def compute_gauss_point_coordinates_quad8(elem_coords, xi, eta):
+    """
+    Compute physical coordinates of a Gauss point in an 8-node quadrilateral.
+    
+    Args:
+        elem_coords: Array of element node coordinates (8x2)
+        xi, eta: Natural coordinates of Gauss point
+        
+    Returns:
+        Physical coordinates [x, y] of the Gauss point
+    """
+    # 8-node quadrilateral shape functions
+    N = np.zeros(8)
+    N[0] = 0.25 * (1 - xi) * (1 - eta) * (-xi - eta - 1)
+    N[1] = 0.25 * (1 + xi) * (1 - eta) * (xi - eta - 1)
+    N[2] = 0.25 * (1 + xi) * (1 + eta) * (xi + eta - 1)
+    N[3] = 0.25 * (1 - xi) * (1 + eta) * (-xi + eta - 1)
+    N[4] = 0.5 * (1 - xi*xi) * (1 - eta)
+    N[5] = 0.5 * (1 + xi) * (1 - eta*eta)
+    N[6] = 0.5 * (1 - xi*xi) * (1 + eta)
+    N[7] = 0.5 * (1 - xi) * (1 - eta*eta)
+    
+    # Compute physical coordinates
+    gauss_coords = np.zeros(2)
+    for i in range(8):
+        gauss_coords += N[i] * elem_coords[i]
+    
+    return gauss_coords
+
+
+def check_initial_yield_state(stress_state, c_values, phi_values):
+    """
+    Check how many elements are yielding at the initial stress state.
+    
+    Args:
+        stress_state: Dictionary with 'element_stresses' array
+        c_values: Cohesion values for each element
+        phi_values: Friction angle values for each element (in radians)
+        
+    Returns:
+        Number of elements that are yielding
+    """
+    element_stresses = stress_state['element_stresses']
+    n_elements = element_stresses.shape[0]
+    yield_count = 0
+    
+    for elem_idx in range(n_elements):
+        # Check first Gauss point of each element
+        sig_x = element_stresses[elem_idx, 0, 0]
+        sig_y = element_stresses[elem_idx, 0, 1]
+        tau_xy = element_stresses[elem_idx, 0, 2]
+        
+        c = c_values[elem_idx]
+        phi = phi_values[elem_idx]
+        
+        # Check Mohr-Coulomb yield criterion
+        stress = np.array([sig_x, sig_y, tau_xy])
+        F_yield = check_mohr_coulomb_perzyna(stress, c, phi)
+        if F_yield > 0:
+            yield_count += 1
+    
+    return yield_count
+
+
+def update_plastic_strains_perzyna(nodes, elements, element_types, element_materials,
+                                  displacements, plastic_strains, c_reduced, phi_reduced,
+                                  E_by_mat, nu_by_mat, u_nodal, eta, initial_stresses=None):
+    """
+    Update plastic strains using Perzyna visco-plastic algorithm with proper Gauss integration.
+    """
+    plastic_strains_new = {}
+    total_increment = 0.0
+    
+    # Get Gauss points for 8-node quads
+    gauss_points_2x2, weights_2x2 = get_gauss_points_2x2()
+    
+    for elem_idx in range(len(elements)):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        c = c_reduced[elem_idx]
+        phi = phi_reduced[elem_idx]
+        
+        if elem_type == 8:
+            n_gauss = 4  # 8-node quad with reduced integration
+        else:
+            n_gauss = 1  # Triangle - single Gauss point
+        
+        plastic_strains_new[elem_idx] = plastic_strains[elem_idx].copy()
+        
+        # Get element data
+        elem_nodes = elements[elem_idx][:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Get element displacements
+        elem_disp = np.zeros(2 * elem_type)
+        for i, node in enumerate(elem_nodes):
+            elem_disp[2*i] = displacements[2*node]
+            elem_disp[2*i+1] = displacements[2*node+1]
+        
+        # For each Gauss point
+        for gp in range(n_gauss):
+            # Compute total strains at this Gauss point
+            if elem_type == 3:  # Triangle
+                total_strains = compute_triangle_strains_manual(elem_coords, elem_disp)
+            elif elem_type == 8:  # 8-node quad with proper Gauss points
+                xi, eta_local = gauss_points_2x2[gp]
+                total_strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta_local)
+            else:
+                # Simplified for other element types
+                total_strains = np.array([0.0, 0.0, 0.0])
+            
+            # Elastic trial strains
+            plastic_strain_old = plastic_strains[elem_idx][gp, :]
+            elastic_strains = total_strains - plastic_strain_old
+            
+            # Elastic trial stress = initial stress + incremental stress
+            D = build_constitutive_matrix_perzyna(E, nu)
+            incremental_stress = D @ elastic_strains
+            
+            # Add initial stress if provided
+            if initial_stresses is not None:
+                initial_stress = initial_stresses['element_stresses'][elem_idx, gp, :]
+                trial_stress = initial_stress + incremental_stress
+            else:
+                trial_stress = incremental_stress
+            
+            # Check yield criterion with total stress
+            f_yield = check_mohr_coulomb_perzyna(trial_stress, c, phi)
+            
+            if f_yield > 1e-8:  # Plastic loading
+                # Perzyna visco-plastic flow as per Griffiths & Lane (1999)
+                # Δλ = η * <f> where <f> = max(0, f)
+                # Use appropriate viscosity parameter from paper
+                delta_lambda = eta * f_yield  # Remove artificial cap
+                
+                # Flow vector (non-associated: ψ = 0)
+                flow_vector = compute_plastic_flow_vector(trial_stress, 0.0)  # ψ = 0
+                
+                # Plastic strain increment - controlled flow to prevent instability
+                plastic_increment = delta_lambda * flow_vector
+                
+                # Apply reasonable limit to prevent numerical explosion
+                increment_norm = np.linalg.norm(plastic_increment)
+                if increment_norm > 1e-5:  # Very conservative limit for localized failure
+                    plastic_increment *= 1e-5 / increment_norm
+                
+                # Update plastic strains
+                plastic_strains_new[elem_idx][gp, :] += plastic_increment
+                
+                # Track total plastic increment
+                total_increment += np.linalg.norm(plastic_increment)
+    
+    return plastic_strains_new, total_increment
+
+
+def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, element_materials,
+                                              displacements_new, displacements_prev, plastic_strains, 
+                                              current_stress_state, c_reduced, phi_reduced,
+                                              E_by_mat, nu_by_mat, eta):
+    """
+    Update plastic strains using incremental Perzyna algorithm.
+    
+    This version properly handles incremental displacements and stress updates
+    to avoid double-counting stress contributions.
+    """
+    plastic_strains_new = {}
+    total_increment = 0.0
+    
+    # Create new stress state (copy of current)
+    new_stress_state = {
+        'element_stresses': current_stress_state['element_stresses'].copy(),
+        'plastic_state': current_stress_state['plastic_state'].copy()
+    }
+    
+    # Compute displacement increment
+    displacement_increment = displacements_new - displacements_prev
+    
+    for elem_idx in range(len(elements)):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        c = c_reduced[elem_idx]
+        phi = phi_reduced[elem_idx]
+        
+        # Get element nodes and coordinates
+        elem_nodes = elements[elem_idx][:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Get incremental displacements for this element
+        elem_disp_increment = np.zeros(2 * elem_type)
+        for i, node_idx in enumerate(elem_nodes):
+            elem_disp_increment[2*i] = displacement_increment[2*node_idx]
+            elem_disp_increment[2*i+1] = displacement_increment[2*node_idx+1]
+        
+        # Initialize plastic strains for this element
+        plastic_strains_new[elem_idx] = plastic_strains[elem_idx].copy()
+        
+        # Determine number of Gauss points
+        if elem_type == 8:
+            gauss_points_2x2, _ = get_gauss_points_2x2()
+            n_gauss = 4
+        else:
+            n_gauss = 1
+        
+        # For each Gauss point
+        for gp in range(n_gauss):
+            # Compute incremental strains at this Gauss point
+            if elem_type == 3:  # Triangle
+                incremental_strains = compute_triangle_strains_manual(elem_coords, elem_disp_increment)
+            elif elem_type == 8:  # 8-node quad
+                xi, eta_local = gauss_points_2x2[gp]
+                incremental_strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp_increment, xi, eta_local)
+            else:
+                incremental_strains = np.array([0.0, 0.0, 0.0])
+            
+            # Compute incremental stress from incremental strains
+            D = build_constitutive_matrix_perzyna(E, nu)
+            incremental_stress = D @ incremental_strains
+            
+            # Get current total stress at this Gauss point
+            current_stress = current_stress_state['element_stresses'][elem_idx, gp, :]
+            
+            # Trial stress = current stress + incremental stress  
+            trial_stress = current_stress + incremental_stress
+            
+            # Check yield criterion with trial stress
+            f_yield = check_mohr_coulomb_perzyna(trial_stress, c, phi)
+            
+            if f_yield > 1e-8:  # Plastic loading
+                # Perzyna visco-plastic flow
+                delta_lambda = eta * f_yield
+                
+                # Flow vector (non-associated: ψ = 0)
+                flow_vector = compute_plastic_flow_vector(trial_stress, 0.0)
+                
+                # Plastic strain increment
+                plastic_increment = delta_lambda * flow_vector
+                
+                # Apply reasonable limit to prevent numerical explosion
+                increment_norm = np.linalg.norm(plastic_increment)
+                if increment_norm > 1e-5:
+                    plastic_increment *= 1e-5 / increment_norm
+                
+                # Update plastic strains
+                plastic_strains_new[elem_idx][gp, :] += plastic_increment
+                
+                # Update stress state (remove plastic stress contribution)
+                plastic_stress = D @ plastic_increment
+                new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress - plastic_stress
+                
+                # Track total plastic increment
+                total_increment += np.linalg.norm(plastic_increment)
+                
+            else:
+                # Elastic loading - just update stress
+                new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress
+    
+    return plastic_strains_new, total_increment, new_stress_state
+
+
+def compute_final_state_perzyna(nodes, elements, element_types, element_materials,
+                               displacements, plastic_strains, c_reduced, phi_reduced,
+                               E_by_mat, nu_by_mat, u_nodal, stress_state):
+    """
+    Compute final stress state and identify plastic elements.
+    """
+    n_elements = len(elements)
+    final_stresses = np.zeros((n_elements, 4))
+    plastic_elements = np.zeros(n_elements, dtype=bool)
+    
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        c = c_reduced[elem_idx]
+        phi = phi_reduced[elem_idx]
+        
+        # Get element nodes and coordinates
+        elem_nodes = elements[elem_idx][:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Get element displacements
+        elem_disp = np.zeros(2 * elem_type)
+        for i, node_idx in enumerate(elem_nodes):
+            elem_disp[2*i] = displacements[2*node_idx]
+            elem_disp[2*i+1] = displacements[2*node_idx+1]
+        
+        # For triangular elements (single Gauss point)
+        if elem_type == 3:
+            # Compute strains
+            total_strains = compute_triangle_strains_manual(elem_coords, elem_disp)
+            
+            # Get plastic strains (single Gauss point)
+            plastic_strain = plastic_strains[elem_idx][0, :]  # First (and only) Gauss point
+            
+            # Elastic strains
+            elastic_strains = total_strains - plastic_strain
+            
+            # Stress calculation: initial stress + incremental stress
+            D = build_constitutive_matrix_perzyna(E, nu)
+            incremental_stress = D @ elastic_strains
+            
+            # Add initial geostatic stress
+            if stress_state is not None:
+                initial_stress = stress_state['element_stresses'][elem_idx, 0, :]  # Single Gauss point
+                stress = initial_stress + incremental_stress
+            else:
+                stress = incremental_stress
+            
+            # Store stress (σx, σy, τxy, σvm)
+            sig_x, sig_y, tau_xy = stress
+            sig_vm = np.sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
+            final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
+            
+            # Check if element is plastic (yield criterion)
+            f_yield = check_mohr_coulomb_perzyna(stress, c, phi)
+            plastic_elements[elem_idx] = f_yield > 1e-8
+        
+        else:
+            # 8-node quad: compute average stress and check yield function
+            elem_nodes = elements[elem_idx][:elem_type]
+            elem_coords = nodes[elem_nodes]
+            
+            # Get element displacements
+            elem_disp = np.zeros(2 * elem_type)
+            for i, node in enumerate(elem_nodes):
+                elem_disp[2*i] = displacements[2*node]
+                elem_disp[2*i+1] = displacements[2*node+1]
+            
+            # Average stress over all Gauss points using current stress state
+            elem_stress_avg = np.zeros(3)
+            n_gauss = 4  # 2x2 integration for 8-node quads
+            
+            if elem_idx in stress_state:
+                # Use current stress state from Perzyna iteration
+                for gp in range(n_gauss):
+                    elem_stress_avg += stress_state[elem_idx][gp, :]
+                elem_stress_avg /= n_gauss
+            else:
+                # Fallback: compute stress from displacements
+                gauss_coords = [(-1/np.sqrt(3), -1/np.sqrt(3)), (1/np.sqrt(3), -1/np.sqrt(3)),
+                               (1/np.sqrt(3), 1/np.sqrt(3)), (-1/np.sqrt(3), 1/np.sqrt(3))]
+                for xi, eta in gauss_coords:
+                    strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
+                    D = build_constitutive_matrix_perzyna(E, nu)
+                    stress = D @ strains
+                    elem_stress_avg += stress
+                elem_stress_avg /= len(gauss_coords)
+            
+            # Compute von Mises for display
+            sig_x, sig_y, tau_xy = elem_stress_avg
+            sig_vm = np.sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
+            final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
+            
+            # Check yield function (same as triangles)
+            f_yield = check_mohr_coulomb_perzyna(elem_stress_avg, c, phi)
+            plastic_elements[elem_idx] = f_yield > 1e-8
+    
+    return final_stresses, plastic_elements
+
+
+def compute_triangle_strains_manual(coords, displacements):
+    """Manually compute triangle strains from displacements."""
+    
+    x1, y1 = coords[0]
+    x2, y2 = coords[1]
+    x3, y3 = coords[2]
+    
+    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+    
+    if area < 1e-12:
+        return np.array([0.0, 0.0, 0.0])
+    
+    # Shape function derivatives
+    b1 = y2 - y3
+    b2 = y3 - y1
+    b3 = y1 - y2
+    c1 = x3 - x2
+    c2 = x1 - x3
+    c3 = x2 - x1
+    
+    # B matrix (standard tension positive convention)
+    B = np.array([
+        [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
+        [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
+        [c1, b1, c2, b2, c3, b3]   # γxy = ∂u/∂y + ∂v/∂x
+    ]) / (2 * area)
+    
+    # Strains
+    strains = B @ displacements
+    return strains
+
+
+def build_constitutive_matrix_perzyna(E, nu):
+    """Build constitutive matrix for plane strain."""
+    factor = E / ((1 + nu) * (1 - 2*nu))
+    D = factor * np.array([
+        [1-nu, nu,   0        ],
+        [nu,   1-nu, 0        ],
+        [0,    0,    (1-2*nu)/2]
+    ])
+    return D
+
+
+def check_mohr_coulomb_perzyna(stress, c, phi, debug=False):
+    """Check Mohr-Coulomb yield criterion and return violation.
+    
+    Uses Griffiths & Lane (1999) formulation with compression-negative convention.
+    """
+    
+    sig_x, sig_y, tau_xy = stress
+    
+    # Principal stresses (tension positive, compression negative)
+    sig_mean = (sig_x + sig_y) / 2
+    tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
+    
+    sig1 = sig_mean + tau_max  # Most positive (least compressive/most tensile)
+    sig3 = sig_mean - tau_max  # Most negative (most compressive/least tensile)
+    
+    # Griffiths & Lane (1999) yield function for compression-negative
+    # F = (σ₁ + σ₃)/2 × sin φ' - (σ₁ - σ₃)/2 - c' cos φ'
+    # Yield when F > 0
+    cos_phi = cos(phi)
+    sin_phi = sin(phi)
+    
+    # Note: sig1 + sig3 = 2*sig_mean = sig_x + sig_y
+    # And: sig1 - sig3 = 2*tau_max
+    F = sig_mean * sin_phi - tau_max - c * cos_phi
+    
+    if debug and F > -c * cos_phi * 0.1:  # Near yielding
+        print(f"  Debug: σx={sig_x:.1f}, σy={sig_y:.1f}, τxy={tau_xy:.1f}")
+        print(f"         σ1={sig1:.1f}, σ3={sig3:.1f}, F={F:.3f}, c={c:.1f}, φ={np.degrees(phi):.1f}°")
+    
+    # Return actual F value, positive means yielding
+    return F
+
+
+def compute_plastic_flow_vector(stress, psi):
+    """Compute plastic flow vector for non-associated plasticity."""
+    
+    sig_x, sig_y, tau_xy = stress
+    
+    # For non-associated plasticity with ψ = 0 (Griffiths approach)
+    # Flow vector is derived from potential function g = (sig1 - sig3)
+    
+    # Principal stresses
+    sig_mean = (sig_x + sig_y) / 2
+    tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
+    
+    if tau_max < 1e-12:
+        # Hydrostatic stress state
+        return np.array([0.0, 0.0, 0.0])
+    
+    sig1 = sig_mean + tau_max
+    sig3 = sig_mean - tau_max
+    
+    # Flow direction derivatives for ψ = 0 case
+    # ∂g/∂σ where g = (σ1 - σ3) + (σ1 + σ3)*sin(ψ) - 2*c*cos(ψ)
+    
+    sin_psi = sin(psi)
+    
+    # Simplified flow vector for ψ = 0
+    # Direction: [1+sin(ψ), -(1-sin(ψ)), 0] for principal directions
+    # Transform back to x-y coordinates
+    
+    # For simplicity, use associated flow approximation
+    flow_x = 1 + sin_psi
+    flow_y = -(1 - sin_psi)
+    flow_xy = 0
+    
+    flow_vector = np.array([flow_x, flow_y, flow_xy])
+    
+    # Normalize
+    norm = np.linalg.norm(flow_vector)
+    if norm > 1e-12:
+        flow_vector /= norm
+    
+    return flow_vector
+
+
+def establish_k0_stress_state(K_global, F_gravity, bc_type, nodes, elements, element_types, 
+                             element_materials, E_by_mat, nu_by_mat, gamma_by_mat, u_nodal, debug_level=0):
+    """
+    Establish K₀ initial stress state through elastic gravity loading.
+    
+    This creates the geostatic stress field that exists before applying strength reduction.
+    Critical for developing proper rotational failure modes in slopes.
+    """
+    
+    # Apply boundary conditions to gravity loading system
+# apply_boundary_conditions is now defined in this same file
+    K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
+        K_global, F_gravity, bc_type, nodes)
+    
+    # Solve elastic system under gravity
+    try:
+        if hasattr(K_constrained, 'toarray'):
+            K_constrained = K_constrained.tocsr()
+        displacements_free = spsolve(K_constrained, F_constrained)
+        
+        # Reconstruct full displacement vector
+        n_dof = 2 * len(nodes)
+        displacements = np.zeros(n_dof)
+        free_dofs = [i for i in range(n_dof) if i not in constraint_dofs]
+        displacements[free_dofs] = displacements_free
+        
+    except Exception as e:
+        print(f"K₀ stress establishment failed: {e}")
+        # Fall back to zero displacement
+        displacements = np.zeros(2 * len(nodes))
+    
+    # Compute stress state from elastic solution
+    stress_state = compute_k0_stress_state(
+        nodes, elements, element_types, element_materials, displacements,
+        E_by_mat, nu_by_mat, gamma_by_mat, u_nodal)
+    
+    if debug_level >= 2:
+        max_disp = np.max(np.abs(displacements))
+        print(f"  K₀ solution: max displacement = {max_disp:.6f}")
+        
+        # Debug: Check actual displacement at a specific node
+        node_near_top = nodes[:, 1].argmax()  # Node with highest y coordinate
+        disp_x = displacements[2*node_near_top]
+        disp_y = displacements[2*node_near_top+1]
+        print(f"  Top node {node_near_top} at y={nodes[node_near_top, 1]:.1f}: disp_x={disp_x:.6f}, disp_y={disp_y:.6f}")
+        
+        n_stress_elements = len(stress_state.get('element_stresses', []))
+        print(f"  Stress state established for {n_stress_elements} elements")
+    
+    return displacements, stress_state
+
+
+def compute_k0_stress_state(nodes, elements, element_types, element_materials, displacements,
+                           E_by_mat, nu_by_mat, gamma_by_mat, u_nodal):
+    """
+    Compute initial stress state from elastic FEM gravity solution.
+    
+    Following Griffiths & Lane (1999): "The present work applies gravity in a single 
+    increment to an initially stress-free slope" - this means:
+    1. Start with zero stress everywhere
+    2. Apply gravity loads via FEM
+    3. Compute strains from resulting displacements  
+    4. Compute stresses from elastic strains: σ = D·ε
+    
+    This captures stress concentrations and geometric effects essential for proper
+    plastic failure initiation, unlike simplified geostatic K₀ approaches.
+    """
+    n_elements = len(elements)
+    max_gauss_points = 4
+    element_stresses = np.zeros((n_elements, max_gauss_points, 3))  # [sig_x, sig_y, tau_xy]
+    
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        gamma = gamma_by_mat[mat_id]
+        
+        # Get element data
+        elem_nodes = elements[elem_idx][:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Get Gauss points for proper integration
+        if elem_type == 8:
+            gauss_points_2x2, _ = get_gauss_points_2x2()
+            n_gauss = 4
+        else:
+            n_gauss = 1
+        
+        # Get element displacements from FEM gravity solution
+        elem_disp = np.zeros(2 * elem_type)
+        for i, node in enumerate(elem_nodes):
+            elem_disp[2*i] = displacements[2*node]
+            elem_disp[2*i+1] = displacements[2*node+1]
+        
+        # Compute stresses at each Gauss point from FEM strains
+        for gp in range(n_gauss):
+            # True Griffiths approach: compute strains from FEM displacements at this Gauss point
+            if elem_type == 3:  # Triangle
+                strains = compute_triangle_strains_manual(elem_coords, elem_disp)
+            elif elem_type == 8:  # 8-node quad
+                xi, eta_local = gauss_points_2x2[gp]
+                strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta_local)
+            else:
+                strains = np.array([0.0, 0.0, 0.0])
+            
+            # Compute stresses from strains using elastic constitutive matrix
+            # This is the true "gravity in single increment to initially stress-free slope"
+            # Standard tension positive convention: compression is negative
+            D = build_constitutive_matrix_perzyna(E, nu)
+            stresses = D @ strains
+            
+            # Store stress at this Gauss point (tension positive, compression negative)
+            element_stresses[elem_idx, gp, :] = stresses
+    
+    # Debug: Check stress state statistics
+    stress_stats = {
+        'sigma_x': {'min': np.min(element_stresses[:, :, 0]), 'max': np.max(element_stresses[:, :, 0]), 'mean': np.mean(element_stresses[:, :, 0])},
+        'sigma_y': {'min': np.min(element_stresses[:, :, 1]), 'max': np.max(element_stresses[:, :, 1]), 'mean': np.mean(element_stresses[:, :, 1])},
+        'tau_xy': {'min': np.min(element_stresses[:, :, 2]), 'max': np.max(element_stresses[:, :, 2]), 'mean': np.mean(element_stresses[:, :, 2])}
+    }
+    
+    print(f"  Initial stress state statistics:")
+    print(f"    σ_x: min={stress_stats['sigma_x']['min']:.1f}, max={stress_stats['sigma_x']['max']:.1f}, mean={stress_stats['sigma_x']['mean']:.1f}")
+    print(f"    σ_y: min={stress_stats['sigma_y']['min']:.1f}, max={stress_stats['sigma_y']['max']:.1f}, mean={stress_stats['sigma_y']['mean']:.1f}")
+    print(f"    τ_xy: min={stress_stats['tau_xy']['min']:.1f}, max={stress_stats['tau_xy']['max']:.1f}, mean={stress_stats['tau_xy']['mean']:.1f}")
+    
+    return {
+        'element_stresses': element_stresses,
+        'plastic_state': np.zeros((n_elements, max_gauss_points), dtype=bool)
+    }
+
+
+def compute_strains_perzyna(nodes, elements, element_types, displacements):
+    """
+    Compute element strains for visualization.
+    """
+    n_elements = len(elements)
+    strains = np.zeros((n_elements, 4))  # [eps_x, eps_y, gamma_xy, max_shear_strain]
+    
+    for elem_idx, element in enumerate(elements):
+        elem_type = element_types[elem_idx]
+        elem_nodes = element[:elem_type]
+        elem_coords = nodes[elem_nodes]
+        
+        # Get element displacements
+        elem_disp = np.zeros(2 * elem_type)
+        for i, node in enumerate(elem_nodes):
+            elem_disp[2*i] = displacements[2*node]
+            elem_disp[2*i+1] = displacements[2*node+1]
+        
+        # Compute strains
+        if elem_type == 3:
+            element_strains = compute_triangle_strains_manual(elem_coords, elem_disp)
+        elif elem_type == 8:
+            # For 8-node quad, compute strain at centroid
+            xi, eta = 0.0, 0.0  # Centroid
+            element_strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
+        else:
+            element_strains = np.array([0.0, 0.0, 0.0])
+        
+        eps_x = element_strains[0]
+        eps_y = element_strains[1] 
+        gamma_xy = element_strains[2]
+        
+        # Maximum shear strain
+        max_shear_strain = sqrt(((eps_x - eps_y) / 2)**2 + (gamma_xy / 2)**2)
+        
+        strains[elem_idx] = [eps_x, eps_y, gamma_xy, max_shear_strain]
+    
+    return strains
+
+
+def compute_quad8_strains_at_xi_eta(coords, displacements, xi, eta):
+    """
+    Compute strains for 8-node quadrilateral at specific (xi, eta) coordinates.
+    """
+    # 8-node quad shape function derivatives at (xi, eta)
+    dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta)
+    
+    # Jacobian matrix and its inverse
+    J = np.zeros((2, 2))
+    for i in range(8):
+        x, y = coords[i]
+        J[0, 0] += dN_dxi[i] * x   # dx/dxi
+        J[0, 1] += dN_dxi[i] * y   # dy/dxi
+        J[1, 0] += dN_deta[i] * x  # dx/deta
+        J[1, 1] += dN_deta[i] * y  # dy/deta
+    
+    det_J = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+    
+    if abs(det_J) < 1e-12:
+        return np.array([0.0, 0.0, 0.0])
+    
+    # Inverse Jacobian
+    J_inv = np.array([[J[1, 1], -J[0, 1]], [-J[1, 0], J[0, 0]]]) / det_J
+    
+    # Shape function derivatives in physical coordinates
+    dN_dx = np.zeros(8)
+    dN_dy = np.zeros(8)
+    for i in range(8):
+        dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
+        dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
+    
+    # B matrix for strain calculation (standard tension positive)
+    B = np.zeros((3, 16))  # 3 strains x 16 DOFs (8 nodes x 2 DOFs)
+    for i in range(8):
+        B[0, 2*i] = dN_dx[i]      # εx = ∂u/∂x
+        B[1, 2*i+1] = dN_dy[i]    # εy = ∂v/∂y
+        B[2, 2*i] = dN_dy[i]      # γxy = ∂u/∂y + ∂v/∂x
+        B[2, 2*i+1] = dN_dx[i]    # γxy = ∂u/∂y + ∂v/∂x
+    
+    # Compute strains
+    strains = B @ displacements
+    return strains
+
+def compute_simple_quad4_strains(coords, displacements):
+    """
+    Simple strain calculation for 4-node quad using bilinear interpolation.
+    This is a test to see if the issue is in the isoparametric formulation.
+    """
+    # Use center point (xi=0, eta=0) for simplicity
+    xi, eta = 0.0, 0.0
+    
+    # 4-node bilinear shape function derivatives
+    dN_dxi = 0.25 * np.array([-(1-eta), (1-eta), (1+eta), -(1+eta)])
+    dN_deta = 0.25 * np.array([-(1-xi), -(1+xi), (1+xi), (1-xi)])
+    
+    # Jacobian matrix
+    J = np.zeros((2, 2))
+    for i in range(4):
+        x, y = coords[i]
+        J[0, 0] += dN_dxi[i] * x   # dx/dxi
+        J[0, 1] += dN_dxi[i] * y   # dy/dxi
+        J[1, 0] += dN_deta[i] * x  # dx/deta
+        J[1, 1] += dN_deta[i] * y  # dy/deta
+    
+    det_J = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+    
+    if abs(det_J) < 1e-12:
+        return np.array([0.0, 0.0, 0.0])
+    
+    # Inverse Jacobian
+    J_inv = np.array([[J[1, 1], -J[0, 1]], [-J[1, 0], J[0, 0]]]) / det_J
+    
+    # Shape function derivatives in physical coordinates
+    dN_dx = np.zeros(4)
+    dN_dy = np.zeros(4)
+    for i in range(4):
+        dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
+        dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
+    
+    # B matrix (standard tension positive, 3 strains x 8 DOFs for 4 nodes)
+    B = np.zeros((3, 8))
+    for i in range(4):
+        B[0, 2*i] = dN_dx[i]      # εx = ∂u/∂x
+        B[1, 2*i+1] = dN_dy[i]    # εy = ∂v/∂y
+        B[2, 2*i] = dN_dy[i]      # γxy = ∂u/∂y + ∂v/∂x
+        B[2, 2*i+1] = dN_dx[i]    # γxy = ∂u/∂y + ∂v/∂x
+    
+    # Compute strains
+    strains = B @ displacements
+    return strains
+
+def compute_quad8_strains_at_gauss_point(coords, displacements, gauss_point):
+    """
+    Compute strains for 8-node quadrilateral element at specific Gauss point.
+    
+    This implements the exact formulation used in Griffiths & Lane (1999).
+    Uses reduced integration with 4 Gauss points (2x2 rule).
+    """
+    # 2x2 Gauss points for reduced integration (as per Griffiths paper)
+    gauss_coords = [
+        (-0.5773502692, -0.5773502692),  # Point 0
+        ( 0.5773502692, -0.5773502692),  # Point 1
+        ( 0.5773502692,  0.5773502692),  # Point 2
+        (-0.5773502692,  0.5773502692)   # Point 3
+    ]
+    
+    if gauss_point >= len(gauss_coords):
+        return np.array([0.0, 0.0, 0.0])
+    
+    xi, eta = gauss_coords[gauss_point]
+    
+    # 8-node quad shape function derivatives at (xi, eta)
+    dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta)
+    
+    # Jacobian matrix and its inverse
+    J = np.zeros((2, 2))
+    for i in range(8):
+        x, y = coords[i]
+        J[0, 0] += dN_dxi[i] * x   # dx/dxi
+        J[0, 1] += dN_dxi[i] * y   # dy/dxi
+        J[1, 0] += dN_deta[i] * x  # dx/deta
+        J[1, 1] += dN_deta[i] * y  # dy/deta
+    
+    det_J = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+    
+    if abs(det_J) < 1e-12:
+        return np.array([0.0, 0.0, 0.0])
+    
+    # Inverse Jacobian
+    J_inv = np.array([[J[1, 1], -J[0, 1]], 
+                      [-J[1, 0], J[0, 0]]]) / det_J
+    
+    # Shape function derivatives in physical coordinates
+    dN_dx = np.zeros(8)
+    dN_dy = np.zeros(8)
+    for i in range(8):
+        dN_dx[i] = J_inv[0, 0] * dN_dxi[i] + J_inv[0, 1] * dN_deta[i]
+        dN_dy[i] = J_inv[1, 0] * dN_dxi[i] + J_inv[1, 1] * dN_deta[i]
+    
+    # B matrix for strain calculation
+    B = np.zeros((3, 16))  # 3 strains x 16 DOFs (8 nodes x 2 DOFs)
+    for i in range(8):
+        B[0, 2*i]     = dN_dx[i]    # ∂u/∂x
+        B[1, 2*i+1]   = dN_dy[i]    # ∂v/∂y  
+        B[2, 2*i]     = dN_dy[i]    # ∂u/∂y
+        B[2, 2*i+1]   = dN_dx[i]    # ∂v/∂x
+    
+    # Compute strains: ε = B * u
+    strains = B @ displacements
+    
+    return strains
+
+
+def compute_quad8_shape_derivatives(xi, eta):
+    """
+    Compute shape function derivatives for 8-node quadrilateral at (xi, eta).
+    
+    Uses correct serendipity formulation with CCW node ordering:
+    3 --- 6 --- 2
+    |           |
+    7     +     5
+    |           |
+    0 --- 4 --- 1
+    
+    Corner nodes: 0(-1,-1), 1(1,-1), 2(1,1), 3(-1,1) 
+    Edge nodes: 4(0,-1), 5(1,0), 6(0,1), 7(-1,0)
+    """
+    
+    # Serendipity shape function derivatives for CCW node ordering
+    # (From working implementation in seep.py)
+    dN_dxi = np.array([
+        -0.25*(1-eta)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta), # Node 0: corner (-1,-1)
+        0.25*(1-eta)*(xi-eta-1) + 0.25*(1+xi)*(1-eta),   # Node 1: corner (1,-1)
+        0.25*(1+eta)*(xi+eta-1) + 0.25*(1+xi)*(1+eta),   # Node 2: corner (1,1)
+        -0.25*(1+eta)*(-xi+eta-1) - 0.25*(1-xi)*(1+eta), # Node 3: corner (-1,1)
+        -xi*(1-eta),                                      # Node 4: edge (0,-1)
+        0.5*(1-eta*eta),                                  # Node 5: edge (1,0)
+        -xi*(1+eta),                                      # Node 6: edge (0,1)
+        -0.5*(1-eta*eta)                                  # Node 7: edge (-1,0)
+    ])
+    
+    dN_deta = np.array([
+        -0.25*(1-xi)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta),  # Node 0: corner (-1,-1)
+        -0.25*(1+xi)*(xi-eta-1) - 0.25*(1+xi)*(1-eta),   # Node 1: corner (1,-1)
+        0.25*(1+xi)*(xi+eta-1) + 0.25*(1+xi)*(1+eta),    # Node 2: corner (1,1)
+        0.25*(1-xi)*(-xi+eta-1) + 0.25*(1-xi)*(1+eta),   # Node 3: corner (-1,1)
+        -0.5*(1-xi*xi),                                   # Node 4: edge (0,-1)
+        -eta*(1+xi),                                      # Node 5: edge (1,0)
+        0.5*(1-xi*xi),                                    # Node 6: edge (0,1)
+        -eta*(1-xi)                                       # Node 7: edge (-1,0)
+    ])
+    
+    return dN_dxi, dN_deta
+
+
+def build_quad8_stiffness_reduced_integration_corrected(coords, E, nu):
+    """
+    Build stiffness matrix for 8-node quadrilateral with 2x2 reduced integration.
+    
+    This follows the Griffiths & Lane (1999) implementation exactly:
+    - 8-node serendipity quadrilateral elements
+    - 2x2 reduced integration (4 Gauss points) 
+    - Prevents volumetric locking in nearly incompressible materials
+    """
+    # Constitutive matrix for plane strain
+    factor = E / ((1 + nu) * (1 - 2 * nu))
+    D = factor * np.array([
+        [1 - nu, nu,     0],
+        [nu,     1 - nu, 0],
+        [0,      0,      (1 - 2 * nu) / 2]
+    ])
+    
+    # 2x2 Gauss points for reduced integration (exactly as in Griffiths paper)
+    gauss_coord = 1.0 / np.sqrt(3.0)  # = 0.5773502692
+    xi_points = np.array([-gauss_coord, gauss_coord])
+    eta_points = np.array([-gauss_coord, gauss_coord])
+    weights = np.array([1.0, 1.0, 1.0, 1.0])  # 2D weights = 1 * 1
+    
+    K = np.zeros((16, 16))  # 8 nodes x 2 DOF = 16x16 matrix
+    
+    gp_idx = 0
+    for i in range(2):
+        for j in range(2):
+            xi, eta = xi_points[i], eta_points[j] 
+            w = weights[gp_idx]
+            gp_idx += 1
+            
+            # Use the existing correct shape function derivatives
+            dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta)
+            
+            # Jacobian matrix
+            J = np.zeros((2, 2))
+            for a in range(8):
+                J[0,0] += dN_dxi[a] * coords[a,0]   # dx/dxi
+                J[0,1] += dN_dxi[a] * coords[a,1]   # dy/dxi
+                J[1,0] += dN_deta[a] * coords[a,0]  # dx/deta
+                J[1,1] += dN_deta[a] * coords[a,1]  # dy/deta
+            
+            det_J = J[0,0] * J[1,1] - J[0,1] * J[1,0]
+            
+            if abs(det_J) < 1e-12:
+                print(f"Warning: Nearly singular Jacobian in quad8 element: det(J) = {det_J}")
+                continue
+            
+            # Inverse Jacobian
+            J_inv = np.array([[J[1,1], -J[0,1]], [-J[1,0], J[0,0]]]) / det_J
+            
+            # Shape function derivatives in physical coordinates
+            dN_dx = np.zeros(8)
+            dN_dy = np.zeros(8)
+            for a in range(8):
+                dN_dx[a] = J_inv[0,0] * dN_dxi[a] + J_inv[0,1] * dN_deta[a]
+                dN_dy[a] = J_inv[1,0] * dN_dxi[a] + J_inv[1,1] * dN_deta[a]
+            
+            # B matrix (strain-displacement, standard tension positive)
+            B = np.zeros((3, 16))  # 3 strains x 16 DOF
+            for a in range(8):
+                B[0, 2*a] = dN_dx[a]      # εx = ∂u/∂x
+                B[1, 2*a+1] = dN_dy[a]    # εy = ∂v/∂y
+                B[2, 2*a] = dN_dy[a]      # γxy = ∂u/∂y + ∂v/∂x
+                B[2, 2*a+1] = dN_dx[a]    # γxy = ∂u/∂y + ∂v/∂x
+            
+            # Element stiffness matrix contribution
+            K += w * det_J * (B.T @ D @ B)
+    
+    return K
+
+
+def build_triangle_stiffness_corrected(coords, E, nu):
+    """
+    Build corrected stiffness matrix for triangular element (plane strain).
+    """
+    x1, y1 = coords[0]
+    x2, y2 = coords[1] 
+    x3, y3 = coords[2]
+    
+    # Area
+    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+    
+    if area < 1e-12:
+        print(f"Warning: Very small triangle area: {area}")
+        return np.zeros((6, 6))
+    
+    # Shape function derivatives
+    b1 = y2 - y3
+    b2 = y3 - y1  
+    b3 = y1 - y2
+    c1 = x3 - x2
+    c2 = x1 - x3
+    c3 = x2 - x1
+    
+    # B matrix (strain-displacement, standard tension positive)
+    B = np.array([
+        [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
+        [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
+        [c1, b1, c2, b2, c3, b3]   # γxy = ∂u/∂y + ∂v/∂x
+    ]) / (2 * area)
+    
+    # Constitutive matrix (plane strain)
+    factor = E / ((1 + nu) * (1 - 2*nu))
+    D = factor * np.array([
+        [1-nu, nu,   0        ],
+        [nu,   1-nu, 0        ],
+        [0,    0,    (1-2*nu)/2]
+    ])
+    
+    # Element stiffness matrix
+    K_elem = area * B.T @ D @ B
+    
+    return K_elem

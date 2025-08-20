@@ -8,8 +8,8 @@ Expected results:
 - Slope: φ=20°, c/γH=0.05, 26.57° (2:1)
 """
 
-from fem_perzyna import solve_fem_perzyna, solve_ssrm_perzyna
-from fem import build_fem_data, solve_ssrm
+from fem import solve_fem_perzyna, solve_ssrm_perzyna
+from fem import build_fem_data
 from plot_fem import plot_fem_results, plot_fem_data
 from fileio import load_slope_data, print_dictionary
 from mesh import build_polygons, build_mesh_from_polygons
@@ -54,7 +54,7 @@ def test_griffiths_example1():
     print(f"  phi: {fem_data['phi_by_mat']} (friction angle, degrees)")
     
     # Get just the gravity stress state without any strength reduction
-    from fem_perzyna import establish_k0_stress_state, build_global_stiffness_perzyna, build_gravity_loads_perzyna
+    from fem import establish_k0_stress_state, build_global_stiffness_perzyna, build_gravity_loads_perzyna
     
     K_global = build_global_stiffness_perzyna(fem_data["nodes"], fem_data["elements"], 
                                             fem_data["element_types"], fem_data["element_materials"],

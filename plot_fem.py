@@ -424,7 +424,7 @@ def _plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7):
 
 
 def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=None, 
-                    show_mesh=True, show_reinforcement=True, figsize=(12, 8)):
+                    show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False):
     """
     Plot FEM results with various visualization options.
     
@@ -440,6 +440,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         show_mesh (bool): Whether to show mesh lines
         show_reinforcement (bool): Whether to show reinforcement elements
         figsize (tuple): Figure size
+        label_elements (bool): If True, show element IDs at element centers
     
     Returns:
         matplotlib figure and axes (or list of axes for multiple plots)
@@ -452,7 +453,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     
     # Parse plot types (support comma-separated list)
     plot_types = [pt.strip().lower() for pt in plot_type.split(',')]
-    valid_types = ['displacement', 'deformation', 'stress', 'strain', 'shear_strain']
+    valid_types = ['displacement', 'deformation', 'stress', 'strain', 'shear_strain', 'yield']
     
     # Validate plot types
     for pt in plot_types:
@@ -525,19 +526,22 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         
         if pt == 'displacement':
             plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement, 
-                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
-                             cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+                             cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'strain':
             plot_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'shear_strain':
             plot_shear_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad)
+                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+        elif pt == 'yield':
+            plot_yield_function_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+                                        cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         
         # Set consistent axis limits for all plots (including single plots)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
@@ -555,7 +559,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
 
 
 def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
-                              cbar_shrink=0.8, cbar_labelpad=20):
+                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
     Plot displacement magnitude contours.
     """
@@ -603,6 +607,10 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_lines(ax, fem_data, solution)
     
+    # Add element labels if requested
+    if label_elements:
+        _add_element_labels(ax, fem_data)
+    
     ax.set_aspect('equal')
     ax.set_title('Displacement Magnitude Contours')
     ax.set_xlabel('x')
@@ -610,7 +618,7 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
 
 def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
-                        cbar_shrink=0.8, cbar_labelpad=20):
+                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
     Plot von Mises stress contours.
     """
@@ -693,6 +701,10 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_forces(ax, fem_data, solution)
     
+    # Add element labels if requested
+    if label_elements:
+        _add_element_labels(ax, fem_data)
+    
     ax.set_aspect('equal')
     ax.set_title('von Mises Stress (Red lines = Plastic Elements)')
     ax.set_xlabel('x')
@@ -700,7 +712,7 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 
 def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True, 
-                       cbar_shrink=0.8, cbar_labelpad=20):
+                       cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
     Plot deformed mesh overlay on original mesh.
     """
@@ -728,6 +740,10 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
         plot_reinforcement_lines(ax, fem_data, solution, color='gray', alpha=0.5, linewidth=2, label='Original Reinforcement')
         plot_reinforcement_lines(ax, fem_data_deformed, solution, color='red', alpha=0.8, linewidth=2, label='Deformed Reinforcement')
     
+    # Add element labels if requested
+    if label_elements:
+        _add_element_labels(ax, fem_data_deformed)  # Label on deformed mesh
+    
     # Add a dummy colorbar to maintain consistent spacing with other plots
     # This ensures the x-axis alignment is consistent across all subplots
     dummy_data = np.array([[0, 1]])
@@ -748,6 +764,38 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     ax.set_ylabel('y')
     if show_mesh or show_reinforcement:
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2)
+
+
+def _add_element_labels(ax, fem_data):
+    """
+    Add element ID labels at element centers.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        
+        # Get element nodes for centroid calculation
+        if elem_type == 3:  # Triangle
+            elem_nodes = nodes[elem[:3]]
+        elif elem_type == 4:  # Quad
+            elem_nodes = nodes[elem[:4]]
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            elem_nodes = nodes[elem[:3]]
+        elif elem_type in [8, 9]:  # 8 or 9-node quad - use corner nodes
+            elem_nodes = nodes[elem[:4]]
+        else:
+            continue
+            
+        # Calculate centroid
+        centroid = np.mean(elem_nodes, axis=0)
+        
+        # Add label (1-based indexing for display)
+        ax.text(centroid[0], centroid[1], str(i+1),
+                ha='center', va='center', fontsize=6, 
+                color='darkblue', alpha=0.7, zorder=100)
 
 
 def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=1.0, label=None):
@@ -1004,7 +1052,7 @@ def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6)):
 
 
 def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
-                        cbar_shrink=0.8, cbar_labelpad=20):
+                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
     Plot equivalent strain contours (von Mises equivalent strain).
     """
@@ -1027,11 +1075,11 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     
     # Plot contours
     _plot_element_contours(ax, fem_data, equiv_strain, 'Equivalent Strain', 
-                          show_mesh, show_reinforcement, cbar_shrink, cbar_labelpad)
+                          show_mesh, show_reinforcement, cbar_shrink, cbar_labelpad, label_elements)
 
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
-                              cbar_shrink=0.8, cbar_labelpad=20):
+                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
     Plot maximum shear strain contours - key indicator for failure surfaces in slope stability.
     """
@@ -1050,14 +1098,178 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     # Plot contours with specialized colormap for shear strain (red=high, blue=low)
     _plot_nodal_contours(ax, fem_data, max_shear_strain, 'Max Shear Strain', 
                         False, show_reinforcement, cbar_shrink, cbar_labelpad,
-                        colormap='coolwarm')  # Coolwarm: red=high, blue=low
+                        colormap='coolwarm', label_elements=label_elements)  # Coolwarm: red=high, blue=low
     
     # Add title indicating this shows failure zones
     ax.set_title('Max Shear Strain (Failure Zone Indicator)', fontsize=12, pad=15)
 
 
+def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+                                cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
+    """
+    Plot yield function values (Mohr-Coulomb failure criterion).
+    Positive values indicate yielding/failure, negative values indicate elastic state.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    yield_function = solution.get("yield_function", None)
+    
+    if yield_function is None:
+        print("Warning: Yield function data not available in solution")
+        # Create dummy data
+        yield_function = np.zeros(len(elements))
+    
+    # Create custom colormap for yield function visualization
+    # Strong blue for very negative (very safe), white near zero, red for positive (yielding)
+    from matplotlib.colors import LinearSegmentedColormap
+    
+    # Define color transitions for yield function
+    # F < -50: dark blue (very safe)
+    # F = -10: light blue (safe)  
+    # F = 0: white (critical)
+    # F > 0: red (yielding)
+    colors = ['darkblue', 'blue', 'lightblue', 'white', 'pink', 'red', 'darkred']
+    n_bins = 100
+    cmap_yield = LinearSegmentedColormap.from_list('yield', colors, N=n_bins)
+    
+    # Set visualization bounds - asymmetric to focus on near-yield region
+    vmin = -500  # Cap negative values for better contrast
+    vmax = 100   # Positive values are more important
+    
+    # Plot each element as a colored patch
+    from matplotlib.collections import PatchCollection
+    from matplotlib.patches import Polygon
+    patches_list = []
+    values_list = []
+    
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        if elem_type == 3:  # Triangle
+            coords = nodes[elem[:3]]
+        elif elem_type == 4:  # Quad
+            coords = nodes[elem[:4]]
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            coords = nodes[elem[:3]]
+        elif elem_type in [8, 9]:  # 8 or 9-node quad - use corner nodes
+            coords = nodes[elem[:4]]
+        else:
+            continue
+            
+        patch = Polygon(coords, closed=True)
+        patches_list.append(patch)
+        # Clip values for visualization
+        values_list.append(np.clip(yield_function[i], vmin, vmax))
+    
+    if patches_list:
+        p = PatchCollection(patches_list, alpha=0.9, edgecolors='gray', linewidths=0.3)
+        p.set_array(np.array(values_list))
+        p.set_cmap(cmap_yield)
+        p.set_clim(vmin, vmax)
+        ax.add_collection(p)
+        
+        # Add colorbar with custom ticks
+        cbar = plt.colorbar(p, ax=ax, shrink=cbar_shrink)
+        cbar.set_label('Yield Function F', rotation=270, labelpad=cbar_labelpad)
+        
+        # Set custom ticks to highlight key values
+        tick_values = [-500, -200, -100, -50, -10, 0, 10, 50, 100]
+        tick_labels = ['-500', '-200', '-100', '-50', '-10', '0', '10', '50', '100']
+        cbar.set_ticks(tick_values)
+        cbar.set_ticklabels(tick_labels)
+        
+        # Add a line at F=0
+        cbar.ax.axhline(y=0, color='black', linewidth=2)
+    
+    # Add yield function values as text on elements (if requested or for yielding elements)
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        
+        # Get element centroid
+        if elem_type == 3:  # Triangle
+            elem_nodes = nodes[elem[:3]]
+        elif elem_type == 4:  # Quad
+            elem_nodes = nodes[elem[:4]]
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            elem_nodes = nodes[elem[:3]]
+        elif elem_type in [8, 9]:  # 8 or 9-node quad - use corner nodes
+            elem_nodes = nodes[elem[:4]]
+        else:
+            continue
+            
+        centroid = np.mean(elem_nodes, axis=0)
+        
+        # Show values for elements that are close to yielding or already yielding
+        # or if label_elements is True
+        f_val = yield_function[i]
+        
+        if label_elements or f_val > -50:  # Show if requested or if close to yielding
+            # Format the number based on magnitude
+            if abs(f_val) < 10:
+                text = f'{f_val:.1f}'
+            else:
+                text = f'{f_val:.0f}'
+            
+            # Choose text color based on value
+            if f_val > 0:
+                color = 'white'  # White on red background
+                fontweight = 'bold'
+            elif f_val > -10:
+                color = 'black'  # Black on light background
+                fontweight = 'normal'
+            else:
+                color = 'white'  # White on blue background
+                fontweight = 'normal'
+            
+            # Only show for elements near yield or if explicitly requested
+            if label_elements or f_val > -30:
+                ax.text(centroid[0], centroid[1], text,
+                       ha='center', va='center', fontsize=5,
+                       color=color, fontweight=fontweight, alpha=0.8)
+    
+    # Highlight yielding elements with thick red border
+    for i, elem in enumerate(elements):
+        if yield_function[i] > 0:
+            elem_type = element_types[i]
+            if elem_type == 3:  # Triangle
+                coords = nodes[elem[:3]]
+            elif elem_type == 4:  # Quad
+                coords = nodes[elem[:4]]
+            elif elem_type == 6:  # 6-node triangle - use corner nodes
+                coords = nodes[elem[:3]]
+            elif elem_type in [8, 9]:  # 8 or 9-node quad - use corner nodes
+                coords = nodes[elem[:4]]
+            else:
+                continue
+            
+            # Close the polygon
+            coords = np.vstack([coords, coords[0]])
+            ax.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, alpha=1.0)
+    
+    # Add reinforcement if requested
+    if show_reinforcement and 'elements_1d' in fem_data:
+        plot_reinforcement_lines(ax, fem_data, solution)
+    
+    # Add title indicating yield state
+    ax.set_title('Yield Function (F>0: Yielding, F<0: Elastic)', fontsize=12, pad=15)
+    
+    # Add statistics to the plot
+    n_yielding = np.sum(yield_function > 0)
+    n_total = len(yield_function)
+    n_critical = np.sum((yield_function > -10) & (yield_function <= 0))  # Near yielding
+    
+    stats_text = f'Yielding: {n_yielding}/{n_total} elements\n'
+    stats_text += f'Critical (F>-10): {n_critical} elements\n'
+    stats_text += f'Max F: {np.max(yield_function):.1f}\n'
+    stats_text += f'Min F: {np.min(yield_function):.1f}'
+    
+    ax.text(0.02, 0.98, stats_text,
+            transform=ax.transAxes, fontsize=9, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7))
+
+
 def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_reinforcement=True,
-                          cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis'):
+                          cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, colormap='viridis'):
     """
     Helper function to plot element-based contour data.
     """
@@ -1154,11 +1366,15 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
                     y_coords = [nodes[elem[0], 1], nodes[elem[1], 1]]
                     ax.plot(x_coords, y_coords, 'r-', linewidth=2, alpha=0.8)
     
+    # Add element labels if requested
+    if label_elements:
+        _add_element_labels(ax, fem_data)
+    
     ax.set_aspect('equal')
 
 
 def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, show_reinforcement=True,
-                        cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis'):
+                        cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis', label_elements=False):
     """
     Plot smooth contours by interpolating element values to nodes.
     """
@@ -1255,5 +1471,9 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
                     x_coords = [nodes[elem[0], 0], nodes[elem[1], 0]]
                     y_coords = [nodes[elem[0], 1], nodes[elem[1], 1]]
                     ax.plot(x_coords, y_coords, 'r-', linewidth=2, alpha=0.8)
+    
+    # Add element labels if requested
+    if label_elements:
+        _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')

@@ -527,7 +527,7 @@ def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem_perzyna(fem_data, F=1.0, debug_level=0):
+def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
     """
     Solve FEM using Perzyna visco-plastic algorithm exactly as in Griffiths & Lane (1999).
     
@@ -541,6 +541,10 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0):
         fem_data (dict): FEM data dictionary
         F (float): Shear strength reduction factor
         debug_level (int): Verbosity level
+        abort_after (int): Abort after this many iterations. -1 = no abort (default)
+                          0 = abort after gravity loading (before plasticity check)
+                          1 = abort after first plasticity iteration
+                          etc.
         
     Returns:
         dict: Solution dictionary with convergence status
@@ -659,6 +663,48 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0):
             print(f"    Stress: σx={sample_stress[0]:.1f}, σy={sample_stress[1]:.1f}, τxy={sample_stress[2]:.1f}")
             f_sample = check_mohr_coulomb_perzyna(sample_stress, c_reduced[sample_elem], phi_reduced[sample_elem])
             print(f"    Yield function F = {f_sample:.3f}")
+    
+    # Calculate yield function values for all elements after gravity loading
+    yield_function_values = np.zeros(n_elements)
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        # Use first Gauss point stress for yield function (or average for quads)
+        if elem_type == 8:  # 8-node quad - average over Gauss points
+            elem_stress_avg = np.mean(stress_state['element_stresses'][elem_idx, :4, :], axis=0)
+        else:  # Triangle or other - use first Gauss point
+            elem_stress_avg = stress_state['element_stresses'][elem_idx, 0, :]
+        
+        # Calculate yield function with reduced strength parameters
+        yield_function_values[elem_idx] = check_mohr_coulomb_perzyna(
+            elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
+    
+    # Check for early abort after gravity loading
+    if abort_after == 0:
+        if debug_level >= 1:
+            print("Aborting after gravity loading (abort_after=0)")
+        
+        # Compute stresses and strains for output
+        final_stresses, plastic_elements = compute_final_state_perzyna(
+            nodes, elements, element_types, element_materials,
+            initial_displacements, {}, c_reduced, phi_reduced,
+            E_by_mat, nu_by_mat, u_nodal, stress_state)
+        
+        strains = compute_strains_perzyna(nodes, elements, element_types, initial_displacements)
+        
+        return {
+            "converged": True,
+            "iterations": 0,
+            "displacements": initial_displacements,
+            "stresses": final_stresses,
+            "strains": strains,
+            "plastic_elements": plastic_elements,
+            "yield_function": yield_function_values,
+            "max_displacement": np.max(np.abs(initial_displacements)),
+            "plastic_strains": {},
+            "algorithm": "Perzyna Visco-Plastic (aborted after gravity)",
+            "aborted": True,
+            "abort_after": abort_after
+        }
     
     if debug_level >= 1:
         print("Phase 2: Starting Perzyna strength reduction analysis...")
@@ -780,6 +826,13 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0):
         displacements = displacements_new.copy()
         plastic_strains = plastic_strains_new
         
+        # Check for early abort
+        if abort_after > 0 and iteration + 1 >= abort_after:
+            if debug_level >= 1:
+                print(f"Aborting after iteration {iteration + 1} (abort_after={abort_after})")
+            converged = True  # Mark as converged for early abort
+            break
+        
         # Check for excessive displacements (numerical instability indicator)
         max_disp = np.max(np.abs(displacements))
         if max_disp > 1e6:  # Very large threshold - only for true instability
@@ -796,21 +849,37 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0):
     # Compute strains
     strains = compute_strains_perzyna(nodes, elements, element_types, displacements)
     
+    # Calculate final yield function values
+    final_yield_function_values = np.zeros(n_elements)
+    for elem_idx in range(n_elements):
+        # Use the stress from final_stresses (which includes von Mises as 4th column)
+        elem_stress = final_stresses[elem_idx, :3]  # [sig_x, sig_y, tau_xy]
+        final_yield_function_values[elem_idx] = check_mohr_coulomb_perzyna(
+            elem_stress, c_reduced[elem_idx], phi_reduced[elem_idx])
+    
     if debug_level >= 2:
         n_plastic = np.sum(plastic_elements)
         print(f"Final: {n_plastic}/{n_elements} plastic elements")
     
-    return {
+    result = {
         "converged": converged,
         "iterations": iteration + 1,
         "displacements": displacements,
         "stresses": final_stresses,
         "strains": strains,
         "plastic_elements": plastic_elements,
+        "yield_function": final_yield_function_values,
         "max_displacement": np.max(np.abs(displacements)),
         "plastic_strains": plastic_strains,
         "algorithm": "Perzyna Visco-Plastic"
     }
+    
+    # Add abort information if applicable
+    if abort_after > 0 and iteration + 1 >= abort_after:
+        result["aborted"] = True
+        result["abort_after"] = abort_after
+    
+    return result
 
 
 def solve_ssrm_perzyna(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
@@ -1522,8 +1591,11 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             # Compute strains
             total_strains = compute_triangle_strains_manual(elem_coords, elem_disp)
             
-            # Get plastic strains (single Gauss point)
-            plastic_strain = plastic_strains[elem_idx][0, :]  # First (and only) Gauss point
+            # Get plastic strains (single Gauss point) - handle empty plastic_strains
+            if elem_idx in plastic_strains:
+                plastic_strain = plastic_strains[elem_idx][0, :]  # First (and only) Gauss point
+            else:
+                plastic_strain = np.zeros(3)  # No plastic strains yet
             
             # Elastic strains
             elastic_strains = total_strains - plastic_strain

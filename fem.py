@@ -614,7 +614,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
     # Debug gravity loads and element areas
     if debug_level >= 1:
         print(f"  Debug: Checking gravity load calculation")
-        sample_elem = 100
+        sample_elem = 129  # should be close to shear zone for tri3 mesh
         if sample_elem < len(elements):
             elem_type = element_types[sample_elem]
             elem_nodes = elements[sample_elem][:elem_type]
@@ -632,37 +632,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
             load_per_node = gamma * area / elem_type
             print(f"    Element {sample_elem}: area={area:.2f}, gamma={gamma}, load_per_node={load_per_node:.1f}")
     
-    # Debug: Check yield states at different F values  
-    if debug_level >= 1:
-        print(f"  Checking yield at F=1.0 (original strength):")
-        c_original = fem_data["c_by_mat"][element_materials - 1]
-        phi_original = np.radians(fem_data["phi_by_mat"][element_materials - 1])
-        initial_yield_count = check_initial_yield_state(stress_state, c_original, phi_original)
-        print(f"    Elements yielding at F=1.0: {initial_yield_count}/{n_elements}")
-        
-        print(f"  Checking yield at F={F:.2f} (reduced strength):")
-        print(f"    c_reduced = {c_reduced[0]:.1f}, phi_reduced = {np.degrees(phi_reduced[0]):.1f}°")
-        reduced_yield_count = check_initial_yield_state(stress_state, c_reduced, phi_reduced)
-        print(f"    Elements yielding at F={F:.2f}: {reduced_yield_count}/{n_elements}")
-        
-        # Find elements near the slope face (high x, high y)
-        elem_centroids = []
-        for elem_idx in range(n_elements):
-            elem_type = element_types[elem_idx]
-            elem_nodes = elements[elem_idx][:elem_type]
-            centroid = np.mean(nodes[elem_nodes], axis=0)
-            elem_centroids.append((elem_idx, centroid[0], centroid[1]))
-        
-        # Find elements with x > 100 and y > 20 (near slope face)
-        face_elements = [e for e in elem_centroids if e[1] > 100 and e[2] > 20]
-        if face_elements:
-            face_elements.sort(key=lambda x: -x[2])  # Sort by y descending
-            sample_elem = face_elements[0][0]
-            print(f"  Checking element {sample_elem} near face (x={face_elements[0][1]:.1f}, y={face_elements[0][2]:.1f}):")
-            sample_stress = stress_state['element_stresses'][sample_elem, 0, :]
-            print(f"    Stress: σx={sample_stress[0]:.1f}, σy={sample_stress[1]:.1f}, τxy={sample_stress[2]:.1f}")
-            f_sample = check_mohr_coulomb(sample_stress, c_reduced[sample_elem], phi_reduced[sample_elem])
-            print(f"    Yield function F = {f_sample:.3f}")
     
     # Calculate yield function values for all elements after gravity loading
     yield_function_values = np.zeros(n_elements)
@@ -677,6 +646,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
         # Calculate yield function with reduced strength parameters
         yield_function_values[elem_idx] = check_mohr_coulomb(
             elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
+        
+    # Output detailed yield function values for element 129
+    if debug_level >= 1:
+        print(f"Yield function values for element 129: {yield_function_values[129]:.2f}")
+        print(f"Stress state for element 129: {stress_state['element_stresses'][129, 0, :]}")
+        print(f"Reduced strength parameters for element 129: c={c_reduced[129]:.1f}, phi={np.degrees(phi_reduced[129]):.1f}°")
+        print(f"Yield function F = {yield_function_values[129]:.3f}")
+        
+        
     
     # Check for early abort after gravity loading
     if abort_after == 0:
@@ -1177,6 +1155,8 @@ def compute_plastic_load_correction_perzyna(nodes, elements, element_types, elem
             # Compute plastic stress
             D = build_constitutive_matrix(E, nu)
             plastic_stress = D @ plastic_strain
+            # Negate for compression-positive convention
+            plastic_stress = -plastic_stress
             
             # Compute B matrix for this element
             if elem_type == 3:  # Triangle
@@ -1413,6 +1393,8 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
             # Elastic trial stress = initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
             incremental_stress = D @ elastic_strains
+            # Negate for compression-positive convention
+            incremental_stress = -incremental_stress
             
             # Add initial stress if provided
             if initial_stresses is not None:
@@ -1515,6 +1497,8 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
             # Compute incremental stress from incremental strains
             D = build_constitutive_matrix(E, nu)
             incremental_stress = D @ incremental_strains
+            # Negate for compression-positive convention
+            incremental_stress = -incremental_stress
             
             # Get current total stress at this Gauss point
             current_stress = current_stress_state['element_stresses'][elem_idx, gp, :]
@@ -1545,6 +1529,8 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 
                 # Update stress state (remove plastic stress contribution)
                 plastic_stress = D @ plastic_increment
+                # Negate for compression-positive convention
+                plastic_stress = -plastic_stress
                 new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress - plastic_stress
                 
                 # Track total plastic increment
@@ -1603,6 +1589,8 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             # Stress calculation: initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
             incremental_stress = D @ elastic_strains
+            # Negate for compression-positive convention
+            incremental_stress = -incremental_stress
             
             # Add initial geostatic stress
             if stress_state is not None:
@@ -1648,6 +1636,8 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
                     strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
                     D = build_constitutive_matrix(E, nu)
                     stress = D @ strains
+                    # Negate for compression-positive convention
+                    stress = -stress
                     elem_stress_avg += stress
                 elem_stress_avg /= len(gauss_coords)
             
@@ -1709,27 +1699,31 @@ def build_constitutive_matrix(E, nu):
 def check_mohr_coulomb(stress, c, phi, debug=False):
     """Check Mohr-Coulomb yield criterion and return violation.
     
-    Uses Griffiths & Lane (1999) formulation with compression-negative convention.
+    Uses yield function for compression-positive convention from docs/fem/overview.md:
+    f = (σ1 - σ3)/2 - ((σ1 + σ3)/2 * sin(φ) + c * cos(φ))
+    
+    With compression positive: σ1 is major (most compressive), σ3 is minor (least compressive)
     """
     
     sig_x, sig_y, tau_xy = stress
     
-    # Principal stresses (tension positive, compression negative)
+    # Principal stresses (compression positive, tension negative)
     sig_mean = (sig_x + sig_y) / 2
     tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
     
-    sig1 = sig_mean + tau_max  # Most positive (least compressive/most tensile)
-    sig3 = sig_mean - tau_max  # Most negative (most compressive/least tensile)
+    # For compression-positive: sig1 is major (most compressive), sig3 is minor (least compressive)
+    sig1 = sig_mean + tau_max  # Major principal stress (most positive/compressive)
+    sig3 = sig_mean - tau_max  # Minor principal stress (least positive/most tensile)
     
-    # Griffiths & Lane (1999) yield function for compression-negative
-    # F = (σ₁ + σ₃)/2 × sin φ' - (σ₁ - σ₃)/2 - c' cos φ'
-    # Yield when F > 0
+    # Yield function from docs/fem/overview.md for compression-positive convention:
+    # f = (σ1 - σ3)/2 - ((σ1 + σ3)/2 * sin(φ) + c * cos(φ))
+    # Simplifying: (σ1 - σ3)/2 = tau_max, (σ1 + σ3)/2 = sig_mean
+    # So: f = tau_max - (sig_mean * sin(φ) + c * cos(φ))
+    # Yield when f > 0
     cos_phi = cos(phi)
     sin_phi = sin(phi)
     
-    # Note: sig1 + sig3 = 2*sig_mean = sig_x + sig_y
-    # And: sig1 - sig3 = 2*tau_max
-    F = sig_mean * sin_phi - tau_max - c * cos_phi
+    F = tau_max - (sig_mean * sin_phi + c * cos_phi)
     
     if debug and F > -c * cos_phi * 0.1:  # Near yielding
         print(f"  Debug: σx={sig_x:.1f}, σy={sig_y:.1f}, τxy={tau_xy:.1f}")
@@ -1891,11 +1885,13 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
             
             # Compute stresses from strains using elastic constitutive matrix
             # This is the true "gravity in single increment to initially stress-free slope"
-            # Standard tension positive convention: compression is negative
+            # Geotechnical convention: compression is positive, tension is negative
             D = build_constitutive_matrix(E, nu)
             stresses = D @ strains
+            # Negate to convert from tension-positive to compression-positive
+            stresses = -stresses
             
-            # Store stress at this Gauss point (tension positive, compression negative)
+            # Store stress at this Gauss point (compression positive, tension negative)
             element_stresses[elem_idx, gp, :] = stresses
     
     # Debug: Check stress state statistics

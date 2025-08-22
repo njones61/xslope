@@ -1,5 +1,5 @@
 
-from fem import build_fem_data, solve_fem_perzyna, solve_ssrm_perzyna
+from fem import build_fem_data, solve_fem, solve_ssrm
 from plot_fem import plot_fem_results, plot_reinforcement_force_profiles, plot_ssrm_convergence, plot_fem_data
 from fileio import load_slope_data, print_dictionary
 from mesh import build_polygons, build_mesh_from_polygons
@@ -32,7 +32,7 @@ print("=== Testing New Improved FEM Solver ===")
 
 # Test 1: Single FEM analysis with new two-phase solver
 print("\n1. Testing new two-phase elastic-plastic solver...")
-solution_new = solve_fem_perzyna(fem_data, F=1.28, debug_level=2)
+solution_new = solve_fem(fem_data, F=1.28, debug_level=2)
 
 if solution_new.get("converged", False):
     print("✓ New solver converged successfully!")
@@ -50,7 +50,7 @@ else:
 # Test 2: Compare with old solver (if it still works)
 print("\n2. Testing old solver for comparison...")
 try:
-    solution_old = solve_fem_perzyna(fem_data, F=1.28, debug_level=1)
+    solution_old = solve_fem(fem_data, F=1.28, debug_level=1)
     if solution_old.get("converged", False):
         print("✓ Old solver also converged")
         print(f"  Iterations: {solution_old.get('iterations', 'Unknown')}")
@@ -64,7 +64,7 @@ except Exception as e:
 
 # Test 3: Test new SSRM with bisection method
 print("\n3. Testing new SSRM with bisection method...")
-solution_ssrm_new = solve_ssrm_perzyna(fem_data, F_min=1.0, F_max=5.0, tolerance=0.01, debug_level=1)
+solution_ssrm_new = solve_ssrm(fem_data, F_min=1.0, F_max=5.0, tolerance=0.01, debug_level=1)
 
 if solution_ssrm_new.get("converged", False):
     print("✓ SSRM bisection completed successfully!")

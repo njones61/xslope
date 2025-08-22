@@ -527,7 +527,7 @@ def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
+def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
     """
     Solve FEM using Perzyna visco-plastic algorithm exactly as in Griffiths & Lane (1999).
     
@@ -588,11 +588,11 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
         print(f"Reduced φ range: [{np.min(np.degrees(phi_reduced)):.1f}°, {np.max(np.degrees(phi_reduced)):.1f}°]")
     
     # Build global stiffness matrix (elastic, constant throughout)
-    K_global = build_global_stiffness_perzyna(nodes, elements, element_types, 
+    K_global = build_global_stiffness(nodes, elements, element_types, 
                                              element_materials, E_by_mat, nu_by_mat)
     
     # Build gravity load vector
-    F_gravity = build_gravity_loads_perzyna(nodes, elements, element_types, 
+    F_gravity = build_gravity_loads(nodes, elements, element_types, 
                                            element_materials, gamma_by_mat, k_seismic)
     
     # Boundary conditions will be applied in each iteration using apply_boundary_conditions
@@ -661,7 +661,7 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
             print(f"  Checking element {sample_elem} near face (x={face_elements[0][1]:.1f}, y={face_elements[0][2]:.1f}):")
             sample_stress = stress_state['element_stresses'][sample_elem, 0, :]
             print(f"    Stress: σx={sample_stress[0]:.1f}, σy={sample_stress[1]:.1f}, τxy={sample_stress[2]:.1f}")
-            f_sample = check_mohr_coulomb_perzyna(sample_stress, c_reduced[sample_elem], phi_reduced[sample_elem])
+            f_sample = check_mohr_coulomb(sample_stress, c_reduced[sample_elem], phi_reduced[sample_elem])
             print(f"    Yield function F = {f_sample:.3f}")
     
     # Calculate yield function values for all elements after gravity loading
@@ -675,7 +675,7 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
             elem_stress_avg = stress_state['element_stresses'][elem_idx, 0, :]
         
         # Calculate yield function with reduced strength parameters
-        yield_function_values[elem_idx] = check_mohr_coulomb_perzyna(
+        yield_function_values[elem_idx] = check_mohr_coulomb(
             elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
     
     # Check for early abort after gravity loading
@@ -689,7 +689,7 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
             initial_displacements, {}, c_reduced, phi_reduced,
             E_by_mat, nu_by_mat, u_nodal, stress_state)
         
-        strains = compute_strains_perzyna(nodes, elements, element_types, initial_displacements)
+        strains = compute_strains(nodes, elements, element_types, initial_displacements)
         
         return {
             "converged": True,
@@ -847,14 +847,14 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
         E_by_mat, nu_by_mat, u_nodal, stress_state)
     
     # Compute strains
-    strains = compute_strains_perzyna(nodes, elements, element_types, displacements)
+    strains = compute_strains(nodes, elements, element_types, displacements)
     
     # Calculate final yield function values
     final_yield_function_values = np.zeros(n_elements)
     for elem_idx in range(n_elements):
         # Use the stress from final_stresses (which includes von Mises as 4th column)
         elem_stress = final_stresses[elem_idx, :3]  # [sig_x, sig_y, tau_xy]
-        final_yield_function_values[elem_idx] = check_mohr_coulomb_perzyna(
+        final_yield_function_values[elem_idx] = check_mohr_coulomb(
             elem_stress, c_reduced[elem_idx], phi_reduced[elem_idx])
     
     if debug_level >= 2:
@@ -882,7 +882,7 @@ def solve_fem_perzyna(fem_data, F=1.0, debug_level=0, abort_after=-1):
     return result
 
 
-def solve_ssrm_perzyna(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
+def solve_ssrm(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
     """
     SSRM using Perzyna algorithm with pure non-convergence failure criterion.
     """
@@ -960,7 +960,7 @@ def solve_ssrm_perzyna(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_lev
     }
 
 
-def build_global_stiffness_perzyna(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat):
+def build_global_stiffness(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat):
     """
     Build global stiffness matrix using existing FE implementation for proper 8-node quad support.
     """
@@ -1034,12 +1034,12 @@ def build_quad8_stiffness_reduced_integration(coords, E, nu):
             quad_coords[1], 
             quad_coords[2]
         ])
-        return build_triangle_stiffness_perzyna(tri_coords, E, nu)
+        return build_triangle_stiffness(tri_coords, E, nu)
     else:
-        return build_triangle_stiffness_perzyna(coords, E, nu)
+        return build_triangle_stiffness(coords, E, nu)
 
 
-def build_triangle_stiffness_perzyna(coords, E, nu):
+def build_triangle_stiffness(coords, E, nu):
     """
     Build stiffness matrix for triangular element (plane strain).
     """
@@ -1083,7 +1083,7 @@ def build_triangle_stiffness_perzyna(coords, E, nu):
     return K_elem
 
 
-def build_gravity_loads_perzyna(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic):
+def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic):
     """
     Build gravity load vector.
     """
@@ -1175,7 +1175,7 @@ def compute_plastic_load_correction_perzyna(nodes, elements, element_types, elem
                 continue
             
             # Compute plastic stress
-            D = build_constitutive_matrix_perzyna(E, nu)
+            D = build_constitutive_matrix(E, nu)
             plastic_stress = D @ plastic_strain
             
             # Compute B matrix for this element
@@ -1349,7 +1349,7 @@ def check_initial_yield_state(stress_state, c_values, phi_values):
         
         # Check Mohr-Coulomb yield criterion
         stress = np.array([sig_x, sig_y, tau_xy])
-        F_yield = check_mohr_coulomb_perzyna(stress, c, phi)
+        F_yield = check_mohr_coulomb(stress, c, phi)
         if F_yield > 0:
             yield_count += 1
     
@@ -1411,7 +1411,7 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
             elastic_strains = total_strains - plastic_strain_old
             
             # Elastic trial stress = initial stress + incremental stress
-            D = build_constitutive_matrix_perzyna(E, nu)
+            D = build_constitutive_matrix(E, nu)
             incremental_stress = D @ elastic_strains
             
             # Add initial stress if provided
@@ -1422,7 +1422,7 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
                 trial_stress = incremental_stress
             
             # Check yield criterion with total stress
-            f_yield = check_mohr_coulomb_perzyna(trial_stress, c, phi)
+            f_yield = check_mohr_coulomb(trial_stress, c, phi)
             
             if f_yield > 1e-8:  # Plastic loading
                 # Perzyna visco-plastic flow as per Griffiths & Lane (1999)
@@ -1513,7 +1513,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 incremental_strains = np.array([0.0, 0.0, 0.0])
             
             # Compute incremental stress from incremental strains
-            D = build_constitutive_matrix_perzyna(E, nu)
+            D = build_constitutive_matrix(E, nu)
             incremental_stress = D @ incremental_strains
             
             # Get current total stress at this Gauss point
@@ -1523,7 +1523,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
             trial_stress = current_stress + incremental_stress
             
             # Check yield criterion with trial stress
-            f_yield = check_mohr_coulomb_perzyna(trial_stress, c, phi)
+            f_yield = check_mohr_coulomb(trial_stress, c, phi)
             
             if f_yield > 1e-8:  # Plastic loading
                 # Perzyna visco-plastic flow
@@ -1601,7 +1601,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             elastic_strains = total_strains - plastic_strain
             
             # Stress calculation: initial stress + incremental stress
-            D = build_constitutive_matrix_perzyna(E, nu)
+            D = build_constitutive_matrix(E, nu)
             incremental_stress = D @ elastic_strains
             
             # Add initial geostatic stress
@@ -1617,7 +1617,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
             
             # Check if element is plastic (yield criterion)
-            f_yield = check_mohr_coulomb_perzyna(stress, c, phi)
+            f_yield = check_mohr_coulomb(stress, c, phi)
             plastic_elements[elem_idx] = f_yield > 1e-8
         
         else:
@@ -1646,7 +1646,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
                                (1/np.sqrt(3), 1/np.sqrt(3)), (-1/np.sqrt(3), 1/np.sqrt(3))]
                 for xi, eta in gauss_coords:
                     strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
-                    D = build_constitutive_matrix_perzyna(E, nu)
+                    D = build_constitutive_matrix(E, nu)
                     stress = D @ strains
                     elem_stress_avg += stress
                 elem_stress_avg /= len(gauss_coords)
@@ -1657,7 +1657,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
             
             # Check yield function (same as triangles)
-            f_yield = check_mohr_coulomb_perzyna(elem_stress_avg, c, phi)
+            f_yield = check_mohr_coulomb(elem_stress_avg, c, phi)
             plastic_elements[elem_idx] = f_yield > 1e-8
     
     return final_stresses, plastic_elements
@@ -1695,7 +1695,7 @@ def compute_triangle_strains_manual(coords, displacements):
     return strains
 
 
-def build_constitutive_matrix_perzyna(E, nu):
+def build_constitutive_matrix(E, nu):
     """Build constitutive matrix for plane strain."""
     factor = E / ((1 + nu) * (1 - 2*nu))
     D = factor * np.array([
@@ -1706,7 +1706,7 @@ def build_constitutive_matrix_perzyna(E, nu):
     return D
 
 
-def check_mohr_coulomb_perzyna(stress, c, phi, debug=False):
+def check_mohr_coulomb(stress, c, phi, debug=False):
     """Check Mohr-Coulomb yield criterion and return violation.
     
     Uses Griffiths & Lane (1999) formulation with compression-negative convention.
@@ -1892,7 +1892,7 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
             # Compute stresses from strains using elastic constitutive matrix
             # This is the true "gravity in single increment to initially stress-free slope"
             # Standard tension positive convention: compression is negative
-            D = build_constitutive_matrix_perzyna(E, nu)
+            D = build_constitutive_matrix(E, nu)
             stresses = D @ strains
             
             # Store stress at this Gauss point (tension positive, compression negative)
@@ -1916,7 +1916,7 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
     }
 
 
-def compute_strains_perzyna(nodes, elements, element_types, displacements):
+def compute_strains(nodes, elements, element_types, displacements):
     """
     Compute element strains for visualization.
     """

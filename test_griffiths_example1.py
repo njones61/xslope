@@ -8,7 +8,7 @@ Expected results:
 - Slope: φ=20°, c/γH=0.05, 26.57° (2:1)
 """
 
-from fem import solve_fem_perzyna
+from fem import solve_fem
 from fem import build_fem_data
 from plot_fem import plot_fem_results, plot_fem_data
 from fileio import load_slope_data
@@ -39,7 +39,7 @@ def test_griffiths_example1():
     
     print(f"\n=== Testing Initial Gravity Loading (abort_after=0) ===")
     # First check gravity loading only
-    gravity_solution = solve_fem_perzyna(fem_data, F=1.6, debug_level=2, abort_after=0)
+    gravity_solution = solve_fem(fem_data, F=1.6, debug_level=2, abort_after=0)
     
     # Plot gravity stress state and yield function
     print(f"\n=== Plotting Initial Gravity Stress and Yield Function ===")
@@ -63,7 +63,7 @@ def test_griffiths_example1():
     
     print(f"\n=== Testing One Perzyna Iteration (abort_after=1) ===")
     # Test one iteration to see plastic correction
-    one_iter_solution = solve_fem_perzyna(fem_data, F=1.6, debug_level=2, abort_after=1)
+    one_iter_solution = solve_fem(fem_data, F=1.6, debug_level=2, abort_after=1)
     
     # Plot after one iteration
     print(f"\n=== Plotting After One Perzyna Iteration ===")
@@ -75,7 +75,7 @@ def test_griffiths_example1():
     
     F = 1.2
     print(f"\nTesting F = {F:.3f}")
-    solution = solve_fem_perzyna(fem_data, F=F, debug_level=2)
+    solution = solve_fem(fem_data, F=F, debug_level=2)
     
     converged_str = "YES" if solution["converged"] else "NO"
     max_disp = solution.get("max_displacement", 0.0)

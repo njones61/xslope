@@ -849,8 +849,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
                     
                     # Compute stresses
                     D = build_constitutive_matrix(E, nu)
-                    stresses_raw = D @ strains
-                    stresses = -stresses_raw  # Convert to compression-positive
+                    stresses = D @ strains  # Already compression-positive from D matrix
                     
                     print(f"  Computed stresses: σx={stresses[0]:.1f}, σy={stresses[1]:.1f}, τxy={stresses[2]:.1f}")
                     
@@ -1389,9 +1388,7 @@ def compute_plastic_load_correction_perzyna(nodes, elements, element_types, elem
             
             # Compute plastic stress
             D = build_constitutive_matrix(E, nu)
-            plastic_stress = D @ plastic_strain
-            # Negate for compression-positive convention
-            plastic_stress = -plastic_stress
+            plastic_stress = D @ plastic_strain  # Already compression-positive from D matrix
             
             # Compute B matrix for this element
             if elem_type == 3:  # Triangle
@@ -1627,9 +1624,7 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
             
             # Elastic trial stress = initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ elastic_strains
-            # Negate for compression-positive convention
-            incremental_stress = -incremental_stress
+            incremental_stress = D @ elastic_strains  # Already compression-positive from D matrix
             
             # Add initial stress if provided
             if initial_stresses is not None:
@@ -1731,9 +1726,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
             
             # Compute incremental stress from incremental strains
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ incremental_strains
-            # Negate for compression-positive convention
-            incremental_stress = -incremental_stress
+            incremental_stress = D @ incremental_strains  # Already compression-positive from D matrix
             
             # Get current total stress at this Gauss point
             current_stress = current_stress_state['element_stresses'][elem_idx, gp, :]
@@ -1763,9 +1756,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 plastic_strains_new[elem_idx][gp, :] += plastic_increment
                 
                 # Update stress state (remove plastic stress contribution)
-                plastic_stress = D @ plastic_increment
-                # Negate for compression-positive convention
-                plastic_stress = -plastic_stress
+                plastic_stress = D @ plastic_increment  # Already compression-positive from D matrix
                 new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress - plastic_stress
                 
                 # Track total plastic increment
@@ -1823,9 +1814,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             
             # Stress calculation: initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ elastic_strains
-            # Negate for compression-positive convention
-            incremental_stress = -incremental_stress
+            incremental_stress = D @ elastic_strains  # Already compression-positive from D matrix
             
             # Add initial geostatic stress
             if stress_state is not None:
@@ -1870,9 +1859,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
                 for xi, eta in gauss_coords:
                     strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
                     D = build_constitutive_matrix(E, nu)
-                    stress = D @ strains
-                    # Negate for compression-positive convention
-                    stress = -stress
+                    stress = D @ strains  # Already compression-positive from D matrix
                     elem_stress_avg += stress
                 elem_stress_avg /= len(gauss_coords)
             
@@ -1921,7 +1908,7 @@ def compute_triangle_strains_manual(coords, displacements):
 
 
 def build_constitutive_matrix(E, nu):
-    """Build constitutive matrix for plane strain."""
+    """Build constitutive matrix for plane strain - compression positive convention."""
     # Add numerical stability check for near-incompressible materials
     if nu >= 0.45:
         print(f"Warning: Poisson's ratio {nu:.3f} is close to incompressible limit (0.5)")
@@ -1936,7 +1923,8 @@ def build_constitutive_matrix(E, nu):
         [nu,   1-nu, 0        ],
         [0,    0,    (1-2*nu)/2]
     ])
-    return D
+    # Use compression-positive convention throughout (matches Griffiths & Lane approach)
+    return -D
 
 
 def check_mohr_coulomb(stress, c, phi, debug=False):
@@ -2130,9 +2118,7 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
             # This is the true "gravity in single increment to initially stress-free slope"
             # Geotechnical convention: compression is positive, tension is negative
             D = build_constitutive_matrix(E, nu)
-            stresses = D @ strains
-            # Negate to convert from tension-positive to compression-positive
-            stresses = -stresses
+            stresses = D @ strains  # Already compression-positive from D matrix
             
             # Store stress at this Gauss point (compression positive, tension negative)
             element_stresses[elem_idx, gp, :] = stresses

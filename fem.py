@@ -602,13 +602,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
     tolerance = 1e-5  # Tighter tolerance for better convergence
     eta = 0.01  # Much lower viscosity for more localized plastic flow
     
-    # Phase 1: Establish K₀ initial stress state through elastic gravity loading
+    # Phase 1: Start with zero stress state (TRUE Griffiths & Lane approach)
     if debug_level >= 1:
-        print("Phase 1: Establishing K₀ initial stress state...")
+        print("Phase 1: Starting with zero stress state (Griffiths approach)...")
     
-    initial_displacements, stress_state = establish_k0_stress_state(
-        K_global, F_gravity, bc_type, nodes, elements, element_types, 
-        element_materials, E_by_mat, nu_by_mat, gamma_by_mat, u_nodal, debug_level)
+    # Initialize with zero displacements and stresses (exactly as in Program 6.2)
+    initial_displacements = np.zeros(2 * len(nodes))
+    n_elements = len(elements)
+    max_gauss_points = 4
+    element_stresses = np.zeros((n_elements, max_gauss_points, 3))
+    
+    stress_state = {
+        'element_stresses': element_stresses,
+        'plastic_state': np.zeros((n_elements, max_gauss_points), dtype=bool)
+    }
     
     # Phase 2: Initialize Perzyna iteration from K₀ state
     # Debug gravity loads and element areas
@@ -727,6 +734,132 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
             print(f"Plastic correction norm: {np.linalg.norm(F_plastic_correction):.2e}")
         
         F_total += F_plastic_correction
+        
+        # DEBUG: Detailed analysis for first iteration only
+        if iteration == 0 and debug_level >= 1:
+            print(f"\n=== DEBUGGING FIRST ITERATION ===")
+            print(f"Gravity load norm: {np.linalg.norm(F_gravity):.2e}")
+            print(f"Total load norm: {np.linalg.norm(F_total):.2e}")
+            
+            # Debug element 129 specifically
+            elem_idx = 129
+            if elem_idx < len(elements):
+                elem_type = element_types[elem_idx]
+                mat_id = element_materials[elem_idx] - 1
+                E = E_by_mat[mat_id]
+                nu = nu_by_mat[mat_id]
+                
+                elem_nodes = elements[elem_idx][:elem_type]
+                elem_coords = nodes[elem_nodes]
+                
+                print(f"\nElement {elem_idx} debug:")
+                print(f"  Material: E={E:.0f}, nu={nu:.3f}")
+                print(f"  Nodes: {elem_nodes}")
+                print(f"  Coordinates: {elem_coords}")
+                
+                if elem_type == 3:  # Triangle
+                    x1, y1 = elem_coords[0]
+                    x2, y2 = elem_coords[1] 
+                    x3, y3 = elem_coords[2]
+                    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+                    
+                    print(f"  Triangle area: {area:.4f}")
+                    
+                    # Check if area is reasonable
+                    if area < 0.1:
+                        print(f"  WARNING: Very small element area!")
+                    elif area > 100:
+                        print(f"  WARNING: Very large element area!")
+                    
+                    # B matrix coefficients
+                    b1 = y2 - y3
+                    b2 = y3 - y1  
+                    b3 = y1 - y2
+                    c1 = x3 - x2
+                    c2 = x1 - x3
+                    c3 = x2 - x1
+                    
+                    print(f"  B matrix coefficients:")
+                    print(f"    b1={b1:.2f}, b2={b2:.2f}, b3={b3:.2f}")
+                    print(f"    c1={c1:.2f}, c2={c2:.2f}, c3={c3:.2f}")
+                    
+                    B = np.array([
+                        [b1, 0,  b2, 0,  b3, 0 ],
+                        [0,  c1, 0,  c2, 0,  c3],
+                        [c1, b1, c2, b2, c3, b3]
+                    ]) / (2 * area)
+                    
+                    print(f"  B matrix (strain-displacement):")
+                    for i, row in enumerate(['εx', 'εy', 'γxy']):
+                        print(f"    {row}: {B[i,:]}")
+                        
+                    # Check B matrix scaling
+                    max_B = np.max(np.abs(B))
+                    print(f"  Max |B| value: {max_B:.2e}")
+                    if max_B > 1e3:
+                        print(f"  WARNING: B matrix values seem very large!")
+                    elif max_B < 1e-6:
+                        print(f"  WARNING: B matrix values seem very small!")
+                        
+        # Add displacement and stress debugging after load application
+        if iteration == 0 and debug_level >= 1:
+            # Apply boundary conditions and solve to see what displacements result
+            K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
+                K_global, F_total, bc_type, nodes)
+            
+            try:
+                if hasattr(K_constrained, 'toarray'):
+                    K_constrained = K_constrained.tocsr()
+                displacements_free = spsolve(K_constrained, F_constrained)
+                
+                # Reconstruct full displacement vector
+                n_dof = 2 * n_nodes
+                displacements_new = np.zeros(n_dof)
+                free_dofs = [i for i in range(n_dof) if i not in constraint_dofs]
+                displacements_new[free_dofs] = displacements_free
+                
+                # Check displacement magnitudes
+                max_disp = np.max(np.abs(displacements_new))
+                print(f"\nFirst iteration displacement analysis:")
+                print(f"  Max displacement magnitude: {max_disp:.4f}")
+                print(f"  Max vertical displacement: {np.max(displacements_new[1::2]):.4f}")
+                print(f"  Min vertical displacement: {np.min(displacements_new[1::2]):.4f}")
+                print(f"  Max horizontal displacement: {np.max(displacements_new[0::2]):.4f}")
+                print(f"  Min horizontal displacement: {np.min(displacements_new[0::2]):.4f}")
+                
+                # Check displacements for element 129 nodes
+                elem_idx = 129
+                if elem_idx < len(elements):
+                    elem_nodes = elements[elem_idx][:3]
+                    print(f"\nElement {elem_idx} nodal displacements:")
+                    for i, node in enumerate(elem_nodes):
+                        u_x = displacements_new[2*node]
+                        u_y = displacements_new[2*node+1]
+                        print(f"  Node {node}: u_x={u_x:.6f}, u_y={u_y:.6f}")
+                        
+                    # Compute strains for this element
+                    elem_disp = np.zeros(6)
+                    for i, node in enumerate(elem_nodes):
+                        elem_disp[2*i] = displacements_new[2*node]
+                        elem_disp[2*i+1] = displacements_new[2*node+1]
+                    
+                    # Use the B matrix computed earlier
+                    strains = B @ elem_disp
+                    print(f"  Computed strains: εx={strains[0]:.2e}, εy={strains[1]:.2e}, γxy={strains[2]:.2e}")
+                    
+                    # Compute stresses
+                    D = build_constitutive_matrix(E, nu)
+                    stresses_raw = D @ strains
+                    stresses = -stresses_raw  # Convert to compression-positive
+                    
+                    print(f"  Computed stresses: σx={stresses[0]:.1f}, σy={stresses[1]:.1f}, τxy={stresses[2]:.1f}")
+                    
+                    # Check yield function
+                    F_yield = check_mohr_coulomb(stresses, c_reduced[elem_idx], phi_reduced[elem_idx])
+                    print(f"  Yield function: F={F_yield:.1f} {'(YIELDING!)' if F_yield > 0 else '(safe)'}")
+                    
+            except Exception as e:
+                print(f"  Error in displacement analysis: {e}")
         
         # Add boundary condition loads
         for i in range(n_nodes):
@@ -1789,6 +1922,14 @@ def compute_triangle_strains_manual(coords, displacements):
 
 def build_constitutive_matrix(E, nu):
     """Build constitutive matrix for plane strain."""
+    # Add numerical stability check for near-incompressible materials
+    if nu >= 0.45:
+        print(f"Warning: Poisson's ratio {nu:.3f} is close to incompressible limit (0.5)")
+        print("Consider using nu <= 0.4 for better numerical stability")
+    
+    # Optional: Add small regularization to prevent singularity
+    # nu_effective = min(nu, 0.495)  # Cap at safe value if needed
+    
     factor = E / ((1 + nu) * (1 - 2*nu))
     D = factor * np.array([
         [1-nu, nu,   0        ],

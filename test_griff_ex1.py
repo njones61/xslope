@@ -30,7 +30,7 @@ def test_griffiths_example1():
     target_size = 5  # Coarser mesh initially for testing
     
     print(f"\n=== Building Mesh with 3-node Triangles ===")
-    mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
+    mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
     fem_data = build_fem_data(slope_data, mesh)
 
     # Plot the initial mesh

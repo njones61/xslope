@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test Perzyna implementation against Griffiths & Lane (1999) Example 1.
+Test implementation against Griffiths & Lane (1999) Example 1.
 
 Expected results:
 - Spencer's method: FS = 1.376
@@ -30,21 +30,21 @@ def test_griffiths_example1():
     target_size = 5  # Coarser mesh initially for testing
     
     print(f"\n=== Building Mesh with 3-node Triangles ===")
-    mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
+    mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
     fem_data = build_fem_data(slope_data, mesh)
 
     # Plot the initial mesh
     plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
                   material_table=True, label_elements=False, label_nodes=False)
     
-    F_test = 1.2
+    F_test = 1.3
     
-    print(f"\n=== Testing Initial Gravity Loading (abort_after=0) ===")
+    print(f"\n\n=== Testing Initial Gravity Loading (abort_after=0) ===")
     # First check gravity loading only
     gravity_solution = solve_fem(fem_data, F=F_test, debug_level=2, abort_after=0)
     
     # Plot gravity stress state and yield function
-    print(f"\n=== Plotting Initial Gravity Stress and Yield Function ===")
+    print(f"\n\n=== Plotting Initial Gravity Stress and Yield Function ===")
     plot_fem_results(fem_data, gravity_solution, 
                      plot_type='stress,yield', 
                      label_elements=True)  # This will show element IDs on stress plot and F values on yield plot
@@ -55,25 +55,25 @@ def test_griffiths_example1():
         n_yielding = np.sum(yield_fn > 0)
         max_yield = np.max(yield_fn)
         min_yield = np.min(yield_fn)
-        print(f"\nYield function statistics after gravity loading at F={F_test:.3f}:")
+        print(f"\n\nYield function statistics after gravity loading at F={F_test:.3f}:")
         print(f"  Elements yielding: {n_yielding}/{len(yield_fn)}")
         print(f"  Max yield function: {max_yield:.3f}")
         print(f"  Min yield function: {min_yield:.3f}")
         
         if n_yielding == 0:
-            print("  WARNING: No elements yielding at F=1.6 - may need higher F for failure")
+            print(f"  WARNING: No elements yielding at F={F_test:.3f} - may need higher F for failure")
     
-    print(f"\n=== Testing One Perzyna Iteration (abort_after=1) ===")
+    print(f"\n\n=== Testing One Perzyna Iteration (abort_after=1) ===")
     # Test one iteration to see plastic correction
     one_iter_solution = solve_fem(fem_data, F=F_test, debug_level=2, abort_after=1)
     
     # Plot after one iteration
-    print(f"\n=== Plotting After One Perzyna Iteration ===")
+    print(f"\n\n=== Plotting After One Perzyna Iteration ===")
     plot_fem_results(fem_data, one_iter_solution, 
                      plot_type='stress,yield,shear_strain', 
                      label_elements=False)
     
-    print(f"\n=== Testing Full Perzyna Analysis at F = {F_test:.3f} ===")
+    print(f"\n\n=== Testing Full Perzyna Analysis at F = {F_test:.3f} ===")
     solution = solve_fem(fem_data, F=F_test, debug_level=2)
     
     converged_str = "YES" if solution["converged"] else "NO"
@@ -81,7 +81,7 @@ def test_griffiths_example1():
     plastic_count = np.sum(solution.get("plastic_elements", []))
     iterations = solution.get("iterations", 0)
     
-    print(f"\nResults:")
+    print(f"\n\nResults:")
     print(f"  F={F_test:<6.3f}")
     print(f"  Converged={converged_str}")
     print(f"  Iterations={iterations}")
@@ -94,7 +94,7 @@ def test_griffiths_example1():
         print(f"  Status: F = {F_test:.3f} FAILED to converge (unstable)")
     
     # Plot the final state
-    print(f"\n=== Plotting Final State at F = {F_test:.3f} ===")
+    print(f"\n\n=== Plotting Final State at F = {F_test:.3f} ===")
     plot_fem_results(fem_data, solution, 
                    plot_type='stress,deformation,shear_strain',
                    label_elements=False)

@@ -1063,7 +1063,10 @@ def build_triangle_stiffness(coords, E, nu):
 
 def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic):
     """
-    Build gravity load vector.
+    Build gravity load vector using Griffiths & Lane (1999) approach.
+    
+    Uses equation 3 from the paper: p(e) = γ ∫[Ve] N^T d(vol)
+    This integrates shape functions over each element to properly distribute gravity loads.
     """
     n_nodes = len(nodes)
     F_gravity = np.zeros(2 * n_nodes)
@@ -1076,28 +1079,127 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
         elem_nodes = element[:elem_type]
         elem_coords = nodes[elem_nodes]
         
-        # Calculate element area/volume
-        if elem_type >= 3:  # Triangle or higher
-            if elem_type == 8:  # 8-node quad
-                # Approximate area for 8-node quad
-                area = compute_quad_area(elem_coords)
-            else:
-                # Triangle area
+        if elem_type == 3:  # 3-node triangle
+            # For linear triangles, shape function integration gives equal distribution (1/3 each)
+            x1, y1 = elem_coords[0]
+            x2, y2 = elem_coords[1]
+            x3, y3 = elem_coords[2]
+            area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
+            
+            # Each node gets 1/3 of the element weight (exact for linear shape functions)
+            for i, node in enumerate(elem_nodes):
+                load = gamma * area / 3.0
+                F_gravity[2*node + 1] -= load  # Vertical (negative = downward)
+                F_gravity[2*node] += k_seismic * load  # Horizontal seismic
+                
+        elif elem_type == 8:  # 8-node quad
+            # For 8-node quads, use 2x2 Gauss integration as in Griffiths
+            # This properly weights corner vs midside nodes
+            
+            # Gauss points for 2x2 integration
+            gauss_coord = 1.0 / np.sqrt(3.0)
+            xi_points = np.array([-gauss_coord, gauss_coord])
+            eta_points = np.array([-gauss_coord, gauss_coord])
+            weights = np.array([1.0, 1.0])
+            
+            # Initialize element load vector
+            elem_loads = np.zeros(2 * elem_type)
+            
+            # Numerical integration over Gauss points
+            for i in range(2):
+                for j in range(2):
+                    xi = xi_points[i]
+                    eta = eta_points[j]
+                    w = weights[i] * weights[j]
+                    
+                    # Shape functions for 8-node quad at (xi, eta)
+                    N = compute_quad8_shape_functions(xi, eta)
+                    
+                    # Jacobian for coordinate transformation
+                    J = compute_quad8_jacobian(elem_coords, xi, eta)
+                    det_J = np.linalg.det(J)
+                    
+                    # Accumulate load contribution: w * det(J) * γ * N
+                    for k in range(8):
+                        elem_loads[2*k + 1] -= w * det_J * gamma * N[k]  # Vertical
+                        elem_loads[2*k] += w * det_J * gamma * k_seismic * N[k]  # Horizontal
+            
+            # Add element loads to global vector
+            for i, node in enumerate(elem_nodes):
+                F_gravity[2*node] += elem_loads[2*i]
+                F_gravity[2*node + 1] += elem_loads[2*i + 1]
+                
+        elif elem_type == 4:  # 4-node quad (if used)
+            # For 4-node quads, use 2x2 Gauss integration
+            area = compute_quad_area(elem_coords)
+            # Simple equal distribution for now (can be refined)
+            load_per_node = gamma * area / 4.0
+            
+            for i, node in enumerate(elem_nodes):
+                F_gravity[2*node + 1] -= load_per_node
+                F_gravity[2*node] += k_seismic * load_per_node
+        else:
+            # Fallback for other element types
+            if elem_type >= 3:
+                # Triangle area calculation
                 x1, y1 = elem_coords[0]
                 x2, y2 = elem_coords[1]
                 x3, y3 = elem_coords[2]
                 area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
-            
-            # Distribute loads to nodes
-            load_per_node = gamma * area / elem_type
-            
-            for i, node in enumerate(elem_nodes):
-                # Vertical gravity load (negative = downward)
-                F_gravity[2*node + 1] -= load_per_node
-                # Horizontal seismic load  
-                F_gravity[2*node] += k_seismic * load_per_node
+                
+                load_per_node = gamma * area / elem_type
+                
+                for i, node in enumerate(elem_nodes):
+                    F_gravity[2*node + 1] -= load_per_node
+                    F_gravity[2*node] += k_seismic * load_per_node
     
     return F_gravity
+
+
+def compute_quad8_shape_functions(xi, eta):
+    """
+    Compute shape functions for 8-node serendipity quadrilateral at (xi, eta).
+    
+    Node numbering:
+    3---6---2
+    |       |
+    7       5
+    |       |
+    0---4---1
+    """
+    N = np.zeros(8)
+    
+    # Corner nodes
+    N[0] = 0.25 * (1 - xi) * (1 - eta) * (-xi - eta - 1)
+    N[1] = 0.25 * (1 + xi) * (1 - eta) * (xi - eta - 1)
+    N[2] = 0.25 * (1 + xi) * (1 + eta) * (xi + eta - 1)
+    N[3] = 0.25 * (1 - xi) * (1 + eta) * (-xi + eta - 1)
+    
+    # Midside nodes
+    N[4] = 0.5 * (1 - xi**2) * (1 - eta)
+    N[5] = 0.5 * (1 + xi) * (1 - eta**2)
+    N[6] = 0.5 * (1 - xi**2) * (1 + eta)
+    N[7] = 0.5 * (1 - xi) * (1 - eta**2)
+    
+    return N
+
+
+def compute_quad8_jacobian(coords, xi, eta):
+    """
+    Compute Jacobian matrix for 8-node quad at (xi, eta).
+    """
+    # Shape function derivatives
+    dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta)
+    
+    # Jacobian matrix
+    J = np.zeros((2, 2))
+    for i in range(8):
+        J[0, 0] += dN_dxi[i] * coords[i, 0]   # dx/dxi
+        J[0, 1] += dN_dxi[i] * coords[i, 1]   # dy/dxi
+        J[1, 0] += dN_deta[i] * coords[i, 0]  # dx/deta
+        J[1, 1] += dN_deta[i] * coords[i, 1]  # dy/deta
+    
+    return J
 
 
 def compute_quad_area(coords):

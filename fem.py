@@ -849,7 +849,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
                     
                     # Compute stresses
                     D = build_constitutive_matrix(E, nu)
-                    stresses = D @ strains  # Already compression-positive from D matrix
+                    stresses = D @ strains  # Tension-positive convention
                     
                     print(f"  Computed stresses: σx={stresses[0]:.1f}, σy={stresses[1]:.1f}, τxy={stresses[2]:.1f}")
                     
@@ -1388,7 +1388,7 @@ def compute_plastic_load_correction_perzyna(nodes, elements, element_types, elem
             
             # Compute plastic stress
             D = build_constitutive_matrix(E, nu)
-            plastic_stress = D @ plastic_strain  # Already compression-positive from D matrix
+            plastic_stress = D @ plastic_strain  # Tension-positive convention
             
             # Compute B matrix for this element
             if elem_type == 3:  # Triangle
@@ -1624,7 +1624,7 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
             
             # Elastic trial stress = initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ elastic_strains  # Already compression-positive from D matrix
+            incremental_stress = D @ elastic_strains  # Tension-positive convention
             
             # Add initial stress if provided
             if initial_stresses is not None:
@@ -1726,7 +1726,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
             
             # Compute incremental stress from incremental strains
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ incremental_strains  # Already compression-positive from D matrix
+            incremental_stress = D @ incremental_strains  # Tension-positive convention
             
             # Get current total stress at this Gauss point
             current_stress = current_stress_state['element_stresses'][elem_idx, gp, :]
@@ -1756,7 +1756,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 plastic_strains_new[elem_idx][gp, :] += plastic_increment
                 
                 # Update stress state (remove plastic stress contribution)
-                plastic_stress = D @ plastic_increment  # Already compression-positive from D matrix
+                plastic_stress = D @ plastic_increment  # Tension-positive convention
                 new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress - plastic_stress
                 
                 # Track total plastic increment
@@ -1814,7 +1814,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             
             # Stress calculation: initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ elastic_strains  # Already compression-positive from D matrix
+            incremental_stress = D @ elastic_strains  # Tension-positive convention
             
             # Add initial geostatic stress
             if stress_state is not None:
@@ -1859,7 +1859,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
                 for xi, eta in gauss_coords:
                     strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
                     D = build_constitutive_matrix(E, nu)
-                    stress = D @ strains  # Already compression-positive from D matrix
+                    stress = D @ strains  # Tension-positive convention
                     elem_stress_avg += stress
                 elem_stress_avg /= len(gauss_coords)
             
@@ -1908,7 +1908,7 @@ def compute_triangle_strains_manual(coords, displacements):
 
 
 def build_constitutive_matrix(E, nu):
-    """Build constitutive matrix for plane strain - compression positive convention."""
+    """Build constitutive matrix for plane strain - standard tension-positive convention."""
     # Add numerical stability check for near-incompressible materials
     if nu >= 0.45:
         print(f"Warning: Poisson's ratio {nu:.3f} is close to incompressible limit (0.5)")
@@ -1923,38 +1923,36 @@ def build_constitutive_matrix(E, nu):
         [nu,   1-nu, 0        ],
         [0,    0,    (1-2*nu)/2]
     ])
-    # Use compression-positive convention throughout (matches Griffiths & Lane approach)
-    return -D
+    # Standard tension-positive convention (σ > 0 in tension, σ < 0 in compression)
+    return D
 
 
 def check_mohr_coulomb(stress, c, phi, debug=False):
     """Check Mohr-Coulomb yield criterion and return violation.
     
-    Uses yield function for compression-positive convention from docs/fem/overview.md:
-    f = (σ1 - σ3)/2 - ((σ1 + σ3)/2 * sin(φ) + c * cos(φ))
+    Uses tension-positive convention (σ > 0 in tension, σ < 0 in compression):
+    f = τ_max + σ_mean * sin(φ) - c * cos(φ)
     
-    With compression positive: σ1 is major (most compressive), σ3 is minor (least compressive)
+    With tension positive: σ1 is major (most tensile), σ3 is minor (most compressive)
     """
     
     sig_x, sig_y, tau_xy = stress
     
-    # Principal stresses (compression positive, tension negative)
+    # Principal stresses (tension positive, compression negative)
     sig_mean = (sig_x + sig_y) / 2
     tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
     
-    # For compression-positive: sig1 is major (most compressive), sig3 is minor (least compressive)
-    sig1 = sig_mean + tau_max  # Major principal stress (most positive/compressive)
-    sig3 = sig_mean - tau_max  # Minor principal stress (least positive/most tensile)
+    # For tension-positive: sig1 is major (most tensile), sig3 is minor (most compressive)
+    sig1 = sig_mean + tau_max  # Major principal stress (most positive/tensile)
+    sig3 = sig_mean - tau_max  # Minor principal stress (most negative/compressive)
     
-    # Yield function from docs/fem/overview.md for compression-positive convention:
-    # f = (σ1 - σ3)/2 - ((σ1 + σ3)/2 * sin(φ) + c * cos(φ))
-    # Simplifying: (σ1 - σ3)/2 = tau_max, (σ1 + σ3)/2 = sig_mean
-    # So: f = tau_max - (sig_mean * sin(φ) + c * cos(φ))
+    # Yield function for tension-positive convention:
+    # f = τ_max + σ_mean * sin(φ) - c * cos(φ)
     # Yield when f > 0
     cos_phi = cos(phi)
     sin_phi = sin(phi)
     
-    F = tau_max - (sig_mean * sin_phi + c * cos_phi)
+    F = tau_max + sig_mean * sin_phi - c * cos_phi
     
     if debug and F > -c * cos_phi * 0.1:  # Near yielding
         print(f"  Debug: σx={sig_x:.1f}, σy={sig_y:.1f}, τxy={tau_xy:.1f}")
@@ -1965,14 +1963,14 @@ def check_mohr_coulomb(stress, c, phi, debug=False):
 
 
 def compute_plastic_flow_vector(stress, psi):
-    """Compute plastic flow vector for non-associated plasticity."""
+    """Compute plastic flow vector for non-associated plasticity with tension-positive convention."""
     
     sig_x, sig_y, tau_xy = stress
     
     # For non-associated plasticity with ψ = 0 (Griffiths approach)
-    # Flow vector is derived from potential function g = (sig1 - sig3)
+    # With tension-positive convention (σ > 0 in tension, σ < 0 in compression)
     
-    # Principal stresses
+    # Principal stresses (tension-positive)
     sig_mean = (sig_x + sig_y) / 2
     tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
     
@@ -1980,22 +1978,40 @@ def compute_plastic_flow_vector(stress, psi):
         # Hydrostatic stress state
         return np.array([0.0, 0.0, 0.0])
     
-    sig1 = sig_mean + tau_max
-    sig3 = sig_mean - tau_max
+    # For tension-positive: sig1 is major (most tensile), sig3 is minor (most compressive)
+    sig1 = sig_mean + tau_max  # Most positive (tensile)
+    sig3 = sig_mean - tau_max  # Most negative (compressive)
     
-    # Flow direction derivatives for ψ = 0 case
-    # ∂g/∂σ where g = (σ1 - σ3) + (σ1 + σ3)*sin(ψ) - 2*c*cos(ψ)
+    # Flow direction derivatives for Mohr-Coulomb with dilatancy angle ψ
+    # Potential function g = τ_max + σ_mean * sin(ψ) - constant
+    # ∂g/∂σ gives flow direction
     
     sin_psi = sin(psi)
     
-    # Simplified flow vector for ψ = 0
-    # Direction: [1+sin(ψ), -(1-sin(ψ)), 0] for principal directions
-    # Transform back to x-y coordinates
+    # For ψ = 0 (non-associated flow), simplified flow vector
+    # The flow vector in terms of stress invariants becomes:
+    # ∂g/∂σ_mean = sin(ψ), ∂g/∂τ_max = 1
     
-    # For simplicity, use associated flow approximation
-    flow_x = 1 + sin_psi
-    flow_y = -(1 - sin_psi)
-    flow_xy = 0
+    # Transform to Cartesian stress components
+    if tau_max > 1e-12:
+        # Derivatives of stress invariants w.r.t. stress components
+        dsig_mean_dsig_x = 0.5
+        dsig_mean_dsig_y = 0.5
+        dsig_mean_dtau_xy = 0.0
+        
+        dtau_max_dsig_x = (sig_x - sig_y) / (4 * tau_max)
+        dtau_max_dsig_y = -(sig_x - sig_y) / (4 * tau_max)
+        dtau_max_dtau_xy = tau_xy / tau_max
+        
+        # Chain rule: ∂g/∂σ = ∂g/∂σ_mean * ∂σ_mean/∂σ + ∂g/∂τ_max * ∂τ_max/∂σ
+        flow_x = sin_psi * dsig_mean_dsig_x + 1.0 * dtau_max_dsig_x
+        flow_y = sin_psi * dsig_mean_dsig_y + 1.0 * dtau_max_dsig_y
+        flow_xy = sin_psi * dsig_mean_dtau_xy + 1.0 * dtau_max_dtau_xy
+    else:
+        # Fallback for very small shear stress
+        flow_x = sin_psi
+        flow_y = sin_psi
+        flow_xy = 0.0
     
     flow_vector = np.array([flow_x, flow_y, flow_xy])
     
@@ -2116,11 +2132,11 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
             
             # Compute stresses from strains using elastic constitutive matrix
             # This is the true "gravity in single increment to initially stress-free slope"
-            # Geotechnical convention: compression is positive, tension is negative
+            # Standard FEM convention: tension is positive, compression is negative
             D = build_constitutive_matrix(E, nu)
-            stresses = D @ strains  # Already compression-positive from D matrix
+            stresses = D @ strains  # Tension-positive convention
             
-            # Store stress at this Gauss point (compression positive, tension negative)
+            # Store stress at this Gauss point (tension positive, compression negative)
             element_stresses[elem_idx, gp, :] = stresses
     
     # Debug: Check stress state statistics

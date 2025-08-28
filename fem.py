@@ -527,7 +527,7 @@ def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
+def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_frequency=10):
     """
     Solve FEM using Perzyna visco-plastic algorithm exactly as in Griffiths & Lane (1999).
     
@@ -545,6 +545,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
                           0 = abort after gravity loading (before plasticity check)
                           1 = abort after first plasticity iteration
                           etc.
+        iteration_print_frequency (int): Print iteration info every N iterations (default=1)
         
     Returns:
         dict: Solution dictionary with convergence status
@@ -963,10 +964,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
         
         plastic_fraction = n_plastic_gauss / total_gauss if total_gauss > 0 else 0
         
-        # Diagnostic 3: Per-iteration output
-        if debug_level >= 2:
-            print(f"\nIteration {iteration + 1}: F={F:.3f}, Residual={residual_norm:.3e}, Plastic fraction={plastic_fraction*100:.1f}%")
-        elif debug_level >= 3:
+        # Diagnostic 3: Per-iteration output (controlled by frequency)
+        if debug_level >= 2 and (iteration + 1) % iteration_print_frequency == 0:
+            print(f"Iteration {iteration + 1}: F={F:.3f}, Residual={residual_norm:.3e}, Plastic fraction={plastic_fraction*100:.1f}%")
+        elif debug_level >= 3 and (iteration + 1) % iteration_print_frequency == 0:
             print(f"Displacement change norm: {disp_change:.2e}")
             print(f"Plastic strain increment: {plastic_change:.2e}")
             print(f"Max displacement: {np.max(np.abs(displacements_new)):.6f}")
@@ -2028,6 +2029,192 @@ def build_constitutive_matrix(E, nu):
     return D
 
 
+def check_shear_convention_consistency(strain_vec, D_matrix, E, nu, element_id=None, debug=True):
+    """
+    Diagnostic check for engineering vs tensor shear strain convention consistency.
+    
+    This catches the common bug where B-matrix computes εxy (tensor shear) but 
+    D-matrix expects γxy (engineering shear), causing τxy to be off by factor of 2.
+    
+    Args:
+        strain_vec: [εx, εy, γxy] strain vector from B-matrix
+        D_matrix: Constitutive matrix 
+        E, nu: Material properties
+        element_id: For debugging output
+        debug: Whether to print warnings
+    """
+    if len(strain_vec) < 3:
+        return True  # Skip if not enough components
+        
+    ex, ey, gxy = strain_vec[:3]  # what your code uses
+    
+    # Expected shear modulus for engineering shear
+    mu = E / (2 * (1 + nu))
+    
+    # What D-matrix actually computes for shear stress
+    tau_from_D = (D_matrix @ strain_vec)[2]
+    
+    # What we expect for engineering shear: τxy = μ * γxy  
+    tau_expected = mu * gxy
+    
+    # Check consistency
+    tolerance = 1e-6 * max(1.0, abs(tau_expected))
+    is_consistent = abs(tau_from_D - tau_expected) <= tolerance
+    
+    if not is_consistent and debug:
+        elem_str = f" (element {element_id})" if element_id is not None else ""
+        print(f"WARNING: Shear convention mismatch{elem_str}!")
+        print(f"  γxy from B-matrix: {gxy:.6f}")
+        print(f"  τxy from D-matrix: {tau_from_D:.2f}")  
+        print(f"  τxy expected (μ*γxy): {tau_expected:.2f}")
+        print(f"  Ratio (actual/expected): {tau_from_D/tau_expected if abs(tau_expected) > 1e-12 else 'inf':.3f}")
+        print(f"  D[2,2] = {D_matrix[2,2]:.1f}, expected μ = {mu:.1f}")
+        print("  Either B builds [εx, εy, εxy] but labels it γxy, or")
+        print("  D[2,2] isn't correct for engineering shear convention")
+    
+    return is_consistent
+
+
+def validate_bd_matrices_simple_test():
+    """
+    Simple validation test for B and D matrix consistency using pure shear.
+    Apply known displacement field and check if resulting stresses are correct.
+    """
+    print("\n=== B/D Matrix Validation Test ===")
+    
+    # Simple triangle for testing
+    coords = np.array([[0, 0], [1, 0], [0, 1]])  # Right triangle
+    E, nu = 30000, 0.3
+    
+    # Test case 1: Pure shear displacement field
+    # u = 0.001*y, v = 0.001*x (creates γxy = 0.002)
+    displacements = np.array([
+        0.0,     0.0,      # Node 1: u1=0, v1=0
+        0.0,     0.001,    # Node 2: u2=0, v2=0.001  
+        0.001,   0.0       # Node 3: u3=0.001, v3=0
+    ])
+    
+    # Compute strains using triangle B-matrix
+    strains = compute_triangle_strains_manual(coords, displacements)
+    print(f"Computed strains: εx={strains[0]:.6f}, εy={strains[1]:.6f}, γxy={strains[2]:.6f}")
+    
+    # Expected: εx=0, εy=0, γxy=0.002 (engineering shear)
+    expected_gxy = 0.002
+    print(f"Expected γxy: {expected_gxy:.6f}")
+    
+    # Compute stresses  
+    D = build_constitutive_matrix(E, nu)
+    stresses = D @ strains
+    print(f"Computed stresses: σx={stresses[0]:.2f}, σy={stresses[1]:.2f}, τxy={stresses[2]:.2f}")
+    
+    # Expected: σx=0, σy=0, τxy = G*γxy = E/(2*(1+ν))*γxy
+    G = E / (2 * (1 + nu))
+    expected_tau_xy = G * expected_gxy
+    print(f"Expected τxy: G*γxy = {G:.1f} * {expected_gxy:.6f} = {expected_tau_xy:.2f}")
+    
+    # Check consistency
+    is_consistent = check_shear_convention_consistency(strains, D, E, nu, debug=False)
+    
+    if is_consistent:
+        print("✓ B/D matrices are consistent (engineering shear convention)")
+    else:
+        print("✗ B/D matrices have shear convention mismatch!")
+    
+    print("=================================\n")
+    return is_consistent
+
+# Uncomment this line to run the validation test:
+# validate_bd_matrices_simple_test()
+
+
+def test_constitutive_matrix_sanity():
+    """
+    Basic sanity checks for constitutive matrix behavior.
+    Tests fundamental stress-strain relationships.
+    """
+    print("\n=== Constitutive Matrix Sanity Tests ===")
+    
+    E, nu = 1e5, 0.3
+    D = build_constitutive_matrix(E, nu)
+    
+    # Test (A) Pure vertical shortening → σyy negative
+    print("Test A: Pure vertical shortening")
+    eps = np.array([0.0, -1e-4, 0.0])   # [εx, εy, γxy]
+    sig = D @ eps
+    print(f"  Strain: εx={eps[0]:.1e}, εy={eps[1]:.1e}, γxy={eps[2]:.1e}")
+    print(f"  Stress: σx={sig[0]:.1f}, σy={sig[1]:.1f}, τxy={sig[2]:.1f}")
+    
+    try:
+        assert sig[1] < 0, "σyy must be negative under vertical shortening (tension-positive)."
+        print("  ✓ PASS: σyy is negative (compression) as expected")
+    except AssertionError as e:
+        print(f"  ✗ FAIL: {e}")
+        print(f"    σyy = {sig[1]:.3f}, expected < 0")
+    
+    # Test (B) Pure shear → τxy = μ * γxy
+    print("\nTest B: Pure shear stress")
+    mu = E / (2*(1+nu))
+    eps = np.array([0.0, 0.0, 1e-3])    # γxy = 1e-3
+    sig = D @ eps
+    expected_tau = mu * eps[2]
+    
+    print(f"  Strain: εx={eps[0]:.1e}, εy={eps[1]:.1e}, γxy={eps[2]:.1e}")
+    print(f"  Stress: σx={sig[0]:.1f}, σy={sig[1]:.1f}, τxy={sig[2]:.1f}")
+    print(f"  Expected τxy = μ*γxy = {mu:.1f} * {eps[2]:.1e} = {expected_tau:.1f}")
+    
+    try:
+        assert abs(sig[2] - mu*eps[2]) < 1e-8*max(1.0, abs(mu*eps[2])), "τxy must equal μ*γxy."
+        print("  ✓ PASS: τxy = μ*γxy exactly")
+    except AssertionError as e:
+        print(f"  ✗ FAIL: {e}")
+        print(f"    τxy = {sig[2]:.6f}, expected = {expected_tau:.6f}")
+        print(f"    Error = {abs(sig[2] - expected_tau):.2e}")
+    
+    # Test (C) Check Poisson effect - verify D-matrix formulation
+    print("\nTest C: Poisson effect under uniaxial tension")
+    eps = np.array([1e-4, 0.0, 0.0])   # Pure εx
+    sig = D @ eps
+    
+    print(f"  Strain: εx={eps[0]:.1e}, εy={eps[1]:.1e}, γxy={eps[2]:.1e}")
+    print(f"  Stress: σx={sig[0]:.1f}, σy={sig[1]:.1f}, τxy={sig[2]:.1f}")
+    
+    # Debug: Check what D-matrix actually looks like
+    print(f"  D-matrix:")
+    print(f"    [{D[0,0]:.1f}  {D[0,1]:.1f}  {D[0,2]:.1f}]")
+    print(f"    [{D[1,0]:.1f}  {D[1,1]:.1f}  {D[1,2]:.1f}]")
+    print(f"    [{D[2,0]:.1f}  {D[2,1]:.1f}  {D[2,2]:.1f}]")
+    
+    # What we expect from your D-matrix formulation
+    factor = E / ((1 + nu) * (1 - 2*nu))
+    expected_d11 = factor * (1 - nu)
+    expected_d12 = factor * nu  
+    expected_d22 = factor * (1 - nu)
+    expected_d33 = factor * (1 - 2*nu) / 2
+    
+    print(f"  Expected D-matrix (your formulation):")
+    print(f"    [{expected_d11:.1f}  {expected_d12:.1f}  0.0]")
+    print(f"    [{expected_d12:.1f}  {expected_d22:.1f}  0.0]") 
+    print(f"    [0.0  0.0  {expected_d33:.1f}]")
+    
+    # For your D-matrix, under pure εx strain:
+    expected_sigx_your = expected_d11 * eps[0]  # D[0,0] * εx
+    expected_sigy_your = expected_d12 * eps[0]  # D[1,0] * εx
+    
+    print(f"  Your D gives: σx = {expected_sigx_your:.1f}, σy = {expected_sigy_your:.1f}")
+    
+    # Verify this matches what D actually computed
+    if abs(sig[0] - expected_sigx_your) < 1e-10 and abs(sig[1] - expected_sigy_your) < 1e-10:
+        print("  ✓ PASS: D-matrix working as designed")
+    else:
+        print("  ✗ FAIL: D-matrix computation error")
+    
+    print("==========================================\n")
+
+
+# Run the tests
+# test_constitutive_matrix_sanity()
+
+
 def check_mohr_coulomb(stress, c, phi, debug=False):
     """Check Mohr-Coulomb yield criterion and return violation.
     
@@ -2236,6 +2423,12 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
             # Standard FEM convention: tension is positive, compression is negative
             D = build_constitutive_matrix(E, nu)
             stresses = D @ strains  # Tension-positive convention
+            
+            # DIAGNOSTIC: Check shear convention consistency (first few elements only)
+            if elem_idx < 5 and gp == 0:  # Only check first few elements, first Gauss point
+                is_consistent = check_shear_convention_consistency(
+                    strains, D, E, nu, element_id=elem_idx, debug=True
+                )
             
             # Store stress at this Gauss point (tension positive, compression negative)
             element_stresses[elem_idx, gp, :] = stresses

@@ -85,3 +85,29 @@ if solution_new.get("converged", False):
     plot_fem_results(fem_data, solution_new, plot_type='stress, shear_strain, deformation')
 else:
     print("\nCannot plot results - solver did not converge")
+
+# Diagnostic 5: CSV table output
+print("\n=== CSV Output Table ===")
+print("F,iterations,converged,residual,plastic_fraction,min_sigma_yy,max_sigma_yy")
+
+# Output for single FEM run
+if 'F' in solution_new:
+    print(f"{solution_new.get('F', 'N/A'):.3f},"
+          f"{solution_new.get('iterations', 'N/A')},"
+          f"{'True' if solution_new.get('converged', False) else 'False'},"
+          f"{solution_new.get('residual', 0.0):.3e},"
+          f"{solution_new.get('plastic_fraction', 0.0):.4f},"
+          f"{solution_new.get('min_sigma_yy', 0.0):.3f},"
+          f"{solution_new.get('max_sigma_yy', 0.0):.3f}")
+
+# Output for SSRM if it was run
+if solution_ssrm_new.get("converged", False) and 'last_solution' in solution_ssrm_new:
+    last_sol = solution_ssrm_new['last_solution']
+    if 'F' in last_sol:
+        print(f"{last_sol.get('F', solution_ssrm_new.get('FS', 'N/A')):.3f},"
+              f"{last_sol.get('iterations', 'N/A')},"
+              f"{'True' if last_sol.get('converged', False) else 'False'},"
+              f"{last_sol.get('residual', 0.0):.3e},"
+              f"{last_sol.get('plastic_fraction', 0.0):.4f},"
+              f"{last_sol.get('min_sigma_yy', 0.0):.3f},"
+              f"{last_sol.get('max_sigma_yy', 0.0):.3f}")

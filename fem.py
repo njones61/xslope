@@ -642,17 +642,56 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
     
     # Calculate yield function values for all elements after gravity loading
     yield_function_values = np.zeros(n_elements)
+    # Collect all σyy values for diagnostics
+    all_sigma_yy = []
+    total_gauss_points = 0
+    yielded_gauss_points = 0
+    
     for elem_idx in range(n_elements):
         elem_type = element_types[elem_idx]
         # Use first Gauss point stress for yield function (or average for quads)
         if elem_type == 8:  # 8-node quad - average over Gauss points
             elem_stress_avg = np.mean(stress_state['element_stresses'][elem_idx, :4, :], axis=0)
+            # Collect all σyy from Gauss points
+            for gp in range(4):
+                all_sigma_yy.append(stress_state['element_stresses'][elem_idx, gp, 1])  # σyy is index 1
+                total_gauss_points += 1
+                # Check if this Gauss point yields
+                gp_yield = check_mohr_coulomb(
+                    stress_state['element_stresses'][elem_idx, gp, :], 
+                    c_reduced[elem_idx], phi_reduced[elem_idx])
+                if gp_yield > 0:
+                    yielded_gauss_points += 1
         else:  # Triangle or other - use first Gauss point
             elem_stress_avg = stress_state['element_stresses'][elem_idx, 0, :]
+            all_sigma_yy.append(stress_state['element_stresses'][elem_idx, 0, 1])  # σyy
+            total_gauss_points += 1
+            # Check if yields
+            gp_yield = check_mohr_coulomb(
+                stress_state['element_stresses'][elem_idx, 0, :],
+                c_reduced[elem_idx], phi_reduced[elem_idx])
+            if gp_yield > 0:
+                yielded_gauss_points += 1
         
         # Calculate yield function with reduced strength parameters
         yield_function_values[elem_idx] = check_mohr_coulomb(
             elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
+    
+    # Diagnostic 1: Min/max σyy after gravity
+    all_sigma_yy = np.array(all_sigma_yy)
+    min_sigma_yy = np.min(all_sigma_yy)
+    max_sigma_yy = np.max(all_sigma_yy)
+    
+    if debug_level >= 1:
+        print(f"\n=== After Gravity Loading ====")
+        print(f"  Min σyy: {min_sigma_yy:.3f} kPa")
+        print(f"  Max σyy: {max_sigma_yy:.3f} kPa")
+    
+    # Diagnostic 2: Fraction of yielded Gauss points
+    plastic_fraction_initial = yielded_gauss_points / total_gauss_points if total_gauss_points > 0 else 0
+    if debug_level >= 1:
+        print(f"\n=== After Yield Check ===")
+        print(f"  Yielded Gauss points: {yielded_gauss_points}/{total_gauss_points} ({plastic_fraction_initial*100:.1f}%)")
         
     # Output detailed yield function values for element 129
     if debug_level >= 1:
@@ -717,6 +756,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
         plastic_strains[elem_idx] = np.zeros((n_gauss, 3))  # [eps_x, eps_y, gamma_xy] plastic
     
     converged = False
+    
+    # Track data for CSV output
+    csv_data = []
     
     for iteration in range(max_iterations):
         if debug_level >= 3:
@@ -905,8 +947,26 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
         # Check convergence
         disp_change = np.linalg.norm(displacements_new - displacements)
         plastic_change = total_plastic_increment
+        residual_norm = disp_change  # Using displacement change as residual
         
-        if debug_level >= 3:
+        # Calculate current plastic fraction
+        n_plastic_gauss = 0
+        total_gauss = 0
+        for elem_idx in range(n_elements):
+            elem_type = element_types[elem_idx]
+            n_gauss = 4 if elem_type == 8 else 1
+            total_gauss += n_gauss
+            if elem_idx in plastic_strains:
+                for gp in range(n_gauss):
+                    if np.any(plastic_strains[elem_idx][gp] != 0):
+                        n_plastic_gauss += 1
+        
+        plastic_fraction = n_plastic_gauss / total_gauss if total_gauss > 0 else 0
+        
+        # Diagnostic 3: Per-iteration output
+        if debug_level >= 2:
+            print(f"\nIteration {iteration + 1}: F={F:.3f}, Residual={residual_norm:.3e}, Plastic fraction={plastic_fraction*100:.1f}%")
+        elif debug_level >= 3:
             print(f"Displacement change norm: {disp_change:.2e}")
             print(f"Plastic strain increment: {plastic_change:.2e}")
             print(f"Max displacement: {np.max(np.abs(displacements_new)):.6f}")
@@ -959,6 +1019,33 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
     # Compute strains
     strains = compute_strains(nodes, elements, element_types, displacements)
     
+    # Calculate final statistics
+    final_sigma_yy = []
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        if elem_type == 8:
+            for gp in range(4):
+                final_sigma_yy.append(final_stresses[elem_idx, 1])  # Using element average stress
+        else:
+            final_sigma_yy.append(final_stresses[elem_idx, 1])
+    
+    final_min_sigma_yy = np.min(final_sigma_yy)
+    final_max_sigma_yy = np.max(final_sigma_yy)
+    
+    # Final plastic fraction
+    final_n_plastic_gauss = 0
+    final_total_gauss = 0
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        n_gauss = 4 if elem_type == 8 else 1
+        final_total_gauss += n_gauss
+        if elem_idx in plastic_strains:
+            for gp in range(n_gauss):
+                if np.any(plastic_strains[elem_idx][gp] != 0):
+                    final_n_plastic_gauss += 1
+    
+    final_plastic_fraction = final_n_plastic_gauss / final_total_gauss if final_total_gauss > 0 else 0
+    
     # Calculate final yield function values
     final_yield_function_values = np.zeros(n_elements)
     for elem_idx in range(n_elements):
@@ -967,7 +1054,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
         final_yield_function_values[elem_idx] = check_mohr_coulomb(
             elem_stress, c_reduced[elem_idx], phi_reduced[elem_idx])
     
-    if debug_level >= 2:
+    # Diagnostic 4: Final summary
+    if debug_level >= 1:
+        n_plastic = np.sum(plastic_elements)
+        print(f"\n=== Final Summary ===")
+        print(f"  F={F:.3f}, Iterations={iteration + 1}, Converged={'Yes' if converged else 'No'}")
+        print(f"  Final residual: {residual_norm:.3e}")
+        print(f"  Plastic elements: {n_plastic}/{n_elements}")
+        print(f"  Plastic Gauss points: {final_n_plastic_gauss}/{final_total_gauss} ({final_plastic_fraction*100:.1f}%)")
+        print(f"  Min σyy: {final_min_sigma_yy:.3f} kPa, Max σyy: {final_max_sigma_yy:.3f} kPa")
+    elif debug_level >= 2:
         n_plastic = np.sum(plastic_elements)
         print(f"Final: {n_plastic}/{n_elements} plastic elements")
     
@@ -981,7 +1077,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1):
         "yield_function": final_yield_function_values,
         "max_displacement": np.max(np.abs(displacements)),
         "plastic_strains": plastic_strains,
-        "algorithm": "Perzyna Visco-Plastic"
+        "algorithm": "Perzyna Visco-Plastic",
+        "F": F,
+        "residual": residual_norm if 'residual_norm' in locals() else 0.0,
+        "plastic_fraction": final_plastic_fraction,
+        "min_sigma_yy": final_min_sigma_yy,
+        "max_sigma_yy": final_max_sigma_yy
     }
     
     # Add abort information if applicable
@@ -1005,7 +1106,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
     F_right = F_max
     
     # Verify bounds
-    solution_min = solve_fem_perzyna(fem_data, F=F_min, debug_level=max(0, debug_level-1))
+    solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1))
     if not solution_min["converged"]:
         return {
             "converged": False,
@@ -1013,7 +1114,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
             "FS": None
         }
     
-    solution_max = solve_fem_perzyna(fem_data, F=F_max, debug_level=max(0, debug_level-1))
+    solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1))
     if solution_max["converged"]:
         if debug_level >= 1:
             print(f"Warning: F_max = {F_max} still converges - very stable slope")
@@ -1036,7 +1137,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=3.0, tolerance=0.01, debug_level=0):
             print(f"\nSSRM Iteration {iteration + 1}: Testing F = {F_mid:.4f}")
             print(f"Current interval: [{F_left:.4f}, {F_right:.4f}]")
         
-        solution = solve_fem_perzyna(fem_data, F=F_mid, debug_level=max(0, debug_level-1))
+        solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1))
         
         if solution["converged"]:
             # F_mid is stable, critical F is higher

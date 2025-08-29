@@ -648,8 +648,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
                 all_sigma_yy.append(stress_state['element_stresses'][elem_idx, gp, 1])  # σyy is index 1
                 total_gauss_points += 1
                 # Check if this Gauss point yields
-                gp_yield = check_mohr_coulomb_cp_from_tp(
-                    -stress_state['element_stresses'][elem_idx, gp, :], 
+                gp_yield = check_mohr_coulomb_cp(
+                    stress_state['element_stresses'][elem_idx, gp, :], 
                     c_reduced[elem_idx], phi_reduced[elem_idx])
                 if gp_yield > 0:
                     yielded_gauss_points += 1
@@ -658,15 +658,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             all_sigma_yy.append(stress_state['element_stresses'][elem_idx, 0, 1])  # σyy
             total_gauss_points += 1
             # Check if yields
-            gp_yield = check_mohr_coulomb_cp_from_tp(
-                -stress_state['element_stresses'][elem_idx, 0, :],
+            gp_yield = check_mohr_coulomb_cp(
+                stress_state['element_stresses'][elem_idx, 0, :],
                 c_reduced[elem_idx], phi_reduced[elem_idx])
             if gp_yield > 0:
                 yielded_gauss_points += 1
         
         # Calculate yield function with reduced strength parameters
-        yield_function_values[elem_idx] = check_mohr_coulomb_cp_from_tp(
-            -elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
+        yield_function_values[elem_idx] = check_mohr_coulomb_cp(
+            elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
     
     # Diagnostic 1: Min/max σyy after gravity
     all_sigma_yy = np.array(all_sigma_yy)
@@ -679,10 +679,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
         print(f"  Max σyy: {max_sigma_yy:.3f} kPa")
     
     # Diagnostic 2: Fraction of yielded Gauss points
-    plastic_fraction_initial = yielded_gauss_points / total_gauss_points if total_gauss_points > 0 else 0
+    yielding_fraction_initial = yielded_gauss_points / total_gauss_points if total_gauss_points > 0 else 0
     if debug_level >= 1:
-        print(f"\n=== After Yield Check ===")
-        print(f"  Yielded Gauss points: {yielded_gauss_points}/{total_gauss_points} ({plastic_fraction_initial*100:.1f}%)")
+        print(f"\n=== After Yield Check (F > 0) ===")
+        print(f"  Gauss points meeting yield criterion (F>0): {yielded_gauss_points}/{total_gauss_points} ({yielding_fraction_initial*100:.1f}%)")
+        print(f"  Note: These points satisfy F>0 but haven't developed plastic strains yet")
         
     # Output detailed yield function values for element 129
     if debug_level >= 1:
@@ -957,23 +958,35 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
         plastic_change = total_plastic_increment
         residual_norm = disp_change  # Using displacement change as residual
         
-        # Calculate current plastic fraction
+        # Calculate current plastic and yielding fractions
         n_plastic_gauss = 0
+        n_yielding_gauss = 0
         total_gauss = 0
         for elem_idx in range(n_elements):
             elem_type = element_types[elem_idx]
             n_gauss = 4 if elem_type == 8 else 1
             total_gauss += n_gauss
+            
+            # Count plastic strains (use tolerance to avoid numerical precision issues)
             if elem_idx in plastic_strains:
                 for gp in range(n_gauss):
-                    if np.any(plastic_strains[elem_idx][gp] != 0):
+                    strain_magnitude = np.linalg.norm(plastic_strains[elem_idx][gp])
+                    if strain_magnitude > 1e-12:
                         n_plastic_gauss += 1
+            
+            # Count yielding points (F > 0)
+            for gp in range(n_gauss):
+                stress_gp = stress_state['element_stresses'][elem_idx, gp, :]
+                f_yield = check_mohr_coulomb_cp(stress_gp, c_reduced[elem_idx], phi_reduced[elem_idx])
+                if f_yield > 0:
+                    n_yielding_gauss += 1
         
         plastic_fraction = n_plastic_gauss / total_gauss if total_gauss > 0 else 0
+        yielding_fraction = n_yielding_gauss / total_gauss if total_gauss > 0 else 0
         
         # Diagnostic 3: Per-iteration output (controlled by frequency)
         if debug_level >= 2 and (iteration + 1) % iteration_print_frequency == 0:
-            print(f"Iteration {iteration + 1}: F={F:.3f}, Residual={residual_norm:.3e}, Plastic fraction={plastic_fraction*100:.1f}%")
+            print(f"Iteration {iteration + 1}: F={F:.3f}, Residual={residual_norm:.3e}, Yielding={yielding_fraction*100:.1f}%, Plastic strains={plastic_fraction*100:.1f}%")
         elif debug_level >= 3 and (iteration + 1) % iteration_print_frequency == 0:
             print(f"Displacement change norm: {disp_change:.2e}")
             print(f"Plastic strain increment: {plastic_change:.2e}")
@@ -1049,7 +1062,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
         final_total_gauss += n_gauss
         if elem_idx in plastic_strains:
             for gp in range(n_gauss):
-                if np.any(plastic_strains[elem_idx][gp] != 0):
+                strain_magnitude = np.linalg.norm(plastic_strains[elem_idx][gp])
+                if strain_magnitude > 1e-12:
                     final_n_plastic_gauss += 1
     
     final_plastic_fraction = final_n_plastic_gauss / final_total_gauss if final_total_gauss > 0 else 0
@@ -1059,17 +1073,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
     for elem_idx in range(n_elements):
         # Use the stress from final_stresses (which includes von Mises as 4th column)
         elem_stress = final_stresses[elem_idx, :3]  # [sig_x, sig_y, tau_xy]
-        final_yield_function_values[elem_idx] = check_mohr_coulomb_cp_from_tp(
+        final_yield_function_values[elem_idx] = check_mohr_coulomb_cp(
             elem_stress, c_reduced[elem_idx], phi_reduced[elem_idx])
     
     # Diagnostic 4: Final summary
     if debug_level >= 1:
+        n_yielding = np.sum(final_yield_function_values > 0)
         n_plastic = np.sum(plastic_elements)
         print(f"\n=== Final Summary ===")
         print(f"  F={F:.3f}, Iterations={iteration + 1}, Converged={'Yes' if converged else 'No'}")
         print(f"  Final residual: {residual_norm:.3e}")
-        print(f"  Plastic elements: {n_plastic}/{n_elements}")
-        print(f"  Plastic Gauss points: {final_n_plastic_gauss}/{final_total_gauss} ({final_plastic_fraction*100:.1f}%)")
+        print(f"  Elements with F>0 (yielding): {n_yielding}/{n_elements}")
+        print(f"  Elements with plastic strains: {n_plastic}/{n_elements} (based on final F>1e-8)")
+        print(f"  Gauss points with accumulated plastic strains: {final_n_plastic_gauss}/{final_total_gauss} ({final_plastic_fraction*100:.1f}%)")
         print(f"  Min σyy: {final_min_sigma_yy:.3f} kPa, Max σyy: {final_max_sigma_yy:.3f} kPa")
     elif debug_level >= 2:
         n_plastic = np.sum(plastic_elements)
@@ -1865,7 +1881,7 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
             trial_stress_cp = current_stress_cp + incremental_stress_cp
             
             # Yield check (compression-positive)
-            f_yield = check_mohr_coulomb_cp_from_tp(-trial_stress_cp, c, phi)  # pass as tp by negating normals
+            f_yield = check_mohr_coulomb_cp(trial_stress_cp, c, phi)
             
             if f_yield > 1e-12:
                 # Flow direction in tp from cp stress
@@ -1878,8 +1894,8 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 for _it in range(50):
                     # Current stress (compression+) at this λ
                     stress_cp_cur = trial_stress_cp + D @ (lambda_pl * n_flow_tp)
-                    # Yield value at current stress (expects tp): pass -stress_cp
-                    f_val = check_mohr_coulomb_cp_from_tp(-stress_cp_cur, c, phi)
+                    # Yield value at current stress
+                    f_val = check_mohr_coulomb_cp(stress_cp_cur, c, phi)
                     if abs(f_val) < 1e-8:
                         break
                     # Gradient df/dσ in cp mapped to tp
@@ -1982,7 +1998,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             sig_x, sig_y, tau_xy = stress_cp
             sig_vm = np.sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
             final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
-            f_yield = check_mohr_coulomb_cp_from_tp(-stress_cp, c, phi)
+            f_yield = check_mohr_coulomb_cp(stress_cp, c, phi)
             plastic_elements[elem_idx] = f_yield > 1e-8
         else:
             # 8-node quad: average cp stress over Gauss points from stress_state
@@ -1994,7 +2010,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
             sig_x, sig_y, tau_xy = elem_stress_avg_cp
             sig_vm = np.sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
             final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
-            f_yield = check_mohr_coulomb_cp_from_tp(-elem_stress_avg_cp, c, phi)
+            f_yield = check_mohr_coulomb_cp(elem_stress_avg_cp, c, phi)
             plastic_elements[elem_idx] = f_yield > 1e-8
     
     return final_stresses, plastic_elements
@@ -2249,6 +2265,34 @@ def check_mohr_coulomb_cp_from_tp(stress_tp, c, phi):
     cos_phi = cos(phi)
     sin_phi = sin(phi)
     F = tau_max - sig_mean_cp * sin_phi - c * cos_phi
+    return F
+
+
+def check_mohr_coulomb_cp(stress_cp, c, phi):
+    """Mohr-Coulomb yield function for compression-positive stresses.
+    
+    For compression-positive convention (compression > 0, tension < 0):
+    F = tau_max - sigma_mean * sin(phi) - c * cos(phi)
+    
+    Where:
+    - tau_max = maximum shear stress = sqrt((sig_x - sig_y)^2/4 + tau_xy^2)
+    - sigma_mean = mean normal stress = (sig_x + sig_y)/2
+    - Positive F indicates yielding
+    
+    Args:
+        stress_cp: Array [sig_x, sig_y, tau_xy] in compression-positive convention
+        c: Cohesion
+        phi: Friction angle in radians
+        
+    Returns:
+        F: Yield function value (F > 0 means yielding)
+    """
+    sig_x, sig_y, tau_xy = stress_cp
+    sig_mean = (sig_x + sig_y) / 2.0
+    tau_max = sqrt(((sig_x - sig_y) / 2.0)**2 + tau_xy**2)
+    cos_phi = cos(phi)
+    sin_phi = sin(phi)
+    F = tau_max - sig_mean * sin_phi - c * cos_phi
     return F
 
 

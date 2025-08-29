@@ -626,7 +626,14 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
     stresses = solution.get("stresses", np.zeros((len(elements), 4)))
-    plastic_elements = solution.get("plastic_elements", np.zeros(len(elements), dtype=bool))
+    
+    # Use yield function to determine plastic elements for consistency
+    # If yield_function is available, use it; otherwise fall back to plastic_elements
+    yield_function = solution.get("yield_function", None)
+    if yield_function is not None:
+        plastic_elements = yield_function > 0  # F > 0 means yielding
+    else:
+        plastic_elements = solution.get("plastic_elements", np.zeros(len(elements), dtype=bool))
     
     # Extract von Mises stresses
     von_mises = stresses[:, 3]  # 4th column is von Mises stress
@@ -706,7 +713,7 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    ax.set_title('von Mises Stress (Red lines = Plastic Elements)')
+    ax.set_title('von Mises Stress (Red outline = Yielding/Plastic Elements)')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
 
@@ -1125,17 +1132,26 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
     from matplotlib.colors import LinearSegmentedColormap
     
     # Define color transitions for yield function
-    # F < -50: dark blue (very safe)
-    # F = -10: light blue (safe)  
-    # F = 0: white (critical)
-    # F > 0: red (yielding)
-    colors = ['darkblue', 'blue', 'lightblue', 'white', 'pink', 'red', 'darkred']
-    n_bins = 100
-    cmap_yield = LinearSegmentedColormap.from_list('yield', colors, N=n_bins)
+    # F < 0: shades of blue/green (elastic/safe)
+    # F = 0: white/light gray (critical)
+    # F > 0: shades of red (yielding/plastic)
+    colors_below = ['#0000FF', '#0066FF', '#00AAFF', '#00DDDD', '#CCCCCC']  # Blue to gray
+    colors_above = ['#FFCCCC', '#FF9999', '#FF6666', '#FF3333', '#FF0000', '#CC0000']  # Light red to dark red
+    
+    # Create custom colormap with sharp transition at F=0
+    n_bins = 256
+    n_below = int(n_bins * 0.7)  # 70% for negative values
+    n_above = n_bins - n_below   # 30% for positive values
+    
+    from matplotlib.colors import ListedColormap
+    colors_below_interp = plt.cm.Blues_r(np.linspace(0.2, 0.9, n_below))
+    colors_above_interp = plt.cm.Reds(np.linspace(0.3, 1.0, n_above))
+    colors_all = np.vstack([colors_below_interp, colors_above_interp])
+    cmap_yield = ListedColormap(colors_all)
     
     # Set visualization bounds - asymmetric to focus on near-yield region
-    vmin = -500  # Cap negative values for better contrast
-    vmax = 100   # Positive values are more important
+    vmin = -200  # Cap negative values for better contrast
+    vmax = 50    # Positive values are more important
     
     # Plot each element as a colored patch
     from matplotlib.collections import PatchCollection
@@ -1173,10 +1189,14 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
         cbar.set_label('Yield Function F', rotation=270, labelpad=cbar_labelpad)
         
         # Set custom ticks to highlight key values
-        tick_values = [-500, -200, -100, -50, -10, 0, 10, 50, 100]
-        tick_labels = ['-500', '-200', '-100', '-50', '-10', '0', '10', '50', '100']
-        cbar.set_ticks(tick_values)
-        cbar.set_ticklabels(tick_labels)
+        tick_values = [-200, -100, -50, -20, -10, -5, 0, 5, 10, 20, 50]
+        tick_labels = ['-200', '-100', '-50', '-20', '-10', '-5', '0', '5', '10', '20', '50']
+        # Filter ticks to those within bounds
+        valid_ticks = [(v, l) for v, l in zip(tick_values, tick_labels) if vmin <= v <= vmax]
+        if valid_ticks:
+            tick_values, tick_labels = zip(*valid_ticks)
+            cbar.set_ticks(tick_values)
+            cbar.set_ticklabels(tick_labels)
         
         # Add a line at F=0
         cbar.ax.axhline(y=0, color='black', linewidth=2)
@@ -1244,14 +1264,14 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
             
             # Close the polygon
             coords = np.vstack([coords, coords[0]])
-            ax.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, alpha=1.0)
+            ax.plot(coords[:, 0], coords[:, 1], 'k-', linewidth=2.5, alpha=1.0)  # Black border for yielding elements
     
     # Add reinforcement if requested
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_lines(ax, fem_data, solution)
     
     # Add title indicating yield state
-    ax.set_title('Yield Function (F>0: Yielding, F<0: Elastic)', fontsize=12, pad=15)
+    ax.set_title('Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)', fontsize=12, pad=15)
     
     # Add statistics to the plot
     n_yielding = np.sum(yield_function > 0)

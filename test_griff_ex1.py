@@ -37,7 +37,7 @@ def test_griffiths_example1():
     plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
                   material_table=True, label_elements=False, label_nodes=False)
     
-    F_test = 1.3
+    F_test = 1.0
     
     print(f"\n\n=== Testing Initial Gravity Loading (abort_after=0) ===")
     # First check gravity loading only
@@ -56,9 +56,10 @@ def test_griffiths_example1():
         max_yield = np.max(yield_fn)
         min_yield = np.min(yield_fn)
         print(f"\n\nYield function statistics after gravity loading at F={F_test:.3f}:")
-        print(f"  Elements yielding: {n_yielding}/{len(yield_fn)}")
+        print(f"  Elements with F>0 (meeting yield criterion): {n_yielding}/{len(yield_fn)}")
         print(f"  Max yield function: {max_yield:.3f}")
         print(f"  Min yield function: {min_yield:.3f}")
+        print(f"  Note: F>0 means the element meets the yield criterion but hasn't developed plastic strains yet")
         
         if n_yielding == 0:
             print(f"  WARNING: No elements yielding at F={F_test:.3f} - may need higher F for failure")
@@ -79,6 +80,7 @@ def test_griffiths_example1():
     converged_str = "YES" if solution["converged"] else "NO"
     max_disp = solution.get("max_displacement", 0.0)
     plastic_count = np.sum(solution.get("plastic_elements", []))
+    yielding_count = np.sum(solution.get("yield_function", []) > 0)
     iterations = solution.get("iterations", 0)
     
     print(f"\n\nResults:")
@@ -86,7 +88,8 @@ def test_griffiths_example1():
     print(f"  Converged={converged_str}")
     print(f"  Iterations={iterations}")
     print(f"  Max Displacement={max_disp:.5f}")
-    print(f"  Plastic Elements={plastic_count}")
+    print(f"  Elements with F>0 (yielding)={yielding_count}")
+    print(f"  Elements with plastic strains={plastic_count}")
     
     if solution["converged"]:
         print(f"  Status: F = {F_test:.3f} is STABLE")

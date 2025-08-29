@@ -25,11 +25,11 @@ def test_griffiths_example1():
     # Load Griffiths Example 1
     slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
     
-    # Build mesh with 3-node triangles
+    # Build mesh with 8-node quadrilaterals
     polygons = build_polygons(slope_data)
     target_size = 5  # Coarser mesh initially for testing
     
-    print(f"\n=== Building Mesh with 3-node Triangles ===")
+    print(f"\n=== Building Mesh with 8-node Quads ===")
     mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
     fem_data = build_fem_data(slope_data, mesh)
 
@@ -95,9 +95,9 @@ def test_griffiths_example1():
     
     # Plot the final state
     print(f"\n\n=== Plotting Final State at F = {F_test:.3f} ===")
-    plot_fem_results(fem_data, solution, 
-                   plot_type='stress,deformation,shear_strain',
-                   label_elements=False)
+    plot_fem_results(fem_data, solution,
+                  plot_type='stress,deformation,shear_strain',
+                  label_elements=False)
     
     return
 

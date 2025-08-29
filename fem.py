@@ -302,29 +302,26 @@ def build_fem_data(slope_data, mesh=None):
     # Already initialized to zeros
     
     # Step 2: Fixed supports at bottom (type 1) - standard practice
-    max_depth = slope_data.get("max_depth", None)
-    if max_depth is not None:
-        tolerance = 1e-6
-        bottom_nodes = np.abs(nodes[:, 1] - max_depth) < tolerance
-        bc_type[bottom_nodes] = 1  # Fixed (u=0, v=0)
+    # Use global minimum y as bottom
+    tolerance = 1e-6
+    y_min = float(np.min(nodes[:, 1])) if len(nodes) > 0 else 0.0
+    bottom_nodes = np.abs(nodes[:, 1] - y_min) < tolerance
+    bc_type[bottom_nodes] = 1  # Fixed (u=0, v=0)
     
     # Step 3: X-roller supports at left and right sides (type 2) - standard practice
-    if "ground_surface" in slope_data:
-        ground_surface = slope_data["ground_surface"]
-        if len(ground_surface.coords) >= 2:
-            x_left = ground_surface.coords[0][0]
-            x_right = ground_surface.coords[-1][0]
-            tolerance = 1e-6
-            
-            left_nodes = np.abs(nodes[:, 0] - x_left) < tolerance
-            right_nodes = np.abs(nodes[:, 0] - x_right) < tolerance
-            
-            # Apply X-roller but preserve existing boundary conditions
-            left_not_fixed = left_nodes & (bc_type != 1)
-            right_not_fixed = right_nodes & (bc_type != 1)
-            
-            bc_type[left_not_fixed] = 2   # X-roller (u=0, v=free)
-            bc_type[right_not_fixed] = 2  # X-roller (u=0, v=free)
+    # Use global min/max x to identify left/right boundaries
+    if len(nodes) > 0:
+        x_min = float(np.min(nodes[:, 0]))
+        x_max = float(np.max(nodes[:, 0]))
+        left_nodes = np.abs(nodes[:, 0] - x_min) < tolerance
+        right_nodes = np.abs(nodes[:, 0] - x_max) < tolerance
+        
+        # Apply X-roller but preserve existing boundary conditions (fixed takes precedence at corners)
+        left_not_fixed = left_nodes & (bc_type != 1)
+        right_not_fixed = right_nodes & (bc_type != 1)
+        
+        bc_type[left_not_fixed] = 2   # X-roller (u=0, v=free)
+        bc_type[right_not_fixed] = 2  # X-roller (u=0, v=free)
     
     # Step 4: Convert distributed loads to nodal forces (type 4)
     # Check for distributed loads (could be 'dloads', 'dloads2', or 'distributed_loads')
@@ -602,23 +599,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
     max_iterations = 500  # More iterations to allow proper localization
     tolerance = 1e-5  # Tighter tolerance for better convergence
     eta = 0.01  # Much lower viscosity for more localized plastic flow
+    # Allow overriding eta from fem_data for tuning
+    eta = fem_data.get("eta", eta)
     
-    # Phase 1: Start with zero stress state (TRUE Griffiths & Lane approach)
+    # Phase 1: Establish K0 (gravity) stress state from elastic solution
     if debug_level >= 1:
-        print("Phase 1: Starting with zero stress state (Griffiths approach)...")
+        print("Phase 1: Establishing K0 stress state by elastic gravity loading...")
+    initial_displacements, stress_state = establish_k0_stress_state(
+        K_global, F_gravity, bc_type, nodes, elements, element_types,
+        element_materials, E_by_mat, nu_by_mat, gamma_by_mat, u_nodal, debug_level=max(0, debug_level-1)
+    )
     
-    # Initialize with zero displacements and stresses (exactly as in Program 6.2)
-    initial_displacements = np.zeros(2 * len(nodes))
-    n_elements = len(elements)
-    max_gauss_points = 4
-    element_stresses = np.zeros((n_elements, max_gauss_points, 3))
-    
-    stress_state = {
-        'element_stresses': element_stresses,
-        'plastic_state': np.zeros((n_elements, max_gauss_points), dtype=bool)
-    }
-    
-    # Phase 2: Initialize Perzyna iteration from K₀ state
     # Debug gravity loads and element areas
     if debug_level >= 1:
         print(f"  Debug: Checking gravity load calculation")
@@ -640,7 +631,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             load_per_node = gamma * area / elem_type
             print(f"    Element {sample_elem}: area={area:.2f}, gamma={gamma}, load_per_node={load_per_node:.1f}")
     
-    
     # Calculate yield function values for all elements after gravity loading
     yield_function_values = np.zeros(n_elements)
     # Collect all σyy values for diagnostics
@@ -658,8 +648,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
                 all_sigma_yy.append(stress_state['element_stresses'][elem_idx, gp, 1])  # σyy is index 1
                 total_gauss_points += 1
                 # Check if this Gauss point yields
-                gp_yield = check_mohr_coulomb(
-                    stress_state['element_stresses'][elem_idx, gp, :], 
+                gp_yield = check_mohr_coulomb_cp_from_tp(
+                    -stress_state['element_stresses'][elem_idx, gp, :], 
                     c_reduced[elem_idx], phi_reduced[elem_idx])
                 if gp_yield > 0:
                     yielded_gauss_points += 1
@@ -668,15 +658,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             all_sigma_yy.append(stress_state['element_stresses'][elem_idx, 0, 1])  # σyy
             total_gauss_points += 1
             # Check if yields
-            gp_yield = check_mohr_coulomb(
-                stress_state['element_stresses'][elem_idx, 0, :],
+            gp_yield = check_mohr_coulomb_cp_from_tp(
+                -stress_state['element_stresses'][elem_idx, 0, :],
                 c_reduced[elem_idx], phi_reduced[elem_idx])
             if gp_yield > 0:
                 yielded_gauss_points += 1
         
         # Calculate yield function with reduced strength parameters
-        yield_function_values[elem_idx] = check_mohr_coulomb(
-            elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
+        yield_function_values[elem_idx] = check_mohr_coulomb_cp_from_tp(
+            -elem_stress_avg, c_reduced[elem_idx], phi_reduced[elem_idx])
     
     # Diagnostic 1: Min/max σyy after gravity
     all_sigma_yy = np.array(all_sigma_yy)
@@ -765,7 +755,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
         if debug_level >= 3:
             print(f"\n--- Iteration {iteration + 1} ---")
         
-        # Build load vector including plastic corrections
+        # Build load vector: maintain gravity (constant external load) + plastic corrections
         F_total = F_gravity.copy()
         
         # Add plastic strain corrections (Perzyna stress redistribution)
@@ -843,6 +833,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
                         print(f"  WARNING: B matrix values seem very large!")
                     elif max_B < 1e-6:
                         print(f"  WARNING: B matrix values seem very small!")
+                elif elem_type == 8:
+                    # For quad8, compute centroid strains directly for debug
+                    xi, eta = 0.0, 0.0
+                    B_centroid, _ = compute_B_matrix_quad8_centroid(elem_coords)
+                    print(f"  Quad8 centroid B (first 3x8 shown):")
+                    print(f"    εx row (first 8 DOFs): {B_centroid[0, :16:2]}")
+                    print(f"    εy row (first 8 DOFs): {B_centroid[1, 1:16:2]}")
+                    print(f"    γxy row (first 8 DOFs): {B_centroid[2, :16]}")
                         
         # Add displacement and stress debugging after load application
         if iteration == 0 and debug_level >= 1:
@@ -897,7 +895,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
                     print(f"  Computed stresses: σx={stresses[0]:.1f}, σy={stresses[1]:.1f}, τxy={stresses[2]:.1f}")
                     
                     # Check yield function
-                    F_yield = check_mohr_coulomb(stresses, c_reduced[elem_idx], phi_reduced[elem_idx])
+                    F_yield = check_mohr_coulomb_cp_from_tp(stresses, c_reduced[elem_idx], phi_reduced[elem_idx])
                     print(f"  Yield function: F={F_yield:.1f} {'(YIELDING!)' if F_yield > 0 else '(safe)'}")
                     
             except Exception as e:
@@ -913,21 +911,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
         K_constrained, F_constrained, constraint_dofs = apply_boundary_conditions(
             K_global, F_total, bc_type, nodes)
         
-        # Solve for total displacements at equilibrium
+        # Solve for displacement increment at equilibrium (incremental residual form)
         try:
             if hasattr(K_constrained, 'toarray'):
                 K_constrained = K_constrained.tocsr()
-            displacements_free = spsolve(K_constrained, F_constrained)
+            
+            # Current free DOF vector
+            n_dof = 2 * n_nodes
+            free_dofs = [i for i in range(n_dof) if i not in constraint_dofs]
+            u_free_curr = displacements[free_dofs]
+            
+            # Residual: r = F_free - K_free * u_free
+            r_free = F_constrained - K_constrained @ u_free_curr
+            
+            # Solve K * delta_u = r
+            delta_u_free = spsolve(K_constrained, r_free)
+            
+            # Classic update (no extra damping)
+            u_free_new = u_free_curr + delta_u_free
             
             # Reconstruct full displacement vector
-            n_dof = 2 * n_nodes
             displacements_new = np.zeros(n_dof)
-            
-            # Free DOFs
-            free_dofs = [i for i in range(n_dof) if i not in constraint_dofs]
-            displacements_new[free_dofs] = displacements_free
-            
-            # Constrained DOFs remain zero (already initialized)
+            displacements_new[free_dofs] = u_free_new
+            # Constrained DOFs remain zero
         except Exception as e:
             if debug_level >= 1:
                 print(f"Matrix solution failed: {e}")
@@ -940,10 +946,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             }
         
         # Update plastic strains using Perzyna algorithm with incremental approach
+        plastic_strain_cap = None
         plastic_strains_new, total_plastic_increment, current_stress_state = update_plastic_strains_perzyna_incremental(
             nodes, elements, element_types, element_materials,
             displacements_new, displacements_prev, plastic_strains, current_stress_state,
-            c_reduced, phi_reduced, E_by_mat, nu_by_mat, eta)
+            c_reduced, phi_reduced, E_by_mat, nu_by_mat, eta, plastic_strain_cap)
         
         # Check convergence
         disp_change = np.linalg.norm(displacements_new - displacements)
@@ -1015,7 +1022,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
     final_stresses, plastic_elements = compute_final_state_perzyna(
         nodes, elements, element_types, element_materials,
         displacements, plastic_strains, c_reduced, phi_reduced,
-        E_by_mat, nu_by_mat, u_nodal, stress_state)
+        E_by_mat, nu_by_mat, u_nodal, current_stress_state)
     
     # Compute strains
     strains = compute_strains(nodes, elements, element_types, displacements)
@@ -1052,7 +1059,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
     for elem_idx in range(n_elements):
         # Use the stress from final_stresses (which includes von Mises as 4th column)
         elem_stress = final_stresses[elem_idx, :3]  # [sig_x, sig_y, tau_xy]
-        final_yield_function_values[elem_idx] = check_mohr_coulomb(
+        final_yield_function_values[elem_idx] = check_mohr_coulomb_cp_from_tp(
             elem_stress, c_reduced[elem_idx], phi_reduced[elem_idx])
     
     # Diagnostic 4: Final summary
@@ -1274,7 +1281,7 @@ def build_triangle_stiffness(coords, E, nu):
     c2 = x1 - x3
     c3 = x2 - x1
     
-    # B matrix (standard tension positive convention)
+    # B matrix (standard linear triangle)
     B = np.array([
         [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
         [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
@@ -1472,9 +1479,13 @@ def compute_plastic_load_correction_perzyna(nodes, elements, element_types, elem
         elem_coords = nodes[elem_nodes]
         
         if elem_type == 8:
-            n_gauss = 4  # 8-node quad with reduced integration
+            # 8-node quad with 2x2 Gauss integration
+            gauss_points, weights = get_gauss_points_2x2()
+            n_gauss = 4
         else:
             n_gauss = 1  # Triangle - single Gauss point
+            gauss_points = [(0.0, 0.0)]
+            weights = [1.0]
         
         # Element plastic force vector
         elem_f_plastic = np.zeros(2 * elem_type)
@@ -1484,29 +1495,51 @@ def compute_plastic_load_correction_perzyna(nodes, elements, element_types, elem
             # Get plastic strains at this Gauss point
             plastic_strain = plastic_strains[elem_idx][gp, :]
             
-            # Skip if no plastic strain (but use much smaller threshold)
+            # Skip if no plastic strain
             if np.linalg.norm(plastic_strain) < 1e-20:
                 continue
             
-            # Compute plastic stress
+            # Constitutive matrix
             D = build_constitutive_matrix(E, nu)
             plastic_stress = D @ plastic_strain  # Tension-positive convention
             
-            # Compute B matrix for this element
+            # Compute B and weight at this Gauss point
             if elem_type == 3:  # Triangle
                 B, area = compute_B_matrix_triangle(elem_coords)
-                weight = area  # Integration weight
+                weight = area
             elif elem_type == 8:  # 8-node quad
-                # For 8-node quad, use centroid for simplified integration
-                B, det_J = compute_B_matrix_quad8_centroid(elem_coords)
-                weight = det_J  # Integration weight (determinant of Jacobian)
+                xi, eta_local = gauss_points[gp]
+                # Build B and detJ at Gauss point
+                dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta_local)
+                # Jacobian
+                J = np.zeros((2, 2))
+                for a in range(8):
+                    J[0,0] += dN_dxi[a] * elem_coords[a,0]
+                    J[0,1] += dN_dxi[a] * elem_coords[a,1]
+                    J[1,0] += dN_deta[a] * elem_coords[a,0]
+                    J[1,1] += dN_deta[a] * elem_coords[a,1]
+                det_J = J[0,0]*J[1,1] - J[0,1]*J[1,0]
+                if abs(det_J) < 1e-14:
+                    continue
+                J_inv = np.array([[J[1,1], -J[0,1]], [-J[1,0], J[0,0]]]) / det_J
+                dN_dx = np.zeros(8)
+                dN_dy = np.zeros(8)
+                for a in range(8):
+                    dN_dx[a] = J_inv[0,0]*dN_dxi[a] + J_inv[0,1]*dN_deta[a]
+                    dN_dy[a] = J_inv[1,0]*dN_dxi[a] + J_inv[1,1]*dN_deta[a]
+                B = np.zeros((3, 16))
+                for a in range(8):
+                    B[0, 2*a]   = dN_dx[a]
+                    B[1, 2*a+1] = dN_dy[a]
+                    B[2, 2*a]   = dN_dy[a]
+                    B[2, 2*a+1] = dN_dx[a]
+                weight = weights[gp] * abs(det_J)
             else:
                 # Simplified for other elements
                 B = np.zeros((3, 2 * elem_type))
                 weight = 1.0
             
             # Add contribution to element force vector
-            # F_elem += B^T * σ_plastic * weight
             if B.size > 0:
                 elem_f_plastic += B.T @ plastic_stress * weight
         
@@ -1582,7 +1615,7 @@ def compute_B_matrix_triangle(coords):
     c2 = x1 - x3
     c3 = x2 - x1
     
-    # B matrix (standard tension positive convention)
+    # B matrix (standard linear triangle)
     B = np.array([
         [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
         [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
@@ -1663,7 +1696,7 @@ def check_initial_yield_state(stress_state, c_values, phi_values):
         
         # Check Mohr-Coulomb yield criterion
         stress = np.array([sig_x, sig_y, tau_xy])
-        F_yield = check_mohr_coulomb(stress, c, phi)
+        F_yield = check_mohr_coulomb_cp_from_tp(stress, c, phi)
         if F_yield > 0:
             yield_count += 1
     
@@ -1736,7 +1769,7 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
                 trial_stress = incremental_stress
             
             # Check yield criterion with total stress
-            f_yield = check_mohr_coulomb(trial_stress, c, phi)
+            f_yield = check_mohr_coulomb_cp_from_tp(trial_stress, c, phi)
             
             if f_yield > 1e-8:  # Plastic loading
                 # Perzyna visco-plastic flow as per Griffiths & Lane (1999)
@@ -1745,7 +1778,7 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
                 delta_lambda = eta * f_yield  # Remove artificial cap
                 
                 # Flow vector (non-associated: ψ = 0)
-                flow_vector = compute_plastic_flow_vector(trial_stress, 0.0)  # ψ = 0
+                flow_vector = compute_plastic_flow_vector_cp_return_tp(trial_stress, 0.0)  # ψ = 0
                 
                 # Plastic strain increment - controlled flow to prevent instability
                 plastic_increment = delta_lambda * flow_vector
@@ -1767,23 +1800,20 @@ def update_plastic_strains_perzyna(nodes, elements, element_types, element_mater
 def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, element_materials,
                                               displacements_new, displacements_prev, plastic_strains, 
                                               current_stress_state, c_reduced, phi_reduced,
-                                              E_by_mat, nu_by_mat, eta):
+                                              E_by_mat, nu_by_mat, eta, plastic_strain_cap):
     """
-    Update plastic strains using incremental Perzyna algorithm.
-    
-    This version properly handles incremental displacements and stress updates
-    to avoid double-counting stress contributions.
+    Update plastic strains using incremental Perzyna algorithm with compression-positive stress storage.
     """
     plastic_strains_new = {}
     total_increment = 0.0
     
-    # Create new stress state (copy of current)
+    # New stress state (compression-positive)
     new_stress_state = {
         'element_stresses': current_stress_state['element_stresses'].copy(),
         'plastic_state': current_stress_state['plastic_state'].copy()
     }
     
-    # Compute displacement increment
+    # Displacement increment
     displacement_increment = displacements_new - displacements_prev
     
     for elem_idx in range(len(elements)):
@@ -1795,78 +1825,118 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
         c = c_reduced[elem_idx]
         phi = phi_reduced[elem_idx]
         
-        # Get element nodes and coordinates
+        # Element nodes/coords
         elem_nodes = elements[elem_idx][:elem_type]
         elem_coords = nodes[elem_nodes]
         
-        # Get incremental displacements for this element
+        # Incremental displacements for element
         elem_disp_increment = np.zeros(2 * elem_type)
         for i, node_idx in enumerate(elem_nodes):
             elem_disp_increment[2*i] = displacement_increment[2*node_idx]
             elem_disp_increment[2*i+1] = displacement_increment[2*node_idx+1]
         
-        # Initialize plastic strains for this element
         plastic_strains_new[elem_idx] = plastic_strains[elem_idx].copy()
         
-        # Determine number of Gauss points
+        # Gauss points
         if elem_type == 8:
             gauss_points_2x2, _ = get_gauss_points_2x2()
             n_gauss = 4
         else:
             n_gauss = 1
         
-        # For each Gauss point
         for gp in range(n_gauss):
-            # Compute incremental strains at this Gauss point
-            if elem_type == 3:  # Triangle
+            # Incremental strains
+            if elem_type == 3:
                 incremental_strains = compute_triangle_strains_manual(elem_coords, elem_disp_increment)
-            elif elem_type == 8:  # 8-node quad
+            elif elem_type == 8:
                 xi, eta_local = gauss_points_2x2[gp]
                 incremental_strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp_increment, xi, eta_local)
             else:
                 incremental_strains = np.array([0.0, 0.0, 0.0])
             
-            # Compute incremental stress from incremental strains
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ incremental_strains  # Tension-positive convention
+            incremental_stress_tp = D @ incremental_strains
+            incremental_stress_cp = -incremental_stress_tp
             
-            # Get current total stress at this Gauss point
-            current_stress = current_stress_state['element_stresses'][elem_idx, gp, :]
+            # Current total stress at GP (compression-positive)
+            current_stress_cp = current_stress_state['element_stresses'][elem_idx, gp, :]
             
-            # Trial stress = current stress + incremental stress  
-            trial_stress = current_stress + incremental_stress
+            # Trial stress (compression-positive)
+            trial_stress_cp = current_stress_cp + incremental_stress_cp
             
-            # Check yield criterion with trial stress
-            f_yield = check_mohr_coulomb(trial_stress, c, phi)
+            # Yield check (compression-positive)
+            f_yield = check_mohr_coulomb_cp_from_tp(-trial_stress_cp, c, phi)  # pass as tp by negating normals
             
-            if f_yield > 1e-8:  # Plastic loading
-                # Perzyna visco-plastic flow
-                delta_lambda = eta * f_yield
+            if f_yield > 1e-12:
+                # Flow direction in tp from cp stress
+                n_flow_tp = compute_plastic_flow_vector_cp_return_tp(-trial_stress_cp, 0.0)
                 
-                # Flow vector (non-associated: ψ = 0)
-                flow_vector = compute_plastic_flow_vector(trial_stress, 0.0)
+                # Newton return mapping: solve f(λ) = 0 where
+                # stress_cp(λ) = trial_stress_cp + D @ (λ * n_flow_tp)
+                D = build_constitutive_matrix(E, nu)
+                lambda_pl = 0.0
+                for _it in range(50):
+                    # Current stress (compression+) at this λ
+                    stress_cp_cur = trial_stress_cp + D @ (lambda_pl * n_flow_tp)
+                    # Yield value at current stress (expects tp): pass -stress_cp
+                    f_val = check_mohr_coulomb_cp_from_tp(-stress_cp_cur, c, phi)
+                    if abs(f_val) < 1e-8:
+                        break
+                    # Gradient df/dσ in cp mapped to tp
+                    sig_x_cp, sig_y_cp, tau_cp = stress_cp_cur
+                    tau_max = sqrt(((sig_x_cp - sig_y_cp)/2.0)**2 + tau_cp**2)
+                    if tau_max > 1e-20:
+                        dtau_dsigx_cp = (sig_x_cp - sig_y_cp) / (4.0 * tau_max)
+                        dtau_dsigy_cp = -(sig_x_cp - sig_y_cp) / (4.0 * tau_max)
+                        dtau_dtau_cp   = tau_cp / tau_max
+                    else:
+                        dtau_dsigx_cp = dtau_dsigy_cp = dtau_dtau_cp = 0.0
+                    sin_phi = sin(phi)
+                    grad_f_cp = np.array([
+                        -0.5 * sin_phi + dtau_dsigx_cp,
+                        -0.5 * sin_phi + dtau_dsigy_cp,
+                        dtau_dtau_cp
+                    ])
+                    grad_f_tp = np.array([-grad_f_cp[0], -grad_f_cp[1], grad_f_cp[2]])
+                    denom = float(grad_f_tp @ (D @ n_flow_tp))
+                    if abs(denom) < 1e-18:
+                        break
+                    dl = - f_val / denom
+                    # Backtracking line search to ensure |f| decreases
+                    alpha = 1.0
+                    accepted = False
+                    for _ls in range(8):
+                        lambda_try = max(0.0, lambda_pl + alpha * dl)
+                        stress_try_cp = trial_stress_cp + D @ (lambda_try * n_flow_tp)
+                        f_try = check_mohr_coulomb_cp_from_tp(-stress_try_cp, c, phi)
+                        if abs(f_try) < abs(f_val):
+                            lambda_pl = lambda_try
+                            accepted = True
+                            break
+                        alpha *= 0.5
+                    if not accepted:
+                        # fallback step
+                        lambda_pl = max(0.0, lambda_pl + 0.1 * dl)
                 
                 # Plastic strain increment
-                plastic_increment = delta_lambda * flow_vector
-                
-                # Apply reasonable limit to prevent numerical explosion
-                increment_norm = np.linalg.norm(plastic_increment)
-                if increment_norm > 1e-5:
-                    plastic_increment *= 1e-5 / increment_norm
+                relax_lambda = 0.5
+                plastic_increment = relax_lambda * lambda_pl * n_flow_tp
+                inc_norm = float(np.linalg.norm(plastic_increment))
+                # Enforce plastic_strain_cap per Gauss point
+                if plastic_strain_cap is not None and inc_norm > plastic_strain_cap:
+                    plastic_increment *= plastic_strain_cap / max(inc_norm, 1e-20)
+                    inc_norm = plastic_strain_cap
                 
                 # Update plastic strains
                 plastic_strains_new[elem_idx][gp, :] += plastic_increment
                 
                 # Update stress state (remove plastic stress contribution)
-                plastic_stress = D @ plastic_increment  # Tension-positive convention
-                new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress - plastic_stress
-                
-                # Track total plastic increment
-                total_increment += np.linalg.norm(plastic_increment)
-                
+                plastic_stress_tp = D @ plastic_increment
+                plastic_stress_cp = -plastic_stress_tp
+                new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress_cp - plastic_stress_cp
+                total_increment += inc_norm
             else:
-                # Elastic loading - just update stress
-                new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress
+                new_stress_state['element_stresses'][elem_idx, gp, :] = trial_stress_cp
     
     return plastic_strains_new, total_increment, new_stress_state
 
@@ -1875,7 +1945,7 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
                                displacements, plastic_strains, c_reduced, phi_reduced,
                                E_by_mat, nu_by_mat, u_nodal, stress_state):
     """
-    Compute final stress state and identify plastic elements.
+    Compute final stress state (compression-positive) and identify plastic elements.
     """
     n_elements = len(elements)
     final_stresses = np.zeros((n_elements, 4))
@@ -1890,88 +1960,41 @@ def compute_final_state_perzyna(nodes, elements, element_types, element_material
         c = c_reduced[elem_idx]
         phi = phi_reduced[elem_idx]
         
-        # Get element nodes and coordinates
         elem_nodes = elements[elem_idx][:elem_type]
         elem_coords = nodes[elem_nodes]
         
-        # Get element displacements
         elem_disp = np.zeros(2 * elem_type)
         for i, node_idx in enumerate(elem_nodes):
             elem_disp[2*i] = displacements[2*node_idx]
             elem_disp[2*i+1] = displacements[2*node_idx+1]
         
-        # For triangular elements (single Gauss point)
         if elem_type == 3:
-            # Compute strains
             total_strains = compute_triangle_strains_manual(elem_coords, elem_disp)
-            
-            # Get plastic strains (single Gauss point) - handle empty plastic_strains
-            if elem_idx in plastic_strains:
-                plastic_strain = plastic_strains[elem_idx][0, :]  # First (and only) Gauss point
-            else:
-                plastic_strain = np.zeros(3)  # No plastic strains yet
-            
-            # Elastic strains
+            plastic_strain = plastic_strains[elem_idx][0, :] if elem_idx in plastic_strains else np.zeros(3)
             elastic_strains = total_strains - plastic_strain
-            
-            # Stress calculation: initial stress + incremental stress
             D = build_constitutive_matrix(E, nu)
-            incremental_stress = D @ elastic_strains  # Tension-positive convention
-            
-            # Add initial geostatic stress
+            stress_tp = D @ elastic_strains
             if stress_state is not None:
-                initial_stress = stress_state['element_stresses'][elem_idx, 0, :]  # Single Gauss point
-                stress = initial_stress + incremental_stress
+                initial_cp = stress_state['element_stresses'][elem_idx, 0, :]
+                stress_cp = initial_cp - stress_tp  # cp = initial_cp + (-tp)
             else:
-                stress = incremental_stress
-            
-            # Store stress (σx, σy, τxy, σvm)
-            sig_x, sig_y, tau_xy = stress
+                stress_cp = -stress_tp
+            sig_x, sig_y, tau_xy = stress_cp
             sig_vm = np.sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
             final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
-            
-            # Check if element is plastic (yield criterion)
-            f_yield = check_mohr_coulomb(stress, c, phi)
+            f_yield = check_mohr_coulomb_cp_from_tp(-stress_cp, c, phi)
             plastic_elements[elem_idx] = f_yield > 1e-8
-        
         else:
-            # 8-node quad: compute average stress and check yield function
-            elem_nodes = elements[elem_idx][:elem_type]
-            elem_coords = nodes[elem_nodes]
-            
-            # Get element displacements
-            elem_disp = np.zeros(2 * elem_type)
-            for i, node in enumerate(elem_nodes):
-                elem_disp[2*i] = displacements[2*node]
-                elem_disp[2*i+1] = displacements[2*node+1]
-            
-            # Average stress over all Gauss points using current stress state
-            elem_stress_avg = np.zeros(3)
-            n_gauss = 4  # 2x2 integration for 8-node quads
-            
-            if elem_idx in stress_state:
-                # Use current stress state from Perzyna iteration
-                for gp in range(n_gauss):
-                    elem_stress_avg += stress_state[elem_idx][gp, :]
-                elem_stress_avg /= n_gauss
-            else:
-                # Fallback: compute stress from displacements
-                gauss_coords = [(-1/np.sqrt(3), -1/np.sqrt(3)), (1/np.sqrt(3), -1/np.sqrt(3)),
-                               (1/np.sqrt(3), 1/np.sqrt(3)), (-1/np.sqrt(3), 1/np.sqrt(3))]
-                for xi, eta in gauss_coords:
-                    strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
-                    D = build_constitutive_matrix(E, nu)
-                    stress = D @ strains  # Tension-positive convention
-                    elem_stress_avg += stress
-                elem_stress_avg /= len(gauss_coords)
-            
-            # Compute von Mises for display
-            sig_x, sig_y, tau_xy = elem_stress_avg
+            # 8-node quad: average cp stress over Gauss points from stress_state
+            elem_stress_avg_cp = np.zeros(3)
+            n_gauss = 4
+            for gp in range(n_gauss):
+                elem_stress_avg_cp += stress_state['element_stresses'][elem_idx, gp, :]
+            elem_stress_avg_cp /= n_gauss
+            sig_x, sig_y, tau_xy = elem_stress_avg_cp
             sig_vm = np.sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
             final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
-            
-            # Check yield function (same as triangles)
-            f_yield = check_mohr_coulomb(elem_stress_avg, c, phi)
+            f_yield = check_mohr_coulomb_cp_from_tp(-elem_stress_avg_cp, c, phi)
             plastic_elements[elem_idx] = f_yield > 1e-8
     
     return final_stresses, plastic_elements
@@ -1997,7 +2020,7 @@ def compute_triangle_strains_manual(coords, displacements):
     c2 = x1 - x3
     c3 = x2 - x1
     
-    # B matrix (standard tension positive convention)
+    # B matrix (standard linear triangle)
     B = np.array([
         [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
         [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
@@ -2193,7 +2216,7 @@ def test_constitutive_matrix_sanity():
     
     print(f"  Expected D-matrix (your formulation):")
     print(f"    [{expected_d11:.1f}  {expected_d12:.1f}  0.0]")
-    print(f"    [{expected_d12:.1f}  {expected_d22:.1f}  0.0]") 
+    print(f"    [{expected_d12:.1f}  {expected_d22:.1f}  0.0]")
     print(f"    [0.0  0.0  {expected_d33:.1f}]")
     
     # For your D-matrix, under pure εx strain:
@@ -2215,100 +2238,53 @@ def test_constitutive_matrix_sanity():
 # test_constitutive_matrix_sanity()
 
 
-def check_mohr_coulomb(stress, c, phi, debug=False):
-    """Check Mohr-Coulomb yield criterion and return violation.
-    
-    Uses tension-positive convention (σ > 0 in tension, σ < 0 in compression):
-    f = τ_max + σ_mean * sin(φ) - c * cos(φ)
-    
-    With tension positive: σ1 is major (most tensile), σ3 is minor (most compressive)
+def check_mohr_coulomb_cp_from_tp(stress_tp, c, phi):
+    """Mohr-Coulomb yield using compression-positive convention, input stress in tension-positive.
+    F = tau_max - sigma_mean_cp * sin(phi) - c * cos(phi)
+    Positive F => yield.
     """
-    
-    sig_x, sig_y, tau_xy = stress
-    
-    # Principal stresses (tension positive, compression negative)
-    sig_mean = (sig_x + sig_y) / 2
-    tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
-    
-    # For tension-positive: sig1 is major (most tensile), sig3 is minor (most compressive)
-    sig1 = sig_mean + tau_max  # Major principal stress (most positive/tensile)
-    sig3 = sig_mean - tau_max  # Minor principal stress (most negative/compressive)
-    
-    # Yield function for tension-positive convention:
-    # f = τ_max + σ_mean * sin(φ) - c * cos(φ)
-    # Yield when f > 0
+    sig_x_cp, sig_y_cp, tau_xy = stress_tp_to_cp(stress_tp)
+    sig_mean_cp = (sig_x_cp + sig_y_cp) / 2.0
+    tau_max = sqrt(((sig_x_cp - sig_y_cp) / 2.0)**2 + tau_xy**2)
     cos_phi = cos(phi)
     sin_phi = sin(phi)
-    
-    F = tau_max + sig_mean * sin_phi - c * cos_phi
-    
-    if debug and F > -c * cos_phi * 0.1:  # Near yielding
-        print(f"  Debug: σx={sig_x:.1f}, σy={sig_y:.1f}, τxy={tau_xy:.1f}")
-        print(f"         σ1={sig1:.1f}, σ3={sig3:.1f}, F={F:.3f}, c={c:.1f}, φ={np.degrees(phi):.1f}°")
-    
-    # Return actual F value, positive means yielding
+    F = tau_max - sig_mean_cp * sin_phi - c * cos_phi
     return F
 
 
-def compute_plastic_flow_vector(stress, psi):
-    """Compute plastic flow vector for non-associated plasticity with tension-positive convention."""
-    
-    sig_x, sig_y, tau_xy = stress
-    
-    # For non-associated plasticity with ψ = 0 (Griffiths approach)
-    # With tension-positive convention (σ > 0 in tension, σ < 0 in compression)
-    
-    # Principal stresses (tension-positive)
-    sig_mean = (sig_x + sig_y) / 2
-    tau_max = sqrt(((sig_x - sig_y) / 2)**2 + tau_xy**2)
-    
-    if tau_max < 1e-12:
-        # Hydrostatic stress state
+def compute_plastic_flow_vector_cp_return_tp(stress_tp, psi):
+    """Compute flow direction for compression-positive potential and return vector in tension-positive axes.
+    Uses g = tau_max - sigma_mean_cp * sin(psi).
+    Maps derivatives back to tension-positive components: d/dsig_tp = - d/dsig_cp for normal components.
+    """
+    sig_x_cp, sig_y_cp, tau_xy = stress_tp_to_cp(stress_tp)
+    sig_mean_cp = (sig_x_cp + sig_y_cp) / 2.0
+    tau_max = sqrt(((sig_x_cp - sig_y_cp) / 2.0)**2 + tau_xy**2)
+    if tau_max < 1e-20:
         return np.array([0.0, 0.0, 0.0])
-    
-    # For tension-positive: sig1 is major (most tensile), sig3 is minor (most compressive)
-    sig1 = sig_mean + tau_max  # Most positive (tensile)
-    sig3 = sig_mean - tau_max  # Most negative (compressive)
-    
-    # Flow direction derivatives for Mohr-Coulomb with dilatancy angle ψ
-    # Potential function g = τ_max + σ_mean * sin(ψ) - constant
-    # ∂g/∂σ gives flow direction
-    
+    # Derivatives in cp convention
+    dsig_mean_dsigx_cp = 0.5
+    dsig_mean_dsigy_cp = 0.5
+    dsig_mean_dtau_cp = 0.0
+    dtau_dsigx_cp = (sig_x_cp - sig_y_cp) / (4.0 * tau_max)
+    dtau_dsigy_cp = -(sig_x_cp - sig_y_cp) / (4.0 * tau_max)
+    dtau_dtau_cp   = tau_xy / tau_max
     sin_psi = sin(psi)
-    
-    # For ψ = 0 (non-associated flow), simplified flow vector
-    # The flow vector in terms of stress invariants becomes:
-    # ∂g/∂σ_mean = sin(ψ), ∂g/∂τ_max = 1
-    
-    # Transform to Cartesian stress components
-    if tau_max > 1e-12:
-        # Derivatives of stress invariants w.r.t. stress components
-        dsig_mean_dsig_x = 0.5
-        dsig_mean_dsig_y = 0.5
-        dsig_mean_dtau_xy = 0.0
-        
-        dtau_max_dsig_x = (sig_x - sig_y) / (4 * tau_max)
-        dtau_max_dsig_y = -(sig_x - sig_y) / (4 * tau_max)
-        dtau_max_dtau_xy = tau_xy / tau_max
-        
-        # Chain rule: ∂g/∂σ = ∂g/∂σ_mean * ∂σ_mean/∂σ + ∂g/∂τ_max * ∂τ_max/∂σ
-        flow_x = sin_psi * dsig_mean_dsig_x + 1.0 * dtau_max_dsig_x
-        flow_y = sin_psi * dsig_mean_dsig_y + 1.0 * dtau_max_dsig_y
-        flow_xy = sin_psi * dsig_mean_dtau_xy + 1.0 * dtau_max_dtau_xy
-    else:
-        # Fallback for very small shear stress
-        flow_x = sin_psi
-        flow_y = sin_psi
-        flow_xy = 0.0
-    
-    flow_vector = np.array([flow_x, flow_y, flow_xy])
-    
-    # Normalize
-    norm = np.linalg.norm(flow_vector)
-    if norm > 1e-12:
-        flow_vector /= norm
-    
-    return flow_vector
+    # ∂g/∂σ_cp = ∂τ * 1 + ∂σ_mean * ( - sin ψ)
+    flow_x_cp = dtau_dsigx_cp - sin_psi * dsig_mean_dsigx_cp
+    flow_y_cp = dtau_dsigy_cp - sin_psi * dsig_mean_dsigy_cp
+    flow_xy_cp = dtau_dtau_cp - sin_psi * dsig_mean_dtau_cp
+    # Map back to tension-positive: d/dsig_tp = - d/dsig_cp for normals; shear unchanged
+    flow_x_tp = -flow_x_cp
+    flow_y_tp = -flow_y_cp
+    flow_xy_tp = flow_xy_cp
+    return np.array([flow_x_tp, flow_y_tp, flow_xy_tp])
+
+
+def stress_tp_to_cp(stress_tp):
+    """Convert tension-positive stress [sigx, sigy, tau_xy] to compression-positive."""
+    sig_x, sig_y, tau_xy = stress_tp
+    return np.array([-sig_x, -sig_y, tau_xy])
 
 
 def establish_k0_stress_state(K_global, F_gravity, bc_type, nodes, elements, element_types, 
@@ -2375,12 +2351,11 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
     3. Compute strains from resulting displacements  
     4. Compute stresses from elastic strains: σ = D·ε
     
-    This captures stress concentrations and geometric effects essential for proper
-    plastic failure initiation, unlike simplified geostatic K₀ approaches.
+    Store stresses as compression-positive throughout the codebase.
     """
     n_elements = len(elements)
     max_gauss_points = 4
-    element_stresses = np.zeros((n_elements, max_gauss_points, 3))  # [sig_x, sig_y, tau_xy]
+    element_stresses = np.zeros((n_elements, max_gauss_points, 3))  # [sig_x, sig_y, tau_xy] (compression+)
     
     for elem_idx in range(n_elements):
         elem_type = element_types[elem_idx]
@@ -2388,7 +2363,6 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
         
         E = E_by_mat[mat_id]
         nu = nu_by_mat[mat_id]
-        gamma = gamma_by_mat[mat_id]
         
         # Get element data
         elem_nodes = elements[elem_idx][:elem_type]
@@ -2409,7 +2383,6 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
         
         # Compute stresses at each Gauss point from FEM strains
         for gp in range(n_gauss):
-            # True Griffiths approach: compute strains from FEM displacements at this Gauss point
             if elem_type == 3:  # Triangle
                 strains = compute_triangle_strains_manual(elem_coords, elem_disp)
             elif elem_type == 8:  # 8-node quad
@@ -2419,28 +2392,20 @@ def compute_k0_stress_state(nodes, elements, element_types, element_materials, d
                 strains = np.array([0.0, 0.0, 0.0])
             
             # Compute stresses from strains using elastic constitutive matrix
-            # This is the true "gravity in single increment to initially stress-free slope"
-            # Standard FEM convention: tension is positive, compression is negative
             D = build_constitutive_matrix(E, nu)
-            stresses = D @ strains  # Tension-positive convention
+            stresses_tp = D @ strains  # tension-positive
+            stresses_cp = -stresses_tp  # store compression-positive
             
-            # DIAGNOSTIC: Check shear convention consistency (first few elements only)
-            if elem_idx < 5 and gp == 0:  # Only check first few elements, first Gauss point
-                is_consistent = check_shear_convention_consistency(
-                    strains, D, E, nu, element_id=elem_idx, debug=True
-                )
-            
-            # Store stress at this Gauss point (tension positive, compression negative)
-            element_stresses[elem_idx, gp, :] = stresses
+            element_stresses[elem_idx, gp, :] = stresses_cp
     
-    # Debug: Check stress state statistics
+    # Debug: Check stress state statistics (compression-positive)
     stress_stats = {
         'sigma_x': {'min': np.min(element_stresses[:, :, 0]), 'max': np.max(element_stresses[:, :, 0]), 'mean': np.mean(element_stresses[:, :, 0])},
         'sigma_y': {'min': np.min(element_stresses[:, :, 1]), 'max': np.max(element_stresses[:, :, 1]), 'mean': np.mean(element_stresses[:, :, 1])},
         'tau_xy': {'min': np.min(element_stresses[:, :, 2]), 'max': np.max(element_stresses[:, :, 2]), 'mean': np.mean(element_stresses[:, :, 2])}
     }
     
-    print(f"  Initial stress state statistics:")
+    print(f"  Initial stress state statistics (compression+):")
     print(f"    σ_x: min={stress_stats['sigma_x']['min']:.1f}, max={stress_stats['sigma_x']['max']:.1f}, mean={stress_stats['sigma_x']['mean']:.1f}")
     print(f"    σ_y: min={stress_stats['sigma_y']['min']:.1f}, max={stress_stats['sigma_y']['max']:.1f}, mean={stress_stats['sigma_y']['mean']:.1f}")
     print(f"    τ_xy: min={stress_stats['tau_xy']['min']:.1f}, max={stress_stats['tau_xy']['max']:.1f}, mean={stress_stats['tau_xy']['mean']:.1f}")
@@ -2742,8 +2707,8 @@ def build_quad8_stiffness_reduced_integration_corrected(coords, E, nu):
             dN_dx = np.zeros(8)
             dN_dy = np.zeros(8)
             for a in range(8):
-                dN_dx[a] = J_inv[0,0] * dN_dxi[a] + J_inv[0,1] * dN_deta[a]
-                dN_dy[a] = J_inv[1,0] * dN_dxi[a] + J_inv[1,1] * dN_deta[a]
+                dN_dx[a] = J_inv[0,0]*dN_dxi[a] + J_inv[0,1]*dN_deta[a]
+                dN_dy[a] = J_inv[1,0]*dN_dxi[a] + J_inv[1,1]*dN_deta[a]
             
             # B matrix (strain-displacement, standard tension positive)
             B = np.zeros((3, 16))  # 3 strains x 16 DOF
@@ -2782,7 +2747,7 @@ def build_triangle_stiffness_corrected(coords, E, nu):
     c2 = x1 - x3
     c3 = x2 - x1
     
-    # B matrix (strain-displacement, standard tension positive)
+    # B matrix (standard linear triangle)
     B = np.array([
         [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
         [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y

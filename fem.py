@@ -685,14 +685,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
         print(f"  Gauss points meeting yield criterion (F>0): {yielded_gauss_points}/{total_gauss_points} ({yielding_fraction_initial*100:.1f}%)")
         print(f"  Note: These points satisfy F>0 but haven't developed plastic strains yet")
         
-    # Output detailed yield function values for element 129
-    if debug_level >= 1:
-        print(f"Yield function values for element 129: {yield_function_values[129]:.2f}")
-        print(f"Stress state for element 129: {stress_state['element_stresses'][129, 0, :]}")
-        print(f"Reduced strength parameters for element 129: c={c_reduced[129]:.1f}, phi={np.degrees(phi_reduced[129]):.1f}°")
-        print(f"Yield function F = {yield_function_values[129]:.3f}")
-        
-        
     
     # Check for early abort after gravity loading
     if abort_after == 0:
@@ -775,74 +767,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             print(f"Gravity load norm: {np.linalg.norm(F_gravity):.2e}")
             print(f"Total load norm: {np.linalg.norm(F_total):.2e}")
             
-            # Debug element 129 specifically
-            elem_idx = 129
-            if elem_idx < len(elements):
-                elem_type = element_types[elem_idx]
-                mat_id = element_materials[elem_idx] - 1
-                E = E_by_mat[mat_id]
-                nu = nu_by_mat[mat_id]
-                
-                elem_nodes = elements[elem_idx][:elem_type]
-                elem_coords = nodes[elem_nodes]
-                
-                print(f"\nElement {elem_idx} debug:")
-                print(f"  Material: E={E:.0f}, nu={nu:.3f}")
-                print(f"  Nodes: {elem_nodes}")
-                print(f"  Coordinates: {elem_coords}")
-                
-                if elem_type == 3:  # Triangle
-                    x1, y1 = elem_coords[0]
-                    x2, y2 = elem_coords[1] 
-                    x3, y3 = elem_coords[2]
-                    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
-                    
-                    print(f"  Triangle area: {area:.4f}")
-                    
-                    # Check if area is reasonable
-                    if area < 0.1:
-                        print(f"  WARNING: Very small element area!")
-                    elif area > 100:
-                        print(f"  WARNING: Very large element area!")
-                    
-                    # B matrix coefficients
-                    b1 = y2 - y3
-                    b2 = y3 - y1  
-                    b3 = y1 - y2
-                    c1 = x3 - x2
-                    c2 = x1 - x3
-                    c3 = x2 - x1
-                    
-                    print(f"  B matrix coefficients:")
-                    print(f"    b1={b1:.2f}, b2={b2:.2f}, b3={b3:.2f}")
-                    print(f"    c1={c1:.2f}, c2={c2:.2f}, c3={c3:.2f}")
-                    
-                    B = np.array([
-                        [b1, 0,  b2, 0,  b3, 0 ],
-                        [0,  c1, 0,  c2, 0,  c3],
-                        [c1, b1, c2, b2, c3, b3]
-                    ]) / (2 * area)
-                    
-                    print(f"  B matrix (strain-displacement):")
-                    for i, row in enumerate(['εx', 'εy', 'γxy']):
-                        print(f"    {row}: {B[i,:]}")
-                        
-                    # Check B matrix scaling
-                    max_B = np.max(np.abs(B))
-                    print(f"  Max |B| value: {max_B:.2e}")
-                    if max_B > 1e3:
-                        print(f"  WARNING: B matrix values seem very large!")
-                    elif max_B < 1e-6:
-                        print(f"  WARNING: B matrix values seem very small!")
-                elif elem_type == 8:
-                    # For quad8, compute centroid strains directly for debug
-                    xi, eta = 0.0, 0.0
-                    B_centroid, _ = compute_B_matrix_quad8_centroid(elem_coords)
-                    print(f"  Quad8 centroid B (first 3x8 shown):")
-                    print(f"    εx row (first 8 DOFs): {B_centroid[0, :16:2]}")
-                    print(f"    εy row (first 8 DOFs): {B_centroid[1, 1:16:2]}")
-                    print(f"    γxy row (first 8 DOFs): {B_centroid[2, :16]}")
-                        
+
         # Add displacement and stress debugging after load application
         if iteration == 0 and debug_level >= 1:
             # Apply boundary conditions and solve to see what displacements result
@@ -869,35 +794,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
                 print(f"  Max horizontal displacement: {np.max(displacements_new[0::2]):.4f}")
                 print(f"  Min horizontal displacement: {np.min(displacements_new[0::2]):.4f}")
                 
-                # Check displacements for element 129 nodes
-                elem_idx = 129
-                if elem_idx < len(elements):
-                    elem_nodes = elements[elem_idx][:3]
-                    print(f"\nElement {elem_idx} nodal displacements:")
-                    for i, node in enumerate(elem_nodes):
-                        u_x = displacements_new[2*node]
-                        u_y = displacements_new[2*node+1]
-                        print(f"  Node {node}: u_x={u_x:.6f}, u_y={u_y:.6f}")
-                        
-                    # Compute strains for this element
-                    elem_disp = np.zeros(6)
-                    for i, node in enumerate(elem_nodes):
-                        elem_disp[2*i] = displacements_new[2*node]
-                        elem_disp[2*i+1] = displacements_new[2*node+1]
-                    
-                    # Use the B matrix computed earlier
-                    strains = B @ elem_disp
-                    print(f"  Computed strains: εx={strains[0]:.2e}, εy={strains[1]:.2e}, γxy={strains[2]:.2e}")
-                    
-                    # Compute stresses
-                    D = build_constitutive_matrix(E, nu)
-                    stresses = D @ strains  # Tension-positive convention
-                    
-                    print(f"  Computed stresses: σx={stresses[0]:.1f}, σy={stresses[1]:.1f}, τxy={stresses[2]:.1f}")
-                    
-                    # Check yield function
-                    F_yield = check_mohr_coulomb_cp_from_tp(stresses, c_reduced[elem_idx], phi_reduced[elem_idx])
-                    print(f"  Yield function: F={F_yield:.1f} {'(YIELDING!)' if F_yield > 0 else '(safe)'}")
+
                     
             except Exception as e:
                 print(f"  Error in displacement analysis: {e}")

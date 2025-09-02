@@ -424,15 +424,17 @@ def _plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7):
 
 
 def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=None, 
-                    show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False):
+                    show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
+                    plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
+                    scale_vectors=False):
     """
     Plot FEM results with various visualization options.
     
     Parameters:
         fem_data (dict): FEM data dictionary
         solution (dict): FEM solution dictionary
-        plot_type (str): Type(s) of plot. Single type ('stress', 'displacement', 'deformation') 
-            or comma-separated multiple types ('stress,deformation', 'displacement,deformation').
+        plot_type (str): Type(s) of plot. Single type ('stress', 'displace_mag', 'displace_vector', 'deformation') 
+            or comma-separated multiple types ('stress,deformation', 'displace_mag,displace_vector').
             Multiple types are stacked vertically in the order specified.
         deform_scale (float or None): Scale factor for deformed mesh visualization.
             If None, automatically calculates scale factor so max deformation is 10% of mesh size.
@@ -441,6 +443,11 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         show_reinforcement (bool): Whether to show reinforcement elements
         figsize (tuple): Figure size
         label_elements (bool): If True, show element IDs at element centers
+        plot_nodes (bool): For displace_vector plots, show dots at all node locations
+        plot_elements (bool): For displace_vector plots, show all element edges
+        plot_boundary (bool): For displace_vector plots, show only boundary edges (default mesh display)
+        displacement_tolerance (float): Minimum displacement magnitude to show vectors (uses actual displacement)
+        scale_vectors (bool): For displace_vector plots, scale vectors for visualization; if False, use actual displacement
     
     Returns:
         matplotlib figure and axes (or list of axes for multiple plots)
@@ -453,7 +460,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     
     # Parse plot types (support comma-separated list)
     plot_types = [pt.strip().lower() for pt in plot_type.split(',')]
-    valid_types = ['displacement', 'deformation', 'stress', 'strain', 'shear_strain', 'yield']
+    valid_types = ['displace_mag', 'displace_vector', 'deformation', 'stress', 'strain', 'shear_strain', 'yield']
     
     # Validate plot types
     for pt in plot_types:
@@ -524,9 +531,14 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
             cbar_shrink = 0.5  # Slightly larger than before
             cbar_labelpad = 12
         
-        if pt == 'displacement':
+        if pt == 'displace_mag':
             plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement, 
                                      cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+        elif pt == 'displace_vector':
+            plot_displacement_vectors(ax, fem_data, solution, show_mesh, show_reinforcement, 
+                                    cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
+                                    plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
+                                    displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
                              cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -613,6 +625,174 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
     
     ax.set_aspect('equal')
     ax.set_title('Displacement Magnitude Contours')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+
+
+def _get_mesh_boundary(fem_data):
+    """
+    Compute the boundary edges of the mesh.
+    
+    Returns:
+        boundary_edges: List of (node1, node2) tuples representing boundary edges
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    
+    # Count how many times each edge appears
+    edge_count = {}
+    
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        
+        # Define edges for each element type
+        if elem_type == 3:  # Triangle
+            edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[0])]
+        elif elem_type == 4:  # Quadrilateral
+            edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[3]), (elem[3], elem[0])]
+        elif elem_type == 6:  # 6-node triangle - use corner nodes
+            edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[0])]
+        elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
+            edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[3]), (elem[3], elem[0])]
+        else:
+            continue
+        
+        # Count each edge (both directions)
+        for edge in edges:
+            # Normalize edge direction (smaller node first)
+            normalized_edge = tuple(sorted(edge))
+            edge_count[normalized_edge] = edge_count.get(normalized_edge, 0) + 1
+    
+    # Boundary edges appear only once
+    boundary_edges = [edge for edge, count in edge_count.items() if count == 1]
+    
+    return boundary_edges
+
+
+def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+                             cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
+                             plot_nodes=True, plot_elements=False, plot_boundary=False, 
+                             displacement_tolerance=1e-6, scale_vectors=False):
+    """
+    Plot displacement vectors at nodes with plastic strain.
+    The tail of each vector is at the original node location and the head is at the final location.
+    
+    Vectors are ALWAYS plotted at ALL nodes with plastic strain above the tolerance.
+    The plot_nodes/plot_elements/plot_boundary options control additional visual elements:
+    
+    Parameters:
+        plot_nodes: If True, show dots at all node locations
+        plot_elements: If True, show all element edges
+        plot_boundary: If True, show only boundary edges (default mesh display)
+        displacement_tolerance: Minimum displacement magnitude to show vectors (uses actual displacement)
+        scale_vectors: If True, scale vectors for visualization; if False, use actual displacement
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
+    plastic_elements = solution.get("plastic_elements", np.zeros(len(elements), dtype=bool))
+    
+    # Calculate displacement components
+    u = displacements[0::2]  # x-displacements
+    v = displacements[1::2]  # y-displacements
+    
+    # First, find all nodes with displacement above tolerance
+    nodes_above_tolerance = set()
+    for node_idx in range(len(nodes)):
+        disp_mag = np.sqrt(u[node_idx]**2 + v[node_idx]**2)
+        if disp_mag > displacement_tolerance:
+            nodes_above_tolerance.add(node_idx)
+    
+    # Then, find nodes that belong to elements with plastic strain
+    plastic_nodes = set()
+    for i, elem in enumerate(elements):
+        if plastic_elements[i]:
+            elem_type = element_types[i]
+            # Add all nodes of this element
+            for j in range(elem_type):
+                if j < len(elem):
+                    plastic_nodes.add(elem[j])
+    
+    # Only keep nodes that have BOTH plastic strain AND displacement above tolerance
+    target_nodes = list(plastic_nodes.intersection(nodes_above_tolerance))
+    target_nodes = [node for node in target_nodes if node < len(nodes)]
+    
+    if not target_nodes:
+        print("Warning: No target nodes found for displacement vector plot")
+        return
+    
+    # Calculate vector scaling for visualization
+    max_disp_mag = np.max(np.sqrt(u**2 + v**2))
+    if scale_vectors and max_disp_mag > 0:
+        # Scale vectors so the maximum displacement is about 10% of mesh size
+        mesh_x_size = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
+        mesh_y_size = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+        mesh_size = min(mesh_x_size, mesh_y_size)
+        scale_factor = (mesh_size * 0.1) / max_disp_mag
+    else:
+        scale_factor = 1.0
+    
+    # Plot displacement vectors (all target_nodes already meet both criteria)
+    vectors_plotted = 0
+    for node_idx in target_nodes:
+        x_orig = nodes[node_idx, 0]
+        y_orig = nodes[node_idx, 1]
+        
+        # Apply scaling only for visualization
+        u_plot = u[node_idx] * scale_factor
+        v_plot = v[node_idx] * scale_factor
+        
+        # Calculate mesh size for arrow sizing
+        mesh_x_size = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
+        mesh_y_size = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+        mesh_size = min(mesh_x_size, mesh_y_size)
+        
+        ax.arrow(x_orig, y_orig, u_plot, v_plot,
+                head_width=mesh_size*0.01, head_length=mesh_size*0.015,
+                fc='black', ec='black', alpha=0.8, linewidth=1.0)
+        vectors_plotted += 1
+    
+    print(f"Plotted {vectors_plotted} displacement vectors (tolerance = {displacement_tolerance:.2e})")
+    
+    # Plot additional visual elements based on options
+    if show_mesh:
+        if plot_elements:
+            # Plot all element edges
+            plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5, linewidth=0.5)
+        elif plot_boundary:
+            # Plot only boundary edges
+            boundary_edges = _get_mesh_boundary(fem_data)
+            for edge in boundary_edges:
+                x_coords = [nodes[edge[0], 0], nodes[edge[1], 0]]
+                y_coords = [nodes[edge[0], 1], nodes[edge[1], 1]]
+                ax.plot(x_coords, y_coords, 'k-', alpha=0.7, linewidth=1.0)
+    
+    # Plot node dots if requested
+    if plot_nodes:
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2, alpha=0.6)
+    
+    # Plot reinforcement
+    if show_reinforcement and 'elements_1d' in fem_data:
+        plot_reinforcement_lines(ax, fem_data, solution)
+    
+    # Add element labels if requested
+    if label_elements:
+        _add_element_labels(ax, fem_data)
+    
+    # Add a dummy colorbar to maintain consistent spacing with other plots
+    dummy_data = np.array([[0, 1]])
+    dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
+    cbar = plt.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
+    cbar.set_label('Displacement Vectors', rotation=270, labelpad=cbar_labelpad, color='white')
+    cbar.set_ticks([])
+    cbar.set_ticklabels([])
+    cbar.outline.set_color('white')
+    cbar.outline.set_linewidth(0)
+    
+    ax.set_aspect('equal')
+    ax.set_title(f'Displacement Vectors (Scale Factor = {scale_factor:.2f})')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
 

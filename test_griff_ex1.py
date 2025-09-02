@@ -37,7 +37,7 @@ def test_griffiths_example1():
     plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
                   material_table=True, label_elements=False, label_nodes=False)
     
-    F_test = 1.0
+    F_test = 1.3
     
     print(f"\n\n=== Testing Initial Gravity Loading (abort_after=0) ===")
     # First check gravity loading only
@@ -64,16 +64,7 @@ def test_griffiths_example1():
         if n_yielding == 0:
             print(f"  WARNING: No elements yielding at F={F_test:.3f} - may need higher F for failure")
     
-    print(f"\n\n=== Testing One Perzyna Iteration (abort_after=1) ===")
-    # Test one iteration to see plastic correction
-    one_iter_solution = solve_fem(fem_data, F=F_test, debug_level=2, abort_after=1)
-    
-    # Plot after one iteration
-    print(f"\n\n=== Plotting After One Perzyna Iteration ===")
-    plot_fem_results(fem_data, one_iter_solution, 
-                     plot_type='stress,yield,shear_strain', 
-                     label_elements=False)
-    
+
     print(f"\n\n=== Testing Full Perzyna Analysis at F = {F_test:.3f} ===")
     solution = solve_fem(fem_data, F=F_test, debug_level=2)
     
@@ -99,7 +90,7 @@ def test_griffiths_example1():
     # Plot the final state
     print(f"\n\n=== Plotting Final State at F = {F_test:.3f} ===")
     plot_fem_results(fem_data, solution,
-                  plot_type='stress,deformation,shear_strain',
+                  plot_type='displace_vector,deformation,shear_strain',
                   label_elements=False)
     
     return

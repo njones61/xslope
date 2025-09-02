@@ -34,39 +34,14 @@ def test_griffiths_example1():
     fem_data = build_fem_data(slope_data, mesh)
 
     # Plot the initial mesh
-    plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
-                  material_table=True, label_elements=False, label_nodes=False)
+    # plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
+    #               material_table=True, label_elements=False, label_nodes=False)
     
-    F_test = 1.3
+    F_test = 1.4
     
-    print(f"\n\n=== Testing Initial Gravity Loading (abort_after=0) ===")
-    # First check gravity loading only
-    gravity_solution = solve_fem(fem_data, F=F_test, debug_level=2, abort_after=0)
     
-    # Plot gravity stress state and yield function
-    print(f"\n\n=== Plotting Initial Gravity Stress and Yield Function ===")
-    plot_fem_results(fem_data, gravity_solution, 
-                     plot_type='stress,yield', 
-                     label_elements=True)  # This will show element IDs on stress plot and F values on yield plot
-    
-    # Check yield function statistics
-    yield_fn = gravity_solution.get("yield_function", np.array([]))
-    if len(yield_fn) > 0:
-        n_yielding = np.sum(yield_fn > 0)
-        max_yield = np.max(yield_fn)
-        min_yield = np.min(yield_fn)
-        print(f"\n\nYield function statistics after gravity loading at F={F_test:.3f}:")
-        print(f"  Elements with F>0 (meeting yield criterion): {n_yielding}/{len(yield_fn)}")
-        print(f"  Max yield function: {max_yield:.3f}")
-        print(f"  Min yield function: {min_yield:.3f}")
-        print(f"  Note: F>0 means the element meets the yield criterion but hasn't developed plastic strains yet")
-        
-        if n_yielding == 0:
-            print(f"  WARNING: No elements yielding at F={F_test:.3f} - may need higher F for failure")
-    
-
     print(f"\n\n=== Testing Full Perzyna Analysis at F = {F_test:.3f} ===")
-    solution = solve_fem(fem_data, F=F_test, debug_level=2)
+    solution = solve_fem(fem_data, F=F_test, debug_level=3)
     
     converged_str = "YES" if solution["converged"] else "NO"
     max_disp = solution.get("max_displacement", 0.0)

@@ -467,31 +467,9 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         if pt not in valid_types:
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
     
-    # Auto-calculate deformation scale if not provided and deformation plots are requested
-    needs_deform_scale = any(pt in ['deformation', 'stress', 'strain', 'shear_strain'] for pt in plot_types)
-    if deform_scale is None and needs_deform_scale:
-        # Extract displacement components
-        u = displacements[0::2]  # x-displacements
-        v = displacements[1::2]  # y-displacements
-        max_disp_mag = np.max(np.sqrt(u**2 + v**2))
-        
-        if max_disp_mag > 0:
-            # Calculate mesh dimensions
-            mesh_x_size = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
-            mesh_y_size = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-            
-            # Scale so max deformation is 10% of smallest mesh dimension
-            target_deform = min(mesh_x_size, mesh_y_size) * 0.1
-            deform_scale = target_deform / max_disp_mag
-            
-            print(f"Auto-calculated deformation scale factor: {deform_scale:.6f}")
-            print(f"  Max displacement: {max_disp_mag:.4f} units")
-            print(f"  Target visualization: {target_deform:.4f} units (10% of mesh size)")
-        else:
-            deform_scale = 1.0
-            print("No displacements detected, using scale factor 1.0")
-    elif deform_scale is None:
-        deform_scale = 1.0  # Default for non-deformation plots
+    # Set default deformation scale to 1.0 to match vector plot behavior
+    if deform_scale is None:
+        deform_scale = 1.0  # Default to actual displacement scale
     
     # Create subplots based on number of plot types
     n_plots = len(plot_types)

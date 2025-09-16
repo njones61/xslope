@@ -20,3 +20,5 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+.DS_Store
+docs/.DS_Store

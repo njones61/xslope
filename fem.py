@@ -524,7 +524,7 @@ def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_frequency=5):
+def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_frequency=5, dt_max=1e-6, max_iterations=60, tolerance=5e-4, damping_factor=0.9, plastic_strain_cap=0.1):
     """
     Solve FEM using Perzyna visco-plastic algorithm exactly as in Griffiths & Lane (1999).
     
@@ -543,6 +543,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
                           1 = abort after first plasticity iteration
                           etc.
         iteration_print_frequency (int): Print iteration info every N iterations (default=1)
+        dt_max (float): Maximum pseudo-time step for Perzyna updates; dt = min(dt_base, dt_max).
+                        Defaults to 1e-6.
+        max_iterations (int): Maximum Perzyna iterations. Defaults to 60.
+        tolerance (float): Convergence tolerance on relative displacement change. Defaults to 5e-4.
+        damping_factor (float): Under-relaxation factor for displacement update (0<d<=1).
+                               Lower for more damping (e.g., 0.8–0.9). Defaults to 0.95.
+        plastic_strain_cap (float|None): Max per-Gauss plastic strain increment magnitude per
+                               iteration (cap on |erate*dt|). None disables capping.
         
     Returns:
         dict: Solution dictionary with convergence status
@@ -595,27 +603,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
     
     # Boundary conditions will be applied in each iteration using apply_boundary_conditions
     
-    # Viscoplastic strain method parameters (from Griffiths & Lane 1999)
-    max_iterations = 20  # Reduced to prevent global plastic flow
-    tolerance = 1e-3  # Stricter tolerance to stop iteration earlier
+
     
     # Pseudo-time step for numerical stability (not real time - this is steady-state)
     # Griffiths & Lane approach: start with large value, then calculate based on material properties
-    dt = 1.0e15  # Large initial value as in p62.f90 line 19
+    dt_base = 1.0e15  # Large initial value as in p62.f90 line 19
     
     # Calculate time step based on material properties (p62.f90 lines 72-73)
     # Use the first material's properties for time step calculation
     E = E_by_mat[0]  # Young's modulus of first material
     nu = nu_by_mat[0]  # Poisson's ratio of first material
     ddt = 4.0 * (1.0 + nu) / (3.0 * E)  # d4*(one+prop(3))/(d3*prop(2))
-    if ddt < dt:
-        dt = ddt
+    if ddt < dt_base:
+        dt_base = ddt
     
-    # Allow overriding dt from fem_data for tuning
-    dt = fem_data.get("dt", dt)
+    # Final time step control: dt is min of material-based dt_base and user dt_max
+    dt = min(dt_base, dt_max)
     
-    # Control time step for controlled failure approach (like Griffiths & Lane)
-    dt = min(dt, 1.5e-6)  # This is what I was tuning
+    # Debug prints for dt calculation
+    if debug_level >= 2:
+        print(f"Time step estimate: E={E:.3g}, nu={nu:.3g}, ddt={ddt:.3e}")
+        print(f"dt_base={dt_base:.3e}, dt_max={dt_max:.3e}, dt={dt:.3e}")
     
     # Phase 1: Establish K0 (gravity) stress state from elastic solution
     if debug_level >= 1:
@@ -866,7 +874,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             }
         
         # Update plastic strains using Perzyna algorithm with incremental approach
-        plastic_strain_cap = None
         plastic_strains_new, total_plastic_increment, current_stress_state = update_plastic_strains_perzyna_incremental(
             nodes, elements, element_types, element_materials,
             displacements_new, displacements_prev, plastic_strains, current_stress_state,
@@ -946,7 +953,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_fr
             break
         
         # Apply light numerical damping to control global instability
-        damping_factor = 0.95  # Very light under-relaxation factor
         displacements = damping_factor * displacements_new + (1 - damping_factor) * displacements
         displacements_prev = displacements.copy()  # Store previous displacements
         plastic_strains = plastic_strains_new
@@ -1897,8 +1903,8 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 inc_norm = float(np.linalg.norm(plastic_increment))
                 
                 # Debug stress return
-                if debug_level >= 3 and inc_norm > 1e-3:
-                    print(f"    GP {gp}: inc_norm={inc_norm:.2e}, f_yield={f_yield:.2e}")
+                # if debug_level >= 3 and inc_norm > 1e-3:
+                #     print(f"    GP {gp}: inc_norm={inc_norm:.2e}, f_yield={f_yield:.2e}")
                 
                 # Enforce plastic_strain_cap per Gauss point
                 if plastic_strain_cap is not None and inc_norm > plastic_strain_cap:

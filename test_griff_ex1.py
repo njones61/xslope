@@ -27,17 +27,17 @@ def test_griffiths_example1():
     
     # Build mesh with 8-node quadrilaterals
     polygons = build_polygons(slope_data)
-    target_size = 5  # Coarser mesh initially for testing
+    target_size = 4  # Coarser mesh initially for testing
     
     print(f"\n=== Building Mesh with 8-node Quads ===")
-    mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
+    mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
     fem_data = build_fem_data(slope_data, mesh)
 
     # Plot the initial mesh
     # plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
     #               material_table=True, label_elements=False, label_nodes=False)
     
-    F_test = 1.4
+    F_test = 1.3
     
     
     print(f"\n\n=== Testing Full Perzyna Analysis at F = {F_test:.3f} ===")

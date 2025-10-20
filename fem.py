@@ -524,7 +524,7 @@ def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_frequency=5, dt_max=1e-6, max_iterations=60, tolerance=5e-4, damping_factor=0.9, plastic_strain_cap=0.1):
+def solve_fem(fem_data, F=1.0, debug_level=0, abort_after=-1, iteration_print_frequency=5, dt_max=1e-5, max_iterations=60, tolerance=5e-4, damping_factor=0.9, plastic_strain_cap=0.005):
     """
     Solve FEM using Perzyna visco-plastic algorithm exactly as in Griffiths & Lane (1999).
     
@@ -1833,70 +1833,10 @@ def update_plastic_strains_perzyna_incremental(nodes, elements, element_types, e
                 # Griffiths & Lane viscoplastic strain method with strain softening
                 # Calculate plastic strain rate using their approach
                 if f_yield > 0:
-                    # Get Mohr-Coulomb potential derivatives
-                    # For now, use simplified approach - could be enhanced with proper invariant calculation
-                    psi_deg = 0.0  # Dilation angle - could be material property
-                    dsbar = np.sqrt(0.5 * ((trial_stress_cp[0] - trial_stress_cp[1])**2 + trial_stress_cp[2]**2))
-                    theta = 0.0  # Lode angle - simplified
-                    dq1, dq2, dq3 = compute_mohr_coulomb_potential_derivatives(psi_deg, dsbar, theta)
-                    
-                    # Calculate flow matrix (simplified - Griffiths & Lane use m1, m2, m3 matrices)
-                    # For plane strain: flow = f * (m1*dq1 + m2*dq2 + m3*dq3)
-                    # Simplified to: flow = f * n_flow_tp
+                    # Non-associated flow with ψ=0; Perzyna rate: erate ∝ f * n
                     flow_vector = f_yield * n_flow_tp
-                    
-                    # Calculate plastic strain rate: erate = MATMUL(flow, sigma)
-                    # Simplified to: erate = flow_vector
                     erate = flow_vector
-                    
-                    # Apply advanced spatial localization to promote narrow slip surface
-                    # Find potential failure path based on stress concentration and spatial proximity
-                    accumulated_plastic_strain = np.linalg.norm(plastic_strains[elem_idx][gp])
-                    
-                    # Get element center coordinates for spatial analysis
-                    elem_nodes = elements[elem_idx]
-                    elem_coords = nodes[elem_nodes]
-                    elem_center = np.mean(elem_coords, axis=0)
-                    
-                    # Define potential failure path (from upper slope to toe)
-                    # This is a simplified approach - in practice, this could be determined dynamically
-                    failure_path_start = np.array([40.0, 40.0])  # Upper slope
-                    failure_path_end = np.array([100.0, 10.0])   # Near toe
-                    
-                    # Calculate distance from element center to failure path
-                    # Use perpendicular distance to line segment
-                    path_vector = failure_path_end - failure_path_start
-                    path_length = np.linalg.norm(path_vector)
-                    if path_length > 0:
-                        path_unit = path_vector / path_length
-                        to_elem = elem_center - failure_path_start
-                        proj_length = np.dot(to_elem, path_unit)
-                        proj_length = max(0, min(path_length, proj_length))  # Clamp to segment
-                        closest_point = failure_path_start + proj_length * path_unit
-                        distance_to_path = np.linalg.norm(elem_center - closest_point)
-                    else:
-                        distance_to_path = np.linalg.norm(elem_center - failure_path_start)
-                    
-                    # Apply aggressive spatial localization for narrow slip surface like Griffiths
-                    localization_width = 8.0  # Narrow failure zone for localized slip surface
-                    if distance_to_path > localization_width:
-                        # Strongly suppress plastic flow far from failure path
-                        spatial_factor = 0.001  # Almost no flow outside localization zone
-                        erate *= spatial_factor
-                    elif distance_to_path > localization_width * 0.5:
-                        # Sharp transition zone
-                        spatial_factor = 0.001 + 0.999 * (localization_width - distance_to_path) / (localization_width * 0.5)
-                        erate *= spatial_factor
-                    else:
-                        # Full plastic flow near failure path
-                        spatial_factor = 1.0
-                        # Apply moderate strain softening for localization within the failure zone
-                        if accumulated_plastic_strain > 0.01:
-                            softening_factor = max(0.5, 1.0 - accumulated_plastic_strain * 2.0)  # More aggressive softening
-                            spatial_factor *= softening_factor
-                        erate *= spatial_factor
-                    
-                    # Calculate plastic strain increment: evp = erate * dt
+                    # Plastic strain increment: Δεp = erate * dt
                     plastic_increment = erate * dt
                 else:
                     plastic_increment = np.zeros(3)

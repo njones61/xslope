@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from global_config import non_circ
-from slice import generate_slices
-from fileio import load_slope_data, load_data_from_pickle
-from plot import plot_circular_search_results, plot_inputs
-from solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
-from search import circular_search, noncircular_search
+from xslope.global_config import non_circ
+from xslope.slice import generate_slices
+from xslope.fileio import load_slope_data, load_data_from_pickle
+from xslope.plot import plot_circular_search_results, plot_inputs
+from xslope.solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
+from xslope.search import circular_search, noncircular_search
 
 
 def solve_selected(func, slice_df, rapid=False):

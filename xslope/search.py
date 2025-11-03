@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import numpy as np
-from advanced import rapid_drawdown
-from slice import generate_slices, get_y_from_intersection
+from .advanced import rapid_drawdown
+from .slice import generate_slices, get_y_from_intersection
 from shapely.geometry import LineString, Point
 import time
 

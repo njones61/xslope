@@ -8,11 +8,11 @@ Expected results:
 - Slope: φ=20°, c/γH=0.05, 26.57° (2:1)
 """
 
-from fem import solve_fem
-from fem import build_fem_data
-from plot_fem import plot_fem_results, plot_fem_data
-from fileio import load_slope_data
-from mesh import build_polygons, build_mesh_from_polygons
+from xslope.fem import solve_fem
+from xslope.fem import build_fem_data
+from xslope.plot_fem import plot_fem_results, plot_fem_data
+from xslope.fileio import load_slope_data
+from xslope.mesh import build_polygons, build_mesh_from_polygons
 import numpy as np
 
 def test_griffiths_example1():

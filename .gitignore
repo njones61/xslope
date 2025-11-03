@@ -22,3 +22,11 @@ __pycache__/
 *.swo
 .DS_Store
 docs/.DS_Store
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

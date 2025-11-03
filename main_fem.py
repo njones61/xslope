@@ -1,9 +1,9 @@
 
-from fem import build_fem_data, solve_fem, solve_ssrm
-from plot_fem import plot_fem_results, plot_reinforcement_force_profiles, plot_ssrm_convergence, plot_fem_data
-from fileio import load_slope_data, print_dictionary
-from mesh import build_polygons, build_mesh_from_polygons
-from plot import plot_inputs, plot_mesh, plot_polygons
+from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+from xslope.plot_fem import plot_fem_results, plot_reinforcement_force_profiles, plot_ssrm_convergence, plot_fem_data
+from xslope.fileio import load_slope_data, print_dictionary
+from xslope.mesh import build_polygons, build_mesh_from_polygons
+from xslope.plot import plot_inputs, plot_mesh, plot_polygons
 import numpy as np
 
 slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Diagnostic to understand premature yielding."""
 
-from fem import solve_fem, build_fem_data
-from fileio import load_slope_data
-from mesh import build_polygons, build_mesh_from_polygons
+from xslope.fem import solve_fem, build_fem_data
+from xslope.fileio import load_slope_data
+from xslope.mesh import build_polygons, build_mesh_from_polygons
 import numpy as np
 
 # Load slope

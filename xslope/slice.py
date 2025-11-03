@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 from math import sin, cos, tan, radians, atan, atan2, degrees, sqrt
-from mesh import find_element_containing_point, interpolate_at_point
+from .mesh import find_element_containing_point, interpolate_at_point
 
 def get_circular_y_coordinates(x_coords, Xo, Yo, R):
     """

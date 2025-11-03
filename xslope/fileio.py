@@ -19,7 +19,7 @@ import pickle
 import os
 
 # Import functions for seep analysis
-from mesh import import_mesh_from_json
+from .mesh import import_mesh_from_json
 
 def build_ground_surface(profile_lines):
     """

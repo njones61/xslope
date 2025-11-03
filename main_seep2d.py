@@ -1,5 +1,5 @@
-from seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics
-from plot_seep import plot_seep_data, plot_seep_solution
+from xslope.seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
 import numpy as np
 
 

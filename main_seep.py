@@ -1,10 +1,10 @@
-from fileio import load_slope_data, print_dictionary
+from xslope.fileio import load_slope_data, print_dictionary
 
-from mesh import build_polygons, build_mesh_from_polygons
-from mesh import export_mesh_to_json, import_mesh_from_json
-from plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_separately
-from seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
-from plot_seep import plot_seep_data, plot_seep_solution
+from xslope.mesh import build_polygons, build_mesh_from_polygons
+from xslope.mesh import export_mesh_to_json, import_mesh_from_json
+from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_separately
+from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
 import numpy as np
 
 slope_data = load_slope_data("inputs/slope/input_template_lface6.xlsx")

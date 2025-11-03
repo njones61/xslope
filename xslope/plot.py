@@ -14,7 +14,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-from slice import generate_failure_surface
+from .slice import generate_failure_surface
 from shapely.geometry import LineString
 from matplotlib.lines import Line2D
 from matplotlib.path import Path

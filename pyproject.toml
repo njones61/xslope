@@ -1,0 +1,52 @@
+[build-system]
+requires = [
+  "setuptools>=68",
+  "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xslope"
+dynamic = ["version"]
+description = "Slope stability analysis (limit equilibrium and FEM) in Python."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Norman L. Jones" }
+]
+keywords = [
+  "slope", "stability", "geotechnical", "FEM", "limit equilibrium"
+]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "scipy",
+]
+
+[project.urls]
+Homepage = ""
+Documentation = ""
+Source = ""
+Issues = ""
+
+[tool.setuptools]
+packages = ["xslope"]
+
+[tool.setuptools.dynamic]
+version = { attr = "__version__", module = "xslope._version" }
+
+

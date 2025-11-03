@@ -1,12 +1,12 @@
-from global_config import non_circ
+from xslope.global_config import non_circ
 
-from fileio import load_slope_data
-from plot import plot_circular_search_results, plot_noncircular_search_results
-from solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
-from search import circular_search, noncircular_search
+from xslope.fileio import load_slope_data
+from xslope.plot import plot_circular_search_results, plot_noncircular_search_results
+from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
+from xslope.search import circular_search, noncircular_search
 
 
-slope_data = load_slope_data("inputs/slope/input_template_reliability4.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
 
 # Run non-circular search
 # fs_cache, converged, search_path = noncircular_search(slope_data, corps_engineers, diagnostic=False)

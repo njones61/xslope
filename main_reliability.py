@@ -1,10 +1,10 @@
-from fileio import load_slope_data
-from plot import plot_reliability_results
-from advanced import reliability
-from solve import spencer, bishop
+from xslope.fileio import load_slope_data
+from xslope.plot import plot_reliability_results
+from xslope.advanced import reliability
+from xslope.solve import spencer, bishop
 
 # Load slope data
-slope_data = load_slope_data("inputs/slope/input_template_reliability4.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
 
 # Run reliability analysis with Spencer method
 print("Running reliability analysis with Spencer method...")

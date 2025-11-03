@@ -31,7 +31,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     materials = np.unique(element_materials)
     
     # Import get_material_color to ensure consistent colors with plot_mesh
-    from plot import get_material_color
+    from .plot import get_material_color
     mat_to_color = {mat: get_material_color(mat) for mat in materials}
 
     # If element_types is not provided, assume all triangles (backward compatibility)
@@ -271,7 +271,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         materials = np.unique(element_materials)
         
         # Import get_material_color to ensure consistent colors with plot_mesh
-        from plot import get_material_color
+        from .plot import get_material_color
         mat_to_color = {mat: get_material_color(mat) for mat in materials}
 
         # Plot all elements with proper subdivision for quadratic elements

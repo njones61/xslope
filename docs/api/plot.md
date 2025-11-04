@@ -1,6 +1,6 @@
 # API Reference - Plot Module
 
-::: plot
+::: xslope.plot
     handler: python
     rendering:
       show_root_toc_entry: false

@@ -53,9 +53,16 @@ nav:
     - Problem Setup: fem/setup.md
     - Sample Problems: fem/samples.md
   - API:
+      - Advanced: api/advanced.md
+      - FEM: api/fem.md
       - File I/O: api/fileio.md
+      - Global Config: api/global_config.md
+      - Mesh: api/mesh.md
+      - Plot: api/plot.md
+      - Plot FEM: api/plot_fem.md
+      - Plot SEEP: api/plot_seep.md
+      - SEEP: api/seep.md
+      - Search: api/search.md
       - Slice: api/slice.md
       - Solve: api/solve.md
-      - Search: api/search.md
-      - Plot: api/plot.md
 

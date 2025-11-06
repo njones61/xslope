@@ -383,7 +383,7 @@ def load_slope_data(filepath):
             continue  # Skip empty rows
             
         # If coordinates are present, check for required parameters (Tmax, Lp1, Lp2)
-        if pd.isna(row.iloc[5]) or pd.isna(row.iloc[6]) or pd.isna(row.iloc[7]):
+        if pd.isna(row.iloc[5]) or pd.isna(row.iloc[7]) or pd.isna(row.iloc[8]):
             raise ValueError(f"Reinforcement line in row {i + 3} has coordinates but missing required parameters (Tmax, Lp1, Lp2). All three must be specified.")
             
         try:
@@ -455,7 +455,7 @@ def load_slope_data(filepath):
                 points_to_add = []
                 
                 # Point 1: Start point
-                points_to_add.append((x1, y1, 0.0))
+                points_to_add.append((x1, y1, 0.0, 0.0))
                 
                 # Point 2: At distance Lp1 from start (if Lp1 > 0)
                 if Lp1 > 0:
@@ -477,7 +477,7 @@ def load_slope_data(filepath):
                 
                 # Point 4: End point
                 if Lp2 > 0:
-                    points_to_add.append((x2, y2, 0.0))
+                    points_to_add.append((x2, y2, 0.0, 0.0))
                 else:
                     points_to_add.append((x2, y2, Tmax, Tres))
                 
@@ -486,7 +486,7 @@ def load_slope_data(filepath):
                 tolerance = 1e-6
                 for x, y, T, Tres in points_to_add:
                     is_duplicate = False
-                    for ux, uy in unique_points:
+                    for ux, uy, uT, uTres in unique_points:
                         if abs(x - ux) < tolerance and abs(y - uy) < tolerance:
                             # Update tension to maximum value at this location
                             for i, (px, py, pT, pTres) in enumerate(unique_points):

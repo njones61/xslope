@@ -15,7 +15,7 @@
 from xslope.global_config import non_circ
 from xslope.slice import generate_slices
 from xslope.fileio import load_slope_data, load_data_from_pickle
-from xslope.plot import plot_circular_search_results, plot_inputs
+from xslope.plot import plot_circular_search_results, plot_inputs, plot_solution
 from xslope.solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
 from xslope.search import circular_search, noncircular_search
 
@@ -51,7 +51,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_rface6.xlsx")
 
 # plot_inputs(slope_data)
 
@@ -68,10 +68,12 @@ else:
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
 results = solve_selected(spencer, slice_df, rapid=False)
+plot_solution(slope_data, slice_df, failure_surface, results)
+
 
 # solve_all(slice_df)
 
 
-fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
-plot_circular_search_results(slope_data, fs_cache, search_path)
+# fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
+# plot_circular_search_results(slope_data, fs_cache, search_path)
 

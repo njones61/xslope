@@ -50,7 +50,7 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, mat
     materials = np.unique(element_materials)
     
     # Import get_material_color to ensure consistent colors with plot_mesh
-    from plot import get_material_color
+    from .plot import get_material_color
     mat_to_color = {mat: get_material_color(mat) for mat in materials}
     
     # If element_types is not provided, assume all triangles (backward compatibility)

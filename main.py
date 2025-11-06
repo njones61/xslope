@@ -51,7 +51,7 @@ def solve_all(slice_df):
     solve_selected(lowe_karafiath, slice_df)
     solve_selected(spencer, slice_df)
 
-slope_data = load_slope_data("inputs/slope/input_template_rface6.xlsx")
+slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
 
 # plot_inputs(slope_data)
 
@@ -67,13 +67,13 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, slice_df, rapid=False)
-plot_solution(slope_data, slice_df, failure_surface, results)
+# results = solve_selected(spencer, slice_df, rapid=False)
+# plot_solution(slope_data, slice_df, failure_surface, results)
 
 
 # solve_all(slice_df)
 
 
-# fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
-# plot_circular_search_results(slope_data, fs_cache, search_path)
+fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
+plot_circular_search_results(slope_data, fs_cache, search_path)
 

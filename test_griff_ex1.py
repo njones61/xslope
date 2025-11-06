@@ -34,8 +34,8 @@ def test_griffiths_example1():
     fem_data = build_fem_data(slope_data, mesh)
 
     # Plot the initial mesh
-    # plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
-    #               material_table=True, label_elements=False, label_nodes=False)
+    plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, 
+                   material_table=True, label_elements=False, label_nodes=False)
     
     F_test = 1.3
     

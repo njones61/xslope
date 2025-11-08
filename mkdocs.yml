@@ -65,4 +65,8 @@ nav:
       - Search: api/search.md
       - Slice: api/slice.md
       - Solve: api/solve.md
+  - Coding:
+      - PyPI: coding/pypi_guide.md
+      - Conda: coding/conda_guide.md
+      - Contributing: coding/contributing.md
 

@@ -13,9 +13,25 @@
 # limitations under the License.
 
 import numpy as np
-import gmsh
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
+
+# Lazy import gmsh - only needed for mesh generation functions
+_gmsh = None
+def _get_gmsh():
+    global _gmsh
+    if _gmsh is None:
+        try:
+            import gmsh
+            _gmsh = gmsh
+        except (ImportError, OSError) as e:
+            raise ImportError(
+                "gmsh is required for mesh generation but could not be imported. "
+                "If you only need limit equilibrium analysis, you can ignore this. "
+                "To use FEM features, install gmsh: pip install gmsh\n"
+                f"Original error: {e}"
+            ) from e
+    return _gmsh
 
 
 
@@ -47,8 +63,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         element_types_1d: np.ndarray indicating element type (2 for linear, 3 for quadratic)
         element_materials_1d: np.ndarray of material ID for each 1D element (line index)
     """
-    import gmsh
-    import numpy as np
+    gmsh = _get_gmsh()
     from collections import defaultdict
 
     # Set default target_size_1d if None

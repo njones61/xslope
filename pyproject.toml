@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-  "setuptools>=68",
+  "setuptools>=68,<77",
   "wheel",
 ]
 build-backend = "setuptools.build_meta"
@@ -11,7 +11,6 @@ dynamic = ["version"]
 description = "Slope stability analysis (limit equilibrium and FEM) in Python."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
 authors = [
   { name = "Norman L. Jones" }
 ]
@@ -35,18 +34,23 @@ dependencies = [
   "pandas",
   "matplotlib",
   "scipy",
+  "shapely",
+  "openpyxl",
 ]
 
+[project.optional-dependencies]
+fem = ["gmsh"]
+
 [project.urls]
-Homepage = ""
-Documentation = ""
-Source = ""
-Issues = ""
+Homepage = "https://github.com/njones61/xslope"
+Documentation = "https://xslope.readthedocs.io/en/latest/"
+Source = "https://github.com/njones61/xslope"
+Issues = "https://github.com/njones61/xslope/issues"
 
 [tool.setuptools]
 packages = ["xslope"]
 
 [tool.setuptools.dynamic]
-version = { attr = "__version__", module = "xslope._version" }
+version = { attr = "xslope._version.__version__" }
 
 

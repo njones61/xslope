@@ -67,8 +67,8 @@ else:
     exit()
 
 # options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-# results = solve_selected(spencer, slice_df, rapid=False)
-# plot_solution(slope_data, slice_df, failure_surface, results)
+results = solve_selected(spencer, slice_df, rapid=False)
+plot_solution(slope_data, slice_df, failure_surface, results)
 
 
 # solve_all(slice_df)

@@ -1,5 +1,6 @@
-from xslope.fileio import load_data_from_pickle, save_data_to_pickle, load_slope_data
 import os
+
+from xslope.fileio import load_data_from_pickle, save_data_to_pickle, load_slope_data
 
 filepath = "docs/input_template_lface2"  # without extensions
 

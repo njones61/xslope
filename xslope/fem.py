@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+import warnings
+from math import radians, degrees, sin, cos, tan, sqrt, atan2
+
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.linalg import eigh
 from scipy.sparse import lil_matrix, csr_matrix, coo_matrix
 from scipy.sparse.linalg import spsolve
-from scipy.linalg import eigh
 from shapely.geometry import LineString, Point
-from math import radians, degrees, sin, cos, tan, sqrt, atan2
-import warnings
 
 
 def build_fem_data(slope_data, mesh=None):

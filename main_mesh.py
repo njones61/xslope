@@ -1,10 +1,10 @@
-from xslope.fileio import load_slope_data
-
-from xslope.mesh import build_polygons, build_mesh_from_polygons, get_quad_mesh_presets
-from xslope.mesh import export_mesh_to_json, import_mesh_from_json, test_1d_element_alignment
-from xslope.mesh import add_intersection_points_to_polygons, extract_reinforcement_line_geometry
-from xslope.plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 import numpy as np
+
+from xslope.fileio import load_slope_data
+from xslope.mesh import (build_polygons, build_mesh_from_polygons, get_quad_mesh_presets,
+                         export_mesh_to_json, import_mesh_from_json, test_1d_element_alignment,
+                         add_intersection_points_to_polygons, extract_reinforcement_line_geometry)
+from xslope.plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 
 slope_data = load_slope_data("inputs/slope/input_template_reinf5.xlsx")
 

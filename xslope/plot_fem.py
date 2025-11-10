@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import matplotlib.pyplot as plt
+import warnings
+
 import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
-from matplotlib.collections import LineCollection
-import warnings
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, material_table=False, 

@@ -12,13 +12,111 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from math import sin, cos, tan, radians, atan, atan2, degrees
+
 import numpy as np
 import pandas as pd
-from shapely.geometry import LineString, Point
-from math import sin, cos, tan, radians, atan, atan2, degrees
 from scipy.optimize import minimize_scalar, root_scalar, newton
+from shapely.geometry import LineString, Point
 from tabulate import tabulate
 
+from .advanced import rapid_drawdown
+
+def solve_selected(method_name, slice_df, rapid=False):
+    """
+    Executes a specified limit equilibrium solution method and displays results.
+
+    Parameters
+    ----------
+    method_name : str
+        Name of the solution method function to call. Must be one of:
+        'oms', 'bishop', 'janbu', 'spencer', 'corps_engineers', 'lowe_karafiath'
+    slice_df : pandas.DataFrame
+        Slice dataframe containing all required columns for the specified method
+        (see individual method documentation for column requirements)
+    rapid : bool, optional
+        If True, performs rapid drawdown analysis using the specified method.
+        Default is False.
+
+    Returns
+    -------
+    dict or str
+        If successful: dictionary containing method results (includes 'FS' and method-specific parameters)
+        If failed: error message string
+
+    Notes
+    -----
+    This function automatically prints the factor of safety and method-specific
+    parameters to the console. For methods with additional parameters:
+    - Spencer: displays theta (interslice force angle)
+    - Janbu: displays fo (correction factor)
+    - Corps of Engineers: displays theta
+    """
+
+    func = globals()[method_name]
+
+    if rapid:
+        success, result = rapid_drawdown(slice_df, method_name)
+    else:
+        success, result = func(slice_df)
+    if not success:
+        print(f'Error: {result}')
+        return result
+
+    if func == oms:
+        print(f'OMS: FS={result["FS"]:.3f}')
+    elif func == bishop:
+        print(f'Bishop: FS={result["FS"]:.3f}')
+    elif func == spencer:
+        print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
+    elif func == janbu:
+        print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
+    elif func == corps_engineers:
+        print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
+    elif func == lowe_karafiath:
+        print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
+    return result
+
+def solve_all(slice_df):
+    """
+    Executes all available limit equilibrium solution methods sequentially.
+
+    Runs six different limit equilibrium methods on the provided slice dataframe
+    and displays the factor of safety for each method. This is useful for comparing
+    results across multiple solution approaches.
+
+    Parameters
+    ----------
+    slice_df : pandas.DataFrame
+        Slice dataframe containing all required columns for all methods.
+        Must include: 'alpha', 'phi', 'c', 'w', 'u', 'dl', 'dload', 'd_x', 'd_y',
+        'beta', 'kw', 't', 'y_t', 'p', 'x_c', 'y_cg', and additional columns
+        required for specific methods (e.g., 'r', 'xo', 'yo' for circular methods).
+
+    Returns
+    -------
+    None
+        Results are printed to console for each method.
+
+    Notes
+    -----
+    Methods executed in order:
+    1. Ordinary Method of Slices (OMS)
+    2. Bishop's Simplified Method
+    3. Janbu's Simplified Method
+    4. Corps of Engineers Method
+    5. Lowe & Karafiath Method
+    6. Spencer's Method
+
+    If any method fails, an error message is displayed but execution continues
+    with the remaining methods.
+    """
+    solve_selected('oms', slice_df)
+    solve_selected('bishop', slice_df)
+    solve_selected('janbu', slice_df)
+    solve_selected('corps_engineers', slice_df)
+    solve_selected('lowe_karafiath', slice_df)
+    solve_selected('spencer', slice_df)
 
 def oms(slice_df, debug=False):
     """

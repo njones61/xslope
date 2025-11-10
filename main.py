@@ -16,40 +16,9 @@ from xslope.global_config import non_circ
 from xslope.slice import generate_slices
 from xslope.fileio import load_slope_data, load_data_from_pickle
 from xslope.plot import plot_circular_search_results, plot_inputs, plot_solution
-from xslope.solve import oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
+from xslope.solve import solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 
-
-def solve_selected(func, slice_df, rapid=False):
-    if rapid:
-        success, result = rapid_drawdown(slice_df, func)
-    else:
-        success, result = func(slice_df)
-    if not success:
-        print(f'Error: {result}')
-        return result
-
-    if func == oms:
-        print(f'OMS: FS={result["FS"]:.3f}')
-    elif func == bishop:
-        print(f'Bishop: FS={result["FS"]:.3f}')
-    elif func == spencer:
-        print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
-    elif func == janbu:
-        print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
-    elif func == corps_engineers:
-        print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
-    elif func == lowe_karafiath:
-        print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
-    return result
-
-def solve_all(slice_df):
-    solve_selected(oms, slice_df)
-    solve_selected(bishop, slice_df)
-    solve_selected(janbu, slice_df)
-    solve_selected(corps_engineers, slice_df)
-    solve_selected(lowe_karafiath, slice_df)
-    solve_selected(spencer, slice_df)
 
 slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
 
@@ -66,14 +35,14 @@ else:
     print(result)
     exit()
 
-# options = [oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer]
-results = solve_selected(spencer, slice_df, rapid=False)
+methods = ['oms', 'bishop', 'janbu', 'corps_engineers', 'lowe_karafiath', 'spencer']
+results = solve_selected(methods[5], slice_df, rapid=False)  # spencer = methods[5]
 plot_solution(slope_data, slice_df, failure_surface, results)
 
 
-# solve_all(slice_df)
+solve_all(slice_df)
 
 
-fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
+fs_cache, converged, search_path = circular_search(slope_data, methods[5], diagnostic=False)
 plot_circular_search_results(slope_data, fs_cache, search_path)
 

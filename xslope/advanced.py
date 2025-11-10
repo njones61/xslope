@@ -18,7 +18,7 @@ from scipy.stats import norm
 from tabulate import tabulate
 
 
-def rapid_drawdown(df, method_func, debug_level=1):
+def rapid_drawdown(df, method_name, debug_level=1):
     """
     Performs rapid drawdown analysis using a three-stage approach.
     
@@ -32,14 +32,18 @@ def rapid_drawdown(df, method_func, debug_level=1):
             - u2: pore pressure for lowered pool (stage 2)
             - dload, d_x, d_y: distributed loads (stage 1)
             - dload2, d_x2, d_y2: distributed loads for lowered pool (stage 2)
-        method_func : function
-            The method function to use (oms, bishop, spencer, etc.)
+        method_name : str
+            The method name to use ('oms', 'bishop', 'spencer', etc.)
         debug_level : int
             0: no output, 1: print FS at each stage, >1: detailed debug info
     
     Returns:
         Tuple(bool, dict): (True, result_dict) or (False, error_message)
     """
+    
+    # Import solve module and get the method function
+    from . import solve
+    method_func = getattr(solve, method_name)
     
     if debug_level >= 1:
         print("=== RAPID DRAWDOWN ANALYSIS ===")
@@ -251,8 +255,8 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
     Parameters:
         slope_data : dict
             Dictionary containing slope geometry, materials, and other input data
-        method : function
-            The limit equilibrium method function to use (oms, bishop, janbu, spencer, etc.)
+        method : str
+            The limit equilibrium method name to use ('oms', 'bishop', 'janbu', 'spencer', etc.)
         rapid : bool, optional
             If True, performs rapid drawdown analysis (default: False)
         circular : bool, optional
@@ -264,18 +268,13 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         tuple: (success, result) where result contains reliability analysis results
     """
     
-    # Import search functions here to avoid circular import
-    from search import circular_search, noncircular_search
-    
-    # Determine the solver to use
-    if rapid:
-        solver = lambda df: rapid_drawdown(df, method, debug_level=debug_level)
-    else:
-        solver = method
+    # Import search functions and solve module here to avoid circular import
+    from .search import circular_search, noncircular_search
+    from . import solve
     
     if debug_level >= 1:
         print("=== RELIABILITY ANALYSIS ===")
-        print(f"Method: {method.__name__}")
+        print(f"Method: {method}")
         print(f"Rapid drawdown: {rapid}")
         print(f"Circular search: {circular}")
     
@@ -283,11 +282,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
     if circular:
         if debug_level >= 1:
             print("Performing circular search...")
-        fs_cache, converged, search_path = circular_search(slope_data, solver, rapid=rapid)
+        fs_cache, converged, search_path = circular_search(slope_data, method, rapid=rapid)
     else:
         if debug_level >= 1:
             print("Performing noncircular search...")
-        fs_cache, converged, search_path = noncircular_search(slope_data, solver, rapid=rapid)
+        fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid)
     
     if not fs_cache:
         return False, "Search failed - no results found"
@@ -361,11 +360,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         
         # Calculate F+ and F-
         if circular:
-            fs_cache_plus, _, _ = circular_search(slope_data_plus, solver, rapid=rapid)
-            fs_cache_minus, _, _ = circular_search(slope_data_minus, solver, rapid=rapid)
+            fs_cache_plus, _, _ = circular_search(slope_data_plus, method, rapid=rapid)
+            fs_cache_minus, _, _ = circular_search(slope_data_minus, method, rapid=rapid)
         else:
-            fs_cache_plus, _, _ = noncircular_search(slope_data_plus, solver, rapid=rapid)
-            fs_cache_minus, _, _ = noncircular_search(slope_data_minus, solver, rapid=rapid)
+            fs_cache_plus, _, _ = noncircular_search(slope_data_plus, method, rapid=rapid)
+            fs_cache_minus, _, _ = noncircular_search(slope_data_minus, method, rapid=rapid)
         
         if not fs_cache_plus or not fs_cache_minus:
             return False, f"Failed to calculate F+ or F- for parameter {param['param']}"
@@ -445,7 +444,7 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
     
     # Prepare results
     result = {
-        'method': f'{method.__name__}_reliability',
+        'method': f'{method}_reliability',
         'F_MLV': F_MLV,
         'sigma_F': sigma_F,
         'COV_F': COV_F,

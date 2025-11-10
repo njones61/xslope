@@ -4,15 +4,15 @@ Script to run mkdocs serve with warnings suppressed.
 This avoids all the type annotation warnings from griffe.
 """
 
-import warnings
+import logging
 import subprocess
 import sys
+import warnings
 
 # Suppress all warnings
 warnings.filterwarnings("ignore")
 
 # Suppress specific griffe warnings
-import logging
 logging.getLogger("griffe").setLevel(logging.ERROR)
 
 # Run mkdocs serve

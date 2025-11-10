@@ -53,4 +53,3 @@ packages = ["xslope"]
 [tool.setuptools.dynamic]
 version = { attr = "xslope._version.__version__" }
 
-

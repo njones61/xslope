@@ -9,11 +9,11 @@ from xslope.search import circular_search, noncircular_search
 slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
 
 # Run non-circular search
-# fs_cache, converged, search_path = noncircular_search(slope_data, corps_engineers, diagnostic=False)
+# fs_cache, converged, search_path = noncircular_search(slope_data, 'corps_engineers', diagnostic=False)
 # plot_noncircular_search_results(slope_data, fs_cache, search_path)
 
 # For circular search:
-fs_cache, converged, search_path = circular_search(slope_data, spencer, diagnostic=False)
+fs_cache, converged, search_path = circular_search(slope_data, 'spencer', diagnostic=False)
 plot_circular_search_results(slope_data, fs_cache, search_path)
 
 

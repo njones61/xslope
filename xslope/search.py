@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-from .advanced import rapid_drawdown
-from .slice import generate_slices, get_y_from_intersection
-from shapely.geometry import LineString, Point
 import time
 
-def circular_search(slope_data, solver, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
+import numpy as np
+from shapely.geometry import LineString, Point
+
+from . import solve
+from .advanced import rapid_drawdown
+from .slice import generate_slices, get_y_from_intersection
+
+def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
                     fs_fail=9999, depth_tol_frac=0.03, diagnostic=False):
     """
     Global 9-point circular search with adaptive grid refinement.
@@ -28,6 +31,8 @@ def circular_search(slope_data, solver, rapid=False, tol=1e-2, max_iter=50, shri
         bool: convergence flag
         list of dict: search path
     """
+
+    solver = getattr(solve, method_name)
 
     start_time = time.time()  # Start timing
 
@@ -67,7 +72,7 @@ def circular_search(slope_data, solver, rapid=False, tol=1e-2, max_iter=50, shri
                 else:
                     df_slices, failure_surface = result
                     if rapid:
-                        solver_success, solver_result = rapid_drawdown(df_slices, solver)
+                        solver_success, solver_result = rapid_drawdown(df_slices, method_name)
                     else:
                         solver_success, solver_result = solver(df_slices)
                     FS = solver_result['FS'] if solver_success else fs_fail
@@ -193,7 +198,7 @@ def circular_search(slope_data, solver, rapid=False, tol=1e-2, max_iter=50, shri
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path
 
-def noncircular_search(slope_data, solver, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
+def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
     """
     Non-circular search using the specified solver.
     
@@ -201,8 +206,8 @@ def noncircular_search(slope_data, solver, rapid=False, diagnostic=True, movemen
     -----------
     data : dict
         Input data dictionary containing all necessary parameters
-    solver : function
-        The solver function to use (e.g., lowe_karafiath, spencer)
+    method_name : str
+        The method name to use (e.g., 'lowe_karafiath', 'spencer')
     diagnostic : bool
         If True, print diagnostic information during search
     movement_distance : float
@@ -223,6 +228,8 @@ def noncircular_search(slope_data, solver, rapid=False, diagnostic=True, movemen
         converged : bool indicating if search converged
         search_path : list of surfaces evaluated during search
     """
+    # Get the solver function from solve module
+    solver = getattr(solve, method_name)
     def move_point(points, i, dx, dy, movement_type, ground_surface, max_depth):
         """Move a point while respecting constraints"""
         # Get current point
@@ -273,7 +280,7 @@ def noncircular_search(slope_data, solver, rapid=False, diagnostic=True, movemen
             
         df_slices, failure_surface = result
         if rapid:
-            solver_success, solver_result = rapid_drawdown(df_slices, solver)
+            solver_success, solver_result = rapid_drawdown(df_slices, method_name)
         else:
             solver_success, solver_result = solver(df_slices)
         FS = solver_result['FS'] if solver_success else float('inf')

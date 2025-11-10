@@ -1,0 +1,24 @@
+{
+    "include": [
+        "xslope"
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "**/node_modules",
+        "**/.*"
+    ],
+    "executionEnvironments": [
+        {
+            "root": ".",
+            "pythonVersion": "3.10",
+            "pythonPlatform": "Darwin",
+            "extraPaths": [
+                "/Users/njones/miniconda3/lib/python3.10/site-packages"
+            ]
+        }
+    ],
+    "reportMissingImports": true,
+    "reportMissingTypeStubs": false
+}
+
+

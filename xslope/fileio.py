@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import pickle
+
+import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point
-import numpy as np
-import pickle
-import os
 
-# Import functions for seep analysis
 from .mesh import import_mesh_from_json
 
 def build_ground_surface(profile_lines):

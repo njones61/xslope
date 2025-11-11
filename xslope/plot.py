@@ -416,6 +416,8 @@ def plot_non_circ(ax, non_circ):
     Returns:
         None
     """
+    if not non_circ or len(non_circ) == 0:
+        return
     xs, ys = zip(*non_circ)
     ax.plot(xs, ys, 'r--', label='Non-Circular Surface')
 
@@ -744,7 +746,7 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=
 
     if slope_data['circular']:
         plot_circles(ax, slope_data)
-    else:
+    elif slope_data.get('non_circ') and len(slope_data['non_circ']) > 0:
         plot_non_circ(ax, slope_data['non_circ'])
 
     # Handle material table display

@@ -25,12 +25,32 @@ def _get_gmsh():
             import gmsh
             _gmsh = gmsh
         except (ImportError, OSError) as e:
-            raise ImportError(
-                "gmsh is required for mesh generation but could not be imported. "
-                "If you only need limit equilibrium analysis, you can ignore this. "
-                "To use FEM features, install gmsh: pip install gmsh\n"
-                f"Original error: {e}"
-            ) from e
+            error_msg = str(e)
+            error_repr = repr(e)
+            # Check for OpenGL library issues (common in Colab/headless environments)
+            # Check both str() and repr() to catch all variations, and check exception args
+            error_text = error_msg + " " + error_repr
+            if hasattr(e, 'args') and e.args:
+                error_text += " " + " ".join(str(arg) for arg in e.args)
+            if ("libGL" in error_text or "libGLU" in error_text):
+                help_msg = (
+                    "gmsh is required for mesh generation but could not be imported due to missing OpenGL libraries. "
+                    "This is common in headless environments like Google Colab.\n\n"
+                    "To fix this in Google Colab, install the required system libraries first:\n"
+                    "  !apt-get update && apt-get install -y libgl1-mesa-glx libglu1-mesa\n"
+                    "Then install gmsh:\n"
+                    "  !pip install gmsh\n\n"
+                    "For other headless environments, install the appropriate OpenGL libraries for your system.\n"
+                    f"Original error: {e}"
+                )
+            else:
+                help_msg = (
+                    "gmsh is required for mesh generation but could not be imported. "
+                    "If you only need limit equilibrium analysis, you can ignore this. "
+                    "To use FEM features, install gmsh: pip install gmsh\n"
+                    f"Original error: {e}"
+                )
+            raise ImportError(help_msg) from e
     return _gmsh
 
 

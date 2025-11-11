@@ -564,7 +564,13 @@ def load_slope_data(filepath):
     # === VALIDATION ===
  
     circular = len(circles) > 0
-    if not circular and len(non_circ) == 0:
+    # Check if this is a seepage-only analysis (has seepage BCs but no slope stability surfaces)
+    has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or 
+                     len(seepage_bc.get("exit_face", [])) > 0)
+    is_seepage_only = has_seepage_bc and not circular and len(non_circ) == 0
+    
+    # Only require circular/non-circular data if this is NOT a seepage-only analysis
+    if not is_seepage_only and not circular and len(non_circ) == 0:
         raise ValueError("Input must include either circular or non-circular surface data.")
     if not profile_lines:
         raise ValueError("Profile lines sheet is empty or invalid.")

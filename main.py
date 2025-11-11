@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import xslope as xslope
+
 from xslope.global_config import non_circ
 from xslope.slice import generate_slices
 from xslope.fileio import load_slope_data, load_data_from_pickle

@@ -62,7 +62,7 @@ The solution should look something like this:
 
 ![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
 
-### (d) Earth dame with core and filter
+### (d) Earth Dam with Core and Filter
 
 This problem has the following cross-section:
 
@@ -74,4 +74,6 @@ The following Excel file contains the problem inputs:
 
 [xslope_earth_dam2.xlsx](files/xslope_earth_dam2.xlsx)
 
-Hey Norm.
+The solution should look something like this:
+
+![earth_dam2_solution.png](images/earth_dam2_solution.png){width=1200px}

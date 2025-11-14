@@ -1235,14 +1235,8 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
         if max_depth is None:
             raise ValueError("When using only 1 profile line, max_depth must be specified")
 
-    def get_avg_y(line):
-        return sum(y for _, y in line) / len(line)
-
-    # Sort profile lines from top to bottom by average y
-    sorted_lines = sorted(profile_lines, key=get_avg_y, reverse=True)
-    n = len(sorted_lines)
-    # Deep copy so we can insert points
-    lines = [list(line) for line in copy.deepcopy(sorted_lines)]
+    n = len(profile_lines)
+    lines = [list(line) for line in copy.deepcopy(profile_lines)]
     tol = 1e-8
 
     for i in range(n - 1):
@@ -1282,7 +1276,7 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
                     if not found:
                         insert_idx = np.searchsorted(xs_lower, x_top)
                         lower.insert(insert_idx, (round(x_top, 6), round(y_proj, 6)))
-
+    
     def clean_polygon(poly, tol=1e-8):
         # Remove consecutive duplicate points (except for closing point)
         if not poly:
@@ -1304,25 +1298,107 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
         ys_top = np.array(ys_top)
         left_x, left_y = xs_top[0], ys_top[0]
         right_x, right_y = xs_top[-1], ys_top[-1]
+        
+        # Initialize variables for debug output
+        lower_left_x = None
+        lower_right_x = None
+        proj_left_x = None
+        proj_right_x = None
+        bottom_cleaned = []
 
         if i < n - 1:
+            # Use the immediate next line as the lower boundary
             lower_line = lines[i + 1]
             xs_bot, ys_bot = zip(*lower_line)
             xs_bot = np.array(xs_bot)
             ys_bot = np.array(ys_bot)
-            # Project left and right endpoints vertically to lower profile
-            left_y_bot = np.interp(left_x, xs_bot, ys_bot)
-            right_y_bot = np.interp(right_x, xs_bot, ys_bot)
-            # Find all lower profile points between left_x and right_x (exclusive)
-            mask = (xs_bot > left_x) & (xs_bot < right_x)
-            xs_bot_in = xs_bot[mask]
-            ys_bot_in = ys_bot[mask]
-            # Build bottom boundary: right projection, lower profile points (right to left), left projection
+            lower_left_x = xs_bot[0]
+            lower_right_x = xs_bot[-1]
+            
+            # Collect actual points from all lower lines within the top line's x-range
+            # But only include a point if it's actually on the highest lower profile at that x
+            bottom_points = []  # List of (x, y, line_idx) tuples
+            
+            for j in range(i + 1, n):
+                lower_candidate = lines[j]
+                xs_cand = np.array([x for x, y in lower_candidate])
+                ys_cand = np.array([y for x, y in lower_candidate])
+                
+                # Only include points that are within the top line's x-range
+                mask = (xs_cand >= left_x - tol) & (xs_cand <= right_x + tol)
+                for x, y in zip(xs_cand[mask], ys_cand[mask]):
+                    # Check if this point is actually on the highest lower profile at this x
+                    # Compare with all other lower lines at this x-coordinate
+                    is_highest = True
+                    for k in range(i + 1, n):
+                        if k == j:
+                            continue
+                        other_line = lines[k]
+                        xs_other = np.array([x_o for x_o, y_o in other_line])
+                        ys_other = np.array([y_o for x_o, y_o in other_line])
+                        if xs_other[0] - tol <= x <= xs_other[-1] + tol:
+                            y_other = np.interp(x, xs_other, ys_other)
+                            if y_other > y + tol:  # Other line is higher
+                                is_highest = False
+                                break
+                    
+                    if is_highest:
+                        bottom_points.append((x, y, j))
+            
+            # Group by x-coordinate (within tolerance) and keep only the highest y at each x
+            # This handles cases where multiple lines have points at the same x
+            bottom_dict = {}  # x_key -> (y, line_idx, orig_x, orig_y)
+            for x, y, line_idx in bottom_points:
+                x_key = round(x / tol) * tol  # Round to tolerance to group nearby points
+                if x_key not in bottom_dict or y > bottom_dict[x_key][0]:
+                    bottom_dict[x_key] = (y, line_idx, x, y)
+            
+            # Convert to sorted list
+            bottom_cleaned = sorted([(orig_x, orig_y) for _, _, orig_x, orig_y in bottom_dict.values()])
+            
+            # Project endpoints - find highest lower profile or use max_depth
+            left_y_bot = -np.inf
+            right_y_bot = -np.inf
+            for j in range(i + 1, n):
+                lower_candidate = lines[j]
+                xs_cand = np.array([x for x, y in lower_candidate])
+                ys_cand = np.array([y for x, y in lower_candidate])
+                if xs_cand[0] - tol <= left_x <= xs_cand[-1] + tol:
+                    y_cand = np.interp(left_x, xs_cand, ys_cand)
+                    if y_cand > left_y_bot:
+                        left_y_bot = y_cand
+                if xs_cand[0] - tol <= right_x <= xs_cand[-1] + tol:
+                    y_cand = np.interp(right_x, xs_cand, ys_cand)
+                    if y_cand > right_y_bot:
+                        right_y_bot = y_cand
+            
+            # If no lower profile at endpoints, use max_depth
+            if left_y_bot == -np.inf:
+                left_y_bot = max_depth if max_depth is not None else -np.inf
+            if right_y_bot == -np.inf:
+                right_y_bot = max_depth if max_depth is not None else -np.inf
+            
+            # Build bottom boundary: right projection, intermediate points (right to left), left projection
+            # The bottom should go from right to left to close the polygon
             bottom = []
-            bottom.append((right_x, right_y_bot))
-            for x, y in zip(xs_bot_in[::-1], ys_bot_in[::-1]):
-                bottom.append((x, y))
-            bottom.append((left_x, left_y_bot))
+            
+            # Start with right endpoint
+            if right_y_bot != -np.inf:
+                bottom.append((right_x, right_y_bot))
+            
+            # Add intermediate points in reverse order (right to left)
+            # Filter out points too close to endpoints
+            for x, y in reversed(bottom_cleaned):
+                if abs(x - left_x) > tol and abs(x - right_x) > tol:
+                    bottom.append((x, y))
+            
+            # End with left endpoint
+            if left_y_bot != -np.inf:
+                bottom.append((left_x, left_y_bot))
+            
+            # Store for debug output
+            proj_left_x = left_x
+            proj_right_x = right_x
         else:
             # For the lowest polygon, bottom is at max_depth
             # Only need endpoints - no intermediate points

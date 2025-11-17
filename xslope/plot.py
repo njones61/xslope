@@ -86,8 +86,10 @@ def plot_max_depth(ax, profile_lines, max_depth):
     x_max = max(x_vals)
     ax.hlines(max_depth, x_min, x_max, colors='black', linewidth=1.5, label='Max Depth')
 
-    spacing = 5
-    length = 4
+    x_diff = x_max - x_min
+    spacing = x_diff / 100
+    length = x_diff / 80
+
     angle_rad = np.radians(60)
     dx = length * np.cos(angle_rad)
     dy = length * np.sin(angle_rad)

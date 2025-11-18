@@ -1515,6 +1515,142 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
     velocity /= count[:, None]
     return velocity
 
+def compute_gradient(nodes, elements, head, element_types=None):
+    """
+    Compute nodal hydraulic gradient by averaging element-wise head gradients.
+    The hydraulic gradient i = -grad(h), where grad(h) is the gradient of head.
+    Supports both triangular and quadrilateral elements.
+    
+    Parameters:
+        nodes : (n_nodes, 2) array of node coordinates
+        elements : (n_elements, 3 or 4) triangle or quad node indices
+        head : (n_nodes,) nodal head solution
+        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
+    
+    Returns:
+        gradient : (n_nodes, 2) array of nodal hydraulic gradient vectors [ix, iy]
+    """
+    # If element_types is not provided, assume all triangles (backward compatibility)
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+
+    n_nodes = nodes.shape[0]
+    gradient = np.zeros((n_nodes, 2))
+    count = np.zeros(n_nodes)
+
+    for idx, element_nodes in enumerate(elements):
+        element_type = element_types[idx]
+        
+        if element_type == 3:
+            # Triangle: use first 3 nodes
+            i, j, k = element_nodes[:3]
+            xi, yi = nodes[i]
+            xj, yj = nodes[j]
+            xk, yk = nodes[k]
+
+            area = 0.5 * np.linalg.det([[1, xi, yi], [1, xj, yj], [1, xk, yk]])
+            if area <= 0:
+                continue
+
+            beta = np.array([yj - yk, yk - yi, yi - yj])
+            gamma = np.array([xk - xj, xi - xk, xj - xi])
+            grad = np.array([beta, gamma]) / (2 * area)
+
+            h_vals = head[[i, j, k]]
+            grad_h = grad @ h_vals
+            # Hydraulic gradient i = -grad(h)
+            i_elem = -grad_h
+
+            for node in element_nodes[:3]:
+                gradient[node] += i_elem
+                count[node] += 1
+        elif element_type == 4:
+            # Quadrilateral: use first 4 nodes
+            i, j, k, l = element_nodes[:4]
+            nodes_elem = nodes[[i, j, k, l], :]
+            h_elem = head[[i, j, k, l]]
+            
+            # 2x2 Gauss points and weights
+            gauss_pts = [(-1/np.sqrt(3), -1/np.sqrt(3)),
+                         (1/np.sqrt(3), -1/np.sqrt(3)),
+                         (1/np.sqrt(3), 1/np.sqrt(3)),
+                         (-1/np.sqrt(3), 1/np.sqrt(3))]
+            
+            for (xi, eta) in gauss_pts:
+                # Shape function derivatives w.r.t. natural coords
+                dN_dxi = np.array([-(1-eta), (1-eta), (1+eta), -(1+eta)]) * 0.25
+                dN_deta = np.array([-(1-xi), -(1+xi), (1+xi), (1-xi)]) * 0.25
+                # Jacobian
+                J = np.zeros((2,2))
+                for a in range(4):
+                    J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+                    J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+                    J[1,0] += dN_deta[a] * nodes_elem[a,0]
+                    J[1,1] += dN_deta[a] * nodes_elem[a,1]
+                detJ = np.linalg.det(J)
+                if detJ <= 0:
+                    continue
+                Jinv = np.linalg.inv(J)
+                # Shape function derivatives w.r.t. x,y
+                dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+                dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+                gradN = np.vstack((dN_dx, dN_dy))  # shape (2,4)
+                # Compute grad(h) at this Gauss point
+                grad_h = gradN @ h_elem
+                # Hydraulic gradient i = -grad(h)
+                i_gp = -grad_h
+                # Distribute/average to nodes
+                for node in element_nodes[:4]:
+                    gradient[node] += i_gp
+                    count[node] += 1
+        elif element_type == 6:
+            # 6-node triangle (quadratic): compute gradient using 3-point Gauss quadrature
+            nodes_elem = nodes[element_nodes[:6], :]
+            h_elem = head[element_nodes[:6]]
+            
+            # 3-point Gauss quadrature for triangles
+            gauss_pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
+            weights = [1/3, 1/3, 1/3]
+            
+            for (L1, L2, L3), w in zip(gauss_pts, weights):
+                # Shape function derivatives w.r.t. area coordinates
+                dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
+                dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
+                dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
+                
+                # Jacobian transformation
+                x0, y0 = nodes_elem[0]
+                x1, y1 = nodes_elem[1]
+                x2, y2 = nodes_elem[2]
+                
+                J = np.array([[x0 - x2, x1 - x2],
+                              [y0 - y2, y1 - y2]])
+                
+                detJ = np.linalg.det(J)
+                if abs(detJ) < 1e-10:
+                    continue
+                
+                Jinv = np.linalg.inv(J)
+                
+                # Transform derivatives to global coordinates
+                dN_dx = Jinv[0,0] * (dN_dL1 - dN_dL3) + Jinv[0,1] * (dN_dL2 - dN_dL3)
+                dN_dy = Jinv[1,0] * (dN_dL1 - dN_dL3) + Jinv[1,1] * (dN_dL2 - dN_dL3)
+                gradN = np.vstack((dN_dx, dN_dy))  # shape (2,6)
+                
+                # Compute grad(h) at this Gauss point
+                grad_h = gradN @ h_elem
+                # Hydraulic gradient i = -grad(h)
+                i_gp = -grad_h
+                
+                # Distribute gradient to all 6 nodes of tri6 element
+                for node in element_nodes[:6]:
+                    gradient[node] += i_gp * w  # Weight by Gauss weight
+                    count[node] += w
+
+    count[count == 0] = 1  # Avoid division by zero
+    gradient /= count[:, None]
+    return gradient
+
 def tri3_stiffness_matrix(nodes_elem, Kmat):
     """
     Compute the 3x3 local stiffness matrix for a 3-node triangular element.
@@ -1855,7 +1991,14 @@ def run_seepage_analysis(seep_data):
         seep_data: Dictionary containing all the seepage data 
     
     Returns:
-        Dictionary containing solution results
+        Dictionary containing solution results with the following keys:
+        - 'head': numpy array of hydraulic head values at each node
+        - 'u': numpy array of pore pressure values at each node
+        - 'velocity': numpy array of shape (n_nodes, 2) containing velocity vectors [vx, vy] at each node
+        - 'gradient': numpy array of shape (n_nodes, 2) containing hydraulic gradient vectors [ix, iy] at each node
+        - 'q': numpy array of nodal flow vector
+        - 'phi': numpy array of stream function/flow potential values at each node
+        - 'flowrate': scalar total flow rate
     """
     # Extract data from seep_data
     nodes = seep_data["nodes"]
@@ -1920,6 +2063,9 @@ def run_seepage_analysis(seep_data):
         # Compute velocity, don't pass kr0 and h0
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, element_types=element_types)
 
+    # Compute hydraulic gradient i = -grad(h)
+    gradient = compute_gradient(nodes, elements, head, element_types)
+
     gamma_w = unit_weight
     u = gamma_w * (head - nodes[:, 1])
 
@@ -1927,6 +2073,7 @@ def run_seepage_analysis(seep_data):
         "head": head,
         "u": u,
         "velocity": velocity,
+        "gradient": gradient,
         "q": q,
         "phi": phi,
         "flowrate": total_flow
@@ -1937,10 +2084,21 @@ def run_seepage_analysis(seep_data):
 def export_seep_solution(seep_data, solution, filename):
     """Exports nodal results to a CSV file.
     
+    The exported CSV file contains the following columns:
+    - node_id: Node identifier (1-based)
+    - head: Hydraulic head at each node
+    - u: Pore pressure at each node
+    - v_x, v_y: Velocity vector components
+    - v_mag: Velocity magnitude
+    - i_x, i_y: Hydraulic gradient vector components
+    - i_mag: Hydraulic gradient magnitude
+    - q: Nodal flow vector
+    - phi: Stream function/flow potential
+    
     Args:
         filename: Path to the output CSV file
         seep_data: Dictionary containing seepage data 
-        solution: Dictionary containing solution results from run_analysis
+        solution: Dictionary containing solution results from run_seepage_analysis
     """
     import pandas as pd
     n_nodes = len(seep_data["nodes"])
@@ -1951,6 +2109,9 @@ def export_seep_solution(seep_data, solution, filename):
         "v_x": solution["velocity"][:, 0],
         "v_y": solution["velocity"][:, 1],
         "v_mag": np.linalg.norm(solution["velocity"], axis=1),
+        "i_x": solution["gradient"][:, 0],
+        "i_y": solution["gradient"][:, 1],
+        "i_mag": np.linalg.norm(solution["gradient"], axis=1),
         "q": solution["q"],
         "phi": solution["phi"]
     })

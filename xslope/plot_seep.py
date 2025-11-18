@@ -219,18 +219,57 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
 
 def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, show_mesh=True):
     """
-    Plots head contours and optionally overlays flowlines (phi) based on flow function.
-    Fixed version that properly handles mesh aspect ratio and doesn't clip the plot.
-    Supports both triangular and quadrilateral elements.
-
-    Arguments:
-        seep_data: Dictionary containing seepage data from import_seep2d
-        solution: Dictionary containing solution results from run_analysis
-        levels: number of head contour levels
-        base_mat: material ID (1-based) used to compute k for flow function
-        fill_contours: bool, if True shows filled contours, if False only black solid lines
-        phreatic: bool, if True plots phreatic surface (pressure head = 0) as thick red line
-        show_mesh: bool, if True overlays element edges in light gray
+    Plot seepage analysis results including head contours, flowlines, and phreatic surface.
+    
+    This function visualizes the results of a seepage analysis by plotting total head contours
+    (with optional filled contours), flowlines (stream function contours), and the phreatic
+    surface. The plot properly handles mesh aspect ratios and supports both linear and
+    quadratic triangular and quadrilateral elements.
+    
+    Parameters:
+    -----------
+    seep_data : dict
+        Dictionary containing seepage mesh data from import_seep2d. Required keys include:
+        'nodes', 'elements', 'element_materials', 'element_types' (optional), and
+        'k1_by_mat' (optional, for flowline calculation).
+    solution : dict
+        Dictionary containing solution results from run_seepage_analysis. Required keys include:
+        'head' (array of total head values at nodes), 'velocity' (array of velocity vectors),
+        'gradient' (array of hydraulic gradient vectors). Optional keys: 'phi' (stream function),
+        'flowrate' (total flow rate).
+    figsize : tuple of float, optional
+        Figure size in inches (width, height). Default is (14, 6).
+    levels : int, optional
+        Number of head contour levels to plot. Default is 20.
+    base_mat : int, optional
+        Material ID (1-based) used to compute hydraulic conductivity for flow function
+        calculation. Default is 1.
+    fill_contours : bool, optional
+        If True, shows filled head contours with color map. If False, only black solid
+        contour lines are shown. Default is True.
+    phreatic : bool, optional
+        If True, plots the phreatic surface (where pressure head = 0) as a thick red line.
+        Default is True.
+    alpha : float, optional
+        Transparency level (0-1) for material zone fill colors. Default is 0.4.
+    pad_frac : float, optional
+        Fraction of mesh extent to add as padding around the plot boundaries. Default is 0.05.
+    show_mesh : bool, optional
+        If True, overlays element edges in light gray. Default is True.
+    
+    Returns:
+    --------
+    None
+        Displays the plot using matplotlib.pyplot.show().
+    
+    Notes:
+    ------
+    - The function automatically subdivides quadratic elements (tri6, quad8, quad9) for
+      proper visualization and contouring.
+    - Flowlines are only plotted if 'phi' and 'flowrate' are present in solution and
+      'k1_by_mat' is present in seep_data.
+    - The plot includes a colorbar for head contours when fill_contours=True.
+    - The title includes flowrate information if available in the solution dictionary.
     """
     import matplotlib.pyplot as plt
     import matplotlib.tri as tri

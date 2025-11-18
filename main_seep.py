@@ -6,7 +6,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-slope_data = load_slope_data("docs/seepage/files/xslope_earth_dam2.xlsx")
+slope_data = load_slope_data("docs/seepage/files/xslope_double_sheetpile.xlsx")
 
 plot_inputs(slope_data)
 
@@ -30,6 +30,8 @@ seep_data = build_seep_data(mesh, slope_data)
 plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
 
 solution = run_seepage_analysis(seep_data)
+
+print(solution)
 
 plot_seep_solution(seep_data, solution, levels=20, base_mat=3, fill_contours=False, phreatic=True)
 

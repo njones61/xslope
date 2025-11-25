@@ -1996,6 +1996,8 @@ def run_seepage_analysis(seep_data):
         - 'u': numpy array of pore pressure values at each node
         - 'velocity': numpy array of shape (n_nodes, 2) containing velocity vectors [vx, vy] at each node
         - 'gradient': numpy array of shape (n_nodes, 2) containing hydraulic gradient vectors [ix, iy] at each node
+        - 'v_mag': numpy array of velocity magnitude at each node
+        - 'i_mag': numpy array of hydraulic gradient magnitude at each node
         - 'q': numpy array of nodal flow vector
         - 'phi': numpy array of stream function/flow potential values at each node
         - 'flowrate': scalar total flow rate
@@ -2066,6 +2068,10 @@ def run_seepage_analysis(seep_data):
     # Compute hydraulic gradient i = -grad(h)
     gradient = compute_gradient(nodes, elements, head, element_types)
 
+    # Compute velocity and gradient magnitudes
+    v_mag = np.linalg.norm(velocity, axis=1)
+    i_mag = np.linalg.norm(gradient, axis=1)
+
     gamma_w = unit_weight
     u = gamma_w * (head - nodes[:, 1])
 
@@ -2074,6 +2080,8 @@ def run_seepage_analysis(seep_data):
         "u": u,
         "velocity": velocity,
         "gradient": gradient,
+        "v_mag": v_mag,
+        "i_mag": i_mag,
         "q": q,
         "phi": phi,
         "flowrate": total_flow
@@ -2108,10 +2116,10 @@ def export_seep_solution(seep_data, solution, filename):
         "u": solution["u"],
         "v_x": solution["velocity"][:, 0],
         "v_y": solution["velocity"][:, 1],
-        "v_mag": np.linalg.norm(solution["velocity"], axis=1),
+        "v_mag": solution["v_mag"],
         "i_x": solution["gradient"][:, 0],
         "i_y": solution["gradient"][:, 1],
-        "i_mag": np.linalg.norm(solution["gradient"], axis=1),
+        "i_mag": solution["i_mag"],
         "q": solution["q"],
         "phi": solution["phi"]
     })

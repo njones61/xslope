@@ -12,7 +12,7 @@ plot_inputs(slope_data)
 
 polygons = build_polygons(slope_data)
 
-plot_polygons_separately(polygons)
+# plot_polygons_separately(polygons)
 
 # find the x-range of the ground_surface and use it to set the target size
 x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]

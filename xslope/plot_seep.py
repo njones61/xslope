@@ -217,14 +217,14 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     plt.show()
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, show_mesh=True):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True):
     """
     Plot seepage analysis results including head contours, flowlines, and phreatic surface.
     
-    This function visualizes the results of a seepage analysis by plotting total head contours
-    (with optional filled contours), flowlines (stream function contours), and the phreatic
-    surface. The plot properly handles mesh aspect ratios and supports both linear and
-    quadratic triangular and quadrilateral elements.
+    This function visualizes the results of a seepage analysis by plotting contours of various
+    nodal variables (head, pore pressure, velocity magnitude, or gradient magnitude). When
+    plotting head, flowlines are also overlaid. The plot properly handles mesh aspect ratios
+    and supports both linear and quadratic triangular and quadrilateral elements.
     
     Parameters:
     -----------
@@ -236,26 +236,39 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         Dictionary containing solution results from run_seepage_analysis. Required keys include:
         'head' (array of total head values at nodes), 'velocity' (array of velocity vectors),
         'gradient' (array of hydraulic gradient vectors). Optional keys: 'phi' (stream function),
-        'flowrate' (total flow rate).
+        'flowrate' (total flow rate), 'u' (pore pressure), 'v_mag' (velocity magnitude),
+        'i_mag' (gradient magnitude).
     figsize : tuple of float, optional
         Figure size in inches (width, height). Default is (14, 6).
     levels : int, optional
-        Number of head contour levels to plot. Default is 20.
+        Number of contour levels to plot. Default is 20.
     base_mat : int, optional
         Material ID (1-based) used to compute hydraulic conductivity for flow function
-        calculation. Default is 1.
+        calculation. Default is 1. Only used when variable="head".
     fill_contours : bool, optional
-        If True, shows filled head contours with color map. If False, only black solid
+        If True, shows filled contours with color map. If False, only black solid
         contour lines are shown. Default is True.
     phreatic : bool, optional
         If True, plots the phreatic surface (where pressure head = 0) as a thick red line.
-        Default is True.
+        Default is True. Only applicable when variable="head".
     alpha : float, optional
         Transparency level (0-1) for material zone fill colors. Default is 0.4.
     pad_frac : float, optional
         Fraction of mesh extent to add as padding around the plot boundaries. Default is 0.05.
-    show_mesh : bool, optional
+    mesh : bool, optional
         If True, overlays element edges in light gray. Default is True.
+    variable : str, optional
+        Nodal variable to contour. Options: "head" (default), "u" (pore pressure),
+        "v_mag" (velocity magnitude), "i_mag" (gradient magnitude). When "head" is selected,
+        flowlines can be overlaid if flowlines=True. Other variables do not include flowlines.
+    vectors : bool, optional
+        If True, plots velocity vectors as arrows at each node. Default is False.
+    vector_scale : float, optional
+        Scale factor for vector lengths. Maximum vector length will be x_range * vector_scale,
+        where x_range is the x-extent of the mesh. Default is 0.05.
+    flowlines : bool, optional
+        If True and variable="head", overlays flowlines (stream function contours) on the plot.
+        Default is True. Only applicable when variable="head".
     
     Returns:
     --------
@@ -266,10 +279,11 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     ------
     - The function automatically subdivides quadratic elements (tri6, quad8, quad9) for
       proper visualization and contouring.
-    - Flowlines are only plotted if 'phi' and 'flowrate' are present in solution and
-      'k1_by_mat' is present in seep_data.
-    - The plot includes a colorbar for head contours when fill_contours=True.
-    - The title includes flowrate information if available in the solution dictionary.
+    - Flowlines are only plotted when variable="head" and if 'phi' and 'flowrate' are present
+      in solution and 'k1_by_mat' is present in seep_data.
+    - The plot includes a colorbar for contours when fill_contours=True.
+    - The title includes flowrate information if available in the solution dictionary and
+      variable="head".
     """
     import matplotlib.pyplot as plt
     import matplotlib.tri as tri
@@ -277,15 +291,30 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     from matplotlib.patches import Polygon
     import numpy as np
 
+    # Validate variable parameter
+    valid_variables = ["head", "u", "v_mag", "i_mag"]
+    if variable not in valid_variables:
+        raise ValueError(f"variable must be one of {valid_variables}, got '{variable}'")
+    
     # Extract data from seep_data and solution
     nodes = seep_data["nodes"]
     elements = seep_data["elements"]
     element_materials = seep_data["element_materials"]
     element_types = seep_data.get("element_types", None)  # New field for element types
     k1_by_mat = seep_data.get("k1_by_mat")  # Use .get() in case it's not present
+    
+    # Extract the variable to plot
+    if variable not in solution:
+        raise ValueError(f"Variable '{variable}' not found in solution dictionary. Available keys: {list(solution.keys())}")
+    contour_data = solution[variable]
+    
+    # Extract head and flowline-related data (only needed for head plots)
     head = solution["head"]
     phi = solution.get("phi")
     flowrate = solution.get("flowrate")
+    
+    # Determine if we should plot flowlines (only for head and if flowlines=True)
+    plot_flowlines = (variable == "head" and flowlines)
 
 
     # Use constrained_layout for best layout
@@ -386,9 +415,9 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
                 for sub_quad in sub_quads:
                     ax.fill(*zip(*sub_quad), edgecolor='none', facecolor=color, alpha=alpha)
 
-    vmin = np.min(head)
-    vmax = np.max(head)
-    hdrop = vmax - vmin
+    # Set up contour levels
+    vmin = np.min(contour_data)
+    vmax = np.max(contour_data)
     contour_levels = np.linspace(vmin, vmax, levels)
 
     # For contouring, subdivide tri6 elements into 4 subtriangles
@@ -413,24 +442,41 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
             all_triangles_for_contouring.extend([tri1, tri2])
     triang = tri.Triangulation(nodes[:, 0], nodes[:, 1], all_triangles_for_contouring)
 
+    # Variable labels for colorbar and title
+    variable_labels = {
+        "head": "Total Head",
+        "u": "Pore Pressure",
+        "v_mag": "Velocity Magnitude",
+        "i_mag": "Hydraulic Gradient Magnitude"
+    }
+    variable_label = variable_labels[variable]
+
     # Filled contours (only if fill_contours=True)
     if fill_contours:
-        contourf = ax.tricontourf(triang, head, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax, alpha=0.5)
-        cbar = plt.colorbar(contourf, ax=ax, label="Total Head", shrink=0.8, pad=0.02)
+        contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax, alpha=0.5)
+        cbar = plt.colorbar(contourf, ax=ax, label=variable_label, shrink=0.8, pad=0.02)
         cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
         cbar.update_ticks()
 
-    # Solid lines for head contours
-    ax.tricontour(triang, head, levels=contour_levels, colors="k", linewidths=0.5)
+    # Solid lines for contours
+    ax.tricontour(triang, contour_data, levels=contour_levels, colors="k", linewidths=0.5)
 
-    # Phreatic surface (pressure head = 0)
-    if phreatic:
-        elevation = nodes[:, 1]  # y-coordinate is elevation
-        pressure_head = head - elevation
-        ax.tricontour(triang, pressure_head, levels=[0], colors="red", linewidths=2.0)
+    # Phreatic surface (pressure head = 0) - only for head plots
+    # Check if phreatic surface exists (pore pressure must be negative somewhere)
+    has_phreatic = False
+    if phreatic and plot_flowlines:
+        # Check if pore pressure goes negative (indicating a phreatic surface exists)
+        u = solution.get("u")
+        if u is not None and np.min(u) < 0:
+            elevation = nodes[:, 1]  # y-coordinate is elevation
+            pressure_head = head - elevation
+            ax.tricontour(triang, pressure_head, levels=[0], colors="red", linewidths=2.0)
+            has_phreatic = True
 
-    # Overlay flowlines if phi is available
-    if phi is not None and flowrate is not None and k1_by_mat is not None:
+    # Overlay flowlines if variable is head and phi is available
+    if plot_flowlines and phi is not None and flowrate is not None and k1_by_mat is not None:
+        # Compute head drop for flowline calculation
+        hdrop = vmax - vmin
         if base_mat > len(k1_by_mat):
             print(f"Warning: base_mat={base_mat} is larger than number of materials ({len(k1_by_mat)}). Using material 1.")
             base_mat = 1
@@ -445,8 +491,39 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
         ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
 
+    # Plot velocity vectors if requested
+    if vectors:
+        velocity = solution.get("velocity")
+        if velocity is not None:
+            # Calculate x_range for scaling
+            x_min_vec = nodes[:, 0].min()
+            x_max_vec = nodes[:, 0].max()
+            x_range = x_max_vec - x_min_vec
+            max_vector_length = x_range * vector_scale
+            
+            # Get velocity magnitude
+            v_mag = solution.get("v_mag")
+            if v_mag is None:
+                # Calculate v_mag if not available
+                v_mag = np.linalg.norm(velocity, axis=1)
+            
+            # Find maximum velocity magnitude
+            max_v_mag = np.max(v_mag)
+            
+            # Scale vectors: if max_v_mag > 0, scale so max vector has length max_vector_length
+            if max_v_mag > 0:
+                scale_factor = max_vector_length / max_v_mag
+                velocity_scaled = velocity * scale_factor
+            else:
+                velocity_scaled = velocity
+            
+            # Plot vectors using quiver
+            ax.quiver(nodes[:, 0], nodes[:, 1], velocity_scaled[:, 0], velocity_scaled[:, 1],
+                     angles='xy', scale_units='xy', scale=1, width=0.002, headwidth=2.5,
+                     headlength=3, headaxislength=2.5, color='black', alpha=0.7)
+
     # Plot element edges if requested
-    if show_mesh:
+    if mesh:
         # Draw all element edges
         for element, elem_type in zip(elements, element_types if element_types is not None else [3]*len(elements)):
             if elem_type == 3:
@@ -483,13 +560,17 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     ax.set_xlim(x_min - x_pad, x_max + x_pad)
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
-    title = "Flow Net: Head Contours"
-    if phi is not None:
-        title += " and Flowlines"
-    if phreatic:
-        title += " with Phreatic Surface"
-    if flowrate is not None:
-        title += f" — Total Flowrate: {flowrate:.3f}"
+    # Build title based on variable
+    if variable == "head":
+        title = f"Flow Net: {variable_label} Contours"
+        if plot_flowlines and phi is not None:
+            title += " and Flowlines"
+        if has_phreatic:
+            title += " with Phreatic Surface"
+        if flowrate is not None:
+            title += f" — Total Flowrate: {flowrate:.3f}"
+    else:
+        title = f"{variable_label} Contours"
     ax.set_title(title)
 
     # Set equal aspect ratio AFTER setting limits

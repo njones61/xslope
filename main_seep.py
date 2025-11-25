@@ -33,7 +33,7 @@ solution = run_seepage_analysis(seep_data)
 
 print(solution)
 
-plot_seep_solution(seep_data, solution, levels=20, base_mat=3, fill_contours=False, phreatic=True)
+plot_seep_solution(seep_data, solution, variable="head", vectors=True, flowlines=False, mesh=False, levels=20, base_mat=3, fill_contours=False, phreatic=True)
 
 # export_mesh_to_json(mesh, "inputs/slope/seep_mesh_lface5.json")
 # export_seep_solution(seep_data, solution, "inputs/slope/seep_solution_lface5.csv")

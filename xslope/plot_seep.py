@@ -250,7 +250,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         contour lines are shown. Default is True.
     phreatic : bool, optional
         If True, plots the phreatic surface (where pressure head = 0) as a thick red line.
-        Default is True. Only applicable when variable="head".
+        Default is True. Only plotted if pore pressure is negative somewhere in the domain.
     alpha : float, optional
         Transparency level (0-1) for material zone fill colors. Default is 0.4.
     pad_frac : float, optional
@@ -461,16 +461,16 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     # Solid lines for contours
     ax.tricontour(triang, contour_data, levels=contour_levels, colors="k", linewidths=0.5)
 
-    # Phreatic surface (pressure head = 0) - only for head plots
+    # Phreatic surface (pressure head = 0)
     # Check if phreatic surface exists (pore pressure must be negative somewhere)
     has_phreatic = False
-    if phreatic and plot_flowlines:
+    if phreatic:
         # Check if pore pressure goes negative (indicating a phreatic surface exists)
         u = solution.get("u")
         if u is not None and np.min(u) < 0:
             elevation = nodes[:, 1]  # y-coordinate is elevation
             pressure_head = head - elevation
-            ax.tricontour(triang, pressure_head, levels=[0], colors="red", linewidths=2.0)
+            ax.tricontour(triang, pressure_head, levels=[0], colors="black", linewidths=2.0)
             has_phreatic = True
 
     # Overlay flowlines if variable is head and phi is available

@@ -77,7 +77,7 @@ def solve_selected(method_name, slice_df, rapid=False):
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
     return result
 
-def solve_all(slice_df):
+def solve_all(slice_df, rapid=False):
     """
     Executes all available limit equilibrium solution methods sequentially.
 
@@ -111,12 +111,12 @@ def solve_all(slice_df):
     If any method fails, an error message is displayed but execution continues
     with the remaining methods.
     """
-    solve_selected('oms', slice_df)
-    solve_selected('bishop', slice_df)
-    solve_selected('janbu', slice_df)
-    solve_selected('corps_engineers', slice_df)
-    solve_selected('lowe_karafiath', slice_df)
-    solve_selected('spencer', slice_df)
+    solve_selected('oms', slice_df, rapid=rapid)
+    solve_selected('bishop', slice_df, rapid=rapid)
+    solve_selected('janbu', slice_df, rapid=rapid)
+    solve_selected('corps_engineers', slice_df, rapid=rapid)
+    solve_selected('lowe_karafiath', slice_df, rapid=rapid)
+    solve_selected('spencer', slice_df, rapid=rapid)
 
 def oms(slice_df, debug=False):
     """

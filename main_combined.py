@@ -10,7 +10,6 @@ from xslope.advanced import reliability as reliability_analysis
 slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
 
 
-
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 20 # @param {"type":"integer"}
 analysis_type = "all_methods" # @param ["single_surface","all_methods", "auto_search","reliability"]
@@ -50,7 +49,6 @@ elif analysis_type == "auto_search": # automated search for critical surface
   slice_df = critical_surface['slices']
   failure_surface = critical_surface['failure_surface']
   results = critical_surface['solver_result']
-  
   plot_solution(slope_data, slice_df, failure_surface, results)
 
 elif analysis_type == "reliability": # reliability analysis (supports both circular and non-circular)

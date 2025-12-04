@@ -23,7 +23,7 @@ from matplotlib.patches import Polygon
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, material_table=False, 
-                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03):
+                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, dpi=300):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
     
@@ -251,6 +251,11 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, mat
     
     ax.set_title(title)
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '') + '.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 
@@ -427,7 +432,7 @@ def _plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7):
 def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=None, 
                     show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=False):
+                    scale_vectors=False, save_png=False, dpi=300):
     """
     Plot FEM results with various visualization options.
     
@@ -540,6 +545,11 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         ax.set_aspect('equal')
     
     plt.tight_layout()
+    
+    if save_png:
+        filename = f'plot_fem_results_{plot_type.lower().replace(",", "_").replace(" ", "_")}.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
     
     # Return appropriate values
@@ -1071,7 +1081,7 @@ def plot_reinforcement_forces(ax, fem_data, solution):
                 ax.add_collection(lc_failed)
 
 
-def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8)):
+def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_png=False, dpi=300):
     """
     Plot force profiles along each reinforcement line.
     """
@@ -1170,10 +1180,15 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8)):
         axes[i].set_visible(False)
     
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_reinforcement_force_profiles.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     return fig, axes
 
 
-def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6)):
+def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6), save_png=False, dpi=300):
     """
     Plot SSRM convergence history.
     """
@@ -1214,6 +1229,11 @@ def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6)):
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_ssrm_convergence.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     return fig, (ax1, ax2)
 
 

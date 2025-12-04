@@ -4,7 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, material_table=False, label_elements=False, label_nodes=False, alpha=0.4):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, material_table=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, dpi=300):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -214,10 +214,15 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     ax.set_title(title)
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '') + '.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, dpi=300):
     """
     Plot seepage analysis results including head contours, flowlines, and phreatic surface.
     
@@ -579,6 +584,11 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     # Remove tight_layout and subplots_adjust for best constrained layout
     # plt.tight_layout()
     # plt.subplots_adjust(top=0.78)
+    
+    if save_png:
+        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('—', '').replace('(', '').replace(')', '') + '.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 

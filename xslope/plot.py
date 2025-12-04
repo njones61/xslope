@@ -717,15 +717,14 @@ def plot_reinforcement_lines(ax, slope_data):
                 tension_points_plotted = True
 
 
-def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=6, mat_table=True):
+def plot_inputs(slope_data, title="Slope Geometry and Inputs", figsize=(12, 6), mat_table=True, save_png=False, dpi=300):
     """
     Creates a plot showing the slope geometry and input parameters.
 
     Parameters:
         slope_data: Dictionary containing plot data
         title: Title for the plot
-        width: Width of the plot in inches
-        height: Height of the plot in inches
+        figsize: Tuple of (width, height) in inches for the plot
         mat_table: Controls material table display. Can be:
             - True: Auto-position material table to avoid overlaps
             - False: Don't show material table
@@ -736,7 +735,7 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=
     Returns:
         None
     """
-    fig, ax = plt.subplots(figsize=(width, height))
+    fig, ax = plt.subplots(figsize=figsize)
 
     # Plot contents
     plot_profile_lines(ax, slope_data['profile_lines'])
@@ -803,11 +802,16 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", width=12, height=
     ax.set_title(title)
 
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '') + '.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, width=12, height=7, slice_numbers=False):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, save_png=False, dpi=300):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -816,13 +820,12 @@ def plot_solution(slope_data, slice_df, failure_surface, results, width=12, heig
         slice_df: DataFrame containing slice data
         failure_surface: Failure surface geometry
         results: Solution results
-        width: Width of the plot in inches
-        height: Height of the plot in inches
+        figsize: Tuple of (width, height) in inches for the plot
 
     Returns:
         None
     """
-    fig, ax = plt.subplots(figsize=(width, height))
+    fig, ax = plt.subplots(figsize=figsize)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
@@ -896,6 +899,11 @@ def plot_solution(slope_data, slice_df, failure_surface, results, width=12, heig
     ax.set_ylim(ymin, ymax)
 
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg') + '.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 # ========== Functions for Search Results =========
@@ -956,7 +964,7 @@ def plot_search_path(ax, search_path):
         ax.arrow(start['x'], start['y'], dx, dy,
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, dpi=300):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -965,13 +973,12 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
         fs_cache: List of dictionaries containing failure surface data and FS values
         search_path: List of dictionaries containing search path coordinates
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
-        width: Width of the plot in inches
-        height: Height of the plot in inches
+        figsize: Tuple of (width, height) in inches for the plot
 
     Returns:
         None
     """
-    fig, ax = plt.subplots(figsize=(width, height))
+    fig, ax = plt.subplots(figsize=figsize)
 
     plot_profile_lines(ax, slope_data['profile_lines'])
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
@@ -995,9 +1002,14 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_circular_search_results.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, width=12, height=7):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, dpi=300):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -1006,13 +1018,12 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         fs_cache: List of dictionaries containing failure surface data and FS values
         search_path: List of dictionaries containing search path coordinates
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
-        width: Width of the plot in inches
-        height: Height of the plot in inches
+        figsize: Tuple of (width, height) in inches for the plot
 
     Returns:
         None
     """
-    fig, ax = plt.subplots(figsize=(width, height))
+    fig, ax = plt.subplots(figsize=figsize)
 
     # Plot basic profile elements
     plot_profile_lines(ax, slope_data['profile_lines'])
@@ -1060,22 +1071,26 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_noncircular_search_results.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
-def plot_reliability_results(slope_data, reliability_data, width=12, height=7):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, dpi=300):
     """
     Creates a plot showing the results of reliability analysis.
     
     Parameters:
         slope_data: Dictionary containing plot data
         reliability_data: Dictionary containing reliability analysis results
-        width: Width of the plot in inches
-        height: Height of the plot in inches
+        figsize: Tuple of (width, height) in inches for the plot
     
     Returns:
         None
     """
-    fig, ax = plt.subplots(figsize=(width, height))
+    fig, ax = plt.subplots(figsize=figsize)
 
     # Plot basic slope elements (same as other search functions)
     plot_profile_lines(ax, slope_data['profile_lines'])
@@ -1143,9 +1158,14 @@ def plot_reliability_results(slope_data, reliability_data, width=12, height=7):
                 f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
 
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_reliability_results.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, dpi=300):
     """
     Plot the finite element mesh with material regions.
     
@@ -1332,10 +1352,15 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_mesh.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 
-def plot_polygons(polygons, title="Material Zone Polygons"):
+def plot_polygons(polygons, title="Material Zone Polygons", save_png=False, dpi=300):
     """
     Plot all material zone polygons in a single figure.
     
@@ -1358,10 +1383,15 @@ def plot_polygons(polygons, title="Material Zone Polygons"):
     ax.grid(True, alpha=0.3)
     ax.set_aspect('equal')
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '') + '.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 
-def plot_polygons_separately(polygons, title_prefix='Material Zone'):
+def plot_polygons_separately(polygons, title_prefix='Material Zone', save_png=False, dpi=300):
     """
     Plot each polygon in a separate matplotlib frame (subplot), with vertices as round dots.
     
@@ -1387,6 +1417,11 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone'):
         ax.set_aspect('equal')
         ax.legend()
     plt.tight_layout()
+    
+    if save_png:
+        filename = 'plot_' + title_prefix.lower().replace(' ', '_').replace(':', '').replace(',', '') + '_separate.png'
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+    
     plt.show()
 
 

@@ -16,6 +16,7 @@ analysis_type = "single_surface" # @param ["single_surface","all_methods", "auto
 surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}
+save_png = True # @param {"type":"boolean"}
 
 
 if analysis_type == 'single_surface' or analysis_type == 'all_methods' : # selected surface with one or multiple methods
@@ -32,29 +33,29 @@ if analysis_type == 'single_surface' or analysis_type == 'all_methods' : # selec
       exit()
   if analysis_type == 'single_surface':
     results = solve_selected(method, slice_df, rapid=rapid_drawdown)
-    plot_solution(slope_data, slice_df, failure_surface, results, save_png=True)
+    plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
   else:
     results = solve_all(slice_df, rapid=rapid_drawdown)
 
 elif analysis_type == "auto_search": # automated search for critical surface
   if surface_type == "circular":
     fs_cache, converged, search_path = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
-    plot_circular_search_results(slope_data, fs_cache, search_path, save_png=True)
+    plot_circular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
   else:
     fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
-    plot_noncircular_search_results(slope_data, fs_cache, search_path, save_png=True)
+    plot_noncircular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
 
   # Extract critical failure surface (lowest FS is first in sorted list)
   critical_surface = fs_cache[0]
   slice_df = critical_surface['slices']
   failure_surface = critical_surface['failure_surface']
   results = critical_surface['solver_result']
-  plot_solution(slope_data, slice_df, failure_surface, results, save_png=True)
+  plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
 
 elif analysis_type == "reliability": # reliability analysis (supports both circular and non-circular)
   circular = (surface_type == "circular")
   success, result = reliability_analysis(slope_data, method, rapid=rapid_drawdown, circular=circular, debug_level=1)
   if success:
-    plot_reliability_results(slope_data, result, save_png=True)
+    plot_reliability_results(slope_data, result, save_png=save_png)
   else:
     print(f"Reliability analysis failed: {result}")

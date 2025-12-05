@@ -1,14 +1,14 @@
 from xslope.global_config import non_circ
 
 from xslope.fileio import load_slope_data
-from xslope.plot import plot_circular_search_results, plot_noncircular_search_results, plot_solution, plot_reliability_results
+from xslope.plot import plot_circular_search_results, plot_noncircular_search_results, plot_solution, plot_reliability_results, plot_inputs
 from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
 slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
-
+plot_inputs(slope_data)
 
 method = "bishop" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 20 # @param {"type":"integer"}
@@ -19,23 +19,17 @@ reliability = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
 
 
-if analysis_type == 'single_surface' or analysis_type == 'all_methods' : # selected surface with one or multiple methods
-  if surface_type == "circular":
-    circle = slope_data['circles'][0] if slope_data['circular'] else None
-    success, result = generate_slices(slope_data, circle=circle, non_circ=None, num_slices=num_slices)
-  else:
-    non_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
-    success, result = generate_slices(slope_data, circle=None, non_circ=non_circ, num_slices=num_slices)
+if analysis_type == 'single_surface': # analyze the specified failure surface
+  circle = slope_data['circles'][0] if slope_data['circular'] else None
+  non_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
+  success, result = generate_slices(slope_data, circle=circle, non_circ=non_circ, num_slices=num_slices)
   if success:
       slice_df, failure_surface = result
+      results = solve_selected(method, slice_df, rapid=rapid_drawdown)
+      plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
   else:
       print(result)
       exit()
-  if analysis_type == 'single_surface':
-    results = solve_selected(method, slice_df, rapid=rapid_drawdown)
-    plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
-  else:
-    results = solve_all(slice_df, rapid=rapid_drawdown)
 
 elif analysis_type == "auto_search": # automated search for critical surface
   if surface_type == "circular":

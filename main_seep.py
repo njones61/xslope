@@ -8,7 +8,7 @@ from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to
 
 slope_data = load_slope_data("docs/seepage/files/xslope_earth_dam2.xlsx")
 
-plot_inputs(slope_data)
+plot_inputs(slope_data, mode='seep', tab_loc='top')
 
 polygons = build_polygons(slope_data)
 
@@ -27,11 +27,9 @@ seep_data = build_seep_data(mesh, slope_data)
 
 # print_dictionary(seep_data)
 
-plot_seep_data(seep_data, show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
+plot_seep_data(seep_data, show_nodes=True, show_bc=True, label_elements=False, label_nodes=False)
 
 solution = run_seepage_analysis(seep_data)
-
-print(solution)
 
 plot_seep_solution(seep_data, solution, variable="head", vectors=False, flowlines=True, mesh=False, levels=20, base_mat=3, fill_contours=False, phreatic=True)
 

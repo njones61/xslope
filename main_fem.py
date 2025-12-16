@@ -10,13 +10,13 @@ slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
 
 #print_dictionary(slope_data)
 
-#plot_inputs(slope_data)
+plot_inputs(slope_data, mode='fem', tab_loc='top')
 
 polygons = build_polygons(slope_data)
 
 #plot_polygons(polygons)
 
-target_size = 8
+target_size = 2
 
 mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
 
@@ -26,7 +26,7 @@ fem_data = build_fem_data(slope_data, mesh)
 
 #print_dictionary(fem_data)
 
-plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, material_table=True, label_elements=False, label_nodes=False)
+plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, label_elements=False, label_nodes=False)
 
 print("=== Testing New Improved FEM Solver ===")
 

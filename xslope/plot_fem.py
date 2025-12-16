@@ -22,7 +22,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
 
 
-def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, material_table=False, 
+def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, 
                   label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, dpi=300):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
@@ -32,7 +32,6 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, mat
         figsize: Figure size
         show_nodes: If True, plot node points
         show_bc: If True, plot boundary condition symbols
-        material_table: If True, show material table
         label_elements: If True, label each element with its number at its centroid
         label_nodes: If True, label each node with its number just above and to the right
         alpha: Transparency for element faces
@@ -245,10 +244,6 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, mat
     else:
         title = f"FEM Mesh with Material Zones ({num_triangles} triangles)"
     
-    # Place the table in the upper left
-    if material_table:
-        _plot_fem_material_table(ax, fem_data, xloc=0.3, yloc=1.1)  # upper left
-    
     ax.set_title(title)
     plt.tight_layout()
     
@@ -365,69 +360,6 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
             plt.Line2D([0], [0], marker='>', color='green', linestyle='-', 
                       markersize=8, label='Applied Force (bc_type=4)')
         )
-
-
-def _plot_fem_material_table(ax, fem_data, xloc=0.6, yloc=0.7):
-    """
-    Adds a FEM material properties table to the plot.
-
-    Parameters:
-        ax: matplotlib Axes object
-        fem_data: Dictionary containing FEM data with material properties
-        xloc: x-location of table (0-1)
-        yloc: y-location of table (0-1)
-
-    Returns:
-        None
-    """
-    # Extract material properties from fem_data
-    c_by_mat = fem_data.get("c_by_mat")
-    phi_by_mat = fem_data.get("phi_by_mat")
-    E_by_mat = fem_data.get("E_by_mat")
-    nu_by_mat = fem_data.get("nu_by_mat")
-    gamma_by_mat = fem_data.get("gamma_by_mat")
-    material_names = fem_data.get("material_names", [])
-    
-    if c_by_mat is None or len(c_by_mat) == 0:
-        return
-
-    # Column headers for FEM properties
-    col_labels = ["Mat", "Name", "γ", "c", "φ", "E", "ν"]
-
-    # Build table rows
-    table_data = []
-    for idx in range(len(c_by_mat)):
-        c = c_by_mat[idx]
-        phi = phi_by_mat[idx] if phi_by_mat is not None else 0.0
-        E = E_by_mat[idx] if E_by_mat is not None else 0.0
-        nu = nu_by_mat[idx] if nu_by_mat is not None else 0.0
-        gamma = gamma_by_mat[idx] if gamma_by_mat is not None else 0.0
-        
-        # Get material name, use default if not available
-        material_name = material_names[idx] if idx < len(material_names) else f"Material {idx+1}"
-        
-        # Format values with appropriate precision
-        row = [
-            idx + 1,  # Material number (1-based)
-            material_name,  # Material name
-            f"{gamma:.1f}",   # unit weight
-            f"{c:.1f}",  # cohesion
-            f"{phi:.1f}",  # friction angle
-            f"{E:.0f}",  # Young's modulus
-            f"{nu:.2f}"  # Poisson's ratio
-        ]
-        table_data.append(row)
-
-    # Add the table
-    table = ax.table(cellText=table_data,
-                     colLabels=col_labels,
-                     loc='upper right',
-                     colLoc='center',
-                     cellLoc='center',
-                     bbox=[xloc, yloc, 0.45, 0.25])  # Increased width to accommodate name column
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-
 
 def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=None, 
                     show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,

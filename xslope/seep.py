@@ -969,10 +969,14 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
     starting_phi = phi[ordered_nodes[start_idx]]
     closure_error = phi_val - starting_phi
 
-    if debug or abs(closure_error) > 1e-3:
+    # Use a relative threshold based on total positive boundary flow
+    rel_tol = 1e-2  # 1%
+    scale = max(total_q, 1e-12)
+    
+    if debug or abs(closure_error) > rel_tol * scale:
         print(f"Flow potential closure check: error = {closure_error:.6e}")
 
-        if abs(closure_error) > 1e-3:
+        if abs(closure_error) > rel_tol * scale:
             print(f"Warning: Large flow potential closure error = {closure_error:.6e}")
             print("This may indicate:")
             print("  - Non-conservative flow field")

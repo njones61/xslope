@@ -4,7 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, material_table=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, dpi=300):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, dpi=300):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -13,7 +13,6 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         seep_data: Dictionary containing seepage data from import_seep2d
         show_nodes: If True, plot node points
         show_bc: If True, plot boundary condition nodes
-        material_table: If True, show material table
         label_elements: If True, label each element with its number at its centroid
         label_nodes: If True, label each node with its number just above and to the right
     """
@@ -206,10 +205,6 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         title = f"SEEP2D Mesh with Material Zones ({num_quads} quadrilaterals)"
     else:
         title = f"SEEP2D Mesh with Material Zones ({num_triangles} triangles)"
-    
-    # Place the table in the upper left
-    if material_table:
-        plot_seep_material_table(ax, seep_data, xloc=0.3, yloc=1.1)  # upper left
     
     ax.set_title(title)
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
@@ -592,66 +587,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     plt.show()
 
 
-def plot_seep_material_table(ax, seep_data, xloc=0.6, yloc=0.7):
-    """
-    Adds a seepage material properties table to the plot.
-
-    Parameters:
-        ax: matplotlib Axes object
-        seep_data: Dictionary containing seepage data with material properties
-        xloc: x-location of table (0-1)
-        yloc: y-location of table (0-1)
-
-    Returns:
-        None
-    """
-    # Extract material properties from seep_data
-    k1_by_mat = seep_data.get("k1_by_mat")
-    k2_by_mat = seep_data.get("k2_by_mat")
-    angle_by_mat = seep_data.get("angle_by_mat")
-    kr0_by_mat = seep_data.get("kr0_by_mat")
-    h0_by_mat = seep_data.get("h0_by_mat")
-    material_names = seep_data.get("material_names", [])
-    
-    if k1_by_mat is None or len(k1_by_mat) == 0:
-        return
-
-    # Column headers for seepage properties
-    col_labels = ["Mat", "Name", "k₁", "k₂", "Angle", "kr₀", "h₀"]
-
-    # Build table rows
-    table_data = []
-    for idx in range(len(k1_by_mat)):
-        k1 = k1_by_mat[idx]
-        k2 = k2_by_mat[idx] if k2_by_mat is not None else 0.0
-        angle = angle_by_mat[idx] if angle_by_mat is not None else 0.0
-        kr0 = kr0_by_mat[idx] if kr0_by_mat is not None else 0.0
-        h0 = h0_by_mat[idx] if h0_by_mat is not None else 0.0
-        
-        # Get material name, use default if not available
-        material_name = material_names[idx] if idx < len(material_names) else f"Material {idx+1}"
-        
-        # Format values with appropriate precision
-        row = [
-            idx + 1,  # Material number (1-based)
-            material_name,  # Material name
-            f"{k1:.3f}",  # k1 in scientific notation
-            f"{k2:.3f}",  # k2 in scientific notation
-            f"{angle:.1f}",  # angle in degrees
-            f"{kr0:.4f}",  # kr0
-            f"{h0:.2f}"   # h0
-        ]
-        table_data.append(row)
-
-    # Add the table
-    table = ax.table(cellText=table_data,
-                     colLabels=col_labels,
-                     loc='upper right',
-                     colLoc='center',
-                     cellLoc='center',
-                     bbox=[xloc, yloc, 0.45, 0.25])  # Increased width to accommodate name column
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
+    # plot_seep_material_table has been moved to xslope/plot.py
 
 
 def get_ordered_mesh_boundary(nodes, elements, element_types=None):

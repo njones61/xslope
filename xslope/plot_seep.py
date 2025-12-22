@@ -180,10 +180,10 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         bc1 = nodes[bc_type == 1]
         bc2 = nodes[bc_type == 2]
         if len(bc1) > 0:
-            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'ro', label="Fixed Head (bc_type=1)")
+            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'bs', label="Fixed Head (bc_type=1)")
             legend_handles.append(h1)
         if len(bc2) > 0:
-            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'bs', label="Exit Face (bc_type=2)")
+            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)")
             legend_handles.append(h2)
 
     # Single combined legend outside the plot
@@ -195,6 +195,12 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         frameon=False
     )
     ax.set_aspect("equal")
+
+    # Add a bit of headroom so the mesh/BC markers don't touch the top border
+    y0, y1 = ax.get_ylim()
+    if y1 > y0:
+        pad = 0.05 * (y1 - y0)
+        ax.set_ylim(y0, y1 + pad)
     
     # Count element types for title
     num_triangles = np.sum(element_types == 3)

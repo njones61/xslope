@@ -29,8 +29,9 @@ plt.rcParams.update({
 
 # Consistent color for materials (Tableau tab10)
 def get_material_color(idx):
-    tableau_colors = plt.get_cmap('tab10').colors  # 10 distinct colors
-    return tableau_colors[idx % len(tableau_colors)]
+    cmap = plt.get_cmap("tab10")
+    # Use the colormap callable rather than relying on the (typing-unknown) `.colors` attribute.
+    return cmap(idx % getattr(cmap, "N", 10))
 
 def get_dload_legend_handler():
     """
@@ -173,6 +174,26 @@ def plot_piezo_line(ax, slope_data):
         None
     """
     
+    def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=0.0):
+        """
+        Place an inverted triangle marker so its tip visually touches the line at (x, y).
+        We do this in display coordinates (points/pixels) so it scales consistently.
+        """
+        from matplotlib.markers import MarkerStyle
+        from matplotlib.transforms import offset_copy
+
+        # Compute the distance (in "marker units") from the marker origin to the tip.
+        # Matplotlib scales marker vertices by `markersize` (in points) for Line2D.
+        ms = MarkerStyle("v")
+        path = ms.get_path().transformed(ms.get_transform())
+        verts = np.asarray(path.vertices)
+        min_y = float(verts[:, 1].min())  # tip is the lowest y
+        tip_offset_points = (-min_y) * float(markersize) + float(extra_gap_points)
+
+        # Offset the marker center upward in point units so the tip lands at (x, y).
+        trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
+        ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
+
     def plot_single_piezo_line(ax, piezo_line, color, label):
         """Internal function to plot a single piezometric line"""
         if not piezo_line:
@@ -182,19 +203,145 @@ def plot_piezo_line(ax, slope_data):
         ax.plot(piezo_xs, piezo_ys, color=color, linewidth=2, label=label)
         
         # Find middle x-coordinate and corresponding y value
-        x_min, x_max = min(piezo_xs), max(piezo_xs)
-        mid_x = (x_min + x_max) / 2
-        
-        # Interpolate y value at mid_x
-        from scipy.interpolate import interp1d
         if len(piezo_xs) > 1:
-            f = interp1d(piezo_xs, piezo_ys, kind='linear', bounds_error=False, fill_value='extrapolate')
-            mid_y = f(mid_x)
-            ax.plot(mid_x, mid_y + 6, marker='v', color=color, markersize=8)
+            # Sort by x to ensure monotonic input for interpolation
+            pairs = sorted(zip(piezo_xs, piezo_ys), key=lambda p: p[0])
+            sx, sy = zip(*pairs)
+            x_min, x_max = min(sx), max(sx)
+            mid_x = (x_min + x_max) / 2
+            mid_y = float(np.interp(mid_x, sx, sy))
+            # Slight negative gap so the marker visually "touches" the line (not floating above it)
+            _plot_touching_v_marker(ax, mid_x, mid_y, color=color, markersize=8, extra_gap_points=2.0)
     
     # Plot both piezometric lines
     plot_single_piezo_line(ax, slope_data.get('piezo_line'), 'b', "Piezometric Line")
     plot_single_piezo_line(ax, slope_data.get('piezo_line2'), 'skyblue', "Piezometric Line 2")
+
+def plot_seepage_bc_lines(ax, slope_data):
+    """
+    Plots seepage boundary-condition lines for seepage-only workflows.
+
+    - Specified head geometry: solid dark blue, thicker than profile lines
+    - Exit face geometry: solid red
+    - Derived "water level" line for each specified head: y = h
+      plotted as a lighter blue solid line with an inverted triangle marker
+      (styled similarly to piezometric line markers).
+    """
+    def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=2.0):
+        """Place an inverted triangle so its tip visually sits on the line at (x, y)."""
+        from matplotlib.markers import MarkerStyle
+        from matplotlib.transforms import offset_copy
+
+        ms = MarkerStyle("v")
+        path = ms.get_path().transformed(ms.get_transform())
+        verts = np.asarray(path.vertices)
+        min_y = float(verts[:, 1].min())
+        tip_offset_points = (-min_y) * float(markersize) + float(extra_gap_points)
+        trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
+        ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
+
+    # Geometry x-extent (used for vertical-head-line derived segment length / side)
+    x_vals = []
+    for line in slope_data.get("profile_lines", []):
+        try:
+            xs_line, _ = zip(*line)
+            x_vals.extend(xs_line)
+        except Exception:
+            pass
+    gs = slope_data.get("ground_surface", None)
+    if not x_vals and gs is not None and hasattr(gs, "coords"):
+        x_vals.extend([x for x, _ in gs.coords])
+    x_min_geom = min(x_vals) if x_vals else 0.0
+    x_max_geom = max(x_vals) if x_vals else 1.0
+    geom_width = max(1e-9, x_max_geom - x_min_geom)
+
+    seepage_bc = slope_data.get("seepage_bc") or {}
+    specified_heads = seepage_bc.get("specified_heads") or []
+    exit_face = seepage_bc.get("exit_face") or []
+
+    # --- Specified head lines + derived water-level lines ---
+    for i, sh in enumerate(specified_heads):
+        coords = sh.get("coords") or []
+        if len(coords) < 2:
+            continue
+
+        xs, ys = zip(*coords)
+        ax.plot(
+            xs,
+            ys,
+            color="darkblue",
+            linewidth=3,
+            linestyle="--",
+            label="Specified Head Line" if i == 0 else "",
+        )
+
+        # Head values may be scalar (typical) or per-point array-like
+        head_val = sh.get("head", None)
+        if head_val is None:
+            continue
+
+        if isinstance(head_val, (list, tuple, np.ndarray)):
+            if len(head_val) != len(coords):
+                continue
+            heads = [float(h) for h in head_val]
+        else:
+            try:
+                head_scalar = float(head_val)
+            except (TypeError, ValueError):
+                continue
+            heads = [head_scalar] * len(coords)
+
+        # If specified-head geometry is vertical, draw a short horizontal derived line outside the boundary.
+        # This avoids drawing a (nearly) vertical derived line that doesn't convey a water level.
+        tol = 1e-6
+        is_vertical = (max(xs) - min(xs)) <= tol
+        if is_vertical:
+            x0 = float(xs[0])
+            y_head = float(heads[0])
+            seg_len = 0.04 * geom_width
+            gap = 0.01 * geom_width
+            is_right = x0 >= 0.5 * (x_min_geom + x_max_geom)
+            if is_right:
+                wl_xs = [x0 + gap, x0 + gap + seg_len]
+            else:
+                wl_xs = [x0 - gap - seg_len, x0 - gap]
+            wl_ys = [y_head, y_head]
+        else:
+            wl_xs = list(xs)
+            wl_ys = heads
+
+        ax.plot(
+            wl_xs,
+            wl_ys,
+            color="lightskyblue",
+            linewidth=2,
+            linestyle="-",
+            label="Specified Head Water Level" if i == 0 else "",
+        )
+
+        # Inverted triangle marker near the midpoint (like piezometric lines)
+        if len(wl_xs) > 1:
+            try:
+                pairs = sorted(zip(wl_xs, wl_ys), key=lambda p: p[0])
+                sx, sy = zip(*pairs)
+                mid_x = 0.5 * (min(sx) + max(sx))
+                mid_y = float(np.interp(mid_x, sx, sy))
+                _plot_touching_v_marker(ax, mid_x, mid_y, color="lightskyblue", markersize=8, extra_gap_points=2.0)
+            except Exception:
+                # If interpolation fails for any reason, skip marker
+                pass
+
+    # --- Exit face line ---
+    if len(exit_face) >= 2:
+        ex_xs, ex_ys = zip(*exit_face)
+        ax.plot(
+            ex_xs,
+            ex_ys,
+            color="red",
+            linewidth=3,
+            linestyle="--",
+            label="Exit Face",
+        )
 
 def plot_tcrack_surface(ax, tcrack_surface):
     """
@@ -381,6 +528,8 @@ def plot_circles(ax, slope_data):
             continue  # or handle error
         # result = (x_min, x_max, y_left, y_right, clipped_surface)
         x_min, x_max, y_left, y_right, clipped_surface = result
+        if not isinstance(clipped_surface, LineString):
+            clipped_surface = LineString(clipped_surface)
         x_clip, y_clip = zip(*clipped_surface.coords)
         ax.plot(x_clip, y_clip, 'r--', label="Circle")
 
@@ -994,6 +1143,8 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", figsize=(12, 6), 
     plot_profile_lines(ax, slope_data['profile_lines'])
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
+    if mode == "seep":
+        plot_seepage_bc_lines(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data['tcrack_surface'])
     plot_reinforcement_lines(ax, slope_data)
@@ -1109,6 +1260,12 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", figsize=(12, 6), 
                         ax.set_ylim(y_min_curr, y_max_new)
 
     ax.set_aspect('equal')  # ✅ Equal aspect
+
+    # Add a bit of headroom so plotted lines/markers don't touch the top border
+    y0, y1 = ax.get_ylim()
+    if y1 > y0:
+        pad = 0.05 * (y1 - y0)
+        ax.set_ylim(y0, y1 + pad)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
@@ -1223,6 +1380,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         title = f'Corps Engineers: FS = {fs:.3f}, θ = {theta:.2f}°'
     elif method == 'lowe_karafiath':
         title = f'Lowe & Karafiath: FS = {fs:.3f}'
+    else:
+        title = f'{method}: FS = {fs:.3f}'
     ax.set_title(title)
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)

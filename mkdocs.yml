@@ -32,16 +32,16 @@ nav:
     - General Features: usage/features.md
     - Code Structure: usage/structure.md
   - Limit Equilibrium Method:
-    - Overview: lim_eq/overview.md
-    - Ordinary Method of Slices: lim_eq/oms.md
-    - Bishop's Simplified Method: lim_eq/bishop.md
-    - Janbu Method: lim_eq/janbu.md
-    - Force Equilibrium Methods: lim_eq/force_eq.md
-    - Spencer's Method: lim_eq/spencer.md
-    - Rapid Drawdown Analysis: lim_eq/rapid.md
-    - Automated Search Algorithms: lim_eq/search.md
-    - Reliability Analysis: lim_eq/reliability.md
-    - Sample Problems: lim_eq/samples.md
+    - Overview: lem/overview.md
+    - Ordinary Method of Slices: lem/oms.md
+    - Bishop's Simplified Method: lem/bishop.md
+    - Janbu Method: lem/janbu.md
+    - Force Equilibrium Methods: lem/force_eq.md
+    - Spencer's Method: lem/spencer.md
+    - Rapid Drawdown Analysis: lem/rapid.md
+    - Automated Search Algorithms: lem/search.md
+    - Reliability Analysis: lem/reliability.md
+    - Sample Problems: lem/samples.md
   - Seepage Analysis:
     - Overview: seepage/overview.md
     - Problem Setup: seepage/setup.md

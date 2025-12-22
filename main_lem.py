@@ -16,7 +16,7 @@ analysis_type = "single_surface" # @param ["single_surface","all_methods", "auto
 surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}
-save_png = True # @param {"type":"boolean"}
+save_png = False # @param {"type":"boolean"}
 
 
 if analysis_type == 'single_surface': # analyze the specified failure surface

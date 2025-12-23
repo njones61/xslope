@@ -8,7 +8,7 @@ from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to
 
 slope_data = load_slope_data("inputs/slope/input_template_rface6.xlsx")
 
-plot_inputs(slope_data, mode='seep', tab_loc='top')
+plot_inputs(slope_data, mode='seep', tab_loc='top', save_png=False)
 
 polygons = build_polygons(slope_data)
 

@@ -142,7 +142,8 @@ def load_slope_data(filepath):
 
     profile_data_blocks = [
         {"header_row": 4, "data_start": 5, "data_end": 20},
-        {"header_row": 22, "data_start": 23, "data_end": 38}
+        {"header_row": 22, "data_start": 23, "data_end": 38},
+        {"header_row": 40, "data_start": 41, "data_end": 56},
     ]
     profile_block_width = 3
 
@@ -182,35 +183,63 @@ def load_slope_data(filepath):
     mat_df = xls.parse('mat', header=2)  # header=2 because the header row is row 3 in Excel
     materials = []
 
-    # Only process rows 4-15 (Excel), which are 0-indexed 0-11 in pandas 
-    for _, row in mat_df.iloc[0:12].iterrows():
-        # Check if the row is blank (columns 2-22, which are indices 1-21)
+    required_materials = len(profile_lines)
+
+    def _num(x):
+        v = pd.to_numeric(x, errors="coerce")
+        return float(v) if pd.notna(v) else 0.0
+
+    # Read exactly one material row per profile line.
+    # Materials are positional: Excel row 4 corresponds to profile line 1, row 5 to line 2, etc.
+    for i in range(required_materials):
+        # Excel row number: header is on row 3, first data row is row 4
+        excel_row = i + 4
+
+        if i >= len(mat_df):
+            raise ValueError(
+                "CRITICAL ERROR: Materials table ended early. "
+                f"Expected {required_materials} materials for {required_materials} profile lines, "
+                f"but ran out of rows at Excel row {excel_row}."
+            )
+
+        row = mat_df.iloc[i]
         if row.iloc[1:22].isna().all():
-            continue
+            raise ValueError(
+                "CRITICAL ERROR: Missing material row for a profile line. "
+                f"Material {i+1} of {required_materials} is blank (Excel row {excel_row})."
+            )
+
+        gamma_num = pd.to_numeric(row.get("g", None), errors="coerce")
+        if pd.isna(gamma_num):
+            raise ValueError(
+                "CRITICAL ERROR: Invalid material row encountered. "
+                f"Material {i+1} of {required_materials} (Excel row {excel_row}) has a non-numeric 'g' value."
+            )
+
         materials.append({
             "name": row.get('name', ''),
-            "gamma": float(row.get('g', 0) or 0),
+            "gamma": float(gamma_num),
             "option": str(row.get('option', '')).strip().lower(),
-            "c": float(row.get('c', 0) or 0),
-            "phi": float(row.get('f', 0) or 0),
-            "cp": float(row.get('cp', 0) or 0),
-            "r_elev": float(row.get('r-elev', 0) or 0),
-            "d": float(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
-            "psi": float(row.get('ψ', 0)) if pd.notna(row.get('ψ')) else 0,
+            "c": _num(row.get('c', 0)),
+            "phi": _num(row.get('f', 0)),
+            "cp": _num(row.get('cp', 0)),
+            "r_elev": _num(row.get('r-elev', 0)),
+            "d": _num(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
+            "psi": _num(row.get('ψ', 0)) if pd.notna(row.get('ψ')) else 0,
             "u": str(row.get('u', 'none')).strip().lower(),
-            "sigma_gamma": float(row.get('s(g)', 0) or 0),
-            "sigma_c": float(row.get('s(c)', 0) or 0),
-            "sigma_phi": float(row.get('s(f)', 0) or 0),
-            "sigma_cp": float(row.get('s(cp)', 0) or 0),
-            "sigma_d": float(row.get('s(d)', 0) or 0),
-            "sigma_psi": float(row.get('s(ψ)', 0) or 0),
-            "k1": float(row.get('k1', 0) or 0),
-            "k2": float(row.get('k2', 0) or 0),
-            "alpha": float(row.get('alpha', 0) or 0),
-            "kr0" : float(row.get('kr0', 0) or 0),
-            "h0" : float(row.get('h0', 0) or 0),
-            "E": float(row.get('E', 0) or 0),
-            "nu": float(row.get('n', 0) or 0)
+            "sigma_gamma": _num(row.get('s(g)', 0)),
+            "sigma_c": _num(row.get('s(c)', 0)),
+            "sigma_phi": _num(row.get('s(f)', 0)),
+            "sigma_cp": _num(row.get('s(cp)', 0)),
+            "sigma_d": _num(row.get('s(d)', 0)),
+            "sigma_psi": _num(row.get('s(ψ)', 0)),
+            "k1": _num(row.get('k1', 0)),
+            "k2": _num(row.get('k2', 0)),
+            "alpha": _num(row.get('alpha', 0)),
+            "kr0" : _num(row.get('kr0', 0)),
+            "h0" : _num(row.get('h0', 0)),
+            "E": _num(row.get('E', 0)),
+            "nu": _num(row.get('n', 0))
         })
 
     # === SEEPAGE ANALYSIS FILES ===
@@ -222,21 +251,21 @@ def load_slope_data(filepath):
     seep_u2 = None
     
     if has_seep_materials:
-        # Read seepage file names directly from Excel cells L19, L20, L21
+        # Read seepage file names directly from Excel cells L22, L23, L24
         try:
             # Read the 'mat' sheet directly without header parsing
             mat_raw_df = xls.parse('mat', header=None)
             
-            # L19 = row 18, column 11 (0-indexed)
-            mesh_filename = str(mat_raw_df.iloc[18, 11]).strip()  # L19
-            solution1_filename = str(mat_raw_df.iloc[19, 11]).strip()  # L20  
-            solution2_filename = str(mat_raw_df.iloc[20, 11]).strip()  # L21
+            # L22 = row 21, column 11 (0-indexed)
+            mesh_filename = str(mat_raw_df.iloc[21, 11]).strip()  # L22
+            solution1_filename = str(mat_raw_df.iloc[22, 11]).strip()  # L23
+            solution2_filename = str(mat_raw_df.iloc[23, 11]).strip()  # L24
             
             # Validate required files
             if not mesh_filename or mesh_filename.lower() == 'nan':
-                raise ValueError("CRITICAL ERROR: Mesh filename is required when using 'seep' pore pressure option but is blank in cell L19.")
+                raise ValueError("CRITICAL ERROR: Mesh filename is required when using 'seep' pore pressure option but is blank in cell L22.")
             if not solution1_filename or solution1_filename.lower() == 'nan':
-                raise ValueError("CRITICAL ERROR: Solution1 filename is required when using 'seep' pore pressure option but is blank in cell L20.")
+                raise ValueError("CRITICAL ERROR: Solution1 filename is required when using 'seep' pore pressure option but is blank in cell L23.")
             
             # Load mesh file
             if not os.path.exists(mesh_filename):
@@ -510,43 +539,51 @@ def load_slope_data(filepath):
     # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===
     seep_df = xls.parse('seep bc', header=None)
     seepage_bc = {"specified_heads": [], "exit_face": []}
+    seepage_bc2 = {"specified_heads": [], "exit_face": []}
+
+    def _read_specified_head_block(
+        df,
+        head_row: int,
+        head_col: int,
+        x_col: int,
+        y_col: int,
+        data_start_row: int,
+        data_end_row: int,
+    ):
+        """Read a specified-head block; returns (head_value, coords_list)."""
+        head_val = (
+            df.iloc[head_row, head_col]
+            if df.shape[0] > head_row and df.shape[1] > head_col
+            else None
+        )
+        coords = []
+        for r in range(data_start_row, data_end_row):
+            if r >= df.shape[0]:
+                break
+            x = df.iloc[r, x_col] if df.shape[1] > x_col else None
+            y = df.iloc[r, y_col] if df.shape[1] > y_col else None
+            if pd.notna(x) and pd.notna(y):
+                coords.append((float(x), float(y)))
+        return head_val, coords
 
     # Specified Head #1
-    head1 = seep_df.iloc[2, 2] if seep_df.shape[1] > 2 and seep_df.shape[0] > 2 else None
-    coords1 = []
-    for i in range(4, 12):  # rows 5-12 (0-indexed 4-11)
-        if i >= seep_df.shape[0]:
-            break
-        x = seep_df.iloc[i, 1] if seep_df.shape[1] > 1 else None
-        y = seep_df.iloc[i, 2] if seep_df.shape[1] > 2 else None
-        if pd.notna(x) and pd.notna(y):
-            coords1.append((float(x), float(y)))
+    head1, coords1 = _read_specified_head_block(
+        seep_df, head_row=2, head_col=2, x_col=1, y_col=2, data_start_row=4, data_end_row=12
+    )
     if head1 is not None and coords1:
         seepage_bc["specified_heads"].append({"head": float(head1), "coords": coords1})
 
     # Specified Head #2
-    head2 = seep_df.iloc[2, 5] if seep_df.shape[1] > 5 and seep_df.shape[0] > 2 else None
-    coords2 = []
-    for i in range(4, 12):
-        if i >= seep_df.shape[0]:
-            break
-        x = seep_df.iloc[i, 4] if seep_df.shape[1] > 4 else None
-        y = seep_df.iloc[i, 5] if seep_df.shape[1] > 5 else None
-        if pd.notna(x) and pd.notna(y):
-            coords2.append((float(x), float(y)))
+    head2, coords2 = _read_specified_head_block(
+        seep_df, head_row=2, head_col=5, x_col=4, y_col=5, data_start_row=4, data_end_row=12
+    )
     if head2 is not None and coords2:
         seepage_bc["specified_heads"].append({"head": float(head2), "coords": coords2})
 
     # Specified Head #3
-    head3 = seep_df.iloc[2, 8] if seep_df.shape[1] > 8 and seep_df.shape[0] > 2 else None
-    coords3 = []
-    for i in range(4, 12):
-        if i >= seep_df.shape[0]:
-            break
-        x = seep_df.iloc[i, 7] if seep_df.shape[1] > 7 else None
-        y = seep_df.iloc[i, 8] if seep_df.shape[1] > 8 else None
-        if pd.notna(x) and pd.notna(y):
-            coords3.append((float(x), float(y)))
+    head3, coords3 = _read_specified_head_block(
+        seep_df, head_row=2, head_col=8, x_col=7, y_col=8, data_start_row=4, data_end_row=12
+    )
     if head3 is not None and coords3:
         seepage_bc["specified_heads"].append({"head": float(head3), "coords": coords3})
 
@@ -560,6 +597,39 @@ def load_slope_data(filepath):
         if pd.notna(x) and pd.notna(y):
             exit_coords.append((float(x), float(y)))
     seepage_bc["exit_face"] = exit_coords
+
+    # --- RAPID DRAWDOWN BCs (second set) ---
+    # User-added second set starts at:
+    # - Specified Head #1: head in C26, coords in B28:C35
+    head1b, coords1b = _read_specified_head_block(
+        seep_df, head_row=25, head_col=2, x_col=1, y_col=2, data_start_row=27, data_end_row=35
+    )
+    if head1b is not None and coords1b:
+        seepage_bc2["specified_heads"].append({"head": float(head1b), "coords": coords1b})
+
+    # Mirror the same layout for the other two specified-head blocks (same columns as the first set)
+    head2b, coords2b = _read_specified_head_block(
+        seep_df, head_row=25, head_col=5, x_col=4, y_col=5, data_start_row=27, data_end_row=35
+    )
+    if head2b is not None and coords2b:
+        seepage_bc2["specified_heads"].append({"head": float(head2b), "coords": coords2b})
+
+    head3b, coords3b = _read_specified_head_block(
+        seep_df, head_row=25, head_col=8, x_col=7, y_col=8, data_start_row=27, data_end_row=35
+    )
+    if head3b is not None and coords3b:
+        seepage_bc2["specified_heads"].append({"head": float(head3b), "coords": coords3b})
+
+    # Exit Face #2: positioned lower on the sheet (same columns as the first exit face block)
+    exit_coords2 = []
+    for i in range(38, 46):  # rows 39-46 (0-indexed 38-45)
+        if i >= seep_df.shape[0]:
+            break
+        x = seep_df.iloc[i, 1] if seep_df.shape[1] > 1 else None
+        y = seep_df.iloc[i, 2] if seep_df.shape[1] > 2 else None
+        if pd.notna(x) and pd.notna(y):
+            exit_coords2.append((float(x), float(y)))
+    seepage_bc2["exit_face"] = exit_coords2
 
     # === VALIDATION ===
  
@@ -600,6 +670,7 @@ def load_slope_data(filepath):
     globals_data["dloads2"] = dloads2
     globals_data["reinforce_lines"] = reinforce_lines
     globals_data["seepage_bc"] = seepage_bc
+    globals_data["seepage_bc2"] = seepage_bc2
     
     # Add seepage data if available
     if has_seep_materials:

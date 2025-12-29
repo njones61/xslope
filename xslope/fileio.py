@@ -203,22 +203,21 @@ def load_slope_data(filepath):
             )
 
         row = mat_df.iloc[i]
-        if row.iloc[1:22].isna().all():
+        # For seepage workflows, 'g' (unit weight) and shear strength properties are not required.
+        # A material row is considered "missing" only if Excel columns C:X are empty.
+        # (Excel A:B are number and name; C:X contain the actual property fields.)
+        start_col = 2  # C
+        end_col = min(mat_df.shape[1], 24)  # X is column 24 (1-based) -> index 23, so slice end is 24
+        c_to_x_empty = True if start_col >= end_col else row.iloc[start_col:end_col].isna().all()
+        if c_to_x_empty:
             raise ValueError(
                 "CRITICAL ERROR: Missing material row for a profile line. "
-                f"Material {i+1} of {required_materials} is blank (Excel row {excel_row})."
-            )
-
-        gamma_num = pd.to_numeric(row.get("g", None), errors="coerce")
-        if pd.isna(gamma_num):
-            raise ValueError(
-                "CRITICAL ERROR: Invalid material row encountered. "
-                f"Material {i+1} of {required_materials} (Excel row {excel_row}) has a non-numeric 'g' value."
+                f"Material {i+1} of {required_materials} is blank in columns C:X (Excel row {excel_row})."
             )
 
         materials.append({
             "name": row.get('name', ''),
-            "gamma": float(gamma_num),
+            "gamma": _num(row.get("g", 0)),
             "option": str(row.get('option', '')).strip().lower(),
             "c": _num(row.get('c', 0)),
             "phi": _num(row.get('f', 0)),

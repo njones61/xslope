@@ -1945,7 +1945,8 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone', save_png=Fa
         ax.set_title(f'{title_prefix} {i}')
         ax.grid(True, alpha=0.3)
         ax.set_aspect('equal')
-        ax.legend()
+        # Intentionally no legend: these plots are typically used for debugging geometry,
+        # and legends can obscure key vertices/edges.
     plt.tight_layout()
     
     if save_png:

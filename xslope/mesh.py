@@ -1206,7 +1206,7 @@ def get_quad_mesh_presets():
 
 
 
-def build_polygons(slope_data, reinf_lines=None, debug=False):
+def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
     """
     Build material zone polygons from slope_data.
     
@@ -1237,7 +1237,6 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
 
     n = len(profile_lines)
     lines = [list(line) for line in copy.deepcopy(profile_lines)]
-    tol = 1e-8
 
     for i in range(n - 1):
         top = lines[i]
@@ -1432,6 +1431,93 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
                 # Return the lowest y value
                 y_min = min(y_values)
                 return y_min, is_at_endpoint
+
+            def find_projected_y_at_x(line_points, x_query, y_ref, side, tol=1e-8):
+                """
+                For vertical endpoint projections: choose the intersection y at x_query that is
+                closest *below* the point we're projecting from.
+
+                This fixes the case where a candidate profile has a vertical segment at x_query
+                (e.g., (260,229) then (260,202)). In that situation, using the "lowest y" (202)
+                is wrong; we want the first hit when projecting downward (229).
+
+                Behavior is intentionally conservative:
+                - If there is at least one intersection strictly below y_ref, return the highest of those.
+                - Otherwise fall back to the original behavior (lowest y), preserving legacy behavior
+                  in edge cases (e.g., coincident/above intersections).
+                """
+                # Reuse the exact same intersection enumeration logic as find_lowest_y_at_x,
+                # but keep the full set of y-values.
+                if not line_points:
+                    return None, False
+
+                xs = np.array([x for x, y in line_points])
+                ys = np.array([y for x, y in line_points])
+
+                if xs[0] - tol > x_query or xs[-1] + tol < x_query:
+                    return None, False
+
+                is_at_left_endpoint = abs(x_query - xs[0]) < tol
+                is_at_right_endpoint = abs(x_query - xs[-1]) < tol
+                is_at_endpoint = is_at_left_endpoint or is_at_right_endpoint
+
+                y_values = []
+                for k in range(len(line_points)):
+                    if abs(xs[k] - x_query) < tol:
+                        y_values.append(float(ys[k]))
+
+                for k in range(len(line_points) - 1):
+                    x1, y1 = line_points[k]
+                    x2, y2 = line_points[k + 1]
+
+                    if abs(x1 - x_query) < tol and abs(x2 - x_query) < tol:
+                        y_values.append(float(y1))
+                        y_values.append(float(y2))
+                    elif min(x1, x2) - tol <= x_query <= max(x1, x2) + tol:
+                        if abs(x2 - x1) < tol:
+                            y_values.append(float(y1))
+                            y_values.append(float(y2))
+                        else:
+                            t = (x_query - x1) / (x2 - x1)
+                            if 0 <= t <= 1:
+                                y_values.append(float(y1 + t * (y2 - y1)))
+
+                if not y_values:
+                    return None, False
+
+                # If the polyline has multiple *vertices* exactly at this x (vertical segment / duplicate-x),
+                # use a deterministic selection based on which side we are projecting from:
+                # - projecting from LEFT endpoint of the upper line: keep the LAST y encountered
+                # - projecting from RIGHT endpoint of the upper line: keep the FIRST y encountered
+                #
+                # This matches the intended "walk along the lower boundary" behavior and fixes cases like:
+                # - right projection at x=260 with vertices (260,229) then (260,202): choose 229 (first)
+                # - left projection at x=240 with vertices (240,140) then (240,190): choose 190 (last)
+                vertex_y_at_x = [float(y) for (x, y) in line_points if abs(x - x_query) < tol]
+                if len(vertex_y_at_x) >= 2:
+                    if side == "right":
+                        # first encountered vertex at this x
+                        y_pick = vertex_y_at_x[0]
+                        # If we are exactly on a vertex at y_ref, that is the first hit.
+                        if abs(y_pick - y_ref) < tol:
+                            return float(y_ref), is_at_endpoint
+                        if y_pick < (y_ref - tol):
+                            return y_pick, is_at_endpoint
+                    elif side == "left":
+                        # last encountered vertex at this x
+                        y_pick = vertex_y_at_x[-1]
+                        # If we are exactly on a vertex at y_ref, that is the first hit.
+                        if abs(y_pick - y_ref) < tol:
+                            return float(y_ref), is_at_endpoint
+                        if y_pick < (y_ref - tol):
+                            return y_pick, is_at_endpoint
+
+                y_below = [y for y in y_values if y < (y_ref - tol)]
+                if y_below:
+                    return max(y_below), is_at_endpoint
+
+                # Fall back to legacy behavior
+                return min(y_values), is_at_endpoint
             
             # Project endpoints - find highest lower profile or use max_depth
             # When projecting right side: if intersection is at left end of lower line,
@@ -1445,7 +1531,7 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
                 
                 # Check left endpoint projection
                 if xs_cand[0] - tol <= left_x <= xs_cand[-1] + tol:
-                    y_cand, is_at_endpoint = find_lowest_y_at_x(lower_candidate, left_x, tol)
+                    y_cand, is_at_endpoint = find_projected_y_at_x(lower_candidate, left_x, left_y, side="left", tol=tol)
                     if y_cand is not None:
                         # If intersection is at the right end of the lower line, add point but continue
                         if is_at_endpoint and abs(left_x - xs_cand[-1]) < tol:  # At right endpoint
@@ -1458,7 +1544,7 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
                 
                 # Check right endpoint projection
                 if xs_cand[0] - tol <= right_x <= xs_cand[-1] + tol:
-                    y_cand, is_at_endpoint = find_lowest_y_at_x(lower_candidate, right_x, tol)
+                    y_cand, is_at_endpoint = find_projected_y_at_x(lower_candidate, right_x, right_y, side="right", tol=tol)
                     if y_cand is not None:
                         # If intersection is at the left end of the lower line, add point but continue
                         if is_at_endpoint and abs(right_x - xs_cand[0]) < tol:  # At left endpoint
@@ -1474,6 +1560,25 @@ def build_polygons(slope_data, reinf_lines=None, debug=False):
                 left_y_bot = max_depth if max_depth is not None else -np.inf
             if right_y_bot == -np.inf:
                 right_y_bot = max_depth if max_depth is not None else -np.inf
+
+            # Filter vertical-edge "continue projecting" points so we only keep points that
+            # actually lie on the final vertical edge between the top and bottom of this zone.
+            #
+            # Without this, a deeper left-endpoint intersection (e.g., (240,190) at the left
+            # endpoint of some deeper line) can be appended to right_vertical_points even after
+            # we've already found the correct bottom (e.g., right_y_bot=229). That creates the
+            # dangling vertical segment you observed.
+            if right_y_bot != -np.inf:
+                right_vertical_points = [
+                    (x, y) for (x, y) in right_vertical_points
+                    if (y < right_y - tol) and (y > right_y_bot + tol)
+                ]
+            if left_y_bot != -np.inf:
+                # Left edge runs from bottom up to top; keep points strictly between bottom and top.
+                left_vertical_points = [
+                    (x, y) for (x, y) in left_vertical_points
+                    if (y > left_y_bot + tol) and (y < left_y - tol)
+                ]
             
             # Deduplicate vertical points (remove points that are too close to each other)
             def deduplicate_points(points, tol=1e-8):

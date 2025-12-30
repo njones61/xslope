@@ -17,6 +17,7 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
 from shapely.geometry import LineString
+import math
 
 from .slice import generate_failure_surface
 
@@ -1103,7 +1104,19 @@ def plot_reinforcement_lines(ax, slope_data):
                 tension_points_plotted = True
 
 
-def plot_inputs(slope_data, title="Slope Geometry and Inputs", figsize=(12, 6), mat_table=True, save_png=False, dpi=300, mode="lem", tab_loc="upper left"):
+def plot_inputs(
+    slope_data,
+    title="Slope Geometry and Inputs",
+    figsize=(12, 6),
+    mat_table=True,
+    save_png=False,
+    dpi=300,
+    mode="lem",
+    tab_loc="upper left",
+    legend_ncol="auto",
+    legend_max_cols=6,
+    legend_max_rows=4,
+):
     """
     Creates a plot showing the slope geometry and input parameters.
 
@@ -1133,6 +1146,11 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", figsize=(12, 6), 
             - "center right": Middle-right of plot area
             - "center": Center of plot area
             - "top": Above plot area, horizontally centered
+        legend_ncol: Legend column count. Use "auto" (default) to choose a value that
+            keeps the legend from getting too tall, or pass an int to force a width.
+        legend_max_cols: When legend_ncol="auto", cap the number of columns (default: 6).
+        legend_max_rows: When legend_ncol="auto", try to keep legend rows <= this value
+            by increasing columns (default: 4).
 
     Returns:
         None
@@ -1279,16 +1297,38 @@ def plot_inputs(slope_data, title="Slope Geometry and Inputs", figsize=(12, 6), 
         handles.append(dummy_line)
         labels.append('Distributed Load')
     
+    # --- Legend layout ---
+    # Historically this legend used ncol=2 and was anchored below the axes.
+    # If there are many entries, that makes the legend tall and it can fall
+    # off the bottom of the window. We auto-increase columns to cap row count,
+    # and we also reserve bottom margin so the legend stays visible.
+    n_items = len(labels)
+    if legend_ncol == "auto":
+        # Choose enough columns to keep row count <= legend_max_rows (as best we can),
+        # but never exceed legend_max_cols.
+        required_cols = max(1, math.ceil(n_items / max(1, int(legend_max_rows))))
+        ncol = min(int(legend_max_cols), required_cols)
+        # Keep at least 2 columns once there's more than one entry (matches prior look).
+        if n_items > 1:
+            ncol = max(2, ncol)
+    else:
+        ncol = max(1, int(legend_ncol))
+
+    n_rows = max(1, math.ceil(n_items / max(1, ncol)))
+    # Reserve a bit more space as the legend grows so it doesn't get clipped.
+    bottom_margin = min(0.45, 0.10 + 0.04 * n_rows)
+
     ax.legend(
         handles=handles,
         labels=labels,
-        loc='upper center',
+        loc="upper center",
         bbox_to_anchor=(0.5, -0.12),
-        ncol=2
+        ncol=ncol,
     )
 
     ax.set_title(title)
 
+    plt.subplots_adjust(bottom=bottom_margin)
     plt.tight_layout()
     
     if save_png:

@@ -8,7 +8,7 @@ from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to
 
 slope_data = load_slope_data("inputs/seep/xslope_lost_lake.xlsx")
 
-plot_inputs(slope_data, mode='seep', tab_loc='top', save_png=False)
+plot_inputs(slope_data, figsize=(10, 8), mode='seep', mat_table=False, tab_loc='top', save_png=False)
 
 polygons = build_polygons(slope_data)
 

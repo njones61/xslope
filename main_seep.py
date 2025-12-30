@@ -6,7 +6,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-slope_data = load_slope_data("inputs/seep/xslope_lost_lake.xlsx")
+slope_data = load_slope_data("docs/seepage/files/xslope_lost_lake.xlsx")
 
 plot_inputs(slope_data, figsize=(10, 8), mode='seep', mat_table=False, tab_loc='top', save_png=False)
 
@@ -16,7 +16,7 @@ polygons = build_polygons(slope_data, debug=True)
 
 # find the x-range of the ground_surface and use it to set the target size
 x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
-target_size = (x_range[1] - x_range[0]) / 150
+target_size = (x_range[1] - x_range[0]) / 100
 
 # Build quadrilateral mesh
 mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
@@ -29,9 +29,9 @@ seep_data = build_seep_data(mesh, slope_data)
 
 plot_seep_data(seep_data, show_nodes=True, show_bc=True, label_elements=False, label_nodes=False)
 
-solution = run_seepage_analysis(seep_data)
+solution = run_seepage_analysis(seep_data, tol=1e-4)
 
-plot_seep_solution(seep_data, solution, variable="head", vectors=False, flowlines=True, mesh=False, levels=25, base_mat=12, fill_contours=False, phreatic=True)
+plot_seep_solution(seep_data, solution, variable="head", vectors=False, flowlines=True, mesh=False, levels=20, base_mat=2, fill_contours=False, phreatic=True)
 
 # export_mesh_to_json(mesh, "inputs/slope/seep_mesh_lface5.json")
 # export_seep_solution(seep_data, solution, "inputs/slope/seep_solution_lface5.csv")

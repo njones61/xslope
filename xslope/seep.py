@@ -404,7 +404,7 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
 
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
-                      max_iter=200, tol=1e-4, element_types=None):
+                      max_iter=200, tol=1e-6, element_types=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
@@ -716,7 +716,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         print("  - Non-conservative flow field")
         print("  - Incorrect boundary identification")
         print("  - Numerical issues in the flow solution")
-
+        print(f"Try reducing the tolerance (tol) parameter. Current value: {tol:.6e}")
 
     return h, A, q_final, total_inflow
 
@@ -1987,7 +1987,7 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
     
     return ke
 
-def run_seepage_analysis(seep_data):
+def run_seepage_analysis(seep_data, tol=1e-6):
     """
     Standalone function to run seepage analysis.
     
@@ -2052,7 +2052,8 @@ def run_seepage_analysis(seep_data):
             k1_vals=k1,
             k2_vals=k2,
             angles=angle,
-            element_types=element_types
+            element_types=element_types,
+            tol=tol
         )
         # Solve for potential function φ for flow lines
         dirichlet_phi_bcs = create_flow_potential_bc(nodes, elements, q, element_types=element_types)

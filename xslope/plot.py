@@ -1890,7 +1890,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     plt.show()
 
 
-def plot_polygons(polygons, materials=None, title="Material Zone Polygons", save_png=False, dpi=300):
+def plot_polygons(polygons, materials=None, nodes=False, title="Material Zone Polygons", save_png=False, dpi=300):
     """
     Plot all material zone polygons in a single figure.
     
@@ -1898,6 +1898,7 @@ def plot_polygons(polygons, materials=None, title="Material Zone Polygons", save
         polygons: List of polygon coordinate lists
         materials: Optional list of material dicts (with key "name") or list of material
             name strings. If provided, the material name will be used in the legend.
+        nodes: If True, plot each polygon vertex as a dot.
         title: Plot title
     """
     import matplotlib.pyplot as plt
@@ -1916,6 +1917,9 @@ def plot_polygons(polygons, materials=None, title="Material Zone Polygons", save
         label = mat_name if mat_name else f"Material {i}"
         ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=label)
         ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
+        if nodes:
+            # Avoid legend clutter by not adding a label here.
+            ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3)
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
     ax.set_title(title)

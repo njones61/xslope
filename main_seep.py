@@ -12,7 +12,7 @@ plot_inputs(slope_data, figsize=(10, 8), mode='seep', mat_table=False, tab_loc='
 
 polygons = build_polygons(slope_data, debug=True)
 
-plot_polygons(polygons, materials=slope_data['materials'], save_png=True)
+plot_polygons(polygons, materials=slope_data['materials'], title="Lost Lake", nodes=False, save_png=True)
 # plot_polygons_separately(polygons, materials=slope_data['materials'], save_png=True)
 
 # find the x-range of the ground_surface and use it to set the target size

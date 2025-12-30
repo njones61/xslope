@@ -1890,12 +1890,14 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     plt.show()
 
 
-def plot_polygons(polygons, title="Material Zone Polygons", save_png=False, dpi=300):
+def plot_polygons(polygons, materials=None, title="Material Zone Polygons", save_png=False, dpi=300):
     """
     Plot all material zone polygons in a single figure.
     
     Parameters:
         polygons: List of polygon coordinate lists
+        materials: Optional list of material dicts (with key "name") or list of material
+            name strings. If provided, the material name will be used in the legend.
         title: Plot title
     """
     import matplotlib.pyplot as plt
@@ -1904,7 +1906,15 @@ def plot_polygons(polygons, title="Material Zone Polygons", save_png=False, dpi=
     for i, polygon in enumerate(polygons):
         xs = [x for x, y in polygon]
         ys = [y for x, y in polygon]
-        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=f'Material {i}')
+        mat_name = None
+        if materials is not None and i < len(materials):
+            item = materials[i]
+            if isinstance(item, dict):
+                mat_name = item.get("name", None)
+            elif isinstance(item, str):
+                mat_name = item
+        label = mat_name if mat_name else f"Material {i}"
+        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=label)
         ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
@@ -1921,13 +1931,14 @@ def plot_polygons(polygons, title="Material Zone Polygons", save_png=False, dpi=
     plt.show()
 
 
-def plot_polygons_separately(polygons, title_prefix='Material Zone', save_png=False, dpi=300):
+def plot_polygons_separately(polygons, materials=None, save_png=False, dpi=300):
     """
     Plot each polygon in a separate matplotlib frame (subplot), with vertices as round dots.
     
     Parameters:
         polygons: List of polygon coordinate lists
-        title_prefix: Prefix for each subplot title
+        materials: Optional list of material dicts (with key "name") or list of material
+            name strings. If provided, the material name will be included in each subplot title.
     """
     import matplotlib.pyplot as plt
     
@@ -1942,7 +1953,17 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone', save_png=Fa
         ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3, label='Vertices')
         ax.set_xlabel('X Coordinate')
         ax.set_ylabel('Y Coordinate')
-        ax.set_title(f'{title_prefix} {i}')
+        mat_name = None
+        if materials is not None and i < len(materials):
+            item = materials[i]
+            if isinstance(item, dict):
+                mat_name = item.get("name", None)
+            elif isinstance(item, str):
+                mat_name = item
+        if mat_name:
+            ax.set_title(f'Material {i}: {mat_name}')
+        else:
+            ax.set_title(f'Material {i}')
         ax.grid(True, alpha=0.3)
         ax.set_aspect('equal')
         # Intentionally no legend: these plots are typically used for debugging geometry,
@@ -1950,7 +1971,7 @@ def plot_polygons_separately(polygons, title_prefix='Material Zone', save_png=Fa
     plt.tight_layout()
     
     if save_png:
-        filename = 'plot_' + title_prefix.lower().replace(' ', '_').replace(':', '').replace(',', '') + '_separate.png'
+        filename = 'plot_polygons_separately.png'
         plt.savefig(filename, dpi=dpi, bbox_inches='tight')
     
     plt.show()

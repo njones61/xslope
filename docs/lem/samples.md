@@ -14,5 +14,5 @@
 
 This notebook is for running basic limit equilibrium analysis with any of the standard methods using either a single solution for the starting circular or non-circular failure surface or for running an automated search for the critical failure surface.
 
-<a href="https://colab.research.google.com/github/njones61/xslope/blob/main/docs/lim_eq/xslope_lem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<a href="https://colab.research.google.com/github/njones61/xslope/blob/main/docs/lem/xslope_lem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 

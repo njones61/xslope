@@ -210,3 +210,130 @@ Rapid drawdown analysis represents a specialized application that can use any of
 
 XSLOPE includes an option to perform a reliability analysis with any of the supported limit equilibrium methods. Rather than finding a single factor of safety, selected inputs are perturbed and the critical factor of safety is computed for each combination of inputs allowing the computation of a probability of failure. [Documentation](reliability.md)
 
+## Code Examples and Usage
+
+To perform a limit equilibrium analsysi in XSLOPE, the user must first define the slope geometry, material properties, distributed loads, etc using the Excel Input Template as described in the [Input Template](../usage/input_template.md) page. The input template can then be loaded into Python using the 'load_slope_data' function. This function loads the input file and returns a dictionary containing the data from each sheet. The data can then be accessed using the sheet name as the key. For example:
+
+```python
+import xslope as xslope
+from xslope.fileio import load_slope_data
+
+data = load_slope_data("input_template.xlsx")
+profile_lines = data["profile_lines"]
+materials = data["materials"]
+piezo_line = data["piezo_line"]
+gamma_w = data["gamma_water"]
+circle = data["circles"][0]  # or whichever one you want
+non_circ = data["non_circ"]
+dloads = data["dloads"]
+max_depth = data["max_depth"]
+reinforce_lines = data["reinforce_lines"]
+```
+However, you don't normally need to access the data directly. In most cases you simply load the slope data and display it as 
+follows:
+
+```python
+import xslope as xslope
+from xslope.fileio import load_slope_data
+from xslope.plot import lot_inputs,
+
+slope_data = load_slope_data(file_name)
+plot_inputs(slope_data)
+```
+This loads the slope data into a dictionary and displays the inputs as follows:
+
+![xslope_inputs.png](images/xslope_inputs.png)
+
+The next is to select the method you want to use for the analysis. You can choose to perform a single analysis for a 
+selected failure surface or perform an exhaustive search to find the surface with the lowest or critical factor of 
+safety. If you are performing a single analysis, your first build a set of slices using the 'generate_slices' function. 
+This function takes the slope data and the failure surface you want to analyze as inputs and returns a set of 
+slices in a pandas DataFrame. These slices are then passed to the 'solve_selected' function along with a string 
+defining the method to be used ("oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"). This function 
+returns a dictionary containing the results of the analysis which can then be plotted using the 'plot_solution' 
+function. For example:
+
+```python
+import xslope as xslope
+from xslope.slice import generate_slices
+from xslope.plot import plot_solution
+from xslope.solve import solve_selected
+
+circle = slope_data['circles'][0] if slope_data['circular'] else None
+on_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
+success, result = generate_slices(slope_data, circle=circle, non_circ=non_circ, num_slices=num_slices)
+if success:
+  slice_df, failure_surface = result
+  results = solve_selected(method, slice_df, rapid=rapid_drawdown)
+  plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
+else:
+  print(result)
+  exit()
+```
+
+The 'plot_solution' function takes the slope data, the slices, the failure surface, and the results of the analysis 
+as inputs and plots the results. The results are displayed as follows:
+
+![xslope_results_single.png](images/xslope_results_single.png)
+
+To perform an automated search for the critical factor of safety, you can use the 'circular_search' function for 
+circular failure surfaces or the 'non_circular_search' function for non-circular failure surfaces. This function 
+takes the slope data, the method string, and flag for the rapid drawdown analysis as inputs and returns a dictionary 
+containing the results of the analysis. The results are then plotted using the 'circular_search_results' or 
+'non_circular_search_results' functions. You can also plot the results for the critical circle using the 
+`plot_solution` function. For 
+example:
+
+```python
+import xslope as xslope
+from xslope.plot import plot_circular_search_results, plot_noncircular_search_results
+from xslope.solve import solve_all
+from xslope.search import circular_search, noncircular_search
+
+if surface_type == "circular":
+  fs_cache, converged, search_path = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
+  plot_circular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
+else:
+  fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
+  plot_noncircular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
+
+```
+The results are displayed as follows:
+
+![xslope_results_search.png](images/xslope_results_search.png)
+
+You can also extract the critical factor of safety from the results dictionary as follows:
+
+```python
+import xslope as xslope
+from xslope.plot import plot_solution
+
+critical_surface = fs_cache[0]
+slice_df = critical_surface['slices']
+failure_surface = critical_surface['failure_surface']
+results = critical_surface['solver_result']
+plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
+```
+The results are displayed as follows:
+
+![xslope_results_search2.png](images/xslope_results_search2.png)
+
+To perform a reliability analysis, you can use the 'reliability_analysis' function. The input template should 
+include a set of standard deviations for each of the material properties. The results are then plotted using the 
+'plot_reliability_results' function. For example:
+
+```python
+import xslope as xslope
+from xslope.advanced import reliability
+from xslope.plot import plot_reliability_results
+
+circular = (surface_type == "circular")
+  success, result = reliability_analysis(slope_data, method, rapid=rapid_drawdown, circular=circular, debug_level=1)
+if success:
+  plot_reliability_results(slope_data, result, save_png=save_png)
+else:
+  print(f"Reliability analysis failed: {result}")
+```
+
+You can find a Google Colab notebook with the code examples and usage and a set of sample problems in the [Sample 
+Problems](samples.md) page.

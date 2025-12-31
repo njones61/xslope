@@ -29,8 +29,8 @@ plugins:
 nav:
   - Home: index.md
   - Usage Guide:
-    - General Features: usage/features.md
-    - Code Structure: usage/structure.md
+    - Installation: usage/installation.md
+    - Input Template: usage/input_template.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

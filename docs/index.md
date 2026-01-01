@@ -1,8 +1,8 @@
 # XSLOPE
 
-**xslope** is a comprehensive Python package for geotechnical slope stability and seepage analysis. Available on [PyPI](https://pypi.org/project/xslope/), it provides integrated tools for limit equilibrium slope stability analysis, finite element seepage analysis, and finite element-based slope stability analysis.
+**xslope** is a comprehensive Python package for geotechnical slope stability and seepage analysis. Available on [PyPI](https://pypi.org/project/xslope/){target="blank} and [github](https://github.com/njones61/xslope){target="blank}, it provides integrated tools for limit equilibrium slope stability analysis, finite element seepage analysis, and finite element-based slope stability analysis. The package uses an Excel-based input template system, making it accessible to practitioners familiar with spreadsheet workflows while leveraging the power of Python for computational analysis and visualization.
 
-The package uses an Excel-based input template system, making it accessible to practitioners familiar with spreadsheet workflows while leveraging the power of Python for computational analysis and visualization.
+The xslope software was developed by Norman L Jones, PhD. Jones, a professor in the Civil and Construction Engineering Department at [Brigham Young University](https://cce.byu.edu/){target="blank} and a principal at [Jones Geoscience LLC](https://jonesgeo.com/){target="blank}. Prof. Jones earned his PhD at the University of Texas where his PhD advisor was the world-renowned slope stability expert, [Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank}. He has been on the faculty at BYU for 34 years where he has taught _CE 544 - Seepage and Slope Stability Analysis_. This course curriculum is built around the xslope software and is publically available [here](https://byu-ce544.readthedocs.io/en/latest/){target="blank}.
 
 ## Limit Equilibrium Slope Stability Analysis
 
@@ -25,15 +25,11 @@ Beyond single surface analysis, xslope includes automated search algorithms that
 
 ## Finite Element Seepage Analysis
 
-Pore water pressures play a critical role in slope stability, yet they are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions.
-
-xslope addresses this challenge by providing comprehensive finite element seepage analysis capabilities that solve the complete groundwater flow equation throughout the slope domain. The package generates finite element meshes directly from the slope geometry defined in the Excel template, computes spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions, and seamlessly integrates these results into slope stability calculations. Both saturated and unsaturated flow problems can be simulated, with the system automatically selecting the appropriate solution algorithm based on boundary conditions.
+Pore water pressures play a critical role in slope stability, yet they are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions. xslope addresses this challenge by providing comprehensive finite element seepage analysis capabilities that solve the complete groundwater flow equation throughout the slope domain. The package generates finite element meshes directly from the slope geometry defined in the Excel template, computes spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions, and seamlessly integrates these results into slope stability calculations. Both saturated and unsaturated flow problems can be simulated, with the system automatically selecting the appropriate solution algorithm based on boundary conditions.
 
 ![johnson_res_solution.png](seepage/images/johnson_res_solution.png){width="1200"}
 
 Beyond slope stability applications, xslope can be used as a standalone 2D groundwater flow analysis package for a wide range of seepage problems. This includes analysis of earth dams, excavations, foundation seepage, flow under sheetpiles, and other civil engineering applications where groundwater flow patterns need to be characterized. The Excel template-based workflow makes it straightforward to set up complex seepage problems with multiple material zones and boundary conditions.
-
-![clay_blanket_solution.png](seepage/images/clay_blanket_solution.png){width="1200"}
 
 ## Finite Element Slope Stability Analysis
 
@@ -47,3 +43,7 @@ xslope implements finite element slope stability analysis using an elastic-perfe
 The finite element implementation seamlessly integrates with xslope's existing seepage analysis capabilities, enabling coupled stress-seepage analysis for slopes under varying groundwater conditions. Soil reinforcement systems including geotextiles, soil nails, and ground anchors are modeled using embedded truss elements that capture both material tensile strength and pullout resistance. Seismic loading is incorporated through the pseudo-static method, representing earthquake forces as equivalent static body forces throughout the slope mass.
 
 All finite element analysis capabilities use the same Excel input template system as the limit equilibrium and seepage modules, with additional material properties (Young's modulus, Poisson's ratio) and reinforcement parameters (cross-sectional area, elastic modulus, pullout lengths) specified in dedicated columns of the existing tables. This unified input framework ensures consistency across all analysis types while minimizing the learning curve for users already familiar with xslope's limit equilibrium capabilities.
+
+## Licensing
+
+xslope is released as open source software under the Apache License 2.0, a permissive license that allows both commercial and private use while fostering collaboration and innovation in the geotechnical engineering community. The Apache license grants users the freedom to use, modify, and distribute the software with minimal restrictions, requiring only preservation of copyright and license notices. It provides express patent protection, ensuring contributors grant patent rights to users, and allows derivative works to be distributed under different terms. This licensing approach encourages widespread adoption in both academic research and professional practice while maintaining attribution to the original developers.

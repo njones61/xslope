@@ -226,7 +226,7 @@ def build_fem_data(slope_data, mesh=None):
                     u[i] = 0.0
     
     elif pp_option == "seep":
-        # Use existing seepage solution
+        # Use existing seep solution
         if "seepage_solution" in slope_data:
             seepage_solution = slope_data["seepage_solution"]
             if isinstance(seepage_solution, np.ndarray) and len(seepage_solution) == n_nodes:

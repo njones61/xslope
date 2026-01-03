@@ -36,8 +36,8 @@ mkdocs serve  # For local development server
 python main_fileio_test.py    # Test file I/O functions
 python main_mesh.py           # Test mesh operations
 python main_search.py         # Test search algorithms
-python main_seep.py           # Test seepage analysis
-python main_seep2d.py         # Test 2D seepage analysis
+python main_seep.py           # Test seep analysis
+python main_seep2d.py         # Test 2D seep analysis
 ```
 
 ## Code Architecture

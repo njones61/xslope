@@ -926,7 +926,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             else:
                 u = 0
                 
-            # Check for second seepage solution (rapid drawdown)
+            # Check for second seep solution (rapid drawdown)
             if 'seep_u2' in data:
                 seep_mesh = data['seep_mesh']
                 seep_u2 = data['seep_u2']

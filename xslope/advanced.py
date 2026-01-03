@@ -23,7 +23,7 @@ def rapid_drawdown(df, method_name, debug_level=1):
     Performs rapid drawdown analysis using a three-stage approach.
     
     Parameters:
-        df : pandas.DataFrame
+        df: pandas.DataFrame
             Slice data with all required columns including rapid drawdown specific data:
             - c, phi: current strength parameters
             - c1, phi1: original strength parameters (for stage 3)
@@ -32,9 +32,9 @@ def rapid_drawdown(df, method_name, debug_level=1):
             - u2: pore pressure for lowered pool (stage 2)
             - dload, d_x, d_y: distributed loads (stage 1)
             - dload2, d_x2, d_y2: distributed loads for lowered pool (stage 2)
-        method_name : str
+        method_name: str
             The method name to use ('oms', 'bishop', 'spencer', etc.)
-        debug_level : int
+        debug_level: int
             0: no output, 1: print FS at each stage, >1: detailed debug info
     
     Returns:

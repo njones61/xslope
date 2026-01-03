@@ -43,10 +43,10 @@ nav:
     - Reliability Analysis: lem/reliability.md
     - Sample Problems: lem/samples.md
   - Seepage Analysis:
-    - Overview: seepage/overview.md
-    - Problem Setup: seepage/setup.md
-    - Pore pressures: seepage/pore.md
-    - Sample Problems: seepage/samples.md
+    - Overview: seep/overview.md
+    - Problem Setup: seep/setup.md
+    - Pore pressures: seep/pore.md
+    - Sample Problems: seep/samples.md
   - Finite Element Method:
     - Overview: fem/overview.md
     - Mesh Generation: fem/mesh.md

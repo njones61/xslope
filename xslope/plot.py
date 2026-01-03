@@ -220,7 +220,7 @@ def plot_piezo_line(ax, slope_data):
 
 def plot_seepage_bc_lines(ax, slope_data):
     """
-    Plots seepage boundary-condition lines for seepage-only workflows.
+    Plots seep boundary-condition lines for seep-only workflows.
 
     - Specified head geometry: solid dark blue, thicker than profile lines
     - Exit face geometry: solid red
@@ -687,14 +687,14 @@ def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
 
 def plot_seep_material_table(ax, seep_data, xloc=0.6, yloc=0.7):
     """
-    Adds a seepage material properties table to the plot.
+    Adds a seep material properties table to the plot.
 
-    Displays hydraulic properties for seepage analysis including hydraulic conductivities
+    Displays hydraulic properties for seep analysis including hydraulic conductivities
     (k₁, k₂), anisotropy angle, and unsaturated flow parameters (kr₀, h₀).
 
     Parameters:
         ax: matplotlib Axes object to add the table to
-        seep_data: Dictionary containing seepage material properties with keys:
+        seep_data: Dictionary containing seep material properties with keys:
             - 'k1_by_mat': List of primary hydraulic conductivity values (float)
             - 'k2_by_mat': List of secondary hydraulic conductivity values (float)
             - 'angle_by_mat': List of anisotropy angles in degrees (float)

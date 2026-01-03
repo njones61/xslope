@@ -10,7 +10,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     Supports both triangular and quadrilateral elements.
     
     Args:
-        seep_data: Dictionary containing seepage data from import_seep2d
+        seep_data: Dictionary containing seep data from import_seep2d
         show_nodes: If True, plot node points
         show_bc: If True, plot boundary condition nodes
         label_elements: If True, label each element with its number at its centroid
@@ -225,9 +225,9 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
 
 def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, dpi=300):
     """
-    Plot seepage analysis results including head contours, flowlines, and phreatic surface.
+    Plot seep analysis results including head contours, flowlines, and phreatic surface.
     
-    This function visualizes the results of a seepage analysis by plotting contours of various
+    This function visualizes the results of a seep analysis by plotting contours of various
     nodal variables (head, pore pressure, velocity magnitude, or gradient magnitude). When
     plotting head, flowlines are also overlaid. The plot properly handles mesh aspect ratios
     and supports both linear and quadratic triangular and quadrilateral elements.
@@ -235,7 +235,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     Parameters:
     -----------
     seep_data : dict
-        Dictionary containing seepage mesh data from import_seep2d. Required keys include:
+        Dictionary containing seep mesh data from import_seep2d. Required keys include:
         'nodes', 'elements', 'element_materials', 'element_types' (optional), and
         'k1_by_mat' (optional, for flowline calculation).
     solution : dict

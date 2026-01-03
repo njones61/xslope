@@ -27,7 +27,7 @@ Beyond single surface analysis, xslope includes automated search algorithms that
 
 Pore water pressures play a critical role in slope stability, yet they are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions. xslope addresses this challenge by providing comprehensive finite element seepage analysis capabilities that solve the complete groundwater flow equation throughout the slope domain. The package generates finite element meshes directly from the slope geometry defined in the Excel template, computes spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions, and seamlessly integrates these results into slope stability calculations. Both saturated and unsaturated flow problems can be simulated, with the system automatically selecting the appropriate solution algorithm based on boundary conditions.
 
-![johnson_res_solution.png](seepage/images/johnson_res_solution.png){width="1200"}
+![johnson_res_solution.png](seep/images/johnson_res_solution.png){width="1200"}
 
 Beyond slope stability applications, xslope can be used as a standalone 2D groundwater flow analysis package for a wide range of seepage problems. This includes analysis of earth dams, excavations, foundation seepage, flow under sheetpiles, and other civil engineering applications where groundwater flow patterns need to be characterized. The Excel template-based workflow makes it straightforward to set up complex seepage problems with multiple material zones and boundary conditions.
 

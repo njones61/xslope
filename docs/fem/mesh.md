@@ -488,7 +488,7 @@ from seep import setup_seepage_boundary_conditions, solve_confined
 import numpy as np
 
 def create_slope_mesh_workflow():
-    """Complete workflow for slope mesh generation and seepage analysis."""
+    """Complete workflow for slope mesh generation and seep analysis."""
     
     # Step 1: Load slope geometry
     print("Loading slope geometry...")
@@ -535,13 +535,13 @@ def create_slope_mesh_workflow():
     if 'elements_1d' in mesh:
         print(f"  1D Elements: {len(mesh['elements_1d'])}")
     
-    # Step 6: Setup seepage boundary conditions
-    print("Setting up seepage analysis...")
+    # Step 6: Setup seep boundary conditions
+    print("Setting up seep analysis...")
     bc_type, dirichlet_bcs = setup_seepage_boundary_conditions(
         nodes, slope_data
     )
     
-    # Step 7: Solve seepage problem
+    # Step 7: Solve seep problem
     material_props = slope_data.get('materials', {})
     k1_vals = np.array([mat.get('k1', 1e-6) for mat in material_props.values()])
     k2_vals = np.array([mat.get('k2', 1e-6) for mat in material_props.values()])
@@ -567,7 +567,7 @@ if __name__ == "__main__":
 from plot import plot_mesh, plot_seepage_results
 
 def visualize_mesh_and_results(mesh, heads):
-    """Visualize mesh and seepage results."""
+    """Visualize mesh and seep results."""
     
     # Plot mesh with material zones
     plot_mesh(
@@ -579,7 +579,7 @@ def visualize_mesh_and_results(mesh, heads):
         show_element_numbers=False
     )
     
-    # Plot seepage results
+    # Plot seep results
     if 'elements_1d' in mesh:
         plot_seepage_results(
             mesh['nodes'], 

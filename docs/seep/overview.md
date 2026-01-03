@@ -398,7 +398,7 @@ slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
 # Generate material zone polygons from profile lines
 polygons = build_polygons(slope_data, debug=True)
 
-# Create finite element mesh optimized for seepage analysis
+# Create finite element mesh optimized for seep analysis
 mesh = build_mesh_from_polygons(
     polygons=polygons,
     target_size=2.0,        # Element size in model units
@@ -408,7 +408,7 @@ mesh = build_mesh_from_polygons(
 
 print(f"Generated mesh: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements")
 
-# Build seepage analysis data structure
+# Build seep analysis data structure
 seep_data = build_seep_data(mesh, slope_data)
 
 # Visualize mesh and boundary conditions
@@ -420,7 +420,7 @@ plot_seep_data(
     alpha=0.4
 )
 
-# Solve seepage problem
+# Solve seep problem
 solution = run_seepage_analysis(seep_data)
 
 print(f"Seepage analysis complete!")
@@ -464,7 +464,7 @@ plot_seep_data(
     label_nodes=False
 )
 
-# Run seepage analysis
+# Run seep analysis
 solution = run_seepage_analysis(seep_data)
 
 # Plot results with customized visualization
@@ -489,7 +489,7 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 
 def parametric_seepage_study():
-    """Perform parametric study of permeability effects on seepage."""
+    """Perform parametric study of permeability effects on seep."""
     
     # Base case setup
     slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
@@ -510,7 +510,7 @@ def parametric_seepage_study():
             modified_data['materials'][0]['k1'] *= k_ratio
             modified_data['materials'][0]['k2'] *= k_ratio
         
-        # Build seepage data and solve
+        # Build seep data and solve
         seep_data = build_seep_data(mesh, modified_data)
         solution = run_seepage_analysis(seep_data)
         
@@ -547,18 +547,18 @@ from solve import bishop, spencer
 from plot import plot_solution
 
 def coupled_seepage_stability_analysis():
-    """Perform coupled seepage-stability analysis."""
+    """Perform coupled seep-stability analysis."""
     
     # Load and prepare slope data
     slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
     
-    # Generate seepage mesh and solve
+    # Generate seep mesh and solve
     polygons = build_polygons(slope_data)
     mesh = build_mesh_from_polygons(polygons, target_size=1.5, element_type='tri6')
     seep_data = build_seep_data(mesh, slope_data)
     seepage_solution = run_seepage_analysis(seep_data)
     
-    # Store seepage results in slope_data for limit equilibrium analysis
+    # Store seep results in slope_data for limit equilibrium analysis
     slope_data['seep_mesh'] = mesh
     slope_data['seep_u'] = seepage_solution['head']  # Will be converted to pore pressures
     
@@ -599,7 +599,7 @@ def coupled_seepage_stability_analysis():
         plot_solution(slice_df, result_bishop, slope_data, failure_surface, 
                      title="Coupled Seepage-Stability Analysis (Bishop)")
     
-    # Plot seepage solution for comparison
+    # Plot seep solution for comparison
     plot_seep_solution(seep_data, seepage_solution, 
                       title="Seepage Analysis - Pore Pressures for Stability Analysis")
     
@@ -629,13 +629,13 @@ def export_seepage_results():
     export_mesh_to_json(mesh, "outputs/seepage_mesh.json")
     print("Exported mesh to outputs/seepage_mesh.json")
     
-    # Export seepage solution for limit equilibrium analysis
+    # Export seep solution for limit equilibrium analysis
     export_seep_solution(seep_data, solution, "outputs/seepage_solution.csv")
     print("Exported solution to outputs/seepage_solution.csv")
     
-    # Save complete seepage data structure
+    # Save complete seep data structure
     save_seep_data_to_json(seep_data, "outputs/seep_data.json")
-    print("Exported complete seepage data to outputs/seep_data.json")
+    print("Exported complete seep data to outputs/seep_data.json")
     
     # Plot 1: Mesh with boundary conditions
     plot_seep_data(seep_data, show_bc=True, material_table=True)

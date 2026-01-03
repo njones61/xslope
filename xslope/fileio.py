@@ -203,7 +203,7 @@ def load_slope_data(filepath):
             )
 
         row = mat_df.iloc[i]
-        # For seepage workflows, 'g' (unit weight) and shear strength properties are not required.
+        # For seep workflows, 'g' (unit weight) and shear strength properties are not required.
         # A material row is considered "missing" only if Excel columns C:X are empty.
         # (Excel A:B are number and name; C:X contain the actual property fields.)
         start_col = 2  # C
@@ -242,7 +242,7 @@ def load_slope_data(filepath):
         })
 
     # === SEEPAGE ANALYSIS FILES ===
-    # Check if any materials use seepage analysis for pore pressure
+    # Check if any materials use seep analysis for pore pressure
     has_seep_materials = any(material["u"] == "seep" for material in materials)
     
     seep_mesh = None
@@ -250,7 +250,7 @@ def load_slope_data(filepath):
     seep_u2 = None
     
     if has_seep_materials:
-        # Read seepage file names directly from Excel cells L22, L23, L24
+        # Read seep file names directly from Excel cells L22, L23, L24
         try:
             # Read the 'mat' sheet directly without header parsing
             mat_raw_df = xls.parse('mat', header=None)
@@ -633,12 +633,12 @@ def load_slope_data(filepath):
     # === VALIDATION ===
  
     circular = len(circles) > 0
-    # Check if this is a seepage-only analysis (has seepage BCs but no slope stability surfaces)
+    # Check if this is a seep-only analysis (has seep BCs but no slope stability surfaces)
     has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or 
                      len(seepage_bc.get("exit_face", [])) > 0)
     is_seepage_only = has_seepage_bc and not circular and len(non_circ) == 0
     
-    # Only require circular/non-circular data if this is NOT a seepage-only analysis
+    # Only require circular/non-circular data if this is NOT a seep-only analysis
     if not is_seepage_only and not circular and len(non_circ) == 0:
         raise ValueError("Input must include either circular or non-circular surface data.")
     if not profile_lines:
@@ -671,7 +671,7 @@ def load_slope_data(filepath):
     globals_data["seepage_bc"] = seepage_bc
     globals_data["seepage_bc2"] = seepage_bc2
     
-    # Add seepage data if available
+    # Add seep data if available
     if has_seep_materials:
         globals_data["seep_mesh"] = seep_mesh
         globals_data["seep_u"] = seep_u

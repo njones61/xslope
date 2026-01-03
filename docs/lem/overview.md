@@ -30,7 +30,7 @@ where $\Delta y$ is the distance from the piezometric line to the point in quest
 
 ![piezo_line.png](images/piezo_line.png){width="700px"}
 
-The pore pressures can also be derived from a 2D finite element seepage analysis of the slope using the [seepage tools](../seepage/overview.md) in XSLOPE. In this case, the pore pressure at a point is interpolated from the nodes of the element containing the point using the element basis functions. This is the most accurate way to obtain pore pressures.  
+The pore pressures can also be derived from a 2D finite element seepage analysis of the slope using the [seepage tools](../seep/overview.md) in XSLOPE. In this case, the pore pressure at a point is interpolated from the nodes of the element containing the point using the element basis functions. This is the most accurate way to obtain pore pressures.  
 
 ## Developed Shear Strength
 

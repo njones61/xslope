@@ -24,13 +24,13 @@ def build_seep_data(mesh, slope_data):
     Build a seep_data dictionary from a mesh and data dictionary.
     
     This function takes a mesh dictionary (from build_mesh_from_polygons) and a data dictionary
-    (from load_slope_data) and constructs a seep_data dictionary suitable for seepage analysis.
+    (from load_slope_data) and constructs a seep_data dictionary suitable for seep analysis.
     
     The function:
     1. Extracts mesh information (nodes, elements, element types, element materials)
     2. Builds material property arrays (k1, k2, alpha, kr0, h0) from the materials table
     3. Constructs boundary conditions by finding nodes that intersect with specified head
-       and seepage face lines from the data dictionary
+       and seep face lines from the data dictionary
     
     Parameters:
         mesh (dict): Mesh dictionary from build_mesh_from_polygons containing:
@@ -122,7 +122,7 @@ def build_seep_data(mesh, slope_data):
                 bc_type[i] = 1  # Fixed head
                 bc_values[i] = head_value
     
-    # Process seepage face (exit face) boundary conditions
+    # Process seep face (exit face) boundary conditions
     exit_face_coords = seepage_bc.get("exit_face", [])
     if len(exit_face_coords) >= 2:
         # Create LineString from exit face coordinates
@@ -286,7 +286,7 @@ def import_seep2d(filepath):
 
 def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, angles=None, element_types=None):
     """
-    FEM solver for confined seepage with anisotropic conductivity.
+    FEM solver for confined seep with anisotropic conductivity.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
     
     Parameters:
@@ -1989,10 +1989,10 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
 
 def run_seepage_analysis(seep_data, tol=1e-6):
     """
-    Standalone function to run seepage analysis.
+    Standalone function to run seep analysis.
     
     Args:
-        seep_data: Dictionary containing all the seepage data 
+        seep_data: Dictionary containing all the seep data
     
     Returns:
         Dictionary containing solution results with the following keys:
@@ -2023,7 +2023,7 @@ def run_seepage_analysis(seep_data, tol=1e-6):
     # Determine if unconfined flow
     is_unconfined = np.any(bc_type == 2)
     flow_type = "unconfined" if is_unconfined else "confined"
-    print(f"Solving {flow_type.upper()} seepage problem...")
+    print(f"Solving {flow_type.upper()} seep problem...")
     print("Number of fixed-head nodes:", np.sum(bc_type == 1))
     print("Number of exit face nodes:", np.sum(bc_type == 2))
 
@@ -2110,7 +2110,7 @@ def export_seep_solution(seep_data, solution, filename):
     
     Args:
         filename: Path to the output CSV file
-        seep_data: Dictionary containing seepage data 
+        seep_data: Dictionary containing seep data
         solution: Dictionary containing solution results from run_seepage_analysis
     """
     import pandas as pd
@@ -2140,7 +2140,7 @@ def print_seep_data_diagnostics(seep_data):
     Diagnostic function to print out the contents of seep_data after loading.
     
     Args:
-        seep_data: Dictionary containing seepage data 
+        seep_data: Dictionary containing seep data
     """
     print("\n" + "="*60)
     print("SEEP DATA DIAGNOSTICS")

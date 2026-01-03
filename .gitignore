@@ -1,5 +1,5 @@
+# macOS
 .DS_Store
-*/.DS_Store
 **/.DS_Store
 
 # Python virtual environment
@@ -20,8 +20,6 @@ __pycache__/
 .idea/
 *.swp
 *.swo
-.DS_Store
-docs/.DS_Store
 
 # Build artifacts
 dist/
@@ -30,6 +28,3 @@ build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.DS_Store
-docs/.DS_Store
-inputs/.DS_Store

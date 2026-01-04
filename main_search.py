@@ -6,7 +6,7 @@ from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_kara
 from xslope.search import circular_search, noncircular_search
 
 
-slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
+slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx")
 
 # Run non-circular search
 # fs_cache, converged, search_path = noncircular_search(slope_data, 'corps_engineers', diagnostic=False)

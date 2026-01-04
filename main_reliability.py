@@ -3,7 +3,7 @@ from xslope.plot import plot_reliability_results
 from xslope.advanced import reliability
 
 # Load slope data
-slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
+slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx")
 
 # Run reliability analysis with Spencer method
 print("Running reliability analysis with Spencer method...")

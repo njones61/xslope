@@ -7,7 +7,7 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
+slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx")
 plot_inputs(slope_data, mode='lem', tab_loc='top')
 
 method = "bishop" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]

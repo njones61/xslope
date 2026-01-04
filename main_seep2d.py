@@ -5,7 +5,7 @@ from xslope.seep import import_seep2d, run_seepage_analysis, print_seep_data_dia
 
 
 # Load input
-seep_data = import_seep2d("inputs/seep/lface.s2d")
+seep_data = import_seep2d("docs/inputs/seep/lface.s2d")
 
 # Print diagnostics
 print_seep_data_diagnostics(seep_data)

@@ -23,7 +23,7 @@ def test_griffiths_example1():
     print("Slope: φ=20°, c/γH=0.05, angle=26.57° (2:1)")
     
     # Load Griffiths Example 1
-    slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
+    slope_data = load_slope_data("docs/inputs/slope/input_template_griffiths1_6.xlsx")
     
     # Build mesh with 8-node quadrilaterals
     polygons = build_polygons(slope_data)

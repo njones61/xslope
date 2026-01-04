@@ -1,7 +1,7 @@
 
 from xslope.fileio import load_slope_data
 
-filepath = "inputs/slope/input_template_MASTER5.xlsx"  # Replace with full path if needed
+filepath = "docs/inputs/slope/input_template_MASTER5.xlsx"  # Replace with full path if needed
 slope_data = load_slope_data(filepath)
 
 for key, value in slope_data.items():

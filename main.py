@@ -22,7 +22,7 @@ from xslope.solve import solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 
 
-slope_data = load_slope_data("inputs/slope/input_template_griffiths1_6.xlsx")
+slope_data = load_slope_data("docs/inputs/slope/input_template_griffiths1_6.xlsx")
 
 # plot_inputs(slope_data)
 

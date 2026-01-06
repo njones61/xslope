@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:scicomp.stackexchange.com)",
+      "WebFetch(domain:www.mathworks.com)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

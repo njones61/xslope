@@ -35,7 +35,7 @@ repository:
 
 To clone the repository, click on the green Code button and click the clipboard icon to copy the clone URL.
 
-![clone_repo.png](clone_repo.png)
+![clone_repo.png](images/clone_repo.png)
 
 Then, in your terminal, navigate to the directory where you want to clone the repository and run the following 
 command (you can either type the URL or paste it from the clipboard):

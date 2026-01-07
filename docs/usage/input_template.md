@@ -82,7 +82,9 @@ This worksheet is purely for quality control and visualization within the Excel 
 
 - Profile lines are correctly positioned and form a reasonable slope geometry
 - Piezometric lines are within the slope boundaries
-- Circular failure surfaces intersect the ground surface at reasonable locations
+- Distributed loads and seepage boundary conditions are at correct locations
+- Reinforcement lines are correctly positioned
+- etc.
 
 The plot is not used by xslope during analysis - it exists solely to help you validate your inputs before running 
 calculations. When working with complex multi-layer geometries or multiple water tables, this visual check can catch 
@@ -218,14 +220,11 @@ The **circles** worksheet defines circular failure surfaces for limit equilibriu
 the most common assumption in slope stability analysis and are required for methods like Bishop's Simplified Method 
 and Spencer's Method. XSLOPE supports up to 10 circular failure surfaces, each of which can be analyzed 
 individually, or used as starting points when searching for a critical failure surface with a mininum factor of 
-safety using an automated search algorithm. A common problem in limit equilibrium analysis is finding the critical 
-failure surface. The automated search algorithm sometimes converges to a location corresponding to a local minimum 
-of the factor of safety, but this location may not correspond to the global minimum. To find the critical surface, 
-it is common practice to start the search at multiple locations and then analyze the results to identify the 
-critical surface. XSLOPE automates this process by testing each of the defined circle locations when performing an 
-automated search and then continuing to iterate from the location with the lowest factor of safety.
+safety using an automated search algorithm.
 
-Each row specifies one circular failure surface with the following 
+![circles.png](images/circles.png)
+
+Each row in the circles table specifies one circular failure surface with the following 
 parameters:
 
 - **Xo, Yo**: Coordinates of the circle center
@@ -242,7 +241,12 @@ During a limit equilibrium (LEM) analysis, XSLOPE performs the following steps:
 3. Divides the arc into slices
 4. Assigns material properties to each slice based on its position
 
-When defining multiple circles, a good strategy is to start define one circle passing through the toe of the slope 
+A common problem in limit equilibrium analysis is finding the critical 
+failure surface. The automated search algorithm sometimes converges to a location corresponding to a local minimum 
+of the factor of safety, but this location may not correspond to the global minimum. To find the critical surface, 
+it is common practice to start the search at multiple locations and then analyze the results to identify the 
+critical surface. XSLOPE automates this process by testing each of the defined circle locations when performing an 
+automated search and then continuing to iterate from the location with the lowest factor of safety. When defining multiple circles, a good strategy is to start define one circle passing through the toe of the slope 
 (for steep slopes) and one circle at the base of each soil layer.
 
 ---

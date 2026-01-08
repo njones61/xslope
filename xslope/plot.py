@@ -1890,7 +1890,16 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     plt.show()
 
 
-def plot_polygons(polygons, materials=None, nodes=False, legend=True, title="Material Zone Polygons", save_png=False, dpi=300):
+def plot_polygons(
+    polygons,
+    materials=None,
+    nodes=False,
+    legend=True,
+    title="Material Zone Polygons",
+    figsize=(10, 6),
+    save_png=False,
+    dpi=300,
+):
     """
     Plot all material zone polygons in a single figure.
     
@@ -1901,10 +1910,11 @@ def plot_polygons(polygons, materials=None, nodes=False, legend=True, title="Mat
         nodes: If True, plot each polygon vertex as a dot.
         legend: If True, show the legend.
         title: Plot title
+        figsize: Matplotlib figure size tuple, e.g. (10, 6)
     """
     import matplotlib.pyplot as plt
     
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=figsize)
     for i, polygon in enumerate(polygons):
         xs = [x for x, y in polygon]
         ys = [y for x, y in polygon]

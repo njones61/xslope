@@ -11,7 +11,7 @@ slope_data = load_slope_data("docs/inputs/slope/xslope_lface6.xlsx")
 plot_inputs(slope_data, mode='lem', tab_loc='top')
 
 method = "bishop" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
-num_slices = 20 # @param {"type":"integer"}
+num_slices = 30 # @param {"type":"integer"}
 analysis_type = "single_surface" # @param ["single_surface","all_methods", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}

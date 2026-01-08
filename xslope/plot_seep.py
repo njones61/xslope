@@ -206,11 +206,11 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     num_triangles = np.sum(element_types == 3)
     num_quads = np.sum(element_types == 4)
     if num_triangles > 0 and num_quads > 0:
-        title = f"SEEP2D Mesh with Material Zones ({num_triangles} triangles, {num_quads} quads)"
+        title = f"Finite Element Mesh with Material Zones ({num_triangles} triangles, {num_quads} quads)"
     elif num_quads > 0:
-        title = f"SEEP2D Mesh with Material Zones ({num_quads} quadrilaterals)"
+        title = f"Finite Element Mesh with Material Zones ({num_quads} quadrilaterals)"
     else:
-        title = f"SEEP2D Mesh with Material Zones ({num_triangles} triangles)"
+        title = f"Finite Element Mesh with Material Zones ({num_triangles} triangles)"
     
     ax.set_title(title)
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion

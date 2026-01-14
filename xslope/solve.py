@@ -768,13 +768,17 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         """Compute Q and y_Q for given F and theta values."""
         # Equation (24): m_alpha
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
-        
+
         # Equation (23): Q
         Q = (- Fv * sin_a - Fh * cos_a - (c / F) * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p / F) * ma
-        
-        # Equation (26): y_Q
-        y_q = y_b + Mo / (Q * np.cos(theta_rad))
-        
+
+        # Equation (26): y_Q with numerical safeguard
+        # Add small epsilon to prevent divide-by-zero when Q * cos(theta) is very small
+        Q_cos_theta = Q * np.cos(theta_rad)
+        eps = 1e-10
+        safe_denom = np.where(np.abs(Q_cos_theta) < eps, eps * np.sign(Q_cos_theta + eps), Q_cos_theta)
+        y_q = y_b + Mo / safe_denom
+
         return Q, y_q
     
     def compute_residuals(F, theta_rad):
@@ -814,10 +818,18 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         dC3_dtheta = sin_alpha_theta  # Equation (55)
         dC4_dtheta = -cos_alpha_theta * tan_p  # Equation (56)
         dQ_dtheta = (-1 / denom_Q**2) * (C1 + C2 / F) * (dC3_dtheta + dC4_dtheta / F)
-        
+
         # Partial derivatives of y_Q (Equations 59-60)
-        dyQ_dF = (-1 / (Q * cos_theta)**2) * Mo * dQ_dF * cos_theta
-        dyQ_dtheta = (-1 / (Q * cos_theta)**2) * Mo * (dQ_dtheta * cos_theta - Q * sin_theta)
+        # Add numerical safeguard to prevent divide-by-zero when Q * cos_theta is very small
+        Q_cos_theta = Q * cos_theta
+        eps = 1e-10  # Small epsilon to prevent exact zero division
+
+        # Use np.where to handle element-wise operations safely
+        # Where |Q * cos_theta| < eps, set derivatives to a large value to signal ill-conditioning
+        safe_denom = np.where(np.abs(Q_cos_theta) < eps, eps * np.sign(Q_cos_theta + eps), Q_cos_theta)
+
+        dyQ_dF = (-1 / safe_denom**2) * Mo * dQ_dF * cos_theta
+        dyQ_dtheta = (-1 / safe_denom**2) * Mo * (dQ_dtheta * cos_theta - Q * sin_theta)
         
         # First-order partial derivatives of R1 (Equations 35-36)
         dR1_dF = np.sum(dQ_dF)

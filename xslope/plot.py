@@ -54,13 +54,14 @@ def get_dload_legend_handler():
     return None, dummy_line
 
 
-def plot_profile_lines(ax, profile_lines):
+def plot_profile_lines(ax, profile_lines, labels=False):
     """
     Plots the profile lines for each material in the slope.
 
     Parameters:
         ax: matplotlib Axes object
         profile_lines: List of line coordinates representing material boundaries
+        labels: If True, add index labels to each profile line (default: False)
 
     Returns:
         None
@@ -68,6 +69,112 @@ def plot_profile_lines(ax, profile_lines):
     for i, line in enumerate(profile_lines):
         xs, ys = zip(*line)
         ax.plot(xs, ys, color=get_material_color(i), linewidth=1, label=f'Profile {i+1}')
+
+        if labels:
+            _add_profile_index_label(ax, line, i + 1, get_material_color(i))
+
+
+def _add_profile_index_label(ax, line, index, color):
+    """
+    Adds an index label to a profile line, positioned on a suitable segment.
+
+    Parameters:
+        ax: matplotlib Axes object
+        line: List of (x, y) coordinates for the profile line
+        index: The index number to display (1-based)
+        color: Color for the label text
+
+    Returns:
+        None
+    """
+    if len(line) < 2:
+        return
+
+    # Build list of segments with their properties
+    segments = []
+    for j in range(len(line) - 1):
+        x1, y1 = line[j]
+        x2, y2 = line[j + 1]
+        dx = x2 - x1
+        dy = y2 - y1
+        length = np.sqrt(dx**2 + dy**2)
+
+        if length < 1e-9:
+            continue
+
+        # Calculate how horizontal the segment is (1.0 = perfectly horizontal)
+        horizontalness = abs(dx) / length
+
+        # Midpoint of the segment
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+
+        segments.append({
+            'length': length,
+            'horizontalness': horizontalness,
+            'mid_x': mid_x,
+            'mid_y': mid_y,
+            'position': j  # segment index in the line
+        })
+
+    if not segments:
+        return
+
+    # Calculate the total line length and find segments in the middle third
+    total_length = sum(s['length'] for s in segments)
+
+    # Score segments: prefer longer, more horizontal segments near the middle
+    # Avoid very short segments (less than 5% of total length)
+    min_length_threshold = 0.05 * total_length
+
+    n_segments = len(segments)
+    best_segment = None
+    best_score = -1
+
+    for seg in segments:
+        # Skip very short segments
+        if seg['length'] < min_length_threshold:
+            continue
+
+        # Calculate how close to the middle this segment is (0-1 scale, 1 = center)
+        position_ratio = (seg['position'] + 0.5) / n_segments
+        middle_score = 1.0 - 2.0 * abs(position_ratio - 0.5)  # 1.0 at center, 0.0 at ends
+
+        # Score: weight length, horizontalness, and middle position
+        # Length is normalized by total length
+        length_score = seg['length'] / total_length
+
+        # Combined score: prioritize horizontalness, then middle position, then length
+        score = (seg['horizontalness'] * 2.0 +
+                 middle_score * 1.5 +
+                 length_score * 1.0)
+
+        if score > best_score:
+            best_score = score
+            best_segment = seg
+
+    # Fallback: if no segment passed the threshold, use the longest one
+    if best_segment is None:
+        best_segment = max(segments, key=lambda s: s['length'])
+
+    # Place the label at the midpoint of the chosen segment
+    ax.text(
+        best_segment['mid_x'],
+        best_segment['mid_y'],
+        str(index),
+        fontsize=7,
+        color=color,
+        fontfamily='monospace',
+        ha='center',
+        va='center',
+        bbox=dict(
+            boxstyle='round,pad=0.3',
+            facecolor='white',
+            edgecolor=color,
+            linewidth=0.8
+        ),
+        zorder=10
+    )
 
 def plot_max_depth(ax, profile_lines, max_depth):
     """
@@ -1158,7 +1265,7 @@ def plot_inputs(
     fig, ax = plt.subplots(figsize=figsize)
 
     # Plot contents
-    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_profile_lines(ax, slope_data['profile_lines'], labels=True)
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     if mode == "seep":

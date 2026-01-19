@@ -55,7 +55,7 @@ def _get_gmsh():
 
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -70,6 +70,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
         target_size_1d : Optional target size for 1D elements (default None, which is set to target_size if None)
+        profile_lines: Optional list of profile line dicts with 'mat_id' keys for material assignment
 
     Returns:
         mesh dict containing:
@@ -93,7 +94,19 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             print(f"Using default target_size_1d = target_size = {target_size_1d}")
 
     # build a list of region ids (list of material IDs - one per polygon)
-    region_ids = [i for i in range(len(polygons))]
+    # Polygon i is between profile line i and i+1, so use mat_id from profile line i
+    if profile_lines and len(profile_lines) >= len(polygons):
+        region_ids = []
+        for i in range(len(polygons)):
+            mat_id = profile_lines[i].get('mat_id')
+            if mat_id is not None:
+                region_ids.append(mat_id)
+            else:
+                # Fallback to polygon index if no mat_id
+                region_ids.append(i)
+    else:
+        # Fallback to sequential IDs if no profile_lines provided
+        region_ids = [i for i in range(len(polygons))]
 
     if element_type not in ['tri3', 'tri6', 'quad4', 'quad8', 'quad9']:
         raise ValueError("element_type must be 'tri3', 'tri6', 'quad4', 'quad8', or 'quad9'")
@@ -1236,7 +1249,7 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
             raise ValueError("When using only 1 profile line, max_depth must be specified")
 
     n = len(profile_lines)
-    lines = [list(line) for line in copy.deepcopy(profile_lines)]
+    lines = [list(line['coords']) for line in copy.deepcopy(profile_lines)]
 
     for i in range(n - 1):
         top = lines[i]

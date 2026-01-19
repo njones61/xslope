@@ -122,7 +122,7 @@ def get_profile_layer_y_coordinates(x_coords, profile_lines):
     
     Parameters:
         x_coords (array-like): X-coordinates to evaluate
-        profile_lines (list): List of profile layer lines
+        profile_lines (list): List of profile line dicts, each with 'coords' key containing coordinate tuples
         
     Returns:
         list: List of arrays, each containing y-coordinates for a profile layer
@@ -131,7 +131,7 @@ def get_profile_layer_y_coordinates(x_coords, profile_lines):
     layer_y_coords = []
     
     for line in profile_lines:
-        line_coords = np.array(line)
+        line_coords = np.array(line['coords'])
         line_x = line_coords[:, 0]
         line_y = line_coords[:, 1]
         
@@ -534,7 +534,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     
     # Vectorized approach for profile line points
     for line in profile_lines:
-        line_coords = np.array(line)
+        line_coords = np.array(line['coords'])
         x_coords = line_coords[:, 0]
         y_coords = line_coords[:, 1]
         
@@ -591,7 +591,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # For circular failure surfaces, we can use a more efficient approach
         # by creating a dense circle representation and finding intersections
         for line in profile_lines:
-            line_geom = LineString(line)
+            line_geom = LineString(line['coords'])
             # Create a dense circle representation for intersection
             theta_range = np.linspace(np.pi, 2 * np.pi, 200)
             circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
@@ -608,7 +608,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     else:
         # For non-circular failure surfaces, use the original approach
         for i in range(len(profile_lines)):
-            intersection = LineString(profile_lines[i]).intersection(clipped_surface)
+            intersection = LineString(profile_lines[i]['coords']).intersection(clipped_surface)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
                     fixed_xs.add(intersection.x)
@@ -775,12 +775,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         sum_gam_h_y = 0  # for calculating center of gravity of slice
         sum_gam_h = 0    # ditto
         
-        for mat_index, layer_y in enumerate(profile_y_coords):
+        for profile_idx, layer_y in enumerate(profile_y_coords):
             layer_top_y = layer_y[i]
             
             # Bottom: highest of all other profile lines at x, or failure surface
             layer_bot_y = y_cb  # Start with failure surface as default bottom
-            for j in range(mat_index + 1, len(profile_y_coords)):
+            for j in range(profile_idx + 1, len(profile_y_coords)):
                 next_y = profile_y_coords[j][i]
                 if not np.isnan(next_y) and next_y > layer_bot_y:
                     # Take the highest of the lower profile lines
@@ -792,14 +792,36 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 overlap_top = min(y_ct, layer_top_y)
                 overlap_bot = max(y_cb, layer_bot_y)
                 h = max(0, overlap_top - overlap_bot)
+                
+                # Get material index from mat_id in profile line (already 0-based)
+                mat_id = profile_lines[profile_idx].get('mat_id')
+                if mat_id is not None and 0 <= mat_id < len(materials):
+                    mat_index = mat_id
+                else:
+                    # Fallback to profile index if no mat_id or out of range
+                    mat_index = profile_idx
+                
                 sum_gam_h_y += h * materials[mat_index]['gamma'] * (overlap_top + overlap_bot) / 2
                 sum_gam_h += h * materials[mat_index]['gamma']
 
             heights.append(h)
+            
+            # Get material index for soil weight calculation (already 0-based)
+            mat_id = profile_lines[profile_idx].get('mat_id')
+            if mat_id is not None and 0 <= mat_id < len(materials):
+                mat_index = mat_id
+            else:
+                mat_index = profile_idx
+            
             soil_weight += h * materials[mat_index]['gamma'] * dx
 
             if h > 0:
-                base_material_idx = mat_index
+                # Get material index for base material (already 0-based)
+                mat_id = profile_lines[profile_idx].get('mat_id')
+                if mat_id is not None and 0 <= mat_id < len(materials):
+                    base_material_idx = mat_id
+                else:
+                    base_material_idx = profile_idx
 
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None

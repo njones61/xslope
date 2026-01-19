@@ -54,24 +54,39 @@ def get_dload_legend_handler():
     return None, dummy_line
 
 
-def plot_profile_lines(ax, profile_lines, labels=False):
+def plot_profile_lines(ax, profile_lines, materials=None, labels=False):
     """
     Plots the profile lines for each material in the slope.
 
     Parameters:
         ax: matplotlib Axes object
-        profile_lines: List of line coordinates representing material boundaries
+        profile_lines: List of profile line dicts, each with 'coords' and 'mat_id' keys
+        materials: List of material dictionaries (optional, for color mapping)
         labels: If True, add index labels to each profile line (default: False)
 
     Returns:
         None
     """
     for i, line in enumerate(profile_lines):
-        xs, ys = zip(*line)
-        ax.plot(xs, ys, color=get_material_color(i), linewidth=1, label=f'Profile {i+1}')
+        coords = line['coords']
+        xs, ys = zip(*coords)
+        
+        # Get material index from mat_id (already 0-based)
+        if materials and line.get('mat_id') is not None:
+            mat_idx = line['mat_id']
+            if 0 <= mat_idx < len(materials):
+                color = get_material_color(mat_idx)
+            else:
+                # Fallback to index-based color if mat_id out of range
+                color = get_material_color(i)
+        else:
+            # Fallback to index-based color if no materials or mat_id
+            color = get_material_color(i)
+        
+        ax.plot(xs, ys, color=color, linewidth=1, label=f'Profile {i+1}')
 
         if labels:
-            _add_profile_index_label(ax, line, i + 1, get_material_color(i))
+            _add_profile_index_label(ax, coords, i + 1, color)
 
 
 def _add_profile_index_label(ax, line, index, color):
@@ -182,7 +197,7 @@ def plot_max_depth(ax, profile_lines, max_depth):
 
     Parameters:
         ax: matplotlib Axes object
-        profile_lines: List of line coordinates representing material boundaries
+        profile_lines: List of profile line dicts, each with 'coords' key containing coordinate tuples
         max_depth: Maximum allowed depth for analysis
 
     Returns:
@@ -190,7 +205,7 @@ def plot_max_depth(ax, profile_lines, max_depth):
     """
     if max_depth is None:
         return
-    x_vals = [x for line in profile_lines for x, _ in line]
+    x_vals = [x for line in profile_lines for x, _ in line['coords']]
     x_min = min(x_vals)
     x_max = max(x_vals)
     ax.hlines(max_depth, x_min, x_max, colors='black', linewidth=1.5, label='Max Depth')
@@ -352,7 +367,7 @@ def plot_seepage_bc_lines(ax, slope_data):
     x_vals = []
     for line in slope_data.get("profile_lines", []):
         try:
-            xs_line, _ = zip(*line)
+            xs_line, _ = zip(*line['coords'])
             x_vals.extend(xs_line)
         except Exception:
             pass
@@ -1143,10 +1158,11 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
     # 1) collect all profile line elevations
     for line in data.get('profile_lines', []):
-        if hasattr(line, "xy"):
-            _, ys = line.xy
+        coords = line['coords']
+        if hasattr(coords, "xy"):
+            _, ys = coords.xy
         else:
-            _, ys = zip(*line)
+            _, ys = zip(*coords)
         y_vals.extend(ys)
 
     # 2) explicitly include the deepest allowed depth
@@ -1265,7 +1281,7 @@ def plot_inputs(
     fig, ax = plt.subplots(figsize=figsize)
 
     # Plot contents
-    plot_profile_lines(ax, slope_data['profile_lines'], labels=True)
+    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     if mode == "seep":
@@ -1465,7 +1481,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ax.set_ylabel("y")
     ax.grid(False)
 
-    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
@@ -1617,7 +1633,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
     """
     fig, ax = plt.subplots(figsize=figsize)
 
-    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
@@ -1663,7 +1679,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     fig, ax = plt.subplots(figsize=figsize)
 
     # Plot basic profile elements
-    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
@@ -1730,7 +1746,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     fig, ax = plt.subplots(figsize=figsize)
 
     # Plot basic slope elements (same as other search functions)
-    plot_profile_lines(ax, slope_data['profile_lines'])
+    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
@@ -2175,8 +2191,9 @@ def get_plot_elements_bounds(ax, slope_data):
     if 'profile_lines' in slope_data:
         for line in slope_data['profile_lines']:
             if line:
-                xs = [p[0] for p in line]
-                ys = [p[1] for p in line]
+                coords = line['coords']
+                xs = [p[0] for p in coords]
+                ys = [p[1] for p in coords]
                 bounds.append((min(xs), max(xs), min(ys), max(ys)))
     
     # Distributed loads bounds

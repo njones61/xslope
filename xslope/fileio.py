@@ -29,8 +29,8 @@ def build_ground_surface(profile_lines):
     which represents the true ground surface.
 
     Parameters:
-        profile_lines (list of list of tuple): A list of profile lines, each represented
-            as a list of (x, y) coordinate tuples.
+        profile_lines (list of dict): A list of profile lines, each represented
+            as a dict with 'coords' key containing a list of (x, y) coordinate tuples.
 
     Returns:
         shapely.geometry.LineString: A LineString of the top surface, or an empty LineString
@@ -40,9 +40,12 @@ def build_ground_surface(profile_lines):
     if not profile_lines:
         return LineString([])
     
+    # Extract coordinate lists from profile line dicts
+    coord_lists = [line['coords'] for line in profile_lines]
+    
     # Step 1: Gather all points from all profile lines
     all_points = []
-    for line in profile_lines:
+    for line in coord_lists:
         all_points.extend(line)
     
     # Step 2: Group points by x-coordinate and find the highest y for each x
@@ -61,7 +64,7 @@ def build_ground_surface(profile_lines):
         
         # Check intersections with all profile lines
         is_topmost = True
-        for profile_line in profile_lines:
+        for profile_line in coord_lists:
             line = LineString(profile_line)
             if line.length == 0:
                 continue
@@ -125,10 +128,10 @@ def load_slope_data(filepath):
 
     try:
         template_version = main_df.iloc[4, 3]  # Excel row 5, column D
-        gamma_water = float(main_df.iloc[18, 3])  # Excel row 19, column D
-        tcrack_depth = float(main_df.iloc[19, 3])  # Excel row 20, column D
-        tcrack_water = float(main_df.iloc[20, 3])  # Excel row 21, column D
-        k_seismic = float(main_df.iloc[21, 3])  # Excel row 22, column D
+        gamma_water = float(main_df.iloc[7, 3])  # Excel row 8, column D
+        tcrack_depth = float(main_df.iloc[8, 3])  # Excel row 9, column D
+        tcrack_water = float(main_df.iloc[9, 3])  # Excel row 10, column D
+        k_seismic = float(main_df.iloc[10, 3])  # Excel row 11, column D
     except Exception as e:
         raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
@@ -139,38 +142,76 @@ def load_slope_data(filepath):
     max_depth = float(profile_df.iloc[1, 1])  # Excel B2 = row 1, column 1
 
     profile_lines = []
-
-    profile_data_blocks = [
-        {"header_row": 4, "data_start": 5, "data_end": 20},
-        {"header_row": 22, "data_start": 23, "data_end": 38},
-        {"header_row": 40, "data_start": 41, "data_end": 56},
-    ]
-    profile_block_width = 3
-
-    for block in profile_data_blocks:
-        for col in range(0, profile_df.shape[1], profile_block_width):
-            x_col, y_col = col, col + 1
+    
+    # New format: single data block, profile lines arranged horizontally
+    # First profile line: columns A:B, second: D:E, third: G:H, etc.
+    # Header row is row 4 (index 3), mat_id is in B5 (row 4, column 1)
+    # XY coordinates start in row 7 (index 6)
+    header_row = 3  # Excel row 4 (0-indexed)
+    mat_id_row = 4  # Excel row 5 (0-indexed)
+    coords_start_row = 6  # Excel row 7 (0-indexed)
+    
+    col = 0  # Start with column A (index 0)
+    while col < profile_df.shape[1]:
+        x_col = col
+        y_col = col + 1
+        
+        # Check if header row is empty (stop reading if empty)
+        try:
+            header_val = str(profile_df.iloc[header_row, x_col]).strip()
+            if not header_val or header_val.lower() == 'nan':
+                break  # No more profile lines
+        except:
+            break  # No more profile lines
+        
+        # Read mat_id from B5 (row 4, column 1) for this profile line
+        # Convert from 1-based to 0-based for internal use
+        try:
+            mat_id_val = profile_df.iloc[mat_id_row, y_col]
+            if pd.isna(mat_id_val):
+                mat_id = None
+            else:
+                # Convert to integer and subtract 1 to make it 0-based
+                mat_id = int(float(mat_id_val)) - 1
+                if mat_id < 0:
+                    mat_id = None  # Invalid mat_id
+        except (ValueError, TypeError):
+            mat_id = None
+        
+        # Read XY coordinates starting from row 7, stop at first empty row
+        coords = []
+        row = coords_start_row
+        while row < profile_df.shape[0]:
             try:
-                x_header = str(profile_df.iloc[block["header_row"], x_col]).strip().lower()
-                y_header = str(profile_df.iloc[block["header_row"], y_col]).strip().lower()
+                x_val = profile_df.iloc[row, x_col]
+                y_val = profile_df.iloc[row, y_col]
+                
+                # Stop at first empty row (both x and y are empty)
+                if pd.isna(x_val) and pd.isna(y_val):
+                    break
+                
+                # If at least one coordinate is present, try to convert
+                if pd.notna(x_val) and pd.notna(y_val):
+                    coords.append((float(x_val), float(y_val)))
             except:
-                continue
-            if x_header != 'x' or y_header != 'y':
-                continue
-            data = profile_df.iloc[block["data_start"]:block["data_end"], [x_col, y_col]]
-            data = data.dropna(how='all')
-            if data.empty:
-                continue
-            if data.iloc[0].isna().any():
-                continue
-            coords = data.dropna().apply(lambda r: (float(r.iloc[0]), float(r.iloc[1])), axis=1).tolist()
-            if len(coords) == 1:
-                raise ValueError("Each profile line must contain at least two points.")
-            if coords:
-                profile_lines.append(coords)
+                break
+            row += 1
+        
+        # Validate that we have at least 2 points
+        if len(coords) == 1:
+            raise ValueError(f"Each profile line must contain at least two points. Profile line starting at column {chr(65 + col)} has only one point.")
+        
+        if len(coords) >= 2:
+            # Store as dict with coords and mat_id
+            profile_lines.append({
+                'coords': coords,
+                'mat_id': mat_id
+            })
+        
+        # Move to next profile line (skip 3 columns: A->D, D->G, etc.)
+        col += 3
 
     # === BUILD GROUND SURFACE FROM PROFILE LINES ===
-
     ground_surface = build_ground_surface(profile_lines)
 
     # === BUILD TENSILE CRACK LINE ===
@@ -180,29 +221,23 @@ def load_slope_data(filepath):
         tcrack_surface = LineString([(x, y - tcrack_depth) for (x, y) in ground_surface.coords])
 
     # === MATERIALS (Optimized Parsing) ===
-    mat_df = xls.parse('mat', header=2)  # header=2 because the header row is row 3 in Excel
+    mat_df = xls.parse('mat', header=7)  # header=7 because the header row is row 8 in Excel (0-indexed row 7)
     materials = []
-
-    required_materials = len(profile_lines)
 
     def _num(x):
         v = pd.to_numeric(x, errors="coerce")
         return float(v) if pd.notna(v) else 0.0
 
-    # Read exactly one material row per profile line.
-    # Materials are positional: Excel row 4 corresponds to profile line 1, row 5 to line 2, etc.
-    for i in range(required_materials):
-        # Excel row number: header is on row 3, first data row is row 4
-        excel_row = i + 4
-
-        if i >= len(mat_df):
-            raise ValueError(
-                "CRITICAL ERROR: Materials table ended early. "
-                f"Expected {required_materials} materials for {required_materials} profile lines, "
-                f"but ran out of rows at Excel row {excel_row}."
-            )
-
+    # Read materials row by row until we encounter an empty material name (Column B)
+    # Data starts at Excel row 9 (0-indexed row 0 after header=7)
+    for i in range(len(mat_df)):
         row = mat_df.iloc[i]
+        
+        # Check if material name (Column B) is empty - stop reading if empty
+        material_name = row.get('name', '')
+        if pd.isna(material_name) or str(material_name).strip() == '':
+            break  # Stop reading when we encounter an empty material name
+        
         # For seep workflows, 'g' (unit weight) and shear strength properties are not required.
         # A material row is considered "missing" only if Excel columns C:X are empty.
         # (Excel A:B are number and name; C:X contain the actual property fields.)
@@ -210,13 +245,15 @@ def load_slope_data(filepath):
         end_col = min(mat_df.shape[1], 24)  # X is column 24 (1-based) -> index 23, so slice end is 24
         c_to_x_empty = True if start_col >= end_col else row.iloc[start_col:end_col].isna().all()
         if c_to_x_empty:
+            # Excel row number: header is on row 8, first data row is row 9
+            excel_row = i + 9
             raise ValueError(
-                "CRITICAL ERROR: Missing material row for a profile line. "
-                f"Material {i+1} of {required_materials} is blank in columns C:X (Excel row {excel_row})."
+                "CRITICAL ERROR: Material row has empty property fields. "
+                f"Material '{material_name}' (Excel row {excel_row}) is blank in columns C:X."
             )
 
         materials.append({
-            "name": row.get('name', ''),
+            "name": str(material_name).strip(),
             "gamma": _num(row.get("g", 0)),
             "option": str(row.get('option', '')).strip().lower(),
             "c": _num(row.get('c', 0)),
@@ -250,15 +287,15 @@ def load_slope_data(filepath):
     seep_u2 = None
     
     if has_seep_materials:
-        # Read seep file names directly from Excel cells L22, L23, L24
+        # Read seep file names directly from Excel cells P3, P4, P5
         try:
             # Read the 'mat' sheet directly without header parsing
             mat_raw_df = xls.parse('mat', header=None)
             
-            # L22 = row 21, column 11 (0-indexed)
-            mesh_filename = str(mat_raw_df.iloc[21, 11]).strip()  # L22
-            solution1_filename = str(mat_raw_df.iloc[22, 11]).strip()  # L23
-            solution2_filename = str(mat_raw_df.iloc[23, 11]).strip()  # L24
+            # P3 = row 2, column 15 (0-indexed)
+            mesh_filename = str(mat_raw_df.iloc[2, 15]).strip()  # P3
+            solution1_filename = str(mat_raw_df.iloc[3, 15]).strip()  # P4
+            solution2_filename = str(mat_raw_df.iloc[4, 15]).strip()  # P5
             
             # Validate required files
             if not mesh_filename or mesh_filename.lower() == 'nan':
@@ -295,66 +332,176 @@ def load_slope_data(filepath):
                 raise ValueError(f"Error reading seepage files: {e}")
 
     # === PIEZOMETRIC LINE ===
-    piezo_df = xls.parse('piezo')
+    piezo_df = xls.parse('piezo', header=None)
     piezo_line = []
     piezo_line2 = []
 
-    # Read all data once (rows 4-18)
-    piezo_data = piezo_df.iloc[2:18].dropna(how='all')
+    # Read first piezometric line (columns A:B, starting at row 4, Excel row 4 = index 3)
+    # Keep reading until we encounter an empty row
+    start_row = 3  # Excel row 4 (0-indexed row 3)
+    x_col = 0  # Column A
+    y_col = 1  # Column B
     
-    if len(piezo_data) >= 2:
-        # Extract first table (A4:B18) - columns 0 and 1
+    row = start_row
+    while row < piezo_df.shape[0]:
         try:
-            piezo_data1 = piezo_data.dropna(subset=[piezo_data.columns[0], piezo_data.columns[1]], how='all')
-            if len(piezo_data1) < 2:
-                raise ValueError("First piezometric line must contain at least two points.")
-            piezo_line = piezo_data1.apply(lambda row: (float(row.iloc[0]), float(row.iloc[1])), axis=1).tolist()
-        except Exception:
-            raise ValueError("Invalid first piezometric line format.")
-
-        # Extract second table (D4:E18) - columns 3 and 4
+            x_val = piezo_df.iloc[row, x_col]
+            y_val = piezo_df.iloc[row, y_col]
+            
+            # Stop at first empty row (both x and y are empty)
+            if pd.isna(x_val) and pd.isna(y_val):
+                break
+            
+            # If at least one coordinate is present, try to convert
+            if pd.notna(x_val) and pd.notna(y_val):
+                piezo_line.append((float(x_val), float(y_val)))
+        except:
+            break
+        row += 1
+    
+    # Validate first piezometric line
+    if len(piezo_line) == 1:
+        raise ValueError("First piezometric line must contain at least two points.")
+    
+    # Read second piezometric line (columns D:E, starting at row 4, Excel row 4 = index 3)
+    # Keep reading until we encounter an empty row
+    x_col2 = 3  # Column D
+    y_col2 = 4  # Column E
+    
+    row = start_row
+    while row < piezo_df.shape[0]:
         try:
-            piezo_data2 = piezo_data.dropna(subset=[piezo_data.columns[3], piezo_data.columns[4]], how='all')
-            if len(piezo_data2) < 2:
-                raise ValueError("Second piezometric line must contain at least two points.")
-            piezo_line2 = piezo_data2.apply(lambda row: (float(row.iloc[3]), float(row.iloc[4])), axis=1).tolist()
-        except Exception:
-            # If second table reading fails, just leave piezo_line2 as empty list
-            piezo_line2 = []
-    elif len(piezo_data) == 1:
-        raise ValueError("Piezometric line must contain at least two points.")
+            x_val = piezo_df.iloc[row, x_col2]
+            y_val = piezo_df.iloc[row, y_col2]
+            
+            # Stop at first empty row (both x and y are empty)
+            if pd.isna(x_val) and pd.isna(y_val):
+                break
+            
+            # If at least one coordinate is present, try to convert
+            if pd.notna(x_val) and pd.notna(y_val):
+                piezo_line2.append((float(x_val), float(y_val)))
+        except:
+            break
+        row += 1
+    
+    # Validate second piezometric line (only if it has data)
+    if len(piezo_line2) == 1:
+        raise ValueError("Second piezometric line must contain at least two points if provided.")
 
     # === DISTRIBUTED LOADS ===
+    # Read first set from "dloads" tab
     dload_df = xls.parse('dloads', header=None)
     dloads = []
+    
+    # Start reading from column B (index 1), each distributed load uses 3 columns (X, Y, Normal)
+    # Keep reading to the right until we encounter an empty distributed load
+    start_row = 3  # Excel row 4 (0-indexed row 3)
+    col = 1  # Start with column B (index 1)
+    
+    while col < dload_df.shape[1]:
+        x_col = col
+        y_col = col + 1
+        normal_col = col + 2
+        
+        # Check if this distributed load block is empty (check first row for X coordinate)
+        if pd.isna(dload_df.iloc[start_row, x_col]):
+            break  # Stop reading when we encounter an empty distributed load
+        
+        # Read points for this distributed load, keep reading down until empty row
+        block_points = []
+        row = start_row
+        while row < dload_df.shape[0]:
+            try:
+                x_val = dload_df.iloc[row, x_col]
+                y_val = dload_df.iloc[row, y_col]
+                normal_val = dload_df.iloc[row, normal_col]
+                
+                # Stop at first empty row (all three values are empty)
+                if pd.isna(x_val) and pd.isna(y_val) and pd.isna(normal_val):
+                    break
+                
+                # If at least coordinates are present, try to convert
+                if pd.notna(x_val) and pd.notna(y_val):
+                    normal = float(normal_val) if pd.notna(normal_val) else 0.0
+                    block_points.append({
+                        "X": float(x_val),
+                        "Y": float(y_val),
+                        "Normal": normal
+                    })
+            except:
+                break
+            row += 1
+        
+        # Validate that we have at least 2 points
+        if len(block_points) == 1:
+            raise ValueError(f"Each distributed load must contain at least two points. Distributed load starting at column {chr(65 + col)} has only one point.")
+        
+        if len(block_points) >= 2:
+            dloads.append(block_points)
+        
+        # Move to next distributed load (skip 4 columns: 3 for the dload + 1 empty column)
+        col += 4
+    
+    # Read second set from "dloads (2)" tab
     dloads2 = []
-    dload_data_blocks = [
-        {"start_row": 3, "end_row": 13},
-        {"start_row": 16, "end_row": 26}
-    ]
-    dload_block_starts = [1, 5, 9, 13]
-
-    for block_idx, block in enumerate(dload_data_blocks):
-        for col in dload_block_starts:
-            section = dload_df.iloc[block["start_row"]:block["end_row"], col:col + 3]
-            section = section.dropna(how='all')
-            section = section.dropna(subset=[col, col + 1], how='any')
-            if len(section) >= 2:
+    try:
+        dload_df2 = xls.parse('dloads (2)', header=None)
+        
+        # Start reading from column B (index 1), each distributed load uses 3 columns (X, Y, Normal)
+        # Keep reading to the right until we encounter an empty distributed load
+        col = 1  # Start with column B (index 1)
+        
+        while col < dload_df2.shape[1]:
+            x_col = col
+            y_col = col + 1
+            normal_col = col + 2
+            
+            # Check if dataframe has enough rows before accessing start_row
+            if dload_df2.shape[0] <= start_row:
+                break  # Not enough rows, stop reading
+            
+            # Check if this distributed load block is empty (check first row for X coordinate)
+            if pd.isna(dload_df2.iloc[start_row, x_col]):
+                break  # Stop reading when we encounter an empty distributed load
+            
+            # Read points for this distributed load, keep reading down until empty row
+            block_points = []
+            row = start_row
+            while row < dload_df2.shape[0]:
                 try:
-                    block_points = section.apply(
-                        lambda row: {
-                            "X": float(row.iloc[0]),
-                            "Y": float(row.iloc[1]),
-                            "Normal": float(row.iloc[2])
-                        }, axis=1).tolist()
-                    if block_idx == 0:
-                        dloads.append(block_points)
-                    else:
-                        dloads2.append(block_points)
+                    x_val = dload_df2.iloc[row, x_col]
+                    y_val = dload_df2.iloc[row, y_col]
+                    normal_val = dload_df2.iloc[row, normal_col]
+                    
+                    # Stop at first empty row (all three values are empty)
+                    if pd.isna(x_val) and pd.isna(y_val) and pd.isna(normal_val):
+                        break
+                    
+                    # If at least coordinates are present, try to convert
+                    if pd.notna(x_val) and pd.notna(y_val):
+                        normal = float(normal_val) if pd.notna(normal_val) else 0.0
+                        block_points.append({
+                            "X": float(x_val),
+                            "Y": float(y_val),
+                            "Normal": normal
+                        })
                 except:
-                    raise ValueError("Invalid data format in distributed load block.")
-            elif len(section) == 1:
-                raise ValueError("Each distributed load block must contain at least two points.")
+                    break
+                row += 1
+            
+            # Validate that we have at least 2 points
+            if len(block_points) == 1:
+                raise ValueError(f"Each distributed load must contain at least two points. Distributed load starting at column {chr(65 + col)} has only one point.")
+            
+            if len(block_points) >= 2:
+                dloads2.append(block_points)
+            
+            # Move to next distributed load (skip 4 columns: 3 for the dload + 1 empty column)
+            col += 4
+    except (ValueError, KeyError):
+        # If "dloads (2)" tab doesn't exist, just leave dloads2 as empty list
+        pass
 
     # === CIRCLES ===
 
@@ -404,11 +551,16 @@ def load_slope_data(filepath):
     reinforce_df = xls.parse('reinforce', header=1)  # Header in row 2 (0-indexed row 1)
     reinforce_lines = []
     
-    # Process rows 3-22 (Excel) which are 0-indexed rows 0-19 in pandas after header=1
-    for i, row in reinforce_df.iloc[0:20].iterrows():
-        # Check if the row has coordinate data (x1, y1, x2, y2)
-        if pd.isna(row.iloc[1]) or pd.isna(row.iloc[2]) or pd.isna(row.iloc[3]) or pd.isna(row.iloc[4]):
-            continue  # Skip empty rows
+    # Process rows starting from row 3 (Excel) which is 0-indexed row 0 in pandas after header=1
+    # Keep reading until we encounter an empty value in column B
+    for i, row in reinforce_df.iterrows():
+        # Check if column B (x1 coordinate) is empty - stop reading if empty
+        if pd.isna(row.iloc[1]):
+            break  # Stop reading when column B is empty
+        
+        # Check if other required coordinates are present
+        if pd.isna(row.iloc[2]) or pd.isna(row.iloc[3]) or pd.isna(row.iloc[4]):
+            continue  # Skip rows with incomplete coordinate data
             
         # If coordinates are present, check for required parameters (Tmax, Lp1, Lp2)
         if pd.isna(row.iloc[5]) or pd.isna(row.iloc[7]) or pd.isna(row.iloc[8]):
@@ -536,99 +688,144 @@ def load_slope_data(filepath):
 
 
     # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===
+    # Read first set from "seep bc" sheet
     seep_df = xls.parse('seep bc', header=None)
     seepage_bc = {"specified_heads": [], "exit_face": []}
-    seepage_bc2 = {"specified_heads": [], "exit_face": []}
-
-    def _read_specified_head_block(
-        df,
-        head_row: int,
-        head_col: int,
-        x_col: int,
-        y_col: int,
-        data_start_row: int,
-        data_end_row: int,
-    ):
-        """Read a specified-head block; returns (head_value, coords_list)."""
-        head_val = (
-            df.iloc[head_row, head_col]
-            if df.shape[0] > head_row and df.shape[1] > head_col
-            else None
-        )
-        coords = []
-        for r in range(data_start_row, data_end_row):
-            if r >= df.shape[0]:
-                break
-            x = df.iloc[r, x_col] if df.shape[1] > x_col else None
-            y = df.iloc[r, y_col] if df.shape[1] > y_col else None
-            if pd.notna(x) and pd.notna(y):
-                coords.append((float(x), float(y)))
-        return head_val, coords
-
-    # Specified Head #1
-    head1, coords1 = _read_specified_head_block(
-        seep_df, head_row=2, head_col=2, x_col=1, y_col=2, data_start_row=4, data_end_row=12
-    )
-    if head1 is not None and coords1:
-        seepage_bc["specified_heads"].append({"head": float(head1), "coords": coords1})
-
-    # Specified Head #2
-    head2, coords2 = _read_specified_head_block(
-        seep_df, head_row=2, head_col=5, x_col=4, y_col=5, data_start_row=4, data_end_row=12
-    )
-    if head2 is not None and coords2:
-        seepage_bc["specified_heads"].append({"head": float(head2), "coords": coords2})
-
-    # Specified Head #3
-    head3, coords3 = _read_specified_head_block(
-        seep_df, head_row=2, head_col=8, x_col=7, y_col=8, data_start_row=4, data_end_row=12
-    )
-    if head3 is not None and coords3:
-        seepage_bc["specified_heads"].append({"head": float(head3), "coords": coords3})
-
-    # Exit Face
+    
+    # Exit Face BC: starts at B5 (row 4, columns 1 and 2), continues down until empty x value
     exit_coords = []
-    for i in range(15, 23):  # rows 16-23 (0-indexed 15-22)
-        if i >= seep_df.shape[0]:
+    exit_start_row = 4  # Excel row 5 (0-indexed row 4)
+    exit_x_col = 1  # Column B
+    exit_y_col = 2  # Column C
+    
+    row = exit_start_row
+    while row < seep_df.shape[0]:
+        try:
+            x_val = seep_df.iloc[row, exit_x_col]
+            y_val = seep_df.iloc[row, exit_y_col]
+            
+            # Stop at first empty x value
+            if pd.isna(x_val):
+                break
+            
+            # If x is present, try to convert (y can be empty but we'll still add the point)
+            if pd.notna(x_val) and pd.notna(y_val):
+                exit_coords.append((float(x_val), float(y_val)))
+        except:
             break
-        x = seep_df.iloc[i, 1] if seep_df.shape[1] > 1 else None
-        y = seep_df.iloc[i, 2] if seep_df.shape[1] > 2 else None
-        if pd.notna(x) and pd.notna(y):
-            exit_coords.append((float(x), float(y)))
+        row += 1
     seepage_bc["exit_face"] = exit_coords
-
-    # --- RAPID DRAWDOWN BCs (second set) ---
-    # User-added second set starts at:
-    # - Specified Head #1: head in C26, coords in B28:C35
-    head1b, coords1b = _read_specified_head_block(
-        seep_df, head_row=25, head_col=2, x_col=1, y_col=2, data_start_row=27, data_end_row=35
-    )
-    if head1b is not None and coords1b:
-        seepage_bc2["specified_heads"].append({"head": float(head1b), "coords": coords1b})
-
-    # Mirror the same layout for the other two specified-head blocks (same columns as the first set)
-    head2b, coords2b = _read_specified_head_block(
-        seep_df, head_row=25, head_col=5, x_col=4, y_col=5, data_start_row=27, data_end_row=35
-    )
-    if head2b is not None and coords2b:
-        seepage_bc2["specified_heads"].append({"head": float(head2b), "coords": coords2b})
-
-    head3b, coords3b = _read_specified_head_block(
-        seep_df, head_row=25, head_col=8, x_col=7, y_col=8, data_start_row=27, data_end_row=35
-    )
-    if head3b is not None and coords3b:
-        seepage_bc2["specified_heads"].append({"head": float(head3b), "coords": coords3b})
-
-    # Exit Face #2: positioned lower on the sheet (same columns as the first exit face block)
-    exit_coords2 = []
-    for i in range(38, 46):  # rows 39-46 (0-indexed 38-45)
-        if i >= seep_df.shape[0]:
+    
+    # Specified Head BCs: start at columns E:F, then H:I, etc.
+    # Head value is in row 3 (index 2), XY values start at row 5 (index 4)
+    # Keep reading to the right until head value in row 3 is empty
+    head_row = 2  # Excel row 3 (0-indexed row 2)
+    data_start_row = 4  # Excel row 5 (0-indexed row 4)
+    col = 4  # Start with column E (index 4)
+    
+    while col < seep_df.shape[1]:
+        x_col = col
+        y_col = col + 1
+        head_col = col + 1  # Head value is in the Y column (F, I, L, etc.)
+        
+        # Check if head value in row 3 is empty - stop reading if empty
+        if seep_df.shape[0] <= head_row:
             break
-        x = seep_df.iloc[i, 1] if seep_df.shape[1] > 1 else None
-        y = seep_df.iloc[i, 2] if seep_df.shape[1] > 2 else None
-        if pd.notna(x) and pd.notna(y):
-            exit_coords2.append((float(x), float(y)))
-    seepage_bc2["exit_face"] = exit_coords2
+        head_val = seep_df.iloc[head_row, head_col]
+        if pd.isna(head_val):
+            break  # Stop reading when head value is empty
+        
+        # Read XY coordinates starting from row 5, continue down until empty
+        coords = []
+        row = data_start_row
+        while row < seep_df.shape[0]:
+            try:
+                x_val = seep_df.iloc[row, x_col]
+                y_val = seep_df.iloc[row, y_col]
+                
+                # Stop at first empty x value
+                if pd.isna(x_val):
+                    break
+                
+                # If x is present, try to convert
+                if pd.notna(x_val) and pd.notna(y_val):
+                    coords.append((float(x_val), float(y_val)))
+            except:
+                break
+            row += 1
+        
+        if coords:  # Only add if we have coordinates
+            seepage_bc["specified_heads"].append({"head": float(head_val), "coords": coords})
+        
+        # Move to next specified head BC (skip 3 columns: E->H, H->K, etc.)
+        col += 3
+    
+    # Read second set from "seep bc (2)" sheet
+    seepage_bc2 = {"specified_heads": [], "exit_face": []}
+    try:
+        seep_df2 = xls.parse('seep bc (2)', header=None)
+        
+        # Exit Face BC: starts at B5 (row 4, columns 1 and 2), continues down until empty x value
+        exit_coords2 = []
+        row = exit_start_row
+        while row < seep_df2.shape[0]:
+            try:
+                x_val = seep_df2.iloc[row, exit_x_col]
+                y_val = seep_df2.iloc[row, exit_y_col]
+                
+                # Stop at first empty x value
+                if pd.isna(x_val):
+                    break
+                
+                # If x is present, try to convert
+                if pd.notna(x_val) and pd.notna(y_val):
+                    exit_coords2.append((float(x_val), float(y_val)))
+            except:
+                break
+            row += 1
+        seepage_bc2["exit_face"] = exit_coords2
+        
+        # Specified Head BCs: same structure as first sheet
+        col = 4  # Start with column E (index 4)
+        while col < seep_df2.shape[1]:
+            x_col = col
+            y_col = col + 1
+            head_col = col + 1  # Head value is in the Y column
+            
+            # Check if head value in row 3 is empty - stop reading if empty
+            if seep_df2.shape[0] <= head_row:
+                break
+            head_val = seep_df2.iloc[head_row, head_col]
+            if pd.isna(head_val):
+                break  # Stop reading when head value is empty
+            
+            # Read XY coordinates starting from row 5, continue down until empty
+            coords = []
+            row = data_start_row
+            while row < seep_df2.shape[0]:
+                try:
+                    x_val = seep_df2.iloc[row, x_col]
+                    y_val = seep_df2.iloc[row, y_col]
+                    
+                    # Stop at first empty x value
+                    if pd.isna(x_val):
+                        break
+                    
+                    # If x is present, try to convert
+                    if pd.notna(x_val) and pd.notna(y_val):
+                        coords.append((float(x_val), float(y_val)))
+                except:
+                    break
+                row += 1
+            
+            if coords:  # Only add if we have coordinates
+                seepage_bc2["specified_heads"].append({"head": float(head_val), "coords": coords})
+            
+            # Move to next specified head BC (skip 3 columns: E->H, H->K, etc.)
+            col += 3
+    except (ValueError, KeyError):
+        # If "seep bc (2)" sheet doesn't exist, just leave seepage_bc2 as empty
+        pass
 
     # === VALIDATION ===
  
@@ -645,8 +842,6 @@ def load_slope_data(filepath):
         raise ValueError("Profile lines sheet is empty or invalid.")
     if not materials:
         raise ValueError("Materials sheet is empty.")
-    if len(materials) != len(profile_lines):
-        raise ValueError("Each profile line must have a corresponding material. You have " + str(len(materials)) + " materials and " + str(len(profile_lines)) + " profile lines.")
         
 
     # Add everything to globals_data

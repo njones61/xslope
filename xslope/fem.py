@@ -204,8 +204,8 @@ def build_fem_data(slope_data, mesh=None):
         elif "profile_lines" in slope_data:
             # Check if one of the profile lines is designated as piezo
             for line in slope_data["profile_lines"]:
-                if hasattr(line, 'type') and line.type == 'piezo':
-                    piezo_line_coords = line
+                if line.get('type') == 'piezo':
+                    piezo_line_coords = line['coords']
                     break
         
         if piezo_line_coords:

@@ -287,49 +287,37 @@ def load_slope_data(filepath):
     seep_u2 = None
     
     if has_seep_materials:
-        # Read seep file names directly from Excel cells P3, P4, P5
         try:
-            # Read the 'mat' sheet directly without header parsing
-            mat_raw_df = xls.parse('mat', header=None)
-            
-            # P3 = row 2, column 15 (0-indexed)
-            mesh_filename = str(mat_raw_df.iloc[2, 15]).strip()  # P3
-            solution1_filename = str(mat_raw_df.iloc[3, 15]).strip()  # P4
-            solution2_filename = str(mat_raw_df.iloc[4, 15]).strip()  # P5
-            
-            # Validate required files
-            if not mesh_filename or mesh_filename.lower() == 'nan':
-                raise ValueError("CRITICAL ERROR: Mesh filename is required when using 'seep' pore pressure option but is blank in cell L22.")
-            if not solution1_filename or solution1_filename.lower() == 'nan':
-                raise ValueError("CRITICAL ERROR: Solution1 filename is required when using 'seep' pore pressure option but is blank in cell L23.")
-            
-            # Load mesh file
+            base, _ = os.path.splitext(filepath)
+            mesh_filename = f"{base}_mesh.json"
+            solution1_filename = f"{base}_seep.csv"
+            solution2_filename = f"{base}_seep2.csv"
+
+            missing_required = []
             if not os.path.exists(mesh_filename):
-                raise ValueError(f"CRITICAL ERROR: Mesh file '{mesh_filename}' not found.")
-            seep_mesh = import_mesh_from_json(mesh_filename)
-            
-            # Load solution1 file
+                missing_required.append(mesh_filename)
             if not os.path.exists(solution1_filename):
-                raise ValueError(f"CRITICAL ERROR: Solution1 file '{solution1_filename}' not found.")
-            solution1_df = pd.read_csv(solution1_filename)
-            # Skip the last row which contains the total flowrate comment
-            solution1_df = solution1_df.iloc[:-1]
-            seep_u = solution1_df["u"].to_numpy()
-            
-            # Load solution2 file if provided
-            if solution2_filename and solution2_filename.lower() != 'nan':
-                if not os.path.exists(solution2_filename):
-                    raise ValueError(f"CRITICAL ERROR: Solution2 file '{solution2_filename}' not found.")
-                solution2_df = pd.read_csv(solution2_filename)
-                # Skip the last row which contains the total flowrate comment
-                solution2_df = solution2_df.iloc[:-1]
-                seep_u2 = solution2_df["u"].to_numpy()
-                
-        except Exception as e:
-            if "CRITICAL ERROR" in str(e):
-                raise e
+                missing_required.append(solution1_filename)
+
+            if missing_required:
+                missing_list = ", ".join(f"'{path}'" for path in missing_required)
+                print(
+                    "WARNING: Seep pore pressure option selected but required seep files "
+                    f"were not found: {missing_list}. Continuing without seep data."
+                )
             else:
-                raise ValueError(f"Error reading seepage files: {e}")
+                seep_mesh = import_mesh_from_json(mesh_filename)
+                solution1_df = pd.read_csv(solution1_filename)
+                solution1_df = solution1_df.iloc[:-1]
+                seep_u = solution1_df["u"].to_numpy()
+
+                if os.path.exists(solution2_filename):
+                    solution2_df = pd.read_csv(solution2_filename)
+                    solution2_df = solution2_df.iloc[:-1]
+                    seep_u2 = solution2_df["u"].to_numpy()
+
+        except Exception as e:
+            print(f"WARNING: Error reading seepage files: {e}. Continuing without seep data.")
 
     # === PIEZOMETRIC LINE ===
     piezo_df = xls.parse('piezo', header=None)

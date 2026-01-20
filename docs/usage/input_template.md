@@ -103,8 +103,8 @@ the horizontal scale.
 The **profile** worksheet defines the slope geometry using XY coordinates of profile lines are the primary input for 
 all types of analysis (LEM, SEEP, and FEM). 
 Each profile line the top of a soil layer or profile and all of the soil below that line and above all of the lower 
-profile lines is assumed to consist of the material associated with the profile line. There is one material in the 
-material properties table for each profile line. For example, consider a slope with three layers:
+profile lines is assumed to consist of the material associated with the profile line. The material id listed for each profile line references one of the materials in the 
+material properties table. For example, consider a slope with three layers:
 
 ![profile_lines.png](images/profile_lines.png)
 
@@ -115,9 +115,7 @@ bottom of the slope is defined by the Max Depth parameter at the top of the **pr
 horizontal base to the problem. During a limit equilibrium analysis using an automated search algorithm, the failure 
 surface is not allowed to go below this depth. Thus, it can be thought of as a bedrock surface.
 
-
-The template accommodates up to 15 profile lines, organized in three blocks of tables. You can use up to 15 points 
-per profile line to capture complex geometries.
+The template includes tables for 15 profile lines, organized horizontally. However, you can copy additional tables to the right as needed. There is no limit to the number of profile lines that can be defined. Furthermore, each table includes 20 rows of XY coordinates, but you can add as many rows as needed.
 
 During analysis, xslope uses these lines to:
 
@@ -132,9 +130,7 @@ During analysis, xslope uses these lines to:
 
 ![sheet_mat1.png](images/sheet_mat1.png)
 
-The **mat** worksheet defines material properties for each soil layer. Each row 
-corresponds to one profile line from the **profile** worksheet, establishing a one-to-one correspondence between 
-geometry and properties. The template supports up to 15 materials with comprehensive property definitions for strength, permeability, and stiffness.
+The **mat** worksheet defines material properties for the soil layer defined by the profile lines. Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -150,14 +146,8 @@ geometry and properties. The template supports up to 15 materials with comprehen
 **Pore Pressure Options** (column K):
 
 - **piezo**: Use piezometric line from **piezo** worksheet
-- **seep**: Interpolate from seepage analysis solution (requires mesh and solution files in cells L22:L24)
+- **seep**: Interpolate from seepage analysis solution (requires mesh and solution files - see [Using Seepage Results for Pore Pressures](../seep/pore.md))
 - **none**: No pore pressure
-
-When using the "seep" pore pressure option, you must specify in cells L22:L24:
-
-- L22: Mesh filename (JSON format from `export_mesh_to_json()`)
-- L23: Solution filename for normal or pre-drawdown condition (CSV format from `export_seep_solution()`)
-- L24: Solution filename for post-drawdown condition (optional, for rapid drawdown analysis)
 
 **Variability** (for reliability analysis):
 
@@ -197,8 +187,8 @@ the piezometric line to the slice base as follows:
 
 ![piezo.png](images/piezo.png)
 
-It should be noted that the use of a piezometric line is optional for limit equilibrium analysis. xslope can also 
-calculate pore pressures from a finite element seepage analysis solutions, which is more accurate and can be used for 
+It should be noted that the use of a piezometric line is optional for limit equilibrium analysis. XSLOPE can also 
+calculate pore pressures from a finite element seepage analysis solution, which is more accurate and can be used for 
 more complex problems.
 
 The worksheet provides space for two piezometric lines (columns A-B and D-E), which is useful for rapid drawdown 
@@ -207,8 +197,8 @@ analysis:
 - **First line (A-B)**: Steady-state or initial condition water table
 - **Second line (D-E)**: Drawdown condition water table (optional)
 
-Each piezometric line requires at least two XY coordinate pairs and can accommodate up to 14 points. The points 
-should be listed from left to right.
+Each piezometric line requires at least two XY coordinate pairs The table is formatted for 20 rows, but XY coordinates can be entered beyond the bottom of the table as needed. The points 
+should be ordered from left to right.
 
 ---
 
@@ -219,7 +209,7 @@ should be listed from left to right.
 The **circles** worksheet defines circular failure surfaces for limit equilibrium analysis. Circular surfaces are 
 the most common assumption in slope stability analysis and are required for methods like Bishop's Simplified Method 
 and Spencer's Method. XSLOPE supports up to 10 circular failure surfaces, each of which can be analyzed 
-individually, or used as starting points when searching for a critical failure surface with a mininum factor of 
+individually or used as starting points when searching for a critical failure surface with a mininum factor of 
 safety using an automated search algorithm.
 
 ![circles.png](images/circles.png)
@@ -258,7 +248,7 @@ automated search and then continuing to iterate from the location with the lowes
 The **non-circ** worksheet allows definition of arbitrary non-circular failure surfaces. Some slopes include thin 
 layers with especially weak soils. In such cases, a failure surface where much of the surface is confined to the 
 weak layer can be more critical than a circular failure surface. A non-circular failure surface is defined by a set 
-of XY points, listed from left to right. Generally, the leftmost point is the entry point and the rightmost point is 
+of XY points, listed from left to right. The table is formatted for 20 rows, but extra rows can be added below the table if needed. Generally, the leftmost point is the entry point and the rightmost point is 
 the exit point and both should correspond to the ground suface. 
 
 ![noncircular.png](images/noncircular.png)
@@ -297,19 +287,20 @@ described in more detail in the [Automated Search Algorithms](../lem/search.md) 
 
 ![sheet_dloads.png](images/sheet_dloads.png)
 
-The **dloads** worksheet defines distributed surface loads applied to the slope. These represent surcharge loads 
+The **dloads** and **dloads (2)** worksheets define distributed surface loads applied to the slope. These represent surcharge loads 
 such as traffic, buildings, stockpiled materials, or other surface loading. They are also used with submerged slopes 
 to represent the force of the water on the slope. During limit equilibrium analysis, distributed loads are applied to the top of each slice, which affects either or 
-both of the driving and resisting forces depending on the slope angle and load orientation.
+both of the driving and resisting forces depending on the slope angle and load orientation. The **dloads** sheet defines loads used in a normal slope stability analysis or the first stage of a rapid drawdown analysis. The **dloads (2)** sheet defines loads used in the second stage of a rapid drawdown analysis.
 
-The worksheet supports up to 8 distributed loads, organized in two 
-sets of 4 blocks each. Each distributed load is defined by a series of points with:
+Each worksheet is formatted for 6 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, but additional rows can be added below the end of table if necessary.
+
+Each distributed load is defined by a series of points with:
 
 - **X, Y**: Coordinates of points along the load distribution line, ordered from left to right
 - **Normal**: Normal stress (force per unit area) acting perpendicular to the line
 
 At least two points are required to define each load block. The load distribution typically follows the ground 
-surface. For example, consider the following load distribution:
+surface. The points should be listed in order from left to right. For example, consider the following load distribution:
 
 ![dist_loads.png](images/dist_loads.png)
 
@@ -318,13 +309,6 @@ the force at each point would be the unit weight of water multiplied by the heig
 question. For the example shown above, there distributed load would consist of three points, the first two points 
 having the normal force and the last point having a normal force of zero. The surcharge load on the right would be 
 defined by two points with a normal force for each.
-
-**Two load sets** are provided (rows 4-13 and rows 17-26) to support rapid drawdown or staged loading analysis:
-
-- **First set**: Normal or pre-drawdown loading condition
-- **Second set**: Post-drawdown loading condition (for rapid drawdown analysis)
-
-For rapid drawdown analysis, the second set of loads corresponds to the water loads at the post-drawdown level.
 
 ---
 
@@ -342,7 +326,8 @@ from the left end of the line and Lp2 from the right end of the line.
 
 ![reinforce.png](images/reinforce.png)
 
-The template accommodates up to 20 reinforcement lines (rows 3-22).
+The template is formatted for up to 20 reinforcement lines (rows 3-22), but additional rows can be added to the 
+table as needed.
 
 Each reinforcement element is defined by:
 
@@ -380,11 +365,12 @@ considered to be in failure and the tension is the line is limited to the residu
 
 ![sheet_seepbc.png](images/sheet_seepbc.png)
 
-The **seep bc** worksheet defines boundary conditions for finite element seepage analysis. Boundary conditions 
+The **seep bc** and **seep bc (2)** worksheets define boundary conditions for finite element seepage analysis. 
+Boundary conditions 
 specify where water enters or exits the domain and the magnitude of hydraulic head on the boundary. There are two 
-types of boundary conditions: speficied head and exit face. Specified head boundaries correspond to free water on 
+types of boundary conditions: speficied head and exit face. **Specified head** boundaries correspond to free water on 
 the face of the slope and the magnitude of the head is the height of water above the datum defined for the problem. 
-Exit face boundaries conditions are used for unconfined problems are applied to the "downstream" side of the slope 
+**Exit face** boundaries conditions are used for unconfined problems are applied to the "downstream" side of the slope 
 where water exits the slope. In the unconfined seepage solution, the phreatic surface intersects the exit face at 
 some point (exit point) that is determined as part of an iterative solution process. For points on the exit face below 
 the exit point, a head = elevation (zero pressure) condition is applied. For points on the exit face above the exit 
@@ -392,36 +378,15 @@ point, the head is determined by the pore pressure equation.
 
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
 exit face. For confied problems, there is typically one upstream and one downstream specified head boundary 
-condition. A third specified head boundary condition can be defined to represent the water level in an excavation.
+condition. Additional specified head boundary conditions can be defined to represent the water level in an 
+excavation, etc. The sheet is formatted for one exit face and up to 5 specified head boundaries. Additional 
+specified head boundary 
+conditions can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, 
+but additional rows can be added below the end of table if necessary.
 
-Futhermore, worksheet 
-provides 
-two 
-complete 
-sets of 
-boundary conditions to support rapid drawdown analysis, with one set corresponding to the initial condition and 
-the other set corresponding to the drawdown conditions.
-
-**Boundary Condition Types:**
-
-1. **Specified Head Boundaries** (columns B-C, E-F, H-I):
-
->   - Define locations where hydraulic head is known (e.g., reservoir levels, constant head boundaries)
->   - Each specified head region requires:
->>  - Head value (in the header row)
->>  - XY coordinates of points along the boundary from left to right (minimum 2 points)
->   - Up to three specified head regions can be defined per set
-
-2. **Exit Face Boundary** (columns B-C, rows 16-23):
-
-   - Defines where water exits the domain (e.g., downstream toe, seepage face)
-   - Special boundary condition where head = elevation (zero pressure)
-   - Requires at least 2 XY coordinate pairs
-
-**Two Boundary Condition Sets:**
-
-- **Set 1** (rows 3-23): Initial or steady-state condition (e.g., full reservoir)
-- **Set 2** (rows 26-46): Modified condition (e.g., rapid drawdown, reservoir empty)
+For most analyses, only the main **seep bc** sheet is used. However, the **seep bc (2)** sheet is used for rapid drawdown 
+analysis where a second seepage solution is used to calculate the pore pressures corresponding to the drawdown 
+condition.
 
 During seepage analysis, xslope:
 

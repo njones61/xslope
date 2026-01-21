@@ -23,9 +23,9 @@ target_size = 5
 # Test the new linear-first approach with quadratic elements
 print("Testing  with reinforcement lines:")
 mesh = build_mesh_from_polygons(
-    polygons, 
-    target_size, 
-    element_type='tri6', 
+    polygons,
+    target_size,
+    element_type='tri6',
     lines=None,
     debug=True
 )

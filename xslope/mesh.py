@@ -61,7 +61,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     Fixed version that properly handles shared boundaries between polygons.
     
     Parameters:
-        polygons     : List of lists of (x, y) tuples defining material boundaries
+        polygons     : List of polygon coordinate lists or dicts with "coords"/"mat_id"
         target_size  : Desired element size
         element_type : 'tri3' (3-node triangles), 'tri6' (6-node triangles), 
                       'quad4' (4-node quadrilaterals), 'quad8' (8-node quadrilaterals),
@@ -93,11 +93,26 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         if debug:
             print(f"Using default target_size_1d = target_size = {target_size_1d}")
 
-    # build a list of region ids (list of material IDs - one per polygon)
-    # Polygon i is between profile line i and i+1, so use mat_id from profile line i
-    if profile_lines and len(profile_lines) >= len(polygons):
+    # Normalize polygons to coordinate lists and optional mat_id
+    polygon_coords = []
+    polygon_mat_ids = []
+    for i, polygon in enumerate(polygons):
+        if isinstance(polygon, dict):
+            polygon_coords.append(polygon.get("coords", []))
+            polygon_mat_ids.append(polygon.get("mat_id"))
+        else:
+            polygon_coords.append(polygon)
+            polygon_mat_ids.append(None)
+
+    # Build a list of region ids (list of material IDs - one per polygon)
+    if any(mat_id is not None for mat_id in polygon_mat_ids):
+        region_ids = [
+            mat_id if mat_id is not None else i
+            for i, mat_id in enumerate(polygon_mat_ids)
+        ]
+    elif profile_lines and len(profile_lines) >= len(polygon_coords):
         region_ids = []
-        for i in range(len(polygons)):
+        for i in range(len(polygon_coords)):
             mat_id = profile_lines[i].get('mat_id')
             if mat_id is not None:
                 region_ids.append(mat_id)
@@ -106,7 +121,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                 region_ids.append(i)
     else:
         # Fallback to sequential IDs if no profile_lines provided
-        region_ids = [i for i in range(len(polygons))]
+        region_ids = [i for i in range(len(polygon_coords))]
 
     if element_type not in ['tri3', 'tri6', 'quad4', 'quad8', 'quad9']:
         raise ValueError("element_type must be 'tri3', 'tri6', 'quad4', 'quad8', or 'quad9'")
@@ -173,7 +188,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     short_edge_points = set()  # Points that are endpoints of short edges
     
     # Pre-pass to identify short edges - improved logic
-    for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
+    for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
         poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
         for i in range(len(poly_pts_clean)):
             p1 = poly_pts_clean[i]
@@ -200,7 +215,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                 print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
     
     # Main pass: Create points with appropriate sizes
-    for idx, (poly_pts, region_id) in enumerate(zip(polygons, region_ids)):
+    for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
         poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))  # make a copy
         pt_tags = []
         for x, y in poly_pts_clean:
@@ -1231,7 +1246,9 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
         slope_data: Dictionary containing slope geometry data
         
     Returns:
-        List of polygons, each defined by (x,y) coordinate tuples
+        List of polygons as dicts with keys:
+            "coords": list of (x, y) coordinate tuples
+            "mat_id": optional material ID (0-based) or None
     """
     import numpy as np
     import copy
@@ -1679,7 +1696,11 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
         
         # Clean up polygon (should rarely do anything)
         poly = clean_polygon(poly)
-        polygons.append(poly)
+        mat_id = profile_lines[i].get("mat_id") if i < len(profile_lines) else None
+        polygons.append({
+            "coords": poly,
+            "mat_id": mat_id
+        })
     
     # Add distributed load points to polygon edges if coincident
     polygons = add_dload_points_to_polygons(polygons, slope_data)
@@ -1696,7 +1717,7 @@ def add_dload_points_to_polygons(polygons, slope_data):
     but not existing vertices.
     
     Parameters:
-        polygons: List of polygons (lists of (x,y) tuples)
+        polygons: List of polygons (list of (x,y) tuples) or dicts with "coords"
         slope_data: Dictionary containing slope data
         
     Returns:
@@ -1721,7 +1742,8 @@ def add_dload_points_to_polygons(polygons, slope_data):
     # Process each polygon
     updated_polygons = []
     for poly in polygons:
-        updated_poly = list(poly)  # Make a copy
+        coords = poly.get("coords", []) if isinstance(poly, dict) else poly
+        updated_poly = list(coords)  # Make a copy
         
         # Check each point against polygon edges
         for check_point in points_to_check:
@@ -1748,7 +1770,12 @@ def add_dload_points_to_polygons(polygons, slope_data):
                     updated_poly.insert(i + 1, (round(x_check, 6), round(y_check, 6)))
                     break  # Only insert once per point
         
-        updated_polygons.append(updated_poly)
+        if isinstance(poly, dict):
+            updated_entry = dict(poly)
+            updated_entry["coords"] = updated_poly
+            updated_polygons.append(updated_entry)
+        else:
+            updated_polygons.append(updated_poly)
     
     return updated_polygons
 
@@ -1799,29 +1826,33 @@ def print_polygon_summary(polygons):
     Prints a summary of the generated polygons for diagnostic purposes.
     
     Parameters:
-        polygons: List of polygon coordinate lists
+        polygons: List of polygon coordinate lists or dicts with "coords"
     """
     print("=== POLYGON SUMMARY ===")
     print(f"Number of material zones: {len(polygons)}")
     print()
     
     for i, polygon in enumerate(polygons):
-        print(f"Material Zone {i+1} (Material ID: {i}):")
-        print(f"  Number of vertices: {len(polygon)}")
+        coords = polygon.get("coords") if isinstance(polygon, dict) else polygon
+        mat_id = polygon.get("mat_id") if isinstance(polygon, dict) else i
+        if mat_id is None:
+            mat_id = i
+        print(f"Material Zone {i+1} (Material ID: {mat_id}):")
+        print(f"  Number of vertices: {len(coords)}")
         
         # Calculate area (simple shoelace formula)
         area = 0
-        for j in range(len(polygon) - 1):
-            x1, y1 = polygon[j]
-            x2, y2 = polygon[j + 1]
+        for j in range(len(coords) - 1):
+            x1, y1 = coords[j]
+            x2, y2 = coords[j + 1]
             area += (x2 - x1) * (y2 + y1) / 2
         area = abs(area)
         
         print(f"  Approximate area: {area:.2f} square units")
         
         # Print bounding box
-        xs = [x for x, y in polygon]
-        ys = [y for x, y in polygon]
+        xs = [x for x, y in coords]
+        ys = [y for x, y in coords]
         print(f"  Bounding box: x=[{min(xs):.2f}, {max(xs):.2f}], y=[{min(ys):.2f}, {max(ys):.2f}]")
         print()
 
@@ -2996,7 +3027,7 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
     This ensures that polygons have vertices at all intersection points with reinforcement lines.
     
     Parameters:
-        polygons: List of polygons (lists of (x,y) tuples)
+        polygons: List of polygons (lists of (x,y) tuples) or dicts with "coords"
         lines: List of reinforcement lines (lists of (x,y) tuples)
         debug: Enable debug output
         
@@ -3012,7 +3043,12 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
     # Make a copy of polygons to modify
     updated_polygons = []
     for poly in polygons:
-        updated_polygons.append(list(poly))  # Convert to list for modification
+        if isinstance(poly, dict):
+            updated_entry = dict(poly)
+            updated_entry["coords"] = list(poly.get("coords", []))
+            updated_polygons.append(updated_entry)
+        else:
+            updated_polygons.append(list(poly))  # Convert to list for modification
     
     # Find all intersections
     for line_idx, line_pts in enumerate(lines):
@@ -3028,10 +3064,11 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
             
             # Check intersection with each polygon
             for poly_idx, poly in enumerate(updated_polygons):
+                poly_coords = poly.get("coords", []) if isinstance(poly, dict) else poly
                 # Check each edge of this polygon
-                for j in range(len(poly)):
-                    poly_edge_start = poly[j]
-                    poly_edge_end = poly[(j + 1) % len(poly)]
+                for j in range(len(poly_coords)):
+                    poly_edge_start = poly_coords[j]
+                    poly_edge_end = poly_coords[(j + 1) % len(poly_coords)]
                     
                     # Find intersection point if it exists
                     intersection = line_segment_intersection(
@@ -3045,7 +3082,7 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                         
                         # Check if intersection point is already a vertex of this polygon
                         is_vertex = False
-                        for vertex in poly:
+                        for vertex in poly_coords:
                             if abs(vertex[0] - intersection[0]) < 1e-8 and abs(vertex[1] - intersection[1]) < 1e-8:
                                 is_vertex = True
                                 break
@@ -3054,7 +3091,10 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
                             # Insert intersection point into polygon at the correct position
                             # Insert after vertex j (which is the start of the edge)
                             insert_idx = j + 1
-                            updated_polygons[poly_idx].insert(insert_idx, intersection)
+                            if isinstance(updated_polygons[poly_idx], dict):
+                                updated_polygons[poly_idx]["coords"].insert(insert_idx, intersection)
+                            else:
+                                updated_polygons[poly_idx].insert(insert_idx, intersection)
                             
                             if debug:
                                 print(f"Added intersection point {intersection} to polygon {poly_idx} at position {insert_idx}")

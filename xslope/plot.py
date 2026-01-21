@@ -2027,7 +2027,7 @@ def plot_polygons(
     Plot all material zone polygons in a single figure.
     
     Parameters:
-        polygons: List of polygon coordinate lists
+        polygons: List of polygon coordinate lists or dicts with "coords"/"mat_id"
         materials: Optional list of material dicts (with key "name") or list of material
             name strings. If provided, the material name will be used in the legend.
         nodes: If True, plot each polygon vertex as a dot.
@@ -2039,18 +2039,22 @@ def plot_polygons(
     
     fig, ax = plt.subplots(figsize=figsize)
     for i, polygon in enumerate(polygons):
-        xs = [x for x, y in polygon]
-        ys = [y for x, y in polygon]
+        coords = polygon.get("coords", []) if isinstance(polygon, dict) else polygon
+        xs = [x for x, y in coords]
+        ys = [y for x, y in coords]
+        mat_idx = polygon.get("mat_id") if isinstance(polygon, dict) else i
+        if mat_idx is None:
+            mat_idx = i
         mat_name = None
-        if materials is not None and i < len(materials):
-            item = materials[i]
+        if materials is not None and 0 <= mat_idx < len(materials):
+            item = materials[mat_idx]
             if isinstance(item, dict):
                 mat_name = item.get("name", None)
             elif isinstance(item, str):
                 mat_name = item
-        label = mat_name if mat_name else f"Material {i}"
-        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=label)
-        ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
+        label = mat_name if mat_name else f"Material {mat_idx}"
+        ax.fill(xs, ys, color=get_material_color(mat_idx), alpha=0.6, label=label)
+        ax.plot(xs, ys, color=get_material_color(mat_idx), linewidth=1)
         if nodes:
             # Avoid legend clutter by not adding a label here.
             ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3)
@@ -2075,7 +2079,7 @@ def plot_polygons_separately(polygons, materials=None, save_png=False, dpi=300):
     Plot each polygon in a separate matplotlib frame (subplot), with vertices as round dots.
     
     Parameters:
-        polygons: List of polygon coordinate lists
+        polygons: List of polygon coordinate lists or dicts with "coords"/"mat_id"
         materials: Optional list of material dicts (with key "name") or list of material
             name strings. If provided, the material name will be included in each subplot title.
     """
@@ -2084,25 +2088,29 @@ def plot_polygons_separately(polygons, materials=None, save_png=False, dpi=300):
     n = len(polygons)
     fig, axes = plt.subplots(n, 1, figsize=(8, 3 * n), squeeze=False)
     for i, polygon in enumerate(polygons):
-        xs = [x for x, y in polygon]
-        ys = [y for x, y in polygon]
+        coords = polygon.get("coords", []) if isinstance(polygon, dict) else polygon
+        xs = [x for x, y in coords]
+        ys = [y for x, y in coords]
         ax = axes[i, 0]
-        ax.fill(xs, ys, color=get_material_color(i), alpha=0.6, label=f'Material {i}')
-        ax.plot(xs, ys, color=get_material_color(i), linewidth=1)
+        mat_idx = polygon.get("mat_id") if isinstance(polygon, dict) else i
+        if mat_idx is None:
+            mat_idx = i
+        ax.fill(xs, ys, color=get_material_color(mat_idx), alpha=0.6, label=f'Material {mat_idx}')
+        ax.plot(xs, ys, color=get_material_color(mat_idx), linewidth=1)
         ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3, label='Vertices')
         ax.set_xlabel('X Coordinate')
         ax.set_ylabel('Y Coordinate')
         mat_name = None
-        if materials is not None and i < len(materials):
-            item = materials[i]
+        if materials is not None and 0 <= mat_idx < len(materials):
+            item = materials[mat_idx]
             if isinstance(item, dict):
                 mat_name = item.get("name", None)
             elif isinstance(item, str):
                 mat_name = item
         if mat_name:
-            ax.set_title(f'Material {i}: {mat_name}')
+            ax.set_title(f'Material {mat_idx}: {mat_name}')
         else:
-            ax.set_title(f'Material {i}')
+            ax.set_title(f'Material {mat_idx}')
         ax.grid(True, alpha=0.3)
         ax.set_aspect('equal')
         # Intentionally no legend: these plots are typically used for debugging geometry,

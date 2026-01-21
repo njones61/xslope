@@ -149,7 +149,7 @@ def load_slope_data(filepath):
     # XY coordinates start in row 7 (index 6)
     header_row = 3  # Excel row 4 (0-indexed)
     mat_id_row = 4  # Excel row 5 (0-indexed)
-    coords_start_row = 6  # Excel row 7 (0-indexed)
+    coords_start_row = 7  # Excel row 8 (0-indexed)
     
     col = 0  # Start with column A (index 0)
     while col < profile_df.shape[1]:
@@ -392,6 +392,10 @@ def load_slope_data(filepath):
         y_col = col + 1
         normal_col = col + 2
         
+        # Check if dataframe has enough rows before accessing start_row
+        if dload_df.shape[0] <= start_row:
+            break  # Not enough rows, stop reading
+
         # Check if this distributed load block is empty (check first row for X coordinate)
         if pd.isna(dload_df.iloc[start_row, x_col]):
             break  # Stop reading when we encounter an empty distributed load

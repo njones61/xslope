@@ -39,8 +39,8 @@ The template consists of 10 worksheets, each serving a specific purpose. Differe
 |------------|-------------|:---:|:----:|:---:|
 | **main** | Global parameters and instructions | X   | X    | X   |
 | **plot** | Auto-generated geometry preview | X   | X    | X   |
-| **profile** | XY coordinates of profile lines defining slope geometry | X   | X    | X   |
 | **mat** | Material properties including strength, permeability, and stiffness | X   | X    | X   |
+| **profile** | XY coordinates of profile lines defining slope geometry | X   | X    | X   |
 | **piezo** | Piezometric lines for pore pressure calculations | X   |      | X   |
 | **circles** | Circular failure surface definitions | X   |      |     |
 | **non-circ** | Non-circular failure surface coordinates | X   |      |     |
@@ -96,41 +96,11 @@ the horizontal scale.
 
 ---
 
-## Worksheet: profile
-
-![sheet_profile.png](images/sheet_profile.png)
-
-The **profile** worksheet defines the slope geometry using XY coordinates of profile lines are the primary input for 
-all types of analysis (LEM, SEEP, and FEM). 
-Each profile line the top of a soil layer or profile and all of the soil below that line and above all of the lower 
-profile lines is assumed to consist of the material associated with the profile line. The material id listed for each profile line references one of the materials in the 
-material properties table. For example, consider a slope with three layers:
-
-![profile_lines.png](images/profile_lines.png)
-
-The profile lines should always be drawn in the order of increasing depth, from top to bottom and the XY coordinates 
-defining the line should be listed from left to right. In the example above, the top profile line has three points, 
-the next line has three points, and the last line has two points. Each line should have at least two points. The 
-bottom of the slope is defined by the Max Depth parameter at the top of the **profile** worksheet. This defines a 
-horizontal base to the problem. During a limit equilibrium analysis using an automated search algorithm, the failure 
-surface is not allowed to go below this depth. Thus, it can be thought of as a bedrock surface.
-
-The template includes tables for 15 profile lines, organized horizontally. However, you can copy additional tables to the right as needed. There is no limit to the number of profile lines that can be defined. Furthermore, each table includes 20 rows of XY coordinates, but you can add as many rows as needed.
-
-During analysis, xslope uses these lines to:
-
-1. Construct the ground surface by finding the highest elevation at each x-coordinate
-2. Determine slice geometry when a failure surface is intersected with the profile
-3. Assign material properties to slices based on which layer they fall within
-4. Build polygons for finite element meshing in seepage or FEM analysis
-
----
-
 ## Worksheet: mat
 
 ![sheet_mat1.png](images/sheet_mat1.png)
 
-The **mat** worksheet defines material properties for the soil layer defined by the profile lines. Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
+The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -169,6 +139,41 @@ These parameters are defined in more detail in the [seepage analysis](../seep/ov
 
 - **E**: Young's modulus
 - **ν**: Poisson's ratio
+
+---
+
+## Worksheet: profile
+
+![sheet_profile.png](images/sheet_profile.png)
+
+The **profile** worksheet defines the slope geometry using XY coordinates of profile lines are the primary input for 
+all types of analysis (LEM, SEEP, and FEM). 
+Each profile line the top of a soil layer or profile and all of the soil below that line and above all of the lower 
+profile lines is assumed to consist of the material associated with the profile line. The material id listed for each profile line references one of the materials in the 
+material properties table. The material name in row 6 is found by using the material ids in row 5 to look up the 
+name in the second column of the materials table.
+
+To illustrate how profile lines can be used to define the geometry of a slope, consider the following slope 
+with three 
+layers:
+
+![profile_lines.png](images/profile_lines.png)
+
+The profile lines should always be drawn in the order of increasing depth, from top to bottom and the XY coordinates 
+defining the line should be listed from left to right. In the example above, the top profile line has three points, 
+the next line has three points, and the last line has two points. Each line should have at least two points. The 
+bottom of the slope is defined by the Max Depth parameter at the top of the **profile** worksheet. This defines a 
+horizontal base to the problem. During a limit equilibrium analysis using an automated search algorithm, the failure 
+surface is not allowed to go below this depth. Thus, it can be thought of as a bedrock surface.
+
+The template includes tables for 15 profile lines, organized horizontally. However, you can copy additional tables to the right as needed. There is no limit to the number of profile lines that can be defined. Furthermore, each table includes 20 rows of XY coordinates, but you can add as many rows as needed.
+
+During analysis, xslope uses these lines to:
+
+1. Construct the ground surface by finding the highest elevation at each x-coordinate
+2. Determine slice geometry when a failure surface is intersected with the profile
+3. Assign material properties to slices based on which layer they fall within
+4. Build polygons for finite element meshing in seepage or FEM analysis
 
 ---
 

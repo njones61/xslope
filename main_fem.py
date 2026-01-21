@@ -18,7 +18,11 @@ polygons = build_polygons(slope_data)
 
 target_size = 2
 
-mesh = build_mesh_from_polygons(polygons, target_size, 'quad8')
+mesh = build_mesh_from_polygons(
+    polygons,
+    target_size,
+    'quad8'
+)
 
 #plot_mesh(mesh, materials=slope_data['materials'])
 

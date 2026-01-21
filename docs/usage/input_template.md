@@ -116,7 +116,7 @@ The **mat** worksheet defines material properties for the soil layer defined by 
 **Pore Pressure Options** (column K):
 
 - **piezo**: Use piezometric line from **piezo** worksheet
-- **seep**: Interpolate from seepage analysis solution (requires mesh and solution files - see [Using Seepage Results for Pore Pressures](../seep/pore.md))
+- **seep**: Interpolate from seepage analysis solution (requires mesh and solution files - see [Using Seepage Results for Pore Pressures](../seep/seep_slope.md))
 - **none**: No pore pressure
 
 **Variability** (for reliability analysis):

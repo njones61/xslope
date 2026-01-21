@@ -44,8 +44,7 @@ nav:
     - Sample Problems: lem/samples.md
   - Seepage Analysis:
     - Overview: seep/overview.md
-    - Problem Setup: seep/setup.md
-    - Pore pressures: seep/pore.md
+    - Seep-Slope Integration: seep/seep_slope.md
     - Sample Problems: seep/samples.md
   - Finite Element Method:
     - Overview: fem/overview.md

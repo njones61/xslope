@@ -297,67 +297,12 @@ The system automatically interpolates the specified head value along the line se
 
 ### Seepage Solution Integration
 
-For problems requiring seepage analysis coupled with either limit equilibrium or finite element slope stability calculations, XSLOPE provides seamless integration through pre-computed seepage solutions. This approach separates the computationally intensive seepage analysis from the slope stability analysis, enabling efficient parameter studies and optimization workflows.
+For problems requiring seepage analysis coupled with either limit equilibrium or finite element slope stability 
+calculations, XSLOPE provides seamless integration through pre-computed seepage solutions. This approach separates 
+the computationally intensive seepage analysis from the slope stability analysis, enabling efficient parameter 
+studies and optimization workflows. This process is described in more detail in the [Seepage - Slope Stability 
+Integration](seep_slope.md) section.
 
-In the materials table on the `materials` sheet of the Excel input template, the user can select one of three options for pore pressures used in an effective stress analysis for each material:
-
-| Option | Description |
-|------- |-------------|
-| none   | No pore pressures. This is appropriate for dry soils or total stress analysis |
-| piezo  | Pore presssure are derived from a piezometric line defined on the `piezo` tabl |
-| seep   | Pore pressures are derived from the results of a 2D finite element seepage analysis |
-
- For the `seep` option, the user first performs a seepage analysis and exports the resulting finite element mesh and solution file. These files are then referenced for a subsequent slope stability analysis using the three input variables just below the materials table in the Excel template:
-
-**Mesh File (JSON format):** Contains the finite element mesh used for seepage analysis, including node coordinates, element connectivity, and material zone assignments. This mesh is generated using the automated mesh generation capabilities documented in the mesh generation section.
-
-**Primary Solution File (CSV format):** Contains the seepage analysis results for the primary groundwater condition, typically steady-state conditions or the most critical transient condition. The file includes hydraulic head and pore pressure values at each mesh node.
-
-**Secondary Solution File (CSV format, optional):** A second solution can be used for rapid drawdown scenarios where slopes are analyzed under both full reservoir and drawn-down conditions.
-
-The pore pressure values from these solution files are automatically interpolated to slice locations during limit equilibrium analysis, ensuring that the slope stability calculations properly account for the complex pore pressure distributions computed by the seepage analysis.
-
-It is also possible to generate the mesh and solution after importing the Excel input template. In other words, the seepage anlysis can be performed at the same time as the slope stability analysis, eliminating the need to save and then reference the mesh and solution files. Example code is shown below. 
-
-## Seepage Results for Pore Pressures
-
-### Pore Pressure Calculation
-
-The primary output of seepage analysis is the hydraulic head distribution throughout the analysis domain. However, slope stability analysis requires pore pressure values rather than hydraulic heads. The conversion between these quantities follows the fundamental relationship:
-
->>$u = \gamma_w (h - z)$
-
-where:
-- $u$ is the pore water pressure
-- $\gamma_w$ is the unit weight of water (typically 9.81 kN/m³ or 62.4 lbf/ft³)
-- $h$ is the hydraulic head from seepage analysis
-- $z$ is the elevation coordinate
-
-This relationship automatically accounts for the effect of elevation on pore pressure while preserving the hydraulic gradients computed by the seepage analysis. Positive pore pressures indicate groundwater under pressure (below the phreatic surface), while zero or negative values indicate conditions above the groundwater table.
-
-### Conservative Treatment of Negative Pore Pressures
-
-In certain situations, the seepage analysis may compute negative pore pressures (tensions) in portions of the domain, particularly in unsaturated zones or regions with strong capillary effects. While these negative pore pressures may be physically realistic, their inclusion in slope stability analysis can lead to unconservative results by artificially increasing effective stresses and apparent slope stability.
-
-XSLOPE implements a conservative approach by automatically setting any computed negative pore pressures to zero before transferring them to slope stability calculations. This treatment ensures that:
-
-**Conservative Assessment:** Slope stability calculations do not benefit from potentially unreliable tensile strength in pore water
-**Physical Realism:** Avoids dependence on soil-water tension effects that may not persist under loading conditions
-**Robustness:** Eliminates sensitivity to uncertain unsaturated soil parameters that may not be well-characterized
-
-### Interpolation to Slice Locations
-
-The integration of seepage analysis results with limit equilibrium slope stability calculations requires interpolation of pore pressures from the seepage mesh nodes to the slice centroids used in limit equilibrium analysis. XSLOPE implements a robust interpolation scheme that preserves the accuracy of the computed pore pressure field while ensuring computational efficiency.
-
-The interpolation process follows these key steps:
-
-**Spatial Search:** For each slice centroid, the system identifies the seepage analysis element containing that point using efficient spatial search algorithms.
-
-**Shape Function Evaluation:** The pore pressure at the slice centroid is computed using the finite element shape functions and the nodal pore pressure values of the containing element:
-
->>$u(x,y) = \sum_{i=1}^{n} N_i(x,y) \cdot u_i$
-
-where $N_i$ are the element shape functions and $u_i$ are the nodal pore pressures.
 
 ### Flow Net Generation and Visualization
 
@@ -535,78 +480,6 @@ def parametric_seepage_study():
 
 # Run parametric study
 parametric_results = parametric_seepage_study()
-```
-
-### Integration with Limit Equilibrium Analysis
-
-This example shows how to integrate seepage results with slope stability analysis:
-
-```python
-from slice import generate_slices
-from solve import bishop, spencer
-from plot import plot_solution
-
-def coupled_seepage_stability_analysis():
-    """Perform coupled seep-stability analysis."""
-    
-    # Load and prepare slope data
-    slope_data = load_slope_data("inputs/slope/input_template_lface5.xlsx")
-    
-    # Generate seep mesh and solve
-    polygons = build_polygons(slope_data)
-    mesh = build_mesh_from_polygons(polygons, target_size=1.5, element_type='tri6')
-    seep_data = build_seep_data(mesh, slope_data)
-    seepage_solution = run_seepage_analysis(seep_data)
-    
-    # Store seep results in slope_data for limit equilibrium analysis
-    slope_data['seep_mesh'] = mesh
-    slope_data['seep_u'] = seepage_solution['head']  # Will be converted to pore pressures
-    
-    # Define circular failure surface for analysis
-    failure_surface = {
-        'xc': 25.0,     # Center x-coordinate
-        'yc': 45.0,     # Center y-coordinate  
-        'radius': 35.0  # Radius
-    }
-    
-    # Generate analysis slices
-    slice_df = generate_slices(
-        slope_data, 
-        failure_surface, 
-        num_slices=20
-    )
-    
-    print(f"Generated {len(slice_df)} slices for stability analysis")
-    
-    # Solve using multiple limit equilibrium methods
-    methods = ['bishop', 'spencer']
-    results = {}
-    
-    # Bishop's method
-    success_bishop, result_bishop = bishop(slice_df)
-    if success_bishop:
-        results['bishop'] = result_bishop['FS']
-        print(f"Bishop's Method: FS = {result_bishop['FS']:.3f}")
-    
-    # Spencer's method  
-    success_spencer, result_spencer = spencer(slice_df)
-    if success_spencer:
-        results['spencer'] = result_spencer['FS']
-        print(f"Spencer's Method: FS = {result_spencer['FS']:.3f}")
-    
-    # Plot stability analysis results
-    if success_bishop:
-        plot_solution(slice_df, result_bishop, slope_data, failure_surface, 
-                     title="Coupled Seepage-Stability Analysis (Bishop)")
-    
-    # Plot seep solution for comparison
-    plot_seep_solution(seep_data, seepage_solution, 
-                      title="Seepage Analysis - Pore Pressures for Stability Analysis")
-    
-    return results, seepage_solution
-
-# Run coupled analysis
-stability_results, seepage_results = coupled_seepage_stability_analysis()
 ```
 
 ### Export and Visualization of Results

@@ -1,14 +1,12 @@
 # Sample Problems - Seepage Analysis
 
-## 1. Basic Analysis
-
-This notebook is for running basic seepage analysis without a slope stability analysis.
+The following examples illustrate how to use XSLOPE to perform seepage analysis. The problems feature both saturated and unsaturated conditions. Each of the Excel input files below can be used with the following notebook which has been set up specifically for running seepage analyses:
 
 <a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_seep.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-The following sample problems can be used with this notebook
+These problems feature standalone seepage analyses. For instructions on to run an integrated seepage analysis with slope stability analysis, see the [Integrated Seeapage and Slope Stability Analysis](seep_slope.md) page.
 
-### (a) Sheetpile with Clay Blanket
+### 1. Sheetpile with Clay Blanket
 
 Saturated problem with a partially penetrating sheetpile and a clay blanket. Should have upstream head BC = 13m up 
 to the tip of the blanket. Downstream head BC = 10m. The profile line should follow th edge of the sheetpile (down 
@@ -25,7 +23,7 @@ The solution should look something like this:
 
 ![clay_blanket_solution.png](images/clay_blanket_solution.png){width=1200px}
 
-### (b) Earth Dam with Core
+### 2. Earth Dam with Core
 
 The following diagram illustrates a simple earth dam with a clay core and a granular shell:
 
@@ -45,7 +43,7 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-### (c) Johnson Reservoir
+### 3. Johnson Reservoir
 
 This is another earth dam problem with a shell, a core, and a foundation. 
 
@@ -62,7 +60,7 @@ The solution should look something like this:
 
 ![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
 
-### (d) Earth Dam with Core and Filter
+### 4. Earth Dam with Core and Filter
 
 This problem has the following cross-section:
 

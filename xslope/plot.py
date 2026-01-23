@@ -673,11 +673,16 @@ def plot_circles(ax, slope_data):
             dx /= length
             dy /= length
 
-        # Shorten shaft length slightly
-        shaft_length = R - 5
-
-        ax.arrow(Xo, Yo, dx * shaft_length, dy * shaft_length,
-                 head_width=5, head_length=5, fc='red', ec='red')
+        # Draw arrow with pixel-based head size
+        ax.annotate('',
+                    xy=(Xo + dx * R, Yo + dy * R),  # arrow tip
+                    xytext=(Xo, Yo),                 # arrow start
+                    arrowprops=dict(
+                        arrowstyle='-|>',
+                        color='red',
+                        lw=1.0,            # shaft width in points
+                        mutation_scale=20  # head size in points
+                    ))
 
 def plot_non_circ(ax, non_circ):
     """
@@ -1231,11 +1236,11 @@ def plot_inputs(
     slope_data,
     title="Slope Geometry and Inputs",
     figsize=(12, 6),
-    mat_table=True,
+    mat_table=False,
     save_png=False,
     dpi=300,
     mode="lem",
-    tab_loc="upper left",
+    tab_loc="top",
     legend_ncol="auto",
     legend_max_cols=6,
     legend_max_rows=4,

@@ -10,17 +10,17 @@ The notebook allows the user to select a variety of analysis options using simpl
 
 This problem features a simple slope with a single material. 
 
-![simple_embankment.png](sample_images/simple_embankment.png){width=800}
+![simple_embankment.png](sample_images/simple_embankment.png){width=700}
 
 Excel input file: [xslope_simple_embankment.xlsx](files/xslope_simple_embankment.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![simple_embankment_inputs.png](sample_images/simple_embankment_inputs.png){width=800}
+![simple_embankment_inputs1.png](sample_images/simple_embankment_inputs1.png)
 
 Solution:
 
-![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=800}
+![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
 
 Here is copy of the input file with the following variations/changes:
 

@@ -7,12 +7,12 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_simple_embankment.xlsx")
+slope_data = load_slope_data("docs/lem/files/xslope_simple_embankment_mods.xlsx")
 plot_inputs(slope_data, mode='lem')
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 30 # @param {"type":"integer"}
-analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
+analysis_type = "single_surface" # @param ["single_surface","all_methods", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}

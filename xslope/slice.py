@@ -264,22 +264,6 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
     return True, "", pruned
 
 
-def adjust_ground_for_tcrack(ground_surface, x_center, tcrack_depth, right_facing):
-    # helper function to adjust the ground surface for tension crack
-    if tcrack_depth <= 0:
-        return ground_surface
-
-    new_coords = []
-    for x, y in ground_surface.coords:
-        if right_facing and x < x_center:
-            new_coords.append((x, y - tcrack_depth))
-        elif not right_facing and x > x_center:
-            new_coords.append((x, y - tcrack_depth))
-        else:
-            new_coords.append((x, y))
-    return LineString(new_coords)
-
-
 def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None, tcrack_depth=0):
     """
     Generates a failure surface based on either a circular or non-circular definition.
@@ -311,7 +295,7 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     else:
         return False, "Either a circular or non-circular failure surface must be provided."
 
-    # --- Step 2: Intersect with original ground surface to determine slope facing ---
+    # --- Step 2: Intersect with original ground surface to determine slope facing and toe ---
     if circular and circle:
         success, msg, points = get_sorted_intersections(failure_surface, ground_surface, circle_params=circle)
     else:
@@ -322,41 +306,64 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     x_min, x_max = points[0].x, points[1].x
     y_left, y_right = points[0].y, points[1].y
     right_facing = y_left > y_right
-    x_center = 0.5 * (x_min + x_max)
 
-    # --- Step 3: If tension crack exists, adjust surface and re-intersect ---
+    # --- Step 3: If tension crack exists, find intersection with tension crack surface ---
     if tcrack_depth > 0:
-        modified_surface = adjust_ground_for_tcrack(ground_surface, x_center, tcrack_depth, right_facing)
+        # Create tension crack surface as parallel offset of entire ground surface
+        tcrack_surface = LineString([(x, y - tcrack_depth) for x, y in ground_surface.coords])
+
+        # Find intersection of failure surface with tension crack surface
         if circular and circle:
-            success, msg, points = get_sorted_intersections(failure_surface, modified_surface, circle_params=circle)
+            tcrack_points = circle_polyline_intersections(Xo, Yo, R, tcrack_surface)
         else:
-            success, msg, points = get_sorted_intersections(failure_surface, modified_surface)
-        if not success:
-            return False, msg
-        x_min, x_max = points[0].x, points[1].x
-        y_left, y_right = points[0].y, points[1].y
+            tcrack_intersection = failure_surface.intersection(tcrack_surface)
+            if isinstance(tcrack_intersection, Point):
+                tcrack_points = [tcrack_intersection]
+            elif isinstance(tcrack_intersection, MultiPoint):
+                tcrack_points = list(tcrack_intersection.geoms)
+            elif isinstance(tcrack_intersection, GeometryCollection):
+                tcrack_points = [g for g in tcrack_intersection.geoms if isinstance(g, Point)]
+            else:
+                tcrack_points = []
+
+        if len(tcrack_points) >= 1:
+            # Sort tension crack intersection points by x
+            tcrack_points = sorted(tcrack_points, key=lambda p: p.x)
+
+            if right_facing:
+                # Right-facing slope: tension crack is on the left (upslope)
+                # Use leftmost tcrack intersection as new x_min
+                new_left = tcrack_points[0]
+                x_min = new_left.x
+                y_left = new_left.y
+            else:
+                # Left-facing slope: tension crack is on the right (upslope)
+                # Use rightmost tcrack intersection as new x_max
+                new_right = tcrack_points[-1]
+                x_max = new_right.x
+                y_right = new_right.y
 
     # --- Step 4: Clip the failure surface between intersection x-range ---
     # Filter coordinates within the x-range
     filtered_coords = [pt for pt in failure_coords if x_min <= pt[0] <= x_max]
-    
+
     # Add the exact intersection points if they're not already in the filtered list
     left_intersection = (x_min, y_left)
     right_intersection = (x_max, y_right)
-    
+
     # Check if intersection points are already in the filtered list (with tolerance)
     tol = 1e-6
     has_left = any(abs(pt[0] - x_min) < tol and abs(pt[1] - y_left) < tol for pt in filtered_coords)
     has_right = any(abs(pt[0] - x_max) < tol and abs(pt[1] - y_right) < tol for pt in filtered_coords)
-    
+
     if not has_left:
         filtered_coords.insert(0, left_intersection)
     if not has_right:
         filtered_coords.append(right_intersection)
-    
+
     # Sort by x-coordinate to ensure proper ordering
     filtered_coords.sort(key=lambda pt: pt[0])
-    
+
     clipped_surface = LineString(filtered_coords)
 
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
@@ -600,10 +607,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             intersection = line_geom.intersection(circle_line)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
-                    fixed_xs.add(intersection.x)
+                    if x_min <= intersection.x <= x_max:
+                        fixed_xs.add(intersection.x)
                 elif hasattr(intersection, 'geoms'):
                     for geom in intersection.geoms:
-                        if hasattr(geom, 'x'):
+                        if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
                             fixed_xs.add(geom.x)
     else:
         # For non-circular failure surfaces, use the original approach
@@ -611,10 +619,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             intersection = LineString(profile_lines[i]['coords']).intersection(clipped_surface)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
-                    fixed_xs.add(intersection.x)
+                    if x_min <= intersection.x <= x_max:
+                        fixed_xs.add(intersection.x)
                 elif hasattr(intersection, 'geoms'):
                     for geom in intersection.geoms:
-                        if hasattr(geom, 'x'):
+                        if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
                             fixed_xs.add(geom.x)
 
     # Find intersections with piezometric lines

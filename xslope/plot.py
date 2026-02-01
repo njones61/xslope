@@ -466,22 +466,159 @@ def plot_seepage_bc_lines(ax, slope_data):
             label="Exit Face",
         )
 
-def plot_tcrack_surface(ax, tcrack_surface):
+def plot_tcrack_surface(ax, slope_data):
     """
-    Plots the tension crack surface as a thin dashed red line.
+    Plots the tension crack surface as a thin dashed red line, clipped to max_depth.
 
     Parameters:
         ax: matplotlib Axes object
-        tcrack_surface: Shapely LineString
+        slope_data: Dictionary containing tcrack_surface and max_depth
 
     Returns:
         None
     """
+    tcrack_surface = slope_data.get('tcrack_surface')
     if tcrack_surface is None:
         return
 
-    x_vals, y_vals = tcrack_surface.xy
-    ax.plot(x_vals, y_vals, linestyle='--', color='red', linewidth=1.0, label='Tension Crack Depth')
+    color = 'red'
+    linestyle = ':'
+    linewidth = 1.5
+
+    max_depth = slope_data.get('max_depth')
+    if max_depth is None:
+        # No clipping needed
+        x_vals, y_vals = tcrack_surface.xy
+        ax.plot(x_vals, y_vals, linestyle=linestyle, color=color, linewidth=linewidth, label='Tension Crack Depth')
+        return
+
+    # Get coordinates and clip to max_depth with interpolation
+    coords = list(tcrack_surface.coords)
+    x_clipped = []
+    y_clipped = []
+
+    for i in range(len(coords)):
+        x1, y1 = coords[i]
+
+        if y1 >= max_depth:
+            # Point is above max_depth, include it
+            x_clipped.append(x1)
+            y_clipped.append(y1)
+
+        # Check if segment crosses max_depth (need to interpolate)
+        if i < len(coords) - 1:
+            x2, y2 = coords[i + 1]
+            # Check if segment crosses max_depth
+            if (y1 < max_depth and y2 >= max_depth) or (y1 >= max_depth and y2 < max_depth):
+                # Interpolate to find crossing point
+                t = (max_depth - y1) / (y2 - y1)
+                x_cross = x1 + t * (x2 - x1)
+                x_clipped.append(x_cross)
+                y_clipped.append(max_depth)
+
+    if x_clipped:
+        ax.plot(x_clipped, y_clipped, linestyle=linestyle, color=color, linewidth=linewidth, label='Tension Crack Depth')
+
+
+def plot_tcrack_water_force(ax, slice_df, slope_data):
+    """
+    Plots the triangular water pressure distribution on the tension crack face.
+
+    The water in the tension crack creates a triangular pressure distribution
+    acting horizontally on the side of the top slice. Pressure is zero at the
+    water surface and maximum (gamma_w * water_depth) at the bottom.
+    The triangle is drawn on the outside of the slice, with arrows pointing
+    toward the slice to show force direction. The base of the triangle is
+    scaled to equal the water depth.
+
+    Parameters:
+        ax: matplotlib Axes object
+        slice_df: DataFrame containing slice data with 't' and 'y_t' columns
+        slope_data: Dictionary containing slope data including tcrack_water
+
+    Returns:
+        None
+    """
+    tcrack_water = slope_data.get('tcrack_water', 0)
+    if tcrack_water <= 0:
+        return
+
+    # Find the slice with the tension crack force
+    t_forces = slice_df['t'].abs()
+    if t_forces.max() == 0:
+        return
+
+    # Get the slice with the tension crack force
+    tcrack_slice_idx = t_forces.idxmax()
+    tcrack_slice = slice_df.loc[tcrack_slice_idx]
+
+    t_force = tcrack_slice['t']
+    y_rb = tcrack_slice['y_rb']
+    y_rt = tcrack_slice['y_rt']
+
+    # Determine if right-facing or left-facing based on sign of t
+    # Negative t means right-facing (force acts to the right, on left side of first slice)
+    # Positive t means left-facing (force acts to the left, on right side of last slice)
+    right_facing = t_force < 0
+
+    if right_facing:
+        # Water on left side of slice, triangle extends left (outside), arrows point right (into slice)
+        x_base = tcrack_slice['x_l']
+        triangle_direction = -1  # triangle extends left (outside the slice)
+        arrow_direction = 1      # arrows point right (into the slice)
+    else:
+        # Water on right side of slice, triangle extends right (outside), arrows point left (into slice)
+        x_base = tcrack_slice['x_r']
+        triangle_direction = 1   # triangle extends right (outside the slice)
+        arrow_direction = -1     # arrows point left (into the slice)
+
+    # Water surface is at ground level, bottom of water is at y_rb
+    y_water_top = y_rt  # top of water (at ground surface)
+    y_water_bottom = y_rb  # bottom of water (at failure surface)
+    water_depth = y_water_top - y_water_bottom
+
+    if water_depth <= 0:
+        return
+
+    # Scale so that the base of the triangle equals the water depth
+    max_length = tcrack_water  # base of triangle = water depth
+
+    # Arrow head dimensions (same style as distributed loads)
+    head_length = max_length / 8
+    head_width = head_length * 0.8
+
+    # Draw triangular pressure distribution (on outside of slice)
+    num_arrows = 5
+    y_positions = np.linspace(y_water_bottom, y_water_top, num_arrows + 1)[:-1]
+
+    for y_pos in y_positions:
+        # Arrow length proportional to depth (0 at top, max_length at bottom)
+        depth_from_surface = y_water_top - y_pos
+        arrow_length = max_length * (depth_from_surface / water_depth)
+
+        if arrow_length < 0.1:
+            continue  # Skip very short arrows
+
+        # Arrow starts from outside (triangle edge) and points toward slice
+        x_start = x_base + arrow_length * triangle_direction
+        dx = -arrow_length * triangle_direction  # direction toward slice
+
+        # Draw arrow using same style as distributed loads
+        if head_length > arrow_length:
+            # Draw a simple line without arrowhead for short arrows
+            ax.plot([x_start, x_base], [y_pos, y_pos],
+                   color='blue', linewidth=2, alpha=0.7)
+        else:
+            ax.arrow(x_start, y_pos, dx, 0,
+                    head_width=head_width, head_length=head_length,
+                    fc='blue', ec='blue', alpha=0.7,
+                    length_includes_head=True)
+
+    # Draw the triangular outline (pressure diagram) on outside of slice
+    triangle_x = [x_base, x_base + max_length * triangle_direction, x_base]
+    triangle_y = [y_water_top, y_water_bottom, y_water_bottom]
+    ax.fill(triangle_x, triangle_y, color='lightblue', alpha=0.3, edgecolor='blue', linewidth=1)
+
 
 def plot_dloads(ax, slope_data):
     """
@@ -1292,7 +1429,7 @@ def plot_inputs(
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data)
     plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_tcrack_surface(ax, slope_data)
     plot_reinforcement_lines(ax, slope_data)
 
     if slope_data['circular']:
@@ -1492,7 +1629,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_failure_surface(ax, failure_surface)
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_tcrack_surface(ax, slope_data)
+    plot_tcrack_water_force(ax, slice_df, slope_data)
     plot_reinforcement_lines(ax, slope_data)
     if slice_numbers:
         plot_slice_numbers(ax, slice_df)
@@ -1642,7 +1780,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_tcrack_surface(ax, slope_data)
 
     plot_failure_surfaces(ax, fs_cache)
     plot_circle_centers(ax, fs_cache)
@@ -1688,7 +1826,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_tcrack_surface(ax, slope_data)
 
     # Plot all failure surfaces from cache
     for i, result in reversed(list(enumerate(fs_cache))):
@@ -1755,7 +1893,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data['tcrack_surface'])
+    plot_tcrack_surface(ax, slope_data)
 
     # Plot reliability-specific failure surfaces
     fs_cache = reliability_data['fs_cache']

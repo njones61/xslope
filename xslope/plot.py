@@ -1325,7 +1325,18 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
         y_min -= max_bar
         y_max += max_bar
 
-    # 4) add a final small pad
+    # 4) account for distributed loads extending above ground surface
+    gamma_w = data.get('gamma_water', 62.4)
+    for dloads in [data.get('dloads', []), data.get('dloads2', [])]:
+        if dloads:
+            for line in dloads:
+                for pt in line:
+                    # dload arrows extend above surface by load/gamma_w (water depth equivalent)
+                    load = pt.get('Normal', 0)
+                    if load > 0:
+                        y_max = max(y_max, pt.get('Y', 0) + load / gamma_w)
+
+    # 5) add a final small pad
     pad = (y_max - y_min) * pad_fraction
     return y_min - pad, y_max + pad
 

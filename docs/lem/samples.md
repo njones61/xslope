@@ -28,10 +28,12 @@ a) Distributed load on top of slope. q = 750 psf<br>
 b) Tension crack. Depth = 3 ft<br>
 c) Submerged by 10 ft depth of water (distributed load)
 
-Excel input file: [xslope_simple_embankment.xlsx](files/xslope_simple_embankment.xlsx)
+Excel input file: [xslope_simple_embankment_mods.xlsx](files/xslope_simple_embankment_mods.xlsx){width=700}
 
 Inputs:
 
+![simple_embankment_inputs2.png](sample_images/simple_embankment_inputs2.png){width=700}
 
 Solution:
 
+![simple_embankment_results2.png](sample_images/simple_embankment_results2.png){width=700}

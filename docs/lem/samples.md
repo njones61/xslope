@@ -18,15 +18,16 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![simple_embankment_inputs1.png](sample_images/simple_embankment_inputs1.png)
 
-Solution:
+Solution (critical surface and factor of safety):
 
 ![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
 
 Here is copy of the input file with the following variations/changes:
 
 a) Distributed load on top of slope. q = 750 psf<br>
-b) Tension crack. Depth = 3 ft<br>
-c) Submerged by 10 ft depth of water (distributed load)
+b) Tension crack. Depth = 3 ft. <br>
+c) Tension crack filled with water.<br>
+d) Submerged by 10 ft depth of water (distributed load)
 
 Excel input file: [xslope_simple_embankment_mods.xlsx](files/xslope_simple_embankment_mods.xlsx){width=700}
 
@@ -34,6 +35,6 @@ Inputs:
 
 ![simple_embankment_inputs2.png](sample_images/simple_embankment_inputs2.png){width=700}
 
-Solution:
+Solution (critical surface and factor of safety):
 
 ![simple_embankment_results2.png](sample_images/simple_embankment_results2.png){width=700}

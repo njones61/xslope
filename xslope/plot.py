@@ -772,6 +772,8 @@ def plot_circles(ax, slope_data):
         None
     """
     circles = slope_data['circles']
+    tcrack_depth = slope_data.get('tcrack_depth', 0)
+
     for circle in circles:
         Xo = circle['Xo']
         Yo = circle['Yo']
@@ -781,9 +783,9 @@ def plot_circles(ax, slope_data):
         # y_circle = Yo + R * np.sin(theta)
         # ax.plot(x_circle, y_circle, 'r--', label='Circle')
 
-        # Plot the portion of the circle in the slope
+        # Plot the portion of the circle in the slope (clipped to tension crack if present)
         ground_surface = slope_data['ground_surface']
-        success, result = generate_failure_surface(ground_surface, circular=True, circle=circle)
+        success, result = generate_failure_surface(ground_surface, circular=True, circle=circle, tcrack_depth=tcrack_depth)
         if not success:
             continue  # or handle error
         # result = (x_min, x_max, y_left, y_right, clipped_surface)

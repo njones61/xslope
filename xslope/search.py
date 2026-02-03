@@ -30,9 +30,11 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
         list of dict: sorted fs_cache by FS
         bool: convergence flag
         list of dict: search path
+        list of dict: circle_cache - all circles tested during search
     """
 
     solver = getattr(solve, method_name)
+    circle_cache = []  # Store ALL circles tested for plotting
 
     start_time = time.time()  # Start timing
 
@@ -46,7 +48,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
     circles = slope_data['circles']
     max_depth = slope_data['max_depth']
 
-    def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, diagnostic=False):
+    def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, circle_cache, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
         best_depth = max(depth_guess, max_depth)
         best_fs = fs_fail
@@ -78,6 +80,17 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
                     FS = solver_result['FS'] if solver_success else fs_fail
                 fs_results.append((FS, d, df_slices, failure_surface, solver_result))
 
+                # Add to circle_cache for plotting all tested circles
+                if FS != fs_fail:
+                    circle_cache.append({
+                        "Xo": x,
+                        "Yo": y,
+                        "Depth": d,
+                        "R": y - d,
+                        "FS": FS,
+                        "failure_surface": failure_surface
+                    })
+
             fs_results.sort(key=lambda t: t[0])
             best_fs, best_depth, best_df, best_surface, best_solver_result = fs_results[0]
 
@@ -98,7 +111,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
 
         return best_depth, best_fs, best_df, best_surface, best_solver_result
 
-    def evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=False, fs_cache=None):
+    def evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=False, fs_cache=None, circle_cache=None):
         if fs_cache is None:
             fs_cache = {}
 
@@ -116,7 +129,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
             depth_step_init = grid_size * 0.75
             d, FS, df_slices, failure_surface, solver_result = optimize_depth(
                 x, y, depth_guess, depth_step_init, depth_shrink_factor=0.25, tol_frac=0.01, fs_fail=fs_fail,
-                diagnostic=diagnostic
+                circle_cache=circle_cache, diagnostic=diagnostic
             )
 
             fs_cache[(x, y)] = {
@@ -143,6 +156,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
 
     # === Step 1: Evaluate starting circles ===
     all_starts = []
+    fs_cache = {}  # Shared cache for all starting circles
     for i, start_circle in enumerate(circles):
         x0 = start_circle['Xo']
         y0 = start_circle['Yo']
@@ -151,11 +165,11 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
             print(f"\n[⏱ starting circle {i+1}] x={x0:.2f}, y={y0:.2f}, r={r0:.2f}")
         grid_size = r0 * 0.15
         depth_guess = start_circle['Depth']
-        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic)
-        all_starts.append((start_circle, best_point, fs_cache))
+        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
+        all_starts.append((start_circle, best_point))
 
     all_starts.sort(key=lambda t: t[1]['FS'])
-    start_circle, best_start, fs_cache = all_starts[0]
+    start_circle, best_start = all_starts[0]
     x0 = best_start['Xo']
     y0 = best_start['Yo']
     depth_guess = best_start['Depth']
@@ -174,7 +188,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
 
     for iteration in range(max_iter):
         print(f"[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
-        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache)
+        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
 
         if best_point['FS'] < best_fs:
             best_fs = best_point['FS']
@@ -196,7 +210,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
         print(f"\n[❌ max iterations reached] FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f})")
 
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
-    return sorted_fs_cache, converged, search_path
+    return sorted_fs_cache, converged, search_path, circle_cache
 
 def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
     """

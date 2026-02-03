@@ -7,7 +7,7 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_simple_embankment_mods.xlsx")
+slope_data = load_slope_data("docs/lem/files/reinforce.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
@@ -17,6 +17,7 @@ surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
+diagnostic = False # @param {"type":"boolean"}
 
 if analysis_type == 'single_surface': # analyze the specified failure surface
   circle = slope_data['circles'][0] if slope_data['circular'] else None
@@ -32,10 +33,10 @@ if analysis_type == 'single_surface': # analyze the specified failure surface
 
 elif analysis_type == "auto_search": # automated search for critical surface
   if surface_type == "circular":
-    fs_cache, converged, search_path = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
-    plot_circular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
+    fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=diagnostic)
+    plot_circular_search_results(slope_data, fs_cache, search_path, circle_cache=circle_cache, save_png=save_png)
   else:
-    fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
+    fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=diagnostic)
     plot_noncircular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
 
   # Extract critical failure surface (lowest FS is first in sorted list)

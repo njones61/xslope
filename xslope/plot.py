@@ -774,7 +774,7 @@ def plot_circles(ax, slope_data):
     circles = slope_data['circles']
     tcrack_depth = slope_data.get('tcrack_depth', 0)
 
-    for circle in circles:
+    for i, circle in enumerate(circles):
         Xo = circle['Xo']
         Yo = circle['Yo']
         R = circle['R']
@@ -787,7 +787,8 @@ def plot_circles(ax, slope_data):
         ground_surface = slope_data['ground_surface']
         success, result = generate_failure_surface(ground_surface, circular=True, circle=circle, tcrack_depth=tcrack_depth)
         if not success:
-            continue  # or handle error
+            print(f"Warning: Circle {i+1} (Xo={Xo:.2f}, Yo={Yo:.2f}, R={R:.2f}) could not be plotted: {result}")
+            continue
         # result = (x_min, x_max, y_left, y_right, clipped_surface)
         x_min, x_max, y_left, y_right, clipped_surface = result
         if not isinstance(clipped_surface, LineString):
@@ -836,7 +837,12 @@ def plot_non_circ(ax, non_circ):
     """
     if not non_circ or len(non_circ) == 0:
         return
-    xs, ys = zip(*non_circ)
+    # Handle both dict format {'X': x, 'Y': y} and tuple format (x, y)
+    if isinstance(non_circ[0], dict):
+        xs = [p['X'] for p in non_circ]
+        ys = [p['Y'] for p in non_circ]
+    else:
+        xs, ys = zip(*non_circ)
     ax.plot(xs, ys, 'r--', label='Non-Circular Surface')
 
 def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
@@ -1773,7 +1779,7 @@ def plot_search_path(ax, search_path):
         ax.arrow(start['x'], start['y'], dx, dy,
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, dpi=300):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, dpi=300):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -1781,6 +1787,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
         slope_data: Dictionary containing plot data
         fs_cache: List of dictionaries containing failure surface data and FS values
         search_path: List of dictionaries containing search path coordinates
+        circle_cache: List of dictionaries containing all tested circles (for plotting)
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
         figsize: Tuple of (width, height) in inches for the plot
 
@@ -1795,8 +1802,31 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, highlig
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
 
-    plot_failure_surfaces(ax, fs_cache)
+    # Plot all tested circles from circle_cache (light gray)
+    if circle_cache:
+        first_plotted = True
+        for result in circle_cache:
+            surface = result.get('failure_surface')
+            if surface is None or surface.is_empty:
+                continue
+            x, y = zip(*surface.coords)
+            label = 'Tested Circle' if first_plotted else None
+            ax.plot(x, y, color='gray', linestyle='-', linewidth=0.5, alpha=0.5, label=label)
+            first_plotted = False
+
+    # Plot only the critical circle from fs_cache (red)
+    if fs_cache:
+        critical = fs_cache[0]
+        surface = critical.get('failure_surface')
+        if surface is not None and not surface.is_empty:
+            x, y = zip(*surface.coords)
+            ax.plot(x, y, color='red', linestyle='-', linewidth=2, label='Critical Circle')
+        # Plot critical circle center
+        ax.plot(critical['Xo'], critical['Yo'], 'ro', markersize=5)
+
+    # Plot all circle centers from fs_cache
     plot_circle_centers(ax, fs_cache)
+
     if search_path:
         plot_search_path(ax, search_path)
 
@@ -1842,14 +1872,20 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     plot_tcrack_surface(ax, slope_data)
 
     # Plot all failure surfaces from cache
+    first_tested = True
     for i, result in reversed(list(enumerate(fs_cache))):
         surface = result['failure_surface']
         if surface is None or surface.is_empty:
             continue
         x, y = zip(*surface.coords)
-        color = 'red' if i == 0 else 'gray'
-        lw = 2 if i == 0 else 1
-        ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6)
+        if i == 0:
+            # Critical surface
+            ax.plot(x, y, color='red', linestyle='-', linewidth=2, alpha=1.0, label='Critical Surface')
+        else:
+            # Tested surfaces
+            label = 'Tested Surface' if first_tested else None
+            ax.plot(x, y, color='gray', linestyle='-', linewidth=1, alpha=0.6, label=label)
+            first_tested = False
 
     # Plot search path if provided
     if search_path:
@@ -1873,14 +1909,14 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    ax.legend()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4)
 
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     plt.tight_layout()
-    
+
     if save_png:
         filename = 'plot_noncircular_search_results.png'
         plt.savefig(filename, dpi=dpi, bbox_inches='tight')

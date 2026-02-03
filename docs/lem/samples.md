@@ -18,7 +18,9 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![simple_embankment_inputs1.png](sample_images/simple_embankment_inputs1.png)
 
-Solution (critical surface and factor of safety):
+Solution (critical surface and factor of safety). The green bars on the base of each slice represent the effective 
+stress on the base of the slice. The red bars correspond to tension at the base of the slice. The red dashed line 
+represents the line of thrust computed using Spencer's method.
 
 ![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
 
@@ -38,3 +40,250 @@ Inputs:
 Solution (critical surface and factor of safety):
 
 ![simple_embankment_results2.png](sample_images/simple_embankment_results2.png){width=700}
+
+### 2. Simple Slope with Foundation
+
+This problem involves a uniform material extending below the toe of the slope. 
+
+![simple_foundation.png](sample_images/simple_foundation.png){width=700}
+
+Excel input file: [xslope_simple_foundation.xlsx](files/xslope_simple_foundation.xlsx) 
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![simple_foundation_inputs.png](sample_images/simple_foundation_inputs.png){width=700}
+
+Solution (critical surface and factor of safety):
+
+![simple_foundation_results.png](sample_images/simple_foundation_results.png){width=700}
+
+### 3. Simple Slope with Multiple Layers
+
+This problem involves a simple slope with multiple layers of material. 
+
+![simple_mult_layers.png](sample_images/simple_mult_layers.png){width=700}
+
+Excel input file: [xslope_simple_mult_layers.xlsx](files/xslope_simple_mult_layers.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function. Note that in this case we use two starting circles - one at 
+the base each of each of the two materials - to ensure that the search algorithm finds the critical surface 
+corresponding to a global and not a local minimum. 
+
+![simple_mult_layers_inputs.png](sample_images/simple_mult_layers_inputs.png){width=900}
+
+Search results. Each gray line represent each circle used in the search. The dots represent the center of the 
+circles used in the nine-point search algorithm, and the green arrows represent the path of grid centers taken to 
+reach the critical surface. The red circle represents the critical surface.
+
+![simple_mult_layers_search_results.png](sample_images/simple_mult_layers_search_results.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![simple_mult_layers_results.png](sample_images/simple_mult_layers_results.png){width=900}
+
+### 4. Submerged Slope
+
+This problem features a slope submerged by 10 ft of water. 
+
+![submerged_slope.png](sample_images/submerged_slope.png){width=600}
+
+The submerged slope is analyzed by applying a distributed load over the entire slope based on the unit weight of 
+water (62.4 lb/ft3) and the depth of the water at a particular point on the slope. 
+
+Excel input file: [xslope_submerged_slope.xlsx](files/xslope_submerged_slope.xlsx){width=900}
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![submerged_slope_inputs.png](sample_images/submerged_slope_inputs.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![submerged_slope_results.png](sample_images/submerged_slope_results.png){width=900}
+
+### 5. Slope with Multiple Materials and Piezometric Line
+
+This problem features three layers of material with an effective stress analysis where pore pressures are derives 
+from a piezometric line. 
+
+![method_slices_problem.png](sample_images/method_slices_problem.png){width=900}
+
+This problem is featured as part of a graduate course on slope stability analysis (CE 544 - Slope Stability Analysis)
+at Brigham Young University. The problem used in two exercises to illustrate how to solve limit equilibrium slope 
+stability problems using the method of slices and an Excel spreadsheet. The problem descriptions are here:
+
+[Ordinary Method of Slices Exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)<br>
+[Bishop Simplified Procedure Homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
+
+In these exercises, a single circular surface was analyzed. The following Excel input file illustrates the problem:
+
+Excel input file: [xslope_method_slices_problem.xlsx](files/xslope_method_slices_problem.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![method_slices_problem_inputs.png](sample_images/method_slices_problem_inputs.png){width=900}
+
+Here is the solution for just the starting circle (to match the problem description) using Bishop's simplified procedure:
+
+![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
+
+Here is the Excel input file with multiple starting circles for a global search for the critical surface:
+
+Excel input file: [xslope_method_slices_problem2.xlsx](files/xslope_method_slices_problem2.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![method_slices_problem_inputs2.png](sample_images/method_slices_problem_inputs2.png){width=900}
+
+Sarch results. This problem is a good example of the search path and the large number of circles that are sometimes 
+tested in the search algorithm. In this case, the critical surface is isolated to sloughing of the 2nd layer.
+
+![method_slices_problem_search_results2.png](sample_images/method_slices_problem_search_results2.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![method_slices_problem_results2.png](sample_images/method_slices_problem_results2.png){width=900}
+
+### 6. Slope with Eight Layers
+
+This problem features a slope with eight soil layers. This problem was featured in the user manual for the UTEXASED 
+slope stability analysis software developed by  at the University of Texas at Austin by Stephen G. Wright. If 
+features a series of alternating layers, some of which are analyzed with an effective stress analysis and a 
+piezometric line, and some of which are analyzed using a total stress analysis. We will assume that the base (max 
+depth) is 10 ft below the top of the bottom material.
+
+![eight_layers.png](sample_images/eight_layers.png){width=900}
+
+To find the critical surface and the global minimum factor of safety, we must use a circle starting at the base of 
+each layer. The following Excel input file illustrates the problem.
+
+Excel input file: [xslope_eight_layers.xlsx](files/xslope_eight_layers.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![eight_layers_inputs.png](sample_images/eight_layers_inputs.png){width=900}
+
+Search results:
+
+![eight_layers_search_results.png](sample_images/eight_layers_search_results.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![eight_layers_results.png](sample_images/eight_layers_results.png){width=900}
+
+### 7. Non-Circular Failure Surface
+
+This problem features a thin weak layer in the foundation of a slope. In such cases, a non-circular failure surface 
+constrained to fit in the weak layer often corresponds to the critical failure surface. This can be modeled with 
+non-circular options in XSLOPE. This problem is also featured in the user manual for the UTEXASED slope stability 
+analysis software developed by Stephen G. Wright at the University of Texas at Austin.
+
+![noncircular.png](sample_images/noncircular.png){width=900}
+
+The non-circular failure surface is modeled with the following Excel input file. The failure surface is defined by 
+four points. The first and last point are assigned the "Free" option, which causes them to be automatically 
+calculated based on the slope geometry. The two middle points are assigned the "Horiz" option, which causes them to 
+be moved horizontally inside the weak layer.
+
+Excel input file: [xslope_noncircular.xlsx](files/xslope_noncircular.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![noncircular_inputs.png](sample_images/noncircular_inputs.png){width=900}
+
+Search results:
+
+![noncircular_search_results.png](sample_images/noncircular_search_results.png){width=900}
+
+!!! note
+    The search algorithm for non-circular failure surfaces is highly sensitive to the starting location. It the 
+    angle of the wedge at the toe of the slope is too steep, there will be tension at the toe of the slope and the search 
+    will fail to find a correct solution.
+
+Solution (critical surface and factor of safety):
+
+![noncircular_results.png](sample_images/noncircular_results.png){width=900}
+
+### 8. Earth Dam 
+
+This problem features a dam with a shell and a clay core on top of a foundation with a clay layer and a sand layer. 
+This problem was featured on page 121 of Shear Strength and Slope Stability - Second Edition by Duncan, Wright, and 
+Brandon. 
+
+![earth_dam.png](sample_images/earth_dam.png)
+
+The material properties are as follows:
+
+|  Mat   | c' (psf) | $\phi$' (degrees) | γ (pcf) |
+|:------:|:--------:|:-----------------:|:-------:|
+| Shell  |    0     |        34         |   125   |
+|  Core  |   100    |        26         |   122   |
+|  Clay  |    0     |        24         |   123   |
+|  Sand  |    0     |        32         |   127   |
+
+**Upstream side of the dam**
+
+First, we will analyze the upstream side. This is accomplished by defining starting circles on the upstream side of the 
+dam. The following Excel input file illustrates the problem.
+
+Excel input file: [xslope_earth_dam_up.xlsx](files/xslope_earth_dam_up.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![earth_dam_up_inputs.png](sample_images/earth_dam_up_inputs.png){width=900}
+
+Search results:
+
+![earth_dam_up_search_results.png](sample_images/earth_dam_up_search_results.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![earth_dam_up_results.png](sample_images/earth_dam_up_results.png){width=900}
+
+**Downstream side of the dam**
+
+Next, we will analyze the other side of the dam by defining starting circles on the downstream 
+side of the dam. 
+
+Excel input file: [xslope_earth_dam_down.xlsx](files/xslope_earth_dam_down.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![earth_dam_down_inputs.png](sample_images/earth_dam_down_inputs.png){width=900}
+
+Search results:
+
+![earth_dam_down_search_results.png](sample_images/earth_dam_down_search_results.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![earth_dam_down_results.png](sample_images/earth_dam_down_results.png){width=900}
+
+### 9. Reinforced Slope
+
+This problem features an engineered slope with six layers of geogrid reinforcement. This problem was featured in the 
+user manual for the UTEXASED slope stability analysis software developed by Stephen G. Wright at the University of Texas 
+at Austin.
+
+![reinforce.png](sample_images/reinforce.png){width=900}
+
+For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds 
+to (0, 0) and the top of the slope corresponds to (30, 24). 
+
+The following Excel input file illustrates the problem. The soil reinforcement is entered in the "reinforce" sheet.
+
+Excel input file: [xslope_reinforce.xlsx](files/xslope_reinforce.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![reinforce_inputs.png](sample_images/reinforce_inputs.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![reinforce_results.png](sample_images/reinforce_results.png){width=900}
+
+!!! note
+    The solution for this problem found by XSLOPE is not the same as the solution found by UTEXASED. The difference
+    is due to the fact that XSLOPE assumes the reinforcement is flexible and the force from the reinforcement is
+    therefore parallel to the base of the slope. UTEXASED assumes the reinforcement is rigid and the force from the
+    reinforcement is in the direction of the reinforcement line. The flexible assumption is more conservative. The
+    UTEXASED solution for this problem is FS = 1.646.

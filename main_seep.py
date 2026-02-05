@@ -36,7 +36,8 @@ plot_seep_data(seep_data, figsize=(12, 6), show_nodes=True, show_bc=True, label_
 
 solution = run_seepage_analysis(seep_data, tol=1e-4)
 
-plot_seep_solution(seep_data, solution, figsize=(12, 6), variable="head", vectors=False, flowlines=True, mesh=False, levels=20, base_mat=2, fill_contours=False, phreatic=True)
+plot_seep_solution(seep_data, solution, figsize=(12, 6), variable="head", vectors=False, flowlines=True, 
+                          mesh=False, levels=20, base_mat=2, fill_contours=False, phreatic=True, save_png=True)
 
 # export_mesh_to_json(mesh, path_prefix + "_mesh.json")
 # export_seep_solution(seep_data, solution, path_prefix + "_seep.csv")

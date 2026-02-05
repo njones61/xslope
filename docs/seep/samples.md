@@ -8,8 +8,8 @@ These problems feature standalone seepage analyses. For instructions on to run a
 
 ### 1. Sheetpile with Clay Blanket
 
-Saturated problem with a partially penetrating sheetpile and a clay blanket. Should have upstream head BC = 13m up 
-to the tip of the blanket. Downstream head BC = 10m. The profile line should follow th edge of the sheetpile (down 
+This is a saturated problem with a partially penetrating sheetpile and a clay blanket. It should have an upstream head BC = 13m up 
+to the tip of the blanket and a downstream head BC = 10m. The profile line should follow the edge of the sheetpile (down 
 and then back up) with a small gap to ensure that there is a crack in the resulting mesh. 
 
 ![clay_blanket_prob.png](images/clay_blanket.png)
@@ -17,13 +17,34 @@ and then back up) with a small gap to ensure that there is a crack in the result
 The following Excel file illustrates how the inputs should be structured. Since this is a fully saturated problem, 
 the kr0 and h0 material parameters are ignored. 
 
-Sample excel template for testing: [xslope_clay_blanket.xlsx](files/xslope_clay_blanket.xlsx)
+Excel input file: [xslope_clay_blanket.xlsx](files/xslope_clay_blanket.xlsx)
 
 The solution should look something like this:
 
 ![clay_blanket_solution.png](images/clay_blanket_solution.png){width=1200px}
 
-### 2. Earth Dam with Core
+### 2. Sea Trench
+
+This is another saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer.
+
+![sea_trench.png](images/sea_trench.png)
+
+The properties of the soil layers are as follows:
+
+| Soil Layer | K1  | K2  |
+|:----------:|:---:|:---:|
+|    Silt    | 0.5 | 0.5 |
+| Silty Clay | 0.1 | 0.1 |
+
+Since this is a fully saturated problem, the kr0 and h0 material parameters are ignored. The problem set up requires 3 profile lines: 1 at the top of the silt layer on the left side, 1 at the top of the silt layer on the right, and 1 at the top of the silty clay layer that goes all the way from the left side to the right side of the problem. This profile line includes a small gap at the location of each sheetpile penetration to create a no-flow boundary along the edge of the sheetpile. The following Excel file illustrates how the inputs should be structured.
+
+Excel input file: [xslope_sea_trench.xlsx](files/xslope_sea_trench.xlsx)
+
+Solution:
+
+![sea_trench_solution.png](images/sea_trench_solution.png){width=1000px}
+
+### 3. Earth Dam with Core
 
 The following diagram illustrates a simple earth dam with a clay core and a granular shell:
 
@@ -43,7 +64,7 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-### 3. Johnson Reservoir
+### 4. Johnson Reservoir
 
 This is another earth dam problem with a shell, a core, and a foundation. 
 
@@ -60,7 +81,7 @@ The solution should look something like this:
 
 ![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
 
-### 4. Earth Dam with Core and Filter
+### 5. Earth Dam with Core and Filter
 
 This problem has the following cross-section:
 

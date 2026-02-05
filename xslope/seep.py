@@ -990,9 +990,13 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
 
 def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, dirichlet_nodes, element_types=None):
     """
-    Solves Laplace equation for flow function Phi on the same mesh,
+    Solves the stream function (flow function) Phi on the same mesh,
     assigning Dirichlet values along no-flow boundaries.
-    Assembles the element matrix using the inverse of Kmat for each element.
+
+    For anisotropic permeability, the stream function equation uses K/det(K)
+    (not K^(-1)) in the stiffness matrix assembly. This is because the stream
+    function PDE has swapped diagonal coefficients compared to the head equation.
+
     Supports both triangular and quadrilateral elements.
     
     Parameters:
@@ -1043,8 +1047,10 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
 
-            # Assemble using the inverse of Kmat
-            ke = area * grad.T @ np.linalg.inv(Kmat) @ grad
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            # This is because the stream function PDE has swapped diagonal terms
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+            ke = area * grad.T @ Kmat_flow @ grad
 
             for a in range(3):
                 for b_ in range(3):
@@ -1053,7 +1059,7 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
         elif element_type == 6:
             # 6-node triangle (quadratic)
             nodes_elem = nodes[element_nodes[:6], :]
-            
+
             # Get anisotropic conductivity for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1062,9 +1068,10 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
-            ke = tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
+            ke = tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
             for a in range(6):
                 for b_ in range(6):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1073,7 +1080,7 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             # 4-node quadrilateral (bilinear)
             i, j, k, l = element_nodes[:4]
             nodes_elem = nodes[[i, j, k, l], :]
-            
+
             # Get anisotropic conductivity for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1082,9 +1089,10 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
-            ke = quad4_stiffness_matrix(nodes_elem, Kmat_inv)
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
+            ke = quad4_stiffness_matrix(nodes_elem, Kmat_flow)
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1092,7 +1100,7 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
         elif element_type == 8:
             # 8-node quadrilateral (serendipity)
             nodes_elem = nodes[element_nodes[:8], :]
-            
+
             # Get anisotropic conductivity for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1101,9 +1109,10 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
-            ke = quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
+            ke = quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
             for a in range(8):
                 for b_ in range(8):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1111,7 +1120,7 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
         elif element_type == 9:
             # 9-node quadrilateral (Lagrange)
             nodes_elem = nodes[element_nodes[:9], :]
-            
+
             # Get anisotropic conductivity for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1120,9 +1129,10 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
-            ke = quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
+            ke = quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
             for a in range(9):
                 for b_ in range(9):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1137,8 +1147,12 @@ def solve_flow_function_confined(nodes, elements, k1_vals, k2_vals, angles, diri
 
 def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, angles, kr0, h0, dirichlet_nodes, element_types=None):
     """
-    Solves the flow function Phi using the correct ke for unsaturated flow.
-    For flowlines, assemble the element matrix using the inverse of kr_elem and Kmat, matching the FORTRAN logic.
+    Solves the stream function (flow function) Phi for unsaturated flow.
+
+    For anisotropic permeability, the stream function equation uses K/det(K)
+    (not K^(-1)) in the stiffness matrix assembly. The relative permeability
+    kr is also included in the formulation.
+
     Supports both triangular and quadrilateral elements.
     """
 
@@ -1185,12 +1199,14 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
-            # Assemble using the inverse of kr_elem and Kmat
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+            # Assemble using the inverse of kr_elem and Kmat_flow
             # If kr_elem is very small, avoid division by zero
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * area * grad.T @ np.linalg.inv(Kmat) @ grad
+                ke = (1.0 / kr_elem) * area * grad.T @ Kmat_flow @ grad
             else:
-                ke = 1e12 * area * grad.T @ np.linalg.inv(Kmat) @ grad  # Large value for near-zero kr
+                ke = 1e12 * area * grad.T @ Kmat_flow @ grad  # Large value for near-zero kr
 
             for a in range(3):
                 for b_ in range(3):
@@ -1199,7 +1215,7 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
         elif element_type == 6:
             # 6-node triangle (quadratic)
             nodes_elem = nodes[element_nodes[:6], :]
-            
+
             # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1208,16 +1224,17 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
             # Compute element pressure using quadratic shape functions at centroid
             p_elem = compute_tri6_centroid_pressure(p_nodes, element_nodes)
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+                ke = (1.0 / kr_elem) * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
             else:
-                ke = 1e12 * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+                ke = 1e12 * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
 
             for a in range(6):
                 for b_ in range(6):
@@ -1227,7 +1244,7 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             # 4-node quadrilateral (bilinear)
             i, j, k, l = element_nodes[:4]
             nodes_elem = nodes[[i, j, k, l], :]
-            
+
             # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1236,17 +1253,18 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
             # Get kr for this element based on its material properties (use centroid)
             p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-            
-            # Assemble using the inverse of kr_elem and Kmat
+
+            # Assemble using the inverse of kr_elem and Kmat_flow
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(nodes_elem, Kmat_inv)
+                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(nodes_elem, Kmat_flow)
             else:
-                ke = 1e12 * quad4_stiffness_matrix(nodes_elem, Kmat_inv)
+                ke = 1e12 * quad4_stiffness_matrix(nodes_elem, Kmat_flow)
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1254,7 +1272,7 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
         elif element_type == 8:
             # 8-node quadrilateral (serendipity)
             nodes_elem = nodes[element_nodes[:8], :]
-            
+
             # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1263,16 +1281,17 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
             # Compute element pressure using serendipity shape functions at centroid
             p_elem = compute_quad8_centroid_pressure(p_nodes, element_nodes)
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+                ke = (1.0 / kr_elem) * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
             else:
-                ke = 1e12 * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+                ke = 1e12 * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
 
             for a in range(8):
                 for b_ in range(8):
@@ -1281,7 +1300,7 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
         elif element_type == 9:
             # 9-node quadrilateral (Lagrange)
             nodes_elem = nodes[element_nodes[:9], :]
-            
+
             # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -1290,16 +1309,17 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            Kmat_inv = np.linalg.inv(Kmat)
-            
+            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat_flow = Kmat / np.linalg.det(Kmat)
+
             # Compute element pressure using biquadratic shape functions at centroid
             p_elem = compute_quad9_centroid_pressure(p_nodes, element_nodes)
             kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
 
             if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+                ke = (1.0 / kr_elem) * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
             else:
-                ke = 1e12 * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_inv)
+                ke = 1e12 * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
 
             for a in range(9):
                 for b_ in range(9):

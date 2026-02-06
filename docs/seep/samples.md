@@ -96,3 +96,33 @@ The following Excel file contains the problem inputs:
 The solution should look something like this:
 
 ![earth_dam2_solution.png](images/earth_dam2_solution.png){width=1200px}
+
+### 6. Levee with Grouted Foundation
+
+The following problem represents a levee underlain by a foundation with a grout curtain. 
+
+![levee.png](images/levee.png)
+
+The material properties of the soil layers are as follows:
+
+|  Soil Layer   | K1 [m/day] | K2 [m/day] | $\alpha$   | kr0    | h0 |
+|:-------------:|:----------:|:----------:|:----------:|:----------:|:----------:|
+|     Levee     |    0.5     |    0.2     |    0       |   0.001 | -1 |
+| Grout Curtain |    0.2     |    0.2     |    0       |   0.001 | -1 |
+|  Foundation   |     2      |     1      |    0       |   0.001 | -1 |
+
+The coordinate geometry is shown here:
+
+![levee_coords.png](images/levee_coords.png)
+
+The following file illustrates how to prepare the inputs:
+
+[xslope_levee_full.xlsx](files/xslope_levee_full.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![levee_inputs.png](images/levee_inputs.png){width=1200px}
+
+Solution:
+
+![levee_results.png](images/levee_results.png){width=1200px}

@@ -6,13 +6,13 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-path = "docs/seep/files/xslope_sea_trench_anis.xlsx"
+path = "docs/seep/files/xslope_levee_full.xlsx"
 
 path_prefix = path.replace(".xlsx", "")  # make a copy of the path minus the extension for later use
 
 slope_data = load_slope_data(path)
 
-plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=False)
+plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=True)
 
 polygons = build_polygons(slope_data, debug=True)
 

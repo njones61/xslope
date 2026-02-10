@@ -1380,16 +1380,31 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
                     if is_highest:
                         bottom_points.append((x, y, j))
             
-            # Group by x-coordinate (within tolerance) and keep only the highest y at each x
-            # This handles cases where multiple lines have points at the same x
-            bottom_dict = {}  # x_key -> (y, line_idx, orig_x, orig_y)
-            for x, y, line_idx in bottom_points:
-                x_key = round(x / tol) * tol  # Round to tolerance to group nearby points
-                if x_key not in bottom_dict or y > bottom_dict[x_key][0]:
-                    bottom_dict[x_key] = (y, line_idx, x, y)
-            
-            # Convert to sorted list
-            bottom_cleaned = sorted([(orig_x, orig_y) for _, _, orig_x, orig_y in bottom_dict.values()])
+            # Build bottom_cleaned: ordered path along the bottom boundary
+            # Check if all bottom points come from a single lower profile
+            line_indices_set = set(line_idx for _, _, line_idx in bottom_points)
+
+            if len(line_indices_set) == 1:
+                # Single lower profile: extract ordered sub-path directly from the profile.
+                # This preserves vertical segments (multiple y-values at same x) that would
+                # be lost by the x-based grouping approach.
+                j = next(iter(line_indices_set))
+                lower_path = lines[j]
+                bottom_cleaned = [
+                    (x, y) for x, y in lower_path
+                    if left_x - tol <= x <= right_x + tol
+                ]
+            else:
+                # Multiple lower profiles: group by x-coordinate and keep only the highest y
+                # at each x. This handles cases where multiple lines have points at the same x.
+                bottom_dict = {}  # x_key -> (y, line_idx, orig_x, orig_y)
+                for x, y, line_idx in bottom_points:
+                    x_key = round(x / tol) * tol  # Round to tolerance to group nearby points
+                    if x_key not in bottom_dict or y > bottom_dict[x_key][0]:
+                        bottom_dict[x_key] = (y, line_idx, x, y)
+
+                # Convert to sorted list
+                bottom_cleaned = sorted([(orig_x, orig_y) for _, _, orig_x, orig_y in bottom_dict.values()])
             
             # Helper function to check if a point already exists in a list
             def point_exists(point_list, x, y, tol=1e-8):

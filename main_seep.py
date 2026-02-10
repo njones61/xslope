@@ -6,7 +6,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-path = "docs/seep/files/xslope_levee_full.xlsx"
+path = "docs/seep/files/input_template_p2.xlsx"
 
 path_prefix = path.replace(".xlsx", "")  # make a copy of the path minus the extension for later use
 
@@ -37,7 +37,7 @@ plot_seep_data(seep_data, figsize=(12, 6), show_nodes=True, show_bc=True, label_
 solution = run_seepage_analysis(seep_data, tol=1e-4)
 
 plot_seep_solution(seep_data, solution, figsize=(12, 6), variable="head", vectors=False, flowlines=True, 
-                          mesh=False, levels=20, base_mat=2, fill_contours=False, phreatic=True, save_png=True)
+                          mesh=False, levels=20, base_mat=3, fill_contours=False, phreatic=True, save_png=True)
 
 # export_mesh_to_json(mesh, path_prefix + "_mesh.json")
 # export_seep_solution(seep_data, solution, path_prefix + "_seep.csv")

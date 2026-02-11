@@ -1,117 +1,39 @@
-import numpy as np
-
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm
-from xslope.fileio import load_slope_data, print_dictionary
+from xslope.fileio import load_slope_data
 from xslope.mesh import build_polygons, build_mesh_from_polygons
-from xslope.plot import plot_inputs, plot_mesh, plot_polygons
-from xslope.plot_fem import plot_fem_results, plot_reinforcement_force_profiles, plot_ssrm_convergence, plot_fem_data
+from xslope.plot import plot_inputs
+from xslope.plot_fem import plot_fem_results, plot_fem_data
 
-slope_data = load_slope_data("docs/inputs/slope/input_template_griffiths1_6.xlsx")
-
-#print_dictionary(slope_data)
+# Load Griffiths & Lane (1999) Example 1: homogeneous slope, c/γH=0.05, φ=20°
+slope_data = load_slope_data("docs/inputs/slope/xslope_griffiths1.xlsx")
 
 plot_inputs(slope_data, mode='fem', tab_loc='top')
 
+# Build mesh
 polygons = build_polygons(slope_data)
+mesh = build_mesh_from_polygons(polygons, target_size=2, element_type='quad8')
 
-#plot_polygons(polygons)
-
-target_size = 2
-
-mesh = build_mesh_from_polygons(
-    polygons,
-    target_size,
-    'quad8'
-)
-
-#plot_mesh(mesh, materials=slope_data['materials'])
-
+# Build FEM data
 fem_data = build_fem_data(slope_data, mesh)
+plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
+              label_elements=False, label_nodes=False)
 
-#print_dictionary(fem_data)
+# Quick sanity check: F=1.0 should converge easily
+print("\n=== Test: F=1.0 (should converge quickly) ===")
+solution = solve_fem(fem_data, F=1.0, debug_level=2)
+print(f"  Converged: {solution['converged']}, Iterations: {solution['iterations']}")
 
-plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, label_elements=False, label_nodes=False)
+# SSRM to find critical FS (expect ~1.4 for Griffiths Example 1)
+print("\n=== SSRM Analysis ===")
+result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=1)
 
-print("=== Testing New Improved FEM Solver ===")
+if result.get("converged", False):
+    print(f"\nFactor of Safety: {result['FS']:.2f}")
+    print(f"Method: {result.get('method', 'Unknown')}")
 
-# Test 1: Single FEM analysis with new two-phase solver
-print("\n1. Testing new two-phase elastic-plastic solver...")
-solution_new = solve_fem(fem_data, F=1.28, debug_level=2)
-
-if solution_new.get("converged", False):
-    print("✓ New solver converged successfully!")
-    print(f"  Phase: {solution_new.get('phase', 'unknown')}")
-    print(f"  Total iterations: {solution_new.get('iterations', 'Unknown')}")
-    if 'elastic_iterations' in solution_new:
-        print(f"  Elastic iterations: {solution_new['elastic_iterations']}")
-        print(f"  Plastic iterations: {solution_new['plastic_iterations']}")
-    print(f"  Max displacement: {np.max(np.abs(solution_new.get('displacements', [0]))):.6f}")
-    print(f"  Plastic elements: {np.sum(solution_new.get('plastic_elements', []))}/{len(solution_new.get('plastic_elements', []))}")
+    # Plot results from last converged solution
+    if 'last_solution' in result:
+        plot_fem_results(fem_data, result['last_solution'],
+                         plot_type='deformation, shear_strain')
 else:
-    print("✗ New solver failed to converge")
-    print(f"  Error: {solution_new.get('error', 'Unknown error')}")
-
-# Test 2: Compare with old solver (if it still works)
-print("\n2. Testing old solver for comparison...")
-try:
-    solution_old = solve_fem(fem_data, F=1.28, debug_level=1)
-    if solution_old.get("converged", False):
-        print("✓ Old solver also converged")
-        print(f"  Iterations: {solution_old.get('iterations', 'Unknown')}")
-        print(f"  Max displacement: {np.max(np.abs(solution_old.get('displacements', [0]))):.6f}")
-        print(f"  Plastic elements: {np.sum(solution_old.get('plastic_elements', []))}/{len(solution_old.get('plastic_elements', []))}")
-    else:
-        print("✗ Old solver failed to converge")
-        print(f"  Error: {solution_old.get('error', 'Unknown error')}")
-except Exception as e:
-    print(f"✗ Old solver encountered an error: {e}")
-
-# Test 3: Test new SSRM with bisection method
-print("\n3. Testing new SSRM with bisection method...")
-solution_ssrm_new = solve_ssrm(fem_data, F_min=1.0, F_max=5.0, tolerance=0.01, debug_level=1)
-
-if solution_ssrm_new.get("converged", False):
-    print("✓ SSRM bisection completed successfully!")
-    print(f"  Factor of Safety: {solution_ssrm_new.get('FS', 'Unknown'):.4f}")
-    print(f"  Method: {solution_ssrm_new.get('method', 'Unknown')}")
-    print(f"  Total SSRM iterations: {solution_ssrm_new.get('iterations_ssrm', 'Unknown')}")
-    if 'final_interval' in solution_ssrm_new:
-        F_left, F_right = solution_ssrm_new['final_interval']
-        print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
-        print(f"  Interval width: {solution_ssrm_new.get('interval_width', 'Unknown'):.4f}")
-else:
-    print("✗ SSRM bisection failed")
-    print(f"  Error: {solution_ssrm_new.get('error', 'Unknown error')}")
-
-# Plot results from new solver
-if solution_new.get("converged", False):
-    print("\n=== FEM Results Visualization (New Solver) ===")
-    plot_fem_results(fem_data, solution_new, plot_type='stress, shear_strain, deformation')
-else:
-    print("\nCannot plot results - solver did not converge")
-
-# Diagnostic 5: CSV table output
-print("\n=== CSV Output Table ===")
-print("F,iterations,converged,residual,plastic_fraction,min_sigma_yy,max_sigma_yy")
-
-# Output for single FEM run
-if 'F' in solution_new:
-    print(f"{solution_new.get('F', 'N/A'):.3f},"
-          f"{solution_new.get('iterations', 'N/A')},"
-          f"{'True' if solution_new.get('converged', False) else 'False'},"
-          f"{solution_new.get('residual', 0.0):.3e},"
-          f"{solution_new.get('plastic_fraction', 0.0):.4f},"
-          f"{solution_new.get('min_sigma_yy', 0.0):.3f},"
-          f"{solution_new.get('max_sigma_yy', 0.0):.3f}")
-
-# Output for SSRM if it was run
-if solution_ssrm_new.get("converged", False) and 'last_solution' in solution_ssrm_new:
-    last_sol = solution_ssrm_new['last_solution']
-    if 'F' in last_sol:
-        print(f"{last_sol.get('F', solution_ssrm_new.get('FS', 'N/A')):.3f},"
-              f"{last_sol.get('iterations', 'N/A')},"
-              f"{'True' if last_sol.get('converged', False) else 'False'},"
-              f"{last_sol.get('residual', 0.0):.3e},"
-              f"{last_sol.get('plastic_fraction', 0.0):.4f},"
-              f"{last_sol.get('min_sigma_yy', 0.0):.3f},"
-              f"{last_sol.get('max_sigma_yy', 0.0):.3f}")
+    print(f"SSRM failed: {result.get('error', 'Unknown error')}")

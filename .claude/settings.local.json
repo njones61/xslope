@@ -3,7 +3,9 @@
     "allow": [
       "WebFetch(domain:scicomp.stackexchange.com)",
       "WebFetch(domain:www.mathworks.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python3:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

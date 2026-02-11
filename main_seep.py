@@ -6,7 +6,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-path = "docs/seep/files/input_template_p2.xlsx"
+path = "docs/seep/files/xslope_bear_creek.xlsx"
 
 path_prefix = path.replace(".xlsx", "")  # make a copy of the path minus the extension for later use
 

@@ -23,14 +23,14 @@ analysis_type = "single" # @param ["single","ssrm"]
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=1.406, debug_level=2)
     print(f"  Converged: {solution['converged']}, Iterations: {solution['iterations']}")
-    plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'])
+    plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], save_png=True)
 elif analysis_type == "ssrm":
     result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=1)
     if result.get("converged", False):
         print(f"\nFactor of Safety: {result['FS']:.2f}")
         print(f"Method: {result.get('method', 'Unknown')}")
         plot_fem_results(fem_data, result['last_solution'],
-                         plot_type=['deformation', 'shear_strain', 'displace_vector'])
+                         plot_type=['deformation', 'shear_strain', 'displace_vector'], save_png=True)
     else:
         print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 

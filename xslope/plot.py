@@ -1451,10 +1451,11 @@ def plot_inputs(
     plot_tcrack_surface(ax, slope_data)
     plot_reinforcement_lines(ax, slope_data)
 
-    if slope_data['circular']:
-        plot_circles(ax, slope_data)
-    elif slope_data.get('non_circ') and len(slope_data['non_circ']) > 0:
-        plot_non_circ(ax, slope_data['non_circ'])
+    if mode == "lem":
+        if slope_data['circular']:
+            plot_circles(ax, slope_data)
+        elif slope_data.get('non_circ') and len(slope_data['non_circ']) > 0:
+            plot_non_circ(ax, slope_data['non_circ'])
 
     # Handle material table display
     if mat_table:

@@ -65,7 +65,7 @@ def test_griffiths_example1():
     # Plot the final state
     print(f"\n\n=== Plotting Final State at F = {F_test:.3f} ===")
     plot_fem_results(fem_data, solution,
-                  plot_type='displace_vector,deformation,shear_strain',
+                  plot_type=['displace_vector', 'deformation', 'shear_strain'],
                   label_elements=False)
     
     return

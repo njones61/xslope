@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
-from math import radians, degrees, sin, cos, tan, sqrt, atan2
+from math import degrees, sin, cos, sqrt
 
 
 import numpy as np
@@ -397,22 +396,6 @@ def build_fem_data(slope_data, mesh=None):
                     bc_values[i, 0] = 0.0  # No horizontal component
                     bc_values[i, 1] = -nodal_force_magnitude  # Downward
             
-            pass
-    
-    # Print boundary condition summary
-    bc_summary = np.bincount(bc_type, minlength=5)
-    print(f"\nBoundary condition summary:")
-    print(f"  Type 0 (free): {bc_summary[0]} nodes")
-    print(f"  Type 1 (fixed): {bc_summary[1]} nodes") 
-    print(f"  Type 2 (x-roller): {bc_summary[2]} nodes")
-    print(f"  Type 3 (y-roller): {bc_summary[3]} nodes")
-    print(f"  Type 4 (force): {bc_summary[4]} nodes")
-    
-    # Count non-zero forces
-    force_nodes = np.where(bc_type == 4)[0]
-    if len(force_nodes) > 0:
-        max_force = np.max(np.abs(bc_values[force_nodes]))
-        print(f"  Maximum force magnitude: {max_force:.3f}")
     
     # Get other parameters
     unit_weight = slope_data.get("gamma_water", 9.81)
@@ -447,68 +430,6 @@ def build_fem_data(slope_data, mesh=None):
     
    
     return fem_data
-
-
-def apply_boundary_conditions(K_global, F_global, bc_type, nodes):
-    """
-    Apply boundary conditions to global system using constraint elimination.
-    
-    This function applies boundary conditions by eliminating constrained degrees
-    of freedom from the global stiffness matrix and load vector.
-    
-    Parameters:
-        K_global: Global stiffness matrix (sparse or dense)
-        F_global: Global load vector
-        bc_type: Array of boundary condition types for each node:
-                 0 = free (both u and v free)
-                 1 = fixed (both u=0 and v=0) 
-                 2 = x-roller (u=0, v free)
-                 3 = y-roller (u free, v=0)
-                 4 = force (both u and v free, external forces applied)
-        nodes: Array of node coordinates (for reference)
-    
-    Returns:
-        K_constrained: Constrained stiffness matrix (only free DOFs)
-        F_constrained: Constrained load vector (only free DOFs)
-        constraint_dofs: List of constrained DOF indices
-    """
-    
-    n_nodes = len(nodes)
-    n_dof = 2 * n_nodes
-    
-    # Identify constrained DOFs
-    constraint_dofs = []
-    
-    for i in range(n_nodes):
-        if bc_type[i] == 1:  # Fixed: both u and v constrained
-            constraint_dofs.extend([2*i, 2*i+1])
-        elif bc_type[i] == 2:  # X-roller: u constrained, v free
-            constraint_dofs.append(2*i)
-        elif bc_type[i] == 3:  # Y-roller: u free, v constrained
-            constraint_dofs.append(2*i+1)
-        # bc_type 0 and 4 are free DOFs - no constraints
-    
-    # Get free DOFs
-    all_dofs = set(range(n_dof))
-    constraint_dofs_set = set(constraint_dofs)
-    free_dofs = sorted(all_dofs - constraint_dofs_set)
-    
-    # Extract free DOF submatrices
-    if hasattr(K_global, 'toarray'):
-        # Sparse matrix
-        K_global_dense = K_global.toarray()
-    else:
-        K_global_dense = K_global
-    
-    # Extract submatrix for free DOFs only
-    K_constrained = K_global_dense[np.ix_(free_dofs, free_dofs)]
-    F_constrained = F_global[free_dofs]
-    
-    # Convert back to sparse if original was sparse and matrix is large
-    if hasattr(K_global, 'toarray') and len(free_dofs) > 100:
-        K_constrained = csr_matrix(K_constrained)
-    
-    return K_constrained, F_constrained, constraint_dofs
 
 
 # Implementation of Perzyna Visco-Plastic Algorithm for Slope Stability
@@ -678,6 +599,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
     # Full displacement vector
     u = np.zeros(n_dof)
     u[free_dofs] = u_free
+    u_elastic = u.copy()  # Store elastic solution for VP displacement computation
 
     if debug_level >= 1:
         print(f"  Initial elastic: max|u| = {np.max(np.abs(u)):.6f}")
@@ -809,17 +731,32 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
 
     strains = compute_strains(nodes, elements, element_types, u)
 
+    # Compute viscoplastic max shear strain per element (averaged over Gauss points)
+    # This is what Griffiths plots — zero in elastic regions, large in failure zone
+    vp_shear_strain = np.zeros(n_elements)
+    for elem_idx in range(n_elements):
+        n_gp = len(evp[elem_idx])
+        gp_shear = 0.0
+        for gp_idx in range(n_gp):
+            evp_gp = evp[elem_idx][gp_idx]
+            eps_x, eps_y, gamma_xy = evp_gp[0], evp_gp[1], evp_gp[2]
+            gp_shear += sqrt(((eps_x - eps_y) / 2)**2 + (gamma_xy / 2)**2)
+        vp_shear_strain[elem_idx] = gp_shear / n_gp
+
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
         print(f"  Plastic elements: {n_plastic}/{n_elements}")
         print(f"  Max displacement: {np.max(np.abs(u)):.6f}")
+        print(f"  Max VP shear strain: {np.max(vp_shear_strain):.6e}")
 
     return {
         "converged": converged,
         "iterations": iteration + 1,
         "displacements": u,
+        "displacements_elastic": u_elastic,
         "stresses": final_stresses,
         "strains": strains,
+        "vp_shear_strain": vp_shear_strain,
         "plastic_elements": plastic_elements,
         "yield_function": np.array([check_mohr_coulomb_cp(final_stresses[i, :3], c_reduced[i], phi_reduced[i]) for i in range(n_elements)]),
         "max_displacement": np.max(np.abs(u)),
@@ -1067,50 +1004,6 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
 
 
 
-def build_triangle_stiffness(coords, E, nu):
-    """
-    Build stiffness matrix for triangular element (plane strain).
-    """
-    x1, y1 = coords[0]
-    x2, y2 = coords[1] 
-    x3, y3 = coords[2]
-    
-    # Area
-    area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
-    
-    if area < 1e-12:
-        print(f"Warning: Very small element area: {area}")
-        return np.zeros((6, 6))
-    
-    # Shape function derivatives
-    b1 = y2 - y3
-    b2 = y3 - y1  
-    b3 = y1 - y2
-    c1 = x3 - x2
-    c2 = x1 - x3
-    c3 = x2 - x1
-    
-    # B matrix (standard linear triangle)
-    B = np.array([
-        [b1, 0,  b2, 0,  b3, 0 ],  # εx = ∂u/∂x
-        [0,  c1, 0,  c2, 0,  c3],  # εy = ∂v/∂y
-        [c1, b1, c2, b2, c3, b3]   # γxy = ∂u/∂y + ∂v/∂x
-    ]) / (2 * area)
-    
-    # Constitutive matrix (plane strain)
-    factor = E / ((1 + nu) * (1 - 2*nu))
-    D = factor * np.array([
-        [1-nu, nu,   0        ],
-        [nu,   1-nu, 0        ],
-        [0,    0,    (1-2*nu)/2]
-    ])
-    
-    # Element stiffness matrix
-    K_elem = area * B.T @ D @ B
-    
-    return K_elem
-
-
 def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic):
     """
     Build gravity load vector using Griffiths & Lane (1999) approach.
@@ -1310,37 +1203,6 @@ def get_gauss_points_2x2():
     return gauss_points, weights
 
 
-def compute_gauss_point_coordinates_quad8(elem_coords, xi, eta):
-    """
-    Compute physical coordinates of a Gauss point in an 8-node quadrilateral.
-    
-    Args:
-        elem_coords: Array of element node coordinates (8x2)
-        xi, eta: Natural coordinates of Gauss point
-        
-    Returns:
-        Physical coordinates [x, y] of the Gauss point
-    """
-    # 8-node quadrilateral shape functions
-    N = np.zeros(8)
-    N[0] = 0.25 * (1 - xi) * (1 - eta) * (-xi - eta - 1)
-    N[1] = 0.25 * (1 + xi) * (1 - eta) * (xi - eta - 1)
-    N[2] = 0.25 * (1 + xi) * (1 + eta) * (xi + eta - 1)
-    N[3] = 0.25 * (1 - xi) * (1 + eta) * (-xi + eta - 1)
-    N[4] = 0.5 * (1 - xi*xi) * (1 - eta)
-    N[5] = 0.5 * (1 + xi) * (1 - eta*eta)
-    N[6] = 0.5 * (1 - xi*xi) * (1 + eta)
-    N[7] = 0.5 * (1 - xi) * (1 - eta*eta)
-    
-    # Compute physical coordinates
-    gauss_coords = np.zeros(2)
-    for i in range(8):
-        gauss_coords += N[i] * elem_coords[i]
-    
-    return gauss_coords
-
-
-
 def compute_triangle_strains_manual(coords, displacements):
     """Manually compute triangle strains from displacements."""
     
@@ -1379,9 +1241,6 @@ def build_constitutive_matrix(E, nu):
     if nu >= 0.45:
         print(f"Warning: Poisson's ratio {nu:.3f} is close to incompressible limit (0.5)")
         print("Consider using nu <= 0.4 for better numerical stability")
-    
-    # Optional: Add small regularization to prevent singularity
-    # nu_effective = min(nu, 0.495)  # Cap at safe value if needed
     
     factor = E / ((1 + nu) * (1 - 2*nu))
     D = factor * np.array([

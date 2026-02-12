@@ -278,64 +278,63 @@ For prescribed displacements (such as u = 0 or v = 0), the most common implement
 
 Applied forces and distributed loads are incorporated directly into the global force vector {F} through the integration processes described above. The stiffness matrix [K] remains unchanged for force boundary conditions.
 
-## Elastic-Plastic Behavior
+## Elastic-Plastic Behavior: Viscoplastic Algorithm
 
-The finite element formulation described above assumes purely elastic behavior governed by the elastic constitutive 
-matrix $[D_e]$. However, when soil elements reach the failure envelope defined by the Mohr-Coulomb criterion, the 
-material behavior transitions from elastic to plastic, fundamentally changing the element response and requiring modification of the solution process.
+The finite element formulation described above assumes purely elastic behavior governed by the elastic constitutive
+matrix $[D_e]$. However, when soil elements reach the failure envelope defined by the Mohr-Coulomb criterion,
+plastic deformation occurs. XSLOPE handles this using the **viscoplastic algorithm** described by Griffiths & Lane (1999) and Smith & Griffiths (2004), which provides a robust and elegant approach to elastic-perfectly plastic finite element analysis.
 
-### Plastic Yielding and Stress Return
+### Overview of the Viscoplastic Approach
 
-When the stress state at any point reaches the yield surface (f = 0), the material can no longer respond according to purely elastic behavior. Instead, plastic yielding occurs, which fundamentally changes the stress-strain relationship and requires special treatment in the finite element formulation.
+Unlike traditional elastic-plastic methods that modify the stiffness matrix when elements yield, the viscoplastic algorithm keeps the elastic stiffness matrix $[K]$ constant throughout the analysis. Plastic behavior is instead handled through accumulated viscoplastic strains that generate body load corrections added to the right-hand side of the equilibrium equations. This has two major advantages:
 
-**Yielding Detection:** During the finite element solution process, the yield function is continuously monitored at each integration point. When f > 0, the stress state has exceeded the yield strength and plastic deformation must occur to return the stress to an admissible state on the yield surface.
+1. The stiffness matrix is assembled and factorized only once, then reused for all iterations via back-substitution
+2. The algorithm is unconditionally stable for appropriate choice of the time step parameter
 
-**Stress Return Process:** When yielding is detected, a stress return algorithm projects the inadmissible stress state back onto the yield surface:
+### Viscoplastic Iteration Process
 
-1. **Elastic Predictor:** Calculate trial stress assuming purely elastic behavior
-2. **Yield Check:** Evaluate f for the trial stress state  
-3. **Plastic Corrector:** If f > 0, apply plastic correction using:
+For a given set of strength parameters (c, φ) and applied loads, the solution proceeds as follows:
 
->>$\{\sigma'\}_{n+1} = \{\sigma'\}_{trial} - \Delta \lambda \dfrac{\partial f}{\partial \sigma'}$
+**1. Setup (performed once):**<br>
+>- Assemble global elastic stiffness matrix $[K]$ using $[D_e]$ for all elements<br>
+- Build gravity load vector $\{F\}_{gravity}$<br>
+- Pre-factorize $[K]$ using sparse LU decomposition (reused for all iterations)<br>
+- Initialize viscoplastic strains $\{\varepsilon^{vp}\} = 0$ at all Gauss points
 
-where $\Delta \lambda$ is the plastic multiplier determined by requiring f = 0 for the final stress state.
+**2. Initial Elastic Solution:**<br>
+>- Solve $[K]\{U\} = \{F\}_{gravity}$ using the pre-factored matrix
 
-**Impact on Element Stiffness:** Once yielding occurs, the material stiffness is fundamentally altered. The elastic 
-constitutive matrix $[D_e]$ is replaced by an elastic-plastic matrix $[D_{ep}]$ that accounts for the reduced stiffness 
-in the direction of plastic flow. This ensures that further loading does not violate the yield criterion while maintaining equilibrium.
+**3. Viscoplastic Iteration Loop:**<br>
 
-### Elastic-Plastic Solution Process
+Each iteration builds a corrected load vector and solves the full system:
 
-The incorporation of plastic yielding fundamentally changes the finite element solution process from a simple linear system to an iterative nonlinear procedure. For a given set of strength parameters (c, φ) and applied loads, the solution process works as follows:
+>a. Start with gravity loads: $\{F\} = \{F\}_{gravity}$<br>
+>b. At each Gauss point in every element:<br>
+>>- Compute total strains from current displacements: $\{\varepsilon\} = [B]\{u_e\}$<br>
+>>- Compute elastic strains: $\{\varepsilon^{el}\} = \{\varepsilon\} - \{\varepsilon^{vp}\}$<br>
+>>- Compute stress from elastic strains: $\{\sigma\} = [D_e]\{\varepsilon^{el}\}$<br>
+>>- Evaluate Mohr-Coulomb yield function: $f = \tau_{max} - \bar{\sigma}\sin\phi - c\cos\phi$<br>
+>>- If $f > 0$ (yielding): compute viscoplastic strain increment $\Delta\varepsilon^{vp} = f \cdot \dfrac{\partial Q}{\partial \sigma} \cdot \Delta t$<br>
+>>- Accumulate: $\{\varepsilon^{vp}\} \mathrel{+}= \Delta\varepsilon^{vp}$<br>
+>
+>c. Add body load corrections from viscoplastic strains:
+>>$\{F\} \mathrel{+}= \sum_{elements} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$<br>
+>
+>d. Solve $[K]\{U_{new}\} = \{F\}$ using the pre-factored matrix<br>
+>e. Check convergence (see below)<br>
+>f. If not converged, repeat from step (a) with updated displacements
 
-**1. Initial Elastic Solution:**<br>
->- Assemble global stiffness matrix $[K]$ using elastic constitutive matrix $[D_e]$ for all elements<br>
-- Apply boundary conditions and external loads<br>
-- Solve linear system: $[K]{U} = {F}$<br>
-- Calculate stresses at all integration points
+**Key Parameters:**<br>
 
-**2. Yield Check:**<br>
->- Evaluate yield function $f$ at each integration point<br>
-- Identify elements where $f > 0$ (yielding has occurred)
-
-**3. Stress Return and Stiffness Modification:**<br>
->- For yielded integration points, apply stress return algorithm to project stresses back to yield surface<br>
-- Replace elastic constitutive matrix $[D_e]$ with elastic-plastic matrix $[D_{ep}]$ for yielded points<br>
-- $[D_{ep}]$ accounts for reduced stiffness in the direction of plastic flow
-
-**4. Iterative Solution:**<br>
->- Reassemble global stiffness matrix with modified $[D_{ep}]$ for yielded elements<br>
-- Solve updated system: $[K_{modified}]{U} = {F}$<br>
-- Check convergence of displacements and forces<br>
-- If not converged, repeat steps 2-4 until equilibrium is achieved
+>- **Time step** $\Delta t$: A numerical parameter (not physical time) that controls stability. Following Smith & Griffiths: $\Delta t = \dfrac{4(1+\nu)}{3E}$<br>
+>- **Flow rule** $\dfrac{\partial Q}{\partial \sigma}$: XSLOPE uses non-associated flow with dilation angle $\psi = 0$, producing purely deviatoric plastic strains (no volume change)<br>
+>- **Maximum iterations**: 500 (sufficient for convergence near the critical factor of safety, where hundreds of iterations may be needed)
 
 **Key Points:**<br>
->- **Mixed Response:** The slope contains both elastic elements (f < 0) and plastic elements (f = 0) simultaneously<br>
->- **Load Redistribution:** As elements yield and lose stiffness, loads redistribute to remaining elastic elements<br>
->- **Iterative Convergence:** Multiple iterations are required to achieve equilibrium with the correct combination of elastic and plastic element responses<br>
->- **Strength Dependency:** The final pattern of plastic zones depends entirely on the strength parameters (c, φ) - stronger soils develop fewer/smaller plastic zones
-
-This iterative elastic-plastic solution process forms the foundation for understanding how the Shear Strength Reduction Method works by systematically weakening the strength parameters.
+>- **Constant stiffness**: $[K]$ never changes — all nonlinearity enters through the body load corrections<br>
+>- **Mixed response**: The slope contains both elastic Gauss points ($f < 0$) and yielding Gauss points ($f > 0$) simultaneously<br>
+>- **Load redistribution**: As Gauss points yield and accumulate viscoplastic strains, stress redistributes to surrounding regions through the body load correction mechanism<br>
+>- **Elastic strains matter**: The yield check uses stress from elastic strains $\{\varepsilon\} - \{\varepsilon^{vp}\}$, not total strains — this correctly accounts for stress relief from already-accumulated viscoplastic deformation
 
 ## Shear Strength Reduction Method (SSRM)
 
@@ -359,32 +358,23 @@ The critical factor of safety is determined when the iterative solution process 
 
 ### Convergence Criteria
 
-The identification of failure in SSRM relies on robust convergence criteria that can reliably distinguish between stable solutions with large but finite displacements and unstable solutions where displacements grow without bound. Two primary convergence criteria are commonly used, and most practical implementations employ both criteria simultaneously for robust failure detection.
+The identification of failure in SSRM relies on a convergence criterion that can reliably distinguish between stable solutions with large but finite displacements and unstable solutions where displacements grow without bound.
 
-**Displacement-Based Convergence Criterion:** 
+**Displacement-Based Convergence Criterion:**
 
-The displacement-based criterion, as proposed by Dawson et al. (1999), monitors the relative change in displacement between successive iterations:
+XSLOPE uses the displacement-based criterion proposed by Dawson et al. (1999), which monitors the relative change in displacement between successive viscoplastic iterations:
 
->>$\dfrac{||\{U\}_{i+1} - \{U\}_i||}{||\{U\}_{i+1}||} < \text{tol}_U$
+>>$\dfrac{||\{U\}_{i+1} - \{U\}_i||}{||\{U\}_{i+1}||} < \text{tol}$
 
-This criterion becomes increasingly difficult to satisfy as the slope approaches failure because displacements grow rapidly while the change between iterations remains large.
+This criterion becomes increasingly difficult to satisfy as the slope approaches failure because displacements grow rapidly while the change between iterations remains large. Conversely, for stable configurations well below the critical factor of safety, convergence is achieved quickly (often in fewer than 10 iterations).
 
-**Force-Based Convergence Criterion:**
+**Implementation in XSLOPE:**
 
-The force-based criterion monitors the equilibrium residual:
+>- Default tolerance: $\text{tol} = 10^{-3}$<br>
+>- Maximum iterations: 500<br>
+>- Failure to converge within the maximum number of iterations indicates that the current reduction factor corresponds to an unstable configuration
 
->>$\dfrac{||\{R\}||}{||\{F\}||} < \text{tol}_F$
-
-The residual force vector $\{R\}$ represents the out-of-balance forces that remain after each iteration of the solution process. As failure approaches, these residual forces become increasingly difficult to eliminate because the soil's capacity to redistribute stress through elastic deformation is exhausted.
-
-**Typical Implementation:**
-
-In practice, both criteria are used together with typical tolerance values:
-
->>$\text{tol}_U = 10^{-3}$ to $10^{-2}$<br>
-$\text{tol}_F = 10^{-4}$ to $10^{-3}$
-
-Convergence is achieved only when **both** criteria are satisfied simultaneously. Failure to achieve convergence within a specified maximum number of iterations (typically 50-200) indicates that the current reduction factor corresponds to an unstable configuration and the critical factor of safety has been reached or exceeded.
+Near the critical factor of safety, the viscoplastic algorithm may require hundreds of iterations to converge. For example, Griffiths & Lane (1999) report 792 iterations at a reduction factor just below failure for their Example 1. The maximum iteration count of 500 in XSLOPE provides sufficient margin for most practical problems.
 
 ## Seismic Forces
 
@@ -627,181 +617,20 @@ The transfer of pore pressure data between seepage and structural meshes can be 
 
 where $N_i$ are the triangular shape functions of the seepage element containing point $(x,y)$, and $u_i$ are the pore pressures at the seepage element nodes.
 
-## Implementation Strategy
+## Implementation in XSLOPE
 
-The following instructions are for Claude Code or Cursor to implement the finite element slope stability analysis in 
-XSLOPE. The code development will be done in the `fem.py` module, which will be integrated into the existing XSLOPE framework. The 
-implementation will follow the structure of the existing limit equilibrium analysis code, leveraging the established 
-infrastructure for file input, mesh generation, and plotting of results.
+The FEM slope stability analysis in XSLOPE is implemented in the `fem.py` module with the following key functions:
 
-The implementation will be divided into the following key components:
+- **`build_fem_data(slope_data, mesh)`** — Constructs the FEM data dictionary from the slope geometry, material properties, boundary conditions, and mesh. Handles pore pressure assignment (from piezometric lines or seepage solutions), reinforcement element properties (tensile capacity, pullout reduction, axial stiffness), distributed load conversion to nodal forces, and seismic coefficient storage.
 
-### Step 1: Mesh Generation
+- **`solve_fem(fem_data, F=1.0)`** — Solves the finite element system for a given strength reduction factor $F$ using the viscoplastic algorithm described above. Returns a solution dictionary containing nodal displacements, element stresses, convergence status, and iteration count.
 
-The meshing tools in mesh.py are already complete and can be used to generate the finite element mesh based on the 
-slope geometry defined in the Excel input template. This code already includes the ability to generate 1D truss 
-elements for soil reinforcement lines, which will be used to model the reinforcement systems in the slope. Each 
-reinforcement line is discretized into multiple truss elements based on the specified mesh density (target_size) and 
-the 1D elements share the same nodes as the 2D elements and the 1D elements coincide with the edges of the 2D 
-elements. Each 1D element is assigned a material id which is the number of the reinforcement line in the input template.
+- **`solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05)`** — Determines the critical factor of safety using bisection on the strength reduction factor. Repeatedly calls `solve_fem` with different values of $F$, bracketing the transition between convergence (stable) and non-convergence (failure).
 
-No new code is needed for this step, as the existing mesh generation code in `mesh.py` can be reused.
+Visualization is provided in `plot_fem.py`:
 
-### Step 2: Construction of the fem_data dictionary
-
-Next we need to create a function in the `fel.py` file called `build_fem_data`. This will be somewhat similar to the 
-`build_seep_data` function in `seep.py`. This function will take two arguments: the mesh generated in Step 1 and the slope_data dictionary that contains all of the data imported from the Excel template using the `load_slope_data` function in `fileio.py`.
-
-The build_fem_data function will create a dictionary called `fem_data` that is similar to seep_data in that it will 
-include a finite element mesh, but it will also include material properties need by the fem analysis, including the 
-shear strength (c and phi), pore pressure option, and the two stress parameters E and nu. These will be stored in an 
-array, one item per element like we do in seep_data. For the mc option, we will use c and phi directly. For the cp option, we will use the c/p and r-elev values to assign shear strength to each element with the corresponding material id, by computing the centroid of the element and finding the depth below the r-elev parameter and multiplying that depth by the c/p ratio to get an undrained strength that we assign to c field for element and we will set phi=0. The material properties will also include the unit weight for each element based on the values in the materials list.
-
-We will also populate an array of pore pressure values (one per node), if the pore pressure option does not = "none” 
-for any of the materials. If the pore pressure option is either seep or piezo, we need to first do a check to ensure 
-that the user has not mixed a combination of seep and piezo. They have to all be piezo or all seep. To populate the 
-values, if the piezo option is selected, we will use the piezo line to find the depth of the node below the piezo 
-line and multiply that depth by the unit weight of water. If the node is above the piezo line, the pore pressure = 
-zero. If the seep option is selected, there should already be a seepage pore pressure solution (one per node) that 
-we can just copy over. However, as we copy it over, if any of the pore pressures are < 0, they should be set to 0 
-because negative pore pressures would increase the effective stress and be unconservative. 
-
-For the reinforcement lines, the mesh should include a set of 1D elements correponding to the lines. We will need to 
-create a list of material properties for the 1D element, stored in a set of arrays - one per element. The properties will be the t_max, t_res. For each element, we can also compute the length of the element and use that to compute the axial stiffness $k = \frac{E 
-\cdot A}{L}$, where $E$ is the modulus of elasticity, $A$ is the cross-sectional area, and $L$ is the length of the 
-element. The stiffness will be stored in an array, one per element.
-
-For each of the reinforcement lines, we will also need to compute the distance of the centroid of the element from 
-the left and right ends of the reinforcement line. This will be used to compute the allowable tensile force and 
-residual tensile force for each element based on the pullout length as described in the previous section (part 2 of 
-Reinforcement Line Input Parameters and Element Properties). This logic will be used to compute a t_allow and t_res for each element, which will be stored in arrays, one per element.
-
-We will also need to create a set of boundary conditions. For each node we will have a bc type and potentially two bc values. The types of boundary condtions are as follows:
-
-0 = none
-1 = fixed (no movement in either x or y direction)
-2 = x roller (no movement in y, can move in x)
-3 = y roller (no movement in x, can move in y)
-4 = specified force
-
-For type 4, we will also have the f_x an f_y values with are the x and y components of a force vector acting at the node. 
-
-To build the boundary conditions, we will do the following:
-
-a) if no other type is applied, assume type=0 by default
-
-b) all nodes on the bottom of the mesh will be type=1. we will take the max_depth global parameter and find all nodes where the y value = max_depth and assign this value.
-
-c) all nodes on the left and right sides of the mesh will be type=3 (y roller). We will look at the ground_surface line in the slope_data dictionary which is the top profile of the mesh from left to right. The x coordinate of the first point in this line should be the min x value (x_left) and the x coordiante of the last point in this line should be the max value (x_right). We will then find all nodes where the x coordinate of the node = x_left or x_right and mark those nodes as type=3.
-
-d) The type=4 boundary nodes will correspond to the distributed loads. If there is a set of distributed load lines in slope_data, each line is a set of xy coordinates with a load value that is assumed to vary linearly between each load. These lines are defined along the edge of the mesh (typically at the top). The loads are assumed to act perpendicular to the face of the slope (edges of the elements). These will be converted to point forces by finding each node that is coincident with a distributed load line and then for the 1/2 distance along the element edge on either side of the node, we will integrate the distributed load trapezoid to come up with a force with x and y components. These will be stored as f_x and f_y for the boundary condition values. 
-
-We will need to store the seismic coefficient in the fem_data dictionary as well, which will be used to apply the pseudo-static seismic forces to the mesh.
-
-The mesh argument will be optional. If mesh=None, the function will look for the mesh data in the slope_data dictionary
-and use that to build the fem_data dictionary. If mesh is provided, it will use that mesh to build the fem_data 
-dictionary. If mesh=None and the slope_data dictionary does not contain a mesh, the function will raise an error.
-
-The function will return a dictionary called `fem_data` that contains the following keys:
-
-    Returns:
-        dict: fem_data dictionary with the following structure:
-            - nodes: np.ndarray (n_nodes, 2) of node coordinates
-            - elements: np.ndarray (n_elements, 9) of element node indices
-            - element_types: np.ndarray (n_elements,) indicating 3 for tri3 elements, 4 for quad4 elements, etc
-            - element_materials: np.ndarray (n_elements,) of material IDs (1-based)
-            - bc_type: np.ndarray (n_nodes,) of boundary condition flags (0=free, 1=fixed, 2=x roller, 3=y roller, 4=force)
-            - bc_values: np.ndarray (n_nodes, 2) of boundary condition values (f_x, f_y for type 4)
-            - c_by_mat: np.ndarray (n_materials,) of cohesion values
-            - phi_by_mat: np.ndarray (n_materials,) of friction angle values (degrees
-            - E_by_mat: np.ndarray (n_materials,) of Young's modulus values
-            - nu_by_mat: np.ndarray (n_materials,) of Poisson's ratio values
-            - gamma_by_mat: np.ndarray (n_materials,) of unit weight values
-            - u: np.ndarray (n_nodes,) of pore pressures (if applicable)
-            - elements_1d: np.ndarray (n_1d_elements, 3) of 1D element node indices
-            - element_types_1d: np.ndarray (n_1d_elements,) indicating 2 for linear elements and 3 for quadratic elements
-            - element_materials_1d: np.ndarray (n_1d_elements,) of material IDs (1-based) corresponding to reinforcement lines
-            - t_allow_by_1d_elem: np.ndarray (n_1d_elements,) of maximum tensile forces for reinforcement lines
-            - t_res_by_1d_elem: np.ndarray (n_1d_elements,) of residual tensile forces for reinforcement lines
-            - k_by_1d_elem: np.ndarray (n_1d_elements,) of axial stiffness values for reinforcement lines
-            - unit_weight: float, unit weight of water
-            - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
-
-### Step 3: Finite Element Analysis Solver
-
-We will implement the finite element solver in a new function called `solve_fem` in `fem.py`. This function will 
-take the 'fem_data' dictionary as input and return a solution dictionary. It will also take an optional argument F, 
-which is the shear strength reduction factor (default = 1.0). It will reduce the mohr-coulomb shear strength parameters 
-(c and phi) by the factor F, and then solve the finite element system of equations to find the nodal displacements and stresses. 
-
-The solver will follow the steps outlined in the `Elastic-Plastic Solution Process` section above, which includes 
-assembling the global stiffness matrix and force vector, applying boundary conditions, solving the system of 
-equations, and checking for convergence. Critical implementation details include:
-
-- **Yield detection and stress return**: Follow the elastic predictor-plastic corrector algorithm described in the `Elastic-Plastic Behavior` section
-- **Constitutive matrix switching**: Replace elastic matrix $[D_e]$ with elastic-plastic matrix $[D_{ep}]$ for yielded integration points as detailed in the `Elastic-Plastic Solution Process` 
-- **Reinforcement integration**: Truss elements contribute to the global stiffness matrix and force vector based on their axial stiffness and tensile capacity, with tension-only behavior enforced through iterative removal of compression-carrying elements
-
-The function will return a solution dictionary containing nodal displacements, stresses, strains, 
-and any other relevant quantities, including an indicator of whether the solution converged.
-
-The function should include an optional argument debug_level, which can be used to control the verbosity of the output.
-If debug_level = 1, only the main diagnostics will be printed, such as whether the solution converged. If debug_level 
-= 2, the function should print detailed information about the 
-convergence process, including the current iteration number, convergence criteria values, and any other relevant 
-information. If debug_level = 3, highly detailed diagnostics for debugging will be output.
-
-### Step 4: SSRM Implementation
-
-We will implement the strength reduction method (SSRM) in a new function called `solve_ssrm` in `fem.py`. This 
-function will take the `fem_data` dictionary as input and return a solution dictionary. It will repeatedly call the 
-`solve_fem` function with different shear strength reduction factors until convergence is achieved as outlined in 
-the SSRM section above. 
-
-The main steps for the SSRM implementation are as follows:
-
-1. **Initialize Reduction Factor**: Start with an initial shear strength reduction factor $F = 1.0$.
-2. **Iterative Analysis Loop**: 
-   - Call `solve_fem` with the current reduction factor $F$.
-   - Check the SSRM convergence criteria based on displacement and force residuals.
-   - If convergence is not achieved, increment the reduction factor (e.g., by 0.05) and repeat until convergence is reached or a maximum number of iterations is exceeded.
-3. **Determine Critical Factor of Safety**: The critical factor of safety is the last reduction factor $F$ for which convergence was achieved. This represents the maximum reduction in shear strength that still allows the slope to remain stable under the applied loading conditions.
-4. **Output Solution Dictionary**: Return a solution dictionary containing the critical factor of safety, nodal displacements, stresses, and any other relevant quantities.
-
-It would be helpful to implement a convergence check function that can be reused in both the `solve_fem` and `solve_ssrm` functions. This function will take the current and previous displacement vectors and force vectors as inputs and return a boolean indicating whether convergence has been achieved based on the specified tolerance levels.
-
-It would also be helpful to intelligently adjust the reduction factor increment based on the convergence behavior. If convergence is achieved quickly, the increment can be reduced to allow for finer resolution near the critical factor of safety. If convergence is slow, a larger increment can be used to speed up the analysis.
-
-The function should include an optional argument debug_level, which can be used to control the verbosity of the output.
-If debug_level = 1, only the main diagnostics will be printed, such as whether the solution converged and the factor 
-of safety.
-If debug_level 
-= 2, the function should print detailed information about the 
-convergence process, including the current iteration number, convergence criteria values, current reduction factor, and 
-any other relevant 
-information. If debug_level = 3, highly detailed diagnostics for debugging will be output.
-
-### Step 5: Output and Visualization
-
-We will need to implement some new functions in a new file called 'plot_fem.py` that will take 
-the solution dictionary and the fem_data dictionary as inputs and generate plots of the results. This functions will 
-create the following plots:
-
-1. **Displacement Contours**: A contour plot showing the nodal displacements in the x and y directions, with color 
-   gradients indicating the magnitude of displacement. It would be helpful to include on overlay of the 
-   reinforcement lines if they exist, to visualize how the reinforcement interacts with the slope. 
-2. **Stress Contours**: A contour plot showing the von Mises stress distribution across the slope, highlighting 
-   areas of high stress concentration. It would be helpful to include color codes thick lines corresponding to the reinforcement lines, indicating the tensile forces in the reinforcement elements. The color gradient should indicate the magnitude of the von Mises stress, with a threshold for failure (e.g., a red line for areas where the stress exceeds the material strength).
-3. **Mesh Displacement**: A deformed mesh plot showing the original mesh overlaid with the deformed mesh based on the nodal displacements. This will help visualize how the slope deforms under loading conditions.
-4. **Reinforcement Force Distribution**: A plot showing the tensile forces in the reinforcement elements, indicating 
-   how the reinforcement contributes to slope stability. It should include some kind of indicator of whether the 
-   reinforcement has reached its maximum tensile capacity or residual capacity. This chart could be a stacked series of 
-   line plots, one for each reinforcement line, showing the tensile force along the length of the reinforcement line. The 
-   vertical axis would be the tensile force and the horizontal axis would be the distance along the reinforcement 
-   line. The vertical axis size would need to be carefully chosen to ensure that the forces are visible for all of 
-   the reinforcement lines, but not so large that the chart is difficult to read.
-
-The first two items (displacement and stress) could perhaps be handled by passing arguments to a single function. Another option is to put the stress/strain contours in one axis on top and plot the deformation (item 3) in a second axis at the bottom. 
+- **`plot_fem_data(fem_data)`** — Displays the mesh, boundary conditions, and material zones
+- **`plot_fem_results(fem_data, solution)`** — Displays deformation patterns and shear strain contours from the analysis results
 
 ## References
 
@@ -816,5 +645,7 @@ Dyson, A.P., & Tolooiyan, A. (2018). Comparative approaches to probabilistic fin
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Géotechnique*, 49(3), 387-403.
 
 Matsui, T., & San, K.C. (1992). Finite element slope stability analysis by shear strength reduction technique. *Soils and Foundations*, 32(1), 59-70.
+
+Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.
 
 Zheng, H., Liu, D.F., & Li, C.G. (2005). Slope stability analysis based on elasto‐plastic finite element method. *International Journal for Numerical Methods in Engineering*, 64(14), 1871-1888.

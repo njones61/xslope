@@ -361,34 +361,37 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                       markersize=8, label='Applied Force (bc_type=4)')
         )
 
-def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=None, 
+def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_scale=None, 
                     show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=False, save_png=False, dpi=300):
     """
     Plot FEM results with various visualization options.
-    
+
     Parameters:
-        fem_data (dict): FEM data dictionary
-        solution (dict): FEM solution dictionary
-        plot_type (str): Type(s) of plot. Single type ('stress', 'displace_mag', 'displace_vector', 'deformation') 
-            or comma-separated multiple types ('stress,deformation', 'displace_mag,displace_vector').
-            Multiple types are stacked vertically in the order specified.
-        deform_scale (float or None): Scale factor for deformed mesh visualization.
-            If None, automatically calculates scale factor so max deformation is 10% of mesh size.
-            If 1.0, shows actual displacements (may be too small or too large to see).
-        show_mesh (bool): Whether to show mesh lines
-        show_reinforcement (bool): Whether to show reinforcement elements
-        figsize (tuple): Figure size
-        label_elements (bool): If True, show element IDs at element centers
-        plot_nodes (bool): For displace_vector plots, show dots at all node locations
-        plot_elements (bool): For displace_vector plots, show all element edges
-        plot_boundary (bool): For displace_vector plots, show only boundary edges (default mesh display)
-        displacement_tolerance (float): Minimum displacement magnitude to show vectors (uses actual displacement)
-        scale_vectors (bool): For displace_vector plots, scale vectors for visualization; if False, use actual displacement
-    
-    Returns:
-        matplotlib figure and axes (or list of axes for multiple plots)
+        fem_data: FEM data dictionary from build_fem_data
+        solution: FEM solution dictionary from solve_fem
+        plot_type: Comma-separated plot types. Valid types:
+            'deformation' - deformed mesh overlay
+            'displace_mag' - displacement magnitude contours
+            'displace_vector' - displacement vectors at corner nodes
+            'stress' - von Mises stress contours
+            'strain' - equivalent strain contours
+            'shear_strain' - viscoplastic max shear strain contours
+            'yield' - Mohr-Coulomb yield function contours
+        deform_scale: Scale factor for deformed mesh. If None, auto-calculates
+            so max deformation is ~10% of mesh height.
+        show_mesh: Show mesh lines
+        show_reinforcement: Show reinforcement elements
+        figsize: Figure size (width, height)
+        label_elements: Show element ID labels at centroids
+        plot_nodes: For displace_vector, show dots at node locations
+        plot_elements: For displace_vector, show all element edges
+        plot_boundary: For displace_vector, show boundary edges only (default)
+        displacement_tolerance: Fraction of max displacement below which vectors are hidden
+        scale_vectors: For displace_vector, auto-scale vectors for visibility
+        save_png: Save figure to PNG file
+        dpi: Resolution for saved PNG
     """
     
     nodes = fem_data["nodes"]
@@ -396,8 +399,11 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
     
-    # Parse plot types (support comma-separated list)
-    plot_types = [pt.strip().lower() for pt in plot_type.split(',')]
+    # Accept a single string or a list of strings
+    if isinstance(plot_type, str):
+        plot_types = [plot_type.strip().lower()]
+    else:
+        plot_types = [pt.strip().lower() for pt in plot_type]
     valid_types = ['displace_mag', 'displace_vector', 'deformation', 'stress', 'strain', 'shear_strain', 'yield']
     
     # Validate plot types
@@ -405,9 +411,19 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         if pt not in valid_types:
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
     
-    # Set default deformation scale to 1.0 to match vector plot behavior
+    # Auto-calculate deformation scale so max displacement is ~10% of mesh height
+    # Use VP displacement if available (matches what plot_deformed_mesh will plot)
     if deform_scale is None:
-        deform_scale = 1.0  # Default to actual displacement scale
+        disp_elastic = solution.get("displacements_elastic", None)
+        disp_for_scale = displacements - disp_elastic if disp_elastic is not None else displacements
+        u_arr = disp_for_scale[0::2]
+        v_arr = disp_for_scale[1::2]
+        max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
+        mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+        if max_disp > 1e-30:
+            deform_scale = (mesh_height * 0.10) / max_disp
+        else:
+            deform_scale = 1.0
     
     # Create subplots based on number of plot types
     n_plots = len(plot_types)
@@ -479,7 +495,7 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
     plt.tight_layout()
     
     if save_png:
-        filename = f'plot_fem_results_{plot_type.lower().replace(",", "_").replace(" ", "_")}.png'
+        filename = f'plot_fem_results_{"_".join(plot_types)}.png'
         plt.savefig(filename, dpi=dpi, bbox_inches='tight')
     
     plt.show()
@@ -491,10 +507,10 @@ def plot_fem_results(fem_data, solution, plot_type='displacement', deform_scale=
         return fig, axes
 
 
-def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                               cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
-    Plot displacement magnitude contours.
+    Plot total displacement magnitude as filled contours using the viridis colormap.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -591,137 +607,132 @@ def _get_mesh_boundary(fem_data):
     return boundary_edges
 
 
-def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
-                             plot_nodes=True, plot_elements=False, plot_boundary=False, 
-                             displacement_tolerance=1e-6, scale_vectors=False):
+                             plot_nodes=False, plot_elements=False, plot_boundary=True,
+                             displacement_tolerance=1e-6, scale_vectors=True):
     """
-    Plot displacement vectors at nodes with plastic strain.
-    The tail of each vector is at the original node location and the head is at the final location.
-    
-    Vectors are ALWAYS plotted at ALL nodes with plastic strain above the tolerance.
-    The plot_nodes/plot_elements/plot_boundary options control additional visual elements:
-    
+    Plot displacement vectors at corner nodes of each element.
+
+    If viscoplastic solution data is available (displacements_elastic in solution),
+    plots VP displacement (total - elastic) to show the failure mechanism rather
+    than the gravity settlement. Otherwise plots total displacement.
+
     Parameters:
+        ax: Matplotlib axes
+        fem_data: FEM data dictionary
+        solution: FEM solution dictionary
+        show_mesh: Show mesh lines or boundary
+        show_reinforcement: Show reinforcement elements
+        label_elements: Show element ID labels
         plot_nodes: If True, show dots at all node locations
         plot_elements: If True, show all element edges
-        plot_boundary: If True, show only boundary edges (default mesh display)
-        displacement_tolerance: Minimum displacement magnitude to show vectors (uses actual displacement)
-        scale_vectors: If True, scale vectors for visualization; if False, use actual displacement
+        plot_boundary: If True, show only boundary edges (default)
+        displacement_tolerance: Fraction of max displacement below which vectors are hidden
+        scale_vectors: If True (default), auto-scale vectors for visibility
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
-    plastic_elements = solution.get("plastic_elements", np.zeros(len(elements), dtype=bool))
-    
-    # Calculate displacement components
-    u = displacements[0::2]  # x-displacements
-    v = displacements[1::2]  # y-displacements
-    
-    # First, find all nodes with displacement above tolerance
-    nodes_above_tolerance = set()
-    for node_idx in range(len(nodes)):
-        disp_mag = np.sqrt(u[node_idx]**2 + v[node_idx]**2)
-        if disp_mag > displacement_tolerance:
-            nodes_above_tolerance.add(node_idx)
-    
-    # Then, find nodes that belong to elements with plastic strain
-    plastic_nodes = set()
-    for i, elem in enumerate(elements):
-        if plastic_elements[i]:
-            elem_type = element_types[i]
-            # Add all nodes of this element
-            for j in range(elem_type):
-                if j < len(elem):
-                    plastic_nodes.add(elem[j])
-    
-    # Only keep nodes that have BOTH plastic strain AND displacement above tolerance
-    target_nodes = list(plastic_nodes.intersection(nodes_above_tolerance))
-    target_nodes = [node for node in target_nodes if node < len(nodes)]
-    
-    if not target_nodes:
-        print("Warning: No target nodes found for displacement vector plot")
-        return
-    
-    # Calculate vector scaling for visualization
-    max_disp_mag = np.max(np.sqrt(u**2 + v**2))
-    if scale_vectors and max_disp_mag > 0:
-        # Scale vectors so the maximum displacement is about 10% of mesh size
-        mesh_x_size = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
-        mesh_y_size = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-        mesh_size = min(mesh_x_size, mesh_y_size)
-        scale_factor = (mesh_size * 0.1) / max_disp_mag
+
+    # Use VP displacement (total - elastic) if available, to show failure mechanism
+    # This removes the gravity settlement and shows only plastic deformation
+    disp_elastic = solution.get("displacements_elastic", None)
+    if disp_elastic is not None:
+        disp_vp = displacements - disp_elastic
+        u = disp_vp[0::2]
+        v = disp_vp[1::2]
     else:
-        scale_factor = 1.0
-    
-    # Plot displacement vectors (all target_nodes already meet both criteria)
-    vectors_plotted = 0
-    for node_idx in target_nodes:
-        x_orig = nodes[node_idx, 0]
-        y_orig = nodes[node_idx, 1]
-        
-        # Apply scaling only for visualization
-        u_plot = u[node_idx] * scale_factor
-        v_plot = v[node_idx] * scale_factor
-        
-        # Calculate mesh size for arrow sizing
-        mesh_x_size = np.max(nodes[:, 0]) - np.min(nodes[:, 0])
-        mesh_y_size = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-        mesh_size = min(mesh_x_size, mesh_y_size)
-        
-        ax.arrow(x_orig, y_orig, u_plot, v_plot,
-                head_width=mesh_size*0.01, head_length=mesh_size*0.015,
-                fc='black', ec='black', alpha=0.8, linewidth=1.0)
-        vectors_plotted += 1
-    
-    print(f"Plotted {vectors_plotted} displacement vectors (tolerance = {displacement_tolerance:.2e})")
-    
-    # Plot additional visual elements based on options
+        u = displacements[0::2]
+        v = displacements[1::2]
+    disp_mag = np.sqrt(u**2 + v**2)
+    max_disp_mag = np.max(disp_mag)
+
+    if max_disp_mag < 1e-30:
+        print("Warning: No VP displacements to plot")
+        return
+
+    # Collect corner nodes only (avoid mid-side nodes of quad8/tri6)
+    corner_nodes = set()
+    for i, elem in enumerate(elements):
+        et = element_types[i]
+        if et == 8 or et == 9:
+            for j in range(4):
+                corner_nodes.add(elem[j])
+        elif et == 6:
+            for j in range(3):
+                corner_nodes.add(elem[j])
+        else:
+            for j in range(et):
+                corner_nodes.add(elem[j])
+
+    # Absolute threshold
+    abs_tol = displacement_tolerance * max_disp_mag
+
+    # Plot boundary outline first
     if show_mesh:
         if plot_elements:
-            # Plot all element edges
             plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5, linewidth=0.5)
         elif plot_boundary:
-            # Plot only boundary edges
             boundary_edges = _get_mesh_boundary(fem_data)
             for edge in boundary_edges:
                 x_coords = [nodes[edge[0], 0], nodes[edge[1], 0]]
                 y_coords = [nodes[edge[0], 1], nodes[edge[1], 1]]
                 ax.plot(x_coords, y_coords, 'k-', alpha=0.7, linewidth=1.0)
-    
+
+    # Plot small vectors at corner nodes
+    corner_list = sorted(corner_nodes)
+    cx = nodes[corner_list, 0]
+    cy = nodes[corner_list, 1]
+    cu = u[corner_list]
+    cv = v[corner_list]
+    cmag = disp_mag[corner_list]
+
+    mask = cmag > abs_tol
+
+    if np.sum(mask) == 0:
+        print("Warning: All displacements below tolerance")
+        return
+
+    ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask],
+              angles='xy', color='black', alpha=0.7,
+              scale=None, width=0.002, headwidth=3, headlength=4,
+              headaxislength=3, pivot='tail')
+
     # Plot node dots if requested
     if plot_nodes:
-        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2, alpha=0.6)
-    
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=1, alpha=0.4)
+
     # Plot reinforcement
     if show_reinforcement and 'elements_1d' in fem_data:
         plot_reinforcement_lines(ax, fem_data, solution)
-    
+
     # Add element labels if requested
     if label_elements:
         _add_element_labels(ax, fem_data)
-    
-    # Add a dummy colorbar to maintain consistent spacing with other plots
+
+    # Dummy colorbar for axis alignment with other subplots
     dummy_data = np.array([[0, 1]])
     dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
     cbar = plt.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
-    cbar.set_label('Displacement Vectors', rotation=270, labelpad=cbar_labelpad, color='white')
+    cbar.set_label('', color='white')
     cbar.set_ticks([])
     cbar.set_ticklabels([])
     cbar.outline.set_color('white')
     cbar.outline.set_linewidth(0)
-    
-    ax.set_aspect('equal')
-    ax.set_title(f'Displacement Vectors (Scale Factor = {scale_factor:.2f})')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
+
+    F = solution.get("F", None)
+    title = 'Viscoplastic Displacement Vectors' if disp_elastic is not None else 'Displacement Vectors'
+    if F is not None:
+        title += f'  F={F:.2f}'
+    ax.set_title(title, fontsize=12, pad=15)
 
 
 def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                         cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
-    Plot von Mises stress contours.
+    Plot von Mises stress contours with yielding elements highlighted.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -823,15 +834,27 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
                        cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
     Plot deformed mesh overlay on original mesh.
+
+    Shows the original mesh in light gray and the deformed mesh in blue.
+    Uses VP displacement (total - elastic) when available to show the failure
+    mechanism rather than gravity settlement. The deform_scale parameter
+    amplifies the displacements for visibility.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
-    
+
+    # Use VP displacement (total - elastic) if available, to show failure mechanism
+    disp_elastic = solution.get("displacements_elastic", None)
+    if disp_elastic is not None:
+        disp = displacements - disp_elastic
+    else:
+        disp = displacements
+
     # Calculate deformed node positions
-    u = displacements[0::2]
-    v = displacements[1::2]
+    u = disp[0::2]
+    v = disp[1::2]
     nodes_deformed = nodes + deform_scale * np.column_stack([u, v])
     
     # Plot original mesh
@@ -867,7 +890,12 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     
     # Note: Axis limits will be set by the calling function for consistent multi-plot alignment
     # When used as a standalone plot, matplotlib will auto-scale appropriately
-    ax.set_title(f'Mesh Deformation (Scale Factor = {deform_scale:.1f})')
+    F = solution.get("F", None)
+    disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
+    title = f'{disp_label} (Scale = {deform_scale:.0f}x)'
+    if F is not None:
+        title += f'  F={F:.2f}'
+    ax.set_title(title, fontsize=12, pad=15)
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     if show_mesh or show_reinforcement:
@@ -964,7 +992,7 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, lin
 
 def plot_reinforcement_forces(ax, fem_data, solution):
     """
-    Plot reinforcement elements with color based on force magnitude.
+    Plot reinforcement elements colored by force ratio (force/allowable).
     """
     if 'elements_1d' not in fem_data:
         return
@@ -1015,7 +1043,7 @@ def plot_reinforcement_forces(ax, fem_data, solution):
 
 def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_png=False, dpi=300):
     """
-    Plot force profiles along each reinforcement line.
+    Plot axial force profiles along each reinforcement line as subplots.
     """
     if 'elements_1d' not in fem_data:
         print("No reinforcement elements found")
@@ -1122,7 +1150,7 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_
 
 def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6), save_png=False, dpi=300):
     """
-    Plot SSRM convergence history.
+    Plot SSRM bisection convergence history showing F vs iteration and convergence status.
     """
     if 'F_history' not in ssrm_solution:
         print("No SSRM convergence history found")
@@ -1169,10 +1197,10 @@ def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6), save_png=False, dpi=30
     return fig, (ax1, ax2)
 
 
-def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                         cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
-    Plot equivalent strain contours (von Mises equivalent strain).
+    Plot von Mises equivalent strain contours computed from total strains.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -1196,30 +1224,37 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
                           show_mesh, show_reinforcement, cbar_shrink, cbar_labelpad, label_elements)
 
 
-def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
+def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                               cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
     """
-    Plot maximum shear strain contours - key indicator for failure surfaces in slope stability.
+    Plot viscoplastic max shear strain contours.
+
+    Uses accumulated viscoplastic strains from the solution (vp_shear_strain key).
+    Falls back to total shear strain if VP data is not available.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
-    strains = solution.get("strains", np.zeros((len(elements), 4)))
-    
-    if strains.shape[1] < 4:
-        print("Warning: Maximum shear strain data not available")
-        return
-    
-    # Extract maximum shear strain (4th column)
-    max_shear_strain = strains[:, 3]
-    
-    # Plot contours with specialized colormap for shear strain (red=high, blue=low)
-    _plot_nodal_contours(ax, fem_data, max_shear_strain, 'Max Shear Strain', 
+
+    vp_shear_strain = solution.get("vp_shear_strain", None)
+    if vp_shear_strain is None:
+        # Fallback to total shear strain if VP not available
+        strains = solution.get("strains", np.zeros((len(elements), 4)))
+        if strains.shape[1] >= 4:
+            vp_shear_strain = strains[:, 3]
+        else:
+            print("Warning: Shear strain data not available")
+            return
+
+    _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
                         False, show_reinforcement, cbar_shrink, cbar_labelpad,
-                        colormap='coolwarm', label_elements=label_elements)  # Coolwarm: red=high, blue=low
-    
-    # Add title indicating this shows failure zones
-    ax.set_title('Max Shear Strain (Failure Zone Indicator)', fontsize=12, pad=15)
+                        colormap='coolwarm', label_elements=label_elements)
+
+    F = solution.get("F", None)
+    title = 'Viscoplastic Shear Strain'
+    if F is not None:
+        title += f'  F={F:.2f}'
+    ax.set_title(title, fontsize=12, pad=15)
 
 
 def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
@@ -1402,7 +1437,7 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
 def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_reinforcement=True,
                           cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, colormap='viridis'):
     """
-    Helper function to plot element-based contour data.
+    Plot element-based scalar data as colored patches (one color per element).
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -1507,7 +1542,7 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
 def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, show_reinforcement=True,
                         cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis', label_elements=False):
     """
-    Plot smooth contours by interpolating element values to nodes.
+    Plot smooth filled contours by averaging element values to nodes and triangulating.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]

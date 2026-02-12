@@ -217,7 +217,7 @@ and Spencer's Method. XSLOPE supports up to 10 circular failure surfaces, each o
 individually or used as starting points when searching for a critical failure surface with a mininum factor of 
 safety using an automated search algorithm.
 
-![circles.png](images/circles.png)
+![circles.png](images/circles.png){width=1000px}
 
 Each row in the circles table specifies one circular failure surface with the following 
 parameters:

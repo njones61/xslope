@@ -376,6 +376,52 @@ This criterion becomes increasingly difficult to satisfy as the slope approaches
 
 Near the critical factor of safety, the viscoplastic algorithm may require hundreds of iterations to converge. For example, Griffiths & Lane (1999) report 792 iterations at a reduction factor just below failure for their Example 1. The maximum iteration count of 500 in XSLOPE provides sufficient margin for most practical problems.
 
+## Element Type Selection and Volumetric Locking
+
+### The Problem: Volumetric Locking in Low-Order Elements
+
+A critical consideration in finite element slope stability analysis is the choice of element type. Low-order elements — specifically 3-node linear triangles (tri3) and 4-node bilinear quadrilaterals (quad4) — suffer from a well-known numerical pathology called **volumetric locking** that causes them to significantly overestimate the factor of safety.
+
+Volumetric locking occurs because plastic deformation under the Mohr-Coulomb criterion (particularly with a non-associated flow rule where the dilation angle $\psi = 0$) produces nearly incompressible plastic strains — the material deforms in shear without changing volume. Low-order elements have too few degrees of freedom to simultaneously satisfy this incompressibility constraint and represent the displacement field accurately. The result is an artificially stiff response: the elements resist plastic deformation more than they should, requiring a larger strength reduction factor before failure occurs. This manifests as an unconservative (too high) factor of safety.
+
+The severity of locking depends on the element formulation:
+
+- **Constant-strain triangles (tri3)** have a single integration point and only 6 displacement DOFs per element. The constant strain field cannot represent the complex shear deformation patterns that develop in plastic zones. This is the most severely affected element type.
+
+- **Bilinear quadrilaterals (quad4)** with full 2×2 integration have 8 displacement DOFs but still exhibit significant locking because the bilinear interpolation cannot adequately represent incompressible deformation modes.
+
+- **Reduced integration** (using fewer Gauss points than required for exact integration) can alleviate locking in quadrilateral elements. The 8-node quadrilateral (quad8) with 2×2 reduced integration is a particularly effective combination that avoids locking while maintaining accuracy.
+
+### Recommended Elements: Quadratic Formulations
+
+Quadratic elements — 6-node triangles (tri6), 8-node quadrilaterals (quad8), and 9-node quadrilaterals (quad9) — provide sufficient degrees of freedom to represent incompressible plastic deformation without artificial stiffness. These element types should always be used for slope stability analysis with the SSRM.
+
+The following table shows SSRM results for the Griffiths & Lane (1999) Example 1 benchmark problem (homogeneous slope with $c/\gamma H = 0.05$, $\phi = 20°$, slope angle 26.57°) using each element type with a target mesh size of 5. The expected factor of safety is approximately 1.40 (Griffiths & Lane report FS = 1.4 by FEM, Spencer's method gives FS = 1.376).
+
+| Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. Reference | Recommendation |
+|:---:|:---:|:---:|:---:|:---|
+| tri3 | 3 | 1.70 | +21% | Not recommended — severe locking |
+| quad4 | 4 | 1.56 | +11% | Not recommended — significant locking |
+| **tri6** | **6** | **1.41** | **< 1%** | **Recommended** |
+| **quad8** | **8** | **1.41** | **< 1%** | **Recommended (default)** |
+| **quad9** | **9** | **1.41** | **< 1%** | **Recommended** |
+
+The three quadratic element types all converge to the same factor of safety (FS = 1.41), consistent with the published reference solution. The low-order elements overestimate FS by 11–21%, which would be unconservative and potentially dangerous in practice.
+
+### Practical Guidance
+
+For slope stability analysis in XSLOPE:
+
+1. **Always use quadratic elements** (tri6, quad8, or quad9) for SSRM analysis. The default element type in XSLOPE is quad8, which provides the best balance of accuracy and efficiency through reduced integration.
+
+2. **Do not use tri3 or quad4 for computing factors of safety.** While these elements may be adequate for purely elastic problems or for qualitative assessment of stress distributions, they produce unconservative factors of safety in elastic-plastic slope stability analysis.
+
+3. **quad8 with reduced integration** is the preferred choice following Griffiths & Lane (1999). The 2×2 Gauss integration (instead of the full 3×3 required for exact integration of the quadratic shape functions) effectively eliminates volumetric locking while providing accurate stress and strain fields.
+
+4. **tri6 elements** are useful when the mesh must conform to complex geometries where quadrilateral elements would become highly distorted. The 3-point triangle integration rule provides sufficient accuracy for the quadratic interpolation.
+
+5. **quad9 elements** with full 3×3 integration also produce correct results and may be preferred for problems requiring higher stress accuracy, though at a computational cost proportional to the additional Gauss points and the extra center node per element.
+
 ## Seismic Forces
 
 For both limit equilibrium and finite element slope stability analysis in XSLOPE, seismic loading is simulated using the pseudo-static method, which is a widely accepted approach for incorporating seismic effects into slope stability assessments. This method simplifies the complex dynamic response of soil during earthquakes by representing seismic loading as equivalent static forces applied to the slope mass. The pseudo-static approach assumes that the earthquake ground acceleration can be represented by a constant horizontal acceleration applied throughout the slope mass. This acceleration generates inertial forces that act on every element of soil, creating additional driving forces that tend to destabilize the slope.

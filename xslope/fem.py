@@ -591,18 +591,36 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         elem_coords = nodes[elem_nodes_idx]
 
         gp_list = []
-        if elem_type == 8:
+        dof_indices = _elem_dof_indices(elem_nodes_idx)
+        if elem_type == 3:
+            B, area = compute_B_matrix_triangle(elem_coords)
+            gp_list.append({'B': B, 'weight': area, 'D': D, 'dof_indices': dof_indices})
+        elif elem_type == 6:
+            tri_gp, tri_wt = get_gauss_points_tri3()
+            for gp_idx in range(3):
+                L1, L2, L3 = tri_gp[gp_idx]
+                B, det_J = _compute_B_and_detJ_tri6(elem_coords, L1, L2, L3)
+                weight = 0.5 * abs(det_J) * tri_wt[gp_idx]
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+        elif elem_type == 4:
+            for gp_idx in range(4):
+                xi, eta = gauss_points_2x2[gp_idx]
+                B, det_J = _compute_B_and_detJ_quad4(elem_coords, xi, eta)
+                weight = gauss_weights_2x2[gp_idx] * abs(det_J)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+        elif elem_type == 8:
             for gp_idx in range(4):
                 xi, eta = gauss_points_2x2[gp_idx]
                 B, det_J = _compute_B_and_detJ_quad8(elem_coords, xi, eta)
                 weight = gauss_weights_2x2[gp_idx] * abs(det_J)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': _elem_dof_indices(elem_nodes_idx)})
-        elif elem_type == 3:
-            B, area = compute_B_matrix_triangle(elem_coords)
-            gp_list.append({'B': B, 'weight': area, 'D': D, 'dof_indices': _elem_dof_indices(elem_nodes_idx)})
-        else:
-            B, area = compute_B_matrix_triangle(elem_coords)
-            gp_list.append({'B': B, 'weight': area, 'D': D, 'dof_indices': _elem_dof_indices(elem_nodes_idx)})
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+        elif elem_type == 9:
+            q9_gp, q9_wt = get_gauss_points_3x3()
+            for gp_idx in range(9):
+                xi, eta = q9_gp[gp_idx]
+                B, det_J = _compute_B_and_detJ_quad9(elem_coords, xi, eta)
+                weight = q9_wt[gp_idx] * abs(det_J)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
 
         elem_gp_data.append(gp_list)
 
@@ -815,6 +833,111 @@ def _compute_B_and_detJ_quad8(coords, xi, eta):
     return B, det_J
 
 
+def _compute_B_and_detJ_tri6(coords, L1, L2, L3):
+    """Compute B matrix (3,12) and det(J) for 6-node triangle at area coordinates."""
+    dN_dL1, dN_dL2, dN_dL3 = compute_tri6_shape_derivatives(L1, L2, L3)
+
+    x0, y0 = coords[0]
+    x1, y1 = coords[1]
+    x2, y2 = coords[2]
+
+    # Jacobian from area coordinates to physical coordinates
+    det_J = (x0 - x2) * (y1 - y2) - (x1 - x2) * (y0 - y2)
+    area = 0.5 * abs(det_J)
+
+    if area < 1e-14:
+        return np.zeros((3, 12)), 0.0
+
+    # Area coordinate derivatives w.r.t. physical coordinates
+    dL1_dx = (y1 - y2) / (2 * area)
+    dL1_dy = (x2 - x1) / (2 * area)
+    dL2_dx = (y2 - y0) / (2 * area)
+    dL2_dy = (x0 - x2) / (2 * area)
+    dL3_dx = (y0 - y1) / (2 * area)
+    dL3_dy = (x1 - x0) / (2 * area)
+
+    # Shape function derivatives in physical coordinates via chain rule
+    dN_dx = dN_dL1 * dL1_dx + dN_dL2 * dL2_dx + dN_dL3 * dL3_dx
+    dN_dy = dN_dL1 * dL1_dy + dN_dL2 * dL2_dy + dN_dL3 * dL3_dy
+
+    B = np.zeros((3, 12))
+    for a in range(6):
+        B[0, 2*a] = dN_dx[a]
+        B[1, 2*a+1] = dN_dy[a]
+        B[2, 2*a] = dN_dy[a]
+        B[2, 2*a+1] = dN_dx[a]
+
+    return B, det_J
+
+
+def _compute_B_and_detJ_quad4(coords, xi, eta):
+    """Compute B matrix (3,8) and det(J) for 4-node quad at (xi, eta)."""
+    dN_dxi, dN_deta = compute_quad4_shape_derivatives(xi, eta)
+
+    J = np.zeros((2, 2))
+    for a in range(4):
+        J[0, 0] += dN_dxi[a] * coords[a, 0]
+        J[0, 1] += dN_dxi[a] * coords[a, 1]
+        J[1, 0] += dN_deta[a] * coords[a, 0]
+        J[1, 1] += dN_deta[a] * coords[a, 1]
+
+    det_J = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+
+    if abs(det_J) < 1e-14:
+        return np.zeros((3, 8)), 0.0
+
+    J_inv = np.array([[J[1, 1], -J[0, 1]], [-J[1, 0], J[0, 0]]]) / det_J
+
+    dN_dx = np.zeros(4)
+    dN_dy = np.zeros(4)
+    for a in range(4):
+        dN_dx[a] = J_inv[0, 0] * dN_dxi[a] + J_inv[0, 1] * dN_deta[a]
+        dN_dy[a] = J_inv[1, 0] * dN_dxi[a] + J_inv[1, 1] * dN_deta[a]
+
+    B = np.zeros((3, 8))
+    for a in range(4):
+        B[0, 2*a] = dN_dx[a]
+        B[1, 2*a+1] = dN_dy[a]
+        B[2, 2*a] = dN_dy[a]
+        B[2, 2*a+1] = dN_dx[a]
+
+    return B, det_J
+
+
+def _compute_B_and_detJ_quad9(coords, xi, eta):
+    """Compute B matrix (3,18) and det(J) for 9-node quad at (xi, eta)."""
+    dN_dxi, dN_deta = compute_quad9_shape_derivatives(xi, eta)
+
+    J = np.zeros((2, 2))
+    for a in range(9):
+        J[0, 0] += dN_dxi[a] * coords[a, 0]
+        J[0, 1] += dN_dxi[a] * coords[a, 1]
+        J[1, 0] += dN_deta[a] * coords[a, 0]
+        J[1, 1] += dN_deta[a] * coords[a, 1]
+
+    det_J = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+
+    if abs(det_J) < 1e-14:
+        return np.zeros((3, 18)), 0.0
+
+    J_inv = np.array([[J[1, 1], -J[0, 1]], [-J[1, 0], J[0, 0]]]) / det_J
+
+    dN_dx = np.zeros(9)
+    dN_dy = np.zeros(9)
+    for a in range(9):
+        dN_dx[a] = J_inv[0, 0] * dN_dxi[a] + J_inv[0, 1] * dN_deta[a]
+        dN_dy[a] = J_inv[1, 0] * dN_dxi[a] + J_inv[1, 1] * dN_deta[a]
+
+    B = np.zeros((3, 18))
+    for a in range(9):
+        B[0, 2*a] = dN_dx[a]
+        B[1, 2*a+1] = dN_dy[a]
+        B[2, 2*a] = dN_dy[a]
+        B[2, 2*a+1] = dN_dx[a]
+
+    return B, det_J
+
+
 def _elem_dof_indices(elem_nodes):
     """Get global DOF indices for element nodes."""
     dof_idx = np.zeros(2 * len(elem_nodes), dtype=int)
@@ -888,6 +1011,23 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
     """
+
+    # Warn about volumetric locking with low-order elements
+    element_types = fem_data['element_types']
+    has_linear = any(t in (3, 4) for t in element_types)
+    if has_linear:
+        print("\n" + "!" * 72)
+        print("!  WARNING: VOLUMETRIC LOCKING — RESULTS MAY BE UNCONSERVATIVE")
+        print("!" * 72)
+        print("!  This mesh contains low-order elements (tri3 and/or quad4).")
+        print("!  These elements have too few DOFs to represent the nearly")
+        print("!  incompressible plastic strains produced by Mohr-Coulomb")
+        print("!  yielding, causing an artificially stiff response that")
+        print("!  overestimates the factor of safety by 10-20% or more.")
+        print("!")
+        print("!  Use quadratic elements (tri6, quad8, or quad9) for reliable SSRM")
+        print("!  results. The default element type quad8 is recommended.")
+        print("!" * 72 + "\n")
 
     if debug_level >= 1:
         print("=== SSRM Analysis (Griffiths & Lane 1999) ===")
@@ -984,12 +1124,16 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
         
         # Build element stiffness matrix using corrected implementation
         try:
-            if elem_type == 3:  # Triangular elements
+            if elem_type == 3:
                 K_elem = build_triangle_stiffness_corrected(elem_coords, E, nu)
-            elif elem_type == 8:  # 8-node quadrilateral elements - use corrected Griffiths version
+            elif elem_type == 6:
+                K_elem = build_tri6_stiffness(elem_coords, E, nu)
+            elif elem_type == 4:
+                K_elem = build_quad4_stiffness(elem_coords, E, nu)
+            elif elem_type == 8:
                 K_elem = build_quad8_stiffness_reduced_integration_corrected(elem_coords, E, nu)
-            elif elem_type in [4, 6, 9]:  # Other elements - use simple triangle implementation
-                K_elem = build_triangle_stiffness_corrected(elem_coords, E, nu)
+            elif elem_type == 9:
+                K_elem = build_quad9_stiffness(elem_coords, E, nu)
             else:
                 print(f"Warning: Element type {elem_type} not supported")
                 continue
@@ -1085,29 +1229,54 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                 F_gravity[2*node] += elem_loads[2*i]
                 F_gravity[2*node + 1] += elem_loads[2*i + 1]
                 
-        elif elem_type == 4:  # 4-node quad (if used)
-            # For 4-node quads, use 2x2 Gauss integration
-            area = compute_quad_area(elem_coords)
-            # Simple equal distribution for now (can be refined)
-            load_per_node = gamma * area / 4.0
-            
+        elif elem_type == 6:  # 6-node triangle
+            gauss_pts_tri, gauss_wts_tri = get_gauss_points_tri3()
+            elem_loads = np.zeros(2 * 6)
+            for gp_idx in range(3):
+                L1, L2, L3 = gauss_pts_tri[gp_idx]
+                w = gauss_wts_tri[gp_idx]
+                N = compute_tri6_shape_functions(L1, L2, L3)
+                x0, y0 = elem_coords[0]
+                x1, y1 = elem_coords[1]
+                x2, y2 = elem_coords[2]
+                det_J = (x0 - x2) * (y1 - y2) - (x1 - x2) * (y0 - y2)
+                integration_weight = 0.5 * abs(det_J) * w
+                for k in range(6):
+                    elem_loads[2*k + 1] -= integration_weight * gamma * N[k]
+                    elem_loads[2*k] += integration_weight * gamma * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
-                F_gravity[2*node + 1] -= load_per_node
-                F_gravity[2*node] += k_seismic * load_per_node
-        else:
-            # Fallback for other element types
-            if elem_type >= 3:
-                # Triangle area calculation
-                x1, y1 = elem_coords[0]
-                x2, y2 = elem_coords[1]
-                x3, y3 = elem_coords[2]
-                area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
-                
-                load_per_node = gamma * area / elem_type
-                
-                for i, node in enumerate(elem_nodes):
-                    F_gravity[2*node + 1] -= load_per_node
-                    F_gravity[2*node] += k_seismic * load_per_node
+                F_gravity[2*node] += elem_loads[2*i]
+                F_gravity[2*node + 1] += elem_loads[2*i + 1]
+
+        elif elem_type == 4:  # 4-node quad
+            gauss_pts, gauss_wts = get_gauss_points_2x2()
+            elem_loads = np.zeros(2 * 4)
+            for gp_idx in range(4):
+                xi, eta = gauss_pts[gp_idx]
+                w = gauss_wts[gp_idx]
+                N = compute_quad4_shape_functions(xi, eta)
+                _, det_J = _compute_B_and_detJ_quad4(elem_coords, xi, eta)
+                for k in range(4):
+                    elem_loads[2*k + 1] -= w * abs(det_J) * gamma * N[k]
+                    elem_loads[2*k] += w * abs(det_J) * gamma * k_seismic * N[k]
+            for i, node in enumerate(elem_nodes):
+                F_gravity[2*node] += elem_loads[2*i]
+                F_gravity[2*node + 1] += elem_loads[2*i + 1]
+
+        elif elem_type == 9:  # 9-node quad
+            gauss_pts, gauss_wts = get_gauss_points_3x3()
+            elem_loads = np.zeros(2 * 9)
+            for gp_idx in range(9):
+                xi, eta = gauss_pts[gp_idx]
+                w = gauss_wts[gp_idx]
+                N = compute_quad9_shape_functions(xi, eta)
+                _, det_J = _compute_B_and_detJ_quad9(elem_coords, xi, eta)
+                for k in range(9):
+                    elem_loads[2*k + 1] -= w * abs(det_J) * gamma * N[k]
+                    elem_loads[2*k] += w * abs(det_J) * gamma * k_seismic * N[k]
+            for i, node in enumerate(elem_nodes):
+                F_gravity[2*node] += elem_loads[2*i]
+                F_gravity[2*node + 1] += elem_loads[2*i + 1]
     
     return F_gravity
 
@@ -1216,6 +1385,113 @@ def get_gauss_points_2x2():
     return gauss_points, weights
 
 
+def get_gauss_points_tri3():
+    """Get 3-point Gauss quadrature for triangles (area coordinates).
+    Integration: integral = 0.5 * |detJ| * sum(w_i * f_i)."""
+    gauss_points = [
+        (1.0/6.0, 1.0/6.0, 2.0/3.0),
+        (1.0/6.0, 2.0/3.0, 1.0/6.0),
+        (2.0/3.0, 1.0/6.0, 1.0/6.0),
+    ]
+    weights = [1.0/3.0, 1.0/3.0, 1.0/3.0]
+    return gauss_points, weights
+
+
+def get_gauss_points_3x3():
+    """Get 3x3 Gauss quadrature points and weights for full integration (quad9)."""
+    pts_1d = [-np.sqrt(3.0/5.0), 0.0, np.sqrt(3.0/5.0)]
+    wts_1d = [5.0/9.0, 8.0/9.0, 5.0/9.0]
+    gauss_points = []
+    weights = []
+    for i in range(3):
+        for j in range(3):
+            gauss_points.append((pts_1d[i], pts_1d[j]))
+            weights.append(wts_1d[i] * wts_1d[j])
+    return gauss_points, weights
+
+
+def compute_tri6_shape_functions(L1, L2, L3):
+    """Shape functions for 6-node quadratic triangle at area coordinates (L1, L2, L3).
+    Node ordering: corners (0,1,2), edge midpoints (3=edge 0-1, 4=edge 1-2, 5=edge 2-0)."""
+    return np.array([
+        L1 * (2*L1 - 1),
+        L2 * (2*L2 - 1),
+        L3 * (2*L3 - 1),
+        4*L1*L2,
+        4*L2*L3,
+        4*L3*L1,
+    ])
+
+
+def compute_tri6_shape_derivatives(L1, L2, L3):
+    """Shape function derivatives for 6-node triangle w.r.t. area coordinates.
+    Returns dN_dL1(6,), dN_dL2(6,), dN_dL3(6,)."""
+    dN_dL1 = np.array([4*L1 - 1, 0, 0, 4*L2, 0, 4*L3])
+    dN_dL2 = np.array([0, 4*L2 - 1, 0, 4*L1, 4*L3, 0])
+    dN_dL3 = np.array([0, 0, 4*L3 - 1, 0, 4*L2, 4*L1])
+    return dN_dL1, dN_dL2, dN_dL3
+
+
+def compute_quad4_shape_functions(xi, eta):
+    """Shape functions for 4-node bilinear quadrilateral at (xi, eta)."""
+    return 0.25 * np.array([
+        (1 - xi) * (1 - eta),
+        (1 + xi) * (1 - eta),
+        (1 + xi) * (1 + eta),
+        (1 - xi) * (1 + eta),
+    ])
+
+
+def compute_quad4_shape_derivatives(xi, eta):
+    """Shape function derivatives for 4-node quad. Returns dN_dxi(4,), dN_deta(4,)."""
+    dN_dxi = 0.25 * np.array([-(1 - eta), (1 - eta), (1 + eta), -(1 + eta)])
+    dN_deta = 0.25 * np.array([-(1 - xi), -(1 + xi), (1 + xi), (1 - xi)])
+    return dN_dxi, dN_deta
+
+
+def compute_quad9_shape_functions(xi, eta):
+    """Shape functions for 9-node Lagrange quadrilateral at (xi, eta).
+    Node ordering: corners (0-3), edge midpoints (4-7), center (8)."""
+    return np.array([
+        0.25 * xi * (xi - 1) * eta * (eta - 1),
+        0.25 * xi * (xi + 1) * eta * (eta - 1),
+        0.25 * xi * (xi + 1) * eta * (eta + 1),
+        0.25 * xi * (xi - 1) * eta * (eta + 1),
+        0.5 * (1 - xi*xi) * eta * (eta - 1),
+        0.5 * xi * (xi + 1) * (1 - eta*eta),
+        0.5 * (1 - xi*xi) * eta * (eta + 1),
+        0.5 * xi * (xi - 1) * (1 - eta*eta),
+        (1 - xi*xi) * (1 - eta*eta),
+    ])
+
+
+def compute_quad9_shape_derivatives(xi, eta):
+    """Shape function derivatives for 9-node quad. Returns dN_dxi(9,), dN_deta(9,)."""
+    dN_dxi = np.array([
+        0.25 * (2*xi - 1) * eta * (eta - 1),
+        0.25 * (2*xi + 1) * eta * (eta - 1),
+        0.25 * (2*xi + 1) * eta * (eta + 1),
+        0.25 * (2*xi - 1) * eta * (eta + 1),
+        -xi * eta * (eta - 1),
+        0.5 * (2*xi + 1) * (1 - eta*eta),
+        -xi * eta * (eta + 1),
+        0.5 * (2*xi - 1) * (1 - eta*eta),
+        -2*xi * (1 - eta*eta),
+    ])
+    dN_deta = np.array([
+        0.25 * xi * (xi - 1) * (2*eta - 1),
+        0.25 * xi * (xi + 1) * (2*eta - 1),
+        0.25 * xi * (xi + 1) * (2*eta + 1),
+        0.25 * xi * (xi - 1) * (2*eta + 1),
+        0.5 * (1 - xi*xi) * (2*eta - 1),
+        -xi * (xi + 1) * eta,
+        0.5 * (1 - xi*xi) * (2*eta + 1),
+        -xi * (xi - 1) * eta,
+        -2*eta * (1 - xi*xi),
+    ])
+    return dN_dxi, dN_deta
+
+
 def compute_triangle_strains_manual(coords, displacements):
     """Manually compute triangle strains from displacements."""
     
@@ -1313,13 +1589,21 @@ def compute_strains(nodes, elements, element_types, displacements):
             elem_disp[2*i] = displacements[2*node]
             elem_disp[2*i+1] = displacements[2*node+1]
         
-        # Compute strains
+        # Compute strains at element centroid
         if elem_type == 3:
             element_strains = compute_triangle_strains_manual(elem_coords, elem_disp)
+        elif elem_type == 6:
+            B, det_J = _compute_B_and_detJ_tri6(elem_coords, 1.0/3.0, 1.0/3.0, 1.0/3.0)
+            element_strains = B @ elem_disp
+        elif elem_type == 4:
+            B, det_J = _compute_B_and_detJ_quad4(elem_coords, 0.0, 0.0)
+            element_strains = B @ elem_disp
         elif elem_type == 8:
-            # For 8-node quad, compute strain at centroid
-            xi, eta = 0.0, 0.0  # Centroid
+            xi, eta = 0.0, 0.0
             element_strains = compute_quad8_strains_at_xi_eta(elem_coords, elem_disp, xi, eta)
+        elif elem_type == 9:
+            B, det_J = _compute_B_and_detJ_quad9(elem_coords, 0.0, 0.0)
+            element_strains = B @ elem_disp
         else:
             element_strains = np.array([0.0, 0.0, 0.0])
         
@@ -1534,5 +1818,44 @@ def build_triangle_stiffness_corrected(coords, E, nu):
     
     # Element stiffness matrix
     K_elem = area * B.T @ D @ B
-    
+
     return K_elem
+
+
+def build_tri6_stiffness(coords, E, nu):
+    """Build stiffness matrix (12x12) for 6-node triangle with 3-point integration."""
+    D = build_constitutive_matrix(E, nu)
+    gauss_points, weights = get_gauss_points_tri3()
+    K = np.zeros((12, 12))
+    for gp_idx in range(3):
+        L1, L2, L3 = gauss_points[gp_idx]
+        B, det_J = _compute_B_and_detJ_tri6(coords, L1, L2, L3)
+        w = weights[gp_idx] * 0.5 * abs(det_J)  # 0.5 for area coordinate mapping
+        K += w * (B.T @ D @ B)
+    return K
+
+
+def build_quad4_stiffness(coords, E, nu):
+    """Build stiffness matrix (8x8) for 4-node quad with 2x2 integration."""
+    D = build_constitutive_matrix(E, nu)
+    gauss_points, weights = get_gauss_points_2x2()
+    K = np.zeros((8, 8))
+    for gp_idx in range(4):
+        xi, eta = gauss_points[gp_idx]
+        B, det_J = _compute_B_and_detJ_quad4(coords, xi, eta)
+        w = weights[gp_idx] * abs(det_J)
+        K += w * (B.T @ D @ B)
+    return K
+
+
+def build_quad9_stiffness(coords, E, nu):
+    """Build stiffness matrix (18x18) for 9-node quad with 3x3 integration."""
+    D = build_constitutive_matrix(E, nu)
+    gauss_points, weights = get_gauss_points_3x3()
+    K = np.zeros((18, 18))
+    for gp_idx in range(9):
+        xi, eta = gauss_points[gp_idx]
+        B, det_J = _compute_B_and_detJ_quad9(coords, xi, eta)
+        w = weights[gp_idx] * abs(det_J)
+        K += w * (B.T @ D @ B)
+    return K

@@ -5,7 +5,7 @@ from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
 # Load Griffiths & Lane (1999) Example 1: homogeneous slope, c/γH=0.05, φ=20°
-slope_data = load_slope_data("docs/fem/files/xslope_griffiths1_load.xlsx")
+slope_data = load_slope_data("docs/fem/files/xslope_griffiths1.xlsx")
 
 plot_inputs(slope_data, mode='fem', tab_loc='top')
 
@@ -19,7 +19,7 @@ plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
               label_elements=False, label_nodes=False)
 
 analysis_type = "single" # @param ["single","ssrm"]
-F = 1.36
+F = 1.25
 F_min=0.5
 F_max=1.5
 

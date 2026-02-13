@@ -1717,8 +1717,8 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
             "mat_id": mat_id
         })
     
-    # Add distributed load points to polygon edges if coincident
-    polygons = add_dload_points_to_polygons(polygons, slope_data)
+    # Distributed load points are handled by the FEM load partitioning in fem.py
+    # (not added to polygon edges, which would split curves and cause local refinement)
     
     # Add intersection points with reinforcement lines if provided
     if reinf_lines is not None:
@@ -1743,13 +1743,18 @@ def add_dload_points_to_polygons(polygons, slope_data):
     
     # Collect distributed load points to check
     points_to_check = []
-    
-    # Add distributed load points
-    distributed_loads = slope_data.get('distributed_loads', [])
-    for load in distributed_loads:
-        if 'xy' in load:
-            for point in load['xy']:
-                points_to_check.append(point)
+
+    # Add distributed load points from 'dloads' and 'dloads2' keys
+    # Each is a list of load lines; each load line is a list of dicts with X, Y, Normal
+    for key in ('dloads', 'dloads2'):
+        for load_line in slope_data.get(key, []):
+            if isinstance(load_line, list):
+                for pt in load_line:
+                    if isinstance(pt, dict) and 'X' in pt and 'Y' in pt:
+                        points_to_check.append((pt['X'], pt['Y']))
+            elif isinstance(load_line, dict) and 'xy' in load_line:
+                for point in load_line['xy']:
+                    points_to_check.append(point)
     
     if not points_to_check:
         return polygons

@@ -333,68 +333,81 @@ def build_fem_data(slope_data, mesh=None):
         distributed_loads.extend(slope_data["distributed_loads"])
     
     if distributed_loads:
-        tolerance = 1e-1  # Tolerance for finding nodes on load lines (increased for better matching)
-        
+        tolerance = 1e-1  # Tolerance for finding nodes on load lines
+
         for load_idx, load_line in enumerate(distributed_loads):
             # Handle different possible data structures
             if isinstance(load_line, dict) and "coords" in load_line:
-                # Expected format: {"coords": [...], "loads": [...]}
                 load_coords = load_line["coords"]
                 load_values = load_line["loads"]
             elif isinstance(load_line, list):
-                # Format from fileio: list of dicts with X, Y, Normal keys
                 load_coords = [(pt["X"], pt["Y"]) for pt in load_line]
                 load_values = [pt["Normal"] for pt in load_line]
             else:
                 continue
-            
+
             if len(load_coords) < 2 or len(load_values) < 2:
                 continue
-                
+
             load_linestring = LineString(load_coords)
-            nodes_found = 0
-            
-            # Find nodes that lie on or near the load line
+            load_total_length = load_linestring.length
+
+            # Pass 1: Collect all nodes on the load line with their projected distances
+            load_nodes = []  # list of (node_index, projected_distance)
             for i, node in enumerate(nodes):
                 node_point = Point(node)
-                distance_to_line = load_linestring.distance(node_point)
-                
-                if distance_to_line <= tolerance:
-                    # This node is on the load line
-                    nodes_found += 1
-                    # Find position along line and interpolate load
-                    projected_distance = load_linestring.project(node_point)
-                    
-                    # Get segments and interpolate load value
-                    segment_lengths = []
-                    cumulative_length = 0
-                    
-                    for j in range(len(load_coords) - 1):
-                        seg_length = np.linalg.norm(np.array(load_coords[j+1]) - np.array(load_coords[j]))
-                        segment_lengths.append(seg_length)
-                        cumulative_length += seg_length
-                        
-                        if projected_distance <= cumulative_length:
-                            # Interpolate within this segment
-                            local_distance = projected_distance - (cumulative_length - seg_length)
-                            ratio = local_distance / seg_length if seg_length > 0 else 0
-                            
-                            load_at_node = load_values[j] * (1 - ratio) + load_values[j+1] * ratio
-                            break
+                if load_linestring.distance(node_point) <= tolerance:
+                    proj_dist = load_linestring.project(node_point)
+                    load_nodes.append((i, proj_dist))
+
+            if not load_nodes:
+                continue
+
+            # Sort by projected distance along the load line
+            load_nodes.sort(key=lambda x: x[1])
+
+            # Pass 2: Compute tributary length and load for each node
+            n_load_nodes = len(load_nodes)
+            for k, (node_idx, proj_dist) in enumerate(load_nodes):
+                # Tributary length: half-distance to each neighbor
+                if n_load_nodes == 1:
+                    trib_length = load_total_length
+                else:
+                    if k == 0:
+                        # First node: half-distance to next node
+                        trib_length = (load_nodes[k+1][1] - proj_dist) / 2.0
+                    elif k == n_load_nodes - 1:
+                        # Last node: half-distance to previous node
+                        trib_length = (proj_dist - load_nodes[k-1][1]) / 2.0
                     else:
-                        # Use last load value if beyond end
-                        load_at_node = load_values[-1]
-                    
-                    # Convert to nodal force using tributary length
-                    # For simplicity, use average of adjacent segment lengths
-                    tributary_length = np.mean(segment_lengths) if segment_lengths else 1.0
-                    nodal_force_magnitude = load_at_node * tributary_length
-                    
-                    # Determine direction (perpendicular to ground surface)
-                    # For now, assume vertical loading
-                    bc_type[i] = 4  # Applied force
-                    bc_values[i, 0] = 0.0  # No horizontal component
-                    bc_values[i, 1] = -nodal_force_magnitude  # Downward
+                        # Interior node: half-distance to each neighbor
+                        trib_length = (load_nodes[k+1][1] - load_nodes[k-1][1]) / 2.0
+
+                # Interpolate load value at this position along the load line
+                cumulative_length = 0
+                load_at_node = load_values[-1]  # default to last value
+                for j in range(len(load_coords) - 1):
+                    seg_length = np.linalg.norm(np.array(load_coords[j+1]) - np.array(load_coords[j]))
+                    cumulative_length += seg_length
+                    if proj_dist <= cumulative_length:
+                        local_distance = proj_dist - (cumulative_length - seg_length)
+                        ratio = local_distance / seg_length if seg_length > 0 else 0
+                        load_at_node = load_values[j] * (1 - ratio) + load_values[j+1] * ratio
+                        break
+
+                nodal_force_magnitude = load_at_node * trib_length
+
+                # Apply as vertical load
+                bc_type[node_idx] = 4  # Applied force
+                bc_values[node_idx, 0] = 0.0
+                bc_values[node_idx, 1] = -nodal_force_magnitude
+
+            # Diagnostic: verify total applied force
+            total_force = sum(abs(bc_values[ni, 1]) for ni, _ in load_nodes)
+            expected_force = np.mean(load_values) * load_total_length
+            print(f"  Distributed load {load_idx}: {n_load_nodes} nodes, "
+                  f"total force = {total_force:.1f}, expected ~{expected_force:.1f}, "
+                  f"sum(trib) = {total_force/np.mean(load_values):.2f} vs line length = {load_total_length:.2f}")
             
     
     # Get other parameters

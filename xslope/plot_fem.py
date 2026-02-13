@@ -337,28 +337,38 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
         for node_idx in force_nodes:
             fx, fy = bc_values[node_idx]
             force_magnitudes.append(np.sqrt(fx**2 + fy**2))
-        
+
         if force_magnitudes:
             max_force = max(force_magnitudes)
             if max_force > 0:
-                scale = symbol_size * 3 / max_force  # Scale arrows to reasonable size
-                
+                scale = symbol_size * 3 / max_force
+
+                gap = symbol_size * 0.5  # gap between arrowhead and node
+
                 for node_idx in force_nodes:
                     x, y = nodes[node_idx]
                     fx, fy = bc_values[node_idx]
-                    
-                    # Scale force components
                     scaled_fx = fx * scale
                     scaled_fy = fy * scale
-                    
-                    # Draw arrow from force end to node (so arrow points to node)
-                    ax.annotate('', xy=(x, y), xytext=(x - scaled_fx, y - scaled_fy),
-                               arrowprops=dict(arrowstyle='->', color='green', lw=2))
-        
+
+                    # Arrow direction unit vector (from tail toward node)
+                    mag = np.sqrt(scaled_fx**2 + scaled_fy**2)
+                    if mag == 0:
+                        continue
+                    ux, uy = scaled_fx / mag, scaled_fy / mag
+
+                    # Tail and tip (tip stops short of node by gap)
+                    tail_x = x - scaled_fx
+                    tail_y = y - scaled_fy
+                    tip_x = x - ux * gap
+                    tip_y = y - uy * gap
+                    ax.plot([tail_x, tip_x], [tail_y, tip_y], color='green', lw=1.2)
+                    ax.plot(tip_x, tip_y, marker='v', color='green', markersize=3)
+
         # Add to legend
         legend_handles.append(
-            plt.Line2D([0], [0], marker='>', color='green', linestyle='-', 
-                      markersize=8, label='Applied Force (bc_type=4)')
+            plt.Line2D([0], [0], marker='v', color='green', linestyle='-',
+                      markersize=5, linewidth=0.8, label='Applied Force (bc_type=4)')
         )
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_scale=None, 

@@ -278,23 +278,30 @@ def load_slope_data(filepath):
             "nu": _num(row.get('n', 0))
         })
 
-    # === SEEPAGE ANALYSIS FILES ===
-    # Check if any materials use seep analysis for pore pressure
+    # === MESH AND SEEPAGE ANALYSIS FILES ===
+    base, _ = os.path.splitext(filepath)
+    mesh_filename = f"{base}_mesh.json"
+
+    # Load mesh if it exists (used by both seep and fem workflows)
+    mesh = None
+    if os.path.exists(mesh_filename):
+        try:
+            mesh = import_mesh_from_json(mesh_filename)
+        except Exception as e:
+            print(f"WARNING: Error reading mesh file: {e}. Continuing without mesh.")
+
+    # Load seepage solution files if any materials use seep pore pressure
     has_seep_materials = any(material["u"] == "seep" for material in materials)
-    
-    seep_mesh = None
     seep_u = None
     seep_u2 = None
-    
+
     if has_seep_materials:
         try:
-            base, _ = os.path.splitext(filepath)
-            mesh_filename = f"{base}_mesh.json"
             solution1_filename = f"{base}_seep.csv"
             solution2_filename = f"{base}_seep2.csv"
 
             missing_required = []
-            if not os.path.exists(mesh_filename):
+            if mesh is None:
                 missing_required.append(mesh_filename)
             if not os.path.exists(solution1_filename):
                 missing_required.append(solution1_filename)
@@ -306,7 +313,6 @@ def load_slope_data(filepath):
                     f"were not found: {missing_list}. Continuing without seep data."
                 )
             else:
-                seep_mesh = import_mesh_from_json(mesh_filename)
                 solution1_df = pd.read_csv(solution1_filename)
                 solution1_df = solution1_df.iloc[:-1]
                 seep_u = solution1_df["u"].to_numpy()
@@ -858,9 +864,11 @@ def load_slope_data(filepath):
     globals_data["seepage_bc"] = seepage_bc
     globals_data["seepage_bc2"] = seepage_bc2
     
-    # Add seep data if available
+    # Add mesh if available (used by both seep and fem workflows)
+    globals_data["mesh"] = mesh
+
+    # Add seep solution data if available
     if has_seep_materials:
-        globals_data["seep_mesh"] = seep_mesh
         globals_data["seep_u"] = seep_u
         if seep_u2 is not None:
             globals_data["seep_u2"] = seep_u2

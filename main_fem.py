@@ -1,7 +1,7 @@
 from pathlib import Path
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm
 from xslope.fileio import load_slope_data
-from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json, import_mesh_from_json
+from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
@@ -11,24 +11,21 @@ slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top')
 
-# Check to see if the mesh file already exists
 input_path = Path(input_file)
-mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
+target_size = 4
+element_type = 'quad8'
 
-re_mesh = False
-target_size = 2
-element_type='quad8'
-save_mesh = True
-
-# Build the mesh if it doesn't exist or if re_mesh is True
-if re_mesh or not mesh_file.exists():
+# Use existing mesh from slope_data if available, otherwise build a new one
+if slope_data.get("mesh") is not None:
+    print("Using existing mesh file.")
+    mesh = slope_data["mesh"]
+else:
+    print("No existing mesh found in slope_data, building new mesh from profile line data.")
     polygons = build_polygons(slope_data)
     print(f"Building mesh with {len(polygons)} polygons.")
     mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type)
-    if save_mesh:
-        export_mesh_to_json(mesh, mesh_file)
-else:
-    mesh = import_mesh_from_json(mesh_file)
+    mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
+    export_mesh_to_json(mesh, mesh_file)
 
 # Build FEM data
 fem_data = build_fem_data(slope_data, mesh)

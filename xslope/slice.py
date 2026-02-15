@@ -941,34 +941,34 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
         elif mat_u == 'seep':
             # Seepage-based pore pressure calculation using mesh interpolation
-            if 'seep_mesh' in data and 'seep_u' in data:
-                seep_mesh = data['seep_mesh']
+            if 'mesh' in data and data['mesh'] is not None and 'seep_u' in data:
+                mesh = data['mesh']
                 seep_u = data['seep_u']
-                
+
                 # Interpolate pore pressure at the slice center base point
                 point = (x_c, y_cb)
                 u = interpolate_at_point(
-                    seep_mesh['nodes'], 
-                    seep_mesh['elements'], 
-                    seep_mesh['element_types'], 
-                    seep_u, 
+                    mesh['nodes'],
+                    mesh['elements'],
+                    mesh['element_types'],
+                    seep_u,
                     point
                 )
             else:
                 u = 0
-                
+
             # Check for second seep solution (rapid drawdown)
             if 'seep_u2' in data:
-                seep_mesh = data['seep_mesh']
+                mesh = data['mesh']
                 seep_u2 = data['seep_u2']
-                
+
                 # Interpolate pore pressure at the slice center base point
                 point = (x_c, y_cb)
                 u2 = interpolate_at_point(
-                    seep_mesh['nodes'], 
-                    seep_mesh['elements'], 
-                    seep_mesh['element_types'], 
-                    seep_u2, 
+                    mesh['nodes'],
+                    mesh['elements'],
+                    mesh['element_types'],
+                    seep_u2,
                     point
                 )
             else:

@@ -313,7 +313,7 @@ Each iteration builds a corrected load vector and solves the full system:
 >>- Compute total strains from current displacements: $\{\varepsilon\} = [B]\{u_e\}$<br>
 >>- Compute elastic strains: $\{\varepsilon^{el}\} = \{\varepsilon\} - \{\varepsilon^{vp}\}$<br>
 >>- Compute stress from elastic strains: $\{\sigma\} = [D_e]\{\varepsilon^{el}\}$<br>
->>- Evaluate Mohr-Coulomb yield function: $f = \tau_{max} - \bar{\sigma}\sin\phi - c\cos\phi$<br>
+>>- Evaluate Mohr-Coulomb yield function using effective stress: $f = \tau_{max} - (\bar{\sigma} - u)\sin\phi - c\cos\phi$<br>
 >>- If $f > 0$ (yielding): compute viscoplastic strain increment $\Delta\varepsilon^{vp} = f \cdot \dfrac{\partial Q}{\partial \sigma} \cdot \Delta t$<br>
 >>- Accumulate: $\{\varepsilon^{vp}\} \mathrel{+}= \Delta\varepsilon^{vp}$<br>
 >
@@ -323,6 +323,14 @@ Each iteration builds a corrected load vector and solves the full system:
 >d. Solve $[K]\{U_{new}\} = \{F\}$ using the pre-factored matrix<br>
 >e. Check convergence (see below)<br>
 >f. If not converged, repeat from step (a) with updated displacements
+
+**Pore Pressure at Gauss Points:**
+
+>The pore pressure $u$ in the yield function is evaluated at each Gauss point using the pore pressure option specified for each material in the input template. Three options are available:
+>
+>- **None** ($u = 0$): No pore pressure. The yield check uses total stress.
+>- **Piezometric line** (`"piezo"`): The physical coordinates of the Gauss point are computed via the shape functions ($x_{gp} = \sum N_i x_i$, $y_{gp} = \sum N_i y_i$), and the pore pressure is calculated as $u = \gamma_w (z_{piezo} - y_{gp})$ where $z_{piezo}$ is the elevation of the piezometric surface at the Gauss point's horizontal position. Negative values (above the piezometric surface) are clamped to zero.
+>- **Seepage solution** (`"seep"`): Pore pressures from a prior seepage analysis (stored as nodal values) are interpolated to each Gauss point using the element shape functions: $u_{gp} = \sum N_i \cdot u_i$. Negative values are clamped to zero, since the FEM stress analysis uses effective stress and suction (negative pore pressure) is conservatively ignored.
 
 **Key Parameters:**<br>
 
@@ -356,17 +364,13 @@ The iterative nature of SSRM requires careful monitoring of the solution behavio
 
 The critical factor of safety is determined when the iterative solution process fails to converge within acceptable tolerances, indicating that the reduced strength parameters are insufficient to maintain equilibrium under the applied loading conditions. This point represents the transition from stable to unstable behavior and corresponds to the classical definition of factor of safety as the ratio of available strength to required strength for equilibrium.
 
-### Convergence Criteria
+### Convergence Criterion
 
-The identification of failure in SSRM relies on a convergence criterion that can reliably distinguish between stable solutions with large but finite displacements and unstable solutions where displacements grow without bound.
+The viscoplastic iteration loop requires a convergence criterion to determine when the stress redistribution has reached equilibrium. XSLOPE uses an elastic-relative displacement criterion that normalizes the iteration-to-iteration displacement change by the elastic displacement magnitude:
 
-**Displacement-Based Convergence Criterion:**
+>>$\dfrac{||\{U\}_{i+1} - \{U\}_i||}{||\{U\}_{elastic}||} < \text{tol}$
 
-XSLOPE uses the displacement-based criterion proposed by Dawson et al. (1999), which monitors the relative change in displacement between successive viscoplastic iterations:
-
->>$\dfrac{||\{U\}_{i+1} - \{U\}_i||}{||\{U\}_{i+1}||} < \text{tol}$
-
-This criterion becomes increasingly difficult to satisfy as the slope approaches failure because displacements grow rapidly while the change between iterations remains large. Conversely, for stable configurations well below the critical factor of safety, convergence is achieved quickly (often in fewer than 10 iterations).
+where $\{U\}_{elastic}$ is the displacement vector from the initial elastic solution (before any viscoplastic iterations). This differs from the conventional relative criterion of Dawson et al. (1999), which normalizes by the current displacement $||\{U\}_{i+1}||$. The elastic-relative formulation has a critical advantage: the denominator is a fixed reference that does not grow as plastic displacements accumulate. With the conventional criterion, when a slope is failing and displacements become very large, the relative change $||\Delta U|| / ||U||$ can appear small even though the absolute change is enormous — producing **false convergence** where the solver reports a converged solution despite unbounded plastic flow. By normalizing against the elastic displacement, the convergence check remains meaningful regardless of the displacement magnitude.
 
 **Implementation in XSLOPE:**
 
@@ -375,6 +379,69 @@ This criterion becomes increasingly difficult to satisfy as the slope approaches
 >- Failure to converge within the maximum number of iterations indicates that the current reduction factor corresponds to an unstable configuration
 
 Near the critical factor of safety, the viscoplastic algorithm may require hundreds of iterations to converge. For example, Griffiths & Lane (1999) report 792 iterations at a reduction factor just below failure for their Example 1. The maximum iteration count of 500 in XSLOPE provides sufficient margin for most practical problems.
+
+### SSRM Failure Criteria
+
+Determining the critical factor of safety in the SSRM requires a criterion to distinguish stable from unstable configurations as the strength reduction factor $F$ increases. The choice of failure criterion can significantly influence the computed factor of safety. XSLOPE implements four failure criteria, selectable via the `failure_criterion` parameter in `solve_ssrm()`:
+
+#### 1. Non-Convergence (`"non_convergence"`)
+
+This is the classical approach of Griffiths & Lane (1999). The viscoplastic iteration loop is run with no displacement limit; failure is identified purely by whether the solver converges within the maximum number of iterations. The SSRM bisection brackets the transition between convergence (stable) and non-convergence (failure).
+
+This criterion is the most theoretically pure — it relies entirely on the mathematical behavior of the equilibrium equations. However, it can be sensitive to the convergence tolerance and maximum iteration count. With the elastic-relative convergence criterion described above, the non-convergence transition is sharper than with the conventional relative criterion, because false convergence at high displacement levels is eliminated.
+
+#### 2. Displacement Limit (`"displacement_limit"`)
+
+This criterion adds a physical failure check on top of the convergence criterion. During the viscoplastic iteration, the viscoplastic (plastic) displacement is computed as the difference between the current total displacement and the initial elastic displacement:
+
+>>$\{U\}_{vp} = \{U\}_{total} - \{U\}_{elastic}$
+
+If the maximum nodal VP displacement magnitude exceeds a specified fraction of the mesh height, the slope is declared as failed regardless of whether the convergence criterion is satisfied:
+
+>>$\max_i ||\{U\}_{vp,i}|| > \alpha \cdot H_{mesh}$
+
+where $\alpha$ is the displacement limit factor (default 0.1, i.e., 10% of mesh height) and $H_{mesh}$ is the vertical extent of the mesh. This prevents the solver from reporting convergence when plastic displacements have grown to physically unreasonable levels.
+
+The displacement limit is controlled by the `max_disp_factor` parameter. The default value of 0.1 (10% of mesh height) is empirical but has physical meaning: a slope with plastic displacements exceeding 10% of its height has undergone significant deformation indicative of failure.
+
+#### 3. Displacement Catastrophe (`"displacement_increase"`)
+
+This criterion implements the displacement mutation method described by Sun et al. (2021). Rather than using a fixed displacement threshold, it detects the **sudden acceleration** in displacement growth as the strength reduction factor increases — a hallmark of catastrophic failure.
+
+The procedure has three phases:
+
+>**Phase 1 — Coarse sweep:** The solver runs at $n$ evenly-spaced values of $F$ from $F_{min}$ to $F_{max}$, recording the maximum VP displacement at each. A generous displacement cap (50% of mesh height) is used solely as an early termination to avoid wasting iterations on obviously failed cases.
+
+>**Phase 2 — Catastrophe detection:** The ratio of VP displacement between consecutive $F$ values is computed. The interval with the largest ratio identifies where the displacement growth accelerates most rapidly — the catastrophe point.
+
+>**Phase 3 — Refinement:** The catastrophe interval is refined by bisection, using displacement ratios to determine which half contains the sharper transition, until the interval width falls below the specified tolerance.
+
+This criterion is self-calibrating in that it does not require an absolute displacement threshold. However, it requires the displacement-versus-$F$ curve to exhibit a sufficiently sharp inflection. For problems where the displacement grows smoothly (gradual transition rather than sudden catastrophe), the method may identify the acceleration zone at a higher $F$ than other criteria.
+
+#### 4. Unbalanced Force Ratio (`"unbalanced_force"`)
+
+This criterion is inspired by the unbalanced force ratio used in FLAC (Itasca, 2019) as the primary indicator of mechanical equilibrium. The unbalanced force ratio (UFR) measures the magnitude of the viscoplastic body load corrections relative to the total applied gravity load:
+
+>>$\text{UFR} = \dfrac{||\{F\}_{vp}||}{||\{F\}_{gravity}||}$
+
+where $\{F\}_{vp} = \{F\}_{loads} - \{F\}_{gravity}$ represents the accumulated body load corrections from all yielding Gauss points. A large UFR indicates that significant force redistribution is still occurring — the soil with reduced strength cannot achieve equilibrium under the applied loads.
+
+The UFR method works by establishing a baseline UFR at $F_{min}$ (the unreduced slope), then bisecting to find the $F$ where the UFR exceeds a specified multiple of the baseline. The `ufr_threshold` parameter (default 2.0) defines this multiplier: failure is declared when $\text{UFR} > \text{ufr\_threshold} \times \text{UFR}_{baseline}$.
+
+Unlike the displacement-based criteria, the UFR criterion directly measures force equilibrium rather than deformation. However, the multiplier threshold is itself a parameter that must be chosen, analogous to the displacement limit factor.
+
+#### Comparison of Failure Criteria
+
+The following table summarizes the characteristics of each criterion:
+
+| Criterion | Basis | Arbitrary Parameter | Strengths | Limitations |
+|---|---|---|---|---|
+| Non-convergence | Mathematical convergence | Tolerance, max iterations | Theoretically pure | Sensitive to convergence definition |
+| Displacement limit | Physical deformation | `max_disp_factor` (default 0.1) | Simple, physically intuitive | Threshold is empirical |
+| Displacement catastrophe | Rate of displacement growth | `n_sweep` points | Self-calibrating, no absolute threshold | Requires sharp inflection in displacement curve |
+| Unbalanced force ratio | Force equilibrium | `ufr_threshold` (default 2.0) | Measures equilibrium directly | Multiplier must be chosen |
+
+The **non-convergence** criterion is the default in XSLOPE. It is the most theoretically rigorous approach — based directly on the foundational work of Griffiths & Lane (1999) — and requires no arbitrary parameters beyond the convergence tolerance and maximum iteration count. It is important to recognize that FEM-SSRM and limit equilibrium methods are fundamentally different approaches to slope stability, and some difference in computed factors of safety is expected. The alternative criteria are provided for users who wish to explore the sensitivity of results to the failure definition. Users are encouraged to compare multiple criteria to understand this sensitivity for their specific problem.
 
 ## Element Type Selection and Volumetric Locking
 
@@ -641,37 +708,35 @@ In the reinforcement table, some of the properties for each reinforcement line s
 maximum tensile force $T_{max}$ are used for both limit equilibrium and finite element analysis. The additional 
 parameters required for finite element analysis, such as the modulus of elasticity $E$ and cross-sectional area $A$, are also included in the reinforcement table. This allows the same reinforcement definitions to be used seamlessly across both analysis methods.
 
-### Seepage Analysis Coupling
+### Pore Pressure Options
 
-One of the most powerful aspects of integrating finite element slope stability analysis with the existing XSLOPE framework is the ability to seamlessly couple the established seepage analysis capabilities in `seep.py` with the structural finite element analysis. This coupling enables rigorous analysis of slopes under varying groundwater conditions, which is critical for understanding slope behavior during rainfall events, reservoir drawdown, or other transient groundwater conditions.
+Pore pressures reduce the effective stress in the soil, which in turn reduces the available shear strength. XSLOPE supports three pore pressure options for each material zone, specified via the `u` column in the material property table of the input template:
 
-The existing seepage analysis infrastructure provides a robust foundation for determining pore pressure distributions throughout the slope domain. The seepage analysis solves the groundwater flow equation using finite element methods on triangular meshes, producing hydraulic head values at all nodes in the seepage mesh. These hydraulic head values are then converted to pore pressures using the fundamental relationship:
+**None** (`u = "none"`): No pore pressure is applied. The yield function uses total stress. This is appropriate for dry slopes or total stress analyses with undrained shear strength parameters.
+
+**Piezometric Line** (`u = "piezo"`): A piezometric surface is defined in the input template as a series of coordinate points. The pore pressure at any point below the piezometric surface is computed as:
+
+>>$u = \gamma_w (z_{piezo} - z)$
+
+where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of the piezometric surface directly above the point, and $z$ is the elevation of the point. For points above the piezometric surface, $u = 0$ (suction is conservatively ignored).
+
+**Seepage Solution** (`u = "seep"`): Pore pressures are obtained from a prior finite element seepage analysis performed with the `seep.py` module. The seepage analysis solves the groundwater flow equation on a triangular mesh, producing pore pressure values at all nodes:
 
 >>$u = \gamma_w (h - z)$
 
-where $u$ is the pore pressure, $\gamma_w$ is the unit weight of water, $h$ is the hydraulic head from the seepage analysis, and $z$ is the elevation coordinate.
+where $h$ is the hydraulic head from the seepage solution and $z$ is the elevation coordinate. These nodal pore pressures are stored in the slope data and transferred to the structural mesh during `build_fem_data()`. Negative pore pressures (suction above the phreatic surface) are clamped to zero.
 
-The challenge lies in efficiently transferring these pore pressure values from the seepage mesh to the structural analysis mesh used for slope stability calculations. While both analyses use triangular finite element meshes, they may have different mesh densities and node locations optimized for their respective analysis requirements.
-
-The transfer of pore pressure data between seepage and structural meshes can be accomplished using several interpolation approaches, building upon the existing mesh handling capabilities in `mesh.py`:
-
-**Direct Node Mapping**: When the seepage and structural meshes are identical, pore pressures can be directly transferred from seepage nodes to corresponding structural nodes. This approach provides the highest accuracy but requires careful coordination of mesh generation to ensure node correspondence.
-
-**Element-Based Interpolation**: For cases where mesh geometries differ, pore pressures can be interpolated from the seepage mesh to structural analysis points using the shape functions of the seepage elements. For any point with coordinates $(x, y)$ in the structural mesh, the pore pressure is calculated as:
-
->>$u(x,y) = \sum_{i=1}^{3} N_i(x,y) \cdot u_i$
-
-where $N_i$ are the triangular shape functions of the seepage element containing point $(x,y)$, and $u_i$ are the pore pressures at the seepage element nodes.
+For both the piezometric and seepage options, pore pressures are precomputed at each Gauss point during `build_fem_data()` using the element shape functions to interpolate from nodal values (seep) or by computing the physical coordinates of each Gauss point and projecting onto the piezometric surface (piezo). These precomputed values are then used directly in the effective stress yield check during the viscoplastic iteration, avoiding repeated interpolation at each iteration step.
 
 ## Implementation in XSLOPE
 
 The FEM slope stability analysis in XSLOPE is implemented in the `fem.py` module with the following key functions:
 
-- **`build_fem_data(slope_data, mesh)`** — Constructs the FEM data dictionary from the slope geometry, material properties, boundary conditions, and mesh. Handles pore pressure assignment (from piezometric lines or seepage solutions), reinforcement element properties (tensile capacity, pullout reduction, axial stiffness), distributed load conversion to nodal forces, and seismic coefficient storage.
+- **`build_fem_data(slope_data, mesh)`** — Constructs the FEM data dictionary from the slope geometry, material properties, boundary conditions, and mesh. Handles pore pressure assignment (from piezometric lines or seepage solutions), reinforcement element properties (tensile capacity, pullout reduction, axial stiffness), distributed load conversion to nodal forces, and seismic coefficient storage. Pore pressures are precomputed at each Gauss point for use in the effective stress yield check.
 
-- **`solve_fem(fem_data, F=1.0)`** — Solves the finite element system for a given strength reduction factor $F$ using the viscoplastic algorithm described above. Returns a solution dictionary containing nodal displacements, element stresses, convergence status, and iteration count.
+- **`solve_fem(fem_data, F=1.0)`** — Solves the finite element system for a given strength reduction factor $F$ using the viscoplastic algorithm described above. Returns a solution dictionary containing nodal displacements, element stresses, convergence status, iteration count, and the unbalanced force ratio.
 
-- **`solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05)`** — Determines the critical factor of safety using bisection on the strength reduction factor. Repeatedly calls `solve_fem` with different values of $F$, bracketing the transition between convergence (stable) and non-convergence (failure).
+- **`solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, failure_criterion="non_convergence")`** — Determines the critical factor of safety using the specified failure criterion. The `failure_criterion` parameter selects between `"non_convergence"` (default), `"displacement_limit"`, `"displacement_increase"`, and `"unbalanced_force"`. Additional parameters control criterion-specific behavior: `max_disp_factor` for the displacement limit, `n_sweep` for the displacement catastrophe sweep, and `ufr_threshold` for the unbalanced force ratio multiplier.
 
 Visualization is provided in `plot_fem.py`:
 
@@ -690,8 +755,12 @@ Dyson, A.P., & Tolooiyan, A. (2018). Comparative approaches to probabilistic fin
 
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Géotechnique*, 49(3), 387-403.
 
+Itasca Consulting Group. (2019). *FLAC — Fast Lagrangian Analysis of Continua, Version 8.1, User's Guide*. Itasca Consulting Group, Inc., Minneapolis, Minnesota.
+
 Matsui, T., & San, K.C. (1992). Finite element slope stability analysis by shear strength reduction technique. *Soils and Foundations*, 32(1), 59-70.
 
 Smith, I.M., & Griffiths, D.V. (2004). *Programming the Finite Element Method* (4th ed.). John Wiley & Sons.
+
+Sun, G., Lin, S., Jiang, W., & Yang, Y. (2021). A simplified solution for determining the factor of safety of a slope reinforced with piles based on the shear strength reduction method. *Bulletin of Engineering Geology and the Environment*, 80, 7719-7730.
 
 Zheng, H., Liu, D.F., & Li, C.G. (2005). Slope stability analysis based on elasto‐plastic finite element method. *International Journal for Numerical Methods in Engineering*, 64(14), 1871-1888.

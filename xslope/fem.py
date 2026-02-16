@@ -111,7 +111,13 @@ def build_fem_data(slope_data, mesh=None):
     material_names = []
     
     # Check for consistent pore pressure options
-    pp_options = [mat.get("pp_option", "none") for mat in materials]
+    # Material "u" key may contain "none", "piezo", "seep", or NaN-like values from empty Excel cells
+    def _normalize_pp_option(val):
+        if val is None or (isinstance(val, str) and val.lower() == "nan") or (isinstance(val, float) and np.isnan(val)):
+            return "none"
+        return str(val).lower().strip()
+
+    pp_options = [_normalize_pp_option(mat.get("u", "none")) for mat in materials]
     unique_pp_options = set([opt for opt in pp_options if opt != "none"])
     
     if len(unique_pp_options) > 1:
@@ -190,12 +196,10 @@ def build_fem_data(slope_data, mesh=None):
     
     # Process pore pressures
     u = np.zeros(n_nodes)
-    
+    piezo_line_coords = None
+
     if pp_option == "piezo":
         # Find nodes and compute pore pressure from piezometric line
-        # Assuming the piezometric line is stored in slope_data
-        piezo_line_coords = None
-        
         # Look for piezometric line in various possible locations
         if "piezo_line" in slope_data:
             piezo_line_coords = slope_data["piezo_line"]
@@ -225,10 +229,10 @@ def build_fem_data(slope_data, mesh=None):
     
     elif pp_option == "seep":
         # Use existing seep solution
-        if "seepage_solution" in slope_data:
-            seepage_solution = slope_data["seepage_solution"]
-            if isinstance(seepage_solution, np.ndarray) and len(seepage_solution) == n_nodes:
-                u = np.maximum(0.0, seepage_solution)  # Ensure non-negative
+        if "seep_u" in slope_data:
+            seep_u = slope_data["seep_u"]
+            if isinstance(seep_u, np.ndarray) and len(seep_u) == n_nodes:
+                u = np.maximum(0.0, seep_u)
             else:
                 print("Warning: Seepage solution dimensions don't match mesh nodes")
     
@@ -322,6 +326,13 @@ def build_fem_data(slope_data, mesh=None):
         bc_type[left_not_fixed] = 2   # X-roller (u=0, v=free)
         bc_type[right_not_fixed] = 2  # X-roller (u=0, v=free)
     
+    # Save displacement constraints before force BCs can overwrite them.
+    # Nodes on boundary faces that also receive distributed loads need both
+    # their displacement constraint (roller/fixed) AND the applied force.
+    fixed_nodes = set(np.where(bc_type == 1)[0])
+    roller_x_nodes = set(np.where(bc_type == 2)[0])
+    roller_y_nodes = set(np.where(bc_type == 3)[0])
+
     # Step 4: Convert distributed loads to nodal forces (type 4)
     # Check for distributed loads (could be 'dloads', 'dloads2', or 'distributed_loads')
     distributed_loads = []
@@ -397,17 +408,39 @@ def build_fem_data(slope_data, mesh=None):
 
                 nodal_force_magnitude = load_at_node * trib_length
 
-                # Apply as vertical load
+                # Compute inward normal direction at this point on the load line
+                # The tangent is along the load line; rotate 90° CW for inward normal
+                # (assumes load line runs left-to-right with slope body below)
+                closest_pt = load_linestring.interpolate(proj_dist)
+                eps = min(1e-3, load_total_length * 0.01)
+                d_back = max(0.0, proj_dist - eps)
+                d_fwd = min(load_total_length, proj_dist + eps)
+                pt_back = load_linestring.interpolate(d_back)
+                pt_fwd = load_linestring.interpolate(d_fwd)
+                tx = pt_fwd.x - pt_back.x
+                ty = pt_fwd.y - pt_back.y
+                t_len = np.sqrt(tx**2 + ty**2)
+                if t_len > 1e-15:
+                    # Inward normal: rotate tangent 90° clockwise → (ty, -tx)
+                    nx = ty / t_len
+                    ny = -tx / t_len
+                else:
+                    nx, ny = 0.0, -1.0  # fallback to vertical
+
+                # Apply force in inward normal direction (into the slope)
                 bc_type[node_idx] = 4  # Applied force
-                bc_values[node_idx, 0] = 0.0
-                bc_values[node_idx, 1] = -nodal_force_magnitude
+                bc_values[node_idx, 0] = nodal_force_magnitude * nx
+                bc_values[node_idx, 1] = nodal_force_magnitude * ny
 
             # Diagnostic: verify total applied force
-            total_force = sum(abs(bc_values[ni, 1]) for ni, _ in load_nodes)
+            total_force = np.sqrt(
+                sum(bc_values[ni, 0] for ni, _ in load_nodes)**2 +
+                sum(bc_values[ni, 1] for ni, _ in load_nodes)**2
+            )
             expected_force = np.mean(load_values) * load_total_length
             print(f"  Distributed load {load_idx}: {n_load_nodes} nodes, "
                   f"total force = {total_force:.1f}, expected ~{expected_force:.1f}, "
-                  f"sum(trib) = {total_force/np.mean(load_values):.2f} vs line length = {load_total_length:.2f}")
+                  f"sum(trib) = {load_total_length:.2f}")
             
     
     # Get other parameters
@@ -422,6 +455,9 @@ def build_fem_data(slope_data, mesh=None):
         "element_materials": element_materials,
         "bc_type": bc_type,
         "bc_values": bc_values,
+        "fixed_nodes": fixed_nodes,
+        "roller_x_nodes": roller_x_nodes,
+        "roller_y_nodes": roller_y_nodes,
         "c_by_mat": c_by_mat,
         "phi_by_mat": phi_by_mat,
         "E_by_mat": E_by_mat,
@@ -438,7 +474,10 @@ def build_fem_data(slope_data, mesh=None):
         "t_res_by_1d_elem": t_res_by_1d_elem,
         "k_by_1d_elem": k_by_1d_elem,
         "unit_weight": unit_weight,
-        "k_seismic": k_seismic
+        "k_seismic": k_seismic,
+        "pp_option": pp_option,
+        "piezo_line_coords": piezo_line_coords,
+        "gamma_water": slope_data.get("gamma_water", 9.81)
     }
     
    
@@ -458,14 +497,15 @@ def build_fem_data(slope_data, mesh=None):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3):
+def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3,
+              max_disp_factor=0.1):
     """
     Solve FEM using Griffiths & Lane (1999) viscoplastic algorithm.
 
     Implements the exact algorithm from the 1999 Geotechnique paper:
     - 8-node quadrilateral elements with reduced integration (4 Gauss points)
     - Viscoplastic stress redistribution with accumulated plastic strains
-    - Non-convergence failure criterion
+    - Non-convergence failure criterion with displacement limit safeguard
     - Pre-factored elastic stiffness matrix for efficiency
     - No damping (stability from dt parameter)
     - Direct solve each iteration (not residual-based)
@@ -475,7 +515,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         F (float): Shear strength reduction factor (c/F, tan(phi)/F)
         debug_level (int): 0=silent, 1=summary, 2=per-iteration
         max_iterations (int): Maximum viscoplastic iterations (default 500)
-        tolerance (float): Convergence tolerance ||u_new - u_old|| / ||u_new|| (default 1e-3)
+        tolerance (float): Convergence tolerance ||du|| / ||u_elastic|| (default 1e-3).
+            Normalized by elastic displacement (fixed reference) rather than current
+            displacement, preventing false convergence when plastic displacements are large.
+        max_disp_factor (float): Displacement limit as fraction of mesh height (default 0.1).
+            If max VP displacement (total - elastic) exceeds this fraction of the mesh height,
+            the slope is declared as failed regardless of convergence. This prevents false
+            convergence when large displacements make the relative change appear small.
+            Set to None to disable.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -498,6 +545,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
     element_materials = fem_data["element_materials"]
     bc_type = fem_data["bc_type"]
     bc_values = fem_data["bc_values"]
+    fixed_nodes = fem_data.get("fixed_nodes", set())
+    roller_x_nodes = fem_data.get("roller_x_nodes", set())
+    roller_y_nodes = fem_data.get("roller_y_nodes", set())
 
     # Material properties
     c_by_elem = fem_data.get("c_by_elem", fem_data["c_by_mat"][element_materials - 1])
@@ -535,13 +585,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             F_gravity[2*i+1] += bc_values[i, 1]
 
     # ---- Step 3: Identify free/constrained DOFs ONCE ----
+    # Use saved constraint sets so that nodes with both a displacement constraint
+    # (roller/fixed) and an applied force (bc_type overwritten to 4) are still constrained.
     constraint_dofs = []
     for i in range(n_nodes):
-        if bc_type[i] == 1:  # Fixed
+        if bc_type[i] == 1 or i in fixed_nodes:  # Fixed
             constraint_dofs.extend([2*i, 2*i+1])
-        elif bc_type[i] == 2:  # X-roller
+        elif bc_type[i] == 2 or i in roller_x_nodes:  # X-roller
             constraint_dofs.append(2*i)
-        elif bc_type[i] == 3:  # Y-roller
+        elif bc_type[i] == 3 or i in roller_y_nodes:  # Y-roller
             constraint_dofs.append(2*i+1)
 
     constraint_set = set(constraint_dofs)
@@ -594,35 +646,90 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         dof_indices = _elem_dof_indices(elem_nodes_idx)
         if elem_type == 3:
             B, area = compute_B_matrix_triangle(elem_coords)
-            gp_list.append({'B': B, 'weight': area, 'D': D, 'dof_indices': dof_indices})
+            N = np.array([1.0/3.0, 1.0/3.0, 1.0/3.0])
+            gp_list.append({'B': B, 'weight': area, 'D': D, 'dof_indices': dof_indices, 'N': N})
         elif elem_type == 6:
             tri_gp, tri_wt = get_gauss_points_tri3()
             for gp_idx in range(3):
                 L1, L2, L3 = tri_gp[gp_idx]
                 B, det_J = _compute_B_and_detJ_tri6(elem_coords, L1, L2, L3)
                 weight = 0.5 * abs(det_J) * tri_wt[gp_idx]
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+                N = compute_tri6_shape_functions(L1, L2, L3)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices, 'N': N})
         elif elem_type == 4:
             for gp_idx in range(4):
                 xi, eta = gauss_points_2x2[gp_idx]
                 B, det_J = _compute_B_and_detJ_quad4(elem_coords, xi, eta)
                 weight = gauss_weights_2x2[gp_idx] * abs(det_J)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+                N = compute_quad4_shape_functions(xi, eta)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices, 'N': N})
         elif elem_type == 8:
             for gp_idx in range(4):
                 xi, eta = gauss_points_2x2[gp_idx]
                 B, det_J = _compute_B_and_detJ_quad8(elem_coords, xi, eta)
                 weight = gauss_weights_2x2[gp_idx] * abs(det_J)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+                N = compute_quad8_shape_functions(xi, eta)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices, 'N': N})
         elif elem_type == 9:
             q9_gp, q9_wt = get_gauss_points_3x3()
             for gp_idx in range(9):
                 xi, eta = q9_gp[gp_idx]
                 B, det_J = _compute_B_and_detJ_quad9(elem_coords, xi, eta)
                 weight = q9_wt[gp_idx] * abs(det_J)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices})
+                N = compute_quad9_shape_functions(xi, eta)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'dof_indices': dof_indices, 'N': N})
 
         elem_gp_data.append(gp_list)
+
+    # ---- Step 6b: Precompute pore pressure at each Gauss point ----
+    u_nodes = fem_data.get("u", np.zeros(n_nodes))
+    pp_option = fem_data.get("pp_option", "none")
+
+    u_gp = []
+    if pp_option == "none":
+        for elem_idx in range(n_elements):
+            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+    elif pp_option == "piezo":
+        piezo_line_coords = fem_data.get("piezo_line_coords", None)
+        gamma_water = fem_data.get("gamma_water", 9.81)
+        if piezo_line_coords:
+            piezo_line = LineString(piezo_line_coords)
+            for elem_idx in range(n_elements):
+                elem_type = element_types[elem_idx]
+                elem_nodes_idx = elements[elem_idx][:elem_type]
+                elem_coords = nodes[elem_nodes_idx]
+                gp_u_list = []
+                for gp_data in elem_gp_data[elem_idx]:
+                    N = gp_data['N']
+                    x_gp = N @ elem_coords[:, 0]
+                    y_gp = N @ elem_coords[:, 1]
+                    gp_point = Point(x_gp, y_gp)
+                    closest_pt = piezo_line.interpolate(piezo_line.project(gp_point))
+                    piezo_elev = closest_pt.y
+                    gp_u_list.append(max(0.0, gamma_water * (piezo_elev - y_gp)))
+                u_gp.append(gp_u_list)
+        else:
+            for elem_idx in range(n_elements):
+                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+    elif pp_option == "seep":
+        for elem_idx in range(n_elements):
+            elem_type = element_types[elem_idx]
+            elem_nodes_idx = elements[elem_idx][:elem_type]
+            u_elem_nodes = u_nodes[elem_nodes_idx]
+            gp_u_list = []
+            for gp_data in elem_gp_data[elem_idx]:
+                N = gp_data['N']
+                gp_u_list.append(max(0.0, float(N @ u_elem_nodes)))
+            u_gp.append(gp_u_list)
+    else:
+        for elem_idx in range(n_elements):
+            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+
+    if debug_level >= 1 and pp_option != "none":
+        all_u = [u_gp[e][g] for e in range(n_elements) for g in range(len(u_gp[e]))]
+        max_u = max(all_u) if all_u else 0.0
+        n_nonzero = sum(1 for v in all_u if v > 0.0)
+        print(f"  Pore pressure ({pp_option}): max u_gp = {max_u:.3f}, {n_nonzero}/{len(all_u)} GPs with u > 0")
 
     # ---- Step 7: Initial elastic solution ----
     u_free = K_factor.solve(F_grav_free)
@@ -631,9 +738,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
     u = np.zeros(n_dof)
     u[free_dofs] = u_free
     u_elastic = u.copy()  # Store elastic solution for VP displacement computation
+    norm_u_elastic = np.linalg.norm(u_elastic)  # Fixed reference for convergence check
+
+    # Compute displacement limit for failure detection
+    mesh_height = float(np.max(nodes[:, 1]) - np.min(nodes[:, 1]))
+    if max_disp_factor is not None and mesh_height > 0:
+        vp_disp_limit = max_disp_factor * mesh_height
+    else:
+        vp_disp_limit = None
 
     if debug_level >= 1:
         print(f"  Initial elastic: max|u| = {np.max(np.abs(u)):.6f}")
+        if vp_disp_limit is not None:
+            print(f"  VP displacement limit: {vp_disp_limit:.2f} ({max_disp_factor:.0%} of mesh height {mesh_height:.1f})")
 
     # ---- Step 8: Initialize viscoplastic strains (zero) ----
     # evp[elem_idx][gp_idx] = array of shape (3,)
@@ -642,9 +759,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         n_gp = len(elem_gp_data[elem_idx])
         evp.append([np.zeros(3) for _ in range(n_gp)])
 
+    # Reference force magnitude for unbalanced force ratio
+    norm_F_gravity = np.linalg.norm(F_gravity)
+
     # ---- Step 9: Viscoplastic iteration loop ----
     converged = False
     iteration = 0
+    unbalanced_force_ratio = 0.0
 
     for iteration in range(max_iterations):
         # Build body load correction from accumulated viscoplastic strains
@@ -681,7 +802,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                 # e. Check Mohr-Coulomb yield
                 c_r = c_reduced[elem_idx]
                 phi_r = phi_reduced[elem_idx]
-                f_yield = check_mohr_coulomb_cp(sigma_cp, c_r, phi_r)
+                f_yield = check_mohr_coulomb_cp(sigma_cp, c_r, phi_r, u_gp[elem_idx][gp_idx])
 
                 # f. If yielding, compute viscoplastic strain increment
                 if f_yield > 0:
@@ -699,6 +820,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                     correction = B.T @ (D @ evp_gp) * weight
                     loads[dof_idx] += correction
 
+        # Compute unbalanced force ratio: ||VP corrections|| / ||F_gravity||
+        # This measures how far the system is from force equilibrium.
+        if norm_F_gravity > 1e-30:
+            unbalanced_force_ratio = np.linalg.norm(loads - F_gravity) / norm_F_gravity
+        else:
+            unbalanced_force_ratio = np.linalg.norm(loads - F_gravity)
+
         # Solve K * u_new = loads
         loads_free = loads[free_dofs]
         u_free_new = K_factor.solve(loads_free)
@@ -706,30 +834,49 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         u_new = np.zeros(n_dof)
         u_new[free_dofs] = u_free_new
 
-        # Convergence check: ||u_new - u|| / ||u_new|| < tolerance
-        norm_u_new = np.linalg.norm(u_new)
+        # Convergence check: ||du|| / ||u_elastic|| < tolerance
+        # Normalized by elastic displacement (fixed reference) to prevent false
+        # convergence when plastic displacements grow large at failure.
         norm_diff = np.linalg.norm(u_new - u)
 
-        if norm_u_new > 1e-30:
-            relative_change = norm_diff / norm_u_new
+        if norm_u_elastic > 1e-30:
+            relative_change = norm_diff / norm_u_elastic
         else:
             relative_change = norm_diff
 
         if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
-            print(f"  Iter {iteration+1:4d}: ||du||/||u|| = {relative_change:.3e}, "
+            print(f"  Iter {iteration+1:4d}: ||du||/||u_el|| = {relative_change:.3e}, "
+                  f"UFR = {unbalanced_force_ratio:.3e}, "
                   f"yielding = {n_yielding}/{n_total_gp}, max|u| = {np.max(np.abs(u_new)):.6f}")
+
+        # Displacement limit check: detect false convergence from unbounded plastic flow
+        # When VP displacements exceed a fraction of mesh height, the slope has physically
+        # failed even if the relative convergence criterion is satisfied (see FLAC manual;
+        # Griffiths & Lane 1999 displacement-vs-F plots).
+        if vp_disp_limit is not None:
+            u_vp = u_new - u_elastic
+            vp_x = u_vp[0::2]
+            vp_y = u_vp[1::2]
+            max_vp_disp = float(np.max(np.sqrt(vp_x**2 + vp_y**2)))
+            if max_vp_disp > vp_disp_limit:
+                converged = False
+                u = u_new
+                if debug_level >= 1:
+                    print(f"  Displacement limit exceeded at iteration {iteration+1}: "
+                          f"max VP disp = {max_vp_disp:.2f} > limit {vp_disp_limit:.2f}")
+                break
 
         if relative_change < tolerance:
             converged = True
             u = u_new
             if debug_level >= 1:
-                print(f"  Converged after {iteration+1} iterations (||du||/||u|| = {relative_change:.3e})")
+                print(f"  Converged after {iteration+1} iterations (||du||/||u_el|| = {relative_change:.3e})")
             break
 
         u = u_new
 
     if not converged and debug_level >= 1:
-        print(f"  Did NOT converge after {max_iterations} iterations (||du||/||u|| = {relative_change:.3e})")
+        print(f"  Did NOT converge after {max_iterations} iterations (||du||/||u_el|| = {relative_change:.3e})")
 
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
     final_stresses = np.zeros((n_elements, 4))  # [sig_x, sig_y, tau_xy, sig_vm] compression-positive
@@ -757,7 +904,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         sig_vm = sqrt(sig_x**2 + sig_y**2 - sig_x*sig_y + 3*tau_xy**2)
         final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
 
-        f_yield = check_mohr_coulomb_cp(stress_avg_cp, c_reduced[elem_idx], phi_reduced[elem_idx])
+        u_elem_avg = sum(u_gp[elem_idx]) / len(u_gp[elem_idx]) if u_gp[elem_idx] else 0.0
+        f_yield = check_mohr_coulomb_cp(stress_avg_cp, c_reduced[elem_idx], phi_reduced[elem_idx], u_elem_avg)
         plastic_elements[elem_idx] = f_yield > 1e-8
 
     strains = compute_strains(nodes, elements, element_types, u)
@@ -779,6 +927,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         print(f"  Plastic elements: {n_plastic}/{n_elements}")
         print(f"  Max displacement: {np.max(np.abs(u)):.6f}")
         print(f"  Max VP shear strain: {np.max(vp_shear_strain):.6e}")
+        print(f"  Unbalanced force ratio: {unbalanced_force_ratio:.3e}")
 
     return {
         "converged": converged,
@@ -789,12 +938,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         "strains": strains,
         "vp_shear_strain": vp_shear_strain,
         "plastic_elements": plastic_elements,
-        "yield_function": np.array([check_mohr_coulomb_cp(final_stresses[i, :3], c_reduced[i], phi_reduced[i]) for i in range(n_elements)]),
+        "yield_function": np.array([check_mohr_coulomb_cp(final_stresses[i, :3], c_reduced[i], phi_reduced[i], sum(u_gp[i]) / len(u_gp[i]) if u_gp[i] else 0.0) for i in range(n_elements)]),
         "max_displacement": np.max(np.abs(u)),
         "plastic_strains": {i: np.array(evp[i]) for i in range(n_elements)},
         "algorithm": "Griffiths & Lane (1999) Viscoplastic",
         "F": F,
         "residual": relative_change if 'relative_change' in locals() else 0.0,
+        "unbalanced_force_ratio": unbalanced_force_ratio,
         "plastic_fraction": n_plastic / n_elements if n_elements > 0 else 0.0,
     }
 
@@ -992,7 +1142,9 @@ def compute_flow_vector_tp(stress_tp, psi=0.0):
 
 
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
-               max_iterations=500, convergence_tol=1e-3):
+               max_iterations=500, convergence_tol=1e-3, max_disp_factor=0.1,
+               failure_criterion="non_convergence", n_sweep=10,
+               ufr_threshold=2.0):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -1007,6 +1159,18 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Max viscoplastic iterations passed to solve_fem
         convergence_tol (float): Convergence tolerance passed to solve_fem
+        max_disp_factor (float): Displacement limit as fraction of mesh height passed
+            to solve_fem (default 0.1). Only used when failure_criterion="displacement_limit".
+        failure_criterion (str): How to determine failure in SSRM bisection.
+            "non_convergence" - Pure Griffiths & Lane (1999) non-convergence bisection.
+            "displacement_limit" - Fixed VP displacement threshold (max_disp_factor * mesh_height).
+            "displacement_increase" - Sun et al. (2021) displacement catastrophe method.
+                Sweeps F values, detects sudden displacement jump, refines around it.
+            "unbalanced_force" - Unbalanced force ratio method. Bisects on whether
+                the final UFR exceeds ufr_threshold times the baseline UFR at F_min.
+        n_sweep (int): Number of points in coarse sweep for "displacement_increase". Default 10.
+        ufr_threshold (float): UFR multiplier for "unbalanced_force" criterion. Failure is
+            declared when UFR > ufr_threshold * UFR_baseline. Default 2.0 (UFR doubles).
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
@@ -1029,16 +1193,47 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         print("!  results. The default element type quad8 is recommended.")
         print("!" * 72 + "\n")
 
+    if failure_criterion == "non_convergence":
+        return _ssrm_displacement_limit(
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            debug_level=debug_level, max_iterations=max_iterations,
+            convergence_tol=convergence_tol, max_disp_factor=None)
+    elif failure_criterion == "displacement_increase":
+        return _ssrm_displacement_increase(
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            debug_level=debug_level, max_iterations=max_iterations,
+            convergence_tol=convergence_tol, n_sweep=n_sweep)
+    elif failure_criterion == "unbalanced_force":
+        return _ssrm_unbalanced_force(
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            debug_level=debug_level, max_iterations=max_iterations,
+            convergence_tol=convergence_tol, ufr_threshold=ufr_threshold)
+    else:
+        return _ssrm_displacement_limit(
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            debug_level=debug_level, max_iterations=max_iterations,
+            convergence_tol=convergence_tol, max_disp_factor=max_disp_factor)
+
+
+def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
+                              debug_level=0, max_iterations=500,
+                              convergence_tol=1e-3, max_disp_factor=0.1):
+    """SSRM using fixed VP displacement limit as failure criterion."""
+
     if debug_level >= 1:
-        print("=== SSRM Analysis (Griffiths & Lane 1999) ===")
+        label = "Non-Convergence" if max_disp_factor is None else "Displacement Limit"
+        print(f"=== SSRM Analysis ({label} Method) ===")
         print(f"  Bisection range: [{F_min:.2f}, {F_max:.2f}], tolerance: {tolerance}")
+        if max_disp_factor is not None:
+            print(f"  Displacement limit: {max_disp_factor:.0%} of mesh height")
 
     F_left = F_min
     F_right = F_max
 
     # Verify lower bound converges
     solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1),
-                             max_iterations=max_iterations, tolerance=convergence_tol)
+                             max_iterations=max_iterations, tolerance=convergence_tol,
+                             max_disp_factor=max_disp_factor)
     if not solution_min["converged"]:
         return {
             "converged": False,
@@ -1048,7 +1243,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
 
     # Verify upper bound does not converge
     solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1),
-                             max_iterations=max_iterations, tolerance=convergence_tol)
+                             max_iterations=max_iterations, tolerance=convergence_tol,
+                             max_disp_factor=max_disp_factor)
     if solution_max["converged"]:
         if debug_level >= 1:
             print(f"  Warning: F_max = {F_max} still converges - increase F_max")
@@ -1069,7 +1265,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
             print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
 
         solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1),
-                             max_iterations=max_iterations, tolerance=convergence_tol)
+                             max_iterations=max_iterations, tolerance=convergence_tol,
+                             max_disp_factor=max_disp_factor)
 
         if solution["converged"]:
             F_left = F_mid
@@ -1096,7 +1293,244 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
         "interval_width": F_right - F_left,
-        "method": "Griffiths & Lane (1999) Viscoplastic SSRM"
+        "method": "SSRM — Non-Convergence (Griffiths & Lane 1999)" if max_disp_factor is None else "SSRM — Displacement Limit"
+    }
+
+
+def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
+                            debug_level=0, max_iterations=500,
+                            convergence_tol=1e-3, ufr_threshold=2.0):
+    """
+    SSRM using unbalanced force ratio as failure criterion.
+
+    UFR = ||VP body load corrections|| / ||F_gravity|| measures how much force
+    must be redistributed from yielding elements. At F_min (stable), the UFR
+    converges to a baseline value. As F increases toward failure, the UFR grows
+    because more elements yield and corrections grow. Failure is defined as when
+    the UFR exceeds ufr_threshold times the baseline UFR at F_min.
+
+    No displacement limit is applied — failure is purely force-based.
+    """
+
+    if debug_level >= 1:
+        print(f"=== SSRM Analysis (Unbalanced Force Ratio Method) ===")
+        print(f"  Bisection range: [{F_min:.2f}, {F_max:.2f}], tolerance: {tolerance}")
+        print(f"  UFR multiplier threshold: {ufr_threshold:.1e}")
+
+    F_left = F_min
+    F_right = F_max
+
+    # Get baseline UFR at F_min (stable slope)
+    solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1),
+                             max_iterations=max_iterations, tolerance=convergence_tol,
+                             max_disp_factor=None)
+    ufr_baseline = solution_min.get("unbalanced_force_ratio", 0.0)
+
+    if not solution_min["converged"]:
+        return {
+            "converged": False,
+            "error": f"F_min = {F_min} does not converge — slope unstable at F=1",
+            "FS": None
+        }
+
+    if debug_level >= 1:
+        print(f"  Baseline UFR at F={F_min}: {ufr_baseline:.3e}")
+
+    # Failure = UFR exceeds threshold (absolute, not relative to baseline)
+    # The baseline tells us what a "converged" UFR looks like for this problem.
+    # At failure, the UFR will be orders of magnitude larger.
+    def _is_failed(solution):
+        """Check if solution indicates failure based on UFR or non-convergence."""
+        if not solution["converged"]:
+            return True
+        ufr = solution.get("unbalanced_force_ratio", 0.0)
+        # Failed if UFR exceeds threshold multiple of baseline
+        return ufr > ufr_baseline * ufr_threshold
+
+    # Verify upper bound fails
+    solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1),
+                             max_iterations=max_iterations, tolerance=convergence_tol,
+                             max_disp_factor=None)
+    ufr_max = solution_max.get("unbalanced_force_ratio", 0.0)
+
+    if not _is_failed(solution_max):
+        if debug_level >= 1:
+            print(f"  Warning: F_max = {F_max} still stable (UFR = {ufr_max:.3e}) — increase F_max")
+        return {
+            "converged": True,
+            "FS": F_max,
+            "last_solution": solution_max,
+            "note": f"Slope stable up to F = {F_max}"
+        }
+
+    if debug_level >= 1:
+        print(f"  UFR at F={F_max}: {ufr_max:.3e} (ratio to baseline: {ufr_max/ufr_baseline:.1f}x)")
+
+    last_converged_solution = solution_min
+    iteration = 0
+
+    while (F_right - F_left) > tolerance and iteration < 50:
+        F_mid = (F_left + F_right) / 2.0
+
+        solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1),
+                             max_iterations=max_iterations, tolerance=convergence_tol,
+                             max_disp_factor=None)
+
+        ufr = solution.get("unbalanced_force_ratio", 0.0)
+        failed = _is_failed(solution)
+
+        if debug_level >= 1:
+            status = "FAILED" if failed else "STABLE"
+            ufr_ratio = ufr / ufr_baseline if ufr_baseline > 1e-30 else 0.0
+            print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
+            print(f"    -> {status} (UFR = {ufr:.3e}, {ufr_ratio:.1f}x baseline, iters = {solution['iterations']})")
+
+        if not failed:
+            F_left = F_mid
+            last_converged_solution = solution
+        else:
+            F_right = F_mid
+
+        iteration += 1
+
+    critical_FS = F_left
+
+    if debug_level >= 1:
+        print(f"\n  SSRM result: FS = {critical_FS:.4f}")
+        print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
+
+    return {
+        "converged": True,
+        "FS": critical_FS,
+        "last_solution": last_converged_solution,
+        "iterations_ssrm": iteration,
+        "final_interval": (F_left, F_right),
+        "interval_width": F_right - F_left,
+        "method": "SSRM — Unbalanced Force Ratio"
+    }
+
+
+def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
+                                 debug_level=0, max_iterations=500,
+                                 convergence_tol=1e-3, n_sweep=10):
+    """
+    SSRM using Sun et al. (2021) displacement catastrophe method.
+
+    Phase 1: Coarse sweep of n_sweep F values from F_min to F_max, recording
+             max displacement at each. A generous displacement cap (50% mesh
+             height) is used purely for early termination of hopeless cases.
+    Phase 2: Find the interval with the largest displacement ratio (catastrophe).
+    Phase 3: Refine within that interval by bisection, tracking displacement
+             at each midpoint to determine which half contains the jump.
+    """
+
+    # Compute mesh height for early-termination cap
+    nodes = fem_data['nodes']
+    mesh_height = float(np.max(nodes[:, 1]) - np.min(nodes[:, 1]))
+    # Generous cap just to avoid wasting iterations on hopeless cases
+    early_term_factor = 0.5
+
+    if debug_level >= 1:
+        print("=== SSRM Analysis (Displacement Catastrophe — Sun et al. 2021) ===")
+        print(f"  Sweep range: [{F_min:.2f}, {F_max:.2f}], tolerance: {tolerance}")
+        print(f"  Coarse sweep points: {n_sweep}")
+        print(f"  Early termination cap: {early_term_factor:.0%} of mesh height ({early_term_factor * mesh_height:.1f})")
+
+    def _get_max_vp_disp(F_val):
+        """Run solve_fem and return max VP (plastic) displacement magnitude."""
+        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1),
+                        max_iterations=max_iterations, tolerance=convergence_tol,
+                        max_disp_factor=early_term_factor)
+        # Use VP displacement (total - elastic) to isolate plastic deformation.
+        # The elastic component is roughly constant regardless of F and masks
+        # the catastrophic growth in plastic displacement at failure.
+        u_vp = sol["displacements"] - sol["displacements_elastic"]
+        vp_x = u_vp[0::2]
+        vp_y = u_vp[1::2]
+        max_vp = float(np.max(np.sqrt(vp_x**2 + vp_y**2)))
+        return max_vp, sol
+
+    # Phase 1: Coarse sweep
+    F_values = np.linspace(F_min, F_max, n_sweep)
+    displacements = []
+    solutions = []
+
+    if debug_level >= 1:
+        print(f"\n  Phase 1: Coarse sweep ({n_sweep} points)")
+
+    for i, F_val in enumerate(F_values):
+        max_vp, sol = _get_max_vp_disp(F_val)
+        displacements.append(max_vp)
+        solutions.append(sol)
+        if debug_level >= 1:
+            print(f"    F = {F_val:.4f}  max_vp_disp = {max_vp:.2f}  "
+                  f"(iters={sol['iterations']}, converged={sol['converged']})")
+
+    # Phase 2: Find catastrophe interval (largest displacement ratio)
+    max_ratio = 0.0
+    catastrophe_idx = 1  # Default to first interval
+    for i in range(1, len(displacements)):
+        if displacements[i-1] > 1e-12:
+            ratio = displacements[i] / displacements[i-1]
+        else:
+            ratio = displacements[i]  # Treat near-zero denominator as large ratio
+        if ratio > max_ratio:
+            max_ratio = ratio
+            catastrophe_idx = i
+
+    F_left = F_values[catastrophe_idx - 1]
+    F_right = F_values[catastrophe_idx]
+    d_left = displacements[catastrophe_idx - 1]
+    d_right = displacements[catastrophe_idx]
+    last_converged_solution = solutions[catastrophe_idx - 1]
+
+    if debug_level >= 1:
+        print(f"\n  Phase 2: Catastrophe detected between F = {F_left:.4f} and {F_right:.4f}")
+        print(f"    VP displacement ratio: {max_ratio:.1f}x  ({d_left:.2f} -> {d_right:.2f})")
+
+    # Phase 3: Refine within catastrophe interval by bisection
+    iteration = 0
+    while (F_right - F_left) > tolerance and iteration < 50:
+        F_mid = (F_left + F_right) / 2.0
+        d_mid, sol_mid = _get_max_vp_disp(F_mid)
+
+        # Compute ratios for each half
+        ratio_left_half = d_mid / d_left if d_left > 1e-12 else d_mid
+        ratio_right_half = d_right / d_mid if d_mid > 1e-12 else d_right
+
+        if debug_level >= 1:
+            print(f"\n  Refine step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
+            print(f"    vp_left={d_left:.2f}, vp_mid={d_mid:.2f}, vp_right={d_right:.2f}")
+            print(f"    ratio_left_half={ratio_left_half:.2f}x, ratio_right_half={ratio_right_half:.2f}x")
+
+        if ratio_left_half >= ratio_right_half:
+            # Catastrophe is in left half
+            F_right = F_mid
+            d_right = d_mid
+        else:
+            # Catastrophe is in right half
+            F_left = F_mid
+            d_left = d_mid
+            last_converged_solution = sol_mid
+
+        iteration += 1
+
+    critical_FS = (F_left + F_right) / 2.0
+
+    if debug_level >= 1:
+        print(f"\n  SSRM result: FS = {critical_FS:.4f}")
+        print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
+
+    return {
+        "converged": True,
+        "FS": critical_FS,
+        "last_solution": last_converged_solution,
+        "iterations_ssrm": iteration,
+        "final_interval": (F_left, F_right),
+        "interval_width": F_right - F_left,
+        "method": "SSRM — Displacement Catastrophe (Sun et al. 2021)",
+        "sweep_F": F_values.tolist(),
+        "sweep_vp_displacements": displacements,
     }
 
 
@@ -1542,27 +1976,29 @@ def build_constitutive_matrix(E, nu):
 
 
 
-def check_mohr_coulomb_cp(stress_cp, c, phi):
-    """Mohr-Coulomb yield function for compression-positive stresses.
-    
+def check_mohr_coulomb_cp(stress_cp, c, phi, u=0.0):
+    """Mohr-Coulomb yield function for compression-positive stresses with pore pressure.
+
     For compression-positive convention (compression > 0, tension < 0):
-    F = tau_max - sigma_mean * sin(phi) - c * cos(phi)
-    
+    F = tau_max - sigma'_mean * sin(phi) - c * cos(phi)
+
     Where:
     - tau_max = maximum shear stress = sqrt((sig_x - sig_y)^2/4 + tau_xy^2)
-    - sigma_mean = mean normal stress = (sig_x + sig_y)/2
+    - sigma'_mean = effective mean normal stress = (sig_x + sig_y)/2 - u
+    - u = pore pressure (positive value reduces effective compressive stress)
     - Positive F indicates yielding
-    
+
     Args:
         stress_cp: Array [sig_x, sig_y, tau_xy] in compression-positive convention
         c: Cohesion
         phi: Friction angle in radians
-        
+        u: Pore pressure (default 0.0). Positive u reduces effective stress.
+
     Returns:
         F: Yield function value (F > 0 means yielding)
     """
     sig_x, sig_y, tau_xy = stress_cp
-    sig_mean = (sig_x + sig_y) / 2.0
+    sig_mean = (sig_x + sig_y) / 2.0 - u  # effective mean stress
     tau_max = sqrt(((sig_x - sig_y) / 2.0)**2 + tau_xy**2)
     cos_phi = cos(phi)
     sin_phi = sin(phi)

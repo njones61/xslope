@@ -199,7 +199,8 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
 
     # Plot boundary conditions
     if show_bc:
-        _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size)
+        saved_roller_x = fem_data.get("roller_x_nodes", set())
+        _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size, saved_roller_x)
 
     # Single combined legend outside the plot
     ax.legend(
@@ -254,7 +255,7 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     plt.show()
 
 
-def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size=0.03):
+def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size=0.03, saved_roller_x=None):
     """
     Plot boundary condition symbols on the mesh.
     
@@ -293,8 +294,11 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                       markersize=8, label='Fixed (bc_type=1)')
         )
     
-    # X-roller boundary conditions (type 3) - circle + line on left/right sides
+    # X-roller boundary conditions (type 2) - circle + line on left/right sides
+    # Include nodes that were originally rollers but had bc_type overwritten to 4 (force)
     x_roller_nodes = np.where(bc_type == 2)[0]
+    if saved_roller_x:
+        x_roller_nodes = np.unique(np.concatenate([x_roller_nodes, np.array(sorted(saved_roller_x), dtype=int)]))
     if len(x_roller_nodes) > 0:
         for node_idx in x_roller_nodes:
             x, y = nodes[node_idx]
@@ -431,7 +435,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
         mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
         if max_disp > 1e-30:
-            deform_scale = (mesh_height * 0.10) / max_disp
+            deform_scale = max(1.0, (mesh_height * 0.10) / max_disp)
         else:
             deform_scale = 1.0
     
@@ -902,7 +906,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     # When used as a standalone plot, matplotlib will auto-scale appropriately
     F = solution.get("F", None)
     disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
-    title = f'{disp_label} (Scale = {deform_scale:.0f}x)'
+    scale_str = f'{deform_scale:.0f}' if deform_scale >= 10 else f'{deform_scale:.1f}'
+    title = f'{disp_label} (Scale = {scale_str}x)'
     if F is not None:
         title += f'  F={F:.2f}'
     ax.set_title(title, fontsize=12, pad=15)

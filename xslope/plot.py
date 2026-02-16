@@ -1441,6 +1441,28 @@ def plot_inputs(
     """
     fig, ax = plt.subplots(figsize=figsize)
 
+    # Plot mesh in background if available
+    mesh = slope_data.get('mesh')
+    if mesh is not None:
+        from matplotlib.collections import LineCollection
+        m_nodes = mesh["nodes"]
+        m_elements = mesh["elements"]
+        m_etypes = mesh["element_types"]
+        lines = []
+        for elem, etype in zip(m_elements, m_etypes):
+            if etype in (3, 6):  # tri3 / tri6 – corner edges only
+                edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[0])]
+            elif etype in (4, 8, 9):  # quad4 / quad8 / quad9
+                edges = [(elem[0], elem[1]), (elem[1], elem[2]),
+                         (elem[2], elem[3]), (elem[3], elem[0])]
+            else:
+                continue
+            for n0, n1 in edges:
+                lines.append(m_nodes[[n0, n1]])
+        if lines:
+            lc = LineCollection(lines, colors='gray', alpha=0.25, linewidths=0.5)
+            ax.add_collection(lc)
+
     # Plot contents
     plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])

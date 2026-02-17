@@ -217,7 +217,11 @@ This input file contains all of the inputs for a seepage analysis, a limit equil
 
 ![seep_slope_seep_inputs.png](images/seep_slope_seep_inputs.png){width=1200px}
 
-After running the slope stability analysis, two additional files were created:
+The inputs are used to build a mesh with quadratic triangular (tri6) elements. The seepage solution is as follows:
+
+![seep_slope_seep_results.png](images/seep_slope_seep_results.png){width=1200px}
+
+After running the seepage analysis, two additional files were created:
 
 [xslope_johnson_res_mesh.json](files/xslope_johnson_res_mesh.json)  <--- mesh file<br>
 [xslope_johnson_res_seep.csv](files/xslope_johnson_res_seep.csv)    <--- seepage solution file with pore pressures

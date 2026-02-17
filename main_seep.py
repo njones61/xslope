@@ -7,7 +7,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-input_file = "docs/seep/files/xslope_johnson_res_lem.xlsx"
+input_file = "docs/seep/files/xslope_johnson_res.xlsx"
 input_path = Path(input_file)
 
 slope_data = load_slope_data(input_file)
@@ -27,7 +27,7 @@ else:
 
     # find the x-range of the ground_surface and use it to set the target size
     x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
-    target_size = (x_range[1] - x_range[0]) / 60
+    target_size = (x_range[1] - x_range[0]) / 80
 
     mesh = build_mesh_from_polygons(polygons, target_size, element_type)
     mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"

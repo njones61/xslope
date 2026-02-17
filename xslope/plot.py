@@ -1469,7 +1469,8 @@ def plot_inputs(
     plot_piezo_line(ax, slope_data)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data)
-    plot_dloads(ax, slope_data)
+    if mode != "seep":
+        plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
     plot_reinforcement_lines(ax, slope_data)
 

@@ -6,7 +6,7 @@ from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
 # Load Griffiths & Lane (1999) Example 1: homogeneous slope, c/γH=0.05, φ=20°
-input_file = "docs/seep/files/xslope_johnson_res_lem.xlsx"
+input_file = "docs/seep/files/xslope_johnson_res.xlsx"
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top')

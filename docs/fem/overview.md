@@ -344,6 +344,60 @@ Each iteration builds a corrected load vector and solves the full system:
 >- **Load redistribution**: As Gauss points yield and accumulate viscoplastic strains, stress redistributes to surrounding regions through the body load correction mechanism<br>
 >- **Elastic strains matter**: The yield check uses stress from elastic strains $\{\varepsilon\} - \{\varepsilon^{vp}\}$, not total strains — this correctly accounts for stress relief from already-accumulated viscoplastic deformation
 
+### Convergence Criterion
+
+The viscoplastic iteration loop requires a convergence criterion to determine when the stress redistribution has reached equilibrium. XSLOPE uses an elastic-relative displacement criterion that normalizes the iteration-to-iteration displacement change by the elastic displacement magnitude:
+
+>>$\dfrac{||\{U\}_{i+1} - \{U\}_i||}{||\{U\}_{elastic}||} < \text{tol}$
+
+where $\{U\}_{elastic}$ is the displacement vector from the initial elastic solution (before any viscoplastic iterations). This differs from the conventional relative criterion of Dawson et al. (1999), which normalizes by the current displacement $||\{U\}_{i+1}||$. The elastic-relative formulation has a critical advantage: the denominator is a fixed reference that does not grow as plastic displacements accumulate. With the conventional criterion, when a slope is failing and displacements become very large, the relative change $||\Delta U|| / ||U||$ can appear small even though the absolute change is enormous — producing **false convergence** where the solver reports a converged solution despite unbounded plastic flow. By normalizing against the elastic displacement, the convergence check remains meaningful regardless of the displacement magnitude.
+
+**Implementation in XSLOPE:**
+
+>- Default tolerance: $\text{tol} = 10^{-3}$<br>
+>- Maximum iterations: 500<br>
+>- Failure to converge within the maximum number of iterations indicates that the current strength reduction factor corresponds to an unstable configuration
+
+Near the critical factor of safety, the viscoplastic algorithm may require hundreds of iterations to converge. For example, Griffiths & Lane (1999) report 792 iterations at a reduction factor just below failure for their Example 1. The maximum iteration count of 500 in XSLOPE provides sufficient margin for most practical problems.
+
+### The `solve_fem()` Function
+
+The viscoplastic algorithm described above is implemented in the `solve_fem()` function in the `fem.py` module. This function takes a FEM data dictionary (built by `build_fem_data()`) and an optional strength reduction factor $F$, assembles and factors the elastic stiffness matrix once, then runs the viscoplastic iteration loop until convergence or the maximum iteration count is reached.
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.mesh import build_mesh_from_polygons
+from xslope.fem import build_fem_data, solve_fem
+
+# Load slope data from input template
+slope_data = load_slope_data("inputs/slope/input_template.xlsx")
+
+# Build mesh (quad8 elements recommended — see Element Type Selection below)
+mesh = build_mesh_from_polygons(polygons, target_size=4, element_type='quad8')
+
+# Build FEM data dictionary
+fem_data = build_fem_data(slope_data, mesh)
+
+# Solve with unreduced strength (F=1.0)
+solution = solve_fem(fem_data, F=1.0, debug_level=1)
+
+if solution['converged']:
+    print(f"Converged in {solution['iterations']} iterations")
+    print(f"Max displacement: {solution['max_displacement']:.6f}")
+else:
+    print(f"Did not converge after {solution['iterations']} iterations")
+```
+
+The key parameters of `solve_fem()` are:
+
+>- **`F`** (default 1.0): Strength reduction factor applied as $c_r = c/F$ and $\tan\phi_r = \tan\phi / F$. When called directly, $F = 1.0$ gives the unreduced solution; values of $F > 1.0$ can be used to test stability at specific reduction levels.<br>
+>- **`max_iterations`** (default 500): Maximum viscoplastic iterations before declaring non-convergence.<br>
+>- **`tolerance`** (default $10^{-3}$): Convergence tolerance for the elastic-relative displacement criterion described above.<br>
+>- **`max_disp_factor`** (default 0.1): If the maximum viscoplastic displacement exceeds this fraction of the mesh height, the solve is terminated early and declared non-converged. Set to `None` to disable this check.<br>
+>- **`debug_level`** (default 0): Controls output verbosity — 0 for silent, 1 for a summary, 2 for per-iteration details.
+
+The returned solution dictionary contains the convergence status, nodal displacements, element stresses and strains, viscoplastic shear strains, yield function values, and the unbalanced force ratio — all of which can be used for post-processing and visualization with `plot_fem_results()`.
+
 ## Shear Strength Reduction Method (SSRM)
 
 The Shear Strength Reduction Method (SSRM) represents the most widely adopted approach for determining factors of 
@@ -363,22 +417,6 @@ With the reduced strength parameters, the finite element system is solved using 
 The iterative nature of SSRM requires careful monitoring of the solution behavior to identify the onset of failure. Convergence characteristics provide the primary indicator of impending failure, as the finite element system transitions from stable equilibrium solutions to unstable behavior characterized by rapidly increasing displacements and failure to achieve force equilibrium.
 
 The critical factor of safety is determined when the iterative solution process fails to converge within acceptable tolerances, indicating that the reduced strength parameters are insufficient to maintain equilibrium under the applied loading conditions. This point represents the transition from stable to unstable behavior and corresponds to the classical definition of factor of safety as the ratio of available strength to required strength for equilibrium.
-
-### Convergence Criterion
-
-The viscoplastic iteration loop requires a convergence criterion to determine when the stress redistribution has reached equilibrium. XSLOPE uses an elastic-relative displacement criterion that normalizes the iteration-to-iteration displacement change by the elastic displacement magnitude:
-
->>$\dfrac{||\{U\}_{i+1} - \{U\}_i||}{||\{U\}_{elastic}||} < \text{tol}$
-
-where $\{U\}_{elastic}$ is the displacement vector from the initial elastic solution (before any viscoplastic iterations). This differs from the conventional relative criterion of Dawson et al. (1999), which normalizes by the current displacement $||\{U\}_{i+1}||$. The elastic-relative formulation has a critical advantage: the denominator is a fixed reference that does not grow as plastic displacements accumulate. With the conventional criterion, when a slope is failing and displacements become very large, the relative change $||\Delta U|| / ||U||$ can appear small even though the absolute change is enormous — producing **false convergence** where the solver reports a converged solution despite unbounded plastic flow. By normalizing against the elastic displacement, the convergence check remains meaningful regardless of the displacement magnitude.
-
-**Implementation in XSLOPE:**
-
->- Default tolerance: $\text{tol} = 10^{-3}$<br>
->- Maximum iterations: 500<br>
->- Failure to converge within the maximum number of iterations indicates that the current reduction factor corresponds to an unstable configuration
-
-Near the critical factor of safety, the viscoplastic algorithm may require hundreds of iterations to converge. For example, Griffiths & Lane (1999) report 792 iterations at a reduction factor just below failure for their Example 1. The maximum iteration count of 500 in XSLOPE provides sufficient margin for most practical problems.
 
 ### SSRM Failure Criteria
 
@@ -442,6 +480,44 @@ The following table summarizes the characteristics of each criterion:
 | Unbalanced force ratio | Force equilibrium | `ufr_threshold` (default 2.0) | Measures equilibrium directly | Multiplier must be chosen |
 
 The **non-convergence** criterion is the default in XSLOPE. It is the most theoretically rigorous approach — based directly on the foundational work of Griffiths & Lane (1999) — and requires no arbitrary parameters beyond the convergence tolerance and maximum iteration count. It is important to recognize that FEM-SSRM and limit equilibrium methods are fundamentally different approaches to slope stability, and some difference in computed factors of safety is expected. The alternative criteria are provided for users who wish to explore the sensitivity of results to the failure definition. Users are encouraged to compare multiple criteria to understand this sensitivity for their specific problem.
+
+### The `solve_ssrm()` Function
+
+The SSRM procedure is implemented in the `solve_ssrm()` function, which repeatedly calls `solve_fem()` at different strength reduction factors to bracket and refine the critical factor of safety.
+
+```python
+from xslope.fem import solve_ssrm
+
+# Find critical factor of safety using SSRM
+result = solve_ssrm(
+    fem_data,
+    F_min=1.0,
+    F_max=2.0,
+    tolerance=0.05,
+    debug_level=1,
+    failure_criterion="non_convergence"
+)
+
+if result['converged']:
+    print(f"Factor of Safety: {result['FS']:.2f}")
+    print(f"SSRM iterations: {result['iterations_ssrm']}")
+    print(f"Final interval: {result['final_interval']}")
+else:
+    print(f"SSRM failed: {result.get('error', 'Unknown error')}")
+```
+
+The key parameters of `solve_ssrm()` are:
+
+>- **`F_min`** (default 1.0): Lower bound for the bisection search. The slope must be stable (converge) at this reduction factor.<br>
+>- **`F_max`** (default 2.0): Upper bound for the bisection search. The slope should be unstable (not converge) at this reduction factor.<br>
+>- **`tolerance`** (default 0.05): Bisection stops when $F_{right} - F_{left} <$ tolerance. The critical FS is reported as $F_{left}$ (the last stable value).<br>
+>- **`failure_criterion`** (default `"non_convergence"`): Selects the failure criterion — `"non_convergence"`, `"displacement_limit"`, `"displacement_increase"`, or `"unbalanced_force"` as described above.<br>
+>- **`max_disp_factor`** (default 0.1): Displacement limit fraction, used with the `"displacement_limit"` criterion.<br>
+>- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>
+>- **`ufr_threshold`** (default 2.0): UFR multiplier for the `"unbalanced_force"` criterion.<br>
+>- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 500): Passed through to `solve_fem()` for each trial.
+
+The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. The `last_solution` can be passed directly to `plot_fem_results()` for visualization of the failure mechanism at the critical state.
 
 ## Element Type Selection and Volumetric Locking
 
@@ -727,21 +803,6 @@ where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of th
 where $h$ is the hydraulic head from the seepage solution and $z$ is the elevation coordinate. These nodal pore pressures are stored in the slope data and transferred to the structural mesh during `build_fem_data()`. Negative pore pressures (suction above the phreatic surface) are clamped to zero.
 
 For both the piezometric and seepage options, pore pressures are precomputed at each Gauss point during `build_fem_data()` using the element shape functions to interpolate from nodal values (seep) or by computing the physical coordinates of each Gauss point and projecting onto the piezometric surface (piezo). These precomputed values are then used directly in the effective stress yield check during the viscoplastic iteration, avoiding repeated interpolation at each iteration step.
-
-## Implementation in XSLOPE
-
-The FEM slope stability analysis in XSLOPE is implemented in the `fem.py` module with the following key functions:
-
-- **`build_fem_data(slope_data, mesh)`** — Constructs the FEM data dictionary from the slope geometry, material properties, boundary conditions, and mesh. Handles pore pressure assignment (from piezometric lines or seepage solutions), reinforcement element properties (tensile capacity, pullout reduction, axial stiffness), distributed load conversion to nodal forces, and seismic coefficient storage. Pore pressures are precomputed at each Gauss point for use in the effective stress yield check.
-
-- **`solve_fem(fem_data, F=1.0)`** — Solves the finite element system for a given strength reduction factor $F$ using the viscoplastic algorithm described above. Returns a solution dictionary containing nodal displacements, element stresses, convergence status, iteration count, and the unbalanced force ratio.
-
-- **`solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, failure_criterion="non_convergence")`** — Determines the critical factor of safety using the specified failure criterion. The `failure_criterion` parameter selects between `"non_convergence"` (default), `"displacement_limit"`, `"displacement_increase"`, and `"unbalanced_force"`. Additional parameters control criterion-specific behavior: `max_disp_factor` for the displacement limit, `n_sweep` for the displacement catastrophe sweep, and `ufr_threshold` for the unbalanced force ratio multiplier.
-
-Visualization is provided in `plot_fem.py`:
-
-- **`plot_fem_data(fem_data)`** — Displays the mesh, boundary conditions, and material zones
-- **`plot_fem_results(fem_data, solution)`** — Displays deformation patterns and shear strain contours from the analysis results
 
 ## References
 

@@ -49,7 +49,6 @@ nav:
   - Finite Element Method:
     - Overview: fem/overview.md
     - Mesh Generation: fem/mesh.md
-    - Problem Setup: fem/setup.md
     - Sample Problems: fem/samples.md
   - API:
       - Advanced: api/advanced.md

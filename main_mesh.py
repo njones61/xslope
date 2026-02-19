@@ -6,7 +6,7 @@ from xslope.mesh import (build_polygons, build_mesh_from_polygons, get_quad_mesh
                          add_intersection_points_to_polygons, extract_reinforcement_line_geometry)
 from xslope.plot import plot_inputs, plot_polygons, plot_polygons_separately, plot_mesh
 
-slope_data = load_slope_data("docs/inputs/slope/input_template_reinf5.xlsx")
+slope_data = load_slope_data("xslope_lost_lake.xlsx")
 
 # Extract reinforcement lines in the correct format
 test_lines = extract_reinforcement_line_geometry(slope_data)

@@ -308,6 +308,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     element_materials = seep_data["element_materials"]
     element_types = seep_data.get("element_types", None)  # New field for element types
     k1_by_mat = seep_data.get("k1_by_mat")  # Use .get() in case it's not present
+    k2_by_mat = seep_data.get("k2_by_mat")
     
     # Extract the variable to plot
     if variable not in solution:
@@ -489,11 +490,15 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         elif base_mat < 1:
             print(f"Warning: base_mat={base_mat} is less than 1. Using material 1.")
             base_mat = 1
-        base_k = k1_by_mat[base_mat - 1]
+        base_k1 = k1_by_mat[base_mat - 1]
+        base_k2 = k2_by_mat[base_mat - 1] if k2_by_mat is not None else base_k1
+        # For anisotropic media, the equivalent conductivity is sqrt(k1*k2)
+        # This ensures the flow net cells have the correct aspect ratio sqrt(k1/k2)
+        base_k = np.sqrt(base_k1 * base_k2)
         ne = levels - 1
         nf = (flowrate * ne) / (base_k * hdrop)
         phi_levels = round(nf) + 1
-        print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (flowrate={flowrate:.3f}, base k={base_k}, head drop={hdrop:.3f})")
+        print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (flowrate={flowrate:.3f}, base k={base_k:.4f}, head drop={hdrop:.3f})")
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
         ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
 

@@ -19,7 +19,7 @@ from scipy.sparse.linalg import spsolve
 from shapely.geometry import LineString, Point
 
 
-def build_seep_data(mesh, slope_data):
+def build_seep_data(mesh, slope_data, seep_bc=1):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
     
@@ -90,7 +90,10 @@ def build_seep_data(mesh, slope_data):
         material_names.append(material.get("name", f"Material {i+1}"))
     
     # Process boundary conditions
-    seepage_bc = slope_data.get("seepage_bc", {})
+    if seep_bc == 2:
+        seepage_bc = slope_data.get("seepage_bc2", {})
+    else:
+        seepage_bc = slope_data.get("seepage_bc", {})
     
     # Calculate appropriate tolerance based on mesh size
     # Use a fraction of the typical element size

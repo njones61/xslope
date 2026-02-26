@@ -344,11 +344,8 @@ def plot_seepage_bc_lines(ax, slope_data):
     """
     Plots seep boundary-condition lines for seep-only workflows.
 
-    - Specified head geometry: solid dark blue, thicker than profile lines
-    - Exit face geometry: solid red
-    - Derived "water level" line for each specified head: y = h
-      plotted as a lighter blue solid line with an inverted triangle marker
-      (styled similarly to piezometric line markers).
+    Plots the primary seepage BCs (seepage_bc) and, if present, the second set
+    (seepage_bc2) with different colors to distinguish them.
     """
     def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=2.0):
         """Place an inverted triangle so its tip visually sits on the line at (x, y)."""
@@ -362,6 +359,80 @@ def plot_seepage_bc_lines(ax, slope_data):
         tip_offset_points = (-min_y) * float(markersize) + float(extra_gap_points)
         trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
         ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
+
+    def _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
+                         head_line_color, water_level_color, exit_face_color, label_suffix=""):
+        """Plot a single set of seepage boundary conditions."""
+        specified_heads = seepage_bc.get("specified_heads") or []
+        exit_face = seepage_bc.get("exit_face") or []
+
+        for i, sh in enumerate(specified_heads):
+            coords = sh.get("coords") or []
+            if len(coords) < 2:
+                continue
+
+            xs, ys = zip(*coords)
+            ax.plot(
+                xs, ys,
+                color=head_line_color, linewidth=3, linestyle="--",
+                label=f"Specified Head Line{label_suffix}" if i == 0 else "",
+            )
+
+            head_val = sh.get("head", None)
+            if head_val is None:
+                continue
+
+            if isinstance(head_val, (list, tuple, np.ndarray)):
+                if len(head_val) != len(coords):
+                    continue
+                heads = [float(h) for h in head_val]
+            else:
+                try:
+                    head_scalar = float(head_val)
+                except (TypeError, ValueError):
+                    continue
+                heads = [head_scalar] * len(coords)
+
+            tol = 1e-6
+            is_vertical = (max(xs) - min(xs)) <= tol
+            if is_vertical:
+                x0 = float(xs[0])
+                y_head = float(heads[0])
+                seg_len = 0.04 * geom_width
+                gap = 0.01 * geom_width
+                is_right = x0 >= 0.5 * (x_min_geom + x_max_geom)
+                if is_right:
+                    wl_xs = [x0 + gap, x0 + gap + seg_len]
+                else:
+                    wl_xs = [x0 - gap - seg_len, x0 - gap]
+                wl_ys = [y_head, y_head]
+            else:
+                wl_xs = list(xs)
+                wl_ys = heads
+
+            ax.plot(
+                wl_xs, wl_ys,
+                color=water_level_color, linewidth=2, linestyle="-",
+                label=f"Specified Head Water Level{label_suffix}" if i == 0 else "",
+            )
+
+            if len(wl_xs) > 1:
+                try:
+                    pairs = sorted(zip(wl_xs, wl_ys), key=lambda p: p[0])
+                    sx, sy = zip(*pairs)
+                    mid_x = 0.5 * (min(sx) + max(sx))
+                    mid_y = float(np.interp(mid_x, sx, sy))
+                    _plot_touching_v_marker(ax, mid_x, mid_y, color=water_level_color, markersize=8, extra_gap_points=2.0)
+                except Exception:
+                    pass
+
+        if len(exit_face) >= 2:
+            ex_xs, ex_ys = zip(*exit_face)
+            ax.plot(
+                ex_xs, ex_ys,
+                color=exit_face_color, linewidth=3, linestyle="--",
+                label=f"Exit Face{label_suffix}",
+            )
 
     # Geometry x-extent (used for vertical-head-line derived segment length / side)
     x_vals = []
@@ -378,93 +449,20 @@ def plot_seepage_bc_lines(ax, slope_data):
     x_max_geom = max(x_vals) if x_vals else 1.0
     geom_width = max(1e-9, x_max_geom - x_min_geom)
 
+    # Plot primary BCs
     seepage_bc = slope_data.get("seepage_bc") or {}
-    specified_heads = seepage_bc.get("specified_heads") or []
-    exit_face = seepage_bc.get("exit_face") or []
+    has_bc2 = slope_data.get("has_seepage_bc2", False)
+    label_suffix = " (BC 1)" if has_bc2 else ""
+    _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
+                     head_line_color="darkblue", water_level_color="lightskyblue",
+                     exit_face_color="red", label_suffix=label_suffix)
 
-    # --- Specified head lines + derived water-level lines ---
-    for i, sh in enumerate(specified_heads):
-        coords = sh.get("coords") or []
-        if len(coords) < 2:
-            continue
-
-        xs, ys = zip(*coords)
-        ax.plot(
-            xs,
-            ys,
-            color="darkblue",
-            linewidth=3,
-            linestyle="--",
-            label="Specified Head Line" if i == 0 else "",
-        )
-
-        # Head values may be scalar (typical) or per-point array-like
-        head_val = sh.get("head", None)
-        if head_val is None:
-            continue
-
-        if isinstance(head_val, (list, tuple, np.ndarray)):
-            if len(head_val) != len(coords):
-                continue
-            heads = [float(h) for h in head_val]
-        else:
-            try:
-                head_scalar = float(head_val)
-            except (TypeError, ValueError):
-                continue
-            heads = [head_scalar] * len(coords)
-
-        # If specified-head geometry is vertical, draw a short horizontal derived line outside the boundary.
-        # This avoids drawing a (nearly) vertical derived line that doesn't convey a water level.
-        tol = 1e-6
-        is_vertical = (max(xs) - min(xs)) <= tol
-        if is_vertical:
-            x0 = float(xs[0])
-            y_head = float(heads[0])
-            seg_len = 0.04 * geom_width
-            gap = 0.01 * geom_width
-            is_right = x0 >= 0.5 * (x_min_geom + x_max_geom)
-            if is_right:
-                wl_xs = [x0 + gap, x0 + gap + seg_len]
-            else:
-                wl_xs = [x0 - gap - seg_len, x0 - gap]
-            wl_ys = [y_head, y_head]
-        else:
-            wl_xs = list(xs)
-            wl_ys = heads
-
-        ax.plot(
-            wl_xs,
-            wl_ys,
-            color="lightskyblue",
-            linewidth=2,
-            linestyle="-",
-            label="Specified Head Water Level" if i == 0 else "",
-        )
-
-        # Inverted triangle marker near the midpoint (like piezometric lines)
-        if len(wl_xs) > 1:
-            try:
-                pairs = sorted(zip(wl_xs, wl_ys), key=lambda p: p[0])
-                sx, sy = zip(*pairs)
-                mid_x = 0.5 * (min(sx) + max(sx))
-                mid_y = float(np.interp(mid_x, sx, sy))
-                _plot_touching_v_marker(ax, mid_x, mid_y, color="lightskyblue", markersize=8, extra_gap_points=2.0)
-            except Exception:
-                # If interpolation fails for any reason, skip marker
-                pass
-
-    # --- Exit face line ---
-    if len(exit_face) >= 2:
-        ex_xs, ex_ys = zip(*exit_face)
-        ax.plot(
-            ex_xs,
-            ex_ys,
-            color="red",
-            linewidth=3,
-            linestyle="--",
-            label="Exit Face",
-        )
+    # Plot second set of BCs if present
+    if has_bc2:
+        seepage_bc2 = slope_data.get("seepage_bc2") or {}
+        _plot_one_bc_set(ax, seepage_bc2, geom_width, x_min_geom, x_max_geom,
+                         head_line_color="steelblue", water_level_color="powderblue",
+                         exit_face_color="orangered", label_suffix=" (BC 2)")
 
 def plot_tcrack_surface(ax, slope_data):
     """

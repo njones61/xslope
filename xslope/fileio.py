@@ -863,6 +863,7 @@ def load_slope_data(filepath):
     globals_data["reinforce_lines"] = reinforce_lines
     globals_data["seepage_bc"] = seepage_bc
     globals_data["seepage_bc2"] = seepage_bc2
+    globals_data["has_seepage_bc2"] = bool(seepage_bc2.get("specified_heads") or seepage_bc2.get("exit_face"))
     
     # Add mesh if available (used by both seep and fem workflows)
     globals_data["mesh"] = mesh

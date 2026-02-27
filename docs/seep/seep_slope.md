@@ -55,6 +55,7 @@ The following code snippet shows a complete workflow for building a mesh, runnin
 from pathlib import Path
 from xslope.fileio import load_slope_data
 from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, export_seep_solution
 
 input_file = "docs/seep/files/xslope_johnson_res.xlsx"
@@ -62,21 +63,29 @@ input_path = Path(input_file)
 
 slope_data = load_slope_data(input_file)
 
-# Build the mesh from profile line data
 element_type = 'tri6'
-polygons = build_polygons(slope_data)
-x_range = [min(x for x, _ in slope_data['ground_surface'].coords),
-           max(x for x, _ in slope_data['ground_surface'].coords)]
-target_size = (x_range[1] - x_range[0]) / 60
-mesh = build_mesh_from_polygons(polygons, target_size, element_type)
+re_mesh = True
 
-# Save the mesh to JSON
-mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
-export_mesh_to_json(mesh, mesh_file)
+# Use existing mesh from slope_data if available, otherwise build a new one
+if slope_data.get("mesh") is not None and not re_mesh:
+    print("Using existing mesh file.")
+    mesh = slope_data["mesh"]
+else:
+    print("Building new mesh from profile line data.")
+    polygons = build_polygons(slope_data)
+    x_range = [min(x for x, _ in slope_data['ground_surface'].coords),
+               max(x for x, _ in slope_data['ground_surface'].coords)]
+    target_size = (x_range[1] - x_range[0]) / 60
+    mesh = build_mesh_from_polygons(polygons, target_size, element_type)
+    mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
+    export_mesh_to_json(mesh, mesh_file)
 
 # Build seep data and run seepage analysis
 seep_data = build_seep_data(mesh, slope_data)
+plot_seep_data(seep_data, show_nodes=True, show_bc=True)
+
 solution = run_seepage_analysis(seep_data, tol=1e-4)
+plot_seep_solution(seep_data, solution, variable="head", flowlines=True, phreatic=True)
 
 # Save the seepage solution to CSV
 seep_file = input_path.parent / f"{input_path.stem}_seep.csv"
@@ -84,6 +93,8 @@ export_seep_solution(seep_data, solution, seep_file)
 ```
 
 Note that the `Path` class from Python's `pathlib` module is used to construct the output file paths. The `input_path.stem` property extracts the filename without the extension, and the `input_path.parent` property provides the directory. This ensures the mesh and solution files are saved in the same directory as the input file with the correct naming convention.
+
+When a mesh file already exists (e.g., it was previously exported or included alongside the Excel template), `load_slope_data()` will automatically import it and store it under `slope_data["mesh"]`. The `re_mesh` flag controls whether to rebuild the mesh from scratch or reuse the existing one. Setting `re_mesh = False` skips mesh generation and uses the pre-built mesh, which is useful when iterating on boundary conditions or seepage parameters without needing to regenerate the mesh.
 
 ## Rapid Drawdown Analysis
 
@@ -100,23 +111,48 @@ following code snippet shows how to export the seepage solution files for the ca
 ```python
 from pathlib import Path
 from xslope.fileio import load_slope_data
-from xslope.mesh import export_mesh_to_json
-from xslope.seep import export_seep_solution
+from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
+from xslope.seep import build_seep_data, run_seepage_analysis, export_seep_solution
 
 input_file = "docs/inputs/slope/xslope_lface.xlsx"
 input_path = Path(input_file)
 slope_data = load_slope_data(input_file)
 
-# CODE HERE TO BUILD MESH AND PERFORM SEEPAGE ANALYSIS FOR BOTH CONDITIONS
+element_type = 'tri6'
+re_mesh = True
 
-mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
+# Use existing mesh or build a new one
+if slope_data.get("mesh") is not None and not re_mesh:
+    mesh = slope_data["mesh"]
+else:
+    polygons = build_polygons(slope_data)
+    x_range = [min(x for x, _ in slope_data['ground_surface'].coords),
+               max(x for x, _ in slope_data['ground_surface'].coords)]
+    target_size = (x_range[1] - x_range[0]) / 60
+    mesh = build_mesh_from_polygons(polygons, target_size, element_type)
+    mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
+    export_mesh_to_json(mesh, mesh_file)
+
+# First boundary condition (e.g., full reservoir)
+seep_data = build_seep_data(mesh, slope_data)
+solution = run_seepage_analysis(seep_data, tol=1e-4)
+plot_seep_solution(seep_data, solution, variable="head", flowlines=True, phreatic=True)
+
 seep_file = input_path.parent / f"{input_path.stem}_seep.csv"
-seep_file2 = input_path.parent / f"{input_path.stem}_seep2.csv"
-
-export_mesh_to_json(mesh, mesh_file)
 export_seep_solution(seep_data, solution, seep_file)
-export_seep_solution(seep_data, solution2, seep_file2)
+
+# Second boundary condition (e.g., drawn-down reservoir)
+if slope_data.get("has_seepage_bc2"):
+    seep_data2 = build_seep_data(mesh, slope_data, seep_bc=2)
+    solution2 = run_seepage_analysis(seep_data2, tol=1e-4)
+    plot_seep_solution(seep_data2, solution2, variable="head", flowlines=True, phreatic=True)
+
+    seep_file2 = input_path.parent / f"{input_path.stem}_seep2.csv"
+    export_seep_solution(seep_data2, solution2, seep_file2)
 ```
+
+The `has_seepage_bc2` key in `slope_data` is set automatically by `load_slope_data()` when the input Excel file contains a **seep bc (2)** sheet with valid boundary condition data. The `seep_bc=2` argument to `build_seep_data()` tells it to use the second set of boundary conditions instead of the default first set. Note that both analyses use the same mesh — only the boundary conditions change.
 
 ## Automatic Import of Seepage Files
 
@@ -131,6 +167,55 @@ xslope_johnson_res_lem_seep.csv
 ```
 
 Calling `load_slope_data("xslope_johnson_res_lem.xlsx")` will automatically import the mesh and seepage solution alongside the Excel data.
+
+## Using Zip Archives (Colab Notebook)
+
+The [Colab seepage notebook](https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_seep.ipynb) supports uploading a **zip archive** instead of a standalone Excel file. This is convenient when you want to bundle an Excel input template with a pre-built mesh file (and optionally existing seepage solution files) so that everything can be uploaded in a single step.
+
+### Uploading a Zip Archive
+
+When a `.zip` file is uploaded, the notebook extracts its contents and automatically locates the `.xlsx` file inside:
+
+```python
+from google.colab import files
+import zipfile
+
+upload = files.upload()
+file_name = list(upload.keys())[0]
+
+if file_name.endswith('.zip'):
+    with zipfile.ZipFile(file_name, 'r') as zip_ref:
+        zip_ref.extractall()
+        for f in zip_ref.namelist():
+            if f.endswith('.xlsx'):
+                file_name = f
+                break
+```
+
+After extraction, the mesh JSON file (if included) will be in the working directory alongside the Excel file. When `load_slope_data()` is called, it will automatically detect and import the mesh file using the standard naming convention.
+
+### Downloading Results as a Zip Archive
+
+After running the seepage analysis, the notebook packages all output files — the original Excel file, the mesh JSON, and the seepage solution CSV(s) — into a results zip archive for download:
+
+```python
+import zipfile
+from pathlib import Path
+
+input_path = Path(file_name)
+zip_file_name = f"{input_path.stem}_results.zip"
+
+with zipfile.ZipFile(zip_file_name, 'w') as zipf:
+    zipf.write(file_name)                                # Original Excel file
+    zipf.write(f"{input_path.stem}_mesh.json")           # Mesh file
+    zipf.write(f"{input_path.stem}_seep.csv")            # Seepage solution
+    if slope_data.get("has_seepage_bc2"):
+        zipf.write(f"{input_path.stem}_seep2.csv")       # Second BC solution
+
+files.download(zip_file_name)
+```
+
+This results zip can then be re-uploaded in a future session to continue analysis with the pre-built mesh, avoiding the need to regenerate it.
 
 ## Selecting the SEEP Option for Pore Pressure Calculation
 

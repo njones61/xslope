@@ -140,9 +140,33 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
                 bc_type[i] = 2  # Exit face
                 bc_values[i] = node_coord[1]  # Use node's y-coordinate as elevation
     
+    # Check for missing unsaturated parameters when exit face BCs are present
+    has_exit_face = np.any(bc_type == 2)
+    missing_unsat_params = False
+    if has_exit_face:
+        bad_mats = []
+        for i, material in enumerate(materials):
+            mat_kr0 = material.get("kr0", 0)
+            mat_h0 = material.get("h0", 0)
+            kr0_missing = mat_kr0 is None or (isinstance(mat_kr0, (int, float)) and (mat_kr0 == 0 or np.isnan(mat_kr0)))
+            h0_missing = mat_h0 is None or (isinstance(mat_h0, (int, float)) and (mat_h0 == 0 or np.isnan(mat_h0)))
+            if kr0_missing or h0_missing:
+                name = material.get("name", f"Material {i+1}")
+                bad_mats.append(f"  Material {i+1} ({name}): kr0={mat_kr0}, h0={mat_h0}")
+        if bad_mats:
+            missing_unsat_params = True
+            print("\n" + "="*70)
+            print("WARNING: Exit face boundary condition detected but the following")
+            print("materials are missing unsaturated parameters (kr0 and/or h0):")
+            for line in bad_mats:
+                print(line)
+            print("\nThe unsaturated seepage solver requires valid kr0 (>0) and h0 (<0)")
+            print("values for all materials. Please set these in the input file.")
+            print("="*70 + "\n")
+
     # Get unit weight of water
     unit_weight = slope_data.get("gamma_water", 9.81)
-    
+
     # Construct seep_data dictionary
     seep_data = {
         "nodes": nodes,
@@ -157,9 +181,10 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         "kr0_by_mat": kr0_by_mat,
         "h0_by_mat": h0_by_mat,
         "material_names": material_names,
-        "unit_weight": unit_weight
+        "unit_weight": unit_weight,
+        "missing_unsat_params": missing_unsat_params
     }
-    
+
     return seep_data
 
 
@@ -2029,6 +2054,16 @@ def run_seepage_analysis(seep_data, tol=1e-6):
         - 'phi': numpy array of stream function/flow potential values at each node
         - 'flowrate': scalar total flow rate
     """
+    # Check for missing unsaturated parameters
+    if seep_data.get("missing_unsat_params", False):
+        print("\n" + "="*70)
+        print("ERROR: Cannot run seepage analysis.")
+        print("One or more materials are missing unsaturated parameters (kr0, h0)")
+        print("which are required for unconfined seepage with an exit face BC.")
+        print("Please set valid kr0 (>0) and h0 (<0) values in the input file.")
+        print("="*70 + "\n")
+        return None
+
     # Extract data from seep_data
     nodes = seep_data["nodes"]
     elements = seep_data["elements"]

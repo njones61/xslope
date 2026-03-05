@@ -2337,13 +2337,18 @@ def find_element_containing_point(nodes, elements, element_types, point):
         int: Index of the element containing the point, or -1 if not found
     """
     x, y = point
-    
+
     # Use spatial indexing to find candidate elements quickly
-    # Build spatial hash grid if not already built
-    if not hasattr(find_element_containing_point, '_spatial_grid'):
-        find_element_containing_point._spatial_grid = _build_spatial_grid(nodes, elements, element_types)
-    
-    spatial_grid = find_element_containing_point._spatial_grid
+    # Build spatial hash grid if not already built, or rebuild if mesh changed
+    mesh_id = id(nodes)
+    cache = getattr(find_element_containing_point, '_cache', None)
+    if cache is None or cache['mesh_id'] != mesh_id:
+        find_element_containing_point._cache = {
+            'mesh_id': mesh_id,
+            'spatial_grid': _build_spatial_grid(nodes, elements, element_types)
+        }
+
+    spatial_grid = find_element_containing_point._cache['spatial_grid']
     
     # Find grid cell containing the point
     grid_x = int((x - spatial_grid['x_min']) / spatial_grid['cell_size'])

@@ -1464,7 +1464,8 @@ def plot_inputs(
     # Plot contents
     plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
-    plot_piezo_line(ax, slope_data)
+    if mode != "lem" or any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
+        plot_piezo_line(ax, slope_data)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data)
     if mode != "seep":

@@ -83,7 +83,7 @@ Where:
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
 $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
-$R_f$ = reinforcement force on base of slice <br>
+$P$ = reinforcement force on base of slice <br>
 $water$ = tension crack water force <br>
 
 The rest of the forces are the same as before.

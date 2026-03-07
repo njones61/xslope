@@ -1185,7 +1185,7 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
     Returns:
         None
     """
-    u = slice_df['u'].values
+    u = slice_df['u'].values * slice_df['dl'].values  # convert pore pressure (stress) to force
     n_eff = slice_df['n_eff'].values
     dl = slice_df['dl'].values
     heights = slice_df['y_ct'] - slice_df['y_cb']

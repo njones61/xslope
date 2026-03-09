@@ -40,8 +40,12 @@ for i, beta in enumerate(betas):
 
   print(f"Slope angle: {beta:.1f}°, toe: ({x_toe}, {y_toe}), slope point: ({x_top_new:.2f}, {y_top})")
 
-  fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=diagnostic)
+  fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, diagnostic=diagnostic)
   fs_results[i] = fs_cache[0]['FS']
+
+print("Beta sweep finished. Results:")
+for beta, fs in zip(betas, fs_results):
+    print(f"  β = {beta:.1f}\u00b0: FS = {fs:.3f}")
 
 # From the results, infer what the critical slope angle is to produce FS = design_fs.
 fs_min, fs_max = fs_results.min(), fs_results.max()
@@ -60,7 +64,7 @@ x_top, y_top = profile[slope_index]
 x_top_new = x_toe + (y_top - y_toe) / math.tan(math.radians(critical_slope_angle))
 slope_data['profile_lines'][0]['coords'][slope_index] = (x_top_new, y_top)
 slope_data['ground_surface'] = build_ground_surface(slope_data['profile_lines'])
-fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=diagnostic)
+fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, diagnostic=diagnostic)
 fs_at_critical = fs_cache[0]['FS']
 print(f"FS at critical slope angle ({critical_slope_angle:.2f}°): {fs_at_critical:.3f}")  
 critical_surface = fs_cache[0]

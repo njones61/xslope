@@ -41,6 +41,7 @@ nav:
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md
     - Reliability Analysis: lem/reliability.md
+    - Slope Design: lem/design.md
     - Sample Problems: lem/samples.md
   - Seepage Analysis:
     - Overview: seep/overview.md

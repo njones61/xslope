@@ -9,7 +9,7 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_design.xlsx")
+slope_data = load_slope_data("xslope_design_problem.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
@@ -21,7 +21,7 @@ diagnostic = False # @param {"type":"boolean"}
 
 beta1 = 25  # desired slope angle in degrees
 beta2 = 35  # desired slope angle in degrees
-design_fs = 1.5  # target factor of safety for design
+design_fs = 1.4  # target factor of safety for design
 toe_index = 1  # index of the toe point in the first profile line (zero-based index)
 slope_index = 2  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
 
@@ -40,7 +40,7 @@ for i, beta in enumerate(betas):
 
   print(f"Slope angle: {beta:.1f}°, toe: ({x_toe}, {y_toe}), slope point: ({x_top_new:.2f}, {y_top})")
 
-  fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, diagnostic=diagnostic)
+  fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method)
   fs_results[i] = fs_cache[0]['FS']
 
 print("Beta sweep finished. Results:")

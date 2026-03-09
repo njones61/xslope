@@ -16,8 +16,6 @@ method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_kara
 num_slices = 30 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
-rapid_drawdown = False # @param {"type":"boolean"}
-reliability = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
 diagnostic = False # @param {"type":"boolean"}
 
@@ -25,7 +23,7 @@ beta1 = 25  # desired slope angle in degrees
 beta2 = 35  # desired slope angle in degrees
 design_fs = 1.5  # target factor of safety for design
 toe_index = 1  # index of the toe point in the first profile line (zero-based index)
-slope_index = toe_index + 1  # index of the point above the toe that gets adjusted
+slope_index = 2  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
 
 betas = np.linspace(beta1, beta2, num=10)  # generate slope angles between beta1 and beta2
 fs_results = np.zeros_like(betas)

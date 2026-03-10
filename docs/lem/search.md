@@ -8,11 +8,31 @@ The circular search algorithm (`circular_search()` in xslope/search.py:24) imple
 
 The heart of the circular search algorithm is a two-stage optimization process that operates on both the spatial location of the circle center and the depth of the failure surface. When evaluating a particular center location (x, y), the algorithm first performs a nested depth optimization. This inner optimization recognizes that for any given center point, there exists an optimal depth that minimizes the factor of safety. The depth optimizer uses a three-point bracketing approach, evaluating the factor of safety at the current best depth and at depths one step above and below it. By iteratively selecting the depth that produces the lowest factor of safety and shrinking the step size by a factor of 0.25, the algorithm converges to the locally optimal depth for that center location. This depth optimization continues until the step size falls below a tolerance threshold, typically set to 1% of the current step size.
 
-Once the algorithm can efficiently evaluate any point in the (x, y) plane by optimizing its depth, it employs a nine-point grid search strategy to locate the optimal center coordinates. Starting from the best point found among all initial starting circles, the algorithm constructs a 3×3 grid centered on the current best location. The grid spacing is initially set to 15% of the circle radius, providing a balance between exploration and computational efficiency. The algorithm evaluates the factor of safety at all nine points on this grid, utilizing a caching mechanism to avoid redundant calculations when grid points overlap between iterations. After identifying which of the nine points yields the lowest factor of safety, the algorithm updates its center location if an improvement was found. If the best point on the grid is the center point itself (meaning no improvement was discovered), the algorithm shrinks the grid size by multiplying it by the shrink factor (default 0.5), effectively zooming in on the current location to search at a finer resolution.
+Once the algorithm can efficiently evaluate any point in the (x, y) plane by optimizing its depth, it employs a nine-point grid search strategy to locate the optimal center coordinates. Starting from the best point found among all initial starting circles, the algorithm constructs a 3×3 grid centered on the current best location. The grid spacing is initially set to 15% of the circle radius, providing a balance between exploration and computational efficiency. The algorithm evaluates the factor of safety at all nine points on this grid, utilizing a caching mechanism to avoid redundant calculations when grid points overlap between iterations. 
 
-This iterative process of grid evaluation and refinement continues until the grid size falls below the convergence tolerance (default 1% of the vertical distance between the ground surface maximum elevation and maximum depth). The algorithm tracks its progression through the search space, recording each jump to a new best location along with the corresponding factor of safety. Diagnostic output provides detailed information about each iteration, including the current center coordinates, factor of safety, and grid size, allowing users to monitor the convergence behavior. The search typically converges within 10-20 iterations, depending on the complexity of the slope geometry and the quality of the initial starting guess.
+![alt text](images/autosearch_grid1.png)
+
+After identifying which of the nine points yields the lowest factor of safety, the algorithm updates its center location if an improvement was found. For example, for the grid shown above, suppose the upper right point had the lowest FS of the 9 grid points. The next grid would then shift so that this is the center point:
+
+![alt text](images/autosearch_grid2.png)
+
+The new points on this grid are then evaluated with the circles at various depths to get a new FS value for each point. Then if the grid point on the middle right had the lowest FS, the grid would shift again as follows:
+
+![alt text](images/autosearch_grid3.png)
+
+Again, the new points on this grid are evaluated for minimum FS. If the best point on the grid is the center point itself (meaning no improvement was discovered), the algorithm shrinks the grid size by multiplying it by the shrink factor (default 0.5), effectively zooming in on the current location to search at a finer resolution as follows:
+
+![alt text](images/autosearch_grid4.png)
+
+Each of the new points on this grid are then evaluated. This iterative process of grid evaluation and refinement continues until the grid size falls below the convergence tolerance (default 1% of the vertical distance between the ground surface maximum elevation and maximum depth). The algorithm tracks its progression through the search space, recording each jump to a new best location along with the corresponding factor of safety. Diagnostic output provides detailed information about each iteration, including the current center coordinates, factor of safety, and grid size, allowing users to monitor the convergence behavior. The search typically converges within 10-20 iterations, depending on the complexity of the slope geometry and the quality of the initial starting guess.
 
 Throughout the search process, the algorithm maintains a comprehensive cache (`fs_cache`) that stores every evaluated circle configuration along with its computed factor of safety and associated solution details. This cache serves multiple purposes: it prevents redundant calculations, enables post-analysis visualization of the entire search space, and provides a ranked list of all evaluated failure surfaces. The cache is implemented as a dictionary keyed by (x, y) coordinates, with each entry storing the circle center coordinates, depth, factor of safety, slice dataframe, failure surface geometry, and the detailed solver results.
+
+At the end of the process, the search results can be displayed using the **plot_circular_search_results** function as follows:
+
+![alt text](../seep/images/seep_slope_lem_search.png)
+
+Note that all circles tested in the search are displayed along with all grid points evaluated using the 9-point search algorithm. Furthermore, the sequence of center points for the moving 9-point grids are connected with a series of arrows showing the "search path".
 
 ## Non-Circular Failure Surfaces
 

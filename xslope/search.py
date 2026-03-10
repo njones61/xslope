@@ -22,7 +22,7 @@ from .advanced import rapid_drawdown
 from .slice import generate_slices, get_y_from_intersection
 
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
-                    fs_fail=9999, depth_tol_frac=0.03, diagnostic=False):
+                    fs_fail=9999, depth_tol_frac=0.03, diagnostic=False, num_slices=30):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -65,7 +65,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
             fs_results = []
             for d in depths:
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
-                success, result = generate_slices(slope_data, circle=test_circle)
+                success, result = generate_slices(slope_data, circle=test_circle, num_slices=num_slices)
                 if not success:
                     FS = fs_fail
                     df_slices = None
@@ -288,7 +288,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         non_circ = [{'X': x, 'Y': y, 'Movement': movements[i]} for i, (x, y) in enumerate(points)]
         
         # Generate slices and compute FS
-        success, result = generate_slices(slope_data, non_circ=non_circ)
+        success, result = generate_slices(slope_data, non_circ=non_circ, num_slices=num_slices)
         if not success:
             return float('inf'), None, None, None, fs_cache
             

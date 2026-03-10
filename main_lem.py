@@ -33,7 +33,7 @@ if analysis_type == 'single_surface': # analyze the specified failure surface
 
 elif analysis_type == "auto_search": # automated search for critical surface
   if surface_type == "circular":
-    fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=diagnostic)
+    fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid_drawdown, num_slices=num_slices, diagnostic=diagnostic)
     plot_circular_search_results(slope_data, fs_cache, search_path, circle_cache=circle_cache, save_png=save_png)
   else:
     fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=diagnostic)

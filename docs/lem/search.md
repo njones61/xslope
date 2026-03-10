@@ -48,6 +48,10 @@ Geometric validity is strictly enforced through a series of constraints checked 
 
 Convergence is determined using an AND logic that requires both the change in factor of safety between iterations to fall below the specified tolerance (default 0.001) AND the movement distance to shrink below the movement tolerance (default 0.1). This dual criterion ensures that the algorithm has not only found a local minimum in terms of factor of safety but has also refined the surface position to a satisfactory precision. The maximum iteration limit (default 100) provides a safeguard against excessive computation time, though most searches converge well before reaching this limit.
 
+Once again, XSLOPE preserves the search results and all of the non-circular results tested can be plotted with the **plot_search_results** function.
+
+![alt text](sample_images/noncircular_search_results.png)
+
 ## Search Results Structure
 
 Both search algorithms return a consistent three-element tuple that provides comprehensive information about the optimization process: `(fs_cache, converged, search_path)`. This return structure is designed to support both immediate access to the critical failure surface and detailed post-processing analysis of the entire search trajectory.

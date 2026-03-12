@@ -261,7 +261,7 @@ def load_slope_data(filepath):
             "cp": _num(row.get('cp', 0)),
             "r_elev": _num(row.get('r-elev', 0)),
             "d": _num(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
-            "psi": _num(row.get('ψ', 0)) if pd.notna(row.get('ψ')) else 0,
+            "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
             "u": str(row.get('u', 'none')).strip().lower(),
             "sigma_gamma": _num(row.get('s(g)', 0)),
             "sigma_c": _num(row.get('s(c)', 0)),

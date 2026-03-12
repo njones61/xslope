@@ -74,7 +74,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
                 else:
                     df_slices, failure_surface = result
                     if rapid:
-                        solver_success, solver_result = rapid_drawdown(df_slices, method_name)
+                        solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
                     else:
                         solver_success, solver_result = solver(df_slices)
                     FS = solver_result['FS'] if solver_success else fs_fail
@@ -294,7 +294,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
             
         df_slices, failure_surface = result
         if rapid:
-            solver_success, solver_result = rapid_drawdown(df_slices, method_name)
+            solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
         else:
             solver_success, solver_result = solver(df_slices)
         FS = solver_result['FS'] if solver_success else float('inf')

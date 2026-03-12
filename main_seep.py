@@ -7,7 +7,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-input_file = "docs/inputs/seep/xslope_earth_dam_bc2.xlsx"
+input_file = "docs/lem/files/xslope_johnson_rapid_KEY.xlsx"
 input_path = Path(input_file)
 
 slope_data = load_slope_data(input_file)
@@ -40,7 +40,7 @@ plot_seep_data(seep_data, figsize=(12, 6), show_nodes=True, show_bc=True, label_
 solution = run_seepage_analysis(seep_data, tol=1e-4)
 
 plot_seep_solution(seep_data, solution, figsize=(12, 6), variable="head", vectors=False, flowlines=True, 
-                          mesh=False, levels=20, base_mat=2, fill_contours=False, phreatic=True, save_png=True)
+                          mesh=False, levels=20, base_mat=3, fill_contours=False, phreatic=True, save_png=True)
 
 # Save seep solution to CSV
 seep_file = input_path.parent / f"{input_path.stem}_seep.csv"
@@ -53,6 +53,6 @@ if slope_data.get("has_seepage_bc2"):
     plot_seep_data(seep_data2, figsize=(12, 6), show_nodes=True, show_bc=True, label_elements=False, label_nodes=False)
     solution2 = run_seepage_analysis(seep_data2, tol=1e-4)
     plot_seep_solution(seep_data2, solution2, figsize=(12, 6), variable="head", vectors=False, flowlines=True,
-                       mesh=False, levels=20, base_mat=2, fill_contours=False, phreatic=True, save_png=True)
+                       mesh=False, levels=20, base_mat=3, fill_contours=False, phreatic=True, save_png=True)
     seep_file2 = input_path.parent / f"{input_path.stem}_seep2.csv"
     export_seep_solution(seep_data2, solution2, seep_file2)

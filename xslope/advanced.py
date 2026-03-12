@@ -44,7 +44,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
     # Import solve module and get the method function
     from . import solve
     method_func = getattr(solve, method_name)
-    
+
+    # Validate that d and psi parameters are present for at least some slices
+    if (df['d'] == 0).all() and (df['psi'] == 0).all():
+        return False, "Rapid drawdown requires d and psi parameters for low-K materials. All values are zero — check your input template."
+
     if debug_level >= 1:
         print("=== RAPID DRAWDOWN ANALYSIS ===")
     
@@ -87,11 +91,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
     
     # Process each slice for undrained strength calculation
     for i in range(len(df)):
-        # Check if this slice has low-K material (d and psi are not zero)
+        # Check if this slice has low-K material (d or psi are not zero)
         d_val = df.iloc[i]['d']
         psi_val = df.iloc[i]['psi']
-        
-        if d_val > 0 and psi_val > 0:
+
+        if d_val > 0 or psi_val > 0:
             # Low-K material - calculate undrained strength
             if debug_level >= 2:
                 print(f"Processing low-K material for slice {i+1}")
@@ -188,7 +192,7 @@ def rapid_drawdown(df, method_name, debug_level=1):
         d_val = df.iloc[i]['d']
         psi_val = df.iloc[i]['psi']
         
-        if d_val > 0 and psi_val > 0:
+        if d_val > 0 or psi_val > 0:
             # This is a low-K material slice
             if 'n_eff' not in df.columns:
                 return False, "Stage 2 did not compute n_eff values"
@@ -225,6 +229,7 @@ def rapid_drawdown(df, method_name, debug_level=1):
             print(f"Stage 3 FS = {stage3_FS:.4f}")
     else:
         stage3_FS = stage2_FS
+        result_stage3 = result_stage2
         if debug_level >= 1:
             print("Stage 3: No drained strength adjustments needed")
     

@@ -506,6 +506,14 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     dloads2 = slope_data.get("dloads2", [])
     max_depth = slope_data["max_depth"]
 
+    # Warn once if seep pore pressure is selected but seep data is missing
+    has_seep_materials = any(m["u"] == "seep" for m in materials)
+    has_seep_data = 'mesh' in slope_data and slope_data['mesh'] is not None and 'seep_u' in slope_data
+    if has_seep_materials and not has_seep_data and not getattr(generate_slices, '_seep_warned', False):
+        print("WARNING: Seep pore pressure option selected but required seep files were not found. "
+              "Pore pressures will be set to zero for seep materials.")
+        generate_slices._seep_warned = True
+
     # Determine failure surface type
     if circle is not None:
         circular = True

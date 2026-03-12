@@ -300,19 +300,7 @@ def load_slope_data(filepath):
             solution1_filename = f"{base}_seep.csv"
             solution2_filename = f"{base}_seep2.csv"
 
-            missing_required = []
-            if mesh is None:
-                missing_required.append(mesh_filename)
-            if not os.path.exists(solution1_filename):
-                missing_required.append(solution1_filename)
-
-            if missing_required:
-                missing_list = ", ".join(f"'{path}'" for path in missing_required)
-                print(
-                    "WARNING: Seep pore pressure option selected but required seep files "
-                    f"were not found: {missing_list}. Continuing without seep data."
-                )
-            else:
+            if mesh is not None and os.path.exists(solution1_filename):
                 solution1_df = pd.read_csv(solution1_filename)
                 solution1_df = solution1_df.iloc[:-1]
                 seep_u = solution1_df["u"].to_numpy()

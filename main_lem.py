@@ -7,14 +7,14 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_johnson_rapid_KEY.xlsx")
+slope_data = load_slope_data("docs/lem/files/xslope_noncircular.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 30 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
-surface_type = "circular" # @param ["circular","non_circular"]
-rapid_drawdown = True # @param {"type":"boolean"}
+surface_type = "non_circular" # @param ["circular","non_circular"]
+rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
 diagnostic = False # @param {"type":"boolean"}

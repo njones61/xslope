@@ -212,7 +212,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path, circle_cache
 
-def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1):
+def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30):
     """
     Non-circular search using the specified solver.
     

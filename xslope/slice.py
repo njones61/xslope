@@ -492,10 +492,14 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         - Must specify exactly one of 'circle' or 'non_circ'.
     """
 
+    # Validate material properties
+    materials = slope_data["materials"]
+    if all(m.get('c', 0) == 0 and m.get('phi', 0) == 0 and m.get('gamma', 0) == 0 for m in materials):
+        return False, "All materials have empty strength properties (c, phi, gamma). Check your input template."
+
     # Unpack data
     profile_lines = slope_data["profile_lines"]
     ground_surface = slope_data["ground_surface"]
-    materials = slope_data["materials"]
     piezo_line = slope_data["piezo_line"]
     piezo_line2 = slope_data.get("piezo_line2", [])  # Second piezometric line
     gamma_w = slope_data["gamma_water"]

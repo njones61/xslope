@@ -18,7 +18,7 @@ import numpy as np
 from shapely.geometry import LineString, Point
 
 from . import solve
-from .advanced import rapid_drawdown
+from .advanced import rapid_drawdown, validate_rapid_drawdown
 from .slice import generate_slices, get_y_from_intersection
 
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
@@ -32,6 +32,9 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
         list of dict: search path
         list of dict: circle_cache - all circles tested during search
     """
+
+    if rapid:
+        validate_rapid_drawdown(slope_data)
 
     solver = getattr(solve, method_name)
     circle_cache = []  # Store ALL circles tested for plotting
@@ -242,6 +245,9 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         converged : bool indicating if search converged
         search_path : list of surfaces evaluated during search
     """
+    if rapid:
+        validate_rapid_drawdown(slope_data)
+
     # Get the solver function from solve module
     solver = getattr(solve, method_name)
     def move_point(points, i, dx, dy, movement_type, ground_surface, max_depth):

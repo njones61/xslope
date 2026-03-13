@@ -18,6 +18,33 @@ from scipy.stats import norm
 from tabulate import tabulate
 
 
+def validate_rapid_drawdown(slope_data):
+    """
+    Validates that slope_data has the required inputs for rapid drawdown analysis.
+    Prints warnings for missing optional inputs and raises ValueError for missing required inputs.
+    """
+    materials = slope_data['materials']
+
+    # Hard error: at least one material must have non-zero d or psi
+    has_d_psi = any(m.get('d', 0) != 0 or m.get('psi', 0) != 0 for m in materials)
+    if not has_d_psi:
+        raise ValueError("Rapid drawdown requires at least one material with non-zero d or psi values. Check your input template.")
+
+    # Warning: no second set of distributed loads
+    if not slope_data.get('dloads2'):
+        print("[WARNING] Rapid drawdown: no second set of distributed loads (dloads2) found.")
+
+    # Warning: piezo method selected but no second piezo line
+    has_piezo = any(m.get('u') == 'piezo' for m in materials)
+    if has_piezo and not slope_data.get('piezo_line2'):
+        print("[WARNING] Rapid drawdown: piezo method selected but no second piezo line found.")
+
+    # Warning: seep method selected but no second seep solution
+    has_seep = any(m.get('u') == 'seep' for m in materials)
+    if has_seep and 'seep_u2' not in slope_data:
+        print("[WARNING] Rapid drawdown: seep method selected but no second seep solution found.")
+
+
 def rapid_drawdown(df, method_name, debug_level=1):
     """
     Performs rapid drawdown analysis using a three-stage approach.

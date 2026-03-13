@@ -7,17 +7,20 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_earth_dam_rapid.xlsx")
+slope_data = load_slope_data("temp/xslope_earth_dam_down.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 30 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
-rapid_drawdown = True # @param {"type":"boolean"}
+rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
 diagnostic = False # @param {"type":"boolean"}
+
+# Change the seismic k value
+slope_data['k_seismic'] = 0.136
 
 if analysis_type == 'single_surface': # analyze the specified failure surface
   circle = slope_data['circles'][0] if slope_data['circular'] else None
@@ -50,7 +53,10 @@ elif analysis_type == "auto_search": # automated search for critical surface
     print(f"Stage 2 FS = {results['stage2_FS']:.4f}")
     print(f"Stage 3 FS = {results['stage3_FS']:.4f}")
     print(f"Final rapid drawdown FS = {results['FS']:.4f}")
-  plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
+  if results is None:
+    print(f"[⚠️] No valid solution found (FS=9999 for all surfaces). Check input parameters.")
+  else:
+    plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
 
 elif analysis_type == "reliability": # reliability analysis (supports both circular and non-circular)
   circular = (surface_type == "circular")

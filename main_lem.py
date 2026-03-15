@@ -7,7 +7,7 @@ from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("temp/xslope_earth_dam_down.xlsx")
+slope_data = load_slope_data("temp/xslope_tension_KEY.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
@@ -18,9 +18,6 @@ rapid_drawdown = False # @param {"type":"boolean"}
 reliability = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
 diagnostic = False # @param {"type":"boolean"}
-
-# Change the seismic k value
-slope_data['k_seismic'] = 0.136
 
 if analysis_type == 'single_surface': # analyze the specified failure surface
   circle = slope_data['circles'][0] if slope_data['circular'] else None

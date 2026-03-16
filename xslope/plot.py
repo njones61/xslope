@@ -2001,37 +2001,41 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     fs_cache = reliability_data['fs_cache']
     
     # Plot all failure surfaces
+    added_plus_legend = False
+    added_minus_legend = False
     for i, fs_data in enumerate(fs_cache):
         result = fs_data['result']
         name = fs_data['name']
         failure_surface = result['failure_surface']
-        
+
         # Convert failure surface to coordinates
         if hasattr(failure_surface, 'coords'):
             coords = list(failure_surface.coords)
         else:
             coords = failure_surface
-        
+
         x_coords = [pt[0] for pt in coords]
         y_coords = [pt[1] for pt in coords]
-        
+
         # Color and styling based on surface type
         if name == "MLV":
             # Highlight the MLV (critical) surface in red
-            ax.plot(x_coords, y_coords, color='red', linewidth=3, 
+            ax.plot(x_coords, y_coords, color='red', linewidth=3,
                    label=f'$F_{{MLV}}$ Surface (FS={result["FS"]:.3f})', zorder=10)
         else:
             # Other surfaces in different colors
             if '+' in name:
                 color = 'blue'
                 alpha = 0.7
-                label = f'$F^+$ ({name}) (FS={result["FS"]:.3f})'
+                label = '$F^+$ surfaces' if not added_plus_legend else None
+                added_plus_legend = True
             else:  # '-' in name
                 color = 'green'
                 alpha = 0.7
-                label = f'$F^-$ ({name}) (FS={result["FS"]:.3f})'
-            
-            ax.plot(x_coords, y_coords, color=color, linewidth=1.5, 
+                label = '$F^-$ surfaces' if not added_minus_legend else None
+                added_minus_legend = True
+
+            ax.plot(x_coords, y_coords, color=color, linewidth=1.5,
                    alpha=alpha, label=label, zorder=5)
 
 

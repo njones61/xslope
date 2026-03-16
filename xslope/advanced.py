@@ -314,7 +314,7 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
     if circular:
         if debug_level >= 1:
             print("Performing circular search...")
-        fs_cache, converged, search_path = circular_search(slope_data, method, rapid=rapid)
+        fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid)
     else:
         if debug_level >= 1:
             print("Performing noncircular search...")
@@ -392,8 +392,8 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         
         # Calculate F+ and F-
         if circular:
-            fs_cache_plus, _, _ = circular_search(slope_data_plus, method, rapid=rapid)
-            fs_cache_minus, _, _ = circular_search(slope_data_minus, method, rapid=rapid)
+            fs_cache_plus, _, _, _ = circular_search(slope_data_plus, method, rapid=rapid)
+            fs_cache_minus, _, _, _ = circular_search(slope_data_minus, method, rapid=rapid)
         else:
             fs_cache_plus, _, _ = noncircular_search(slope_data_plus, method, rapid=rapid)
             fs_cache_minus, _, _ = noncircular_search(slope_data_minus, method, rapid=rapid)

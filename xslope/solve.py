@@ -190,9 +190,8 @@ def oms(slice_df, debug=False):
     tan_phi   = np.tan(phi)            # tan(φᵢ)
 
     # ————————————————————————————————————————————————————————
-    # 5) Build the NUMERATOR = Σᵢ [  cᵢ·Δℓᵢ
-    #                               + (Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ )·tanφᵢ
-    #                               + pᵢ  ] + Σ  Dᵢ·sinβᵢ·(Yo - d_{y,i}) 
+    # 5) Build the NUMERATOR (Eqn 8) = Σᵢ [  cᵢ·Δℓᵢ
+    #       + (Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ )·tanφᵢ ]
     #
 
 
@@ -209,15 +208,15 @@ def oms(slice_df, debug=False):
     a_dy = Yo - d_y
     sum_Dy = np.sum(D * np.sin(beta) * a_dy)
 
-    numerator = np.sum(c * dl + N_eff * tan_phi + P)+ (1.0 / R) * sum_Dy
+    numerator = np.sum(c * dl + N_eff * tan_phi)
 
     # ————————————————————————————————————————————————————————
-    # 6) Build each piece of the DENOMINATOR exactly as Eqn 9:
+    # 6) Build each piece of the DENOMINATOR exactly as Eqn 8:
 
     #  (A) = Σ [ Wᵢ · sinαᵢ ]
     sum_W = np.sum(W * sin_alpha)
 
-    #  (B) = Σ  Dᵢ·cosβᵢ·(Xo - d_{x,i}) 
+    #  (B) = Σ  Dᵢ·cosβᵢ·(Xo - d_{x,i})
     a_dx = d_x - Xo
     sum_Dx = np.sum(D * np.cos(beta) * a_dx)
 
@@ -230,9 +229,12 @@ def oms(slice_df, debug=False):
     sum_T = np.sum(T * a_t)
 
     # Put them together with their 1/R factors:
-    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T)
+    # P and sum_Dy are known resisting forces, not factored by FS
+    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy
 
     # 7) Finally compute FS = (numerator)/(denominator)
+    if denominator <= 0:
+        return False, "Net driving moment is non-positive (resisting forces exceed driving forces)."
     FS = numerator / denominator
 
     # 8) Store effective normal forces in the DataFrame
@@ -312,6 +314,9 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     sum_kw = np.sum(kw * a_s)
     sum_T = np.sum(T * a_t)
     denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy
+
+    if denominator <= 0:
+        return False, "Net driving moment is non-positive (resisting forces exceed driving forces)."
 
     # Iterative solution
     F = 1.0

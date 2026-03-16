@@ -24,6 +24,9 @@ __pycache__/
 # Claude Code local settings
 .claude/settings.local.json
 
+# Excel temporary files
+~$*.xlsx
+
 # Build artifacts
 dist/
 build/

@@ -1479,6 +1479,32 @@ def plot_inputs(
         elif slope_data.get('non_circ') and len(slope_data['non_circ']) > 0:
             plot_non_circ(ax, slope_data['non_circ'])
 
+    # Seismic coefficient annotation
+    k_seismic = slope_data.get('k_seismic', 0.0)
+    if k_seismic and mode == "lem":
+        # Determine direction: k acts toward the toe (downslope)
+        gs = slope_data.get('ground_surface')
+        if gs is not None and not gs.is_empty:
+            coords = list(gs.coords)
+            y_left = coords[0][1]
+            y_right = coords[-1][1]
+            y_peak = max(c[1] for c in coords)
+            # Dam detection: both ends are substantially lower than the peak
+            threshold = 0.3 * (y_peak - min(y_left, y_right))
+            if (y_peak - y_left) > threshold and (y_peak - y_right) > threshold:
+                arrow = "\u2194"  # ↔  both faces
+            elif y_left > y_right:
+                arrow = "\u2192"  # →  toe on right
+            else:
+                arrow = "\u2190"  # ←  toe on left
+        else:
+            arrow = ""
+        k_text = f"k = {k_seismic:g} {arrow}".strip()
+        ax.text(0.98, 0.97, k_text, transform=ax.transAxes,
+                fontsize=10, fontweight='bold', ha='right', va='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
+                          edgecolor='orange', linewidth=1.0, alpha=0.9))
+
     # Handle material table display
     if mat_table:
         # Helpers to adapt slope_data materials into formats expected by table functions

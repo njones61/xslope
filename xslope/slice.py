@@ -868,7 +868,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         dload2, d_x2, d_y2 = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL2, qR2, dl_top)
 
         # Seismic force
-        kw = k_seismic * soil_weight
+        kw = abs(k_seismic) * soil_weight
 
         # === BEGIN : "Tension crack water force" ===
 

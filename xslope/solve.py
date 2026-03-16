@@ -391,15 +391,17 @@ def janbu(slice_df, debug=False):
     # Effective normal forces (Equation 10)
     N_eff = W * cos_alpha - kw * sin_alpha + D * cos_beta_alpha - T * sin_alpha - u * dl
 
-    # Numerator: resisting forces (shear resistance)
-    numerator = np.sum(c * dl + N_eff * tan_phi + P)
+    # Numerator: resisting forces (shear resistance only, Equation 13)
+    numerator = np.sum(c * dl + N_eff * tan_phi)
 
-    # Denominator: driving forces parallel to base (Equation 6)
-    denominator = np.sum(W * sin_alpha + kw * cos_alpha - D * sin_beta_alpha + T * cos_alpha)
+    # Denominator: driving forces minus known resisting forces (Equation 13)
+    # P is a known applied force (reinforcement), not shear strength, so it is
+    # subtracted from driving forces rather than added to the numerator.
+    denominator = np.sum(W * sin_alpha + kw * cos_alpha - D * sin_beta_alpha + T * cos_alpha) - np.sum(P)
 
-    # Base factor of safety (Equation 7)
-    if abs(denominator) < 1e-12:
-        return False, "Division by zero in Janbu method: driving forces sum to zero"
+    # Base factor of safety (Equation 13)
+    if denominator <= 0:
+        return False, "Net driving force is non-positive (resisting forces exceed driving forces)."
 
     FS_base = numerator / denominator
 

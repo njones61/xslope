@@ -86,7 +86,7 @@ To revise the factor of safety equation for Janbu's method to include the $D$, $
 
 >>$N'  = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell  \qquad (10)$
 
-The resisting force parallel to the base of the slice includes both the shear force $S$ and the reinforcement force $P$. The shear force is given by:
+The resisting force parallel to the base of the slice is the shear force $S$:
 
 >>$S = c \Delta \ell + N' \tan\phi$
 
@@ -98,9 +98,9 @@ Next, we need to update the driving force parallel to the base of the slice. Upd
 
 >>$W \sin \alpha + kW \cos \alpha  - D \sin (\beta - \alpha)  + T \cos \alpha   \qquad (12)$
 
-Finally, the factor of safety is founcd by substituting the updated resisting and driving forces into equation (6):
+The reinforcement force $P$ is a known applied force, not shear strength. It must not be divided by the factor of safety. Therefore, $P$ is subtracted from the driving forces in the denominator rather than added to the resisting forces in the numerator. The factor of safety is found by substituting the updated resisting and driving forces into equation (6):
 
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi\right] + P}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha))  + T \cos \alpha}   \qquad (13)$
+>>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P}   \qquad (13)$
 
 It should be remembered that $T$ only applies to the side of the uppermost slice. $T$ = 0  for all the other slices.
 

@@ -329,9 +329,8 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
         shear = (
             c * dl * cos_alpha
             + (W + D * cos_beta - P * sin_alpha - u * dl * cos_alpha) * tan_phi
-            + P
         )
-        numerator = np.sum(shear / denom_N) + (1.0 / R) * sum_Dy
+        numerator = np.sum(shear / denom_N + P) + (1.0 / R) * sum_Dy
         F_new = numerator / denominator
 
         if abs(F_new - F) < tol:

@@ -841,41 +841,59 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta
 
     
+    # Compute safe theta bounds to avoid m_alpha singularity.
+    # m_alpha = 1/(cos(α-θ) + sin(α-θ)·tan(φ)/F)
+    # Rewrite denominator as √(1+k²)·cos(α-θ-arctan(k)), k=tan_p/F.
+    # Positive when |α - θ - arctan(k)| < π/2, giving per-slice θ bounds.
+    def safe_theta_bounds(F_val, margin_deg=5):
+        margin = np.radians(margin_deg)
+        k = tan_p / F_val
+        offset = alpha - np.arctan(k)  # per-slice offset
+        lo = np.max(offset) - np.pi/2 + margin
+        hi = np.min(offset) + np.pi/2 - margin
+        if lo >= hi:
+            lo, hi = -np.pi/2, np.pi/2  # fallback if no valid range
+        return max(lo, -np.pi/2), min(hi, np.pi/2)
+
     # Initial guesses
     F0 = 1.5
+    theta_lo, theta_hi = safe_theta_bounds(F0)
     if right_facing:
-        theta0_rad = np.radians(-8.0) 
+        theta0_rad = np.radians(-8.0)
     else:
-        theta0_rad = np.radians(8) 
-    
+        theta0_rad = np.radians(8)
+    # Ensure initial theta is within safe bounds
+    if theta0_rad < theta_lo or theta0_rad > theta_hi:
+        theta0_rad = (theta_lo + theta_hi) / 2
+
     # Newton iteration
     F = F0
     theta_rad = theta0_rad
-    
+
     for iteration in range(max_iter):
         # Compute residuals
         R1, R2, Q, y_q = compute_residuals(F, theta_rad)
-        
+
         if debug_level >= 1:
             if iteration == 0:
                 print(f"Iteration {1} - Initial: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
             else:
                 print(f"Iteration {iteration + 1} - Updated: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
-        
+
         # Check convergence
         if abs(R1) < tol and abs(R2) < tol:
             if debug_level >= 1:
                 print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
             break
-        
+
         # Compute derivatives
         dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_derivatives(F, theta_rad, Q, y_q)
-        
+
         # Basic Newton method (Equations 31-32)
         # Build Jacobian matrix
-        J = np.array([[dR1_dF, dR1_dtheta], 
+        J = np.array([[dR1_dF, dR1_dtheta],
                       [dR2_dF, dR2_dtheta]])
-        
+
         # Check condition number for numerical stability
         try:
             cond_num = np.linalg.cond(J)
@@ -883,7 +901,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
                 return False, f"Ill-conditioned Jacobian matrix (condition number: {cond_num:.2e})"
         except:
             return False, "Unable to compute Jacobian condition number"
-        
+
         # Solve using matrix form for better numerical stability
         try:
             delta_solution = np.linalg.solve(J, np.array([-R1, -R2]))
@@ -898,13 +916,13 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         # Add step size control to prevent large jumps
         max_delta_F = 0.5  # Maximum allowed change in F per iteration
         max_delta_theta = np.radians(20)  # Maximum allowed change in theta per iteration (20 degrees)
-        
+
         # Apply step size limiting
         if abs(delta_F) > max_delta_F:
             delta_F = np.sign(delta_F) * max_delta_F
             if debug_level >= 1:
                 print(f"          Step limited: delta_F clamped to {delta_F:.3f}")
-                
+
         if abs(delta_theta) > max_delta_theta:
             delta_theta = np.sign(delta_theta) * max_delta_theta
             if debug_level >= 1:
@@ -913,13 +931,14 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         # Update values
         F += delta_F
         theta_rad += delta_theta
-        
+
         # Ensure F stays positive
         if F <= 0:
             F = 0.1
-        
-        # Limit theta to reasonable range
-        theta_rad = np.clip(theta_rad, -np.pi/2, np.pi/2)
+
+        # Limit theta to safe range (avoids m_alpha singularity)
+        theta_lo, theta_hi = safe_theta_bounds(F)
+        theta_rad = np.clip(theta_rad, theta_lo, theta_hi)
     
     # Check if we converged
     if iteration >= max_iter - 1:

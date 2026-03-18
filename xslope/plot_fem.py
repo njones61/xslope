@@ -1100,14 +1100,18 @@ def plot_reinforcement_forces(ax, fem_data, solution):
             # Inactive
             inactive_lines.append(coords)
 
-    # Draw inactive elements (gray, thin)
+    # Draw inactive elements (cyan, solid)
     if inactive_lines:
-        lc = LineCollection(inactive_lines, colors='#aaaaaa', linewidths=1.5, alpha=0.5, zorder=4)
+        lc_outline = LineCollection(inactive_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=3.9)
+        ax.add_collection(lc_outline)
+        lc = LineCollection(inactive_lines, colors='white', linewidths=3, alpha=0.9, zorder=4)
         ax.add_collection(lc)
-        ax.plot([], [], '-', color='#aaaaaa', linewidth=1.5, alpha=0.5, label='Inactive (no tension)')
+        ax.plot([], [], '-', color='white', linewidth=3, alpha=0.9, markeredgecolor='black', label='Inactive (no tension)')
 
     # Draw normal tension elements (force-colored)
     if normal_lines:
+        lc_outline = LineCollection(normal_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=4.9)
+        ax.add_collection(lc_outline)
         lc = LineCollection(normal_lines, colors=normal_colors, linewidths=3, alpha=0.9, zorder=5)
         ax.add_collection(lc)
 
@@ -1119,16 +1123,19 @@ def plot_reinforcement_forces(ax, fem_data, solution):
 
     # Draw elements at Tres (magenta)
     if tres_lines:
+        lc_outline = LineCollection(tres_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=5.9)
+        ax.add_collection(lc_outline)
         lc = LineCollection(tres_lines, colors='magenta', linewidths=3, alpha=0.9, zorder=6)
         ax.add_collection(lc)
         ax.plot([], [], '-', color='magenta', linewidth=3, label='At residual (Tres)')
 
-    # Draw pulled-out elements (dashed black outline)
+    # Draw pulled-out elements (orange, solid)
     if pullout_lines:
-        lc = LineCollection(pullout_lines, colors='black', linewidths=1.5, linestyles='dashed',
-                            alpha=0.7, zorder=6)
+        lc_outline = LineCollection(pullout_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=5.9)
+        ax.add_collection(lc_outline)
+        lc = LineCollection(pullout_lines, colors='black', linewidths=3, alpha=0.9, zorder=6)
         ax.add_collection(lc)
-        ax.plot([], [], '--', color='black', linewidth=1.5, alpha=0.7, label='Pulled out')
+        ax.plot([], [], '-', color='black', linewidth=3, alpha=0.9, label='Pulled out')
 
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()

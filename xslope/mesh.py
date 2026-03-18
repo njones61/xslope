@@ -1031,27 +1031,16 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
             new_elements.append(element.tolist())
             new_element_types.append(elem_type)
     
-    # Convert 1D elements to quadratic if present
+    # Keep 1D elements as linear (2-node). Truss stiffness uses only end nodes,
+    # so midside nodes add no physical fidelity and can cause singular K if they
+    # are not shared with a 2D element edge.
     new_elements_1d = []
-    new_element_types_1d = [] 
-    
+    new_element_types_1d = []
+
     if has_1d_elements:
         for elem_idx, element in enumerate(elements_1d):
-            elem_type = element_types_1d[elem_idx]
-            
-            if elem_type == 2:  # Convert linear 1D to quadratic
-                n0, n1 = element[0], element[1]
-                
-                # Get/create midside node (reuse if already created for 2D elements)
-                n2 = get_or_create_midside_node(n0, n1)
-                
-                new_element = [n0, n1, n2]
-                new_elements_1d.append(new_element)
-                new_element_types_1d.append(3)  # quadratic 1D
-            else:
-                # Keep original element unchanged
-                new_elements_1d.append(element.tolist())
-                new_element_types_1d.append(elem_type)
+            new_elements_1d.append(element.tolist())
+            new_element_types_1d.append(element_types_1d[elem_idx])
     
     if debug:
         print(f"  Added {len(midside_nodes)} midside nodes")

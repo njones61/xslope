@@ -440,19 +440,38 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             deform_scale = 1.0
     
     # Create subplots based on number of plot types
+    # When the first plot is 'deformation', add a thin extra row for its legend
     n_plots = len(plot_types)
-    if n_plots == 1:
-        fig, ax = plt.subplots(figsize=figsize)
-        axes = [ax]
-    else:
-        # For multiple plots, adjust height scaling and use tighter spacing
-        height_factor = min(0.8, 1.2 / n_plots)  # Reduce height factor for more plots
-        fig, axes = plt.subplots(n_plots, 1, figsize=(figsize[0], figsize[1] * n_plots * height_factor))
-        if n_plots == 1:  # Handle case where subplots returns single axis for n=1
-            axes = [axes]
-        
+    has_deform_legend = n_plots > 1 and plot_types[0] == 'deformation'
 
-    
+    if n_plots == 1:
+        fig, ax = plt.subplots(figsize=figsize, layout='constrained')
+        axes = [ax]
+        legend_ax = None
+    else:
+        height_factor = min(0.8, 1.2 / n_plots)
+        total_height = figsize[1] * n_plots * height_factor
+        if has_deform_legend:
+            # Add a thin row after the first plot for the legend
+            height_ratios = [1] + [0.08] + [1] * (n_plots - 1)
+            fig, all_axes = plt.subplots(n_plots + 1, 1,
+                                         figsize=(figsize[0], total_height),
+                                         layout='constrained',
+                                         gridspec_kw={'height_ratios': height_ratios})
+            axes = [all_axes[0]] + list(all_axes[2:])
+            legend_ax = all_axes[1]
+            legend_ax.set_axis_off()
+        else:
+            fig, axes = plt.subplots(n_plots, 1,
+                                     figsize=(figsize[0], total_height),
+                                     layout='constrained')
+            legend_ax = None
+        if not isinstance(axes, (list, np.ndarray)):
+            axes = [axes]
+        elif isinstance(axes, np.ndarray):
+            axes = list(axes)
+
+
     # Calculate overall mesh bounds for consistent axis limits
     nodes = fem_data["nodes"]
     x_min, x_max = np.min(nodes[:, 0]), np.max(nodes[:, 0])
@@ -505,9 +524,14 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
         ax.set_ylim(y_min - y_margin, y_max + y_margin)
         ax.set_aspect('equal')
-    
-    plt.tight_layout()
-    
+
+    # Place deformation legend in the dedicated legend row
+    if has_deform_legend and legend_ax is not None:
+        handles, labels = axes[0].get_legend_handles_labels()
+        if handles:
+            legend_ax.legend(handles, labels, loc='center', ncol=4, fontsize=10,
+                             frameon=False)
+
     if save_png:
         filename = 'fem_results.png'
         plt.savefig(filename, dpi=dpi, bbox_inches='tight')
@@ -913,8 +937,6 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     ax.set_title(title, fontsize=12, pad=15)
     ax.set_xlabel('x')
     ax.set_ylabel('y')
-    if show_mesh or show_reinforcement:
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2)
 
 
 def _add_element_labels(ax, fem_data):

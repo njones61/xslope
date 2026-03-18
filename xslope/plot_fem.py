@@ -197,6 +197,18 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
             plt.Line2D([0], [0], color=mat_to_color[mat], lw=4, label=label)
         )
 
+    # Plot 1D reinforcement elements
+    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+    if len(elements_1d) > 0:
+        for elem_idx in range(len(elements_1d)):
+            elem_nodes_1d = elements_1d[elem_idx]
+            n0 = nodes[elem_nodes_1d[0]]
+            n1 = nodes[elem_nodes_1d[1]]
+            ax.plot([n0[0], n1[0]], [n0[1], n1[1]], 'r-', linewidth=2.5, zorder=5)
+        legend_handles.append(
+            plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({len(elements_1d)} elements)')
+        )
+
     # Plot boundary conditions
     if show_bc:
         saved_roller_x = fem_data.get("roller_x_nodes", set())
@@ -236,14 +248,17 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     ax.set_aspect("equal")
     
     # Count element types for title
-    num_triangles = np.sum(element_types == 3)
-    num_quads = np.sum(element_types == 4)
-    if num_triangles > 0 and num_quads > 0:
-        title = f"FEM Mesh with Material Zones ({num_triangles} triangles, {num_quads} quads)"
-    elif num_quads > 0:
-        title = f"FEM Mesh with Material Zones ({num_quads} quadrilaterals)"
-    else:
-        title = f"FEM Mesh with Material Zones ({num_triangles} triangles)"
+    num_tri = np.sum((element_types == 3) | (element_types == 6))
+    num_quad = np.sum((element_types == 4) | (element_types == 8) | (element_types == 9))
+    num_1d = len(elements_1d)
+    parts = []
+    if num_tri > 0:
+        parts.append(f"{num_tri} triangles")
+    if num_quad > 0:
+        parts.append(f"{num_quad} quads")
+    if num_1d > 0:
+        parts.append(f"{num_1d} reinforcement")
+    title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
     ax.set_title(title)
     plt.tight_layout()

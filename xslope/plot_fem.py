@@ -1044,53 +1044,96 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, lin
 
 def plot_reinforcement_forces(ax, fem_data, solution):
     """
-    Plot reinforcement elements colored by force ratio (force/allowable).
+    Plot reinforcement elements colored by force level.
+
+    Color scheme:
+    - Blue to green to yellow to red: 0 to Tmax (tension force ramp)
+    - Magenta: element has yielded and is at residual capacity Tres
+    - White/open with dashed outline: element has pulled out (broken, T=0)
+    - Gray: element carrying no tension (inactive or in compression)
     """
     if 'elements_1d' not in fem_data:
         return
-    
+
+    from matplotlib.colors import LinearSegmentedColormap
+    import matplotlib.cm as cm
+
     nodes = fem_data["nodes"]
     elements_1d = fem_data["elements_1d"]
-    element_types_1d = fem_data["element_types_1d"]
     forces_1d = solution.get("forces_1d", np.zeros(len(elements_1d)))
     t_allow = fem_data.get("t_allow_by_1d_elem", np.ones(len(elements_1d)))
+    t_res = fem_data.get("t_res_by_1d_elem", np.zeros(len(elements_1d)))
     failed_1d = solution.get("failed_1d_elements", np.zeros(len(elements_1d), dtype=bool))
-    
-    lines = []
-    force_ratios = []
-    
-    for i, elem in enumerate(elements_1d):
-        elem_type = element_types_1d[i]
-        if elem_type >= 2:  # At least 2 nodes
-            line_coords = nodes[elem[:2]]
-            lines.append(line_coords)
-            
-            # Compute force ratio (force / allowable)
-            if t_allow[i] > 0:
-                force_ratio = abs(forces_1d[i]) / t_allow[i]
-            else:
-                force_ratio = 0.0
-            
-            # Cap at 1.5 for color scaling
-            force_ratios.append(min(force_ratio, 1.5))
-    
-    if lines:
-        # Create line collection with colors based on force ratio
-        lc = LineCollection(lines, linewidths=3, alpha=0.8)
-        lc.set_array(np.array(force_ratios))
-        lc.set_cmap('coolwarm')  # Blue = low force, Red = high force
+
+    # Find global Tmax (max of all t_allow values)
+    t_max_global = t_allow.max() if len(t_allow) > 0 else 1.0
+
+    # Custom colormap: blue -> green -> yellow -> red
+    force_cmap = LinearSegmentedColormap.from_list(
+        'force_ramp', ['#2166ac', '#1a9850', '#fee08b', '#d73027'], N=256)
+
+    # Classify and draw each element
+    normal_lines = []
+    normal_colors = []
+    tres_lines = []
+    pullout_lines = []
+    inactive_lines = []
+
+    for i in range(len(elements_1d)):
+        elem = elements_1d[i]
+        coords = nodes[elem[:2]]
+        force = forces_1d[i]
+        is_failed = failed_1d[i]
+
+        if is_failed and t_res[i] < 1e-6 and force < 1e-6:
+            # Pulled out / broken — no residual capacity
+            pullout_lines.append(coords)
+        elif is_failed and t_res[i] > 1e-6:
+            # At residual capacity
+            tres_lines.append(coords)
+        elif force > 1e-6:
+            # Normal tension — color by force/Tmax
+            ratio = min(force / t_max_global, 1.0) if t_max_global > 0 else 0.0
+            normal_lines.append(coords)
+            normal_colors.append(force_cmap(ratio))
+        else:
+            # Inactive
+            inactive_lines.append(coords)
+
+    # Draw inactive elements (gray, thin)
+    if inactive_lines:
+        lc = LineCollection(inactive_lines, colors='#aaaaaa', linewidths=1.5, alpha=0.5, zorder=4)
         ax.add_collection(lc)
-        
-        # Colorbar for reinforcement forces
-        cbar = plt.colorbar(lc, ax=ax, shrink=0.6, pad=0.02)
-        cbar.set_label('Force Ratio (Force/Allowable)', rotation=270, labelpad=15, fontsize=10)
-        
-        # Mark failed elements with thick black outline
-        if np.any(failed_1d):
-            failed_lines = [lines[i] for i in range(len(lines)) if i < len(failed_1d) and failed_1d[i]]
-            if failed_lines:
-                lc_failed = LineCollection(failed_lines, colors='black', linewidths=5, alpha=0.6)
-                ax.add_collection(lc_failed)
+        ax.plot([], [], '-', color='#aaaaaa', linewidth=1.5, alpha=0.5, label='Inactive (no tension)')
+
+    # Draw normal tension elements (force-colored)
+    if normal_lines:
+        lc = LineCollection(normal_lines, colors=normal_colors, linewidths=3, alpha=0.9, zorder=5)
+        ax.add_collection(lc)
+
+        # Add colorbar
+        sm = cm.ScalarMappable(cmap=force_cmap, norm=plt.Normalize(0, t_max_global))
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+        cbar.set_label('Reinforcement Force', rotation=270, labelpad=15, fontsize=10)
+
+    # Draw elements at Tres (magenta)
+    if tres_lines:
+        lc = LineCollection(tres_lines, colors='magenta', linewidths=3, alpha=0.9, zorder=6)
+        ax.add_collection(lc)
+        ax.plot([], [], '-', color='magenta', linewidth=3, label='At residual (Tres)')
+
+    # Draw pulled-out elements (dashed black outline)
+    if pullout_lines:
+        lc = LineCollection(pullout_lines, colors='black', linewidths=1.5, linestyles='dashed',
+                            alpha=0.7, zorder=6)
+        ax.add_collection(lc)
+        ax.plot([], [], '--', color='black', linewidth=1.5, alpha=0.7, label='Pulled out')
+
+    # Add legend if any special states exist
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
 
 
 def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_png=False, dpi=300):
@@ -1299,8 +1342,12 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
             return
 
     _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
-                        False, show_reinforcement, cbar_shrink, cbar_labelpad,
+                        False, False, cbar_shrink, cbar_labelpad,
                         colormap='coolwarm', label_elements=label_elements)
+
+    # Draw reinforcement with force-based coloring
+    if show_reinforcement and 'elements_1d' in fem_data:
+        plot_reinforcement_forces(ax, fem_data, solution)
 
     F = solution.get("F", None)
     title = 'Viscoplastic Shear Strain'
@@ -1649,8 +1696,8 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
         cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap)
         
         # Add colorbar
-        cbar = plt.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.05)
-        cbar.set_label(label, rotation=270, labelpad=cbar_labelpad)
+        cbar = plt.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
+        cbar.set_label(label, rotation=270, labelpad=20)
     else:
         # Uniform values - just color all elements the same
         uniform_color = plt.get_cmap(colormap)(0.5)

@@ -617,15 +617,22 @@ they either yield plastically to a residual strength $T_{res}$, or fail complete
 accurately 
 reflects the behavior of flexible reinforcement materials like geotextiles and ensures that the reinforcement cannot resist compressive buckling. The truss elements are oriented along the centerline of the physical reinforcement and connected to the surrounding soil elements through shared nodes. This connection ensures that the reinforcement participates in the overall deformation pattern of the slope while contributing its tensile resistance to improve stability.
 
-Truss elements are incorporated into the XSLOPE finite element mesh by passing the geometry of the reinforcement 
-lines from the input template to the mesh generation process. The reinforcement lines are discretized into multiple 
-truss elements based on the specified mesh density (target_size). The 1D elements are fully integrated with the 2D 
-elements - each 1D element corresponds to the edge of two adjacent 2D elements and both the 1D and 2D elements share 
-the same nodes. The 1D elements have their own set of material properties corresponding to the properties of the 
-corresponding reinforcement lines input by the user and include $T_{max}$, $T_{res}$, $E$, and cross-sectional area 
-$A$. 
-The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil 
-reinforcement are documented in the [Automated Mesh Generation](mesh.md) page. 
+Truss elements are incorporated into the XSLOPE finite element mesh by passing the geometry of the reinforcement
+lines from the input template to the mesh generation process. The reinforcement lines are discretized into multiple
+truss elements based on the specified mesh density (target_size). The 1D elements are fully integrated with the 2D
+elements - each 1D element corresponds to the edge of two adjacent 2D elements and both the 1D and 2D elements share
+the same nodes. The 1D elements have their own set of material properties corresponding to the properties of the
+corresponding reinforcement lines input by the user and include $T_{max}$, $T_{res}$, $E$, and cross-sectional area
+$A$.
+
+Only the two end nodes of each 1D element are used for computing truss stiffness and axial forces. When the mesh uses
+quadratic (8-node) 2D elements, the 1D elements may have a mid-side node shared with the adjacent 2D elements. This
+mid-node participates in the 2D element shape functions for displacement interpolation but is ignored for the truss
+element formulation. A 2-node linear truss element is exact for a prismatic bar with constant axial stiffness, so
+the quadratic interpolation adds no physical fidelity for the 1D element.
+
+The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil
+reinforcement are documented in the [Automated Mesh Generation](mesh.md) page.
 
 ### Mathematical Formulation
 
@@ -653,23 +660,23 @@ For a truss element oriented at angle $\theta$ to the horizontal:
 
 ### Force Behavior and Failure Modes
 
-The forces and failure modes in 1D truss elements are analyzed in an iterative fashion. In general, each truss element 
-has a maximum allowable tensile capacity $T_{allow}$ and a residual tensile capacity $T_{res}$ derived from the 
-user-specified reinforcement parameter inputs. The force in each element is calculated as $T = A*E/L$ as described above until the tensile force meets or exceeds $T_{allow}$ at which point it is converted to $T_{res}$. These two parameters can be adapted to simulate a variety of  behaviors and failure modes, depending on the reinforcement material and loading conditions:
+The forces and failure modes in 1D truss elements are analyzed in an iterative fashion. In general, each truss element
+has a maximum allowable tensile capacity $T_{allow}$ and a residual tensile capacity $T_{res}$ derived from the
+user-specified reinforcement parameter inputs. The axial force in each element is calculated as $T = (AE/L) \cdot \delta$, where $\delta$ is the element elongation (the component of relative nodal displacement along the element axis). When the tensile force meets or exceeds $T_{allow}$, the element's effective capacity drops to $T_{res}$. These two parameters can be adapted to simulate a variety of behaviors and failure modes, depending on the reinforcement material and loading conditions:
 
 **Complete Failure Model:**
 
-A complete failure model is appropriate for brittle materials (some steel cables, fiber reinforcement). 
+A complete failure model is appropriate for brittle materials (some steel cables, fiber reinforcement).
 
-- When $T > T_{allow}$, the element fails completely and is removed from the stiffness matrix<br>
+- When $T > T_{allow}$, the element's effective force is capped at zero via body-force corrections<br>
 - This is simulated by setting $T_{res} = 0$ in the input for the reinforcement line
 
 **Peak-Residual Model:**
 
-This model is appropriate for ductile materials (geotextiles, some geosynthetics) and is the most common scenario. 
+This model is appropriate for ductile materials (geotextiles, some geosynthetics) and is the most common scenario.
 
-- When $T > T_{allow}$, the element capacity drops to a residual strength $T_{residual}$<br>
-- The element remains active but with reduced stiffness: $E_{residual} = E \times (T_{residual}/T_{allow})$<br>
+- When $T > T_{allow}$, the element's effective force is capped at $T_{res}$ via body-force corrections<br>
+- The element remains in the stiffness matrix at full elastic stiffness, but corrective forces prevent it from carrying more than $T_{res}$<br>
 - Typical residual strength ratios for geosynthetics: $T_{residual}/T_{allow} = 0.3-0.7$
 
 **Pullout Failure Model:**
@@ -685,11 +692,57 @@ For each reinforcement line, it is assume that the tension force in the reinforc
 
 **Tension-Only Behavior:** 
 
-Truss elements are restricted to carry only tension forces. This is implemented by:
+Truss elements are restricted to carry only tension forces. This is implemented through body-force corrections within the viscoplastic iteration loop:
 
-- Checking element force after each iteration<br>
-- If compression develops, remove the element's stiffness contribution<br>
-- Reanalyze until equilibrium is achieved with only tension-carrying elements
+- After each iteration, the axial force in each element is computed from the current displacement field<br>
+- If compression develops ($T < 0$), a corrective body force is applied that cancels the compressive force<br>
+- The element remains in the stiffness matrix at full elastic stiffness; the correction enters through the load vector<br>
+- This approach is consistent with the viscoplastic initial-stiffness method used for soil elements, where the stiffness matrix is factored once and all nonlinearity is driven through load corrections
+
+### Integration with Viscoplastic Iteration
+
+The 1D truss element nonlinearity (tension-only behavior, capacity limits, and failure) is handled through body-force
+corrections within the Griffiths & Lane (1999) viscoplastic iteration loop, using the same initial-stiffness approach
+that governs the 2D soil elements. The key principle is that the global stiffness matrix $[K]$ is assembled once with
+the full elastic stiffness of all elements (both 2D soil and 1D truss) and pre-factored for efficient repeated solves.
+All nonlinear behavior is then driven entirely through corrections to the right-hand-side load vector.
+
+**Assembly:** The global stiffness matrix includes contributions from both 2D soil elements and 1D truss elements:
+
+>>$[K]_{global} = \sum_{soil} [K_e]_{soil} + \sum_{truss} [K_e]_{truss}$
+
+This matrix is factored once (via sparse LU decomposition) and reused for all viscoplastic iterations.
+
+**Iteration procedure:** At each viscoplastic iteration, after solving for the updated displacement field $\{u\}$:
+
+1. For each 1D truss element, compute the axial force from the current displacements:
+>>$\delta = (u_{x,j} - u_{x,i})\cos\theta + (u_{y,j} - u_{y,i})\sin\theta$
+>>$T = \dfrac{AE}{L} \cdot \delta$
+
+2. Determine whether a correction is needed:
+>>- If $T < 0$ (compression): set $\Delta T = -T$ (cancel the compressive force entirely)
+>>- If $T > T_{allow}$ and the element has not previously failed: mark the element as failed and set $\Delta T = T_{res} - T$
+>>- If $T > T_{res}$ and the element has previously failed: set $\Delta T = T_{res} - T$
+>>- Otherwise: no correction ($\Delta T = 0$)
+
+3. Convert the axial force correction to equivalent nodal forces and add to the load vector:
+>>$\{F\}_{correction} = \Delta T \begin{Bmatrix} -\cos\theta \\ -\sin\theta \\ \cos\theta \\ \sin\theta \end{Bmatrix}$
+
+These corrections are added to the same load vector that receives the soil viscoplastic strain corrections ($[B]^T [D] \{\varepsilon_{vp}\}$). The factored stiffness matrix then solves the corrected system, and the process repeats until convergence.
+
+**Failure irreversibility:** Once an element is marked as failed (having exceeded $T_{allow}$), it remains failed for all subsequent iterations within that analysis. Its effective capacity permanently drops from $T_{allow}$ to $T_{res}$. This models the irreversible nature of material yielding or pullout failure.
+
+### Strength Reduction and Reinforcement
+
+In the Shear Strength Reduction Method (SSRM), only the soil shear strength parameters $c$ and $\tan\phi$ are reduced
+by the strength reduction factor $F$. The reinforcement properties ($T_{max}$, $T_{res}$, $E$, $A$) are held constant
+throughout the SSRM bisection. The resulting factor of safety represents the margin of safety in the soil strength,
+given the structural reinforcement as-designed. This follows standard practice (Duncan & Wright, 2005) where
+reinforcement capacity is treated as a structural property independent of the soil strength reduction.
+
+This also means that the truss element contributions to the global stiffness matrix do not change between SSRM
+bisection steps — only the soil yield parameters change — so the same pre-factored stiffness matrix approach remains
+efficient.
 
 ### Reinforcement Line Input Parameters and Element Properties
 
@@ -720,7 +773,7 @@ Element stiffness: $K_e = AE/L$ (where L varies based on element length)<br>
 
 2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity based on the following logic:
 
->>For an element whose center is at distance $d$ from the nearest end:
+>>For an element whose center is at distance $d$ from the nearest reinforcement end, where $L_p$ is the pullout length corresponding to that end ($L_{p1}$ if nearest to end 1, $L_{p2}$ if nearest to end 2):
 >>
 >>$T_{allow} = \begin{cases}
 T_{max} \cdot \dfrac{d}{L_p} & \text{if } d < L_p \\
@@ -733,7 +786,7 @@ T_{max} & \text{if } d \geq L_p
 T_{residual} & \text{if } d \geq L_p
 \end{cases}$
 
-This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. For the residual capacity, if $d < L_p$, the residual capicity is set to zero because it is assumed that a pullout failure is sudden and complete and there is no residual capacity. If  $d \geq L_p$, the residual strength specified by the user for the element is used. 
+This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid. For the residual capacity, if $d < L_p$, the residual capacity is set to zero because it is assumed that a pullout failure is sudden and complete and there is no residual capacity. If $d \geq L_p$, the residual strength specified by the user for the element is used.
 
 ### Determining Reinforcement Line Pullout Lengths
 

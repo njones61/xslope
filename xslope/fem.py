@@ -76,6 +76,10 @@ def build_fem_data(slope_data, mesh=None):
             - t_allow_by_1d_elem: np.ndarray (n_1d_elements,) of maximum tensile forces for reinforcement lines
             - t_res_by_1d_elem: np.ndarray (n_1d_elements,) of residual tensile forces for reinforcement lines
             - k_by_1d_elem: np.ndarray (n_1d_elements,) of axial stiffness values for reinforcement lines
+            - cos_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (x) for each 1D element
+            - sin_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (y) for each 1D element
+            - dof_indices_1d: np.ndarray (n_1d_elements, 4) of global DOF indices [2*n0, 2*n0+1, 2*n1, 2*n1+1]
+            - K_global_1d_elems: list of np.ndarray (4, 4) global stiffness matrices for each 1D element
             - unit_weight: float, unit weight of water
             - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
     """
@@ -246,44 +250,61 @@ def build_fem_data(slope_data, mesh=None):
     t_allow_by_1d_elem = np.zeros(n_1d_elements)
     t_res_by_1d_elem = np.zeros(n_1d_elements)
     k_by_1d_elem = np.zeros(n_1d_elements)
-    
+    cos_theta_1d = np.zeros(n_1d_elements)
+    sin_theta_1d = np.zeros(n_1d_elements)
+    dof_indices_1d = np.zeros((n_1d_elements, 4), dtype=int)
+    K_global_1d_elems = []
+
     if n_1d_elements > 0 and "reinforcement_lines" in slope_data:
         reinforcement_lines = slope_data["reinforcement_lines"]
-        
+
         for elem_idx in range(n_1d_elements):
             line_id = element_materials_1d[elem_idx] - 1  # Convert to 0-based
-            
+
             if line_id < len(reinforcement_lines):
                 line_data = reinforcement_lines[line_id]
-                
-                # Get element geometry
-                elem_nodes = elements_1d[elem_idx]
-                elem_type = element_types_1d[elem_idx]
-                active_nodes = elem_nodes[:elem_type]
-                elem_coords = nodes[active_nodes]
-                
-                # Compute element length and centroid
-                if len(elem_coords) >= 2:
-                    elem_length = np.linalg.norm(elem_coords[1] - elem_coords[0])
-                    elem_centroid = np.mean(elem_coords, axis=0)
-                    
+
+                # Get element geometry — use only end nodes [0] and [1],
+                # ignore mid-node for quadratic elements
+                elem_nodes_1d = elements_1d[elem_idx]
+                node_0 = elem_nodes_1d[0]
+                node_1 = elem_nodes_1d[1]
+                coord_0 = nodes[node_0]
+                coord_1 = nodes[node_1]
+
+                # Compute element length from end nodes
+                dx = coord_1[0] - coord_0[0]
+                dy = coord_1[1] - coord_0[1]
+                elem_length = np.sqrt(dx * dx + dy * dy)
+                elem_centroid = 0.5 * (coord_0 + coord_1)
+
+                if elem_length > 1e-12:
+                    # Direction cosines
+                    cos_t = dx / elem_length
+                    sin_t = dy / elem_length
+                    cos_theta_1d[elem_idx] = cos_t
+                    sin_theta_1d[elem_idx] = sin_t
+
+                    # DOF indices for end nodes (4 DOFs total)
+                    dof_indices_1d[elem_idx] = [2*node_0, 2*node_0+1, 2*node_1, 2*node_1+1]
+
                     # Compute distance from element centroid to line ends
                     x1, y1 = line_data.get("x1", 0), line_data.get("y1", 0)
                     x2, y2 = line_data.get("x2", 0), line_data.get("y2", 0)
-                    
+
                     dist_to_left = np.linalg.norm(elem_centroid - [x1, y1])
                     dist_to_right = np.linalg.norm(elem_centroid - [x2, y2])
                     dist_to_nearest_end = min(dist_to_left, dist_to_right)
-                    
+
                     # Get reinforcement properties
                     t_max = line_data.get("t_max", 0.0)
                     t_res = line_data.get("t_res", 0.0)
                     lp1 = line_data.get("lp1", 0.0)  # Pullout length left end
                     lp2 = line_data.get("lp2", 0.0)  # Pullout length right end
-                    
+
                     # Use appropriate pullout length based on which end is closer
                     lp = lp1 if dist_to_left < dist_to_right else lp2
-                    
+
                     # Compute allowable and residual tensile forces
                     if dist_to_nearest_end < lp:
                         # Within pullout zone - linear variation
@@ -293,11 +314,31 @@ def build_fem_data(slope_data, mesh=None):
                         # Beyond pullout zone - full capacity
                         t_allow_by_1d_elem[elem_idx] = t_max
                         t_res_by_1d_elem[elem_idx] = t_res
-                    
+
                     # Compute axial stiffness
                     E = line_data.get("E", 2e11)  # Steel default
                     A = line_data.get("area", 1e-4)  # Default area
-                    k_by_1d_elem[elem_idx] = E * A / elem_length
+                    k_val = E * A / elem_length
+                    k_by_1d_elem[elem_idx] = k_val
+
+                    # Build 4x4 truss element stiffness matrix in global coordinates
+                    # T = [[cos, sin, 0, 0], [0, 0, cos, sin]]  (2x4)
+                    # K_local = k * [[1, -1], [-1, 1]]           (2x2)
+                    # K_global_elem = T^T @ K_local @ T          (4x4)
+                    c2 = cos_t * cos_t
+                    cs = cos_t * sin_t
+                    s2 = sin_t * sin_t
+                    K_global_elem = k_val * np.array([
+                        [ c2,  cs, -c2, -cs],
+                        [ cs,  s2, -cs, -s2],
+                        [-c2, -cs,  c2,  cs],
+                        [-cs, -s2,  cs,  s2]
+                    ])
+                    K_global_1d_elems.append(K_global_elem)
+                else:
+                    K_global_1d_elems.append(np.zeros((4, 4)))
+            else:
+                K_global_1d_elems.append(np.zeros((4, 4)))
     
     # Set up boundary conditions
     
@@ -473,6 +514,10 @@ def build_fem_data(slope_data, mesh=None):
         "t_allow_by_1d_elem": t_allow_by_1d_elem,
         "t_res_by_1d_elem": t_res_by_1d_elem,
         "k_by_1d_elem": k_by_1d_elem,
+        "cos_theta_1d": cos_theta_1d,
+        "sin_theta_1d": sin_theta_1d,
+        "dof_indices_1d": dof_indices_1d,
+        "K_global_1d_elems": K_global_1d_elems,
         "unit_weight": unit_weight,
         "k_seismic": k_seismic,
         "pp_option": pp_option,
@@ -533,6 +578,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             - strains (ndarray): Element strain array (n_elements, 4) [eps_x, eps_y, gamma_xy, max_shear]
             - plastic_elements (ndarray): Boolean array of yielded elements
             - F (float): Applied strength reduction factor
+            - forces_1d (ndarray): Final axial forces in 1D truss elements (empty if none)
+            - failed_1d_elements (ndarray): Boolean array of failed 1D elements (empty if none)
     """
 
     if debug_level >= 1:
@@ -562,6 +609,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
     n_dof = 2 * n_nodes
 
     # Apply strength reduction (Griffiths & Lane 1999): c_r = c/F, phi_r = atan(tan(phi)/F)
+    # Note: Only soil strength (c, phi) is reduced by F. Reinforcement properties
+    # (T_allow, T_res, EA/L) are NOT reduced — they are structural capacities.
     c_reduced = c_by_elem / F
     tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F
     phi_reduced = np.arctan(tan_phi_reduced)  # radians
@@ -570,9 +619,30 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
         print(f"  phi: {phi_by_elem[0]:.1f} -> {np.degrees(phi_reduced[0]):.1f}")
 
-    # ---- Step 1: Build K_global (elastic, constant) ----
+    # Extract 1D truss element data
+    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+    n_1d_elements = len(elements_1d)
+    has_1d_elements = n_1d_elements > 0
+
+    if has_1d_elements:
+        k_by_1d_elem = fem_data["k_by_1d_elem"]
+        t_allow_by_1d_elem = fem_data["t_allow_by_1d_elem"]
+        t_res_by_1d_elem = fem_data["t_res_by_1d_elem"]
+        cos_theta_1d = fem_data["cos_theta_1d"]
+        sin_theta_1d = fem_data["sin_theta_1d"]
+        dof_indices_1d = fem_data["dof_indices_1d"]
+
+        # Tracking arrays for 1D element status
+        forces_1d = np.zeros(n_1d_elements)
+        failed_1d = np.zeros(n_1d_elements, dtype=bool)
+
+        if debug_level >= 1:
+            print(f"  1D truss elements: {n_1d_elements}")
+
+    # ---- Step 1: Build K_global (elastic, constant — includes 2D soil + 1D truss) ----
     K_global = build_global_stiffness(nodes, elements, element_types,
-                                      element_materials, E_by_mat, nu_by_mat)
+                                      element_materials, E_by_mat, nu_by_mat,
+                                      fem_data=fem_data)
 
     # ---- Step 2: Build gravity load vector ----
     F_gravity = build_gravity_loads(nodes, elements, element_types,
@@ -820,6 +890,63 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                     correction = B.T @ (D @ evp_gp) * weight
                     loads[dof_idx] += correction
 
+        # ---- 1D Truss element body-force corrections ----
+        if has_1d_elements:
+            n_1d_compression = 0
+            n_1d_exceeded = 0
+
+            for elem_idx_1d in range(n_1d_elements):
+                dof_idx = dof_indices_1d[elem_idx_1d]
+                k = k_by_1d_elem[elem_idx_1d]
+                cos_t = cos_theta_1d[elem_idx_1d]
+                sin_t = sin_theta_1d[elem_idx_1d]
+
+                # Relative displacement projected along element axis
+                u_elem = u[dof_idx]  # [u_x0, u_y0, u_x1, u_y1]
+                du_x = u_elem[2] - u_elem[0]
+                du_y = u_elem[3] - u_elem[1]
+                delta = du_x * cos_t + du_y * sin_t
+
+                # Axial force: T = k * delta (positive = tension)
+                T = k * delta
+                forces_1d[elem_idx_1d] = T
+
+                # Determine effective capacity
+                if failed_1d[elem_idx_1d]:
+                    T_cap = t_res_by_1d_elem[elem_idx_1d]
+                else:
+                    T_cap = t_allow_by_1d_elem[elem_idx_1d]
+
+                # Check violations and compute correction
+                correction_T = 0.0
+
+                if T < 0:
+                    # Compression: cancel it entirely
+                    correction_T = -T
+                    n_1d_compression += 1
+                elif T > T_cap:
+                    if not failed_1d[elem_idx_1d]:
+                        # First time exceeding T_allow: mark as failed
+                        failed_1d[elem_idx_1d] = True
+                        T_cap = t_res_by_1d_elem[elem_idx_1d]
+                    # Reduce force to T_cap
+                    correction_T = T_cap - T
+                    n_1d_exceeded += 1
+
+                if abs(correction_T) > 1e-30:
+                    # Convert axial correction to nodal forces:
+                    # Internal force pattern for tension T: [-cos, -sin, +cos, +sin]
+                    # correction_T acts as additional axial force along element
+                    loads[dof_idx[0]] += correction_T * (-cos_t)
+                    loads[dof_idx[1]] += correction_T * (-sin_t)
+                    loads[dof_idx[2]] += correction_T * cos_t
+                    loads[dof_idx[3]] += correction_T * sin_t
+
+            if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
+                print(f"    1D elements: {n_1d_compression} in compression, "
+                      f"{n_1d_exceeded} exceeded capacity, "
+                      f"{np.sum(failed_1d)} total failed")
+
         # Compute unbalanced force ratio: ||VP corrections|| / ||F_gravity||
         # This measures how far the system is from force equilibrium.
         if norm_F_gravity > 1e-30:
@@ -922,12 +1049,41 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             gp_shear += sqrt(((eps_x - eps_y) / 2)**2 + (gamma_xy / 2)**2)
         vp_shear_strain[elem_idx] = gp_shear / n_gp
 
+    # ---- Step 10b: Compute final 1D truss element forces ----
+    if has_1d_elements:
+        for elem_idx_1d in range(n_1d_elements):
+            dof_idx = dof_indices_1d[elem_idx_1d]
+            k = k_by_1d_elem[elem_idx_1d]
+            cos_t = cos_theta_1d[elem_idx_1d]
+            sin_t = sin_theta_1d[elem_idx_1d]
+
+            u_elem = u[dof_idx]
+            du_x = u_elem[2] - u_elem[0]
+            du_y = u_elem[3] - u_elem[1]
+            delta = du_x * cos_t + du_y * sin_t
+            T = k * delta
+
+            # Apply constraints to final reported force
+            if failed_1d[elem_idx_1d]:
+                T = min(T, t_res_by_1d_elem[elem_idx_1d])
+            else:
+                T = min(T, t_allow_by_1d_elem[elem_idx_1d])
+            T = max(T, 0.0)  # No compression
+
+            forces_1d[elem_idx_1d] = T
+
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
         print(f"  Plastic elements: {n_plastic}/{n_elements}")
         print(f"  Max displacement: {np.max(np.abs(u)):.6f}")
         print(f"  Max VP shear strain: {np.max(vp_shear_strain):.6e}")
         print(f"  Unbalanced force ratio: {unbalanced_force_ratio:.3e}")
+        if has_1d_elements:
+            max_force = np.max(forces_1d) if n_1d_elements > 0 else 0.0
+            n_failed = np.sum(failed_1d)
+            n_active = np.sum(forces_1d > 0)
+            print(f"  1D elements: {n_active} active, {n_failed} failed, "
+                  f"max force = {max_force:.2f}")
 
     return {
         "converged": converged,
@@ -946,6 +1102,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         "residual": relative_change if 'relative_change' in locals() else 0.0,
         "unbalanced_force_ratio": unbalanced_force_ratio,
         "plastic_fraction": n_plastic / n_elements if n_elements > 0 else 0.0,
+        "forces_1d": forces_1d if has_1d_elements else np.array([]),
+        "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
     }
 
 
@@ -1534,9 +1692,9 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     }
 
 
-def build_global_stiffness(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat):
+def build_global_stiffness(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat, fem_data=None):
     """
-    Build global stiffness matrix using existing FE implementation for proper 8-node quad support.
+    Build global stiffness matrix from 2D soil elements and (optionally) 1D truss elements.
     """
     # Use existing stiffness functions (now they are in this same file after consolidation)
     
@@ -1590,7 +1748,20 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
                         
                         if local_i < K_elem.shape[0] and local_j < K_elem.shape[1]:
                             K_global[global_i, global_j] += K_elem[local_i, local_j]
-    
+
+    # Assemble 1D truss element stiffness matrices
+    if fem_data is not None:
+        K_global_1d_elems = fem_data.get("K_global_1d_elems", [])
+        dof_indices_1d = fem_data.get("dof_indices_1d", np.zeros((0, 4), dtype=int))
+
+        for elem_idx_1d in range(len(K_global_1d_elems)):
+            K_elem_1d = K_global_1d_elems[elem_idx_1d]
+            dof_idx = dof_indices_1d[elem_idx_1d]
+
+            for i in range(4):
+                for j in range(4):
+                    K_global[dof_idx[i], dof_idx[j]] += K_elem_1d[i, j]
+
     return K_global.tocsr()
 
 

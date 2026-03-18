@@ -1,29 +1,31 @@
 from pathlib import Path
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm
 from xslope.fileio import load_slope_data
-from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json
+from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_reinforcement_line_geometry
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
 # Load Griffiths & Lane (1999) Example 1: homogeneous slope, c/γH=0.05, φ=20°
-input_file = "docs/seep/files/xslope_johnson_res.xlsx"
+input_file = "docs/fem/files/xslope_reinforce_fem.xlsx"
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top')
 
 input_path = Path(input_file)
-target_size = 4
-element_type = 'quad8'
+target_size = 2 # Desired target element size for meshing (adjust as needed for finer/coarser mesh)
+element_type = 'tri6' # @param ["quad4","quad8","tri3","tri6"]
+remesh = True # @param {"type":"boolean"}
 
 # Use existing mesh from slope_data if available, otherwise build a new one
-if slope_data.get("mesh") is not None:
+if slope_data.get("mesh") is not None and not remesh:
     print("Using existing mesh file.")
     mesh = slope_data["mesh"]
 else:
-    print("No existing mesh found in slope_data, building new mesh from profile line data.")
-    polygons = build_polygons(slope_data)
-    print(f"Building mesh with {len(polygons)} polygons.")
-    mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type)
+    print("No existing mesh found in slope_data or remeshing enabled, building new mesh from profile line data.")
+    reinf_geom = extract_reinforcement_line_geometry(slope_data)
+    polygons = build_polygons(slope_data, reinf_lines=reinf_geom)
+    print(f"Building mesh with {len(polygons)} polygons, {len(reinf_geom)} reinforcement lines.")
+    mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=reinf_geom)
     mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
     export_mesh_to_json(mesh, mesh_file)
 
@@ -34,9 +36,10 @@ plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
 
 analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
-F = 1.2
-F_min=1.0
-F_max=1.6
+
+F = 1.5     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
+F_min=1.2   # Minimum FS for SSRM search (adjust as needed)
+F_max=1.8   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)

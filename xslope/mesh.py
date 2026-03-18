@@ -1017,6 +1017,15 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
             new_elements.append(new_element)
             new_element_types.append(9)
             
+        elif elem_type == 3 and target_element_type in ['quad8', 'quad9']:
+            # Convert leftover tri3 to tri6 in quad-dominant meshes
+            n0, n1, n2 = element[0], element[1], element[2]
+            n3 = get_or_create_midside_node(n0, n1)
+            n4 = get_or_create_midside_node(n1, n2)
+            n5 = get_or_create_midside_node(n2, n0)
+            new_element = [n0, n1, n2, n3, n4, n5, 0, 0, 0]
+            new_elements.append(new_element)
+            new_element_types.append(6)
         else:
             # Keep original element unchanged
             new_elements.append(element.tolist())

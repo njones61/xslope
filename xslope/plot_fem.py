@@ -509,7 +509,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     plt.tight_layout()
     
     if save_png:
-        filename = 'seep_slope_fem_results.png'
+        filename = 'fem_results.png'
         plt.savefig(filename, dpi=dpi, bbox_inches='tight')
     
     plt.show()

@@ -384,10 +384,10 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                     ax.plot([tail_x, tip_x], [tail_y, tip_y], color='green', lw=1.2)
                     ax.plot(tip_x, tip_y, marker='v', color='green', markersize=3)
 
-        # Add to legend
+        # Add to legend with arrow-like marker
         legend_handles.append(
-            plt.Line2D([0], [0], marker='v', color='green', linestyle='-',
-                      markersize=5, linewidth=0.8, label='Applied Force (bc_type=4)')
+            plt.Line2D([0], [0], marker=r'$\rightarrow$', color='green', linestyle='None',
+                      markersize=12, label='Applied Force')
         )
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_scale=None, 

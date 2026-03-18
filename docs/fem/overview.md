@@ -763,6 +763,35 @@ The units for E and Area need to be compatible with each other and with the othe
 metric units, E should be in $kPa$ and Area should be in $m^2$. For English units, E should be in $psf$ and Area
 should be in $ft^2$. Alternately, E could be in $psi$ as long as Area is in $in^2$.
 
+#### Element Discretization and Capacity Assignment
+
+A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values.
+
+During mesh generation, each reinforcement line is discretized into multiple truss elements based on the specified mesh density. The discretization process follows these steps:
+
+1. **Material Property Assignment**: Each truss element along the line receives the same material properties:
+
+>>Cross-sectional area: $Area$<br>
+Elastic modulus: $E$<br>
+Element stiffness: $K_e = AE/L$ (where L varies based on element length)<br>
+
+2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity based on the following logic:
+
+>>For an element whose center is at distance $d$ from the nearest reinforcement end, where $L_p$ is the pullout length corresponding to that end ($L_{p1}$ if nearest to end 1, $L_{p2}$ if nearest to end 2):
+>>
+>>$T_{allow} = \begin{cases}
+T_{max} \cdot \dfrac{d}{L_p} & \text{if } d < L_p \\
+T_{max} & \text{if } d \geq L_p
+\end{cases}$
+
+>>
+>>$T_{res} = \begin{cases}
+0 & \text{if } d < L_p \\
+T_{residual} & \text{if } d \geq L_p
+\end{cases}$
+
+This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid. For the residual capacity, if $d < L_p$, the residual capacity is set to zero because it is assumed that a pullout failure is sudden and complete and there is no residual capacity. If $d \geq L_p$, the residual strength specified by the user for the element is used.
+
 #### Axial Stiffness (EA)
 
 The analysis depends only on the product $EA$ (the axial stiffness, sometimes called the tensile stiffness or $J$ in
@@ -773,6 +802,33 @@ mobilizing its tensile capacity:
 >>$EA = \dfrac{T_{max}}{\varepsilon_{rupture}}$
 
 where $\varepsilon_{rupture}$ is the strain at which the reinforcement reaches its ultimate tensile strength.
+
+#### Determining Reinforcement Line Pullout Lengths
+
+The pullout length $L_p$ represents the distance from each end of the reinforcement over which the full tensile strength is mobilized. This variation captures the physical reality that pullout resistance must develop over a finite distance from the reinforcement ends through interface friction between the reinforcement and surrounding soil. This friction cannot be mobilized instantaneously but requires relative displacement to develop, creating the gradual strength buildup characteristic of all reinforcement systems. Pullout length can be estimated as follows:
+
+**For Soil Nails:**
+>>$L_p = \dfrac{T_{max}}{\alpha \pi D \sigma_n' \tan \phi_{interface}}$
+
+where:<br>
+>>$T_{max}$ = design tensile capacity of the nail<br>
+$\alpha$ = surface roughness factor (0.5-1.0 for grouted nails)<br>
+$D$ = effective nail diameter <br>
+$\sigma_n'$ = average effective normal stress along the nail<br>
+$\phi_{interface}$ = interface friction angle (typically 0.8-1.0 times soil friction angle)
+
+**For Geotextiles:**
+>>$L_p = \dfrac{T_{max}}{2 \alpha \sigma_n' \tan \phi_{interface}}$
+
+where the factor of 2 accounts for friction on both sides of the geotextile.
+
+These equations are a general guide that can be used to come up with reasonable estimates of Lp. Typical values are as follows:
+
+|Reinforcement Type | Pullout Length $L_p$ (m) | Notes |
+|-------------------|--------------------------|-------|
+| **Soil Nails** | 1.5 - 3.0 | Depends on soil conditions and nail diameter |
+| **Geotextiles** | 0.5 - 1.5 | Depends on normal stress and surface texture |
+| **Geogrid** | 1.0 - 2.0 | Depends on aperture size and bearing resistance |
 
 #### Wished-in-Place Analysis and EA Selection
 
@@ -858,60 +914,6 @@ For the wished-in-place approach currently used by XSLOPE, selecting $EA$ values
 recommended range (see table above) partially compensates for the absence of construction-induced pre-tension and
 produces conservative but reasonable factors of safety. Staged construction analysis may be implemented in a future
 version of XSLOPE.
-
-A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values.
-
-During mesh generation, each reinforcement line is discretized into multiple truss elements based on the specified mesh density. The discretization process follows these steps:
-
-1. **Material Property Assignment**: Each truss element along the line receives the same material properties:
-
->>Cross-sectional area: $Area$<br>
-Elastic modulus: $E$<br>
-Element stiffness: $K_e = AE/L$ (where L varies based on element length)<br>
-
-2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity based on the following logic:
-
->>For an element whose center is at distance $d$ from the nearest reinforcement end, where $L_p$ is the pullout length corresponding to that end ($L_{p1}$ if nearest to end 1, $L_{p2}$ if nearest to end 2):
->>
->>$T_{allow} = \begin{cases}
-T_{max} \cdot \dfrac{d}{L_p} & \text{if } d < L_p \\
-T_{max} & \text{if } d \geq L_p
-\end{cases}$
-
->>
->>$T_{res} = \begin{cases}
-0 & \text{if } d < L_p \\
-T_{residual} & \text{if } d \geq L_p
-\end{cases}$
-
-This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid. For the residual capacity, if $d < L_p$, the residual capacity is set to zero because it is assumed that a pullout failure is sudden and complete and there is no residual capacity. If $d \geq L_p$, the residual strength specified by the user for the element is used.
-
-### Determining Reinforcement Line Pullout Lengths
-
-The pullout length $L_p$ represents the distance from each end of the reinforcement over which the full tensile strength is mobilized. This variation captures the physical reality that pullout resistance must develop over a finite distance from the reinforcement ends through interface friction between the reinforcement and surrounding soil. This friction cannot be mobilized instantaneously but requires relative displacement to develop, creating the gradual strength buildup characteristic of all reinforcement systems. Pullout length can be estimated as follows:
-
-**For Soil Nails:**
->>$L_p = \dfrac{T_{max}}{\alpha \pi D \sigma_n' \tan \phi_{interface}}$
-
-where:<br>
->>$T_{max}$ = design tensile capacity of the nail<br>
-$\alpha$ = surface roughness factor (0.5-1.0 for grouted nails)<br>
-$D$ = effective nail diameter <br>
-$\sigma_n'$ = average effective normal stress along the nail<br>
-$\phi_{interface}$ = interface friction angle (typically 0.8-1.0 times soil friction angle)
-
-**For Geotextiles:**
->>$L_p = \dfrac{T_{max}}{2 \alpha \sigma_n' \tan \phi_{interface}}$
-
-where the factor of 2 accounts for friction on both sides of the geotextile.
-
-These equations are a general guide that can be used to come up with reasonable estimates of Lp. Typical values are as follows:
-
-|Reinforcement Type | Pullout Length $L_p$ (m) | Notes |
-|-------------------|--------------------------|-------|
-| **Soil Nails** | 1.5 - 3.0 | Depends on soil conditions and nail diameter |
-| **Geotextiles** | 0.5 - 1.5 | Depends on normal stress and surface texture |
-| **Geogrid** | 1.0 - 2.0 | Depends on aperture size and bearing resistance |
 
 ## Integration with XSLOPE Framework
 

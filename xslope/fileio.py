@@ -535,8 +535,9 @@ def load_slope_data(filepath):
 
     # === REINFORCEMENT LINES ===
     reinforce_df = xls.parse('reinforce', header=1)  # Header in row 2 (0-indexed row 1)
-    reinforce_lines = []
-    
+    reinforce_lines = []        # LEM format: list of point lists with tension distributions
+    reinforcement_lines = []    # FEM format: list of dicts with raw line endpoints and properties
+
     # Process rows starting from row 3 (Excel) which is 0-indexed row 0 in pandas after header=1
     # Keep reading until we encounter an empty value in column B
     for i, row in reinforce_df.iterrows():
@@ -562,7 +563,15 @@ def load_slope_data(filepath):
             Lp2 = float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0   # Column I
             E = float(row.iloc[9])     # Column J
             Area = float(row.iloc[10]) # Column K
-            
+
+            # Store raw line data for FEM (endpoints + properties)
+            reinforcement_lines.append({
+                "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                "t_max": Tmax, "t_res": Tres,
+                "lp1": Lp1, "lp2": Lp2,
+                "E": E, "area": Area,
+            })
+
             # Calculate line length and direction
             import math
             line_length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
@@ -849,6 +858,7 @@ def load_slope_data(filepath):
     globals_data["dloads"] = dloads
     globals_data["dloads2"] = dloads2
     globals_data["reinforce_lines"] = reinforce_lines
+    globals_data["reinforcement_lines"] = reinforcement_lines
     globals_data["seepage_bc"] = seepage_bc
     globals_data["seepage_bc2"] = seepage_bc2
     globals_data["has_seepage_bc2"] = bool(seepage_bc2.get("specified_heads") or seepage_bc2.get("exit_face"))

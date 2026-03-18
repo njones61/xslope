@@ -759,9 +759,107 @@ In the Excel input template used by XSLOPE, the user can define up to 20 reinfor
 | E    | The modulus of elasticity of reinforcement material  |
 | Area | The cross-sectional area of the reinforcement material  |
 
-The units for E and Area need to compatible with each other and with the other weight and length units used. For metric units, E should be in $Kpa$ and Area should be in $M^2$. For English units, E should be in $psf$ and Area should be in $ft^2$. Alternately, E could be in $psi$ as long as Area is in $in^2$.
+The units for E and Area need to be compatible with each other and with the other weight and length units used. For
+metric units, E should be in $kPa$ and Area should be in $m^2$. For English units, E should be in $psf$ and Area
+should be in $ft^2$. Alternately, E could be in $psi$ as long as Area is in $in^2$.
 
-A separate pullout length (Lp) is used for each end since each end be embedded in a separate soil with different shear resistance values. 
+#### Axial Stiffness (EA)
+
+The analysis depends only on the product $EA$ (the axial stiffness, sometimes called the tensile stiffness or $J$ in
+geosynthetic specifications), not on $E$ and $A$ independently. Any combination of $E$ and $A$ that produces the same
+$EA$ will give identical results. The axial stiffness controls how much the reinforcement must elongate before
+mobilizing its tensile capacity:
+
+>>$EA = \dfrac{T_{max}}{\varepsilon_{rupture}}$
+
+where $\varepsilon_{rupture}$ is the strain at which the reinforcement reaches its ultimate tensile strength.
+
+#### Wished-in-Place Analysis and EA Selection
+
+XSLOPE currently uses a **wished-in-place** approach: the entire slope (all soil layers and all reinforcement) is
+assumed to exist in its final geometry, and gravity is applied in a single step. The reinforcement starts at zero
+strain and zero force. Tension develops only through deformation that occurs during the gravity application and
+subsequent SSRM strength reduction. This differs from reality, where reinforcement accumulates tension progressively
+as each soil lift is placed during construction.
+
+The wished-in-place approach is **conservative** — it underestimates the reinforcement contribution because it misses
+the construction-induced pre-tension. However, for the reinforcement to provide meaningful stabilization in a
+wished-in-place SSRM analysis, it must be stiff enough to develop significant force from the relatively small
+displacements that occur near the incipient failure state. Low-stiffness reinforcement may undergo insufficient
+strain during SSRM to mobilize its capacity, leading to an unrealistically low factor of safety.
+
+Parametric studies show that the computed factor of safety increases with $EA$ and then plateaus above a threshold
+stiffness, beyond which further increases in $EA$ have negligible effect. For typical reinforced slope geometries,
+this plateau is reached at approximately $EA \approx 100$–$200 \times T_{max}$. Below approximately
+$EA \approx 50 \times T_{max}$, the reinforcement may not mobilize enough force to significantly improve the factor
+of safety in a wished-in-place analysis.
+
+The following table provides recommended $EA$ values for wished-in-place SSRM analysis. These values are deliberately
+at the stiffer end of the physical range for each material type, because the wished-in-place approach requires
+sufficient stiffness to compensate for the absence of construction-induced pre-tension:
+
+| Reinforcement Type | Recommended $EA/T_{max}$ | $\varepsilon_{rupture}$ | Notes |
+|---|---|---|---|
+| **Woven geotextiles** | $50$–$100$ | 1–2% | Use stiffer end for SSRM |
+| **HDPE geogrids** | $50$–$100$ | 1–2% | Uniaxial, reinforcement grade |
+| **PET geogrids** | $100$–$200$ | 0.5–1% | Higher stiffness than HDPE at same strength |
+| **Steel strips** | $500$–$2{,}000$ | 0.05–0.2% | Very stiff, minimal elongation |
+| **Soil nails (grouted)** | $1{,}000$–$5{,}000$ | 0.02–0.1% | Based on steel bar + grout composite |
+
+#### Typical E and Area Values
+
+The following tables provide representative $E$ and $Area$ values for common reinforcement materials. These are
+intended as starting points when manufacturer-specific data is not available. Any combination of $E$ and $Area$
+producing the target $EA$ will give identical results.
+
+**English Units:**
+
+| Material | $E$ (psf) | $Area$ (ft$^2$/ft) | $EA$ (lb/ft) | $T_{max}$ (lb/ft) |
+|---|---|---|---|---|
+| Woven geotextile (light) | 500,000 | 0.01 | 5,000 | 100 |
+| Woven geotextile (heavy) | 2,000,000 | 0.02 | 40,000 | 500 |
+| HDPE geogrid | 2,000,000 | 0.03 | 60,000 | 800 |
+| PET geogrid | 5,000,000 | 0.02 | 100,000 | 1,000 |
+| Steel strip (galvanized) | 400,000,000 | 0.0003 | 120,000 | 5,000 |
+| Soil nail (grouted, #8 bar) | 600,000,000 | 0.0006 | 360,000 | 15,000 |
+
+**Metric Units:**
+
+| Material | $E$ (kPa) | $Area$ (m$^2$/m) | $EA$ (kN/m) | $T_{max}$ (kN/m) |
+|---|---|---|---|---|
+| Woven geotextile (light) | 25,000 | 0.003 | 75 | 1.5 |
+| Woven geotextile (heavy) | 100,000 | 0.006 | 600 | 7 |
+| HDPE geogrid | 100,000 | 0.009 | 900 | 12 |
+| PET geogrid | 250,000 | 0.006 | 1,500 | 15 |
+| Steel strip (galvanized) | 20,000,000 | 0.00009 | 1,800 | 75 |
+| Soil nail (grouted, #8 bar) | 30,000,000 | 0.0002 | 6,000 | 220 |
+
+#### Staged Construction Alternative
+
+In practice, reinforced slopes and walls are built in lifts. Each soil layer is placed and compacted on top of
+previously installed reinforcement, which develops tension in the reinforcement before the next lift is added. By the
+time the slope reaches its final geometry, the lower reinforcement layers may have accumulated significant
+construction-induced pre-tension.
+
+A **staged construction analysis** models this process by activating soil layers and reinforcement elements
+sequentially in the FEM, solving for equilibrium at each stage. The stress state — including locked-in reinforcement
+tension — carries forward from each stage to the next. The SSRM analysis then begins from the end-of-construction
+stress state rather than from a zero-strain condition.
+
+Staged construction analysis is supported by all major commercial geotechnical FEM packages (PLAXIS, FLAC,
+RS2/Phase2, SIGMA/W) and is the recommended approach when:
+
+- The reinforcement has low axial stiffness (extensible geosynthetics)
+- The slope is tall with many reinforcement layers
+- Accurate prediction of reinforcement forces is important (not just the factor of safety)
+- The analysis needs to match instrumented field measurements
+
+For the wished-in-place approach currently used by XSLOPE, selecting $EA$ values at the stiffer end of the
+recommended range (see table above) partially compensates for the absence of construction-induced pre-tension and
+produces conservative but reasonable factors of safety. Staged construction analysis may be implemented in a future
+version of XSLOPE.
+
+A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values.
 
 During mesh generation, each reinforcement line is discretized into multiple truss elements based on the specified mesh density. The discretization process follows these steps:
 

@@ -14,7 +14,7 @@ plot_inputs(slope_data, mode='fem', tab_loc='top')
 input_path = Path(input_file)
 target_size = 2 # Desired target element size for meshing (adjust as needed for finer/coarser mesh)
 element_type = 'tri6' # @param ["quad4","quad8","tri3","tri6"]
-remesh = False # @param {"type":"boolean"}
+remesh = True # @param {"type":"boolean"}
 
 # Use existing mesh from slope_data if available, otherwise build a new one
 if slope_data.get("mesh") is not None and not remesh:

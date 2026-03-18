@@ -1068,9 +1068,9 @@ def plot_reinforcement_forces(ax, fem_data, solution):
     # Find global Tmax (max of all t_allow values)
     t_max_global = t_allow.max() if len(t_allow) > 0 else 1.0
 
-    # Custom colormap: blue -> green -> yellow -> red
+    # Custom colormap: blue -> white -> red (coolwarm style)
     force_cmap = LinearSegmentedColormap.from_list(
-        'force_ramp', ['#2166ac', '#1a9850', '#fee08b', '#d73027'], N=256)
+        'force_ramp', ['#2166ac', '#f7f7f7', '#d73027'], N=256)
 
     # Classify and draw each element
     normal_lines = []
@@ -1104,9 +1104,9 @@ def plot_reinforcement_forces(ax, fem_data, solution):
     if inactive_lines:
         lc_outline = LineCollection(inactive_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=3.9)
         ax.add_collection(lc_outline)
-        lc = LineCollection(inactive_lines, colors='white', linewidths=3, alpha=0.9, zorder=4)
+        lc = LineCollection(inactive_lines, colors='#00CC00', linewidths=3, alpha=0.9, zorder=4)
         ax.add_collection(lc)
-        ax.plot([], [], '-', color='white', linewidth=3, alpha=0.9, markeredgecolor='black', label='Inactive (no tension)')
+        ax.plot([], [], '-', color='#00CC00', linewidth=3, alpha=0.9, label='Inactive (no tension)')
 
     # Draw normal tension elements (force-colored)
     if normal_lines:

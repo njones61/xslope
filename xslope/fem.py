@@ -1107,6 +1107,109 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
     }
 
 
+def print_reinforcement_summary(fem_data, solution):
+    """
+    Print a summary table of reinforcement line results.
+
+    Groups 1D elements by reinforcement line and reports per-line statistics
+    including element counts, force ranges, and failure modes.
+    """
+    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+    n_1d = len(elements_1d)
+    if n_1d == 0:
+        return
+
+    element_materials_1d = fem_data["element_materials_1d"]
+    t_allow_by_elem = fem_data["t_allow_by_1d_elem"]
+    t_res_by_elem = fem_data["t_res_by_1d_elem"]
+    forces = solution.get("forces_1d", np.zeros(n_1d))
+    failed = solution.get("failed_1d_elements", np.zeros(n_1d, dtype=bool))
+
+    # Get per-line Tmax and Tres from slope_data stored in fem_data
+    # element_materials_1d is 1-based line ID
+    line_ids = np.unique(element_materials_1d)
+
+    print("\n=== Reinforcement Summary ===")
+    print(f"{'Line':>4}  {'Elems':>5}  {'Max T':>8}  {'Avg T':>8}  "
+          f"{'Tension':>7}  {'In Lp':>5}  {'At Tres':>7}  {'Broken':>6}  {'Status'}")
+    print("-" * 80)
+
+    statuses_seen = set()
+    for line_id in sorted(line_ids):
+        mask = element_materials_1d == line_id
+        n_elem = int(mask.sum())
+        line_forces = forces[mask]
+        line_failed = failed[mask]
+        line_t_allow = t_allow_by_elem[mask]
+        line_t_res = t_res_by_elem[mask]
+
+        # Max Tallow for this line (the full-capacity elements)
+        t_max_line = line_t_allow.max() if n_elem > 0 else 0.0
+
+        # Active: elements carrying tension
+        n_active = int((line_forces > 0).sum())
+
+        # Pullout zone: elements where T_allow < T_max (reduced by proximity to end)
+        n_pullout = int(((line_t_allow < t_max_line - 1e-6) & (line_t_allow > 1e-6)).sum())
+
+        # At Tres: failed elements still carrying residual force
+        n_at_tres = int((line_failed & (line_t_res > 1e-6)).sum())
+
+        # Broken: failed elements with zero residual (complete failure)
+        broken_mask = line_failed & (line_t_res < 1e-6)
+        n_broken = int(broken_mask.sum())
+
+        # Determine if broken elements are in Lp zone or outside
+        in_lp_mask = (line_t_allow < t_max_line - 1e-6) & (line_t_allow > 1e-6)
+        # Elements at the very end (t_allow ~ 0) are also in Lp zone
+        at_end_mask = line_t_allow < 1e-6
+        lp_zone_mask = in_lp_mask | at_end_mask
+        n_broken_in_lp = int((broken_mask & lp_zone_mask).sum())
+        n_broken_outside_lp = n_broken - n_broken_in_lp
+
+        max_t = line_forces.max() if n_elem > 0 else 0.0
+        active_forces = line_forces[line_forces > 0]
+        avg_t = active_forces.mean() if len(active_forces) > 0 else 0.0
+
+        # Status
+        if n_broken == n_elem:
+            status = "RUPTURED"
+        elif n_broken_outside_lp > 0:
+            status = "RUPTURED"
+        elif n_at_tres > 0:
+            status = "YIELDED"
+        elif n_broken_in_lp > 0:
+            status = "PULLOUT"
+        elif max_t > 0.95 * t_max_line and t_max_line > 0:
+            status = "NEAR CAPACITY"
+        elif n_active > 0:
+            status = "OK"
+        else:
+            status = "INACTIVE"
+
+        statuses_seen.add(status)
+
+        print(f"{line_id:>4}  {n_elem:>5}  {max_t:>8.1f}  {avg_t:>8.1f}  "
+              f"{n_active:>7}  {n_pullout:>5}  {n_at_tres:>7}  {n_broken:>6}  {status}")
+
+    print("-" * 80)
+
+    # Print notes for statuses that appeared
+    status_notes = {
+        "OK": "OK: All elements within allowable capacity, no failures.",
+        "NEAR CAPACITY": "NEAR CAPACITY: Maximum force exceeds 95% of Tmax. Close to yielding.",
+        "PULLOUT": "PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.",
+        "YIELDED": "YIELDED: One or more elements have exceeded Tallow and dropped to residual capacity Tres. The line is still carrying load at reduced strength.",
+        "RUPTURED": "RUPTURED: One or more elements outside the pullout zone have broken (T exceeded Tallow with Tres=0). The reinforcement line has lost structural continuity.",
+        "INACTIVE": "INACTIVE: No elements are carrying tension. The reinforcement is not engaged.",
+    }
+    notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED", "RUPTURED", "INACTIVE"] if s in statuses_seen]
+    if notes:
+        print()
+        for note in notes:
+            print(f"  {note}")
+
+
 def _compute_B_and_detJ_quad8(coords, xi, eta):
     """Compute B matrix and det(J) for 8-node quad at (xi, eta)."""
     dN_dxi, dN_deta = compute_quad8_shape_derivatives(xi, eta)

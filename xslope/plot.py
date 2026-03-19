@@ -1464,7 +1464,7 @@ def plot_inputs(
     # Plot contents
     plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
-    if mode != "lem" or any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
+    if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data)
@@ -1676,7 +1676,7 @@ def plot_inputs(
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, save_png=False, dpi=300):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, dpi=300):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -1699,7 +1699,63 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    plot_piezo_line(ax, slope_data)
+    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
+        plot_piezo_line(ax, slope_data)
+
+    # Seep overlays: head contours and phreatic surface when any material uses seep
+    has_seep = any(m.get('u') == 'seep' for m in slope_data.get('materials', []))
+    mesh = slope_data.get('mesh')
+    seep_u = slope_data.get('seep_u')
+    if seep_contours and has_seep and mesh is not None and seep_u is not None:
+        import matplotlib.tri as mtri
+        m_nodes = mesh['nodes']
+        m_elements = mesh['elements']
+        m_etypes = mesh.get('element_types', np.full(len(m_elements), 3))
+        gamma_w = slope_data.get('gamma_water', 62.4)
+        head = seep_u / gamma_w + m_nodes[:, 1]
+
+        # Build triangulation for contouring (subdivide higher-order elements)
+        all_tris = []
+        for idx, elem in enumerate(m_elements):
+            etype = m_etypes[idx]
+            if etype == 3:
+                all_tris.append(elem[:3])
+            elif etype == 6:
+                all_tris.append([elem[0], elem[3], elem[5]])
+                all_tris.append([elem[3], elem[1], elem[4]])
+                all_tris.append([elem[5], elem[4], elem[2]])
+                all_tris.append([elem[3], elem[4], elem[5]])
+            elif etype in (4, 8, 9):
+                all_tris.append([elem[0], elem[1], elem[2]])
+                all_tris.append([elem[0], elem[2], elem[3]])
+        if all_tris:
+            triang = mtri.Triangulation(m_nodes[:, 0], m_nodes[:, 1], all_tris)
+            # Head contours
+            levels = np.linspace(np.min(head), np.max(head), 20)
+            ax.tricontour(triang, head, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
+            # Phreatic surface (u = 0)
+            if np.min(seep_u) < 0:
+                cs_phreatic = ax.tricontour(triang, seep_u, levels=[0], colors='black', linewidths=2.0, alpha=0.5)
+                # Place inverted triangle marker at the midpoint of the phreatic contour
+                from matplotlib.markers import MarkerStyle
+                from matplotlib.transforms import offset_copy
+                for seg in cs_phreatic.allsegs[0]:
+                    if len(seg) > 1:
+                        # Compute cumulative arc length along the segment
+                        diffs = np.diff(seg, axis=0)
+                        arc = np.concatenate([[0], np.cumsum(np.hypot(diffs[:, 0], diffs[:, 1]))])
+                        mid_arc = arc[-1] / 2.0
+                        mid_x = float(np.interp(mid_arc, arc, seg[:, 0]))
+                        mid_y = float(np.interp(mid_arc, arc, seg[:, 1]))
+                        # Offset marker so tip touches the line (same technique as piezo line)
+                        ms = MarkerStyle("v")
+                        path = ms.get_path().transformed(ms.get_transform())
+                        tip_offset = (-float(np.asarray(path.vertices)[:, 1].min())) * 8.0 + 2.0
+                        trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset, units="points")
+                        ax.plot([mid_x], [mid_y], marker="v", color="black", markersize=8,
+                                linestyle="None", transform=trans, alpha=0.5)
+                        break  # marker on the longest/first segment only
+
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
     plot_tcrack_water_force(ax, slice_df, slope_data)
@@ -1851,7 +1907,8 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
 
     plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
-    plot_piezo_line(ax, slope_data)
+    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
+        plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
 
@@ -1920,7 +1977,8 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     # Plot basic profile elements
     plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
-    plot_piezo_line(ax, slope_data)
+    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
+        plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
 
@@ -1993,7 +2051,8 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     # Plot basic slope elements (same as other search functions)
     plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
     plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
-    plot_piezo_line(ax, slope_data)
+    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
+        plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
 

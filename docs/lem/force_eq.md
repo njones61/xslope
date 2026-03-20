@@ -161,34 +161,43 @@ $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force on base of slice <br>
 $T$ = tension crack water force <br>
+$H$ = pile/pier force at point $e$ on the failure surface <br>
+$\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, and $T$ are included in the Force Equilibrium method as follows.
+!!! note
+    The diagram shows a case where $\theta_p < 0$ (force directed below horizontal). The equations handle both positive and negative angles. When $\theta_p = 0$ (default), the pile force is purely horizontal.
 
-Once again, we begin by summing forces in the x-direction, but now we include the additional forces:
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Force Equilibrium method as follows.
 
->>$\sum F_x = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m + P)\right] \cos (\alpha) - (N' + u \Delta \ell) \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - kW - T = 0$
+Once again, we begin by summing forces in the x-direction, but now we include the additional forces. The pile force $H$ at angle $\theta_p$ has a horizontal component $H \cos \theta_p$ that resists sliding (same direction as reinforcement $P$), so it enters the equilibrium equation with the same sign as $P$:
 
->>$c_m \Delta \ell \cos (\alpha) + N' \tan (\phi_m) \cos (\alpha) + P \cos (\alpha) - N' \sin (\alpha) - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - kW - T= 0$
+>>$\sum F_x = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m) + P\right] \cos (\alpha) + H \cos \theta_p - (N' + u \Delta \ell) \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - kW - T = 0$
 
->>$c_m \Delta \ell \cos (\alpha) + N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] + P \cos (\alpha) - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta -kW -T  = 0$
+>>$c_m \Delta \ell \cos (\alpha) + N' \tan (\phi_m) \cos (\alpha) + P \cos (\alpha) + H \cos \theta_p - N' \sin (\alpha) - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta - kW - T= 0$
 
-Rearranging in terms of our two unknows ($N'$ and $Z_{i+1}$) gives:
+>>$c_m \Delta \ell \cos (\alpha) + N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] + P \cos (\alpha) + H \cos \theta_p - u \Delta \ell \sin (\alpha) + Z_{i} \cos (\theta_i) - Z_{i+1} \cos (\theta_{i+1}) + D \sin \beta -kW -T  = 0$
 
->>$N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] - Z_{i+1} \cos (\theta_{i+1}) = - c_m \Delta \ell \cos (\alpha) - P \cos (\alpha) + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T   \qquad (6)$
+Rearranging in terms of our two unknowns ($N'$ and $Z_{i+1}$) gives:
+
+>>$N' \left[\tan (\phi_m) \cos (\alpha) - \sin (\alpha)\right] - Z_{i+1} \cos (\theta_{i+1}) = - c_m \Delta \ell \cos (\alpha) - P \cos (\alpha) - H \cos \theta_p + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T   \qquad (6)$
+
+Note that $H \cos \theta_p$ appears with a **negative** sign on the right-hand side (resisting), same as $P \cos \alpha$. When $\theta_p = 0$, this term is simply $-H$.
 
 It should be noted that the tension crack water force ($T$) only applies to right side of the top slice on a left-facing slope. For a right-facing slope, the tension crack water force is applied to the left side of the top slice and would act in the opposite direction. Therefore, the sign on $T$ would be negative in that case.
 
-Likewise, we can sum forces in the y-direction:
+Likewise, we can sum forces in the y-direction. The pile force has a vertical component $H \sin \theta_p$ (upward for positive $\theta_p$), which acts in the same direction as the reinforcement vertical component $P \sin \alpha$:
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m + P)\right] \sin (\alpha) + (N' + u \Delta \ell) \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan (\phi_m) + P\right] \sin (\alpha) + H \sin \theta_p + (N' + u \Delta \ell) \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
 
->>$c_m \Delta \ell \sin (\alpha) + N' \tan (\phi_m) \sin (\alpha) + P \sin (\alpha) + N' \cos (\alpha) + u \Delta \ell \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
+>>$c_m \Delta \ell \sin (\alpha) + N' \tan (\phi_m) \sin (\alpha) + P \sin (\alpha) + H \sin \theta_p + N' \cos (\alpha) + u \Delta \ell \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
 
->>$c_m \Delta \ell \sin (\alpha) + N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] + P \sin (\alpha) + u \Delta \ell \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
+>>$c_m \Delta \ell \sin (\alpha) + N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] + P \sin (\alpha) + H \sin \theta_p + u \Delta \ell \cos (\alpha) - W + Z_{i} \sin (\theta_{i}) - Z_{i+1} \sin (\theta_{i+1}) - D \cos \beta = 0$
 
-Rearranging in terms of our two unknows ($N'$ and $Z_{i+1}$) gives:
+Rearranging in terms of our two unknowns ($N'$ and $Z_{i+1}$) gives:
 
->>$N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] - Z_{i+1} \sin (\theta_{i+1}) = -c_m \Delta \ell \sin (\alpha) - P \sin (\alpha) - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta   \qquad (7)$
+>>$N' \left[\tan (\phi_m) \sin (\alpha) +  \cos (\alpha)\right] - Z_{i+1} \sin (\theta_{i+1}) = -c_m \Delta \ell \sin (\alpha) - P \sin (\alpha) - H \sin \theta_p - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta   \qquad (7)$
+
+When $\theta_p = 0$, the $H \sin \theta_p$ term vanishes and $b_1$ is unchanged from the case without piles.
 
 Now we can take equations (6) and (7) and rearrange them into a matrix form. We can write the two equations as:
 
@@ -204,9 +213,11 @@ The vector $x$ is given by:
 
 The vector $b$ is given by:
 
->>$b = \begin{bmatrix}- c_m \Delta \ell \cos (\alpha) - P \cos (\alpha) + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T\\-c_m \Delta \ell \sin (\alpha) - P \sin (\alpha) - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta\end{bmatrix}   \qquad (10)$
+>>$b = \begin{bmatrix}- c_m \Delta \ell \cos (\alpha) - P \cos (\alpha) - H \cos \theta_p + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T\\-c_m \Delta \ell \sin (\alpha) - P \sin (\alpha) - H \sin \theta_p - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta\end{bmatrix}   \qquad (10)$
 
-Note that $A$ and $x$ are the same as before, but $b$ has changed to include the additional forces. The matrix equation can then be solved for the two unknowns ($N'$ and $Z_{i+1}$) using the numpy **linalg** method as described above. 
+Note that $A$ and $x$ are the same as before, but $b$ has changed to include the additional forces. The pile force enters with **negative** signs in both $b_0$ and $b_1$ because it resists sliding (same sign convention as reinforcement $P$). When $\theta_p = 0$, the $b_0$ term is $-H$ and the $b_1$ term vanishes.
+
+The matrix equation can then be solved for the two unknowns ($N'$ and $Z_{i+1}$) using the numpy **linalg** method as described above.
 
 Once again, care must be taken to ensure that the tension crack water force ($T$) is applied correctly based on the slope direction.
 

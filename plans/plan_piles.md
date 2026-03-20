@@ -328,9 +328,9 @@ The $H_i \sin(\alpha_i - \theta_{p,i})$ term is the pile force resolved normal t
 
 These methods solve $X$ and $Y$ force equilibrium on each slice.
 
-**Modified $b_0$** (horizontal equilibrium) — add horizontal component of pile force:
+**Modified $b_0$** (horizontal equilibrium) — subtract horizontal component of pile force (resisting, same sign convention as $-P\cos\alpha$):
 
-$$b_0 = \cdots + k W_i + T_i + H_i \cos\theta_{p,i}$$
+$$b_0 = \cdots + k W_i + T_i - H_i \cos\theta_{p,i}$$
 
 **Modified $b_1$** (vertical equilibrium) — subtract upward vertical component:
 
@@ -367,7 +367,7 @@ When $\theta_p = 0$: $F_h$ gets $+H_i$, $F_v$ is unchanged, and $M_o$ gets $-H_i
 | OMS | $+H\sin(\alpha - \theta_p)$ | $-\frac{1}{R}[H\cos\theta_p(Y_o - y_p) + H\sin\theta_p(x_p - X_o)]$ | N/A |
 | Bishop | $-H\sin\theta_p$ in numerator | Same moment term as OMS | N/A |
 | Janbu | $+H\sin(\alpha - \theta_p)$ | $-H\cos(\alpha - \theta_p)$ from denominator | N/A |
-| Corps/L-K | N/A (implicit) | N/A | $+H\cos\theta_p$ to $b_0$; $-H\sin\theta_p$ to $b_1$ |
+| Corps/L-K | N/A (implicit) | N/A | $-H\cos\theta_p$ to $b_0$; $-H\sin\theta_p$ to $b_1$ |
 | Spencer | N/A (implicit) | N/A | $+H\cos\theta_p$ to $F_h$; $+H\sin\theta_p$ to $F_v$; moment to $M_o$ |
 
 All entries reduce to the previously discussed horizontal-only formulation when $\theta_p = 0$.
@@ -415,7 +415,7 @@ This ensures backward compatibility — if no pile data exists, the terms are ze
 - **`oms()`**: Add $H \sin(\alpha - \theta_p)$ to $N'$; add pile moment term (both components) to denominator
 - **`bishop()`**: Add $-H \sin\theta_p$ to $N'$ numerator; add pile moment term to denominator
 - **`janbu()`**: Add $H \sin(\alpha - \theta_p)$ to $N'$; subtract $\sum H \cos(\alpha - \theta_p)$ from denominator
-- **`force_equilibrium()`**: Add $H \cos\theta_p$ to $b_0$; subtract $H \sin\theta_p$ from $b_1$
+- **`force_equilibrium()`**: Subtract $H \cos\theta_p$ from $b_0$; subtract $H \sin\theta_p$ from $b_1$
 - **`spencer()`**: Add $H \cos\theta_p$ to $F_h$; add $H \sin\theta_p$ to $F_v$; add moment terms to $M_o$
 
 
@@ -528,7 +528,7 @@ Update the documentation first so the theory is reviewed and agreed upon before 
    - `docs/lem/oms.md` — $H\sin(\alpha - \theta_p)$ in $N'$, pile moment in denominator
    - `docs/lem/bishop.md` — $-H\sin\theta_p$ in $N'$ numerator, pile moment in denominator
    - `docs/lem/janbu.md` — $H\sin(\alpha - \theta_p)$ in $N'$, $-H\cos\theta_p$ in denominator
-   - `docs/lem/force_eq.md` — $H\cos\theta_p$ in $b_0$, $-H\sin\theta_p$ in $b_1$
+   - `docs/lem/force_eq.md` — $-H\cos\theta_p$ in $b_0$, $-H\sin\theta_p$ in $b_1$
    - `docs/lem/spencer.md` — pile terms in $F_h$, $F_v$, $M_o$
 3. **Input template** (`docs/usage/input_template.md`): Add `piles` sheet section with column definitions and examples
 
@@ -641,7 +641,7 @@ Each method page (`oms.md`, `bishop.md`, `janbu.md`, `force_eq.md`, `spencer.md`
 - **`docs/lem/oms.md`**: Add $H\sin(\alpha - \theta_p)$ to $N'$ equation; add pile moment term to denominator; show reduction to $\theta_p = 0$ case
 - **`docs/lem/bishop.md`**: Add $-H\sin\theta_p$ to $N'$ vertical equilibrium; add pile moment to denominator; explain why $N'$ is unchanged when $\theta_p = 0$
 - **`docs/lem/janbu.md`**: Add $H\sin(\alpha - \theta_p)$ to $N'$; subtract $H\cos(\alpha - \theta_p)$ from denominator
-- **`docs/lem/force_eq.md`**: Add $H\cos\theta_p$ to $b_0$; subtract $H\sin\theta_p$ from $b_1$
+- **`docs/lem/force_eq.md`**: Subtract $H\cos\theta_p$ from $b_0$; subtract $H\sin\theta_p$ from $b_1$
 - **`docs/lem/spencer.md`**: Add pile terms to $F_h$, $F_v$, and $M_o$
 
 For each page, the updates should be integrated into the existing equation derivations (not a separate section). The pile terms should appear naturally alongside the existing reinforcement, distributed load, and seismic terms.

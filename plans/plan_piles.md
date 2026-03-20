@@ -127,11 +127,11 @@ The controlling value is $\min(\text{soil capacity},\; \text{structural capacity
 
 ### 2.5 Recommended Approach for xslope
 
-**Phase 1 (LEM)**: Support user-specified $H$ values. The user provides the horizontal resistance per unit width directly. This covers all cases since the user can compute $H$ externally using any method they prefer.
+Three methods are supported, corresponding to implementation phases (see Section 6):
 
-**Phase 2 (FEM)**: The FEM/SSRM approach computes pile resistance naturally from the beam element stiffness ($EI$, $EA$) — no user-specified $H$ needed.
-
-**Phase 3 (optional future)**: Implement Ito & Matsui (1975) to auto-compute $H$ from pile geometry and soil properties for LEM. See Section 2.1 for detailed theory and implementation plan. Requires $D_{\text{pile}}$ and $S$ in the `piles` sheet; $H$ column left blank triggers auto-computation.
+- **User-specified $H$** (Phase 2): The user provides the pile force magnitude and angle directly, based on external analysis. This is the simplest and most flexible option.
+- **Ito & Matsui auto-computation** (Phase 3): If $H$ is left blank and $D_{\text{pile}}$/$S$ are provided, $H$ is computed automatically using Ito & Matsui theory. The computation is performed at slice generation time for each trial failure surface, since the integration depth depends on where the surface crosses the pile. See Section 2.1 for theory.
+- **FEM beam elements** (Phase 4): The FEM/SSRM approach computes pile resistance naturally from the beam element stiffness ($EI$, $EA$) — no user-specified $H$ needed.
 
 
 ## 3. Input: "piles" Sheet

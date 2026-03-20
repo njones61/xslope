@@ -147,13 +147,19 @@ Row 3+: Data
 
      A        B      C      D      E       F      G       H        I       J        K       L
   ──────────────────────────────────────────────────────────────────────────────────────────────
-2 │ Label  │  x1  │  y1  │  x2  │  y2   │  H   │ theta │ D_pile │  S    │ E_pile │  I    │  A
+2 │ Label  │  x1  │  y1  │  x2  │  y2   │  H   │ theta │ D │  S    │ E │  I    │  Area
   ──────────────────────────────────────────────────────────────────────────────────────────────
 3 │ Pile 1 │ 45.0 │ 32.0 │ 45.0 │ 15.0  │ 50.0 │       │ 0.9    │ 3.0   │        │       │
 4 │ Pile 2 │ 55.0 │ 35.0 │ 55.0 │ 12.0  │ 75.0 │  10   │ 0.9    │ 3.0   │        │       │
 5 │ Batter │ 40.0 │ 30.0 │ 42.0 │ 10.0  │ 60.0 │       │ 0.9    │ 3.0   │        │       │
 6 │        │      │      │      │       │      │       │        │       │        │       │
 ```
+
+Here is a shot of the actual sheet in Excel:
+
+![alt text](pile_sheet.png)
+
+The sheet name is **"piles"**. The user can input any number of piles, with one pile per row. Each pile is defined by its top and bottom coordinates, the force magnitude $H$, and optional parameters for angle, diameter, spacing, and FEM properties.
 
 ### 3.2 Column Definitions
 
@@ -166,11 +172,11 @@ Row 3+: Data
 | E | $y_2$ | Yes | Y-coordinate of pile tip (bottom) |
 | F | $H$ | LEM only | Pile force magnitude per unit width of slope (kN/m or lb/ft) |
 | G | $\theta_p$ | No | Force angle from horizontal in degrees (default 0°; positive = upward) |
-| H | $D_{\text{pile}}$ | No | Pile diameter |
+| H | $D$ | No | Pile diameter |
 | I | $S$ | No | Center-to-center spacing |
-| J | $E_{\text{pile}}$ | FEM only | Young's modulus of pile material |
+| J | $E$ | FEM only | Young's modulus of pile material |
 | K | $I$ | FEM only | Moment of inertia (computed from $D_{\text{pile}}$ if omitted) |
-| L | $A$ | FEM only | Cross-sectional area (computed from $D_{\text{pile}}$ if omitted) |
+| L | $Area$ | FEM only | Cross-sectional area (computed from $D_{\text{pile}}$ if omitted) |
 
 ### 3.3 Column Usage by Analysis Type
 
@@ -180,11 +186,11 @@ Row 3+: Data
 | $(x_2, y_2)$ | Pile tip — defines pile line geometry | Bottom of 1D element chain |
 | $H$ | Pile force magnitude (direct input) | Not used (FEM computes resistance naturally) |
 | $\theta_p$ | Force direction (0° = horizontal) | Not used |
-| $D_{\text{pile}}$ | Not used in Phase 1 | Compute $I = \pi D^4 / 64$ for circular section |
+| $D$ | Not used in Phase 1 | Compute $I = \pi D^4 / 64$ for circular section |
 | $S$ | User divides $H_{\text{single}}/S$ | Scale $EI$ and $EA$ by $1/S$ for per-unit-width |
-| $E_{\text{pile}}$, $I$, $A$ | Not used | Beam element stiffness properties |
+| $E$, $I$, $Area$ | Not used | Beam element stiffness properties |
 
-If $D_{\text{pile}}$ is provided and $I$, $A$ are omitted, assume a solid circular section:
+If $D$ is provided and $I$, $Area$ are omitted, assume a solid circular section:
 
 $$A = \frac{\pi D^2}{4}, \qquad I = \frac{\pi D^4}{64}$$
 

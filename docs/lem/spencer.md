@@ -57,11 +57,6 @@ Note that counter-clockwise moments are positive (right-hand rule). In Spencer's
 
 The reinforcement $R$ contributes no moment in $M_o$ because it acts at the base center $(x_b, y_b)$, making its moment arms zero.
 
-The pile force $H$ enters $F_h$ and $F_v$ with the same sign convention as reinforcement $R$ — both are resisting forces with positive horizontal and upward vertical components. Since the pile force acts at point $e$ on the failure surface (which is near the base center $b$), the moment arms $(y_e - y_b)$ and $(x_e - x_b)$ are typically very small. The pile's effect on the solution is captured primarily through $F_h$ and $F_v$, propagating through the interslice forces.
-
-!!! note
-    All equations downstream of (1), (2), and (3) — including $Q$ (Eq 23), $m_\alpha$ (Eq 24), $y_Q$ (Eq 26), and all partial derivatives — are expressed in terms of $F_h$, $F_v$, and $M_o$. The pile force enters only through these three equations; no other equations in the Spencer derivation need to change.
-
 The shear force on the base of the slice is:
 
 >>$S = \tau \Delta \ell  \qquad (4)$

@@ -603,7 +603,70 @@ Add pile support to the FEM/SSRM module.
 4. **Pile below failure surface** — automatic. If the failure surface does not intersect the pile line, Shapely intersection returns empty and the pile contributes nothing. Handled naturally during slice generation.
 
 
-## 8. Documentation Updates
+## 8. Typical Parameter Values
+
+The following tables provide typical values for pile/pier parameters. These are intended as guidance for users filling in the `piles` sheet and will be included in the documentation.
+
+### 8.1 Pile Types and Typical Dimensions
+
+| Pile Type | Typical Diameter/Width | Typical Length | Notes |
+|-----------|----------------------|----------------|-------|
+| Steel H-pile | 200–400 mm (8–14 in) | 6–30 m (20–100 ft) | Wide-flange sections; high strength-to-weight ratio |
+| Steel pipe pile | 300–900 mm (12–36 in) | 6–40 m (20–130 ft) | Can be open-ended or closed-ended; often concrete-filled |
+| Precast concrete pile | 250–600 mm (10–24 in) | 6–25 m (20–80 ft) | Square or octagonal cross-section |
+| Drilled shaft (caisson) | 450–3000 mm (18–120 in) | 3–60 m (10–200 ft) | Cast-in-place; larger diameters common for slope stabilization |
+| Concrete pier | 600–1500 mm (24–60 in) | 3–15 m (10–50 ft) | Often used for slope stabilization; rectangular or circular |
+| Micropile | 150–300 mm (6–12 in) | 6–30 m (20–100 ft) | Drilled and grouted; used in tight access or existing structures |
+| Timber pile | 200–400 mm (8–16 in) | 6–20 m (20–65 ft) | Tapered; limited to lighter loads |
+
+### 8.2 Typical Spacing
+
+| Application | Typical $S/D$ Ratio | Typical Spacing $S$ | Notes |
+|-------------|---------------------|---------------------|-------|
+| Slope stabilization | 3–6 | 1.5–6 m (5–20 ft) | Closer spacing = more arching between piles |
+| Retaining structures | 2–4 | 1–4 m (3–12 ft) | Often soldier piles with lagging |
+| Ito & Matsui applicability | 2–8 | — | Theory assumes plastic flow between piles |
+
+### 8.3 Material Properties (FEM)
+
+| Material | $E$ (kPa) | $E$ (psf) | $\nu$ |
+|----------|-----------|-----------|-------|
+| Structural steel | 2.0 × 10⁸ | 4.18 × 10⁹ | 0.3 |
+| Reinforced concrete ($f'_c$ = 4000 psi) | 2.5 × 10⁷ | 5.2 × 10⁸ | 0.2 |
+| Reinforced concrete ($f'_c$ = 5000 psi) | 2.8 × 10⁷ | 5.8 × 10⁸ | 0.2 |
+| Reinforced concrete ($f'_c$ = 6000 psi) | 3.0 × 10⁷ | 6.3 × 10⁸ | 0.2 |
+| Timber (Douglas Fir) | 1.2 × 10⁷ | 2.5 × 10⁸ | 0.3 |
+
+Concrete modulus computed as $E_c = 57{,}000 \sqrt{f'_c}$ (psi) per ACI 318. Values should be entered in the same unit system used for the rest of the input (kPa or psf).
+
+### 8.4 Typical Section Properties
+
+| Section | $A$ (Area) | $I$ (Moment of Inertia) |
+|---------|-----------|------------------------|
+| Solid circular, $D$ = 0.6 m (24 in) | 0.283 m² (452 in²) | 6.36 × 10⁻³ m⁴ (16,286 in⁴) |
+| Solid circular, $D$ = 0.9 m (36 in) | 0.636 m² (1,018 in²) | 3.22 × 10⁻² m⁴ (82,448 in⁴) |
+| Solid circular, $D$ = 1.2 m (48 in) | 1.131 m² (1,810 in²) | 1.02 × 10⁻¹ m⁴ (260,576 in⁴) |
+| HP 14×117 (steel H-pile) | 0.022 m² (34.4 in²) | 4.43 × 10⁻⁴ m⁴ (1,063 in⁴) |
+| HP 12×84 (steel H-pile) | 0.016 m² (24.6 in²) | 2.18 × 10⁻⁴ m⁴ (524 in⁴) |
+| Pipe pile, $D$ = 0.6 m, $t$ = 12 mm | 0.022 m² (34.6 in²) | 9.7 × 10⁻⁴ m⁴ (2,330 in⁴) |
+
+For solid circular sections: $A = \pi D^2 / 4$, $I = \pi D^4 / 64$.
+
+### 8.5 Typical Lateral Resistance $H$
+
+Lateral resistance depends heavily on soil conditions, pile geometry, and embedment. The following ranges are approximate for preliminary estimates only.
+
+| Soil Type | Pile Type | Typical $H$ per pile | Notes |
+|-----------|-----------|---------------------|-------|
+| Stiff clay ($c$ = 50–100 kPa) | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 100–400 kN/m (7–27 kip/ft) | Per unit width = $H_{\text{pile}} / S$ |
+| Medium dense sand ($\varphi$ = 30–35°) | Steel H-pile, $S$ = 2 m | 50–200 kN/m (3–14 kip/ft) | Depends on depth above failure surface |
+| Soft clay ($c$ = 15–30 kPa) | Concrete pier, $D$ = 1.2 m, $S$ = 3 m | 30–100 kN/m (2–7 kip/ft) | Lower bound; may govern over structural capacity |
+| Weathered rock | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 200–800 kN/m (14–55 kip/ft) | High capacity but expensive installation |
+
+These values are for guidance only. Actual $H$ should be determined from Ito & Matsui theory, p-y analysis, or structural analysis of the pile.
+
+
+## 9. Documentation Updates
 
 The following documentation pages need to be created or updated when pile support is implemented. The existing docs follow a consistent pattern: MathJax equations, annotated figures, Excel template screenshots, and worked sample problems.
 

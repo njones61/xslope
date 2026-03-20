@@ -113,8 +113,6 @@ This is defined by considering the forces parallel to N, or perpendicular to the
 
 >$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p)$
 
-The pile force $H$ at angle $\theta_p$ is resolved normal to the base as $H \sin(\alpha - \theta_p)$. When $\theta_p = 0$, this reduces to $H \sin \alpha$.
-
 The effective normal force is:
 
 >$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell    \qquad (4)$
@@ -172,9 +170,7 @@ Substituting (5) into the numerator and dividing by $R$, we get:
 Note that:
 
 - The reinforcement force $P$, the pile force $H$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
-- The pile force also increases the effective normal force in the **numerator** through the $H \sin(\alpha - \theta_p)$ term, which increases frictional resistance
 - The water force $T$ only applies to the uppermost slice
-- When $\theta_p = 0$ (horizontal pile force), the numerator term reduces to $H \sin \alpha$ and the denominator term reduces to $\frac{1}{R} H \, a_{ey}$
 
 ## Summary
 

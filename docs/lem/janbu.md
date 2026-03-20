@@ -87,11 +87,9 @@ $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/up
 
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Janbu simplified method factor of safety equation as follows:
 
-To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, $T$, and $H$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The pile force $H$ at angle $\theta_p$ contributes a component $H \sin(\alpha - \theta_p)$ normal to the base (increasing effective stress). The equation for N' then becomes:
+To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, $T$, and $H$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The equation for N' then becomes:
 
 >>$N'  = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell  \qquad (10)$
-
-When $\theta_p = 0$, the pile term reduces to $H \sin \alpha$.
 
 The resisting force parallel to the base of the slice is the shear force $S$:
 
@@ -109,11 +107,7 @@ The reinforcement force $P$ and the pile force $H$ are known applied forces, not
 
 >>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P - \sum H \cos (\alpha - \theta_p)}   \qquad (13)$
 
-Note that:
-
-- The pile force affects both the **numerator** (through $H \sin(\alpha - \theta_p)$ in $N'$, which increases frictional resistance) and the **denominator** (through $H \cos(\alpha - \theta_p)$, which directly resists sliding parallel to the base)
-- When $\theta_p = 0$, the numerator term reduces to $H \sin \alpha$ and the denominator term reduces to $H \cos \alpha$
-- $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices)
+Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
 
 Once again, we apply the correction factor $f_o$ to account for the neglect of interslice forces and moment equilibrium as shown in equation (9) above.
 

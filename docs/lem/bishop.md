@@ -119,7 +119,7 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 ### Vertical Force Equilibrium
 
-First we first need to consider how these forces affect the vertical force equilibrium. The pile force $H$ at angle $\theta_p$ has a vertical component $H \sin \theta_p$ (positive upward) that reduces the net downward force on the slice. Note that when $\theta_p = 0$ (purely horizontal pile force), this term vanishes and $H$ does not affect vertical equilibrium — a key difference from reinforcement $P$, which always has a vertical component because it acts along the inclined base. The vertical force equilibrium equation becomes:
+First we first need to consider how these forces affect the vertical force equilibrium. The vertical force equilibrium equation becomes:
 
 >$N \cos \alpha + S \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0$
 >
@@ -197,8 +197,7 @@ Finally, the $\dfrac{c\Delta\ell}{F} \sin \alpha \tan \phi'$ terms cancel out, l
 This is the **complete formulation** for Bishop's Simplified Method. Note that:
 
 - The reinforcement force $P$, the pile force $H$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
-- $P$ affects the numerator indirectly through its effect on $N'$ (the $-P \sin \alpha$ term from vertical equilibrium)
-- $H$ affects the numerator indirectly through $N'$ via the $-H \sin \theta_p$ term from vertical equilibrium. When $\theta_p = 0$ (horizontal pile force), this term vanishes and $H$ affects only the denominator — a key difference from reinforcement $P$
+- $P$ and $H$ affect the numerator indirectly through their effect on $N'$
 - The water force $T$ only applies to the uppermost slice
 
 The factor of safety $F$ appears on both sides of the equation, so it must be solved **iteratively**, just like the basic formulation.

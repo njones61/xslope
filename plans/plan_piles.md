@@ -517,15 +517,69 @@ The body-force correction loop (`fem.py:893–948`) needs a parallel section for
 - Convergence failure (i.e., slope collapse) occurs when the soil is too weak to transfer load to/from the piles
 
 
-## 6. Implementation Order
+## 6. Implementation Phases
 
-1. **`fileio.py`**: Add `piles` sheet parser with validation
-2. **`slice.py`**: Add pile-to-slice assignment logic and new columns
-3. **`solve.py`**: Modify each method (start with Janbu as simplest, then OMS/Bishop, then force equilibrium, then Spencer)
-4. **`plot.py`**: Add pile visualization
-5. **Testing**: Create test input file with known pile configuration; verify FS increases appropriately
-6. **Documentation**: Update input template documentation
-7. **FEM Phase 2**: Beam element formulation, mesh extraction, viscoplastic corrections (see Section 5)
+### Phase 1: Documentation and Equations
+
+Update the documentation first so the theory is reviewed and agreed upon before writing code. This also produces the free body diagrams and equation derivations that guide the implementation.
+
+1. **LEM overview** (`docs/lem/overview.md`): Add "Piles and Structural Elements" subsection with annotated free body diagram showing $H$ at angle $\theta_p$ on a slice
+2. **Individual method pages**: Integrate pile terms into existing equation derivations for each method:
+   - `docs/lem/oms.md` — $H\sin(\alpha - \theta_p)$ in $N'$, pile moment in denominator
+   - `docs/lem/bishop.md` — $-H\sin\theta_p$ in $N'$ numerator, pile moment in denominator
+   - `docs/lem/janbu.md` — $H\sin(\alpha - \theta_p)$ in $N'$, $-H\cos\theta_p$ in denominator
+   - `docs/lem/force_eq.md` — $H\cos\theta_p$ in $b_0$, $-H\sin\theta_p$ in $b_1$
+   - `docs/lem/spencer.md` — pile terms in $F_h$, $F_v$, $M_o$
+3. **Input template** (`docs/usage/input_template.md`): Add `piles` sheet section with column definitions and examples
+
+### Phase 2: LEM with User-Specified $H$
+
+Core LEM implementation — user provides $H$ and $\theta_p$ directly.
+
+1. **`fileio.py`**: Add `piles` sheet parser. Read $(x_1, y_1)$, $(x_2, y_2)$, $H$, $\theta_p$, and optional columns. Store in `slope_data['pile_lines']`. Validate inputs.
+2. **`slice.py`**: Add pile-to-slice assignment:
+   - Construct Shapely `LineString` for each pile
+   - Intersect with each slice base to find the crossing point
+   - Add `h_pile`, `theta_p`, `x_pile`, `y_pile` columns to `slice_df`
+3. **`solve.py`**: Add pile terms to each method (start with Janbu as simplest to verify, then OMS/Bishop, force equilibrium, Spencer). Use backward-compatible pattern: `H_pile = slice_df['h_pile'].values if 'h_pile' in slice_df.columns else np.zeros(n)`
+4. **`plot.py`**: Add `plot_piles()` — draw pile lines, mark failure surface intersection, annotate with $H$
+5. **Input template**: Create `piles` sheet in the Excel template
+6. **Testing**:
+   - Create test input file with vertical piles at toe of an existing sample problem
+   - Verify FS increases with piles vs. without
+   - Add to `run_tests.py` regression suite with `<!-- test: -->` tags
+   - Test with $\theta_p = 0$ and $\theta_p \neq 0$
+7. **Sample problem**: Add pile example to `docs/lem/samples.md`
+
+### Phase 3: Ito & Matsui Auto-Computation (Optional)
+
+Auto-compute $H$ from pile geometry and soil properties when $H$ is left blank.
+
+1. **`ito_matsui.py`** (new module or function in `solve.py`):
+   - `ito_matsui_coefficients(D1, D, phi)` — closed-form $A_1$, $A_2$
+   - `intersect_pile_with_materials(pile, slope_data, y_failure)` — find soil layers along pile
+   - `compute_ito_matsui_force(pile, segments)` — piecewise integration, divide by $S$
+2. **`fileio.py` or `slice.py`**: If $H$ is blank and $D_{\text{pile}}$/$S$ are provided, auto-compute $H$ using Ito & Matsui
+3. **Validation**: Compare auto-computed $H$ against hand calculations and published examples
+4. **Documentation**: Add Ito & Matsui theory section, worked example
+
+### Phase 4: FEM Beam Elements
+
+Add pile support to the FEM/SSRM module.
+
+1. **`mesh.py`**: Extend mesh generation to constrain edges along pile lines (same pattern as reinforcement lines). Extract 1D beam elements via `extract_1d_elements_from_2d_edges()`.
+2. **`fem.py` — `build_fem_data()`**: Add beam element path parallel to existing reinforcement:
+   - Compute axial stiffness $k_a = EA/L$ and lateral stiffness $k_l = 3EI/L^3$
+   - Build condensed $4 \times 4$ stiffness matrix per element
+   - Store pile-specific arrays (`k_axial_by_pile_elem`, `k_lateral_by_pile_elem`, etc.)
+3. **`fem.py` — viscoplastic iteration**: Add pile body-force corrections:
+   - Compute axial and lateral forces from nodal displacements
+   - Allow both tension and compression (unlike reinforcement)
+   - Optional shear/axial capacity checks
+4. **`fem.py` — SSRM**: Ensure pile properties are NOT reduced during strength reduction
+5. **`plot_fem.py`**: Visualize pile elements in deformed mesh and force plots
+6. **Testing**: Run FEM on same pile problem as LEM, compare FS values
+7. **Sample problem**: Add FEM pile example to `docs/fem/samples.md`
 
 
 ## 7. Design Decisions

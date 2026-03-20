@@ -53,7 +53,7 @@ M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p
 &\quad - H \cos \theta_p (y_e - y_b) + H \sin \theta_p (x_e - x_b)
 \end{aligned}   \qquad (3)$
 
-Note that counter-clockwise moments are positive (right-hand rule). In Spencer's sign convention, resisting forces are **positive** in $F_h$ (e.g., $+R \cos \alpha$, $+H \cos \theta_p$) and driving forces are **negative** (e.g., $-kW$). This is the opposite convention from the force equilibrium method.
+Note that counter-clockwise moments are positive (right-hand rule).
 
 The reinforcement $R$ contributes no moment in $M_o$ because it acts at the base center $(x_b, y_b)$, making its moment arms zero.
 

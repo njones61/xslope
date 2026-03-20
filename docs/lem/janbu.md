@@ -105,14 +105,14 @@ Next, we need to update the driving force parallel to the base of the slice. Upd
 
 >>$W \sin \alpha + kW \cos \alpha  - D \sin (\beta - \alpha)  + T \cos \alpha   \qquad (12)$
 
-The reinforcement force $P$ and the horizontal component of the pile force $H \cos \theta_p$ are known applied forces, not shear strength. They must not be divided by the factor of safety. Therefore, they are subtracted from the driving forces in the denominator rather than added to the resisting forces in the numerator. Since Janbu resolves forces horizontally, only the horizontal component of the pile force enters the denominator directly. The factor of safety is found by substituting the updated resisting and driving forces into equation (6):
+The reinforcement force $P$ and the pile force $H$ are known applied forces, not shear strength. They must not be divided by the factor of safety. Therefore, they are subtracted from the driving forces in the denominator rather than added to the resisting forces in the numerator. Since all forces in the denominator are resolved parallel to the base of the slice, the pile force is resolved as $H \cos(\alpha - \theta_p)$ — the component of $H$ tangential to the base. The factor of safety is found by substituting the updated resisting and driving forces into equation (6):
 
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P - \sum H \cos \theta_p}   \qquad (13)$
+>>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P - \sum H \cos (\alpha - \theta_p)}   \qquad (13)$
 
 Note that:
 
-- The pile force affects both the **numerator** (through $H \sin(\alpha - \theta_p)$ in $N'$, which increases frictional resistance) and the **denominator** (through $H \cos \theta_p$, which reduces driving forces)
-- When $\theta_p = 0$, the numerator term reduces to $H \sin \alpha$ and the denominator term reduces to $H$
+- The pile force affects both the **numerator** (through $H \sin(\alpha - \theta_p)$ in $N'$, which increases frictional resistance) and the **denominator** (through $H \cos(\alpha - \theta_p)$, which directly resists sliding parallel to the base)
+- When $\theta_p = 0$, the numerator term reduces to $H \sin \alpha$ and the denominator term reduces to $H \cos \alpha$
 - $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices)
 
 Once again, we apply the correction factor $f_o$ to account for the neglect of interslice forces and moment equilibrium as shown in equation (9) above.

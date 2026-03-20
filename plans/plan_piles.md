@@ -310,13 +310,13 @@ $$\text{shear}_i = \frac{c_i \, \Delta\ell_i \cos\alpha_i + (W_i + D_i \cos\beta
 
 #### 4.2.3 Janbu's Simplified Method — `solve.py:354`
 
-Janbu uses **horizontal force equilibrium**, not moment equilibrium.
+Janbu uses **force equilibrium parallel to the base**, not moment equilibrium.
 
-**Modified denominator** — horizontal component of pile force reduces driving forces:
+**Modified denominator** — pile force resolved parallel to base reduces driving forces:
 
-$$\cdots - \sum P_i - \sum H_i \cos\theta_{p,i}$$
+$$\cdots - \sum P_i - \sum H_i \cos(\alpha_i - \theta_{p,i})$$
 
-Only the horizontal component enters the denominator directly. When $\theta_p = 0$, this reduces to $-\sum H_i$.
+All forces in the Janbu denominator are resolved parallel to the slice base. When $\theta_p = 0$, this reduces to $-\sum H_i \cos\alpha_i$.
 
 **Modified $N'$** — full pile force resolved normal to the base:
 
@@ -366,7 +366,7 @@ When $\theta_p = 0$: $F_h$ gets $+H_i$, $F_v$ is unchanged, and $M_o$ gets $-H_i
 |--------|-------------|---------------------------|-------------------|
 | OMS | $+H\sin(\alpha - \theta_p)$ | $-\frac{1}{R}[H\cos\theta_p(Y_o - y_p) + H\sin\theta_p(x_p - X_o)]$ | N/A |
 | Bishop | $-H\sin\theta_p$ in numerator | Same moment term as OMS | N/A |
-| Janbu | $+H\sin(\alpha - \theta_p)$ | $-H\cos\theta_p$ from denominator | N/A |
+| Janbu | $+H\sin(\alpha - \theta_p)$ | $-H\cos(\alpha - \theta_p)$ from denominator | N/A |
 | Corps/L-K | N/A (implicit) | N/A | $+H\cos\theta_p$ to $b_0$; $-H\sin\theta_p$ to $b_1$ |
 | Spencer | N/A (implicit) | N/A | $+H\cos\theta_p$ to $F_h$; $+H\sin\theta_p$ to $F_v$; moment to $M_o$ |
 
@@ -414,7 +414,7 @@ This ensures backward compatibility — if no pile data exists, the terms are ze
 
 - **`oms()`**: Add $H \sin(\alpha - \theta_p)$ to $N'$; add pile moment term (both components) to denominator
 - **`bishop()`**: Add $-H \sin\theta_p$ to $N'$ numerator; add pile moment term to denominator
-- **`janbu()`**: Add $H \sin(\alpha - \theta_p)$ to $N'$; subtract $\sum H \cos\theta_p$ from denominator
+- **`janbu()`**: Add $H \sin(\alpha - \theta_p)$ to $N'$; subtract $\sum H \cos(\alpha - \theta_p)$ from denominator
 - **`force_equilibrium()`**: Add $H \cos\theta_p$ to $b_0$; subtract $H \sin\theta_p$ from $b_1$
 - **`spencer()`**: Add $H \cos\theta_p$ to $F_h$; add $H \sin\theta_p$ to $F_v$; add moment terms to $M_o$
 
@@ -640,7 +640,7 @@ Each method page (`oms.md`, `bishop.md`, `janbu.md`, `force_eq.md`, `spencer.md`
 
 - **`docs/lem/oms.md`**: Add $H\sin(\alpha - \theta_p)$ to $N'$ equation; add pile moment term to denominator; show reduction to $\theta_p = 0$ case
 - **`docs/lem/bishop.md`**: Add $-H\sin\theta_p$ to $N'$ vertical equilibrium; add pile moment to denominator; explain why $N'$ is unchanged when $\theta_p = 0$
-- **`docs/lem/janbu.md`**: Add $H\sin(\alpha - \theta_p)$ to $N'$; subtract $H\cos\theta_p$ from denominator
+- **`docs/lem/janbu.md`**: Add $H\sin(\alpha - \theta_p)$ to $N'$; subtract $H\cos(\alpha - \theta_p)$ from denominator
 - **`docs/lem/force_eq.md`**: Add $H\cos\theta_p$ to $b_0$; subtract $H\sin\theta_p$ from $b_1$
 - **`docs/lem/spencer.md`**: Add pile terms to $F_h$, $F_v$, and $M_o$
 

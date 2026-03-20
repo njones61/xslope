@@ -84,7 +84,12 @@ $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
 $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force on base of slice <br>
-$water$ = tension crack water force <br>
+$T$ = tension crack water force <br>
+$H$ = pile/pier force at point $e$ on the failure surface <br>
+$\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
+
+!!! note
+    The diagram shows a case where $\theta_p < 0$ (force directed below horizontal). The equations handle both positive and negative angles. When $\theta_p = 0$ (default), the pile force is purely horizontal.
 
 The rest of the forces are the same as before.
 
@@ -96,19 +101,23 @@ The **reinforcement force** $P$ is a force on the base of the slice resisting sl
 
 The **water force** $T$ on the side of the slice is calculated from the tension crack water input only applies if there is both a tension crack, and if the user has selected to fill the crack with water. This force only applies to the side of the uppermost slice and pushes in the direction of sliding. The force is calculated using the hydrostatic water pressure that is zero at the top of the crack (side of slice) and = $\gamma_w d_{tc}$ where $\gamma_w$ = the unit wt of water and $d_{tc}$ is the depth of the tension crack. The resultant force = $\frac{1}{2} \gamma_w d_{tc}^2$ and it acts at point $c$ which is 1/3 of the height of the slice $d_{tc}$.
 
+The **pile force** $H$ acts at point $e$ on the failure surface where a pile or concrete pier intersects the base of the slice. The force has magnitude $H$ (per unit width of slope) and acts at angle $\theta_p$ from horizontal. Unlike flexible reinforcement which acts parallel to the slice base, the pile force direction is independent of the slice geometry. The force is resolved into components normal and tangential to the slice base: the normal component $H \sin(\alpha - \theta_p)$ increases effective stress and frictional resistance, while the tangential component $H \cos(\alpha - \theta_p)$ directly resists sliding. In moment equilibrium, the horizontal and vertical components of $H$ each contribute a resisting moment about the circle center through their respective moment arms $a_{ey}$ and $a_{ex}$. The pile force is a known applied force and is **not** factored by $F$.
+
 ### Normal Force
 
 To revise the factor of safety equation for the OMS method to include the $D$, $kw$, $P$, and $T$ forces, we first need to consider how these forces affect the normal force on the base of the slice. In doing so, we will return to the original equation for the normal force, not the preferred formulation that uses an effective weight. Previously, the normal force on the base of the slice was defined as:
 
 >$N = W \cos \alpha$
 
-This is defined by considering the forces parallel to N, or perpendicular to the base of the slice. But if we include the new foces, the normal force is:
+This is defined by considering the forces parallel to N, or perpendicular to the base of the slice. But if we include the new forces, the normal force is:
 
->$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha$
+>$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p)$
 
-and the effective normal force is:
+The pile force $H$ at angle $\theta_p$ is resolved normal to the base as $H \sin(\alpha - \theta_p)$. When $\theta_p = 0$, this reduces to $H \sin \alpha$.
 
->$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell    \qquad (4)$
+The effective normal force is:
+
+>$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell    \qquad (4)$
 
 This effective normal force is used in the shear force equation in the numerator of the factor of safety equation. The shear force on the base of the slice was originally defined as:
 
@@ -116,7 +125,7 @@ This effective normal force is used in the shear force equation in the numerator
 
 Substituting the new normal force from (4) into this gives:
 
->$S = c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi    \qquad (5)$
+>$S = c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell ) \tan \phi    \qquad (5)$
 
 ### Moments
 
@@ -134,32 +143,38 @@ R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the
 | $D \sin \beta$  |  $a_{dy}$  | Vertical distance from center of circle to point $d$                           |
 |      $kW$       |   $a_s$    | Vertical distance from center of circle to center of gravity of the slice        |
 |       $P$       |    $R$     | Radius of the circle                                                             |
-|       $T$       |   $a_t$    | The vertical distance beteeen center of circle and the y-coordinate of point $c$ |
+|       $T$       |   $a_t$    | The vertical distance between center of circle and the y-coordinate of point $c$ |
+| $H \cos \theta_p$ |  $a_{ey}$  | Vertical distance from center of circle to point $e$: $Y_o - y_e$             |
+| $H \sin \theta_p$ |  $a_{ex}$  | Horizontal distance from center of circle to point $e$: $x_e - X_o$           |
 
-Notice that for the distributed load, $D$, because the load is at an oblique angle, we decompose it into vertical and horizontal components. The vertical component of the distributed load is $D \cos \beta$ and the horizontal component is $D \sin \beta$. 
+Notice that for the distributed load, $D$, because the load is at an oblique angle, we decompose it into vertical and horizontal components. The vertical component of the distributed load is $D \cos \beta$ and the horizontal component is $D \sin \beta$.
 
-We can now add these moments to the limit equilibrium equation (6). The mobilized shear force is $S_{mob} = S/F$, where $S$ is the full shear strength. The reinforcement force $P$ is a known applied force and is **not** factored by $F$. Taking moments about the center of the circle:
+Similarly, the pile force $H$ at angle $\theta_p$ is decomposed into a horizontal component $H \cos \theta_p$ with vertical moment arm $a_{ey}$, and a vertical component $H \sin \theta_p$ (upward) with horizontal moment arm $a_{ex}$. Both create resisting moments about the circle center, reducing the denominator.
 
->$R \sum \dfrac{S}{F} + R \sum P + \sum D \sin \beta a_{dy} = R \sum W \sin \alpha + \sum D \cos \beta a_{dx} + k\sum W a_s + T a_t   \qquad (7)$
+We can now add these moments to the limit equilibrium equation (6). The mobilized shear force is $S_{mob} = S/F$, where $S$ is the full shear strength. The reinforcement force $P$ and the pile force $H$ are known applied forces and are **not** factored by $F$. Taking moments about the center of the circle:
 
-There is no summation for the term involving $T$ because it only applies to the uppermost slice.
+>$R \sum \dfrac{S}{F} + R \sum P + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t   \qquad (7)$
+
+There is no summation for the term involving $T$ because it only applies to the uppermost slice. The pile terms are summed only over slices that contain a pile (all other $H = 0$).
 
 Isolating the shear term and solving for $F$:
 
->$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta a_{dx} + k\sum W a_s + T a_t - R \sum P - \sum D \sin \beta a_{dy}$
+>$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - R \sum P - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]$
 
->$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta a_{dx} + k\sum W a_s + T a_t - R \sum P - \sum D \sin \beta a_{dy}}$
+>$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - R \sum P - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
 
 ### Complete Factor of Safety Equation
 
 Substituting (5) into the numerator and dividing by $R$, we get:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}   \qquad (8)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}   \qquad (8)$
 
 Note that:
 
-- The reinforcement force $P$ and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
+- The reinforcement force $P$, the pile force $H$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
+- The pile force also increases the effective normal force in the **numerator** through the $H \sin(\alpha - \theta_p)$ term, which increases frictional resistance
 - The water force $T$ only applies to the uppermost slice
+- When $\theta_p = 0$ (horizontal pile force), the numerator term reduces to $H \sin \alpha$ and the denominator term reduces to $\frac{1}{R} H \, a_{ey}$
 
 ## Summary
 

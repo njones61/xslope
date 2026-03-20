@@ -109,18 +109,23 @@ $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force on base of slice <br>
 $T$ = tension crack water force <br>
+$H$ = pile/pier force at point $e$ on the failure surface <br>
+$\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, and $T$ are included in the Bishop's method factor of safety equation as follows:
+!!! note
+    The diagram shows a case where $\theta_p < 0$ (force directed below horizontal). The equations handle both positive and negative angles. When $\theta_p = 0$ (default), the pile force is purely horizontal.
+
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Bishop's method factor of safety equation as follows:
 
 ### Vertical Force Equilibrium
 
-First we first need to consider how these forces affect the vertical force equilibrium. The vertical force equilibrium equation becomes:
+First we first need to consider how these forces affect the vertical force equilibrium. The pile force $H$ at angle $\theta_p$ has a vertical component $H \sin \theta_p$ (positive upward) that reduces the net downward force on the slice. Note that when $\theta_p = 0$ (purely horizontal pile force), this term vanishes and $H$ does not affect vertical equilibrium — a key difference from reinforcement $P$, which always has a vertical component because it acts along the inclined base. The vertical force equilibrium equation becomes:
 
->$N \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
-> 
->$(N' + u \Delta \ell) \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
+>$N \cos \alpha + S \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0$
+>
+>$(N' + u \Delta \ell) \cos \alpha + S \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0$
 
->$N'  \cos \alpha + u \Delta \ell \cos \alpha + S \sin \alpha + P \sin \alpha - W - D \cos \beta = 0  \qquad (6)$
+>$N'  \cos \alpha + u \Delta \ell \cos \alpha + S \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0  \qquad (6)$
  
 The shear force on the base of the slice remains the same as before:
 
@@ -128,67 +133,72 @@ The shear force on the base of the slice remains the same as before:
 
 Substituting (7) into (6) and solving for N':
 
->$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} \left[c \Delta \ell + N' \tan \phi' \right] \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
+>$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} \left[c \Delta \ell + N' \tan \phi' \right] \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0$
 
->$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} c \Delta \ell \sin \alpha + \dfrac{1}{F} N' \tan \phi' \sin \alpha + P \sin \alpha - W - D \cos \beta = 0$
-> 
->$N' \cos \alpha + \dfrac{1}{F} N' \tan \phi' \sin \alpha = W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{1}{F} c \Delta \ell \sin \alpha$
-> 
->$N' \left( \cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F} \right) = W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{1}{F} c \Delta \ell \sin \alpha$
+>$N' \cos \alpha + u \Delta \ell \cos \alpha + \dfrac{1}{F} c \Delta \ell \sin \alpha + \dfrac{1}{F} N' \tan \phi' \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0$
+>
+>$N' \cos \alpha + \dfrac{1}{F} N' \tan \phi' \sin \alpha = W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha - \dfrac{1}{F} c \Delta \ell \sin \alpha$
+>
+>$N' \left( \cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F} \right) = W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha - \dfrac{1}{F} c \Delta \ell \sin \alpha$
 
 Finally, we can solve for $N'$:
 
->$N' = \dfrac{W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F}  \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (8)$
+>$N' = \dfrac{W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F}  \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}   \qquad (8)$
 
 ### Moment Equilibrium
 
 The moment equilibrium equation about the center of the slip circle must also be revised to include the moments from
-the additional forces. The mobilized shear force is $S_{mob} = S/F$, where $S = c \Delta \ell + N' \tan \phi'$ is the full shear strength. The reinforcement force $P$ is a known applied force and is **not** factored by $F$. Taking moments about the center of the circle:
+the additional forces. The mobilized shear force is $S_{mob} = S/F$, where $S = c \Delta \ell + N' \tan \phi'$ is the full shear strength. The reinforcement force $P$ and the pile force $H$ are known applied forces and are **not** factored by $F$. Taking moments about the center of the circle:
 
->$R \sum \dfrac{S}{F} + R \sum P + \sum D \sin \beta a_{dy} = R \sum W \sin \alpha + \sum D \cos \beta a_{dx} + k\sum W a_s + T a_t   \qquad (9)$
+>$R \sum \dfrac{S}{F} + R \sum P + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t   \qquad (9)$
 
 Where:
 >$a_{dx}$ = horizontal distance from center of circle to point $d$<br>
 > $a_{dy}$ = vertical distance from center of circle to point $d$<br>
 > $a_s$ = vertical distance from center of circle to center of gravity of the slice<br>
-> $a_t$ = vertical distance from center of circle to point $c$
+> $a_t$ = vertical distance from center of circle to point $c$<br>
+> $a_{ey}$ = vertical distance from center of circle to point $e$: $Y_o - y_e$<br>
+> $a_{ex}$ = horizontal distance from center of circle to point $e$: $x_e - X_o$
+
+The pile force $H$ is decomposed into horizontal ($H \cos \theta_p$) and vertical ($H \sin \theta_p$) components, each with its own moment arm about the circle center.
 
 Isolating the shear term on the left side:
 
->$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta a_{dx} + k\sum W a_s + T a_t - R \sum P - \sum D \sin \beta a_{dy}$
+>$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - R \sum P - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]$
 
 Dividing by $R$:
 
->$\dfrac{1}{F} \sum S = \sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}$
+>$\dfrac{1}{F} \sum S = \sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]$
 
 Solving for $F$:
 
->$F = \dfrac{\sum S}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}$
+>$F = \dfrac{\sum S}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
 
 Substituting $S = c \Delta \ell + N' \tan \phi'$:
 
->$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi' \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}$
+>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi' \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
 
 Substituting (8) for $N'$:
 
->$F = \dfrac{\sum \left(c \Delta \ell + \left[ \dfrac{W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F}  \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]  \tan \phi' \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}$
+>$F = \dfrac{\sum \left(c \Delta \ell + \left[ \dfrac{W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha - \dfrac{c \Delta \ell}{F}  \sin \alpha}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]  \tan \phi' \right)}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
 
 To simplify the numerator, we multiply $c \Delta \ell$ by $\dfrac{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}}$:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell (\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}) + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell (\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}) + (W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
 
 Now, we can rearrange the numerator:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi' + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi' + (W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha)  \tan \phi' - \dfrac{c \Delta \ell}{F}  \sin \alpha  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
 
 Finally, the $\dfrac{c\Delta\ell}{F} \sin \alpha \tan \phi'$ terms cancel out, leading to:
 
->$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W + D \cos \beta - P \sin \alpha - u \Delta \ell \cos \alpha)  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta a_{dx} + \frac{k}{R}\sum W a_s + \frac{1}{R} T a_t - \sum P - \frac{1}{R}\sum D \sin \beta a_{dy}}   \qquad (10)$
+>$F = \dfrac{\sum \left[ \dfrac{c \Delta \ell \cos \alpha + (W + D \cos \beta - P \sin \alpha - H \sin \theta_p - u \Delta \ell \cos \alpha)  \tan \phi'}{\cos \alpha + \dfrac{\sin \alpha \tan \phi'}{F}} \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}   \qquad (10)$
 
 This is the **complete formulation** for Bishop's Simplified Method. Note that:
 
-- The reinforcement force $P$ and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
-- $P$ still affects the numerator indirectly through its effect on $N'$ (the $-P \sin \alpha$ term from vertical equilibrium)
+- The reinforcement force $P$, the pile force $H$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
+- $P$ affects the numerator indirectly through its effect on $N'$ (the $-P \sin \alpha$ term from vertical equilibrium)
+- $H$ affects the numerator indirectly through $N'$ via the $-H \sin \theta_p$ term from vertical equilibrium. When $\theta_p = 0$ (horizontal pile force), this term vanishes and $H$ affects only the denominator — a key difference from reinforcement $P$
 - The water force $T$ only applies to the uppermost slice
 
 The factor of safety $F$ appears on both sides of the equation, so it must be solved **iteratively**, just like the basic formulation.

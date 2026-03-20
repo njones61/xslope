@@ -164,9 +164,6 @@ $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-!!! note
-    $\theta_p$ is measured counterclockwise from horizontal. Positive values angle the force upward; negative values angle it downward. When $\theta_p = 0$ (default), the pile force is purely horizontal.
-
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Force Equilibrium method as follows.
 
 Once again, we begin by summing forces in the x-direction, but now we include the additional forces. The pile force $H$ at angle $\theta_p$ has a horizontal component $H \cos \theta_p$ that resists sliding (same direction as reinforcement $P$), so it enters the equilibrium equation with the same sign as $P$:

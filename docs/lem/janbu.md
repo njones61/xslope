@@ -82,9 +82,6 @@ $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-!!! note
-    $\theta_p$ is measured counterclockwise from horizontal. Positive values angle the force upward; negative values angle it downward. When $\theta_p = 0$ (default), the pile force is purely horizontal.
-
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Janbu simplified method factor of safety equation as follows:
 
 To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, $T$, and $H$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The equation for N' then becomes:

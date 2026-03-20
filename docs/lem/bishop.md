@@ -112,9 +112,6 @@ $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-!!! note
-    $\theta_p$ is measured counterclockwise from horizontal. Positive values angle the force upward; negative values angle it downward. When $\theta_p = 0$ (default), the pile force is purely horizontal.
-
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Bishop's method factor of safety equation as follows:
 
 ### Vertical Force Equilibrium

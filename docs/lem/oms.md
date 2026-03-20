@@ -88,9 +88,6 @@ $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-!!! note
-    $\theta_p$ is measured counterclockwise from horizontal. Positive values angle the force upward; negative values angle it downward. When $\theta_p = 0$ (default), the pile force is purely horizontal.
-
 The rest of the forces are the same as before.
 
 The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope, therefore the inclination of the distributed load from a vertical line is equal to the slope angle, $\beta$. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 

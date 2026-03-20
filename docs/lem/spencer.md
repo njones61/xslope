@@ -10,7 +10,7 @@ The following derivation is adapted from the US Army Corps of Engineers (USACE) 
 
 The geometry and the forces associated with a representative slice on a left-facing slope are as follows:
 
-![spencer2_forces.png](images/spencer2_forces.png)
+![spencer2_forces.png](images/spencer3_forces.png)
 
 where:
 
@@ -25,38 +25,39 @@ where:
 > $P$ = normal force on the top of the slice<br>
 > $d$ = point of action for the normal force on the top of the slice<br>
 > $T$ = shear force on the top of the slice<br>
-> $R$ = reinforcement force on the base of the slice<br>
+> $R$ = reinforcement force on the base of the slice (parallel to base, acts at base center)<br>
 > $V$ = resultant force of water in tension crack (only applies to last slice)<br>
 > $c$ = point of action for the resultant force of water in the tension crack<br>
 > $H$ = pile/pier force at point $e$ on the failure surface<br>
 > $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward)<br>
 > $\beta$ = angle of the top of the slope<br>
 > $\alpha$ = angle of the base of the slice<br>
-> $\psi$ = angle of the reinforcement force<br>
 > $\Delta \ell$ = length of the base of the slice<br>
 > $\Delta x$ = width of the slice<br>
 
-**Note**: In the current implementation of Spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. The reinforcement force $R$ is assumed flexible and parallel to the base of the slice, so $\psi = \alpha$ and $R$ acts at the base center $(x_b, y_b)$. All of the other forces are included.
+**Note**: In the current implementation of Spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. The reinforcement force $R$ is assumed flexible and therefore parallel to the base of the slice, acting at the base center $(x_b, y_b)$. All of the other forces are included.
 
 ## General Equations
 
 The equations for Spencer's method are derived from the equilibrium of forces and moments acting on the slice. One of the key features of Spencer's method is how the side forces are represented and lumped to a single force $Q_i$, which will be introduced later. Thus, it is helpeful to sum forces and moments using the forces acting on the slice except for the side forces and $N$ and $S$. Summing forces in the horizontal and vertical directions gives:
 
->>$F_h = -kW - V + P \sin \beta + T \cos \beta + R \cos \psi + H \cos \theta_p  \qquad (1)$
+>>$F_h = -kW - V + P \sin \beta + T \cos \beta + R \cos \alpha + H \cos \theta_p  \qquad (1)$
 
->>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \psi + H \sin \theta_p  \qquad (2)$
+>>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \alpha + H \sin \theta_p  \qquad (2)$
 
 Likewise, summing moments about the center of the base of the slice gives:
 
 >>$\begin{aligned}
 M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p - y_b) \\
-&\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) + V (y_v - y_b) - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b) \\
+&\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) + V (y_v - y_b) \\
 &\quad - H \cos \theta_p (y_e - y_b) + H \sin \theta_p (x_e - x_b)
 \end{aligned}   \qquad (3)$
 
-Note that counter-clockwise moments are positive (right-hand rule). In Spencer's sign convention, resisting forces are **positive** in $F_h$ (e.g., $+R \cos \psi$, $+H \cos \theta_p$) and driving forces are **negative** (e.g., $-kW$). This is the opposite convention from the force equilibrium method.
+Note that counter-clockwise moments are positive (right-hand rule). In Spencer's sign convention, resisting forces are **positive** in $F_h$ (e.g., $+R \cos \alpha$, $+H \cos \theta_p$) and driving forces are **negative** (e.g., $-kW$). This is the opposite convention from the force equilibrium method.
 
-The pile force $H$ enters $F_h$ and $F_v$ with the same sign convention as reinforcement $R$ — both are resisting forces with positive horizontal and upward vertical components. The moment $M_o$ follows the same pattern as reinforcement: the horizontal component $H \cos \theta_p$ at height $(y_e - y_b)$ and the vertical component $H \sin \theta_p$ at offset $(x_e - x_b)$. Since the pile force acts at point $e$ on the failure surface (which is near the base center $b$), the moment arms $(y_e - y_b)$ and $(x_e - x_b)$ are typically very small. The pile's effect on the solution is captured primarily through $F_h$ and $F_v$, propagating through the interslice forces.
+The reinforcement $R$ contributes no moment in $M_o$ because it acts at the base center $(x_b, y_b)$, making its moment arms zero.
+
+The pile force $H$ enters $F_h$ and $F_v$ with the same sign convention as reinforcement $R$ — both are resisting forces with positive horizontal and upward vertical components. Since the pile force acts at point $e$ on the failure surface (which is near the base center $b$), the moment arms $(y_e - y_b)$ and $(x_e - x_b)$ are typically very small. The pile's effect on the solution is captured primarily through $F_h$ and $F_v$, propagating through the interslice forces.
 
 !!! note
     All equations downstream of (1), (2), and (3) — including $Q$ (Eq 23), $m_\alpha$ (Eq 24), $y_Q$ (Eq 26), and all partial derivatives — are expressed in terms of $F_h$, $F_v$, and $M_o$. The pile force enters only through these three equations; no other equations in the Spencer derivation need to change.

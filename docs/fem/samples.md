@@ -37,6 +37,8 @@ prior assumption about its shape or location.
 
 ![griffiths1_results.png](images/griffiths1_results.png){width=1000}
 
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8 -->
+
 ### 2. Reinforced Slope with Geogrid Reinforcement
 
 This problem features an engineered slope with six layers of geogrid reinforcement. It is the FEM counterpart of
@@ -73,7 +75,7 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.56**, which is consistent with the LEM result of FS = 1.55
+SSRM results. The computed factor of safety is **FS = 1.57**, which is consistent with the LEM result of FS = 1.55
 obtained using Janbu's method. The top plot shows the deformed mesh with original and deformed reinforcement
 positions. The bottom plot shows the viscoplastic shear strain concentration with reinforcement elements colored by
 axial force (blue = low, red = high). Gray elements at the left ends are inactive (no tension). Dashed black
@@ -83,24 +85,24 @@ elements at the right ends have pulled out. The reinforcement summary table is s
 
 Reinforcement summary:
 
-```
+```bash
 === Reinforcement Summary ===
 Line  Elems     Max T     Avg T  Tension  In Lp  At Tres  Broken  Status
 --------------------------------------------------------------------------------
-   1      7     353.0     155.9        7      4        0       0  OK
-   2      7     642.8     459.5        5      4        0       1  PULLOUT
-   3      7     720.2     550.8        5      4        0       1  PULLOUT
-   4      7     764.9     548.0        4      4        1       2  YIELDED
-   5      7     780.1     580.8        5      4        0       1  PULLOUT
-   6      7     709.3     498.3        5      4        0       1  PULLOUT
+   1      9     324.6     172.0        9      4        0       0  OK
+   2      9     598.7     468.1        7      4        0       1  PULLOUT
+   3      9     706.9     559.1        7      4        0       1  PULLOUT
+   4      9     796.5     610.7        6      4        0       2  PULLOUT
+   5      9     773.0     572.7        7      4        1       1  YIELDED
+   6      9     675.8     515.5        7      4        0       1  PULLOUT
 --------------------------------------------------------------------------------
 
   OK: All elements within allowable capacity, no failures.
-  PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to
-           insufficient embedment length. Interior elements are intact.
-  YIELDED: One or more elements have exceeded Tallow and dropped to residual
-           capacity Tres. The line is still carrying load at reduced strength.
+  PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.
+  YIELDED: One or more elements have exceeded Tallow and dropped to residual capacity Tres. The line is still carrying load at reduced strength.
 ```
+
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.57, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.2, f_max=1.8 -->
 
 The results show that reinforcement lines 2-6 experience pullout failure at the right ends where the failure
 surface intersects the reinforcement. Line 4 has one element that has yielded to residual capacity. The maximum

@@ -24,6 +24,8 @@ represents the line of thrust computed using Spencer's method.
 
 ![simple_embankment_results1.png](sample_images/simple_embankment_results1.png){width=700}
 
+<!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, method=spencer, expected_fs=1.281, num_slices=40 -->
+
 Here is copy of the input file with the following variations/changes:
 
 a) Distributed load on top of slope. q = 750 psf<br>
@@ -41,6 +43,8 @@ Solution (critical surface and factor of safety):
 
 ![simple_embankment_results2.png](sample_images/simple_embankment_results2.png){width=700}
 
+<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, method=spencer, expected_fs=0.986, num_slices=30 -->
+
 ### 2. Simple Slope with Foundation
 
 This problem involves a uniform material extending below the toe of the slope. 
@@ -56,6 +60,8 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 Solution (critical surface and factor of safety):
 
 ![simple_foundation_results.png](sample_images/simple_foundation_results.png){width=700}
+
+<!-- test: file=files/xslope_simple_foundation.xlsx, type=circular_search, method=spencer, expected_fs=0.964, num_slices=30 -->
 
 ### 3. Simple Slope with Multiple Layers
 
@@ -81,6 +87,8 @@ Solution (critical surface and factor of safety):
 
 ![simple_mult_layers_results.png](sample_images/simple_mult_layers_results.png){width=900}
 
+<!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, method=spencer, expected_fs=1.244, num_slices=30 -->
+
 ### 4. Submerged Slope
 
 This problem features a slope submerged by 10 ft of water. 
@@ -99,6 +107,8 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 Solution (critical surface and factor of safety):
 
 ![submerged_slope_results.png](sample_images/submerged_slope_results.png){width=900}
+
+<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, method=spencer, expected_fs=1.154, num_slices=30 -->
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
@@ -126,6 +136,8 @@ Here is the solution for just the starting circle (to match the problem descript
 
 ![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
 
+<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, method=bishop, expected_fs=1.576, num_slices=30 -->
+
 Here is the Excel input file with multiple starting circles for a global search for the critical surface:
 
 Excel input file: [xslope_method_slices_problem2.xlsx](files/xslope_method_slices_problem2.xlsx)
@@ -142,6 +154,8 @@ tested in the search algorithm. In this case, the critical surface is isolated t
 Solution (critical surface and factor of safety):
 
 ![method_slices_problem_results2.png](sample_images/method_slices_problem_results2.png){width=900}
+
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, method=spencer, expected_fs=0.770, num_slices=30 -->
 
 ### 6. Slope with Eight Layers
 
@@ -169,6 +183,8 @@ Search results:
 Solution (critical surface and factor of safety):
 
 ![eight_layers_results.png](sample_images/eight_layers_results.png){width=900}
+
+<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, method=spencer, expected_fs=1.189, num_slices=30 -->
 
 ### 7. Non-Circular Failure Surface
 
@@ -202,6 +218,8 @@ Search results:
 Solution (critical surface and factor of safety):
 
 ![noncircular_results.png](sample_images/noncircular_results.png){width=900}
+
+<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, method=spencer, expected_fs=1.739, num_slices=30 -->
 
 ### 8. Earth Dam 
 
@@ -239,6 +257,8 @@ Solution (critical surface and factor of safety):
 
 ![earth_dam_up_results.png](sample_images/earth_dam_up_results.png){width=900}
 
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, method=spencer, expected_fs=1.800, num_slices=30 -->
+
 **Downstream side of the dam**
 
 Next, we will analyze the other side of the dam by defining starting circles on the downstream 
@@ -257,6 +277,8 @@ Search results:
 Solution (critical surface and factor of safety):
 
 ![earth_dam_down_results.png](sample_images/earth_dam_down_results.png){width=900}
+
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, method=spencer, expected_fs=1.558, num_slices=30 -->
 
 ### 9. Reinforced Slope
 
@@ -280,6 +302,8 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 Solution (critical surface and factor of safety):
 
 ![reinforce_results.png](sample_images/reinforce_results.png){width=900}
+
+<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, method=spencer, expected_fs=1.589, num_slices=30 -->
 
 !!! note
     The solution for this problem found by XSLOPE is not the same as the solution found by UTEXASED. The difference

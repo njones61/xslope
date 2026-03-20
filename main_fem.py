@@ -32,9 +32,9 @@ else:
 # Build FEM data
 fem_data = build_fem_data(slope_data, mesh)
 plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
-              label_elements=False, label_nodes=False)
+              label_elements=False, label_nodes=False, save_png=True)
 
-analysis_type = "single" # @param ["single","ssrm"]
+analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
 
 F = 1.55     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed

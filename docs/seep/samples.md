@@ -23,6 +23,8 @@ The solution should look something like this:
 
 ![clay_blanket_solution.png](images/clay_blanket_solution.png){width=1200px}
 
+<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
+
 ### 2. Sea Trench
 
 This is another saturated problem representing the excavation of a trench in a harbor supported by a parallel set of sheetpile walls. The sheetpiles pass through an upper silt layer down to a lower permeability silty clay layer.
@@ -44,6 +46,8 @@ Solution:
 
 ![sea_trench_solution.png](images/sea_trench_solution.png){width=1000px}
 
+<!-- test: file=files/xslope_sea_trench.xlsx, type=seep, expected_flowrate=4.347, tolerance=0.05 -->
+
 ### 3. Earth Dam with Core
 
 The following diagram illustrates a simple earth dam with a clay core and a granular shell:
@@ -64,6 +68,8 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.342, tolerance=0.05 -->
+
 ### 4. Johnson Reservoir
 
 This is another earth dam problem with a shell, a core, and a foundation. 
@@ -81,6 +87,8 @@ The solution should look something like this:
 
 ![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
 
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.953, tolerance=0.05 -->
+
 ### 5. Earth Dam with Core and Filter
 
 This problem has the following cross-section:
@@ -96,6 +104,8 @@ The following Excel file contains the problem inputs:
 The solution should look something like this:
 
 ![earth_dam2_solution.png](images/earth_dam2_solution.png){width=1200px}
+
+<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, expected_flowrate=1.269, tolerance=0.05 -->
 
 ### 6. Levee with Grouted Foundation
 
@@ -126,3 +136,5 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 Solution:
 
 ![levee_results.png](images/levee_results.png){width=1200px}
+
+<!-- test: file=files/xslope_levee_full.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->

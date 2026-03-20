@@ -555,13 +555,23 @@ Core LEM implementation — user provides $H$ and $\theta_p$ directly.
 
 Auto-compute $H$ from pile geometry and soil properties when $H$ is left blank.
 
-1. **`ito_matsui.py`** (new module or function in `solve.py`):
-   - `ito_matsui_coefficients(D1, D, phi)` — closed-form $A_1$, $A_2$
-   - `intersect_pile_with_materials(pile, slope_data, y_failure)` — find soil layers along pile
-   - `compute_ito_matsui_force(pile, segments)` — piecewise integration, divide by $S$
-2. **`fileio.py` or `slice.py`**: If $H$ is blank and $D_{\text{pile}}$/$S$ are provided, auto-compute $H$ using Ito & Matsui
+**Computation characteristics**: Ito & Matsui is a closed-form equation — no iteration, no convergence issues. It evaluates coefficients from $\tan\varphi$ and $N_\varphi = \tan^2(45° + \varphi/2)$ plus an exponential, then integrates a linear function over each soil layer. Computation is essentially instantaneous (microseconds per pile). Well-behaved for all practical friction angles; $\varphi = 0$ (pure clay) has a separate simpler equation.
+
+**When to compute**: At **slice generation time** (in `slice.py`), not at file load time. The reason: Ito & Matsui integrates the lateral pressure from the ground surface down to the failure surface. The failure surface location changes with each trial circle during the search. Computing $H$ per trial surface is physically correct — a deeper failure surface means more soil above it pushing on the pile, giving a higher $H$. Since the computation is instantaneous, there is no performance penalty for recomputing on every trial. This is the approach used by commercial codes that implement Ito & Matsui (e.g., ReSSA by ADAMA Engineering).
+
+**Implementation**:
+
+1. **`ito_matsui.py`** (new module):
+   - `ito_matsui_coefficients(D1, D, phi)` — closed-form $A_1$, $A_2$ coefficients
+   - `intersect_pile_with_materials(pile, slope_data, y_failure)` — find soil layers along the pile between the ground surface and failure surface intersection
+   - `compute_ito_matsui_force(pile, segments, S)` — piecewise integration over layers, divide by spacing $S$
+2. **`slice.py`**: During pile-to-slice assignment, if `H` is blank and `D_pile`/`S` are provided:
+   - Determine the failure surface $y$-coordinate at the pile intersection (already computed in Phase 2)
+   - Call `compute_ito_matsui_force()` with the pile geometry, soil layers, and failure surface depth
+   - Assign the computed $H$ to the slice's `h_pile` column
+   - If `H` is provided by the user, use that value instead (user override)
 3. **Validation**: Compare auto-computed $H$ against hand calculations and published examples
-4. **Documentation**: Add Ito & Matsui theory section, worked example
+4. **Documentation**: Add Ito & Matsui theory section, worked example showing auto-computed vs. user-specified $H$
 
 ### Phase 4: FEM Beam Elements
 

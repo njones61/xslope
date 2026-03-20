@@ -69,7 +69,7 @@ Where $F_{corr}$ is the corrected factor of safety, $F$ is the factor of safety 
 
 For a complete implementation of Janbu's Simplified Method, we need to consider additional forces acting on the slice. The full set of forces are shown in the following figure:
 
->>![oms_complete.png](images/oms_complete.png){width=300px}
+>>![oms_complete.png](images/oms_complete.png)
 
 Where:
 
@@ -79,12 +79,19 @@ $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
 $P$ = reinforcement force on base of slice <br>
 $T$ = tension crack water force <br>
+$H$ = pile/pier force at point $e$ on the failure surface <br>
+$\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, and $T$ are included in the Janbu simplified method factor of safety equation as follows:
+!!! note
+    The diagram shows a case where $\theta_p < 0$ (force directed below horizontal). The equations handle both positive and negative angles. When $\theta_p = 0$ (default), the pile force is purely horizontal.
 
-To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, and $T$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The equation for N then becomes:
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Janbu simplified method factor of safety equation as follows:
 
->>$N'  = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell  \qquad (10)$
+To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, $T$, and $H$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The pile force $H$ at angle $\theta_p$ contributes a component $H \sin(\alpha - \theta_p)$ normal to the base (increasing effective stress). The equation for N' then becomes:
+
+>>$N'  = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell  \qquad (10)$
+
+When $\theta_p = 0$, the pile term reduces to $H \sin \alpha$.
 
 The resisting force parallel to the base of the slice is the shear force $S$:
 
@@ -92,17 +99,21 @@ The resisting force parallel to the base of the slice is the shear force $S$:
 
 Substituting equation (10) into this gives:
 
->>$S = c \Delta \ell + (W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi   \qquad (11)$
+>>$S = c \Delta \ell + (W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi   \qquad (11)$
 
 Next, we need to update the driving force parallel to the base of the slice. Updating equation (5) above gives:
 
 >>$W \sin \alpha + kW \cos \alpha  - D \sin (\beta - \alpha)  + T \cos \alpha   \qquad (12)$
 
-The reinforcement force $P$ is a known applied force, not shear strength. It must not be divided by the factor of safety. Therefore, $P$ is subtracted from the driving forces in the denominator rather than added to the resisting forces in the numerator. The factor of safety is found by substituting the updated resisting and driving forces into equation (6):
+The reinforcement force $P$ and the horizontal component of the pile force $H \cos \theta_p$ are known applied forces, not shear strength. They must not be divided by the factor of safety. Therefore, they are subtracted from the driving forces in the denominator rather than added to the resisting forces in the numerator. Since Janbu resolves forces horizontally, only the horizontal component of the pile force enters the denominator directly. The factor of safety is found by substituting the updated resisting and driving forces into equation (6):
 
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P}   \qquad (13)$
+>>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P - \sum H \cos \theta_p}   \qquad (13)$
 
-It should be remembered that $T$ only applies to the side of the uppermost slice. $T$ = 0  for all the other slices.
+Note that:
+
+- The pile force affects both the **numerator** (through $H \sin(\alpha - \theta_p)$ in $N'$, which increases frictional resistance) and the **denominator** (through $H \cos \theta_p$, which reduces driving forces)
+- When $\theta_p = 0$, the numerator term reduces to $H \sin \alpha$ and the denominator term reduces to $H$
+- $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices)
 
 Once again, we apply the correction factor $f_o$ to account for the neglect of interslice forces and moment equilibrium as shown in equation (9) above.
 

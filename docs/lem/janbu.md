@@ -6,7 +6,7 @@ The forces on the slice considered by the Janbu method are as follows:
 
 >>![oms_slice.png](images/oms_slice.png){width=200px}
 
-For the Janbu method, the side forces are assumed to cancel each other and are therefore iginored. The method does not satisfy moment equilibrium and only partially satisfies force equilibrium. It can be used on both circular and non-circular failure surfaces. 
+For the Janbu method, the side forces are assumed to cancel each other and are therefore ignored. The method does not satisfy moment equilibrium and only partially satisfies force equilibrium. It can be used on both circular and non-circular failure surfaces. 
 
 From the basic theory of limit equilibrium, the factor of safety $F$ is defined as the ratio of the resisting forces to the driving forces acting on the sliding mass, or:
 

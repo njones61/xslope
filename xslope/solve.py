@@ -311,6 +311,13 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     x_c   = slice_df['x_c'].values
     y_cg  = slice_df['y_cg'].values
 
+    # Pile forces (backward compatible — zeros if no pile data)
+    n = len(slice_df)
+    H_pile  = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n)
+    theta_p = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
+    y_pile  = slice_df['y_pile'].values  if 'y_pile'  in slice_df.columns else np.zeros(n)
+    x_pile  = slice_df['x_pile'].values  if 'x_pile'  in slice_df.columns else np.zeros(n)
+
     # Trigonometric terms
     sin_alpha = np.sin(alpha)
     cos_alpha = np.cos(alpha)
@@ -324,33 +331,42 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     a_s  = Yo - y_cg
     a_t  = Yo - y_t
 
-    # Denominator (moment equilibrium)
+    # Pile resisting moment about circle center (same term as OMS)
+    sum_pile_moment = np.sum(
+        H_pile * np.cos(theta_p) * (Yo - y_pile)
+      + H_pile * np.sin(theta_p) * (x_pile - Xo)
+    )
+
+    # Denominator (moment equilibrium) — pile moment is a known resisting force, not factored by FS
     sum_W = np.sum(W * sin_alpha)
     sum_Dx = np.sum(D * cos_beta * a_dx)
     sum_Dy = np.sum(D * sin_beta * a_dy)
     sum_kw = np.sum(kw * a_s)
     sum_T = np.sum(T * a_t)
-    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy
+    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy - (1.0 / R) * sum_pile_moment
 
     if denominator <= 0:
         return False, "Net driving moment is non-positive (resisting forces exceed driving forces)."
 
+    # Vertical component of pile force (upward, reduces net downward force on slice)
+    H_sin_tp = H_pile * np.sin(theta_p)
+
     # Iterative solution
     F = 1.0
     for _ in range(max_iter):
-        # Compute N_eff from Equation (8)
+        # Compute N_eff — H·sin(θp) enters vertical equilibrium
         num_N = (
-            W + D * cos_beta - P * sin_alpha
+            W + D * cos_beta - P * sin_alpha - H_sin_tp
             - u * dl * cos_alpha
             - (c * dl * sin_alpha) / F
         )
         denom_N = cos_alpha + (sin_alpha * tan_phi) / F
         N_eff = num_N / denom_N
 
-        # Numerator for FS from Equation (10)
+        # Numerator for FS — same H·sin(θp) term in the weight group
         shear = (
             c * dl * cos_alpha
-            + (W + D * cos_beta - P * sin_alpha - u * dl * cos_alpha) * tan_phi
+            + (W + D * cos_beta - P * sin_alpha - H_sin_tp - u * dl * cos_alpha) * tan_phi
         )
         numerator = np.sum(shear / denom_N)
         F_new = numerator / denominator
@@ -361,6 +377,8 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
                 print(f"FS = {F_new:.6f}")
                 print(f"Numerator = {numerator:.6f}")
                 print(f"Denominator = {denominator:.6f}")
+                if np.any(H_pile > 0):
+                    print(f"sum_pile_moment = {sum_pile_moment:.6f}")
                 print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
             return True, {'method': 'bishop', 'FS': F_new}
 

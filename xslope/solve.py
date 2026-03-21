@@ -416,6 +416,11 @@ def janbu(slice_df, debug=False):
     T = slice_df['t'].values
     P = slice_df['p'].values
 
+    # Pile forces (backward compatible — zeros if no pile data)
+    n = len(slice_df)
+    H_pile  = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n)
+    theta_p = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
+
     # Trigonometric terms
     sin_alpha = np.sin(alpha)
     cos_alpha = np.cos(alpha)
@@ -423,16 +428,15 @@ def janbu(slice_df, debug=False):
     sin_beta_alpha = np.sin(beta - alpha)
     cos_beta_alpha = np.cos(beta - alpha)
 
-    # Effective normal forces (Equation 10)
-    N_eff = W * cos_alpha - kw * sin_alpha + D * cos_beta_alpha - T * sin_alpha - u * dl
+    # Effective normal forces — pile force resolved normal to base: +H·sin(α−θp)
+    N_eff = W * cos_alpha - kw * sin_alpha + D * cos_beta_alpha - T * sin_alpha - u * dl + H_pile * np.sin(alpha - theta_p)
 
     # Numerator: resisting forces (shear resistance only, Equation 13)
     numerator = np.sum(c * dl + N_eff * tan_phi)
 
     # Denominator: driving forces minus known resisting forces (Equation 13)
-    # P is a known applied force (reinforcement), not shear strength, so it is
-    # subtracted from driving forces rather than added to the numerator.
-    denominator = np.sum(W * sin_alpha + kw * cos_alpha - D * sin_beta_alpha + T * cos_alpha) - np.sum(P)
+    # P and pile tangential component are known resisting forces, subtracted from driving forces.
+    denominator = np.sum(W * sin_alpha + kw * cos_alpha - D * sin_beta_alpha + T * cos_alpha) - np.sum(P) - np.sum(H_pile * np.cos(alpha - theta_p))
 
     # Base factor of safety (Equation 13)
     if denominator <= 0:
@@ -491,6 +495,8 @@ def janbu(slice_df, debug=False):
         print(f"FS_corrected = {FS:.6f}")
         print(f"Numerator = {numerator:.6f}")
         print(f"Denominator = {denominator:.6f}")
+        if np.any(H_pile > 0):
+            print(f"sum_pile_tangential = {np.sum(H_pile * np.cos(alpha - theta_p)):.6f}")
         print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
 
     return True, {

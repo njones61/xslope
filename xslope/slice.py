@@ -534,6 +534,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             geom = LineString([(pt["X"], pt["Y"]) for pt in line])
             reinf_lines_data.append({"xs": xs, "ts": ts, "geom": geom})
 
+    # Prepare pile lines data
+    pile_lines_data = []
+    if slope_data.get("pile_lines"):
+        for pile in slope_data["pile_lines"]:
+            geom = LineString([(pile["x1"], pile["y1"]), (pile["x2"], pile["y2"])])
+            pile_lines_data.append({
+                "geom": geom,
+                "H": pile["H"] if pile["H"] is not None else 0.0,
+                "theta_p": pile["theta_p"],
+            })
+
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
     # Generate failure surface
@@ -929,7 +940,23 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 continue
 
         # Now p_sum is the TOTAL T‐pull acting at this slice's base.
-        # === END: "Tension crack water force" ===
+        # === END: "Reinforcement lines" ===
+
+        # === BEGIN: "Pile lines" ===
+        h_pile = 0.0
+        theta_p_val = 0.0
+        x_pile = 0.0
+        y_pile = 0.0
+        for pl in pile_lines_data:
+            intersec = slice_base.intersection(pl["geom"])
+            if intersec.is_empty:
+                continue
+            if isinstance(intersec, Point):
+                h_pile += pl["H"]
+                theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
+                x_pile = intersec.x
+                y_pile = intersec.y
+        # === END: "Pile lines" ===
 
         # Process piezometric line and pore pressures using pre-computed coordinates
         piezo_y = piezo_y_all[i]
@@ -1074,6 +1101,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
             'p': p_sum,   # sum of reinforcement line T values that intersect base of slice.
+            'h_pile': h_pile,    # pile force magnitude per unit width (0 if no pile)
+            'theta_p': radians(theta_p_val),  # pile force angle from horizontal in radians
+            'x_pile': x_pile,    # x-coordinate of pile-failure surface intersection
+            'y_pile': y_pile,    # y-coordinate of pile-failure surface intersection
             'n_eff': 0, # Placeholder for effective normal force
             'z': 0,     # Placeholder for interslice side forces
             'theta': 0, # Placeholder for interslice angles

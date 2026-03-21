@@ -1386,6 +1386,41 @@ def plot_reinforcement_lines(ax, slope_data):
                 tension_points_plotted = True
 
 
+def plot_piles(ax, slope_data, slice_df=None):
+    """
+    Plots pile lines from slope_data and optionally marks failure surface intersections.
+
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: Dictionary containing slope data with 'pile_lines' key
+        slice_df: Optional DataFrame — if provided, marks pile-failure surface intersection points
+    """
+    if 'pile_lines' not in slope_data or not slope_data['pile_lines']:
+        return
+
+    for i, pile in enumerate(slope_data['pile_lines']):
+        xs = [pile['x1'], pile['x2']]
+        ys = [pile['y1'], pile['y2']]
+        ax.plot(xs, ys, color='saddlebrown', linewidth=4, linestyle='-',
+                alpha=0.9, solid_capstyle='butt',
+                label='Pile' if i == 0 else "")
+        # Annotate with H value
+        if pile.get('H') is not None:
+            mid_x = (pile['x1'] + pile['x2']) / 2
+            mid_y = (pile['y1'] + pile['y2']) / 2
+            ax.annotate(f"H={pile['H']:.0f}", (mid_x, mid_y),
+                        textcoords="offset points", xytext=(8, 0),
+                        fontsize=8, color='saddlebrown', fontweight='bold')
+
+    # Mark failure surface intersection points from slice_df
+    if slice_df is not None and 'h_pile' in slice_df.columns:
+        pile_slices = slice_df[slice_df['h_pile'] > 0]
+        if not pile_slices.empty:
+            ax.scatter(pile_slices['x_pile'], pile_slices['y_pile'],
+                       marker='o', s=40, color='red', zorder=6,
+                       label='Pile-Surface Intersection')
+
+
 def plot_inputs(
     slope_data,
     title="Slope Geometry and Inputs",
@@ -1472,6 +1507,7 @@ def plot_inputs(
         plot_dloads(ax, slope_data)
     plot_tcrack_surface(ax, slope_data)
     plot_reinforcement_lines(ax, slope_data)
+    plot_piles(ax, slope_data)
 
     if mode == "lem":
         if slope_data['circular']:
@@ -1760,6 +1796,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_tcrack_surface(ax, slope_data)
     plot_tcrack_water_force(ax, slice_df, slope_data)
     plot_reinforcement_lines(ax, slope_data)
+    plot_piles(ax, slope_data, slice_df=slice_df)
     if slice_numbers:
         plot_slice_numbers(ax, slice_df)
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend

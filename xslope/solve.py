@@ -177,6 +177,13 @@ def oms(slice_df, debug=False):
     x_c    = slice_df['x_c'].values      # x_{c,i}
     y_cg = slice_df['y_cg'].values       # y_{cg,i} coordinate of slice centroid
 
+    # Pile forces (backward compatible — zeros if no pile data)
+    n = len(slice_df)
+    H_pile  = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n)
+    theta_p = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
+    y_pile  = slice_df['y_pile'].values  if 'y_pile'  in slice_df.columns else np.zeros(n)
+    x_pile  = slice_df['x_pile'].values  if 'x_pile'  in slice_df.columns else np.zeros(n)
+
     # 3) Convert angles to radians
     alpha = np.radians(alpha_deg)   # αᵢ [rad]
     phi   = np.radians(phi_deg)     # φᵢ [rad]
@@ -195,14 +202,15 @@ def oms(slice_df, debug=False):
     #
 
 
-    # N′ᵢ = Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ
+    # N′ᵢ = Wᵢ·cosαᵢ + Dᵢ·cos(αᵢ−βᵢ) − kWᵢ·sinαᵢ − Tᵢ·sinαᵢ − uᵢ·Δℓᵢ + Hᵢ·sin(αᵢ−θₚᵢ)
     N_eff = (
         W * cos_alpha
       + D * cos_ab
       - kw * sin_alpha
       - T * sin_alpha
       - (u * dl)
-    )  
+      + H_pile * np.sin(alpha - theta_p)
+    )
 
     #   Σ  Dᵢ·sinβᵢ·(Yo - d_{y,i}) 
     a_dy = Yo - d_y
@@ -228,9 +236,16 @@ def oms(slice_df, debug=False):
     a_t = Yo - y_t
     sum_T = np.sum(T * a_t)
 
+    # Pile resisting moment about circle center:
+    # M_pile = Σ [ H·cos(θₚ)·(Yo - y_pile) + H·sin(θₚ)·(x_pile - Xo) ]
+    sum_pile_moment = np.sum(
+        H_pile * np.cos(theta_p) * (Yo - y_pile)
+      + H_pile * np.sin(theta_p) * (x_pile - Xo)
+    )
+
     # Put them together with their 1/R factors:
-    # P and sum_Dy are known resisting forces, not factored by FS
-    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy
+    # P, sum_Dy, and pile moment are known resisting forces, not factored by FS
+    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy - (1.0 / R) * sum_pile_moment
 
     # 7) Finally compute FS = (numerator)/(denominator)
     if denominator <= 0:
@@ -248,6 +263,8 @@ def oms(slice_df, debug=False):
         print(f'Sum_Dy = {sum_Dy:.4f}')
         print(f'Sum_kw = {sum_kw:.4f}')
         print(f'Sum_T = {sum_T:.4f}')
+        if np.any(H_pile > 0):
+            print(f'sum_pile_moment = {sum_pile_moment:.4f}')
         print('N_eff =', np.array2string(N_eff, precision=4, separator=', '))
 
     # 9) Return success and the FS

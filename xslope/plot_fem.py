@@ -197,17 +197,30 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
             plt.Line2D([0], [0], color=mat_to_color[mat], lw=4, label=label)
         )
 
-    # Plot 1D reinforcement elements
+    # Plot 1D elements (reinforcement truss + pile beam)
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+    pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
+    n_reinf_plotted = 0
+    n_pile_plotted = 0
     if len(elements_1d) > 0:
         for elem_idx in range(len(elements_1d)):
             elem_nodes_1d = elements_1d[elem_idx]
             n0 = nodes[elem_nodes_1d[0]]
             n1 = nodes[elem_nodes_1d[1]]
-            ax.plot([n0[0], n1[0]], [n0[1], n1[1]], 'r-', linewidth=2.5, zorder=5)
-        legend_handles.append(
-            plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({len(elements_1d)} elements)')
-        )
+            if pile_elem_mask[elem_idx]:
+                ax.plot([n0[0], n1[0]], [n0[1], n1[1]], color='green', linewidth=3.5, zorder=5)
+                n_pile_plotted += 1
+            else:
+                ax.plot([n0[0], n1[0]], [n0[1], n1[1]], 'r-', linewidth=2.5, zorder=5)
+                n_reinf_plotted += 1
+        if n_reinf_plotted > 0:
+            legend_handles.append(
+                plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({n_reinf_plotted} elements)')
+            )
+        if n_pile_plotted > 0:
+            legend_handles.append(
+                plt.Line2D([0], [0], color='green', lw=3.5, label=f'Pile ({n_pile_plotted} elements)')
+            )
 
     # Plot boundary conditions
     if show_bc:
@@ -256,8 +269,10 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         parts.append(f"{num_tri} triangles")
     if num_quad > 0:
         parts.append(f"{num_quad} quads")
-    if num_1d > 0:
-        parts.append(f"{num_1d} reinforcement")
+    if n_reinf_plotted > 0:
+        parts.append(f"{n_reinf_plotted} reinforcement")
+    if n_pile_plotted > 0:
+        parts.append(f"{n_pile_plotted} pile")
     title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
     ax.set_title(title)
@@ -1021,24 +1036,33 @@ def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=1.0, label
 
 def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, linewidth=2, label=None):
     """
-    Plot reinforcement elements as lines.
+    Plot reinforcement and pile elements as lines with distinct colors.
     """
     if 'elements_1d' not in fem_data:
         return
-    
+
     nodes = fem_data["nodes"]
     elements_1d = fem_data["elements_1d"]
     element_types_1d = fem_data["element_types_1d"]
-    
-    lines = []
+    pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
+
+    reinf_lines = []
+    pile_lines = []
     for i, elem in enumerate(elements_1d):
         elem_type = element_types_1d[i]
-        if elem_type >= 2:  # At least 2 nodes
-            line_coords = nodes[elem[:2]]  # Use first two nodes for line
-            lines.append(line_coords)
-    
-    if lines:
-        lc = LineCollection(lines, colors=color, alpha=alpha, linewidths=linewidth, label=label)
+        if elem_type >= 2:
+            line_coords = nodes[elem[:2]]
+            if pile_elem_mask[i]:
+                pile_lines.append(line_coords)
+            else:
+                reinf_lines.append(line_coords)
+
+    if reinf_lines:
+        lc = LineCollection(reinf_lines, colors=color, alpha=alpha, linewidths=linewidth, label=label)
+        ax.add_collection(lc)
+    if pile_lines:
+        pile_label = label.replace('Reinforcement', 'Pile') if label and 'Reinforcement' in label else None
+        lc = LineCollection(pile_lines, colors='green', alpha=alpha, linewidths=linewidth + 1, label=pile_label)
         ax.add_collection(lc)
 
 
@@ -1079,25 +1103,38 @@ def plot_reinforcement_forces(ax, fem_data, solution):
     pullout_lines = []
     inactive_lines = []
 
+    pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
+    pile_force_lines = []
+    pile_force_colors = []
+    forces_pile_lateral = solution.get("forces_pile_lateral", np.array([]))
+
+    # Build pile element index mapping: global 1d index -> pile force index
+    pile_force_idx = 0
+
     for i in range(len(elements_1d)):
         elem = elements_1d[i]
         coords = nodes[elem[:2]]
+
+        if pile_elem_mask[i]:
+            # Pile element — color by lateral (shear) force
+            if pile_force_idx < len(forces_pile_lateral):
+                pile_force_lines.append(coords)
+                pile_force_colors.append(abs(forces_pile_lateral[pile_force_idx]))
+            pile_force_idx += 1
+            continue
+
         force = forces_1d[i]
         is_failed = failed_1d[i]
 
         if is_failed and t_res[i] < 1e-6 and force < 1e-6:
-            # Pulled out / broken — no residual capacity
             pullout_lines.append(coords)
         elif is_failed and t_res[i] > 1e-6:
-            # At residual capacity
             tres_lines.append(coords)
         elif force > 1e-6:
-            # Normal tension — color by force/Tmax
             ratio = min(force / t_max_global, 1.0) if t_max_global > 0 else 0.0
             normal_lines.append(coords)
             normal_colors.append(force_cmap(ratio))
         else:
-            # Inactive
             inactive_lines.append(coords)
 
     # Draw inactive elements (cyan, solid)
@@ -1136,6 +1173,22 @@ def plot_reinforcement_forces(ax, fem_data, solution):
         lc = LineCollection(pullout_lines, colors='black', linewidths=3, alpha=0.9, zorder=6)
         ax.add_collection(lc)
         ax.plot([], [], '-', color='black', linewidth=3, alpha=0.9, label='Pulled out')
+
+    # Draw pile elements colored by lateral (shear) force
+    if pile_force_lines:
+        from matplotlib.colors import Normalize
+        max_lateral = max(pile_force_colors) if pile_force_colors else 1.0
+        pile_cmap = plt.cm.Greens
+        pile_norm = Normalize(vmin=0, vmax=max_lateral if max_lateral > 0 else 1.0)
+        colors = [pile_cmap(pile_norm(v)) for v in pile_force_colors]
+        lc_outline = LineCollection(pile_force_lines, colors='black', linewidths=5, alpha=0.9, zorder=5.9)
+        ax.add_collection(lc_outline)
+        lc = LineCollection(pile_force_lines, colors=colors, linewidths=3.5, alpha=0.9, zorder=6)
+        ax.add_collection(lc)
+        sm = cm.ScalarMappable(cmap=pile_cmap, norm=pile_norm)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+        cbar.set_label('Pile Lateral Force', rotation=270, labelpad=15, fontsize=10)
 
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()

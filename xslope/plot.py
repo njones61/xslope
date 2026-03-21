@@ -1401,7 +1401,7 @@ def plot_piles(ax, slope_data, slice_df=None):
     for i, pile in enumerate(slope_data['pile_lines']):
         xs = [pile['x1'], pile['x2']]
         ys = [pile['y1'], pile['y2']]
-        ax.plot(xs, ys, color='saddlebrown', linewidth=4, linestyle='-',
+        ax.plot(xs, ys, color='green', linewidth=4, linestyle='-',
                 alpha=0.9, solid_capstyle='butt',
                 label='Pile' if i == 0 else "")
         # Annotate with H value
@@ -1410,7 +1410,7 @@ def plot_piles(ax, slope_data, slice_df=None):
             mid_y = (pile['y1'] + pile['y2']) / 2
             ax.annotate(f"H={pile['H']:.0f}", (mid_x, mid_y),
                         textcoords="offset points", xytext=(8, 0),
-                        fontsize=8, color='saddlebrown', fontweight='bold')
+                        fontsize=8, color='green', fontweight='bold')
 
     # Mark failure surface intersection points from slice_df
     if slice_df is not None and 'h_pile' in slice_df.columns:

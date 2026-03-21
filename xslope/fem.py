@@ -339,7 +339,132 @@ def build_fem_data(slope_data, mesh=None):
                     K_global_1d_elems.append(np.zeros((4, 4)))
             else:
                 K_global_1d_elems.append(np.zeros((4, 4)))
-    
+
+    # === PILE BEAM ELEMENTS ===
+    # Pile 1D elements are identified by element_materials_1d values that exceed
+    # the number of reinforcement lines (since constraint lines are ordered:
+    # reinforcement first, then piles).
+    n_reinf_lines = len(slope_data.get("reinforcement_lines", []))
+    pile_lines = slope_data.get("pile_lines", [])
+    n_pile_lines = len(pile_lines)
+
+    # Identify which 1D elements are pile elements
+    pile_elem_mask = np.zeros(n_1d_elements, dtype=bool)
+    n_pile_elements = 0
+    k_axial_by_pile_elem = []
+    k_lateral_by_pile_elem = []
+    cos_theta_pile = []
+    sin_theta_pile = []
+    dof_indices_pile = []
+    K_global_pile_elems = []
+    pile_elem_indices = []  # maps pile element index to global 1D element index
+
+    if n_1d_elements > 0 and n_pile_lines > 0:
+        for elem_idx in range(n_1d_elements):
+            line_id = element_materials_1d[elem_idx] - 1  # 0-based
+            pile_line_idx = line_id - n_reinf_lines  # index into pile_lines
+
+            if pile_line_idx < 0 or pile_line_idx >= n_pile_lines:
+                continue
+
+            pile_data = pile_lines[pile_line_idx]
+            pile_elem_mask[elem_idx] = True
+            pile_elem_indices.append(elem_idx)
+
+            # Get element geometry
+            elem_nodes = elements_1d[elem_idx]
+            node_0 = elem_nodes[0]
+            node_1 = elem_nodes[1]
+            coord_0 = nodes[node_0]
+            coord_1 = nodes[node_1]
+
+            dx = coord_1[0] - coord_0[0]
+            dy = coord_1[1] - coord_0[1]
+            elem_length = np.sqrt(dx * dx + dy * dy)
+
+            if elem_length > 1e-12:
+                cos_t = dx / elem_length
+                sin_t = dy / elem_length
+
+                # Get pile properties
+                E_pile = pile_data.get("E", 0.0)
+                D_pile = pile_data.get("D_pile")
+                S_pile = pile_data.get("S", 1.0)  # default 1.0 = no spacing reduction
+                I_pile = pile_data.get("I")
+                A_pile = pile_data.get("area")
+
+                # Auto-compute I and A from D if not provided
+                if D_pile is not None:
+                    if A_pile is None:
+                        A_pile = np.pi * D_pile**2 / 4.0
+                    if I_pile is None:
+                        I_pile = np.pi * D_pile**4 / 64.0
+                else:
+                    if A_pile is None:
+                        A_pile = 0.0
+                    if I_pile is None:
+                        I_pile = 0.0
+
+                if E_pile is None or E_pile == 0:
+                    continue
+
+                # Scale by 1/S for per-unit-width (2D plane strain)
+                if S_pile and S_pile > 0:
+                    EA = E_pile * A_pile / S_pile
+                    EI = E_pile * I_pile / S_pile
+                else:
+                    EA = E_pile * A_pile
+                    EI = E_pile * I_pile
+
+                # Axial and lateral stiffness
+                k_a = EA / elem_length
+                k_l = 3.0 * EI / (elem_length ** 3)
+
+                # DOF indices
+                dof_idx = [2*node_0, 2*node_0+1, 2*node_1, 2*node_1+1]
+
+                # Build condensed 4x4 beam stiffness in local coords:
+                # K_local = [[EA/L, 0, -EA/L, 0],
+                #            [0, 3EI/L³, 0, -3EI/L³],
+                #            [-EA/L, 0, EA/L, 0],
+                #            [0, -3EI/L³, 0, 3EI/L³]]
+                # Then transform to global using direction cosines.
+                c2 = cos_t * cos_t
+                cs = cos_t * sin_t
+                s2 = sin_t * sin_t
+
+                # Global beam stiffness = T^T @ K_local @ T
+                # Axial contribution (same as truss):
+                K_axial = k_a * np.array([
+                    [ c2,  cs, -c2, -cs],
+                    [ cs,  s2, -cs, -s2],
+                    [-c2, -cs,  c2,  cs],
+                    [-cs, -s2,  cs,  s2]
+                ])
+                # Lateral contribution (perpendicular to element axis):
+                K_lateral = k_l * np.array([
+                    [ s2, -cs, -s2,  cs],
+                    [-cs,  c2,  cs, -c2],
+                    [-s2,  cs,  s2, -cs],
+                    [ cs, -c2, -cs,  c2]
+                ])
+                K_beam = K_axial + K_lateral
+
+                k_axial_by_pile_elem.append(k_a)
+                k_lateral_by_pile_elem.append(k_l)
+                cos_theta_pile.append(cos_t)
+                sin_theta_pile.append(sin_t)
+                dof_indices_pile.append(dof_idx)
+                K_global_pile_elems.append(K_beam)
+                n_pile_elements += 1
+
+    k_axial_by_pile_elem = np.array(k_axial_by_pile_elem)
+    k_lateral_by_pile_elem = np.array(k_lateral_by_pile_elem)
+    cos_theta_pile = np.array(cos_theta_pile)
+    sin_theta_pile = np.array(sin_theta_pile)
+    dof_indices_pile = np.array(dof_indices_pile, dtype=int).reshape(-1, 4) if n_pile_elements > 0 else np.zeros((0, 4), dtype=int)
+    pile_elem_indices = np.array(pile_elem_indices, dtype=int)
+
     # Set up boundary conditions
     
     # Step 1: Default to free (type 0)
@@ -522,10 +647,20 @@ def build_fem_data(slope_data, mesh=None):
         "k_seismic": k_seismic,
         "pp_option": pp_option,
         "piezo_line_coords": piezo_line_coords,
-        "gamma_water": slope_data.get("gamma_water", 9.81)
+        "gamma_water": slope_data.get("gamma_water", 9.81),
+        # Pile beam elements
+        "n_pile_elements": n_pile_elements,
+        "pile_elem_mask": pile_elem_mask,
+        "pile_elem_indices": pile_elem_indices,
+        "k_axial_by_pile_elem": k_axial_by_pile_elem,
+        "k_lateral_by_pile_elem": k_lateral_by_pile_elem,
+        "cos_theta_pile": cos_theta_pile,
+        "sin_theta_pile": sin_theta_pile,
+        "dof_indices_pile": dof_indices_pile,
+        "K_global_pile_elems": K_global_pile_elems,
     }
-    
-   
+
+
     return fem_data
 
 
@@ -639,7 +774,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         if debug_level >= 1:
             print(f"  1D truss elements: {n_1d_elements}")
 
-    # ---- Step 1: Build K_global (elastic, constant — includes 2D soil + 1D truss) ----
+    # Extract pile beam element data
+    n_pile_elements = fem_data.get("n_pile_elements", 0)
+    has_pile_elements = n_pile_elements > 0
+    pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(n_1d_elements, dtype=bool))
+
+    if has_pile_elements:
+        k_axial_pile = fem_data["k_axial_by_pile_elem"]
+        k_lateral_pile = fem_data["k_lateral_by_pile_elem"]
+        cos_theta_pile = fem_data["cos_theta_pile"]
+        sin_theta_pile = fem_data["sin_theta_pile"]
+        dof_indices_pile = fem_data["dof_indices_pile"]
+        forces_pile_axial = np.zeros(n_pile_elements)
+        forces_pile_lateral = np.zeros(n_pile_elements)
+
+        if debug_level >= 1:
+            print(f"  Pile beam elements: {n_pile_elements}")
+
+    # ---- Step 1: Build K_global (elastic, constant — includes 2D soil + 1D truss + pile beam) ----
     K_global = build_global_stiffness(nodes, elements, element_types,
                                       element_materials, E_by_mat, nu_by_mat,
                                       fem_data=fem_data)
@@ -896,6 +1048,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             n_1d_exceeded = 0
 
             for elem_idx_1d in range(n_1d_elements):
+                if pile_elem_mask[elem_idx_1d]:
+                    continue  # pile elements handled separately below
                 dof_idx = dof_indices_1d[elem_idx_1d]
                 k = k_by_1d_elem[elem_idx_1d]
                 cos_t = cos_theta_1d[elem_idx_1d]
@@ -946,6 +1100,30 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                 print(f"    1D elements: {n_1d_compression} in compression, "
                       f"{n_1d_exceeded} exceeded capacity, "
                       f"{np.sum(failed_1d)} total failed")
+
+        # ---- Pile beam element force computation (no body-force corrections for Phase 1) ----
+        # Piles carry both tension and compression. No capacity checks in Phase 1 —
+        # the SSRM finds the natural failure mode (soil failure around the pile).
+        if has_pile_elements:
+            for p_idx in range(n_pile_elements):
+                dof_idx = dof_indices_pile[p_idx]
+                cos_t = cos_theta_pile[p_idx]
+                sin_t = sin_theta_pile[p_idx]
+
+                # Relative displacement
+                u_elem = u[dof_idx]
+                du_x = u_elem[2] - u_elem[0]
+                du_y = u_elem[3] - u_elem[1]
+
+                # Axial force (projection along element axis)
+                delta_axial = du_x * cos_t + du_y * sin_t
+                T = k_axial_pile[p_idx] * delta_axial
+                forces_pile_axial[p_idx] = T
+
+                # Lateral force (projection perpendicular to element axis)
+                delta_lateral = -du_x * sin_t + du_y * cos_t
+                V = k_lateral_pile[p_idx] * delta_lateral
+                forces_pile_lateral[p_idx] = V
 
         # Compute unbalanced force ratio: ||VP corrections|| / ||F_gravity||
         # This measures how far the system is from force equilibrium.
@@ -1072,6 +1250,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
 
             forces_1d[elem_idx_1d] = T
 
+    # ---- Step 10c: Compute final pile beam element forces ----
+    if has_pile_elements:
+        for p_idx in range(n_pile_elements):
+            dof_idx = dof_indices_pile[p_idx]
+            cos_t = cos_theta_pile[p_idx]
+            sin_t = sin_theta_pile[p_idx]
+
+            u_elem = u[dof_idx]
+            du_x = u_elem[2] - u_elem[0]
+            du_y = u_elem[3] - u_elem[1]
+
+            delta_axial = du_x * cos_t + du_y * sin_t
+            forces_pile_axial[p_idx] = k_axial_pile[p_idx] * delta_axial
+
+            delta_lateral = -du_x * sin_t + du_y * cos_t
+            forces_pile_lateral[p_idx] = k_lateral_pile[p_idx] * delta_lateral
+
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
         print(f"  Plastic elements: {n_plastic}/{n_elements}")
@@ -1084,6 +1279,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             n_active = np.sum(forces_1d > 0)
             print(f"  1D elements: {n_active} active, {n_failed} failed, "
                   f"max force = {max_force:.2f}")
+        if has_pile_elements:
+            max_axial = np.max(np.abs(forces_pile_axial))
+            max_lateral = np.max(np.abs(forces_pile_lateral))
+            print(f"  Pile elements: {n_pile_elements}, "
+                  f"max axial = {max_axial:.2f}, max lateral = {max_lateral:.2f}")
 
     return {
         "converged": converged,
@@ -1104,6 +1304,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         "plastic_fraction": n_plastic / n_elements if n_elements > 0 else 0.0,
         "forces_1d": forces_1d if has_1d_elements else np.array([]),
         "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
+        "forces_pile_axial": forces_pile_axial if has_pile_elements else np.array([]),
+        "forces_pile_lateral": forces_pile_lateral if has_pile_elements else np.array([]),
     }
 
 
@@ -1120,14 +1322,28 @@ def print_reinforcement_summary(fem_data, solution):
         return
 
     element_materials_1d = fem_data["element_materials_1d"]
+    pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(n_1d, dtype=bool))
     t_allow_by_elem = fem_data["t_allow_by_1d_elem"]
     t_res_by_elem = fem_data["t_res_by_1d_elem"]
     forces = solution.get("forces_1d", np.zeros(n_1d))
     failed = solution.get("failed_1d_elements", np.zeros(n_1d, dtype=bool))
 
+    # Filter out pile elements — they are reported separately
+    reinf_mask = ~pile_elem_mask
+    if not np.any(reinf_mask):
+        # Print pile summary instead
+        n_pile = fem_data.get("n_pile_elements", 0)
+        if n_pile > 0:
+            axial = solution.get("forces_pile_axial", np.array([]))
+            lateral = solution.get("forces_pile_lateral", np.array([]))
+            print(f"\n=== Pile Summary ({n_pile} beam elements) ===")
+            print(f"  Max axial force:   {np.max(np.abs(axial)):.1f}")
+            print(f"  Max lateral force: {np.max(np.abs(lateral)):.1f}")
+        return
+
     # Get per-line Tmax and Tres from slope_data stored in fem_data
     # element_materials_1d is 1-based line ID
-    line_ids = np.unique(element_materials_1d)
+    line_ids = np.unique(element_materials_1d[reinf_mask])
 
     print("\n=== Reinforcement Summary ===")
     print(f"{'Line':>4}  {'Elems':>5}  {'Max T':>8}  {'Avg T':>8}  "
@@ -1852,18 +2068,33 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
                         if local_i < K_elem.shape[0] and local_j < K_elem.shape[1]:
                             K_global[global_i, global_j] += K_elem[local_i, local_j]
 
-    # Assemble 1D truss element stiffness matrices
+    # Assemble 1D truss element stiffness matrices (reinforcement only — skip pile elements)
     if fem_data is not None:
         K_global_1d_elems = fem_data.get("K_global_1d_elems", [])
         dof_indices_1d = fem_data.get("dof_indices_1d", np.zeros((0, 4), dtype=int))
+        pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(K_global_1d_elems), dtype=bool))
 
         for elem_idx_1d in range(len(K_global_1d_elems)):
+            if pile_elem_mask[elem_idx_1d]:
+                continue  # pile elements use beam stiffness, assembled below
             K_elem_1d = K_global_1d_elems[elem_idx_1d]
             dof_idx = dof_indices_1d[elem_idx_1d]
 
             for i in range(4):
                 for j in range(4):
                     K_global[dof_idx[i], dof_idx[j]] += K_elem_1d[i, j]
+
+        # Assemble pile beam element stiffness matrices
+        K_global_pile_elems = fem_data.get("K_global_pile_elems", [])
+        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 4), dtype=int))
+
+        for p_idx in range(len(K_global_pile_elems)):
+            K_beam = K_global_pile_elems[p_idx]
+            dof_idx = dof_indices_pile[p_idx]
+
+            for i in range(4):
+                for j in range(4):
+                    K_global[dof_idx[i], dof_idx[j]] += K_beam[i, j]
 
     return K_global.tocsr()
 

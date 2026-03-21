@@ -3127,10 +3127,10 @@ def add_intersection_points_to_polygons(polygons, lines, debug=False):
 def extract_reinforcement_line_geometry(slope_data):
     """
     Extract reinforcement line geometry from slope_data in the format needed for mesh generation.
-    
+
     Parameters:
         slope_data: Dictionary containing slope data with 'reinforce_lines' key
-        
+
     Returns:
         List of reinforcement lines, where each line is a list of (x, y) coordinate tuples
     """
@@ -3141,3 +3141,37 @@ def extract_reinforcement_line_geometry(slope_data):
             line_coords = [(point['X'], point['Y']) for point in line]
             lines.append(line_coords)
     return lines
+
+
+def extract_pile_line_geometry(slope_data):
+    """
+    Extract pile line geometry from slope_data in the format needed for mesh generation.
+
+    Parameters:
+        slope_data: Dictionary containing slope data with 'pile_lines' key
+
+    Returns:
+        List of pile lines, where each line is a list of (x, y) coordinate tuples
+    """
+    lines = []
+    if 'pile_lines' in slope_data and slope_data['pile_lines']:
+        for pile in slope_data['pile_lines']:
+            lines.append([(pile['x1'], pile['y1']), (pile['x2'], pile['y2'])])
+    return lines
+
+
+def extract_constraint_line_geometry(slope_data):
+    """
+    Extract all constraint line geometry (reinforcement + piles) for mesh generation.
+
+    Parameters:
+        slope_data: Dictionary containing slope data
+
+    Returns:
+        lines: Combined list of constraint lines (reinforcement first, then piles)
+        n_reinf: Number of reinforcement lines
+        n_pile: Number of pile lines
+    """
+    reinf_lines = extract_reinforcement_line_geometry(slope_data)
+    pile_lines = extract_pile_line_geometry(slope_data)
+    return reinf_lines + pile_lines, len(reinf_lines), len(pile_lines)

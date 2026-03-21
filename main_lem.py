@@ -43,7 +43,7 @@ elif analysis_type == "auto_search": # automated search for critical surface
   slice_df = critical_surface['slices']
   failure_surface = critical_surface['failure_surface']
   results = critical_surface['solver_result']
-  if 'h_pile' in slice_df.columns:
+  if slice_df is not None and 'h_pile' in slice_df.columns:
     pile_slices = slice_df[slice_df['h_pile'] > 0]
     for _, ps in pile_slices.iterrows():
       print(f'  Pile at x={ps["x_pile"]:.2f}: H={ps["h_pile"]:.1f} (per unit width, Ito & Matsui)')
@@ -54,7 +54,19 @@ elif analysis_type == "auto_search": # automated search for critical surface
     print(f"Stage 3 FS = {results['stage3_FS']:.4f}")
     print(f"Final rapid drawdown FS = {results['FS']:.4f}")
   if results is None:
-    print(f"[⚠️] No valid solution found (FS=9999 for all surfaces). Check input parameters.")
+    print(f"[⚠️] No valid solution found (FS=9999 for all surfaces).")
+    # Check if Ito & Matsui forces may be the cause
+    from xslope.slice import _ito_matsui_warned
+    if _ito_matsui_warned:
+      print(f"    Ito & Matsui pile forces exceed driving forces for all trial surfaces.")
+      print(f"    This may mean the piles are sufficient to stabilize the slope. Note that")
+      print(f"    Ito & Matsui computes an upper bound on soil resistance and does not check")
+      print(f"    pile structural capacity. The available resistance should be taken as the")
+      print(f"    lesser of the Ito & Matsui soil resistance and the pile shear/moment")
+      print(f"    capacity. If the structural capacity governs, specify H directly in the")
+      print(f"    piles sheet as H = min(structural capacity, Ito & Matsui) / S.")
+    else:
+      print(f"    Check input parameters.")
   else:
     plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
 

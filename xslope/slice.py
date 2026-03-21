@@ -20,6 +20,8 @@ from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 
 from .mesh import find_element_containing_point, interpolate_at_point
 
+_ito_matsui_warned = False  # module-level flag: warn once about large H
+
 def get_circular_y_coordinates(x_coords, Xo, Yo, R):
     """
     Calculate y-coordinates on a circular failure surface for given x-coordinates.
@@ -966,7 +968,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                         intersec.x, y_ground_at_pile, intersec.y,
                         profile_lines, materials
                     )
-                    pile_H, _ = compute_ito_matsui_force(pl["D_pile"], pl["S"], segments)
+                    pile_H, F_single = compute_ito_matsui_force(pl["D_pile"], pl["S"], segments)
+                    # Warn once if Ito & Matsui produces very large H
+                    global _ito_matsui_warned
+                    if not _ito_matsui_warned and pile_H > 50000:
+                        depth = y_ground_at_pile - intersec.y
+                        print(f'[WARNING] Ito & Matsui computed very large H={pile_H:.0f} '
+                              f'(D={pl["D_pile"]}, S={pl["S"]}, depth={depth:.1f}). '
+                              f'This may exceed the pile structural capacity. '
+                              f'Consider specifying H directly or increasing pile spacing.')
+                        _ito_matsui_warned = True
                 elif pile_H is None:
                     pile_H = 0.0
 

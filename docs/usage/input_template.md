@@ -33,7 +33,7 @@ This function reads all worksheets, validates the data, and returns a dictionary
 
 ## Template Structure
 
-The template consists of 10 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
+The template consists of 11 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
@@ -46,6 +46,7 @@ The template consists of 10 worksheets, each serving a specific purpose. Differe
 | **non-circ** | Non-circular failure surface coordinates | X   |      |     |
 | **dloads** | Distributed surface loads | X   |      | X   |
 | **reinforce** | Soil reinforcement elements (anchors, nails, geosynthetics) | X   |      | X   |
+| **piles** | Pile and concrete pier support elements | X   |      | X   |
 | **seep bc** | Seepage analysis boundary conditions |     | X    |     |
 
 The following sections describe each worksheet in detail, including the data structure and how it is used in analysis.
@@ -362,6 +363,43 @@ or failure. Only the Tmax parameter is used in this calculation (Tres is ignored
 For the finite element method, the reinforcement is modeled as a 1D line element with a constant Young's modulus and 
 cross-sectional area. At any point along the line, if the force applied to the line exceeds Tmax, the line is 
 considered to be in failure and the tension is the line is limited to the residual tension Tres.
+
+---
+
+## Worksheet: piles
+
+![sheet_piles.png](images/sheet_piles.png)
+
+The **piles** worksheet defines pile and concrete pier support elements that provide lateral resistance to slope movement. Unlike flexible reinforcement (soil nails, geogrids) which resists movement through tension along the reinforcement axis, piles are rigid structural elements that resist soil movement through lateral shear and bending at the failure surface intersection.
+
+![Pile Example](images/pile_example.png){width=800px}
+
+Each pile is represented as a straight line defined by its top and bottom endpoint coordinates. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 10 piles (rows 3-12), but additional rows can be added to the table as needed.
+
+Each pile is defined by:
+
+- **Geometry**:<br>
+>>x1, y1: Pile top coordinates<br>
+>>x2, y2: Pile tip (bottom) coordinates<br>
+- **LEM Properties**:<br>
+>>H: Pile force magnitude per unit width of slope (force/length). If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
+>>$\theta$: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is assumed to be 0° (purely horizontal resisting force).<br>
+- **Pile Geometry** (optional — not used in current LEM analysis):<br>
+>>D: Pile diameter. Used by FEM to compute $I$ and $Area$ if those columns are left blank. Will also be used by the Ito & Matsui auto-computation of $H$ in a future release.<br>
+>>S: Center-to-center spacing. Will be used by Ito & Matsui auto-computation of $H$ in a future release.<br>
+- **FEM Properties** (for FEM analysis):<br>
+>>E: Young's modulus of pile material<br>
+>>I: Moment of inertia (computed from $D$ if omitted for circular sections: $I = \pi D^4 / 64$)<br>
+>>Area: Cross-sectional area (computed from $D$ if omitted for circular sections: $A = \pi D^2 / 4$)<br>
+
+During limit equilibrium analysis, xslope intersects each pile line with the failure surface to find the point where the pile force is applied. The force $H$ at angle $\theta$ is resolved into components normal and tangential to the slice base:
+
+- **Normal to base**: $H\sin(\alpha - \theta)$ — increases effective stress, boosting frictional resistance
+- **Tangential to base**: $H\cos(\alpha - \theta)$ — directly resists sliding
+
+For methods with moment equilibrium (OMS, Bishop), the pile force also contributes a resisting moment about the circle center. The pile must extend below the failure surface to be effective — if the failure surface does not intersect the pile line, the pile provides no resistance for that surface.
+
+See the [LEM Piles](../lem/piles.md) section for detailed equation derivations and the [FEM Piles](../fem/piles.md) section for the beam element formulation used in finite element analysis.
 
 ---
 

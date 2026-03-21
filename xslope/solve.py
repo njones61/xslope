@@ -772,6 +772,13 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     y_v   = slice_df['y_t'].values  # tension crack water force y-coordinate
     R     = slice_df['p'].values  # reinforcement force
 
+    # Pile forces (backward compatible — zeros if no pile data)
+    n_slices = len(slice_df)
+    H_pile    = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n_slices)
+    theta_pile = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n_slices)
+    x_pile    = slice_df['x_pile'].values  if 'x_pile'  in slice_df.columns else np.zeros(n_slices)
+    y_pile    = slice_df['y_pile'].values  if 'y_pile'  in slice_df.columns else np.zeros(n_slices)
+
     # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
     # at the bottom of the slice. Therefore, the psi value used in the derivation is set to alpha, 
     # and the point of action is the center of the base of the slice.
@@ -802,6 +809,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         c = -c
         kw = -kw
         tan_p = -tan_p
+        H_pile = -H_pile
 
     # pre-compute the trigonometric functions
     cos_a = np.cos(alpha)  # cos(alpha)
@@ -812,10 +820,15 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     sin_psi = np.sin(psi)  # sin(psi)
     cos_psi = np.cos(psi)  # cos(psi)
 
-    Fh = - kw - V + P * sin_b + R * cos_psi       # Equation (1)
-    Fv = - W - P * cos_b + R * sin_psi        # Equation (2)
+    # Pile force components
+    H_cos_tp = H_pile * np.cos(theta_pile)  # horizontal component
+    H_sin_tp = H_pile * np.sin(theta_pile)  # vertical component (upward)
+
+    Fh = - kw - V + P * sin_b + R * cos_psi + H_cos_tp       # Equation (1) + pile horizontal
+    Fv = - W - P * cos_b + R * sin_psi + H_sin_tp        # Equation (2) + pile vertical (upward)
     Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
-        + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) # Equation (3)
+        + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) \
+        - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b)  # Equation (3) + pile moment
     
     # ========== BEGIN SOLUTION ==========
     

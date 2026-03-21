@@ -10,7 +10,7 @@ from xslope.advanced import reliability as reliability_analysis
 slope_data = load_slope_data("docs/lem/files/xslope_piles.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
-method = "oms" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
+method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 40 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
@@ -45,8 +45,29 @@ elif analysis_type == "auto_search": # automated search for critical surface
   results = critical_surface['solver_result']
   if slice_df is not None and 'h_pile' in slice_df.columns:
     pile_slices = slice_df[slice_df['h_pile'] > 0]
-    for _, ps in pile_slices.iterrows():
-      print(f'  Pile at x={ps["x_pile"]:.2f}: H={ps["h_pile"]:.1f} (per unit width, Ito & Matsui)')
+    if not pile_slices.empty and slope_data.get('pile_lines'):
+      for pile_info, (_, ps) in zip(slope_data['pile_lines'], pile_slices.iterrows()):
+        if pile_info.get('H') is None and pile_info.get('D_pile') and pile_info.get('S'):
+          from shapely.geometry import Point as Pt
+          from xslope.ito_matsui import ito_matsui_coefficients, intersect_pile_with_materials, compute_ito_matsui_force
+          D_p, S_p = pile_info['D_pile'], pile_info['S']
+          D1 = S_p - D_p
+          y_gnd = slope_data['ground_surface'].interpolate(
+              slope_data['ground_surface'].project(Pt(ps['x_pile'], 1e6))).y
+          depth = y_gnd - ps['y_pile']
+          segments = intersect_pile_with_materials(
+              ps['x_pile'], y_gnd, ps['y_pile'],
+              slope_data['profile_lines'], slope_data['materials'])
+          H_val, F_pile = compute_ito_matsui_force(D_p, S_p, segments)
+          A1, A2 = ito_matsui_coefficients(D1, D_p, segments[0]['phi']) if segments else (0, 0)
+          print(f'  === Ito & Matsui Summary (Pile at x={ps["x_pile"]:.2f}) ===')
+          print(f'  Pile diameter (D)          = {D_p:.1f}')
+          print(f'  Pile spacing (S)           = {S_p:.1f}')
+          print(f'  Clear spacing (D1 = S - D) = {D1:.1f}')
+          print(f'  Depth to failure surface   = {depth:.1f}')
+          print(f'  Coefficients: A1 = {A1:.3f}, A2 = {A2:.3f}')
+          print(f'  Force per pile (F_pile)    = {F_pile:.0f}')
+          print(f'  Force per unit width (H)   = {H_val:.1f}')
   if rapid_drawdown and results and 'stage1_FS' in results:
     print(f"=== RAPID DRAWDOWN SUMMARY (Critical Surface) ===")
     print(f"Stage 1 FS = {results['stage1_FS']:.4f}")

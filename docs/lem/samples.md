@@ -311,3 +311,43 @@ Solution (critical surface and factor of safety):
     therefore parallel to the base of the slope. UTEXASED assumes the reinforcement is rigid and the force from the
     reinforcement is in the direction of the reinforcement line. The flexible assumption is more conservative. The
     UTEXASED solution for this problem is FS = 1.646.
+
+### 10. Slope Stabilized with Piles
+
+This problem features a 1.5H:1V slope in a medium-stiff clay (c = 200 psf, $\phi$ = 10°, $\gamma$ = 120 pcf)
+stabilized by a row of drilled shafts (D = 1.0 ft, S = 6.0 ft center-to-center) near the toe of the slope.
+Without the piles, the slope is marginally unstable (FS = 0.997). With the piles, the factor of safety increases
+to 1.189.
+
+The pile force $H$ is not specified directly in the input file. Instead, XSLOPE auto-computes $H$ using the
+Ito & Matsui (1975) method, which models the plastic flow of soil between adjacent piles to determine the lateral
+resistance. Because $H$ is computed for each trial failure surface during the search, the pile resistance varies
+with the depth of the failure surface at the pile location. For the critical failure surface, the Ito & Matsui
+computation is summarized below:
+
+```text
+  === Ito & Matsui Summary (Pile at x=10.00) ===
+  Pile diameter (D)          = 1.0
+  Pile spacing (S)           = 6.0
+  Clear spacing (D1 = S - D) = 5.0
+  Depth to failure surface   = 20.5
+  Coefficients: A1 = 3.654, A2 = 0.644
+  Force per pile (F_pile)    = 14625
+  Force per unit width (H)   = 2437.5
+```
+
+Excel input file: [xslope_piles.xlsx](files/xslope_piles.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![piles_inputs.png](sample_images/piles_inputs.png){width=900}
+
+Solution without piles (FS = 0.997):
+
+![piles_results_no_pile.png](sample_images/piles_results_no_pile.png){width=900}
+
+Solution with piles (FS = 1.189):
+
+![piles_results.png](sample_images/piles_results.png){width=900}
+
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.189, num_slices=40 -->

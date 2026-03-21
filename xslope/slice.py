@@ -541,8 +541,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             geom = LineString([(pile["x1"], pile["y1"]), (pile["x2"], pile["y2"])])
             pile_lines_data.append({
                 "geom": geom,
-                "H": pile["H"] if pile["H"] is not None else 0.0,
+                "H": pile["H"] if pile["H"] is not None else None,
                 "theta_p": pile["theta_p"],
+                "D_pile": pile.get("D_pile"),
+                "S": pile.get("S"),
+                "label": pile.get("label", ""),
             })
 
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
@@ -952,7 +955,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if intersec.is_empty:
                 continue
             if isinstance(intersec, Point):
-                h_pile += pl["H"]
+                pile_H = pl["H"]
+                # Auto-compute H using Ito & Matsui if H is not specified but D and S are
+                if pile_H is None and pl["D_pile"] is not None and pl["S"] is not None:
+                    from .ito_matsui import intersect_pile_with_materials, compute_ito_matsui_force
+                    y_ground_at_pile = ground_surface.interpolate(
+                        ground_surface.project(Point(intersec.x, 1e6))
+                    ).y
+                    segments = intersect_pile_with_materials(
+                        intersec.x, y_ground_at_pile, intersec.y,
+                        profile_lines, materials
+                    )
+                    pile_H, _ = compute_ito_matsui_force(pl["D_pile"], pl["S"], segments)
+                elif pile_H is None:
+                    pile_H = 0.0
+
+                h_pile += pile_H
                 theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
                 x_pile = intersec.x
                 y_pile = intersec.y

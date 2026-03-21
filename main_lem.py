@@ -43,6 +43,10 @@ elif analysis_type == "auto_search": # automated search for critical surface
   slice_df = critical_surface['slices']
   failure_surface = critical_surface['failure_surface']
   results = critical_surface['solver_result']
+  if 'h_pile' in slice_df.columns:
+    pile_slices = slice_df[slice_df['h_pile'] > 0]
+    for _, ps in pile_slices.iterrows():
+      print(f'  Pile at x={ps["x_pile"]:.2f}: H={ps["h_pile"]:.1f} (per unit width, Ito & Matsui)')
   if rapid_drawdown and results and 'stage1_FS' in results:
     print(f"=== RAPID DRAWDOWN SUMMARY (Critical Surface) ===")
     print(f"Stage 1 FS = {results['stage1_FS']:.4f}")

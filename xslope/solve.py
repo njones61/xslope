@@ -75,6 +75,7 @@ def solve_selected(method_name, slice_df, rapid=False):
         print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
     elif func == lowe_karafiath:
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
+
     return result
 
 def solve_all(slice_df, rapid=False):

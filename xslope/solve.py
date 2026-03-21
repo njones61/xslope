@@ -554,6 +554,11 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     T       = slice_df['t'].values
     P       = slice_df['p'].values
     theta   = np.radians(np.asarray(theta_list))
+
+    # Pile forces (backward compatible — zeros if no pile data)
+    H_pile  = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n)
+    theta_p = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
+
     N = np.zeros(n)  # normal forces on slice bases
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
 
@@ -565,30 +570,33 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
         for i in range(n):
             ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
             cb, sb = np.cos(beta[i]), np.sin(beta[i])
-            
+
             # Matrix A coefficients from equations (6) and (7)
             A = np.array([
                 [tan_phi_m[i]*ca - sa,   -np.cos(theta[i+1])],
                 [tan_phi_m[i]*sa + ca,   -np.sin(theta[i+1])]
             ])
-            
+
             # Vector b from equations (6) and (7)
+            # Pile: subtract H·cos(θp) from b0 (horizontal), subtract H·sin(θp) from b1 (vertical)
             b0 = (
-                -c_m[i]*dl[i]*ca 
-                - P[i]*ca 
-                + u[i]*dl[i]*sa 
-                - Z[i]*np.cos(theta[i]) 
-                - D[i]*sb 
-                + kw[i] 
+                -c_m[i]*dl[i]*ca
+                - P[i]*ca
+                + u[i]*dl[i]*sa
+                - Z[i]*np.cos(theta[i])
+                - D[i]*sb
+                + kw[i]
                 + T[i]
+                - H_pile[i]*np.cos(theta_p[i])
             )
             b1 = (
-                -c_m[i]*dl[i]*sa 
-                - P[i]*sa 
-                - u[i]*dl[i]*ca 
-                + w[i] 
-                - Z[i]*np.sin(theta[i]) 
+                -c_m[i]*dl[i]*sa
+                - P[i]*sa
+                - u[i]*dl[i]*ca
+                + w[i]
+                - Z[i]*np.sin(theta[i])
                 + D[i]*cb
+                - H_pile[i]*np.sin(theta_p[i])
             )
             
             N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))

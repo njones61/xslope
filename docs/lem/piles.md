@@ -181,21 +181,25 @@ For a soil with both cohesion and friction ($c > 0$, $\phi > 0$), the distribute
 
 >$p(z) = c \cdot A_1 + \gamma z \cdot A_2$
 
-where $A_1$ and $A_2$ are dimensionless arching coefficients (with units of length). To define them, first compute the plastic flow amplification factor:
+where $A_1$ and $A_2$ are arching coefficients with units of length. Let $S = D_1 + D$ (center-to-center spacing). The coefficients are computed from three intermediate quantities:
 
->$E = N_\phi^{\,N_\phi \cdot D_1\, /\, [2(D_1 - D)]}$
+>$R = \left(\dfrac{S}{D_1}\right)^{\sqrt{N_\phi}\,\tan\phi + N_\phi - 1}$
 
-This factor captures the exponential amplification as soil squeezes between the piles in a state of plastic equilibrium. It increases as the piles get closer together ($D_1/D$ decreases) and as $\phi$ increases.
+>$\mathcal{E} = \exp\!\left(\dfrac{D}{D_1}\,N_\phi\tan\phi\,\tan\!\left(\dfrac{\pi}{8}+\dfrac{\phi}{4}\right)\right)$
 
-The overburden coefficient is:
+>$F = \dfrac{2\tan\phi + 2\sqrt{N_\phi} + N_\phi^{-1/2}}{\sqrt{N_\phi}\,\tan\phi + N_\phi - 1}$
 
->$A_2 = D_1 \left[E \tan\phi + \dfrac{N_\phi^{1/2} \cdot D}{2(D_1 - D)}\left(E \tan\phi + N_\phi^{1/2} - 1\right)\right] - D_1 \tan\phi$
+$R$ is the geometric amplification from the ratio of center-to-center to clear spacing, $\mathcal{E}$ captures the exponential plastic flow between piles, and $F$ is a dimensionless grouping of friction and earth pressure terms.
 
-and the cohesion coefficient is:
+The overburden coefficient (from Eq. 14, the $c = 0$ specialization of Eq. 13) is:
 
->$A_1 = \dfrac{2\,N_\phi^{1/2}}{N_\phi - 1} \cdot A_2$
+>$A_2 = \dfrac{S \cdot R \cdot \mathcal{E}\, -\, D_1}{N_\phi}$
 
-The full derivation is given in Ito & Matsui (1975). These expressions emerge from solving the plastic equilibrium equations for soil flowing between two rigid boundaries under Mohr-Coulomb failure.
+The cohesion coefficient (from Eq. 13) is:
+
+>$A_1 = \dfrac{S \cdot R\,(\mathcal{E} - 2\sqrt{N_\phi}\,\tan\phi - 1)}{N_\phi\tan\phi} + S \cdot F\,(R - 1) + \dfrac{2\,D_1}{\sqrt{N_\phi}}$
+
+These expressions were verified against the original paper's parametric charts (Figs. 7–9) and field measurements (Table 1, Figs. 13–14).
 
 Key behavior of $p(z)$:
 

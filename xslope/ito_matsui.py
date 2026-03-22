@@ -64,36 +64,29 @@ def ito_matsui_coefficients(D1, D, phi_deg):
     if phi_deg < 0.01:
         return A1_phi0, A2_phi0
 
-    # --- General c-phi soil: Ito & Matsui (1975) Eq. (13) ---
-    # Requires D1 > D (i.e., S/D > 2); at the boundary the theory breaks down.
-    if D1 <= D:
-        return 0.0, 0.0
-
+    # --- General c-phi soil: Ito & Matsui (1975) Eqs. (12)-(14) ---
     phi = np.radians(phi_deg)
     Nphi = np.tan(np.pi / 4 + phi / 2) ** 2  # passive earth pressure coefficient
-    sqrt_Nphi = np.sqrt(Nphi)
+    sN = np.sqrt(Nphi)
+    tp = np.tan(phi)
 
-    # The exponential amplification factor uses Nphi as the base:
-    #   E = Nphi^(Nphi * D1 / (2*(D1 - D)))
-    E = Nphi ** (0.5 * Nphi * D1 / (D1 - D))
+    # Geometric amplification factor (Eq. 5/11)
+    R = (S / D1) ** (sN * tp + Nphi - 1)
 
-    # A2: coefficient for the gamma*z term (overburden pressure)
-    A2 = (D1 * (E * np.tan(phi)
-          + sqrt_Nphi * D / (2.0 * (D1 - D))
-          * (E * np.tan(phi) + sqrt_Nphi - 1.0))
-          - D1 * np.tan(phi))
+    # Exponential plastic flow term (Eq. 10/11)
+    E = np.exp(D / D1 * Nphi * tp * np.tan(np.pi / 8 + phi / 4))
 
-    # A1: coefficient for the cohesion term
-    A1 = 2.0 * sqrt_Nphi * A2 / (Nphi - 1.0)
+    # A2: overburden coefficient, from Eq. (14) (c=0 case of Eq. 13)
+    A2 = (S * R * E - D1) / Nphi
 
-    # --- Apply phi=0 floor ---
-    # The c-phi formula (Eq. 13) was derived independently from the phi=0
-    # formula (Eq. 23) and does not converge to it as phi -> 0. For small
-    # friction angles (roughly phi < 12-15 deg), the c-phi formula produces
-    # coefficients well below the phi=0 values — an unphysical result since
-    # friction can only strengthen soil arching. We enforce the phi=0 values
-    # as a lower bound. See also Ukritchon & Keawsawasvong (2017) for a
-    # broader discussion of errors in Ito & Matsui's solution.
+    # A1: cohesion coefficient, from Eq. (13)
+    F = (2 * tp + 2 * sN + 1 / sN) / (sN * tp + Nphi - 1)
+    A1 = (S * R * (E - 2 * sN * tp - 1) / (Nphi * tp)
+          + S * F * (R - 1)
+          + 2 * D1 / sN)
+
+    # Apply phi=0 floor as safety net. The correct Eq. (13) converges
+    # smoothly to Eq. (23) as phi->0, so this should rarely activate.
     A1 = max(A1, A1_phi0)
     A2 = max(A2, A2_phi0)
 

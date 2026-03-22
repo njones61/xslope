@@ -282,6 +282,31 @@ The Ito & Matsui method has the following characteristics and limitations:
 
 >$H_{\text{design}} = \min(H_{\text{Ito-Matsui}},\; H_{\text{structural}})$
 
+### LEM vs. FEM Pile Modeling
+
+The LEM and FEM approaches to pile stabilization are fundamentally different, and users should be aware that they can produce significantly different factors of safety — particularly when the failure surface is shallow at the pile location.
+
+**How LEM models piles**: The pile contributes a single concentrated force $H$ at the point where the failure surface intersects the pile. This force is computed from the Ito & Matsui theory based on the depth of the sliding mass at the pile. The force is resolved into components on the slice base and enters the equilibrium equations for that one slice. The failure surface geometry (circular or non-circular) is not influenced by the presence of the pile.
+
+**How FEM models piles**: The pile is a beam element with bending stiffness $EI$ that spans the full pile length and is connected to the surrounding soil mesh. In the Shear Strength Reduction Method (SSRM), the beam resists soil deformation along its entire length — both above and below the shear zone. The stiff beam element forces the failure mechanism to develop around the pile, potentially producing a different failure geometry than the LEM circular surface.
+
+**Why the results can differ substantially**: For the XSLOPE sample problem (1.5H:1V slope, D = 1.0 ft, S = 6.0 ft, c = 200 psf, $\phi$ = 10°), the no-pile factors of safety are similar (LEM = 0.997, FEM = 1.02), but the pile contributions differ by a factor of four:
+
+| | Without pile | With pile | Pile contribution |
+|---|---|---|---|
+| **LEM** (Spencer) | 0.997 | 1.08 | +0.08 |
+| **FEM** (SSRM) | 1.02 | 1.37 | +0.35 |
+
+The large difference arises because:
+
+1. **Shallow failure surface at the pile**: The critical LEM circle crosses the pile at only 7.3 ft depth on the slope face. The Ito & Matsui force is governed by this shallow soil column, producing a modest $H$ = 1160 lb/ft. The FEM beam spans the full 16.7 ft pile length and mobilizes bending resistance over a much larger zone.
+
+2. **Point force vs. distributed resistance**: In LEM, the pile's entire contribution enters through one slice. In FEM, the beam element provides distributed resistance that constrains the kinematics of the failure zone along the pile's full length.
+
+3. **Fixed failure geometry**: The LEM search finds the critical circle without regard to the pile's structural stiffness. In FEM, the failure mechanism adapts to the pile — the beam element can force the shear zone to deflect around or below the pile, which requires more strength reduction to achieve failure.
+
+**Practical implications**: For piles on the slope face where the sliding mass is thin at the pile location, the LEM approach with Ito & Matsui may significantly underestimate the pile's effectiveness compared to FEM. The LEM result should be considered conservative. When the difference matters for design, an FEM analysis with beam elements provides a more complete representation of the pile-soil interaction. Conversely, for piles placed where the failure surface is deep (e.g., behind the crest), the LEM and FEM results tend to converge because the Ito & Matsui force is larger and the pile's structural stiffness is less dominant relative to the soil forces.
+
 ### Structural Capacity
 
 The pile resistance used in LEM should not exceed the structural capacity of the pile. Two structural failure modes should be checked:

@@ -101,18 +101,13 @@ where $\delta_{\text{axial}}$ and $\delta_{\text{lateral}}$ are the projections 
 
 Unlike reinforcement truss elements, which zero out compressive forces through body-force corrections, beam elements carry **both tension and compression**. No compression correction is applied.
 
-### Capacity Checks (Optional)
+### Structural Capacity
 
-If structural capacity limits are specified:
+Beam elements are currently **linearly elastic** — they have no structural strength limit. The SSRM finds the factor of safety at which soil fails around the pile, which is the correct result when the pile is strong enough that soil failure governs.
 
-- **Shear capacity**: If $|V| > V_n$, the element force is capped and body-force corrections are applied to redistribute the excess
-- **Axial capacity**: If $|T| > T_{\max}$, similar capping and correction
+Users should check the reported beam element forces (max axial force, max lateral force) against the pile's structural shear and moment capacity as a post-processing step. If the beam forces at the SSRM failure state exceed the pile's structural capacity, the pile would fail before the soil and the reported FS is unconservative.
 
-These capacity checks are optional. If no limits are specified, the beam elements behave as linearly elastic structural members and the SSRM finds the natural failure mode (typically soil failure around the pile).
-
-### Body-Force Corrections
-
-When a capacity check triggers, the correction follows the same pattern as reinforcement elements. The overshoot force is converted to equivalent nodal force corrections and added to the load vector, while the global stiffness matrix remains unchanged. This is consistent with the viscoplastic initial-stiffness approach where all nonlinearity enters through load corrections.
+Elastic-perfectly-plastic capacity checks (V_cap, M_cap) are planned for a future release. These would cap beam element forces and redistribute the excess through body-force corrections, following the same viscoplastic pattern used for soil elements.
 
 
 ## SSRM Treatment

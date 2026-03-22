@@ -120,8 +120,8 @@ Full soil-pile interaction modeling using p-y curves. This is typically done in 
 ### 2.4 Structural Capacity Check
 
 The pile resistance used in the LEM analysis should not exceed the structural capacity of the pile:
-- **Shear capacity**: $V_n$ of the pile cross-section
-- **Moment capacity**: $M_n$ / (moment arm from fixity point to failure surface)
+- **Shear capacity**: $V_{\text{cap}}$ of the pile cross-section
+- **Moment capacity**: $M_{\text{cap}}$ / (moment arm from fixity point to failure surface)
 
 The controlling value is $\min(\text{soil capacity},\; \text{structural capacity})$.
 
@@ -757,3 +757,83 @@ No new top-level sections needed. The pile documentation fits naturally into exi
 - LEM method pages → integrate pile terms into equations
 - FEM pages → add beam element section
 - Sample problems → add pile examples to existing sample pages
+
+---
+
+## 9. Future: Pile Structural Capacity Checks
+
+### Motivation
+
+Neither LEM nor FEM currently enforces structural capacity limits on piles. In LEM, the
+Ito & Matsui force H can exceed the pile's shear or moment capacity — the documentation
+recommends `H_design = min(H_soil, V_cap, M_cap/L_m)` but this is not enforced in code.
+In FEM, beam elements are linearly elastic with infinite strength — the SSRM finds the FS
+at which soil fails around the pile, which is unconservative if the pile would fail structurally
+first. Commercial software (PLAXIS, RS2, FLAC, Slide2) supports structural capacity limits.
+
+### Input Changes
+
+Add two optional columns to the `piles` sheet:
+
+| Column | Field | Description |
+|--------|-------|-------------|
+| N | V_cap | Shear capacity per pile (force units). Blank = no limit. |
+| O | M_cap | Moment capacity per pile (force × length units). Blank = no limit. |
+
+Both are per-pile values. If blank, current behavior is preserved (no structural limit).
+These columns are shared by both LEM and FEM analyses.
+
+### LEM Implementation
+
+V_cap and M_cap are properties of a single pile, so the comparison must be against
+F_pile (total force per pile), not H (force per unit width = F_pile / S).
+
+The capacity check applies regardless of how the pile force was obtained — whether
+auto-computed by Ito & Matsui or specified directly by the user.
+
+When V_cap and/or M_cap are provided, cap F_pile before converting to H:
+
+1. Obtain F_pile:
+   - If H is auto-computed by Ito & Matsui: F_pile is already computed
+   - If H is user-specified: F_pile = H × S
+2. If V_cap is provided: `F_pile = min(F_pile, V_cap)`
+3. If M_cap is provided: estimate the moment arm L_m from the pressure distribution
+   and cap `F_pile = min(F_pile, M_cap / L_m)`. For the Ito & Matsui linear pressure
+   distribution (p = c*A1 + gamma*z*A2), L_m can be computed from the centroid of the
+   pressure diagram. For user-specified H where the distribution is unknown, a
+   conservative default (e.g., L_m = h/3) could be used.
+4. Convert to per-unit-width: `H = F_pile / S`
+5. Use the capped H in the slice equilibrium equations
+
+The Ito & Matsui summary should report both the soil force and the capped force when
+capacity governs.
+
+### FEM Implementation
+
+The existing viscoplastic correction loop for soil elements provides the pattern:
+
+1. After each SSRM solve iteration, compute beam element forces (already done for summary)
+2. For each beam element, check lateral force against V_cap and moment against M_cap
+3. If exceeded, compute a correction force (excess beyond capacity) as equivalent nodal loads
+4. Add corrections to the RHS vector and re-iterate (same as soil viscoplastic corrections)
+5. The beam carries a constant force at the capacity value (elastic-perfectly-plastic)
+
+### Scope Estimate
+
+**LEM**:
+- Input handling: ~10 lines (read V_cap, M_cap from piles sheet)
+- Force capping in slice.py: ~15 lines (min check after Ito & Matsui computation)
+- Summary output: ~5 lines (report when capacity governs)
+
+**FEM**:
+- Capacity check in SSRM loop: ~30 lines (compare forces, compute excess)
+- Force correction / nodal load computation: ~30 lines (convert excess to equivalent nodal forces)
+- Summary output updates: ~10 lines (report yielded elements)
+- Testing: need a problem where structural failure governs (small pile in strong soil)
+
+### What This Enables
+
+- Realistic modeling of pile structural failure (plastic hinge formation)
+- Proper FS when pile structural capacity governs over soil failure
+- Comparison with LEM's `H_design = min(H_ito_matsui, H_structural)` approach
+- More meaningful LEM-FEM comparisons since both methods would respect structural limits

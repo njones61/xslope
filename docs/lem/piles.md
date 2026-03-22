@@ -311,12 +311,12 @@ The large difference arises because:
 
 The pile resistance used in LEM should not exceed the structural capacity of the pile. Two structural failure modes should be checked:
 
-- **Shear capacity**: The nominal shear strength $V_n$ of the pile cross-section. For concrete piles, this is governed by the concrete and steel reinforcement; for steel piles, by the web and flange dimensions.
-- **Moment capacity**: The pile must be able to resist the bending moment that develops from the soil pressure distribution. The limiting lateral force from bending is approximately $M_p / L_m$, where $M_p$ is the plastic moment capacity and $L_m$ is the moment arm from the point of maximum moment to the fixity point below the failure surface.
+- **Shear capacity**: The shear strength $V_{\text{cap}}$ of the pile cross-section. For concrete piles, this is governed by the concrete and steel reinforcement; for steel piles, by the web and flange dimensions.
+- **Moment capacity**: The pile must be able to resist the bending moment that develops from the soil pressure distribution. The limiting lateral force from bending is approximately $M_{\text{cap}} / L_m$, where $M_{\text{cap}}$ is the moment capacity and $L_m$ is the moment arm from the point of maximum moment to the fixity point below the failure surface.
 
 The controlling design value is:
 
->$H = \min(H_{\text{soil}},\; V_n,\; M_p / L_m)$
+>$H = \min(H_{\text{soil}},\; V_{\text{cap}},\; M_{\text{cap}} / L_m)$
 
 where $H_{\text{soil}}$ is from Ito & Matsui or other soil-pile interaction analysis.
 
@@ -400,20 +400,23 @@ These values are for preliminary guidance only. Actual $H$ should be determined 
 
 Pile data is entered in the **piles** sheet of the Excel input template. Each row defines one pile with the following columns:
 
-| Column | Field | Required | Description |
-|--------|-------|----------|-------------|
-| A | Label | No | Name/identifier for the pile |
-| B | $x_1$ | Yes | X-coordinate of pile top |
-| C | $y_1$ | Yes | Y-coordinate of pile top |
-| D | $x_2$ | Yes | X-coordinate of pile tip (bottom) |
-| E | $y_2$ | Yes | Y-coordinate of pile tip (bottom) |
-| F | $H$ | LEM | Pile force magnitude per unit width of slope (kN/m or lb/ft) |
-| G | $\theta_p$ | No | Force angle from horizontal in degrees (positive = upward). If blank, auto-computed as perpendicular to pile axis (0° for vertical piles). |
-| H | $D_{\text{pile}}$ | No | Pile diameter or width |
-| I | $S$ | No | Center-to-center spacing |
-| J | $E$ | FEM | Young's modulus of pile material |
-| K | $I$ | FEM | Moment of inertia (computed from $D_{\text{pile}}$ if omitted) |
-| L | $Area$ | FEM | Cross-sectional area (computed from $D_{\text{pile}}$ if omitted) |
+| Column | Field | Used by | Description |
+|--------|-------|---------|-------------|
+| A | # | — | Row number |
+| B | Label | LEM & FEM | Name/identifier for the pile |
+| C | $x_1$ | LEM & FEM | X-coordinate of pile top |
+| D | $y_1$ | LEM & FEM | Y-coordinate of pile top |
+| E | $x_2$ | LEM & FEM | X-coordinate of pile tip (bottom) |
+| F | $y_2$ | LEM & FEM | Y-coordinate of pile tip (bottom) |
+| G | $H$ | LEM only | Pile force magnitude per unit width of slope (kN/m or lb/ft) |
+| H | $\theta_p$ | LEM only | Force angle from horizontal in degrees (positive = upward). If blank, auto-computed as perpendicular to pile axis (0° for vertical piles). |
+| I | $D_{\text{pile}}$ | LEM & FEM | Pile diameter or width |
+| J | $S$ | LEM & FEM | Center-to-center spacing. Required for Ito & Matsui and for capacity checks. Recommended when $H$ is user-specified so per-pile forces can be reported. |
+| K | $E$ | FEM only | Young's modulus of pile material |
+| L | $I$ | FEM only | Moment of inertia (computed from $D_{\text{pile}}$ if omitted) |
+| M | $Area$ | FEM only | Cross-sectional area (computed from $D_{\text{pile}}$ if omitted) |
+| N | $V_{\text{cap}}$ | LEM & FEM | Shear capacity per pile (force units). Blank = no limit. |
+| O | $M_{\text{cap}}$ | LEM & FEM | Moment capacity per pile (force × length units). Blank = no limit. |
 
 The two-endpoint geometry $(x_1, y_1)$ to $(x_2, y_2)$ supports both **vertical** and **battered (inclined) piles**. Vertical piles are simply the case where $x_1 = x_2$.
 

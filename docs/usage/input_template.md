@@ -384,9 +384,9 @@ Each pile is defined by:
 - **LEM Properties**:<br>
 >>H: Pile force magnitude per unit width of slope (force/length). If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
 >>$\theta$: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is auto-computed as the direction perpendicular to the pile axis (0° for vertical piles).<br>
-- **Pile Geometry** (for Ito & Matsui auto-computation of $H$ and FEM):<br>
+- **Pile Geometry**:<br>
 >>D: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
->>S: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$.<br>
+>>S: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$. Also required when structural capacity limits (V_cap, M_cap) are specified, since capacity is per-pile and must be compared against the per-pile force F = H &times; S. Recommended in general so that xslope can report per-pile forces in the summary output.<br>
 - **FEM Properties** (for FEM analysis):<br>
 >>E: Young's modulus of pile material<br>
 >>I: Moment of inertia. If omitted and D is provided, computed for a solid circular section as I = &pi;D<sup>4</sup>/64.<br>

@@ -1,3 +1,4 @@
+import numpy as np
 from xslope.global_config import non_circ
 
 from xslope.fileio import load_slope_data
@@ -52,8 +53,8 @@ elif analysis_type == "auto_search": # automated search for critical surface
           from xslope.ito_matsui import ito_matsui_coefficients, intersect_pile_with_materials, compute_ito_matsui_force
           D_p, S_p = pile_info['D_pile'], pile_info['S']
           D1 = S_p - D_p
-          y_gnd = slope_data['ground_surface'].interpolate(
-              slope_data['ground_surface'].project(Pt(ps['x_pile'], 1e6))).y
+          gs_coords = np.array(slope_data['ground_surface'].coords)
+          y_gnd = np.interp(ps['x_pile'], gs_coords[:, 0], gs_coords[:, 1])
           depth = y_gnd - ps['y_pile']
           segments = intersect_pile_with_materials(
               ps['x_pile'], y_gnd, ps['y_pile'],

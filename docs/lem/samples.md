@@ -317,7 +317,7 @@ Solution (critical surface and factor of safety):
 This problem features a 1.5H:1V slope in a medium-stiff clay (c = 200 psf, $\phi$ = 10°, $\gamma$ = 120 pcf)
 stabilized by a row of drilled shafts (D = 1.0 ft, S = 6.0 ft center-to-center) near the toe of the slope.
 Without the piles, the slope is marginally unstable (FS = 0.997). With the piles, the factor of safety increases
-to 1.189.
+to 1.100.
 
 The pile force $H$ is not specified directly in the input file. Instead, XSLOPE auto-computes $H$ using the
 Ito & Matsui (1975) method, which models the plastic flow of soil between adjacent piles to determine the lateral
@@ -330,10 +330,10 @@ computation is summarized below:
   Pile diameter (D)          = 1.0
   Pile spacing (S)           = 6.0
   Clear spacing (D1 = S - D) = 5.0
-  Depth to failure surface   = 20.5
-  Coefficients: A1 = 3.654, A2 = 0.644
-  Force per pile (F_pile)    = 14625
-  Force per unit width (H)   = 2437.5
+  Depth to failure surface   = 7.3
+  Coefficients: A1 = 3.654, A2 = 1.000
+  Force per pile (F_pile)    = 8496
+  Force per unit width (H)   = 1415.9
 ```
 
 Excel input file: [xslope_piles.xlsx](files/xslope_piles.xlsx)
@@ -346,8 +346,8 @@ Solution without piles (FS = 0.997):
 
 ![piles_results_no_pile.png](sample_images/piles_results_no_pile.png){width=900}
 
-Solution with piles (FS = 1.189):
+Solution with piles (FS = 1.100):
 
 ![piles_results.png](sample_images/piles_results.png){width=900}
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.189, num_slices=40 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.100, num_slices=40 -->

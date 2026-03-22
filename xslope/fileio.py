@@ -697,7 +697,13 @@ def load_slope_data(filepath):
                 x1, y1 = float(row['x1']), float(row['y1'])
                 x2, y2 = float(row['x2']), float(row['y2'])
                 H = float(row['H']) if pd.notna(row.get('H')) else None
-                theta_p = float(row['theta']) if pd.notna(row.get('theta')) else 0.0
+                if pd.notna(row.get('theta')):
+                    theta_p = float(row['theta'])
+                else:
+                    # Auto-compute: perpendicular to pile axis (0 for vertical)
+                    dx = x2 - x1
+                    dy = y2 - y1
+                    theta_p = np.degrees(np.arctan2(dx, -dy))
                 D_pile = float(row['D']) if pd.notna(row.get('D')) else None
                 S = float(row['S']) if pd.notna(row.get('S')) else None
                 E_pile = float(row['E']) if pd.notna(row.get('E')) else None

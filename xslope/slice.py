@@ -960,10 +960,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 pile_H = pl["H"]
                 # Auto-compute H using Ito & Matsui if H is not specified but D and S are
                 if pile_H is None and pl["D_pile"] is not None and pl["S"] is not None:
+                    # Ito & Matsui is only valid for vertical piles
+                    pile_coords = pl["geom"].coords
+                    if abs(pile_coords[0][0] - pile_coords[1][0]) > 1e-6:
+                        raise ValueError(
+                            f'Ito & Matsui auto-computation requires vertical piles. '
+                            f'Pile "{pl["label"]}" is battered '
+                            f'(x1={pile_coords[0][0]}, x2={pile_coords[1][0]}). '
+                            f'Specify H directly for battered piles.')
                     from .ito_matsui import intersect_pile_with_materials, compute_ito_matsui_force
-                    y_ground_at_pile = ground_surface.interpolate(
-                        ground_surface.project(Point(intersec.x, 1e6))
-                    ).y
+                    gs_coords = np.array(ground_surface.coords)
+                    y_ground_at_pile = np.interp(intersec.x, gs_coords[:, 0], gs_coords[:, 1])
                     segments = intersect_pile_with_materials(
                         intersec.x, y_ground_at_pile, intersec.y,
                         profile_lines, materials

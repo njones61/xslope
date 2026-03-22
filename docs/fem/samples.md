@@ -166,7 +166,7 @@ Pile summary:
   Max lateral force: 10550.1
 ```
 
-The LEM analysis (Spencer's method) gave FS = 1.19 for this problem using Ito & Matsui auto-computed pile
+The LEM analysis (Spencer's method) gave FS = 1.10 for this problem using Ito & Matsui auto-computed pile
 forces. The FEM result of FS = 1.37 is higher because the beam element stiffness provides distributed
 resistance along the entire pile length, whereas the LEM approach applies the pile force at a single point
 on the failure surface.

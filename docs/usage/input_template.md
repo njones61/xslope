@@ -374,7 +374,7 @@ The **piles** worksheet defines pile and concrete pier support elements that pro
 
 ![Pile Example](images/pile_example.png){width=800px}
 
-Each pile is represented as a straight line defined by its top and bottom endpoint coordinates. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 10 piles (rows 3-12), but additional rows can be added to the table as needed.
+Each pile is represented as a straight line defined by its top and bottom endpoint coordinates. The line geometry supports both vertical piles ($x_1 = x_2$) and battered (inclined) piles. The template is formatted for up to 20 piles, but additional rows can be added to the table as needed.
 
 Each pile is defined by:
 
@@ -383,14 +383,14 @@ Each pile is defined by:
 >>x2, y2: Pile tip (bottom) coordinates<br>
 - **LEM Properties**:<br>
 >>H: Pile force magnitude per unit width of slope (force/length). If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
->>$\theta$: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is assumed to be 0° (purely horizontal resisting force).<br>
-- **Pile Geometry** (optional — not used in current LEM analysis):<br>
->>D: Pile diameter. Used by FEM to compute $I$ and $Area$ if those columns are left blank. Will also be used by the Ito & Matsui auto-computation of $H$ in a future release.<br>
->>S: Center-to-center spacing. Will be used by Ito & Matsui auto-computation of $H$ in a future release.<br>
+>>$\theta$: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is auto-computed as the direction perpendicular to the pile axis (0° for vertical piles).<br>
+- **Pile Geometry** (for Ito & Matsui auto-computation of $H$ and FEM):<br>
+>>D: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
+>>S: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$.<br>
 - **FEM Properties** (for FEM analysis):<br>
 >>E: Young's modulus of pile material<br>
->>I: Moment of inertia (computed from $D$ if omitted for circular sections: $I = \pi D^4 / 64$)<br>
->>Area: Cross-sectional area (computed from $D$ if omitted for circular sections: $A = \pi D^2 / 4$)<br>
+>>I: Moment of inertia. If omitted and D is provided, computed for a solid circular section as I = &pi;D<sup>4</sup>/64.<br>
+>>Area: Cross-sectional area. If omitted and D is provided, computed for a solid circular section as A = &pi;D<sup>2</sup>/4.<br>
 
 During limit equilibrium analysis, xslope intersects each pile line with the failure surface to find the point where the pile force is applied. The force $H$ at angle $\theta$ is resolved into components normal and tangential to the slice base:
 
@@ -398,6 +398,8 @@ During limit equilibrium analysis, xslope intersects each pile line with the fai
 - **Tangential to base**: $H\cos(\alpha - \theta)$ — directly resists sliding
 
 For methods with moment equilibrium (OMS, Bishop), the pile force also contributes a resisting moment about the circle center. The pile must extend below the failure surface to be effective — if the failure surface does not intersect the pile line, the pile provides no resistance for that surface.
+
+When $H$ is left blank and $D$ and $S$ are provided, xslope auto-computes $H$ using the Ito & Matsui (1975) method for each trial failure surface. This auto-computation requires vertical piles ($x_1 = x_2$). For battered piles, $H$ must be specified directly.
 
 See the [LEM Piles](../lem/piles.md) section for detailed equation derivations and the [FEM Piles](../fem/piles.md) section for the beam element formulation used in finite element analysis.
 

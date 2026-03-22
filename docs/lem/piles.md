@@ -26,7 +26,7 @@ Piles behave fundamentally differently:
 | **Force mechanism** | Tension along the reinforcement | Lateral shear and bending resistance |
 | **Force components** | Tangential to base only ($P$) | Both normal and tangential to base ($H\sin(\alpha - \theta_p)$ and $H\cos(\alpha - \theta_p)$) |
 | **Compression** | Cannot resist compression | Resists both tension and compression |
-| **Moment contribution** | None (flexible) | Resisting moment about circle center (moment-based methods) |
+| **Moment contribution** | $P \times R$ (tangential force times radius) | $H\cos\theta_p(Y_o - y_e) + H\sin\theta_p(x_e - X_o)$ (both horizontal and vertical moment arms) |
 
 These differences require a distinct formulation for incorporating pile forces into each limit equilibrium method. The pile force $H$ is applied at the point where the pile intersects the failure surface and resolved into components appropriate for each method's equilibrium equations.
 
@@ -170,28 +170,30 @@ Consider a row of piles embedded in a slope:
 - $D_1 = S - D$ = clear spacing between adjacent pile faces
 - $z$ = depth below the ground surface
 - $z_f$ = depth from the ground surface to the failure surface at the pile location
-- Soil properties: cohesion $c$, friction angle $\varphi$, unit weight $\gamma$
-- Passive earth pressure coefficient: $N_\varphi = \tan^2\!\left(45° + \dfrac{\varphi}{2}\right)$
+- Soil properties: cohesion $c$, friction angle $\phi$, unit weight $\gamma$
+- Passive earth pressure coefficient: $N_\phi = \tan^2\!\left(45° + \dfrac{\phi}{2}\right)$
 
 The theory applies to the portion of the pile **above** the failure surface — this is the zone where soil is actively moving and pushing against the pile.
 
-#### General $c$-$\varphi$ Soil
+#### General $c$-$\phi$ Soil
 
-For a soil with both cohesion and friction ($c > 0$, $\varphi > 0$), the distributed lateral force $p(z)$ (force per unit length of pile) at depth $z$ is:
+For a soil with both cohesion and friction ($c > 0$, $\phi > 0$), the distributed lateral force $p(z)$ (force per unit length of pile) at depth $z$ is:
 
 >$p(z) = c \cdot A_1 + \gamma z \cdot A_2$
 
-where $A_1$ and $A_2$ are dimensionless arching coefficients. To define them, first compute the geometric amplification factor:
+where $A_1$ and $A_2$ are dimensionless arching coefficients (with units of length). To define them, first compute the plastic flow amplification factor:
 
->$G = \left(\dfrac{D_1 + D}{D_1}\right)^{N_\varphi \tan\varphi + N_\varphi^{1/2} - 1}$
+>$E = N_\phi^{\,N_\phi \cdot D_1\, /\, [2(D_1 - D)]}$
 
-This factor captures the plastic flow amplification as soil squeezes between the piles. It increases as the piles get closer together ($D_1/D$ decreases) and as $\varphi$ increases.
+This factor captures the exponential amplification as soil squeezes between the piles in a state of plastic equilibrium. It increases as the piles get closer together ($D_1/D$ decreases) and as $\phi$ increases.
 
-The arching coefficients are then:
+The overburden coefficient is:
 
->$A_1 = D_1 \left[\dfrac{N_\varphi^{1/2} \cdot G}{N_\varphi \tan\varphi - 1}\left(N_\varphi^{1/2} \tan\varphi + N_\varphi^{1/2} - 1\right) - \dfrac{2 N_\varphi^{1/2} \tan\varphi + 1}{N_\varphi \tan\varphi - 1}\right] + \dfrac{D}{2}\left(N_\varphi^{1/2} \cdot G - 1\right)$
+>$A_2 = D_1 \left[E \tan\phi + \dfrac{N_\phi^{1/2} \cdot D}{2(D_1 - D)}\left(E \tan\phi + N_\phi^{1/2} - 1\right)\right] - D_1 \tan\phi$
 
->$A_2 = D_1 \left[\dfrac{N_\varphi \cdot G - 1}{N_\varphi \tan\varphi - 1}\right] + \dfrac{D}{2}\left(N_\varphi \cdot G - 1\right)$
+and the cohesion coefficient is:
+
+>$A_1 = \dfrac{2\,N_\phi^{1/2}}{N_\phi - 1} \cdot A_2$
 
 The full derivation is given in Ito & Matsui (1975). These expressions emerge from solving the plastic equilibrium equations for soil flowing between two rigid boundaries under Mohr-Coulomb failure.
 
@@ -199,7 +201,7 @@ Key behavior of $p(z)$:
 
 - **Increases with depth** through the $\gamma z$ term — deeper soil mobilizes more pressure against the pile
 - **Increases as $D_1/D$ decreases** (closer piles = more arching = more force per pile)
-- **Increases with $\varphi$** — higher friction angle produces stronger soil arching between piles
+- **Increases with $\phi$** — higher friction angle produces stronger soil arching between piles
 - **Increases with $c$** — cohesion contributes a constant (depth-independent) component
 
 #### Cohesionless Soil ($c = 0$)
@@ -210,13 +212,13 @@ For a purely frictional soil with $c = 0$, the cohesion term vanishes and the la
 
 where $A_2$ is the same expression as above. The pressure increases linearly from zero at the ground surface.
 
-#### Undrained Clay ($\varphi = 0$)
+#### Undrained Clay ($\phi = 0$)
 
-For a purely cohesive (undrained) soil with $\varphi = 0$, the general $c$-$\varphi$ expressions become indeterminate because $N_\varphi = 1$ and $\tan\varphi = 0$, causing the denominator $N_\varphi \tan\varphi - 1 = -1$. However, taking the appropriate limit or deriving the solution independently for $\varphi = 0$ yields simplified expressions:
+For a purely cohesive (undrained) soil with $\phi = 0$, the general $c$-$\phi$ expressions become indeterminate because $N_\phi = 1$ and $\tan\phi = 0$. Deriving the solution independently for $\phi = 0$ (Ito & Matsui Eq. 23) yields:
 
->$p(z) = c_u \cdot D_1 \left[2\left(\dfrac{D_1 + D}{D_1}\right)\left(\dfrac{D_1 + D}{2 D_1} + \dfrac{\pi}{4}\right) - 1\right] + \gamma z \cdot D \left(\dfrac{D_1 + D}{D_1} - 1\right)$
+>$p(z) = c_u \left[S\left(3\ln\dfrac{S}{D_1} + \dfrac{D}{D_1}\tan\dfrac{\pi}{8} - 2\right) + 2D_1\right] + \gamma z \cdot D$
 
-where $c_u$ is the undrained shear strength. The first term represents the cohesion contribution (constant with depth) and the second term represents the overburden contribution (linear with depth). For undrained clay, the overburden term is typically small relative to the cohesion term.
+where $S = D_1 + D$ is the center-to-center spacing and $c_u$ is the undrained shear strength. The first term represents the cohesion contribution (constant with depth) and the second term represents the overburden contribution (linear with depth), which simplifies to $\gamma z \cdot D$ (the pile diameter).
 
 #### Total Force per Pile
 
@@ -238,7 +240,7 @@ This is the value entered (or computed) for the pile force in the slope stabilit
 
 #### Multi-Layer Soils
 
-When the pile passes through multiple material zones above the failure surface (common in practice), the integration is performed piecewise. For each layer $j$ with properties $c_j$, $\varphi_j$, $\gamma_j$ between depths $z_{\text{top},j}$ and $z_{\text{bot},j}$:
+When the pile passes through multiple material zones above the failure surface (common in practice), the integration is performed piecewise. For each layer $j$ with properties $c_j$, $\phi_j$, $\gamma_j$ between depths $z_{\text{top},j}$ and $z_{\text{bot},j}$:
 
 >$F_j = c_j \cdot A_{1,j} \cdot (z_{\text{bot},j} - z_{\text{top},j}) + \gamma_j \cdot A_{2,j} \cdot \dfrac{z_{\text{bot},j}^2 - z_{\text{top},j}^2}{2}$
 
@@ -246,13 +248,23 @@ The total force per pile is the sum over all layers:
 
 >$F_{\text{pile}} = \sum_j F_j$
 
-Note that $A_{1,j}$ and $A_{2,j}$ must be recomputed for each layer since $\varphi$ may differ between layers. The pile geometry ($D$, $D_1$) remains the same for all layers.
+Note that $A_{1,j}$ and $A_{2,j}$ must be recomputed for each layer since $\phi$ may differ between layers. The pile geometry ($D$, $D_1$) remains the same for all layers.
 
 #### Computation at Each Trial Surface
 
 An important characteristic of the Ito & Matsui calculation is that **$H$ depends on the failure surface location**. A deeper failure surface means more soil above it pushing on the pile, giving a higher $H$. Therefore, $H$ should be recomputed for each trial failure surface during an automated search. Since the computation involves only closed-form expressions and simple integration, it is essentially instantaneous and adds no meaningful computational cost.
 
 In XSLOPE, when $H$ is left blank in the `piles` sheet but the pile diameter $D$ and spacing $S$ are provided, the Ito & Matsui force is computed automatically at slice generation time for each trial surface. If the user provides an explicit $H$ value, that value is used instead (override mode).
+
+#### Low Friction Angle Floor
+
+The general $c$-$\phi$ equation (Eq. 13) and the undrained clay equation (Eq. 23) were derived independently using different mathematical approaches. As $\phi \to 0$, the $c$-$\phi$ equation does **not** converge to the $\phi = 0$ result — the overburden coefficient $A_2$ drops to near zero for small $\phi$ before recovering and exceeding the $\phi = 0$ value at approximately $\phi = 12$–$15°$. This creates an unphysical discontinuity where a soil with $\phi = 2°$ would produce less pile force than one with $\phi = 0°$.
+
+Since friction can only strengthen soil arching (and thus increase the lateral force on the pile), XSLOPE enforces the $\phi = 0$ coefficients as a lower bound for all friction angles:
+
+>$A_1 = \max(A_{1,c\text{-}\phi},\; A_{1,\phi=0}) \qquad A_2 = \max(A_{2,c\text{-}\phi},\; A_{2,\phi=0})$
+
+This ensures that the computed pile force increases monotonically with $\phi$. For further discussion of limitations in the Ito & Matsui formulation, see Ukritchon & Keawsawasvong (2017).
 
 #### Applicability and Limitations
 
@@ -348,7 +360,7 @@ Lateral resistance depends heavily on soil conditions, pile geometry, and embedm
 | Soil Type | Pile Type | Typical $H$ per pile | Notes |
 |-----------|-----------|---------------------|-------|
 | Stiff clay ($c$ = 50-100 kPa) | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 100-400 kN/m (7-27 kip/ft) | Per unit width = $H_{\text{pile}} / S$ |
-| Medium dense sand ($\varphi$ = 30-35 deg) | Steel H-pile, $S$ = 2 m | 50-200 kN/m (3-14 kip/ft) | Depends on depth above failure surface |
+| Medium dense sand ($\phi$ = 30-35 deg) | Steel H-pile, $S$ = 2 m | 50-200 kN/m (3-14 kip/ft) | Depends on depth above failure surface |
 | Soft clay ($c$ = 15-30 kPa) | Concrete pier, $D$ = 1.2 m, $S$ = 3 m | 30-100 kN/m (2-7 kip/ft) | Lower bound; may govern over structural capacity |
 | Weathered rock | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 200-800 kN/m (14-55 kip/ft) | High capacity but expensive installation |
 
@@ -367,7 +379,7 @@ Pile data is entered in the **piles** sheet of the Excel input template. Each ro
 | D | $x_2$ | Yes | X-coordinate of pile tip (bottom) |
 | E | $y_2$ | Yes | Y-coordinate of pile tip (bottom) |
 | F | $H$ | LEM | Pile force magnitude per unit width of slope (kN/m or lb/ft) |
-| G | $\theta_p$ | No | Force angle from horizontal in degrees (default 0; positive = upward) |
+| G | $\theta_p$ | No | Force angle from horizontal in degrees (positive = upward). If blank, auto-computed as perpendicular to pile axis (0° for vertical piles). |
 | H | $D_{\text{pile}}$ | No | Pile diameter or width |
 | I | $S$ | No | Center-to-center spacing |
 | J | $E$ | FEM | Young's modulus of pile material |
@@ -378,7 +390,7 @@ The two-endpoint geometry $(x_1, y_1)$ to $(x_2, y_2)$ supports both **vertical*
 
 The force magnitude $H$ is per unit width of slope, consistent with the 2D plane-strain assumption used throughout XSLOPE. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, the input value is $H = H_{\text{single}} / S$.
 
-If $H$ is left blank and $D_{\text{pile}}$ and $S$ are provided, XSLOPE can auto-compute $H$ using the Ito & Matsui method (see above). If $H$ is provided, it is used directly regardless of other columns.
+If $H$ is left blank and $D_{\text{pile}}$ and $S$ are provided, XSLOPE auto-computes $H$ using the Ito & Matsui method (see above). This auto-computation requires vertical piles ($x_1 = x_2$); for battered piles, $H$ must be specified directly. If $H$ is provided, it is used directly regardless of other columns.
 
 Reading stops when column B ($x_1$) is empty, following the same pattern as the reinforcement sheet.
 
@@ -394,3 +406,5 @@ Poulos, H.G. (1995). Design of reinforcing piles to increase slope stability. *C
 FHWA. (2009). *Design and Construction of Driven Pile Foundations*. Publication No. FHWA-NHI-05-042/043, Federal Highway Administration.
 
 Hassiotis, S., Chameau, J.L., & Gunaratne, M. (1997). Design method for stabilization of slopes with piles. *Journal of Geotechnical and Geoenvironmental Engineering*, 123(4), 314-323.
+
+Ukritchon, B., & Keawsawasvong, S. (2017). Error in Ito and Matsui's limit-equilibrium solution of lateral force on a row of stabilizing piles. *Journal of Geotechnical and Geoenvironmental Engineering*, 143(9), 02817004.

@@ -52,48 +52,50 @@ def ito_matsui_coefficients(D1, D, phi_deg):
     A2 : float
         Overburden coefficient.
     """
+    # --- Phi = 0 baseline: Ito & Matsui (1975) Eq. (23) ---
+    # The phi=0 case is derived independently from the c-phi case using a
+    # different plastic equilibrium formulation. It serves as the physical
+    # lower bound for all friction angles, since adding friction to a cohesive
+    # soil can only increase arching (and thus pile force), never decrease it.
+    S = D1 + D
+    A1_phi0 = S * (3.0 * np.log(S / D1) + (D / D1) * np.tan(np.pi / 8) - 2.0) + 2.0 * D1
+    A2_phi0 = D
+
     if phi_deg < 0.01:
-        # phi = 0 case (undrained clay): simplified equations
-        # A1 = 2*sqrt(2) * D1/(D1-D) + 2*sqrt(2) - 1   (from Ito & Matsui eq. for c-only soil)
-        # A2 = 0 (no frictional component)
-        # Using the exact phi=0 result: p(z) = c * [2*sqrt(2)*D1/(D1-D) + 2*sqrt(2) - 1]
-        # But more precisely from the original paper for phi=0:
-        # p = c * [D1/(D1-D) * (8/3) + (D - D1 + D) * pi/2 ... ]
-        # Use the limiting form: as phi->0, Nphi->1, the exponential term -> 1
-        # Simplified: A1 = D1/(D1-D) + D/(D1-D) = S/(D1) but let's use the standard form
-        # For phi=0: p(z) = c * [2*tan(45)*D1/(D1-D)*exp(0) + D*tan(45) - D1*1]
-        # = c * [2*D1/(D1-D) + D - D1]
-        A1 = 2.0 * D1 / (D1) + D  # simplified phi=0
-        # Actually for phi=0 the standard result is just geometry-dependent.
-        # Use the well-known phi=0 formula: p = 2*c*(D1+D)/(D1) per unit depth
-        A1 = 2.0 * (D1 + D) / D1
-        A2 = 0.0
-        return A1, A2
+        return A1_phi0, A2_phi0
+
+    # --- General c-phi soil: Ito & Matsui (1975) Eq. (13) ---
+    # Requires D1 > D (i.e., S/D > 2); at the boundary the theory breaks down.
+    if D1 <= D:
+        return 0.0, 0.0
 
     phi = np.radians(phi_deg)
     Nphi = np.tan(np.pi / 4 + phi / 2) ** 2  # passive earth pressure coefficient
-
-    # Ito & Matsui (1975) closed-form coefficients
-    # From equations (1) and (2) in the original paper:
-    #
-    # A2 = D1 * [Nphi^(Nphi*D1/(2*(D1-D))) * tan(phi) + Nphi^(1/2) * (D/(2*(D1-D)))
-    #       * {Nphi * D1/(D1-D) * tan(phi) + Nphi^(1/2) - 1}]
-    #       - D1 * tan(phi)   ... simplified form
-    #
-    # The standard implementation follows the form used in FHWA and ReSSA software:
-
-    exp_term = Nphi ** (0.5 * Nphi * D1 / (D1 - D))
     sqrt_Nphi = np.sqrt(Nphi)
 
+    # The exponential amplification factor uses Nphi as the base:
+    #   E = Nphi^(Nphi * D1 / (2*(D1 - D)))
+    E = Nphi ** (0.5 * Nphi * D1 / (D1 - D))
+
     # A2: coefficient for the gamma*z term (overburden pressure)
-    A2 = (D1 * (exp_term * np.tan(phi)
+    A2 = (D1 * (E * np.tan(phi)
           + sqrt_Nphi * D / (2.0 * (D1 - D))
-          * (exp_term * np.tan(phi) + sqrt_Nphi - 1.0))
+          * (E * np.tan(phi) + sqrt_Nphi - 1.0))
           - D1 * np.tan(phi))
 
     # A1: coefficient for the cohesion term
-    # A1 = 2*Nphi^(1/2) * A2 / (Nphi - 1) when phi > 0
     A1 = 2.0 * sqrt_Nphi * A2 / (Nphi - 1.0)
+
+    # --- Apply phi=0 floor ---
+    # The c-phi formula (Eq. 13) was derived independently from the phi=0
+    # formula (Eq. 23) and does not converge to it as phi -> 0. For small
+    # friction angles (roughly phi < 12-15 deg), the c-phi formula produces
+    # coefficients well below the phi=0 values — an unphysical result since
+    # friction can only strengthen soil arching. We enforce the phi=0 values
+    # as a lower bound. See also Ukritchon & Keawsawasvong (2017) for a
+    # broader discussion of errors in Ito & Matsui's solution.
+    A1 = max(A1, A1_phi0)
+    A2 = max(A2, A2_phi0)
 
     return A1, A2
 
@@ -125,52 +127,47 @@ def intersect_pile_with_materials(pile_x, y_ground, y_failure, profile_lines, ma
         - 'phi': friction angle (degrees)
         - 'gamma': unit weight
     """
-    # Get y-coordinates of each profile line at pile_x
-    layer_boundaries = []
+    # Interpolate each profile line's y-coordinate at pile_x
+    profile_y = []
     for line in profile_lines:
         coords = np.array(line['coords'])
         xs = coords[:, 0]
         ys = coords[:, 1]
         sort_idx = np.argsort(xs)
-        y_at_x = np.interp(pile_x, xs[sort_idx], ys[sort_idx], left=np.nan, right=np.nan)
-        mat_id = line.get('mat_id')
-        if mat_id is not None and 0 <= mat_id < len(materials):
-            mat_index = mat_id
-        else:
-            mat_index = len(layer_boundaries)
-        layer_boundaries.append({'y': y_at_x, 'mat_index': mat_index})
+        profile_y.append(np.interp(pile_x, xs[sort_idx], ys[sort_idx], left=np.nan, right=np.nan))
 
-    # Sort boundaries from top (highest y) to bottom (lowest y)
-    layer_boundaries.sort(key=lambda b: -b['y'] if not np.isnan(b['y']) else float('inf'))
-
-    # Build segments between ground surface and failure surface
+    # Build segments using the same layer-stacking logic as slice weight calculation:
+    # for each profile line, the layer top is the profile line itself, and the
+    # layer bottom is the highest of all lower profile lines (or the failure surface).
     segments = []
-    for i, boundary in enumerate(layer_boundaries):
-        y_layer_top = boundary['y']
-        if np.isnan(y_layer_top):
+    for idx, layer_top_y in enumerate(profile_y):
+        if np.isnan(layer_top_y):
             continue
 
-        # Layer bottom is the next boundary below, or the failure surface
-        if i + 1 < len(layer_boundaries) and not np.isnan(layer_boundaries[i + 1]['y']):
-            y_layer_bot = layer_boundaries[i + 1]['y']
-        else:
-            y_layer_bot = y_failure  # extends to failure surface or below
+        # Bottom: highest of all lower profile lines, or failure surface
+        layer_bot_y = y_failure
+        for j in range(idx + 1, len(profile_y)):
+            if not np.isnan(profile_y[j]) and profile_y[j] > layer_bot_y:
+                layer_bot_y = profile_y[j]
 
-        # Clip to [y_failure, y_ground] range
-        seg_top_y = min(y_layer_top, y_ground)
-        seg_bot_y = max(y_layer_bot, y_failure)
-
-        # Skip if segment is outside the range or zero thickness
-        if seg_top_y <= y_failure or seg_bot_y >= y_ground:
-            continue
-        if seg_top_y <= seg_bot_y:
+        # Clip to [y_failure, y_ground]
+        overlap_top = min(y_ground, layer_top_y)
+        overlap_bot = max(y_failure, layer_bot_y)
+        h = overlap_top - overlap_bot
+        if h <= 0:
             continue
 
         # Convert y-coordinates to depths from ground surface (z increases downward)
-        z_top = y_ground - seg_top_y
-        z_bot = y_ground - seg_bot_y
+        z_top = y_ground - overlap_top
+        z_bot = y_ground - overlap_bot
 
-        mat = materials[boundary['mat_index']]
+        mat_id = profile_lines[idx].get('mat_id')
+        if mat_id is not None and 0 <= mat_id < len(materials):
+            mat_index = mat_id
+        else:
+            mat_index = idx
+        mat = materials[mat_index]
+
         segments.append({
             'z_top': z_top,
             'z_bot': z_bot,

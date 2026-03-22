@@ -1188,7 +1188,7 @@ def plot_reinforcement_forces(ax, fem_data, solution):
         sm = cm.ScalarMappable(cmap=pile_cmap, norm=pile_norm)
         sm.set_array([])
         cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-        cbar.set_label('Pile Lateral Force', rotation=270, labelpad=15, fontsize=10)
+        cbar.set_label('Pile Shear Force', rotation=270, labelpad=15, fontsize=10)
 
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()

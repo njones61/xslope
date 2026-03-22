@@ -1283,7 +1283,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             max_axial = np.max(np.abs(forces_pile_axial))
             max_lateral = np.max(np.abs(forces_pile_lateral))
             print(f"  Pile elements: {n_pile_elements}, "
-                  f"max axial = {max_axial:.2f}, max lateral = {max_lateral:.2f}")
+                  f"max axial = {max_axial:.2f}, max shear = {max_lateral:.2f}")
 
     return {
         "converged": converged,
@@ -1328,17 +1328,9 @@ def print_reinforcement_summary(fem_data, solution):
     forces = solution.get("forces_1d", np.zeros(n_1d))
     failed = solution.get("failed_1d_elements", np.zeros(n_1d, dtype=bool))
 
-    # Filter out pile elements — they are reported separately
+    # Filter out pile elements — reinforcement reported separately
     reinf_mask = ~pile_elem_mask
     if not np.any(reinf_mask):
-        # Print pile summary instead
-        n_pile = fem_data.get("n_pile_elements", 0)
-        if n_pile > 0:
-            axial = solution.get("forces_pile_axial", np.array([]))
-            lateral = solution.get("forces_pile_lateral", np.array([]))
-            print(f"\n=== Pile Summary ({n_pile} beam elements) ===")
-            print(f"  Max axial force:   {np.max(np.abs(axial)):.1f}")
-            print(f"  Max lateral force: {np.max(np.abs(lateral)):.1f}")
         return
 
     # Get per-line Tmax and Tres from slope_data stored in fem_data
@@ -1424,6 +1416,151 @@ def print_reinforcement_summary(fem_data, solution):
         print()
         for note in notes:
             print(f"  {note}")
+
+
+def print_pile_summary(fem_data, solution):
+    """
+    Print a summary table of pile results, grouped by pile line.
+    """
+    n_pile = fem_data.get("n_pile_elements", 0)
+    if n_pile == 0:
+        return
+
+    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+    nodes = fem_data["nodes"]
+    element_materials_1d = fem_data.get("element_materials_1d", np.array([]))
+    pile_elem_indices = fem_data.get("pile_elem_indices", np.array([], dtype=int))
+    n_reinf_lines = len(fem_data.get("pile_elem_mask", [])) - n_pile  # approximate
+    # Get actual reinforcement line count from the offset
+    forces_axial = solution.get("forces_pile_axial", np.zeros(n_pile))
+    forces_shear = solution.get("forces_pile_lateral", np.zeros(n_pile))
+
+    # Group pile elements by pile line (material ID)
+    pile_line_ids = {}
+    for p_idx in range(n_pile):
+        global_idx = pile_elem_indices[p_idx]
+        line_id = element_materials_1d[global_idx]
+        if line_id not in pile_line_ids:
+            pile_line_ids[line_id] = []
+        pile_line_ids[line_id].append(p_idx)
+
+    print(f"\n=== Pile Summary ===")
+    print(f"{'Pile':>4}  {'Elems':>5}  {'Max Axial':>10}  {'Avg Axial':>10}  "
+          f"{'Max Shear':>10}  {'Avg Shear':>10}")
+    print("-" * 65)
+
+    pile_num = 0
+    for line_id in sorted(pile_line_ids.keys()):
+        pile_num += 1
+        indices = pile_line_ids[line_id]
+        n_elem = len(indices)
+        axial = forces_axial[indices]
+        shear = forces_shear[indices]
+
+        max_axial = np.max(np.abs(axial))
+        avg_axial = np.mean(np.abs(axial))
+        max_shear = np.max(np.abs(shear))
+        avg_shear = np.mean(np.abs(shear))
+
+        print(f"{pile_num:>4}  {n_elem:>5}  {max_axial:>10.1f}  {avg_axial:>10.1f}  "
+              f"{max_shear:>10.1f}  {avg_shear:>10.1f}")
+
+    print("-" * 65)
+
+
+def print_detailed_element_summary(fem_data, solution):
+    """
+    Print a detailed per-element summary table for reinforcement and pile elements.
+
+    For reinforcement: lists each element with its line, centroid coordinates,
+    force, allowable force, and status.
+    For piles: lists each element with centroid coordinates, axial force,
+    lateral force.
+    """
+    elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
+    n_1d = len(elements_1d)
+    if n_1d == 0 and fem_data.get("n_pile_elements", 0) == 0:
+        return
+
+    nodes = fem_data["nodes"]
+    element_materials_1d = fem_data.get("element_materials_1d", np.array([]))
+    pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(n_1d, dtype=bool))
+    t_allow_by_elem = fem_data.get("t_allow_by_1d_elem", np.zeros(n_1d))
+    t_res_by_elem = fem_data.get("t_res_by_1d_elem", np.zeros(n_1d))
+    forces = solution.get("forces_1d", np.zeros(n_1d))
+    failed = solution.get("failed_1d_elements", np.zeros(n_1d, dtype=bool))
+
+    # --- Reinforcement element table ---
+    reinf_indices = [i for i in range(n_1d) if not pile_elem_mask[i]]
+    if reinf_indices:
+        print("\n=== Detailed Reinforcement Element Summary ===")
+        print(f"{'Elem':>4}  {'Line':>4}  {'X1':>8}  {'Y1':>8}  {'X2':>8}  {'Y2':>8}  "
+              f"{'Force':>8}  {'T_allow':>8}  {'T_res':>8}  {'Status'}")
+        print("-" * 96)
+
+        for i in reinf_indices:
+            elem = elements_1d[i]
+            n0 = nodes[elem[0]]
+            n1 = nodes[elem[1]]
+            line_id = element_materials_1d[i]
+            force = forces[i]
+            t_allow = t_allow_by_elem[i]
+            t_res = t_res_by_elem[i]
+            is_failed = failed[i]
+
+            if is_failed and t_res < 1e-6:
+                # Distinguish pullout (near ends, reduced t_allow) from rupture (full capacity exceeded)
+                # Get max t_allow for this line to determine if element is in pullout zone
+                line_mask = element_materials_1d == line_id
+                t_max_line = t_allow_by_elem[line_mask].max()
+                if t_allow < t_max_line - 1e-6:
+                    status = "PULLOUT"
+                else:
+                    status = "BROKEN"
+            elif is_failed:
+                status = "AT TRES"
+            elif force < -1e-6:
+                status = "COMPRESS"
+            elif force < 1e-6:
+                status = "INACTIVE"
+            elif force > 0.95 * t_allow and t_allow > 0:
+                status = "NEAR CAP"
+            else:
+                status = "OK"
+
+            print(f"{i:>4}  {line_id:>4}  {n0[0]:>8.2f}  {n0[1]:>8.2f}  {n1[0]:>8.2f}  {n1[1]:>8.2f}  "
+                  f"{force:>8.1f}  {t_allow:>8.1f}  {t_res:>8.1f}  {status}")
+
+        print("-" * 96)
+
+    # --- Pile element table ---
+    n_pile = fem_data.get("n_pile_elements", 0)
+    if n_pile > 0:
+        pile_elem_indices = fem_data.get("pile_elem_indices", np.array([], dtype=int))
+        forces_axial = solution.get("forces_pile_axial", np.zeros(n_pile))
+        forces_lateral = solution.get("forces_pile_lateral", np.zeros(n_pile))
+        cos_theta_pile = fem_data.get("cos_theta_pile", np.zeros(n_pile))
+        sin_theta_pile = fem_data.get("sin_theta_pile", np.zeros(n_pile))
+
+        print("\n=== Detailed Pile Element Summary ===")
+        print(f"{'Elem':>4}  {'X1':>8}  {'Y1':>8}  {'X2':>8}  {'Y2':>8}  "
+              f"{'Axial':>10}  {'Shear':>10}")
+        print("-" * 70)
+
+        for p_idx in range(n_pile):
+            global_idx = pile_elem_indices[p_idx]
+            elem = elements_1d[global_idx]
+            n0 = nodes[elem[0]]
+            n1 = nodes[elem[1]]
+            T = forces_axial[p_idx]
+            V = forces_lateral[p_idx]
+
+            print(f"{p_idx:>4}  {n0[0]:>8.2f}  {n0[1]:>8.2f}  {n1[0]:>8.2f}  {n1[1]:>8.2f}  "
+                  f"{T:>10.1f}  {V:>10.1f}")
+
+        print("-" * 70)
+        print(f"{'':>4}  {'':>8}  {'':>8}  {'':>8}  {'max abs:':>8}  "
+              f"{np.max(np.abs(forces_axial)):>10.1f}  {np.max(np.abs(forces_lateral)):>10.1f}")
 
 
 def _compute_B_and_detJ_quad8(coords, xi, eta):

@@ -684,47 +684,48 @@ def load_slope_data(filepath):
 
     # === PILE LINES ===
     pile_lines = []
-    piles_df = xls.parse('piles', header=1)
-    for i, row in piles_df.iterrows():
-        # Stop reading when column x1 is empty
-        if pd.isna(row.get('x1')):
-            break
-        # Check required coordinates
-        if pd.isna(row.get('y1')) or pd.isna(row.get('x2')) or pd.isna(row.get('y2')):
-            continue
-        try:
-            x1, y1 = float(row['x1']), float(row['y1'])
-            x2, y2 = float(row['x2']), float(row['y2'])
-            H = float(row['H']) if pd.notna(row.get('H')) else None
-            theta_p = float(row['theta']) if pd.notna(row.get('theta')) else 0.0
-            D_pile = float(row['D']) if pd.notna(row.get('D')) else None
-            S = float(row['S']) if pd.notna(row.get('S')) else None
-            E_pile = float(row['E']) if pd.notna(row.get('E')) else None
-            I_pile = float(row['I']) if pd.notna(row.get('I')) else None
-            area = float(row['Area']) if pd.notna(row.get('Area')) else None
-            label = str(row['label']) if pd.notna(row.get('label')) else f"Pile {i+1}"
-
-            # Validate
-            line_length = ((x2 - x1)**2 + (y2 - y1)**2)**0.5
-            if line_length == 0:
+    if 'piles' in xls.sheet_names:
+        piles_df = xls.parse('piles', header=1)
+        for i, row in piles_df.iterrows():
+            # Stop reading when column x1 is empty
+            if pd.isna(row.get('x1')):
+                break
+            # Check required coordinates
+            if pd.isna(row.get('y1')) or pd.isna(row.get('x2')) or pd.isna(row.get('y2')):
                 continue
-            if H is not None and H <= 0:
-                raise ValueError(f"H must be positive, got {H}")
+            try:
+                x1, y1 = float(row['x1']), float(row['y1'])
+                x2, y2 = float(row['x2']), float(row['y2'])
+                H = float(row['H']) if pd.notna(row.get('H')) else None
+                theta_p = float(row['theta']) if pd.notna(row.get('theta')) else 0.0
+                D_pile = float(row['D']) if pd.notna(row.get('D')) else None
+                S = float(row['S']) if pd.notna(row.get('S')) else None
+                E_pile = float(row['E']) if pd.notna(row.get('E')) else None
+                I_pile = float(row['I']) if pd.notna(row.get('I')) else None
+                area = float(row['Area']) if pd.notna(row.get('Area')) else None
+                label = str(row['label']) if pd.notna(row.get('label')) else f"Pile {i+1}"
 
-            pile_lines.append({
-                "x1": x1, "y1": y1,
-                "x2": x2, "y2": y2,
-                "H": H,
-                "theta_p": theta_p,
-                "D_pile": D_pile,
-                "S": S,
-                "E": E_pile,
-                "I": I_pile,
-                "area": area,
-                "label": label,
-            })
-        except Exception as e:
-            raise ValueError(f"Error processing pile in row {i + 3}: {e}")
+                # Validate
+                line_length = ((x2 - x1)**2 + (y2 - y1)**2)**0.5
+                if line_length == 0:
+                    continue
+                if H is not None and H <= 0:
+                    raise ValueError(f"H must be positive, got {H}")
+
+                pile_lines.append({
+                    "x1": x1, "y1": y1,
+                    "x2": x2, "y2": y2,
+                    "H": H,
+                    "theta_p": theta_p,
+                    "D_pile": D_pile,
+                    "S": S,
+                    "E": E_pile,
+                    "I": I_pile,
+                    "area": area,
+                    "label": label,
+                })
+            except Exception as e:
+                raise ValueError(f"Error processing pile in row {i + 3}: {e}")
 
 
     # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===

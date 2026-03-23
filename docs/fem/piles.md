@@ -141,6 +141,70 @@ During the Shear Strength Reduction Method:
 This treatment is consistent with how reinforcement elements are handled in the SSRM (see [Soil Reinforcement](reinforcement.md)) and follows standard practice in commercial geotechnical FEM software.
 
 
+## Pile-Soil Interface and Load Transfer
+
+### Shared-Node Coupling (Current Implementation)
+
+In XSLOPE, pile beam element nodes are the same nodes as the adjacent soil element nodes — the beam stiffness is assembled directly into the global stiffness matrix at the shared DOF indices. This means the pile and soil have **identical displacements** at every shared node. There is no relative slip between the pile shaft and the surrounding soil.
+
+This shared-node approach is equivalent to a **perfectly bonded interface** with infinite shear strength. When the soil deforms (e.g., during SSRM strength reduction), the pile resists through its $EI$ and $EA$ stiffness, and whatever force is needed to maintain displacement compatibility is transmitted at each node. There is no cap on the interface shear stress — the force transfer is limited only by the soil elements yielding (via the viscoplastic algorithm) or the pile reaching its structural capacity ($V_{\text{cap}}$, $M_{\text{cap}}$).
+
+**What this is NOT**: The shared-node coupling does not model skin friction. Real skin friction involves relative slip between the pile shaft and the soil, governed by an interface shear strength (adhesion + normal stress × friction). The shared-node approach has no mechanism for:
+
+- Shaft slip — the pile cannot move relative to the soil at any point
+- Progressive load transfer — in reality, skin friction mobilizes from the top down as the pile settles; with shared nodes, load distributes based on relative stiffness alone
+- Distinct end-bearing vs. skin-friction behavior — the load path depends entirely on the stiffness ratio between the beam $EA$ and the surrounding soil elements
+
+### Adequacy for Passive (Stabilizing) Piles
+
+For **passive stabilizing piles** in SSRM slope stability, the shared-node approach is standard and widely used in the literature (Griffiths & Lane 1999, Wei & Cheng 2009, Sun et al. 2021). In this application:
+
+- The soil is pushing **laterally** against the pile — the dominant interaction is lateral, not axial
+- The limiting mechanism is the **soil yielding** around the pile, not interface slip
+- The viscoplastic algorithm naturally limits the forces that the soil can transmit to the pile — when soil elements reach their Mohr-Coulomb yield surface, they redistribute stress
+- The shared-node coupling somewhat overestimates the pile-soil bond, but this makes the computed factor of safety slightly **unconservative** (more pile resistance than reality), and the effect is generally small for passive piles
+
+This is the same approach used by published SSRM implementations with beam elements and produces results consistent with commercial software for the passive pile case.
+
+### Limitation for Load-Bearing Piles
+
+For **load-bearing piles** carrying vertical structural loads (bridge abutments, building foundations near slopes), the shared-node approach has a more significant limitation. The vertical load at the pile head must transfer to the soil through a combination of shaft skin friction and tip end bearing. With shared nodes:
+
+- The load distributes to the soil based on the **relative stiffness** of the beam element vs. the surrounding soil elements at each node
+- This is a rough approximation of load transfer, but it is not governed by interface shear strength — the pile cannot slip through the soil regardless of how large the axial force becomes
+- There is no way to model bearing capacity failure of the pile (punch-through)
+- The depth distribution of load transfer depends on the mesh and element sizes rather than on soil-pile interface properties
+
+The practical consequence depends on the geometry. For a pile embedded through a shallow sliding mass into deep stable ground, the rigid bond tends to transfer more load to the soil **near the pile head** (where the stiffness mismatch is greatest) rather than allowing load to migrate to depth via skin friction. Whether this is conservative or unconservative for slope stability depends on where the failure surface develops relative to the load transfer zone, and cannot be determined a priori.
+
+### Commercial Software Approach
+
+Commercial geotechnical FEM packages (Plaxis 2D, RS2/Phase2, FLAC) address the interface limitation using **interface elements** along the pile shaft:
+
+- **Interface elements** are zero-thickness element pairs inserted between the structural element nodes and the soil nodes. They have separate nodes at the same coordinates, connected by a constitutive model — typically Mohr-Coulomb with a strength reduction factor $R_{\text{inter}}$:
+
+>$c_{\text{inter}} = R_{\text{inter}} \cdot c_{\text{soil}}, \qquad \tan\phi_{\text{inter}} = R_{\text{inter}} \cdot \tan\phi_{\text{soil}}$
+
+- $R_{\text{inter}}$ typically ranges from 0.5 to 1.0 (concrete on soil $\approx$ 0.7, steel on soil $\approx$ 0.5)
+- The interface has a high **normal stiffness** $k_n$ (to prevent interpenetration) and a **shear stiffness** $k_s$ (governing pre-slip deformation)
+- When the interface shear stress reaches the interface strength, relative slip occurs — this is the mechanism that produces realistic skin friction behavior
+- In Plaxis 2D, interfaces are an explicit toggle on plate (beam) elements — without interfaces enabled, the behavior is the same shared-node coupling that XSLOPE uses
+
+XSLOPE does not currently implement interface elements. Adding them would require duplicating nodes along the pile shaft, introducing a new element type with its own constitutive model, and including the interface strength reduction in the SSRM loop.
+
+### Practical Guidance for Load-Bearing Piles in XSLOPE
+
+Until interface elements are implemented, the recommended approach for load-bearing piles near slopes follows the same bounding strategy described in the [LEM piles documentation](../lem/piles.md#load-bearing-piles):
+
+1. **Model the pile as a passive beam element** (current capability) to capture its lateral resistance to slope movement
+2. **Apply the structural load as a surface surcharge** via the `dloads` sheet — this is the conservative upper bound, placing the full load at the surface to maximize driving forces on any failure surface
+3. **Run both with and without the surcharge** to bracket the result when the pile tip is well below the anticipated failure surface (the lower-bound assumption being that the load bypasses the sliding mass entirely)
+
+The surface surcharge approach is conservative because it ignores the fact that some (or most) of the structural load reaches stable ground below the failure surface via end bearing and deep skin friction. For end-bearing piles in competent material with a shallow failure surface, the conservatism may be substantial. For friction piles in weak soil with a deep failure surface, the conservatism is smaller.
+
+This bounding approach avoids the need for explicit skin friction modeling and is consistent with standard LEM practice (FHWA, AASHTO). For cases where the difference between upper and lower bounds is unacceptably large, a commercial FEM package with interface elements (Plaxis, RS2) should be used to resolve the load transfer explicitly.
+
+
 ## Input Parameters
 
 Pile properties for FEM analysis are specified in the `piles` sheet of the input template. The FEM-relevant columns are:

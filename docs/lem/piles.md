@@ -332,40 +332,41 @@ Stabilizing piles are the primary focus of the pile implementation in XSLOPE. Th
 
 Load-bearing piles carry structural loads (vertical forces from foundations) and transfer them to the subsurface through a combination of **skin friction** along the pile shaft and **end bearing** at the pile tip. The key question for slope stability is: does the structural load contribute to the driving forces on the failure surface?
 
-The answer depends on where the pile tip is relative to the failure surface:
+#### Case 1: Pile tip above the failure surface
 
-**Case 1: Pile tip below the failure surface (most common)**
+If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. The structural load **does** contribute to driving forces and should be included in the analysis. Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template. This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice.
 
-This is the usual design intent for load-bearing piles near slopes. The pile transfers the structural load through skin friction and end bearing to stable ground **below** the failure surface. In this case:
+#### Case 2: Pile tip below the failure surface
 
-- The structural load effectively **bypasses** the sliding mass — it is delivered to stable ground below the failure surface and does not contribute to driving forces
-- The structural load should be **omitted** from the slope stability model (i.e., do not apply it as a surcharge on the slope surface)
-- The pile may still provide lateral resistance to sliding, which can be modeled separately as a stabilizing pile force $H$
-- This is the approach recommended by FHWA, AASHTO, and used by commercial slope stability software (SLOPE/W, Slide2)
+This is the usual design intent for load-bearing piles near slopes — the pile is embedded in stable ground below the failure surface. The pile shaft necessarily passes **through** the sliding mass to reach that stable ground, and skin friction is mobilized along the full shaft length, both above and below the failure surface. The portion of the structural load transferred via skin friction **above** the failure surface loads the sliding mass; the remainder (skin friction below the failure surface plus end bearing) bypasses it.
 
-**Case 2: Pile tip above the failure surface**
+In principle, determining the split requires a load-transfer analysis (t-z curves or similar). In practice, this is rarely done in the context of slope stability because the complexity is not justified. Instead, two bounding assumptions are used:
 
-If the pile tip is entirely within the sliding mass (a friction pile in weak soil, for example), the entire pile and its load are part of the sliding mass. In this case:
+**Lower bound (omit the load)**: Assume the pile delivers all of its load to stable ground below the failure surface. The structural load is omitted entirely from the slope stability model. This is the approach recommended by FHWA, AASHTO, and used by commercial slope stability software (SLOPE/W, Slide2). It is appropriate when:
 
-- The structural load **does** contribute to driving forces and should be included in the analysis
-- Standard practice is to apply the structural load as a **distributed surface surcharge** using the distributed loads (`dloads`) sheet in the XSLOPE input template
-- This is slightly conservative because it places all the weight at the surface rather than distributing it with depth through skin friction, but the conservatism is generally small and accepted in practice
+- The pile is designed as an end-bearing pile in competent material (rock, dense sand) — most of the load genuinely reaches the tip
+- The skin friction above the failure surface is small relative to the total pile capacity (shallow failure surface relative to the pile length, or weak soil in the sliding mass)
+- The structural load is modest relative to the soil driving forces
 
-**Case 3: Failure surface intersects the pile mid-shaft**
+**Upper bound (full surcharge)**: Treat the full structural load as a surface surcharge, as in Case 1. This is conservative — it assumes all of the load enters the sliding mass, ignoring the load that bypasses via end bearing and deep skin friction. This approach is appropriate when:
 
-This is the most complex scenario. Some of the structural load has been transferred above the failure surface through skin friction (and thus loads the sliding mass), while some has been transferred below (and bypasses it). In practice:
+- A significant portion of the pile shaft is above the failure surface
+- The soil above the failure surface has high skin friction capacity (the pile sheds substantial load before reaching the failure surface)
+- The structural load is large relative to the soil driving forces, and the lower-bound assumption would meaningfully affect the computed factor of safety
 
-- Most engineers apply the **conservative upper bound** — treat the full structural load as a surface surcharge, assuming all load is within the sliding mass
-- A refined approach would compute the cumulative skin friction transferred above the failure surface (requiring a load-transfer or t-z analysis), but this is rarely done in practice because the complexity is not justified by the improvement in accuracy
-- Modeling the depth-proportional weight distribution within the method of slices is not practical — the slice formulation assigns a single weight to each slice based on its cross-sectional area and unit weight
+For most practical cases with end-bearing piles through a shallow sliding mass, the lower-bound (omit) approach is standard and the error is small. When in doubt, run both assumptions to bracket the answer.
 
-**Summary**: For load-bearing piles near slopes, the recommended approach in XSLOPE is:
+#### Summary
 
-1. If the pile tip is below the failure surface, omit the structural load from the slope stability model
-2. If the pile tip is above the failure surface, apply the structural load as a distributed surface load on the `dloads` sheet
+For load-bearing piles near slopes, the recommended approach in XSLOPE is:
+
+1. If the pile tip is above the failure surface, apply the structural load as a distributed surface load on the `dloads` sheet
+2. If the pile tip is below the failure surface, omit the structural load from the slope stability model (lower bound). If the structural load is significant, also run with full surcharge (upper bound) to bracket the result.
 3. If the pile also provides lateral resistance to sliding, model that separately as a stabilizing pile force $H$
 
 The existing distributed load capability in XSLOPE handles the surcharge case. No additional code is needed for load-bearing piles — only clear guidance on when and how to apply the structural load.
+
+For a more complete treatment of load-bearing piles that avoids these bounding assumptions, see the [FEM pile-soil interface discussion](../fem/piles.md#pile-soil-interface-and-load-transfer).
 
 
 ## Typical Parameter Values

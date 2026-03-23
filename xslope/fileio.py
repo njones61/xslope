@@ -709,6 +709,8 @@ def load_slope_data(filepath):
                 E_pile = float(row['E']) if pd.notna(row.get('E')) else None
                 I_pile = float(row['I']) if pd.notna(row.get('I')) else None
                 area = float(row['Area']) if pd.notna(row.get('Area')) else None
+                V_cap = float(row['Vcap']) if pd.notna(row.get('Vcap')) else None
+                M_cap = float(row['Mcap']) if pd.notna(row.get('Mcap')) else None
                 label = str(row['label']) if pd.notna(row.get('label')) else f"Pile {i+1}"
 
                 # Validate
@@ -717,6 +719,12 @@ def load_slope_data(filepath):
                     continue
                 if H is not None and H <= 0:
                     raise ValueError(f"H must be positive, got {H}")
+                if V_cap is not None and V_cap <= 0:
+                    raise ValueError(f"Vcap must be positive, got {V_cap}")
+                if M_cap is not None and M_cap <= 0:
+                    raise ValueError(f"Mcap must be positive, got {M_cap}")
+                if (V_cap is not None or M_cap is not None) and S is None:
+                    raise ValueError(f"S (pile spacing) is required when Vcap or Mcap are specified")
 
                 pile_lines.append({
                     "x1": x1, "y1": y1,
@@ -728,6 +736,8 @@ def load_slope_data(filepath):
                     "E": E_pile,
                     "I": I_pile,
                     "area": area,
+                    "V_cap": V_cap,
+                    "M_cap": M_cap,
                     "label": label,
                 })
             except Exception as e:

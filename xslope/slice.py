@@ -547,6 +547,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "theta_p": pile["theta_p"],
                 "D_pile": pile.get("D_pile"),
                 "S": pile.get("S"),
+                "V_cap": pile.get("V_cap"),
+                "M_cap": pile.get("M_cap"),
                 "label": pile.get("label", ""),
             })
 
@@ -958,6 +960,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 continue
             if isinstance(intersec, Point):
                 pile_H = pl["H"]
+                pile_H_was_auto = False
+                F_pile_single = None
+                ito_segments = None
+
                 # Auto-compute H using Ito & Matsui if H is not specified but D and S are
                 if pile_H is None and pl["D_pile"] is not None and pl["S"] is not None:
                     # Ito & Matsui is only valid for vertical piles
@@ -971,11 +977,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     from .ito_matsui import intersect_pile_with_materials, compute_ito_matsui_force
                     gs_coords = np.array(ground_surface.coords)
                     y_ground_at_pile = np.interp(intersec.x, gs_coords[:, 0], gs_coords[:, 1])
-                    segments = intersect_pile_with_materials(
+                    ito_segments = intersect_pile_with_materials(
                         intersec.x, y_ground_at_pile, intersec.y,
                         profile_lines, materials
                     )
-                    pile_H, F_single = compute_ito_matsui_force(pl["D_pile"], pl["S"], segments)
+                    pile_H, F_pile_single = compute_ito_matsui_force(pl["D_pile"], pl["S"], ito_segments)
+                    pile_H_was_auto = True
                     # Warn once if Ito & Matsui produces very large H
                     global _ito_matsui_warned
                     if not _ito_matsui_warned and pile_H > 50000:
@@ -987,6 +994,33 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                         _ito_matsui_warned = True
                 elif pile_H is None:
                     pile_H = 0.0
+
+                # Structural capacity check (V_cap and M_cap are per-pile values)
+                V_cap = pl.get("V_cap")
+                M_cap = pl.get("M_cap")
+                if (V_cap is not None or M_cap is not None) and pile_H > 0 and pl["S"] is not None:
+                    S_pile = pl["S"]
+                    if F_pile_single is None:
+                        F_pile_single = pile_H * S_pile  # user-specified H
+                    F_capped = F_pile_single
+
+                    if V_cap is not None:
+                        F_capped = min(F_capped, V_cap)
+
+                    if M_cap is not None:
+                        if pile_H_was_auto and ito_segments:
+                            from .ito_matsui import compute_ito_matsui_force_and_moment_arm
+                            _, _, L_m = compute_ito_matsui_force_and_moment_arm(
+                                pl["D_pile"], S_pile, ito_segments)
+                        else:
+                            gs_coords = np.array(ground_surface.coords)
+                            y_gnd = np.interp(intersec.x, gs_coords[:, 0], gs_coords[:, 1])
+                            depth = y_gnd - intersec.y
+                            L_m = depth / 3.0 if depth > 0 else 0.0
+                        if L_m > 0:
+                            F_capped = min(F_capped, M_cap / L_m)
+
+                    pile_H = F_capped / S_pile
 
                 h_pile += pile_H
                 theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)

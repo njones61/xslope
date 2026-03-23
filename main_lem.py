@@ -1,4 +1,3 @@
-import numpy as np
 from xslope.global_config import non_circ
 
 from xslope.fileio import load_slope_data
@@ -6,6 +5,7 @@ from xslope.plot import plot_circular_search_results, plot_noncircular_search_re
 from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
+from xslope.summary import print_ito_matsui_summary, print_rapid_drawdown_summary, print_no_solution_warning
 from xslope.advanced import reliability as reliability_analysis
 
 slope_data = load_slope_data("docs/lem/files/xslope_piles.xlsx")
@@ -44,51 +44,11 @@ elif analysis_type == "auto_search": # automated search for critical surface
   slice_df = critical_surface['slices']
   failure_surface = critical_surface['failure_surface']
   results = critical_surface['solver_result']
-  if slice_df is not None and 'h_pile' in slice_df.columns:
-    pile_slices = slice_df[slice_df['h_pile'] > 0]
-    if not pile_slices.empty and slope_data.get('pile_lines'):
-      for pile_info, (_, ps) in zip(slope_data['pile_lines'], pile_slices.iterrows()):
-        if pile_info.get('H') is None and pile_info.get('D_pile') and pile_info.get('S'):
-          from shapely.geometry import Point as Pt
-          from xslope.ito_matsui import ito_matsui_coefficients, intersect_pile_with_materials, compute_ito_matsui_force
-          D_p, S_p = pile_info['D_pile'], pile_info['S']
-          D1 = S_p - D_p
-          gs_coords = np.array(slope_data['ground_surface'].coords)
-          y_gnd = np.interp(ps['x_pile'], gs_coords[:, 0], gs_coords[:, 1])
-          depth = y_gnd - ps['y_pile']
-          segments = intersect_pile_with_materials(
-              ps['x_pile'], y_gnd, ps['y_pile'],
-              slope_data['profile_lines'], slope_data['materials'])
-          H_val, F_pile = compute_ito_matsui_force(D_p, S_p, segments)
-          A1, A2 = ito_matsui_coefficients(D1, D_p, segments[0]['phi']) if segments else (0, 0)
-          print(f'  === Ito & Matsui Summary (Pile at x={ps["x_pile"]:.2f}) ===')
-          print(f'  Pile diameter (D)          = {D_p:.1f}')
-          print(f'  Pile spacing (S)           = {S_p:.1f}')
-          print(f'  Clear spacing (D1 = S - D) = {D1:.1f}')
-          print(f'  Depth to failure surface   = {depth:.1f}')
-          print(f'  Coefficients: A1 = {A1:.3f}, A2 = {A2:.3f}')
-          print(f'  Force per pile (F_pile)    = {F_pile:.0f}')
-          print(f'  Force per unit width (H)   = {H_val:.1f}')
-  if rapid_drawdown and results and 'stage1_FS' in results:
-    print(f"=== RAPID DRAWDOWN SUMMARY (Critical Surface) ===")
-    print(f"Stage 1 FS = {results['stage1_FS']:.4f}")
-    print(f"Stage 2 FS = {results['stage2_FS']:.4f}")
-    print(f"Stage 3 FS = {results['stage3_FS']:.4f}")
-    print(f"Final rapid drawdown FS = {results['FS']:.4f}")
+  print_ito_matsui_summary(slope_data, slice_df)
+  if rapid_drawdown:
+    print_rapid_drawdown_summary(results)
   if results is None:
-    print(f"[⚠️] No valid solution found (FS=9999 for all surfaces).")
-    # Check if Ito & Matsui forces may be the cause
-    from xslope.slice import _ito_matsui_warned
-    if _ito_matsui_warned:
-      print(f"    Ito & Matsui pile forces exceed driving forces for all trial surfaces.")
-      print(f"    This may mean the piles are sufficient to stabilize the slope. Note that")
-      print(f"    Ito & Matsui computes an upper bound on soil resistance and does not check")
-      print(f"    pile structural capacity. The available resistance should be taken as the")
-      print(f"    lesser of the Ito & Matsui soil resistance and the pile shear/moment")
-      print(f"    capacity. If the structural capacity governs, specify H directly in the")
-      print(f"    piles sheet as H = min(structural capacity, Ito & Matsui) / S.")
-    else:
-      print(f"    Check input parameters.")
+    print_no_solution_warning()
   else:
     plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
 

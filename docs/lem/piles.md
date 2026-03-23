@@ -278,9 +278,7 @@ The Ito & Matsui method has the following characteristics and limitations:
 - **Plastic flow assumption**: The method gives an **upper bound** on the soil's capacity to push on the pile. The actual mobilized resistance may be lower if the soil has not fully reached the plastic state.
 - **Spacing ratio**: The theory is applicable for $S/D$ between approximately **2 and 8**. Below $S/D \approx 2$, the piles act more like a continuous retaining wall. Above $S/D \approx 8$, soil arching between piles becomes negligible and the method overestimates the force.
 - **Originally derived for horizontal ground**: The overburden term $\gamma z$ in $p(z)$ assumes the vertical stress at depth $z$ equals $\gamma z$, which is exact only for horizontal ground. On a slope face, the actual vertical stress at the pile location is less than $\gamma z$ because the soil column above is truncated by the slope geometry. This means the method can overestimate the overburden contribution for piles on the slope face, particularly near the toe where the soil column is shallowest relative to a horizontal surface at the same elevation. For piles behind the crest on level ground, the approximation is accurate. In practice, the theory is routinely applied to slopes and the overestimation is generally accepted as conservative (it increases the computed pile resistance, not the driving forces). XSLOPE uses the vertical depth from the ground surface at the pile location to the failure surface, consistent with standard practice in commercial software (Slide2, SLOPE/W).
-- **No structural check**: The computed $H$ represents the soil's capacity to push on the pile. The actual pile resistance used in the LEM should be the **lesser** of the Ito-Matsui soil force and the pile's structural shear/bending capacity:
-
->$H_{\text{design}} = \min(H_{\text{Ito-Matsui}},\; H_{\text{structural}})$
+- **Upper bound on soil force**: The computed $H$ represents the soil's capacity to push on the pile. The actual pile resistance used in the LEM is the **lesser** of the Ito-Matsui soil force and the pile's structural shear/bending capacity. See [Structural Capacity Checks](#structural-capacity-checks) below for how XSLOPE enforces this limit when $V_{\text{cap}}$ and $M_{\text{cap}}$ are provided.
 
 ### LEM vs. FEM Pile Modeling
 
@@ -307,18 +305,61 @@ The large difference arises because:
 
 **Practical implications**: For piles on the slope face where the sliding mass is thin at the pile location, the LEM approach with Ito & Matsui may significantly underestimate the pile's effectiveness compared to FEM. The LEM result should be considered conservative. When the difference matters for design, an FEM analysis with beam elements provides a more complete representation of the pile-soil interaction. Conversely, for piles placed where the failure surface is deep (e.g., behind the crest), the LEM and FEM results tend to converge because the Ito & Matsui force is larger and the pile's structural stiffness is less dominant relative to the soil forces.
 
-### Structural Capacity
+### Structural Capacity Checks
 
-The pile resistance used in LEM should not exceed the structural capacity of the pile. Two structural failure modes should be checked:
+The pile resistance used in LEM should not exceed the structural capacity of the pile. Two structural failure modes are checked when the optional $V_{\text{cap}}$ and $M_{\text{cap}}$ columns are provided in the `piles` sheet:
 
-- **Shear capacity**: The shear strength $V_{\text{cap}}$ of the pile cross-section. For concrete piles, this is governed by the concrete and steel reinforcement; for steel piles, by the web and flange dimensions.
-- **Moment capacity**: The pile must be able to resist the bending moment that develops from the soil pressure distribution. The limiting lateral force from bending is approximately $M_{\text{cap}} / L_m$, where $M_{\text{cap}}$ is the moment capacity and $L_m$ is the moment arm from the point of maximum moment to the fixity point below the failure surface.
+- **Shear capacity** ($V_{\text{cap}}$): The maximum lateral shear force that the pile cross-section can resist. For concrete piles, this is governed by the concrete and steel reinforcement; for steel piles, by the web and flange dimensions.
+- **Moment capacity** ($M_{\text{cap}}$): The maximum bending moment the pile can resist. The limiting lateral force from bending is $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface.
+
+Both $V_{\text{cap}}$ and $M_{\text{cap}}$ are properties of a **single pile** (not per unit width). The capacity check compares them against the per-pile force $F_{\text{pile}}$, not the per-unit-width force $H$.
+
+#### Capacity Check Procedure
+
+The capacity check applies regardless of how the pile force was obtained, but the details differ between the two cases.
+
+**Common steps** (both cases):
+
+1. If $V_{\text{cap}}$ is provided: $\;F_{\text{pile}} = \min(F_{\text{pile}},\; V_{\text{cap}})$
+2. If $M_{\text{cap}}$ is provided: $\;F_{\text{pile}} = \min(F_{\text{pile}},\; M_{\text{cap}} / L_m)$
+3. Convert back to per-unit-width: $\;H = F_{\text{pile}} / S$
+
+The capped $H$ is then used in the slice equilibrium equations.
+
+#### Case 1: Ito & Matsui Auto-Computed $H$
+
+When $H$ is left blank and $D$ and $S$ are provided, XSLOPE computes $F_{\text{pile}}$ by integrating the Ito & Matsui pressure distribution $p(z) = c \cdot A_1 + \gamma z \cdot A_2$ from the ground surface to the failure surface. Because the full pressure distribution is known, XSLOPE also computes the **exact moment arm** $L_m$ from the centroid of that distribution:
+
+>$L_m = \dfrac{\displaystyle\int_0^{z_f} (z_f - z)\, p(z)\, dz}{F_{\text{pile}}}$
+
+The integration is performed piecewise over each soil layer (the same segments used for the force calculation). Some limiting cases:
+
+- **Uniform pressure** ($c > 0$, $\gamma = 0$): $L_m = z_f / 2$
+- **Triangular pressure** ($c = 0$, $\gamma > 0$): $L_m = z_f / 3$
+- **General** $c$-$\phi$ **soil**: $z_f / 3 < L_m < z_f / 2$
 
 The controlling design value is:
 
->$H = \min(H_{\text{soil}},\; V_{\text{cap}},\; M_{\text{cap}} / L_m)$
+>$H = \dfrac{1}{S}\min(F_{\text{Ito-Matsui}},\; V_{\text{cap}},\; M_{\text{cap}} / L_m)$
 
-where $H_{\text{soil}}$ is from Ito & Matsui or other soil-pile interaction analysis.
+The summary output reports the soil force, each capacity check with $[\text{GOVERNS}]$ or $[\text{OK}]$ status, and the capped values if the structural capacity controls.
+
+#### Case 2: User-Specified $H$
+
+When the user provides $H$ directly, the per-pile force is computed as $F_{\text{pile}} = H \times S$. The $V_{\text{cap}}$ check is straightforward — it is a direct comparison of $F_{\text{pile}}$ against the shear capacity.
+
+For the $M_{\text{cap}}$ check, the pressure distribution behind the pile is unknown, so XSLOPE cannot compute $L_m$ from integration. Instead, it uses a default of:
+
+>$L_m = z_f / 3$
+
+This corresponds to a triangular pressure distribution (linearly increasing with depth), which gives the **largest** $M_{\text{cap}} / L_m$ and therefore the **least restrictive** cap on $F_{\text{pile}}$. If the actual pressure distribution is more uniform (top-heavy), the true $L_m$ would be larger and the $M_{\text{cap}}$ check would be more restrictive. Users who know their pressure distribution can account for this by pre-computing the capped force externally:
+
+>$H = \dfrac{1}{S}\min(F_{\text{soil}},\; V_{\text{cap}},\; M_{\text{cap}} / L_m) \qquad \text{(enter this value directly)}$
+
+| | $F_{\text{pile}}$ source | $L_m$ for $M_{\text{cap}}$ check | Summary detail |
+|---|---|---|---|
+| **Ito & Matsui** | From integration of $p(z)$ | Exact, from pressure centroid | Full Ito & Matsui summary with capacity check |
+| **User-specified** $H$ | $H \times S$ | Default $z_f / 3$ | Capacity check only (no Ito & Matsui summary) |
 
 ### Soil Arching Between Piles
 
@@ -394,6 +435,23 @@ Lateral resistance depends heavily on soil conditions, pile geometry, and embedm
 | Weathered rock | Drilled shaft, $D$ = 0.9 m, $S$ = 3 m | 200-800 kN/m (14-55 kip/ft) | High capacity but expensive installation |
 
 These values are for preliminary guidance only. Actual $H$ should be determined from Ito & Matsui theory, p-y analysis, or structural analysis of the pile.
+
+### Typical Structural Capacities
+
+The following table provides typical ranges of shear capacity ($V_{\text{cap}}$) and moment capacity ($M_{\text{cap}}$) for common pile types. These are ultimate capacities; appropriate factors of safety or resistance factors should be applied per the governing design code.
+
+| Pile Type | $V_{\text{cap}}$ (kN) | $V_{\text{cap}}$ (kip) | $M_{\text{cap}}$ (kN·m) | $M_{\text{cap}}$ (kip·ft) | Notes |
+|-----------|----------------------|----------------------|-------------------------|--------------------------|-------|
+| Steel H-pile, HP 12x84 | 600–900 | 135–200 | 400–700 | 300–520 | Weak-axis shear/bending; strong-axis values ~2x higher |
+| Steel H-pile, HP 14x117 | 900–1,300 | 200–290 | 700–1,200 | 520–880 | Weak-axis shear/bending |
+| Steel pipe pile, $D$ = 600 mm, $t$ = 12 mm | 800–1,200 | 180–270 | 500–900 | 370–660 | Unfilled; concrete-filled values ~2–3x higher |
+| Drilled shaft, $D$ = 0.6 m, $f'_c$ = 28 MPa | 300–500 | 65–110 | 200–500 | 150–370 | Depends on reinforcement ratio ($\rho$ = 1–3%) |
+| Drilled shaft, $D$ = 0.9 m, $f'_c$ = 28 MPa | 500–900 | 110–200 | 600–1,500 | 440–1,100 | Depends on reinforcement ratio ($\rho$ = 1–3%) |
+| Drilled shaft, $D$ = 1.2 m, $f'_c$ = 28 MPa | 800–1,400 | 180–310 | 1,200–3,500 | 880–2,600 | Depends on reinforcement ratio ($\rho$ = 1–3%) |
+| Concrete pier, 0.6 m × 0.6 m, $f'_c$ = 28 MPa | 250–400 | 55–90 | 150–400 | 110–300 | Rectangular section; depends on reinforcement |
+| Micropile, $D$ = 200 mm, steel casing | 200–400 | 45–90 | 50–150 | 35–110 | Governed by steel casing and grout bond |
+
+$V_{\text{cap}}$ for reinforced concrete is typically computed per ACI 318 as $V_c + V_s$ (concrete + stirrup contributions). $M_{\text{cap}}$ is the nominal moment capacity $M_n$ of the cross-section. For steel sections, $V_{\text{cap}} = 0.6 F_y A_w$ (web area) and $M_{\text{cap}} = F_y Z$ (plastic section modulus).
 
 
 ## Input Template

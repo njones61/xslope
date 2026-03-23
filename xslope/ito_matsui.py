@@ -217,3 +217,71 @@ def compute_ito_matsui_force(D_pile, S, segments):
 
     H = F_pile / S if S > 0 else 0.0
     return H, F_pile
+
+
+def compute_ito_matsui_force_and_moment_arm(D_pile, S, segments):
+    """
+    Compute pile force and moment arm from Ito & Matsui pressure distribution.
+
+    The moment arm L_m is the distance from the failure surface (bottom of
+    the pressure diagram) to the centroid of the pressure resultant. Used
+    for the M_cap structural capacity check: F_pile_max = M_cap / L_m.
+
+    Parameters
+    ----------
+    D_pile : float
+        Pile diameter.
+    S : float
+        Center-to-center spacing.
+    segments : list of dict
+        Soil layer segments from intersect_pile_with_materials().
+
+    Returns
+    -------
+    H : float
+        Force per unit width of slope (F_pile / S).
+    F_pile : float
+        Total force per pile.
+    L_m : float
+        Moment arm from failure surface to pressure centroid.
+        Returns 0.0 if F_pile is zero.
+    """
+    D1 = S - D_pile
+
+    if D1 <= 0 or not segments:
+        return 0.0, 0.0, 0.0
+
+    F_pile = 0.0
+    moment_about_base = 0.0
+
+    # Total depth = max z_bot across all segments (failure surface depth)
+    z_max = max(seg['z_bot'] for seg in segments)
+
+    for seg in segments:
+        z_top = seg['z_top']
+        z_bot = seg['z_bot']
+        c = seg['c']
+        phi = seg['phi']
+        gamma = seg['gamma']
+
+        A1, A2 = ito_matsui_coefficients(D1, D_pile, phi)
+
+        # Force for this segment
+        dz = z_bot - z_top
+        F_j = c * A1 * dz + gamma * A2 * (z_bot ** 2 - z_top ** 2) / 2.0
+        F_pile += F_j
+
+        # Moment of p(z) about the failure surface (z_max).
+        # Lever arm at depth z is (z_max - z).
+        # Integral of p(z)*(z_max - z) dz from z_top to z_bot:
+        #   constant term: c*A1 * [z_max*dz - (z_bot^2 - z_top^2)/2]
+        #   linear term:   gamma*A2 * [z_max*(z_bot^2 - z_top^2)/2 - (z_bot^3 - z_top^3)/3]
+        M_j = (c * A1 * (z_max * dz - (z_bot ** 2 - z_top ** 2) / 2.0)
+               + gamma * A2 * (z_max * (z_bot ** 2 - z_top ** 2) / 2.0
+                               - (z_bot ** 3 - z_top ** 3) / 3.0))
+        moment_about_base += M_j
+
+    H = F_pile / S if S > 0 else 0.0
+    L_m = moment_about_base / F_pile if F_pile > 0 else 0.0
+
+    return H, F_pile, L_m

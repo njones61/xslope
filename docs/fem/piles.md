@@ -10,6 +10,8 @@ This approach captures several behaviors that are difficult or impossible to mod
 - Both axial (along the pile) and lateral (perpendicular to the pile) stiffness are modeled
 - The pile can carry both tension and compression (unlike flexible reinforcement, which is tension-only)
 - The bending stiffness of the pile ($EI$) naturally resists lateral soil movement
+- Bending moments are computed directly at each node along the pile
+- Structural capacity limits ($V_{\text{cap}}$, $M_{\text{cap}}$) are enforced during the analysis through plastic hinge formation
 - During SSRM strength reduction, the pile stiffness remains constant while soil strength is reduced, and the analysis reveals when the soil can no longer transfer load to the pile (failure)
 
 For background on the general finite element slope stability methodology in XSLOPE, see the [FEM Overview](overview.md). For the LEM treatment of piles, including force resolution, typical parameters, and the Ito & Matsui method, see [LEM Piles](../lem/piles.md).
@@ -22,48 +24,40 @@ The existing FEM module models flexible reinforcement as **2-node truss elements
 | Property | Reinforcement (Truss) | Pile (Beam) |
 |----------|----------------------|-------------|
 | Axial stiffness | $EA/L$ | $EA/L$ |
-| Lateral stiffness | None | $3EI/L^3$ (from bending) |
+| Lateral stiffness | None | $12EI/L^3$ (from bending) |
 | Compression | Not allowed (zeroed via body-force corrections) | Allowed |
 | Orientation | Inclined (along reinforcement) | Vertical or battered |
-| Failure mode | Tension rupture / pullout | Shear / bending capacity |
-| DOFs per node | 2 (translational only) | 2 (translational only, rotational condensed out) |
+| Failure mode | Tension rupture / pullout | Shear / bending capacity (plastic hinge) |
+| DOFs per node | 2 (translational only) | 3 (translational + rotational) |
 
 For details on the truss element formulation used for reinforcement, see [Soil Reinforcement](reinforcement.md).
 
 
 ## Beam Element Formulation
 
-### Full Beam Stiffness
+### Euler-Bernoulli Beam Stiffness
 
-A standard Euler-Bernoulli beam element has 3 DOFs per node ($u_x$, $u_y$, $\theta$), giving a 6-DOF element with the following stiffness matrix in local coordinates (beam axis along local $x$):
+XSLOPE uses the standard Euler-Bernoulli beam element with 3 DOFs per node ($u_x$, $u_y$, $\theta$), giving a 6×6 element stiffness matrix in local coordinates (beam axis along local $x$):
 
->$\mathbf{K}_{\text{full}} = \begin{bmatrix} \frac{EA}{L} & 0 & 0 & -\frac{EA}{L} & 0 & 0 \\ 0 & \frac{12EI}{L^3} & \frac{6EI}{L^2} & 0 & -\frac{12EI}{L^3} & \frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{4EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{2EI}{L} \\ -\frac{EA}{L} & 0 & 0 & \frac{EA}{L} & 0 & 0 \\ 0 & -\frac{12EI}{L^3} & -\frac{6EI}{L^2} & 0 & \frac{12EI}{L^3} & -\frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{2EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{4EI}{L} \end{bmatrix}$
+>$\mathbf{K}_{\text{local}} = \begin{bmatrix} \frac{EA}{L} & 0 & 0 & -\frac{EA}{L} & 0 & 0 \\ 0 & \frac{12EI}{L^3} & \frac{6EI}{L^2} & 0 & -\frac{12EI}{L^3} & \frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{4EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{2EI}{L} \\ -\frac{EA}{L} & 0 & 0 & \frac{EA}{L} & 0 & 0 \\ 0 & -\frac{12EI}{L^3} & -\frac{6EI}{L^2} & 0 & \frac{12EI}{L^3} & -\frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{2EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{4EI}{L} \end{bmatrix}$
 
 where $E$ is Young's modulus, $A$ is the cross-sectional area, $I$ is the moment of inertia, and $L$ is the element length.
 
-### Static Condensation
+### Mixed DOF System
 
-The 2D soil mesh in XSLOPE has only 2 DOFs per node ($u_x$, $u_y$). Adding rotational DOFs ($\theta$) at pile nodes would complicate the global system and require special handling. Instead, we use **static condensation** to eliminate the rotational DOFs from the beam stiffness matrix, expressing the element stiffness entirely in terms of translational DOFs.
+The 2D soil elements have 2 DOFs per node ($u_x$, $u_y$), while beam elements require 3 DOFs per node ($u_x$, $u_y$, $\theta$). XSLOPE uses a **mixed DOF system**: nodes belonging to pile elements are assigned 3 DOFs, and all other nodes retain 2 DOFs. A DOF offset array maps each node index to its starting position in the global displacement vector.
 
-Partitioning the full stiffness into translational ($tt$) and rotational ($rr$) blocks:
-
->$\mathbf{K}_{\text{condensed}} = \mathbf{K}_{tt} - \mathbf{K}_{tr} \, \mathbf{K}_{rr}^{-1} \, \mathbf{K}_{rt}$
-
-For a beam element aligned along the local $x$-axis, this yields a $4 \times 4$ condensed stiffness matrix in terms of $[u_1, v_1, u_2, v_2]$:
-
->$\mathbf{K}_{\text{condensed}}^{\text{local}} = \begin{bmatrix} \frac{EA}{L} & 0 & -\frac{EA}{L} & 0 \\ 0 & \frac{3EI}{L^3} & 0 & -\frac{3EI}{L^3} \\ -\frac{EA}{L} & 0 & \frac{EA}{L} & 0 \\ 0 & -\frac{3EI}{L^3} & 0 & \frac{3EI}{L^3} \end{bmatrix}$
-
-The lateral stiffness reduces from $12EI/L^3$ to $3EI/L^3$ after condensation. This corresponds to a beam with rotations free at both ends (pin-pin for rotation), which is a conservative single-element approximation. In practice, with multiple short elements along the pile connected at shared nodes, the chain of elements recovers the correct bending behavior because intermediate node translations are implicitly constrained by the series of elements.
+This approach avoids adding unnecessary rotational DOFs to the thousands of soil-only nodes while giving pile nodes the rotation needed for proper bending behavior. Soil elements at pile nodes only access the translational DOFs ($u_x$, $u_y$); the rotational DOF ($\theta$) is used exclusively by the beam element stiffness.
 
 ### Coordinate Transformation
 
-The condensed local stiffness matrix is transformed to global coordinates using the same direction cosine approach used for truss elements:
+The local stiffness matrix is transformed to global coordinates using a 6×6 rotation matrix:
 
->$\mathbf{K}_{\text{global}} = \mathbf{T}^T \, \mathbf{K}_{\text{condensed}}^{\text{local}} \, \mathbf{T}$
+>$\mathbf{K}_{\text{global}} = \mathbf{T}^T \, \mathbf{K}_{\text{local}} \, \mathbf{T}$
 
-where $\mathbf{T}$ is the $4 \times 4$ transformation matrix constructed from the element direction cosines $\cos\theta$ and $\sin\theta$.
+where $\mathbf{T}$ is a block-diagonal rotation matrix with $\cos\theta$, $\sin\theta$ direction cosines for translational DOFs and identity for rotational DOFs.
 
-For a **vertical pile** ($\cos\theta = 0$, $\sin\theta = 1$), the axial stiffness $EA/L$ acts in the $y$-direction (vertical) and the lateral stiffness $3EI/L^3$ acts in the $x$-direction (horizontal) — exactly the behavior needed for resisting lateral slope movement.
+For a **vertical pile** ($\cos\theta = 0$, $\sin\theta = -1$), the axial stiffness $EA/L$ acts in the $y$-direction (vertical) and the lateral stiffness $12EI/L^3$ acts in the $x$-direction (horizontal) — exactly the behavior needed for resisting lateral slope movement.
 
 ### Assembly
 
@@ -71,52 +65,76 @@ The global stiffness matrix combines contributions from all element types:
 
 >$[\mathbf{K}]_{\text{global}} = \sum_{\text{soil}} [\mathbf{K}_e]_{\text{soil}} + \sum_{\text{truss}} [\mathbf{K}_e]_{\text{truss}} + \sum_{\text{beam}} [\mathbf{K}_e]_{\text{beam}}$
 
-This matrix is factored once (via sparse LU decomposition) and reused for all viscoplastic iterations.
+The total DOF count is $2 \times n_{\text{soil nodes}} + 3 \times n_{\text{pile nodes}}$, typically only a few DOFs more than the pure 2-DOF system. The global matrix is factored once (via sparse LU decomposition) and reused for all viscoplastic iterations.
 
 
 ## Mesh Generation
 
 Pile elements are integrated into the finite element mesh using the same approach as reinforcement elements. The pile line geometry — defined as two endpoints $(x_1, y_1)$ to $(x_2, y_2)$ in the `piles` sheet of the input template — is passed to the mesh generator as a constraint. The mesh generator ensures that element edges align along the pile line, so that 1D beam elements can be extracted from the edges of adjacent 2D soil elements.
 
-The existing `extract_1d_elements_from_2d_edges()` function identifies mesh edges that are collinear with a given line and extracts them as 1D elements with shared nodes. Since pile lines use the same two-endpoint format as reinforcement lines, this function handles both vertical and battered piles without modification.
+When a pile endpoint is within a small tolerance of a polygon boundary (e.g., the ground surface), it is automatically snapped to the nearest boundary point. This prevents near-zero-length elements that would otherwise arise from minor coordinate mismatches between the pile definition and the ground surface interpolation.
 
 For details on the mesh generation process and 1D element extraction, see [Automated Mesh Generation](mesh.md).
 
 
-## Integration with Viscoplastic Iteration
+## Force and Moment Computation
 
-The pile beam elements participate in the same viscoplastic iteration loop used for soil elements and reinforcement truss elements (see [FEM Overview](overview.md) for details on the viscoplastic algorithm). The key differences from reinforcement elements are:
+At each viscoplastic iteration, the forces and moments in each beam element are computed from the 6-DOF nodal displacements. The global displacements are transformed to local coordinates using the rotation matrix $\mathbf{T}$, then:
 
-### Force Computation
+>**Axial force**: $T = \dfrac{EA}{L} (u_2 - u_1)$
 
-At each viscoplastic iteration, after solving for the updated displacement field, the forces in each beam element are computed from the current nodal displacements:
+>**Shear force**: $V = \dfrac{12EI}{L^3}(v_1 - v_2) + \dfrac{6EI}{L^2}(\theta_1 + \theta_2)$
 
->**Axial force**: $T = \dfrac{EA}{L} \cdot \delta_{\text{axial}}$
+>**Bending moments** at nodes 1 and 2: $M_1, M_2 = \mathbf{K}_{\text{local}}[\text{rows 2, 5}] \cdot \mathbf{u}_{\text{local}}$
 
->**Lateral (shear) force**: $V = \dfrac{3EI}{L^3} \cdot \delta_{\text{lateral}}$
+The bending moment diagram along the pile varies from element to element. The maximum moment typically occurs near the failure surface, where the transition from sliding to stable soil creates the largest lateral loading.
 
-where $\delta_{\text{axial}}$ and $\delta_{\text{lateral}}$ are the projections of relative nodal displacement along and perpendicular to the element axis, respectively.
 
-### Compression Allowed
+## Structural Capacity Checks
 
-Unlike reinforcement truss elements, which zero out compressive forces through body-force corrections, beam elements carry **both tension and compression**. No compression correction is applied.
+### Shear Capacity ($V_{\text{cap}}$)
 
-### Structural Capacity
+When $V_{\text{cap}}$ is provided, the shear force in each beam element is compared against $V_{\text{cap}} / S$ (per-unit-width capacity). If the elastic shear exceeds this limit, a body-force correction is applied to cap the force:
 
-Beam elements are currently **linearly elastic** — they have no structural strength limit. The SSRM finds the factor of safety at which soil fails around the pile, which is the correct result when the pile is strong enough that soil failure governs.
+>$\Delta V = \text{sign}(V) \cdot V_{\text{cap}}/S - V$
 
-Users should check the reported beam element forces (max axial force, max lateral force) against the pile's structural shear and moment capacity as a post-processing step. If the beam forces at the SSRM failure state exceed the pile's structural capacity, the pile would fail before the soil and the reported FS is unconservative.
+The correction is converted to equivalent nodal forces perpendicular to the element axis and added to the load vector for the next iteration.
 
-Elastic-perfectly-plastic capacity checks (V_cap, M_cap) are planned for a future release. These would cap beam element forces and redistribute the excess through body-force corrections, following the same viscoplastic pattern used for soil elements.
+### Moment Capacity ($M_{\text{cap}}$) — Plastic Hinge
+
+When $M_{\text{cap}}$ is provided, the bending moment at each node is compared against $M_{\text{cap}} / S$. If exceeded, a **moment correction** is applied directly to the rotational DOF at that node:
+
+>$\Delta M = \text{sign}(M) \cdot M_{\text{cap}}/S - M$
+
+This is added to the load vector at the node's rotation DOF, creating an elastic-perfectly-plastic hinge. The pile carries moment up to $M_{\text{cap}}$ at the hinge location and redistributes the excess through the viscoplastic iteration — the same correction pattern used for soil yielding and reinforcement capacity.
+
+The plastic hinge approach is the standard method used in commercial geotechnical FEM software (PLAXIS, RS2, FLAC) for modeling pile structural failure.
+
+### Interaction
+
+Both checks are applied independently at each iteration. An element can yield in shear, moment, or both. The summary output reports which elements have yielded and by which mechanism.
+
+
+## Pile Head Fixity
+
+The **Fixity** column in the `piles` sheet controls the rotational boundary condition at the pile head (top node):
+
+- **free** (default): The pile head can rotate freely. This is the standard assumption for passive stabilizing piles with no structural connection at the top.
+- **fixed**: Zero rotation at the pile head. This models a pile connected to a pile cap, retaining wall, or other structure that prevents rotation.
+
+The pile tip (bottom node) rotation is always free — the embedment in stable soil naturally provides restraint through the soil elements.
+
+Fixity has no effect on LEM analysis.
 
 
 ## SSRM Treatment
 
 During the Shear Strength Reduction Method:
 
-- Pile material properties ($E$, $I$, $A$, yield strength) are **not reduced** — they remain constant throughout the SSRM bisection
+- Pile material properties ($E$, $I$, $A$) and structural capacities ($V_{\text{cap}}$, $M_{\text{cap}}$) are **not reduced** — they remain constant throughout the SSRM bisection
 - Only soil strength parameters ($c$ and $\tan\varphi$) are reduced by the trial factor $F$
 - As soil strength is reduced, the soil deforms more around the pile; the pile's stiffness naturally resists this additional deformation
+- If structural capacity limits are provided, plastic hinges may form during the SSRM — the pile yields structurally before the soil fails around it, giving a lower (and more realistic) factor of safety
 - Convergence failure (slope collapse) occurs when the reduced soil strength can no longer transfer load to/from the piles effectively
 - The resulting factor of safety represents the margin of safety in the **soil** strength, given the pile reinforcement as-designed
 
@@ -125,22 +143,25 @@ This treatment is consistent with how reinforcement elements are handled in the 
 
 ## Input Parameters
 
-Pile properties for FEM analysis are specified in the same `piles` sheet used for LEM analysis. The FEM-specific columns are:
+Pile properties for FEM analysis are specified in the `piles` sheet of the input template. The FEM-relevant columns are:
 
 | Column | Field | Description |
 |--------|-------|-------------|
-| B-E | $(x_1, y_1)$, $(x_2, y_2)$ | Pile geometry (top and tip coordinates) |
-| H | $D_{\text{pile}}$ | Pile diameter — used to compute $I$ and $A$ if not provided |
-| I | $S$ | Center-to-center spacing — used to scale $EI$ and $EA$ by $1/S$ for per-unit-width |
-| J | $E$ | Young's modulus of pile material |
-| K | $I$ | Moment of inertia of pile cross-section |
-| L | $Area$ | Cross-sectional area of pile cross-section |
+| C-F | $(x_1, y_1)$, $(x_2, y_2)$ | Pile geometry (top and tip coordinates) |
+| I | $D$ | Pile diameter — used to compute $I$ and $A$ if not provided |
+| J | $S$ | Center-to-center spacing — scales $EI$ and $EA$ by $1/S$ for per-unit-width |
+| K | $E$ | Young's modulus of pile material |
+| L | $I$ | Moment of inertia of pile cross-section |
+| M | $Area$ | Cross-sectional area of pile cross-section |
+| N | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
+| O | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
+| P | Fixity | Pile head rotation: **free** (default) or **fixed** |
 
-If $D_{\text{pile}}$ is provided and $I$/$Area$ are omitted, a solid circular section is assumed:
+If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assumed:
 
 >$A = \dfrac{\pi D^2}{4}, \qquad I = \dfrac{\pi D^4}{64}$
 
-The LEM-specific columns ($H$, $\theta_p$) are not used for FEM analysis. See [LEM Piles](../lem/piles.md) for typical material property values.
+The LEM-specific columns ($H$, $\theta_p$) are not used for FEM analysis. See [LEM Piles](../lem/piles.md) for typical material property values and structural capacities.
 
 ## References
 

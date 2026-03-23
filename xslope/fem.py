@@ -2217,12 +2217,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                              max_disp_factor=max_disp_factor)
     if solution_max["converged"]:
         if debug_level >= 1:
-            print(f"  Warning: F_max = {F_max} still converges - increase F_max")
+            print(f"\nSSRM failed: F_max = {F_max} still converges — FS > {F_max}. Increase F_max.")
         return {
-            "converged": True,
-            "FS": F_max,
+            "converged": False,
+            "FS": None,
             "last_solution": solution_max,
-            "note": f"Slope stable up to F = {F_max}"
+            "error": f"F_max = {F_max} still converges — FS > {F_max}. Increase F_max."
         }
 
     last_converged_solution = solution_min
@@ -2325,12 +2325,12 @@ def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
     if not _is_failed(solution_max):
         if debug_level >= 1:
-            print(f"  Warning: F_max = {F_max} still stable (UFR = {ufr_max:.3e}) — increase F_max")
+            print(f"\nSSRM failed: F_max = {F_max} still stable (UFR = {ufr_max:.3e}) — FS > {F_max}. Increase F_max.")
         return {
-            "converged": True,
-            "FS": F_max,
+            "converged": False,
+            "FS": None,
             "last_solution": solution_max,
-            "note": f"Slope stable up to F = {F_max}"
+            "error": f"F_max = {F_max} still stable — FS > {F_max}. Increase F_max."
         }
 
     if debug_level >= 1:

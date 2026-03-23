@@ -314,40 +314,88 @@ Solution (critical surface and factor of safety):
 
 ### 10. Slope Stabilized with Piles
 
-This problem features a 1.5H:1V slope in a medium-stiff clay (c = 200 psf, $\phi$ = 10°, $\gamma$ = 120 pcf)
-stabilized by a row of drilled shafts (D = 1.0 ft, S = 6.0 ft center-to-center) near the toe of the slope.
-Without the piles, the slope is marginally unstable (FS = 0.997). With the piles, the factor of safety increases
-to 1.081.
+This problem features a 1:1 slope in a medium-stiff clay stabilized by two rows of drilled shafts.
+
+![piles_inputs.png](sample_images/piles_inputs.png){width=900}
+
+Excel input file: [xslope_piles.xlsx](files/xslope_piles.xlsx)
+
+| Property | Value |
+|----------|-------|
+| Cohesion, $c$ | 200 psf |
+| Friction angle, $\phi$ | 20 degrees |
+| Unit weight, $\gamma$ | 120 pcf |
+| Pile diameter, $D$ | 2.0 ft |
+| Pile spacing, $S$ | 6.0 ft |
+| $V_{\text{cap}}$ | 46,000 lb |
+| $M_{\text{cap}}$ | 60,000 ft·lb |
+
+#### Results Without Piles (FS = 1.15)
+
+![piles_results_no_pile.png](sample_images/piles_results_no_pile.png){width=900}
+
+#### Results With Piles (FS = 1.85)
+
+![piles_results.png](sample_images/piles_results.png){width=900}
+
+The two rows of piles increase the factor of safety from 1.15 to 1.85.
+
+#### Ito & Matsui Summary
 
 The pile force $H$ is not specified directly in the input file. Instead, XSLOPE auto-computes $H$ using the
 Ito & Matsui (1975) method, which models the plastic flow of soil between adjacent piles to determine the lateral
 resistance. Because $H$ is computed for each trial failure surface during the search, the pile resistance varies
-with the depth of the failure surface at the pile location. For the critical failure surface, the Ito & Matsui
-computation is summarized below:
+with the depth of the failure surface at the pile location.
+
+Structural capacity limits ($V_{\text{cap}}$ = 46,000 lb, $M_{\text{cap}}$ = 60,000 ft·lb) are specified for
+each pile, consistent with a 2-ft diameter reinforced concrete section ($f'_c$ = 4000 psi). For the critical
+failure surface, the Ito & Matsui soil forces far exceed the structural capacity, and the moment capacity
+controls:
 
 ```text
-  === Ito & Matsui Summary (Pile at x=10.00) ===
-  Pile diameter (D)          = 1.0
+  === Ito & Matsui Summary (Pile 1) ===
+  Pile diameter (D)          = 2.0
   Pile spacing (S)           = 6.0
-  Clear spacing (D1 = S - D) = 5.0
-  Depth to failure surface   = 7.3
-  Coefficients: A1 = 1.875, A2 = 1.331
-  Force per pile (F_pile)    = 6957
-  Force per unit width (H)   = 1159.6
+  Clear spacing (D1 = S - D) = 4.0
+  Depth to failure surface   = 9.5
+  Coefficients: A1 = 7.569, A2 = 4.755
+  Force per pile (F_pile)    = 39810
+  Force per unit width (H)   = 6635.1
+  --- Structural Capacity Check ---
+  V_cap = 46000  (F_pile within shear capacity)
+  M_cap = 60000, L_m = 3.72, F_limit = M_cap/L_m = 16139  (F_pile exceeds moment capacity)
+  Controlled by moment (M_cap/L_m)
+  F_pile: 39810 -> 16139 (capped)
+  H:      6635.1 -> 2689.8 (capped)
+
+  === Ito & Matsui Summary (Pile 2) ===
+  Pile diameter (D)          = 2.0
+  Pile spacing (S)           = 6.0
+  Clear spacing (D1 = S - D) = 4.0
+  Depth to failure surface   = 13.9
+  Coefficients: A1 = 7.569, A2 = 4.755
+  Force per pile (F_pile)    = 76447
+  Force per unit width (H)   = 12741.2
+  --- Structural Capacity Check ---
+  V_cap = 46000  (F_pile exceeds shear capacity)
+  M_cap = 60000, L_m = 5.28, F_limit = M_cap/L_m = 11356  (F_pile exceeds moment capacity)
+  Controlled by moment (M_cap/L_m)
+  F_pile: 76447 -> 11356 (capped)
+  H:      12741.2 -> 1892.6 (capped)
 ```
 
-Excel input file: [xslope_piles.xlsx](files/xslope_piles.xlsx)
+The Ito & Matsui soil forces (39,810 and 76,447 lb per pile) represent the theoretical upper bound on what the soil
+can push onto the pile. These greatly exceed both the shear and moment capacities. After capping, the effective
+pile forces are reduced by 59% and 85% respectively, with the moment capacity ($M_{\text{cap}} / L_m$) controlling
+in both cases. Without the capacity checks, the LEM would overestimate the pile resistance and produce an
+unconservatively high factor of safety.
 
-Inputs plotted with the XSLOPE plot_inputs() function:
+#### LEM vs. FEM Comparison
 
-![piles_inputs.png](sample_images/piles_inputs.png){width=900}
+The corresponding FEM analysis of this problem (see [FEM Samples](../fem/samples.md), Problem 3) gives
+FS = 1.32 with piles — significantly lower than the LEM result of 1.85. This difference arises because
+the LEM applies the Ito & Matsui force (even after capping) as a concentrated load at the failure surface,
+while the FEM beam elements only develop as much resistance as the global deformation pattern naturally
+produces. The FEM result is generally considered more realistic for pile-stabilized slopes.
 
-Solution without piles (FS = 0.997):
-
-![piles_results_no_pile.png](sample_images/piles_results_no_pile.png){width=900}
-
-Solution with piles (FS = 1.081):
-
-![piles_results.png](sample_images/piles_results.png){width=900}
-
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.081, num_slices=40 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.85, num_slices=40 -->

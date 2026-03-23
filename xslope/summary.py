@@ -67,21 +67,28 @@ def print_ito_matsui_summary(slope_data, slice_df):
         if V_cap is not None or M_cap is not None:
             _, _, L_m = compute_ito_matsui_force_and_moment_arm(D_p, S_p, segments)
             print(f'  --- Structural Capacity Check ---')
-            F_capped = F_pile
+
+            # Compute limit from each capacity
+            F_limit_V = V_cap if V_cap is not None else float('inf')
+            F_limit_M = M_cap / L_m if M_cap is not None and L_m > 0 else float('inf')
+            F_capped = min(F_pile, F_limit_V, F_limit_M)
+
             if V_cap is not None:
-                governs = F_pile > V_cap
-                print(f'  V_cap = {V_cap:.0f}  {"[GOVERNS]" if governs else "[OK]"}')
-                F_capped = min(F_capped, V_cap)
+                exceeded = F_pile > V_cap
+                print(f'  V_cap = {V_cap:.0f}  (F_pile {"exceeds" if exceeded else "within"} shear capacity)')
             if M_cap is not None:
-                F_from_moment = M_cap / L_m if L_m > 0 else float('inf')
-                governs = F_pile > F_from_moment
-                print(f'  M_cap = {M_cap:.0f}, L_m = {L_m:.2f}, '
-                      f'M_cap/L_m = {F_from_moment:.0f}  {"[GOVERNS]" if governs else "[OK]"}')
-                if L_m > 0:
-                    F_capped = min(F_capped, F_from_moment)
+                exceeded = F_pile > F_limit_M
+                print(f'  M_cap = {M_cap:.0f}, L_m = {L_m:.2f}, F_limit = M_cap/L_m = {F_limit_M:.0f}'
+                      f'  (F_pile {"exceeds" if exceeded else "within"} moment capacity)')
+
             if F_capped < F_pile:
+                controlling = "moment (M_cap/L_m)" if F_limit_M <= F_limit_V else "shear (V_cap)"
                 H_capped = F_capped / S_p
-                print(f'  Capped F_pile = {F_capped:.0f}, Capped H = {H_capped:.1f}')
+                print(f'  Controlled by {controlling}')
+                print(f'  F_pile: {F_pile:.0f} -> {F_capped:.0f} (capped)')
+                print(f'  H:      {H_val:.1f} -> {H_capped:.1f} (capped)')
+            else:
+                print(f'  F_pile = {F_pile:.0f} is within all structural limits.')
 
 
 def print_rapid_drawdown_summary(results):

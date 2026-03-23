@@ -110,65 +110,62 @@ mobilized force is 780 lb/ft (line 5), which is close to but below the $T_{max}$
 
 ### 3. Slope Stabilized with Drilled Shaft Piles
 
-This problem features a 1.5H:1V slope in a medium-stiff clay stabilized by a row of drilled shafts near the
-toe. It is the FEM counterpart of the LEM pile example described in the [LEM Samples](../lem/samples.md) page
-(Problem 10). The soil properties are:
+This problem features a 1:1 slope in a medium-stiff clay stabilized by two rows of drilled shafts.
+
+![piles_fem_inputs.png](images/piles_fem_inputs.png){width=1000}
+
+Excel input file: [xslope_piles_fem.xlsx](files/xslope_piles_fem.xlsx)
+
+The soil properties are:
 
 | Property | Value |
 |----------|-------|
 | Cohesion, $c$ | 200 psf |
-| Friction angle, $\phi$ | 10 degrees |
+| Friction angle, $\phi$ | 20 degrees |
 | Unit weight, $\gamma$ | 120 pcf |
-| Young's modulus, $E$ | 500,000 psf |
-| Poisson's ratio, $\nu$ | 0.35 |
+| Young's modulus, $E$ | 2,000,000 psf |
+| Poisson's ratio, $\nu$ | 0.3 |
 
-The pile is modeled as a vertical drilled shaft with the following properties:
+Two rows of vertical drilled shafts are placed at $x = 5$ ft and $x = 10$ ft along the slope face, both extending from the ground surface to $y = -10$ ft:
 
 | Property | Value |
 |----------|-------|
-| Diameter, $D$ | 1.0 ft |
+| Diameter, $D$ | 2.0 ft |
 | Spacing, $S$ | 6.0 ft |
 | Young's modulus, $E_{\text{pile}}$ | 518,400,000 psf (concrete, $f'_c$ = 4000 psi) |
-| Moment of inertia, $I$ | $\pi D^4 / 64$ = 0.0491 ft$^4$ (auto-computed from $D$) |
-| Cross-sectional area, $A$ | $\pi D^2 / 4$ = 0.785 ft$^2$ (auto-computed from $D$) |
+| Moment of inertia, $I$ | $\pi D^4 / 64$ = 0.785 ft$^4$ (auto-computed from $D$) |
+| Cross-sectional area, $A$ | $\pi D^2 / 4$ = 3.14 ft$^2$ (auto-computed from $D$) |
+| Shear capacity, $V_{\text{cap}}$ | 46,000 lb |
+| Moment capacity, $M_{\text{cap}}$ | 60,000 ft·lb |
+| Fixity | free |
 
-In the FEM approach, the pile is modeled as a chain of beam elements with condensed 4x4 stiffness matrices
-(see [FEM Piles](piles.md) for the formulation). The pile stiffness ($EI$ and $EA$) is scaled by $1/S$ to
-convert from per-pile to per-unit-width quantities. Unlike the LEM approach where the user provides a single
-force $H$, the FEM beam elements naturally develop resistance as the soil deforms around the pile.
+Each pile is modeled as a chain of 6-DOF Euler-Bernoulli beam elements with rotational DOFs at each node (see [FEM Piles](piles.md) for the formulation). The pile stiffness ($EI$ and $EA$) is scaled by $1/S$ to convert from per-pile to per-unit-width quantities. Unlike the LEM approach where the user provides a single force $H$, the FEM beam elements naturally develop resistance as the soil deforms around the pile. Bending moments are computed directly at each node, and structural capacity limits ($V_{\text{cap}}$, $M_{\text{cap}}$) are enforced through the viscoplastic correction loop.
 
-Excel input file: [xslope_piles_fem.xlsx](files/xslope_piles_fem.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![piles_fem_inputs.png](images/piles_fem_inputs.png){width=1000}
-
-FEM mesh with boundary conditions. The pile is shown as green line elements along the pile axis:
+FEM mesh with boundary conditions. The piles are shown as green line elements along the pile axes:
 
 ![piles_fem_mesh.png](images/piles_fem_mesh.png){width=1000}
 
-SSRM results without piles (**FS = 1.02**). The slope is marginally stable. The shear strain concentration
-shows a circular failure mechanism passing through the toe:
+SSRM results without piles (**FS = 1.19**). The shear strain concentration shows a failure mechanism passing through the toe:
 
 ![piles_fem_results_no_pile.png](images/piles_fem_results_no_pile.png){width=1000}
 
-SSRM results with piles (**FS = 1.37**). The pile elements are colored by lateral (shear) force in the
-shear strain plot. The failure mechanism is forced to develop behind the pile, and the factor of safety
-increases significantly:
+SSRM results with two rows of piles (**FS = 1.32**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
 Pile summary:
 
 ```text
-=== Pile Summary (8 beam elements) ===
-  Max axial force:   3079.2
-  Max lateral force: 10550.1
+=== Pile Summary ===
+Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
+--------------------------------------------------------------------------------
+   1      7    1316.9    1277.3    5473.8    7666.7   10000.0    0/7  OK
+   2      9    2512.0     583.4    2522.8    7666.7   10000.0    0/9  OK
+--------------------------------------------------------------------------------
 ```
 
-The LEM analysis (Spencer's method) gave FS = 1.08 for this problem using Ito & Matsui auto-computed pile
-forces. The FEM result of FS = 1.37 is higher because the beam element stiffness provides distributed
-resistance along the entire pile length, whereas the LEM approach applies the pile force at a single point
-on the failure surface.
+The two rows of piles increase the factor of safety from 1.19 to 1.32 — an 11% improvement. The maximum bending moment (5474 per unit width in Pile 1) reaches about 55% of the moment capacity ($M_{\text{cap}}/S$ = 10,000), indicating that the structural capacity does not govern for this problem. The soil's ability to transfer lateral load to the piles is the limiting factor, not the pile strength.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.37, element_type=tri6, target_size=2, tolerance=0.05, f_min=0.8, f_max=1.5 -->
+This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
+
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.32, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5 -->

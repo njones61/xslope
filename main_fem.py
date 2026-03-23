@@ -8,7 +8,7 @@ from xslope.plot_fem import plot_fem_results, plot_fem_data
 input_file = "docs/fem/files/xslope_piles_fem.xlsx"
 slope_data = load_slope_data(input_file)
 
-plot_inputs(slope_data, mode='fem', tab_loc='top')
+plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
 
 input_path = Path(input_file)
 target_size = 2 # Desired target element size for meshing (adjust as needed for finer/coarser mesh)
@@ -36,9 +36,9 @@ plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
 analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
 
-F = 1.1     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
-F_min=1.0   # Minimum FS for SSRM search (adjust as needed)
-F_max=1.2   # Maximum FS for SSRM search (adjust as needed)
+F = 1.3     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
+F_min=1.2   # Minimum FS for SSRM search (adjust as needed)
+F_max=1.4   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)

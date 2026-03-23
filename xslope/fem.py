@@ -358,6 +358,10 @@ def build_fem_data(slope_data, mesh=None):
     dof_indices_pile = []
     K_global_pile_elems = []
     pile_elem_indices = []  # maps pile element index to global 1D element index
+    V_cap_by_pile_elem = []
+    M_cap_by_pile_elem = []
+    elem_length_by_pile_elem = []
+    S_by_pile_elem = []
 
     if n_1d_elements > 0 and n_pile_lines > 0:
         for elem_idx in range(n_1d_elements):
@@ -456,6 +460,15 @@ def build_fem_data(slope_data, mesh=None):
                 sin_theta_pile.append(sin_t)
                 dof_indices_pile.append(dof_idx)
                 K_global_pile_elems.append(K_beam)
+                elem_length_by_pile_elem.append(elem_length)
+
+                # Structural capacity (per-unit-width = per-pile / S)
+                V_cap_pile = pile_data.get("V_cap")
+                M_cap_pile = pile_data.get("M_cap")
+                V_cap_by_pile_elem.append(V_cap_pile / S_pile if V_cap_pile is not None else float('inf'))
+                M_cap_by_pile_elem.append(M_cap_pile / S_pile if M_cap_pile is not None else float('inf'))
+                S_by_pile_elem.append(S_pile)
+
                 n_pile_elements += 1
 
     k_axial_by_pile_elem = np.array(k_axial_by_pile_elem)
@@ -464,6 +477,10 @@ def build_fem_data(slope_data, mesh=None):
     sin_theta_pile = np.array(sin_theta_pile)
     dof_indices_pile = np.array(dof_indices_pile, dtype=int).reshape(-1, 4) if n_pile_elements > 0 else np.zeros((0, 4), dtype=int)
     pile_elem_indices = np.array(pile_elem_indices, dtype=int)
+    V_cap_by_pile_elem = np.array(V_cap_by_pile_elem)
+    M_cap_by_pile_elem = np.array(M_cap_by_pile_elem)
+    elem_length_by_pile_elem = np.array(elem_length_by_pile_elem)
+    S_by_pile_elem = np.array(S_by_pile_elem)
 
     # Set up boundary conditions
     
@@ -658,6 +675,10 @@ def build_fem_data(slope_data, mesh=None):
         "sin_theta_pile": sin_theta_pile,
         "dof_indices_pile": dof_indices_pile,
         "K_global_pile_elems": K_global_pile_elems,
+        "V_cap_by_pile_elem": V_cap_by_pile_elem,
+        "M_cap_by_pile_elem": M_cap_by_pile_elem,
+        "elem_length_by_pile_elem": elem_length_by_pile_elem,
+        "S_by_pile_elem": S_by_pile_elem,
     }
 
 
@@ -785,8 +806,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         cos_theta_pile = fem_data["cos_theta_pile"]
         sin_theta_pile = fem_data["sin_theta_pile"]
         dof_indices_pile = fem_data["dof_indices_pile"]
+        V_cap_pile = fem_data["V_cap_by_pile_elem"]
+        M_cap_pile = fem_data["M_cap_by_pile_elem"]
+        L_pile_elem = fem_data["elem_length_by_pile_elem"]
         forces_pile_axial = np.zeros(n_pile_elements)
         forces_pile_lateral = np.zeros(n_pile_elements)
+        yielded_pile = np.zeros(n_pile_elements, dtype=bool)
 
         if debug_level >= 1:
             print(f"  Pile beam elements: {n_pile_elements}")
@@ -1101,10 +1126,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                       f"{n_1d_exceeded} exceeded capacity, "
                       f"{np.sum(failed_1d)} total failed")
 
-        # ---- Pile beam element force computation (no body-force corrections for Phase 1) ----
-        # Piles carry both tension and compression. No capacity checks in Phase 1 —
-        # the SSRM finds the natural failure mode (soil failure around the pile).
+        # ---- Pile beam element force computation and capacity checks ----
         if has_pile_elements:
+            n_pile_yielded = 0
             for p_idx in range(n_pile_elements):
                 dof_idx = dof_indices_pile[p_idx]
                 cos_t = cos_theta_pile[p_idx]
@@ -1123,7 +1147,34 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                 # Lateral force (projection perpendicular to element axis)
                 delta_lateral = -du_x * sin_t + du_y * cos_t
                 V = k_lateral_pile[p_idx] * delta_lateral
+
+                # Structural capacity checks (V_cap and M_cap)
+                V_limit = V_cap_pile[p_idx]  # per-unit-width shear capacity
+
+                # Moment check: M = V * L_elem, cap at M_cap/S per unit width
+                M_cap_uw = M_cap_pile[p_idx]
+                if M_cap_uw < float('inf'):
+                    V_from_Mcap = M_cap_uw / L_pile_elem[p_idx]
+                    V_limit = min(V_limit, V_from_Mcap)
+
+                correction_V = 0.0
+                if abs(V) > V_limit:
+                    correction_V = np.sign(V) * V_limit - V
+                    V = np.sign(V) * V_limit  # store capped value
+                    yielded_pile[p_idx] = True
+                    n_pile_yielded += 1
+
                 forces_pile_lateral[p_idx] = V
+
+                if abs(correction_V) > 1e-30:
+                    # Lateral internal force pattern: [sin, -cos, -sin, cos]
+                    loads[dof_idx[0]] += correction_V * sin_t
+                    loads[dof_idx[1]] += correction_V * (-cos_t)
+                    loads[dof_idx[2]] += correction_V * (-sin_t)
+                    loads[dof_idx[3]] += correction_V * cos_t
+
+            if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5) and n_pile_yielded > 0:
+                print(f"    Pile elements: {n_pile_yielded} yielded (capacity exceeded)")
 
         # Compute unbalanced force ratio: ||VP corrections|| / ||F_gravity||
         # This measures how far the system is from force equilibrium.
@@ -1250,7 +1301,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
 
             forces_1d[elem_idx_1d] = T
 
-    # ---- Step 10c: Compute final pile beam element forces ----
+    # ---- Step 10c: Compute final pile beam element forces (capped at capacity) ----
     if has_pile_elements:
         for p_idx in range(n_pile_elements):
             dof_idx = dof_indices_pile[p_idx]
@@ -1265,7 +1316,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             forces_pile_axial[p_idx] = k_axial_pile[p_idx] * delta_axial
 
             delta_lateral = -du_x * sin_t + du_y * cos_t
-            forces_pile_lateral[p_idx] = k_lateral_pile[p_idx] * delta_lateral
+            V = k_lateral_pile[p_idx] * delta_lateral
+
+            # Cap at structural capacity
+            V_limit = V_cap_pile[p_idx]
+            M_cap_uw = M_cap_pile[p_idx]
+            if M_cap_uw < float('inf'):
+                V_limit = min(V_limit, M_cap_uw / L_pile_elem[p_idx])
+            if abs(V) > V_limit:
+                V = np.sign(V) * V_limit
+                yielded_pile[p_idx] = True
+
+            forces_pile_lateral[p_idx] = V
 
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
@@ -1306,6 +1368,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
         "forces_pile_axial": forces_pile_axial if has_pile_elements else np.array([]),
         "forces_pile_lateral": forces_pile_lateral if has_pile_elements else np.array([]),
+        "yielded_pile": yielded_pile if has_pile_elements else np.array([], dtype=bool),
     }
 
 
@@ -1430,10 +1493,14 @@ def print_pile_summary(fem_data, solution):
     nodes = fem_data["nodes"]
     element_materials_1d = fem_data.get("element_materials_1d", np.array([]))
     pile_elem_indices = fem_data.get("pile_elem_indices", np.array([], dtype=int))
-    n_reinf_lines = len(fem_data.get("pile_elem_mask", [])) - n_pile  # approximate
-    # Get actual reinforcement line count from the offset
     forces_axial = solution.get("forces_pile_axial", np.zeros(n_pile))
     forces_shear = solution.get("forces_pile_lateral", np.zeros(n_pile))
+    yielded = solution.get("yielded_pile", np.zeros(n_pile, dtype=bool))
+    V_cap_arr = fem_data.get("V_cap_by_pile_elem", np.full(n_pile, float('inf')))
+    M_cap_arr = fem_data.get("M_cap_by_pile_elem", np.full(n_pile, float('inf')))
+
+    # Check if any pile has capacity limits
+    has_capacity = np.any(V_cap_arr < float('inf')) or np.any(M_cap_arr < float('inf'))
 
     # Group pile elements by pile line (material ID)
     pile_line_ids = {}
@@ -1444,28 +1511,87 @@ def print_pile_summary(fem_data, solution):
             pile_line_ids[line_id] = []
         pile_line_ids[line_id].append(p_idx)
 
-    print(f"\n=== Pile Summary ===")
-    print(f"{'Pile':>4}  {'Elems':>5}  {'Max Axial':>10}  {'Avg Axial':>10}  "
-          f"{'Max Shear':>10}  {'Avg Shear':>10}")
-    print("-" * 65)
+    L_elems = fem_data.get("elem_length_by_pile_elem", np.zeros(n_pile))
+    S_arr = fem_data.get("S_by_pile_elem", np.ones(n_pile))
 
+    print(f"\n=== Pile Summary ===")
+    print(f"{'Pile':>4}  {'Elems':>5}  {'Max |T|':>8}  {'Max |V|':>8}  "
+          f"{'V_lim':>8}  {'Yielded':>7}  {'Status'}")
+    print("-" * 62)
+
+    statuses_seen = set()
     pile_num = 0
     for line_id in sorted(pile_line_ids.keys()):
         pile_num += 1
         indices = pile_line_ids[line_id]
         n_elem = len(indices)
-        axial = forces_axial[indices]
-        shear = forces_shear[indices]
+        n_yielded = np.sum(yielded[indices])
 
-        max_axial = np.max(np.abs(axial))
-        avg_axial = np.mean(np.abs(axial))
-        max_shear = np.max(np.abs(shear))
-        avg_shear = np.mean(np.abs(shear))
+        max_axial = np.max(np.abs(forces_axial[indices]))
+        max_shear = np.max(np.abs(forces_shear[indices]))
 
-        print(f"{pile_num:>4}  {n_elem:>5}  {max_axial:>10.1f}  {avg_axial:>10.1f}  "
-              f"{max_shear:>10.1f}  {avg_shear:>10.1f}")
+        # Effective shear limit (min of V_cap/S and M_cap/(S*L))
+        v_cap = V_cap_arr[indices[0]]
+        m_cap = M_cap_arr[indices[0]]
+        L_elem = L_elems[indices[0]]
+        V_limit = v_cap
+        if m_cap < float('inf') and L_elem > 0:
+            V_limit = min(V_limit, m_cap / L_elem)
 
-    print("-" * 65)
+        vlim_str = f"{V_limit:.1f}" if V_limit < float('inf') else "-"
+
+        if n_yielded > 0:
+            status = "YIELDED"
+        elif V_limit < float('inf') and max_shear > 0.95 * V_limit:
+            status = "NEAR CAP"
+        else:
+            status = "OK"
+        statuses_seen.add(status)
+
+        print(f"{pile_num:>4}  {n_elem:>5}  {max_axial:>8.1f}  {max_shear:>8.1f}  "
+              f"{vlim_str:>8}  {n_yielded:>3}/{n_elem}  {status}")
+
+    print("-" * 62)
+
+    # Capacity calculation notes
+    if has_capacity:
+        print()
+        pile_num = 0
+        for line_id in sorted(pile_line_ids.keys()):
+            pile_num += 1
+            indices = pile_line_ids[line_id]
+            v_cap = V_cap_arr[indices[0]]
+            m_cap = M_cap_arr[indices[0]]
+            S_pile = S_arr[indices[0]]
+            L_elem = L_elems[indices[0]]
+
+            if v_cap < float('inf') or m_cap < float('inf'):
+                # Use max element length for this pile (skip zero-length elements)
+                pile_lengths = L_elems[indices]
+                L_repr = np.max(pile_lengths) if np.any(pile_lengths > 0) else 0.0
+                print(f"  Pile {pile_num} capacity (per unit width = per pile / S):")
+                if v_cap < float('inf'):
+                    print(f"    V_cap/S = {v_cap:.1f}")
+                if m_cap < float('inf') and L_repr > 0:
+                    V_from_M = m_cap / L_repr
+                    print(f"    M_cap/S = {m_cap:.1f}, L_elem = {L_repr:.2f}, "
+                          f"-> V_limit from moment = M_cap/(S*L) = {V_from_M:.1f}")
+                V_limit_vcap = v_cap
+                V_limit_mcap = m_cap / L_repr if m_cap < float('inf') and L_repr > 0 else float('inf')
+                governing = "V_cap" if V_limit_vcap <= V_limit_mcap else "M_cap"
+                print(f"    Controlling limit: {governing}")
+
+    # Status notes
+    status_notes = {
+        "OK": "OK: All elements within structural capacity.",
+        "NEAR CAP": "NEAR CAP: Max shear exceeds 95% of structural capacity.",
+        "YIELDED": "YIELDED: Elements reached structural capacity; shear force capped at limit (elastic-perfectly-plastic).",
+    }
+    notes = [status_notes[s] for s in ["OK", "NEAR CAP", "YIELDED"] if s in statuses_seen]
+    if notes:
+        print()
+        for note in notes:
+            print(f"  {note}")
 
 
 def print_detailed_element_summary(fem_data, solution):
@@ -1539,13 +1665,20 @@ def print_detailed_element_summary(fem_data, solution):
         pile_elem_indices = fem_data.get("pile_elem_indices", np.array([], dtype=int))
         forces_axial = solution.get("forces_pile_axial", np.zeros(n_pile))
         forces_lateral = solution.get("forces_pile_lateral", np.zeros(n_pile))
-        cos_theta_pile = fem_data.get("cos_theta_pile", np.zeros(n_pile))
-        sin_theta_pile = fem_data.get("sin_theta_pile", np.zeros(n_pile))
+        yielded = solution.get("yielded_pile", np.zeros(n_pile, dtype=bool))
+        V_cap_arr = fem_data.get("V_cap_by_pile_elem", np.full(n_pile, float('inf')))
+        M_cap_arr = fem_data.get("M_cap_by_pile_elem", np.full(n_pile, float('inf')))
+        L_elems = fem_data.get("elem_length_by_pile_elem", np.zeros(n_pile))
+        has_cap = np.any(V_cap_arr < float('inf')) or np.any(M_cap_arr < float('inf'))
 
         print("\n=== Detailed Pile Element Summary ===")
-        print(f"{'Elem':>4}  {'X1':>8}  {'Y1':>8}  {'X2':>8}  {'Y2':>8}  "
-              f"{'Axial':>10}  {'Shear':>10}")
-        print("-" * 70)
+        header = (f"{'Elem':>4}  {'X1':>8}  {'Y1':>8}  {'X2':>8}  {'Y2':>8}  "
+                  f"{'Axial':>10}  {'Shear':>10}")
+        if has_cap:
+            header += f"  {'V_lim':>8}  {'Status'}"
+        print(header)
+        sep_len = 70 + (20 if has_cap else 0)
+        print("-" * sep_len)
 
         for p_idx in range(n_pile):
             global_idx = pile_elem_indices[p_idx]
@@ -1555,10 +1688,29 @@ def print_detailed_element_summary(fem_data, solution):
             T = forces_axial[p_idx]
             V = forces_lateral[p_idx]
 
-            print(f"{p_idx:>4}  {n0[0]:>8.2f}  {n0[1]:>8.2f}  {n1[0]:>8.2f}  {n1[1]:>8.2f}  "
-                  f"{T:>10.1f}  {V:>10.1f}")
+            row = (f"{p_idx:>4}  {n0[0]:>8.2f}  {n0[1]:>8.2f}  {n1[0]:>8.2f}  {n1[1]:>8.2f}  "
+                   f"{T:>10.1f}  {V:>10.1f}")
 
-        print("-" * 70)
+            if has_cap:
+                v_cap = V_cap_arr[p_idx]
+                m_cap = M_cap_arr[p_idx]
+                L_e = L_elems[p_idx]
+                V_limit = v_cap
+                if m_cap < float('inf') and L_e > 0:
+                    V_limit = min(V_limit, m_cap / L_e)
+                vlim_str = f"{V_limit:.1f}" if V_limit < float('inf') else "-"
+
+                if yielded[p_idx]:
+                    status = "YIELDED"
+                elif V_limit < float('inf') and abs(V) > 0.95 * V_limit:
+                    status = "NEAR CAP"
+                else:
+                    status = "OK"
+                row += f"  {vlim_str:>8}  {status}"
+
+            print(row)
+
+        print("-" * sep_len)
         print(f"{'':>4}  {'':>8}  {'':>8}  {'':>8}  {'max abs:':>8}  "
               f"{np.max(np.abs(forces_axial)):>10.1f}  {np.max(np.abs(forces_lateral)):>10.1f}")
 

@@ -325,13 +325,35 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         
         # Create enhanced reinforcement lines that include intersection points from polygons
         # This is essential for proper mesh generation with embedded 1D elements
+
+        # Snap constraint line endpoints to nearby polygon boundary points.
+        # This prevents near-zero-length elements when a line endpoint is close
+        # to (but not exactly on) a polygon boundary (e.g., pile top near ground surface).
+        snap_tol = adjusted_target_size * 0.05
+        poly_pts_list = list(all_polygon_points)
+        if lines is not None and poly_pts_list:
+            poly_pts_arr = np.array(poly_pts_list)
+            for line_idx in range(len(lines)):
+                snapped = list(lines[line_idx])
+                for i in [0, len(snapped) - 1]:  # snap endpoints only
+                    px, py = snapped[i]
+                    dists = np.sqrt((poly_pts_arr[:, 0] - px)**2 + (poly_pts_arr[:, 1] - py)**2)
+                    j = np.argmin(dists)
+                    if dists[j] < snap_tol and dists[j] > 1e-12:
+                        if debug:
+                            print(f"Snapped line {line_idx} endpoint ({px:.4f},{py:.4f}) "
+                                  f"-> ({poly_pts_list[j][0]:.4f},{poly_pts_list[j][1]:.4f}) "
+                                  f"dist={dists[j]:.6f}")
+                        snapped[i] = poly_pts_list[j]
+                lines[line_idx] = snapped
+
         enhanced_lines = []
         for line_idx, line_pts in enumerate(lines):
             line_pts_clean = remove_duplicate_endpoint(list(line_pts))
-            
+
             # Collect all points for this line: original + intersection points from polygons
             all_line_points = []
-            
+
             # Add original line points
             for x, y in line_pts_clean:
                 all_line_points.append((x, y, 'original'))
@@ -774,7 +796,16 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                                         # Get node indices
                                         idx1 = node_tag_to_index[tag1]
                                         idx2 = node_tag_to_index[tag2]
-                                        
+
+                                        # Skip zero-length elements (degenerate)
+                                        if idx1 == idx2:
+                                            continue
+                                        coord1 = nodes[idx1]
+                                        coord2 = nodes[idx2]
+                                        seg_len = ((coord2[0]-coord1[0])**2 + (coord2[1]-coord1[1])**2)**0.5
+                                        if seg_len < 1e-6:
+                                            continue
+
                                         # Create 1D element
                                         padded_idxs = [idx1, idx2, 0]
                                         elements_1d.append(padded_idxs)
@@ -799,12 +830,19 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                                         tag1 = int(element_list[0])
                                         tag2 = int(element_list[1])
                                         tag3 = int(element_list[2])
-                                        
+
                                         # Get node indices
                                         idx1 = node_tag_to_index[tag1]
                                         idx2 = node_tag_to_index[tag2]
                                         idx3 = node_tag_to_index[tag3]
-                                        
+
+                                        # Skip zero-length elements (degenerate)
+                                        coord1 = nodes[idx1]
+                                        coord2 = nodes[idx2]
+                                        seg_len = ((coord2[0]-coord1[0])**2 + (coord2[1]-coord1[1])**2)**0.5
+                                        if seg_len < 1e-6:
+                                            continue
+
                                         # Create 1D element
                                         padded_idxs = [idx1, idx2, idx3]
                                         elements_1d.append(padded_idxs)

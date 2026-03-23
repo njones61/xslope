@@ -1,8 +1,11 @@
 # Sample Problems - Finite Element Method
 
 The following examples illustrate how to use XSLOPE's finite element capabilities for slope stability analysis using
-the Shear Strength Reduction Method (SSRM). Each example includes an Excel input file that can be used with the
-`main_fem.py` script. The FEM implementation is described in the [FEM Overview](overview.md) page.
+the Shear Strength Reduction Method (SSRM). Each of the Excel input files below can be uploaded and used with the following Google Colab notebook which has been set up specifically for running FEM slope stability analyses:
+
+<a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_fem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+The FEM implementation is described in the [FEM Overview](overview.md) page.
 
 ### 1. Griffiths & Lane (1999) Example 1: Homogeneous Slope
 

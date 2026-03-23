@@ -711,6 +711,10 @@ def load_slope_data(filepath):
                 area = float(row['Area']) if pd.notna(row.get('Area')) else None
                 V_cap = float(row['Vcap']) if pd.notna(row.get('Vcap')) else None
                 M_cap = float(row['Mcap']) if pd.notna(row.get('Mcap')) else None
+                fixity_raw = str(row['Fixity']).strip().lower() if pd.notna(row.get('Fixity')) else 'free'
+                if fixity_raw not in ('free', 'fixed'):
+                    raise ValueError(f"Fixity must be 'free' or 'fixed', got '{fixity_raw}'")
+                fixity = fixity_raw
                 label = str(row['label']) if pd.notna(row.get('label')) else f"Pile {i+1}"
 
                 # Validate
@@ -738,6 +742,7 @@ def load_slope_data(filepath):
                     "area": area,
                     "V_cap": V_cap,
                     "M_cap": M_cap,
+                    "fixity": fixity,
                     "label": label,
                 })
             except Exception as e:

@@ -22,6 +22,19 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
 
 
+def _extract_uv(disp, fem_data):
+    """Extract per-node u,v displacements from a mixed-DOF displacement vector."""
+    dof_offset = fem_data.get("dof_offset", None)
+    if dof_offset is not None:
+        n_nodes = len(fem_data["nodes"])
+        u = np.array([disp[dof_offset[i]] for i in range(n_nodes)])
+        v = np.array([disp[dof_offset[i] + 1] for i in range(n_nodes)])
+    else:
+        u = disp[0::2]
+        v = disp[1::2]
+    return u, v
+
+
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, 
                   label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, dpi=300):
     """
@@ -460,8 +473,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     if deform_scale is None:
         disp_elastic = solution.get("displacements_elastic", None)
         disp_for_scale = displacements - disp_elastic if disp_elastic is not None else displacements
-        u_arr = disp_for_scale[0::2]
-        v_arr = disp_for_scale[1::2]
+        u_arr, v_arr = _extract_uv(disp_for_scale, fem_data)
         max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
         mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
         if max_disp > 1e-30:
@@ -586,8 +598,7 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
     
     # Calculate displacement magnitudes
-    u = displacements[0::2]  # x-displacements
-    v = displacements[1::2]  # y-displacements
+    u, v = _extract_uv(displacements, fem_data)
     disp_mag = np.sqrt(u**2 + v**2)
     
     # Create triangulation for contouring
@@ -709,11 +720,9 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     disp_elastic = solution.get("displacements_elastic", None)
     if disp_elastic is not None:
         disp_vp = displacements - disp_elastic
-        u = disp_vp[0::2]
-        v = disp_vp[1::2]
+        u, v = _extract_uv(disp_vp, fem_data)
     else:
-        u = displacements[0::2]
-        v = displacements[1::2]
+        u, v = _extract_uv(displacements, fem_data)
     disp_mag = np.sqrt(u**2 + v**2)
     max_disp_mag = np.max(disp_mag)
 
@@ -921,8 +930,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
         disp = displacements
 
     # Calculate deformed node positions
-    u = disp[0::2]
-    v = disp[1::2]
+    u, v = _extract_uv(disp, fem_data)
     nodes_deformed = nodes + deform_scale * np.column_stack([u, v])
     
     # Plot original mesh

@@ -36,9 +36,9 @@ plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
 analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
 
-F = 1.37     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
-F_min=1.2   # Minimum FS for SSRM search (adjust as needed)
-F_max=1.6   # Maximum FS for SSRM search (adjust as needed)
+F = 1.1     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
+F_min=1.0   # Minimum FS for SSRM search (adjust as needed)
+F_max=1.2   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)

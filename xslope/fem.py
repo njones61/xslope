@@ -78,8 +78,17 @@ def build_fem_data(slope_data, mesh=None):
             - k_by_1d_elem: np.ndarray (n_1d_elements,) of axial stiffness values for reinforcement lines
             - cos_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (x) for each 1D element
             - sin_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (y) for each 1D element
-            - dof_indices_1d: np.ndarray (n_1d_elements, 4) of global DOF indices [2*n0, 2*n0+1, 2*n1, 2*n1+1]
+            - dof_indices_1d: np.ndarray (n_1d_elements, 4) of global DOF indices using dof_offset
             - K_global_1d_elems: list of np.ndarray (4, 4) global stiffness matrices for each 1D element
+            - dof_offset: np.ndarray (n_nodes+1,) cumulative DOF count; pile nodes get 3 DOFs, others get 2
+            - is_pile_node: np.ndarray (n_nodes,) boolean, True for nodes belonging to pile elements
+            - n_dof_total: int, total number of DOFs (dof_offset[n_nodes])
+            - dof_indices_pile: np.ndarray (n_pile_elements, 6) of global DOF indices for 6-DOF beam elements
+            - K_global_pile_elems: list of np.ndarray (6, 6) global stiffness matrices for pile beam elements
+            - EI_by_pile_elem: np.ndarray (n_pile_elements,) of flexural rigidity per unit width
+            - EA_by_pile_elem: np.ndarray (n_pile_elements,) of axial rigidity per unit width
+            - pile_head_nodes: np.ndarray of node indices for each pile line's top node
+            - pile_head_fixed: np.ndarray of booleans for fixity of each pile head
             - unit_weight: float, unit weight of water
             - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
     """
@@ -351,17 +360,18 @@ def build_fem_data(slope_data, mesh=None):
     # Identify which 1D elements are pile elements
     pile_elem_mask = np.zeros(n_1d_elements, dtype=bool)
     n_pile_elements = 0
-    k_axial_by_pile_elem = []
-    k_lateral_by_pile_elem = []
     cos_theta_pile = []
     sin_theta_pile = []
-    dof_indices_pile = []
     K_global_pile_elems = []
     pile_elem_indices = []  # maps pile element index to global 1D element index
     V_cap_by_pile_elem = []
     M_cap_by_pile_elem = []
     elem_length_by_pile_elem = []
     S_by_pile_elem = []
+    EI_by_pile_elem = []
+    EA_by_pile_elem = []
+    pile_node_pairs = []  # (node_0, node_1) for each pile element
+    pile_line_idx_by_pile_elem = []  # which pile_line each pile element belongs to
 
     if n_1d_elements > 0 and n_pile_lines > 0:
         for elem_idx in range(n_1d_elements):
@@ -420,47 +430,44 @@ def build_fem_data(slope_data, mesh=None):
                     EA = E_pile * A_pile
                     EI = E_pile * I_pile
 
-                # Axial and lateral stiffness
-                k_a = EA / elem_length
-                k_l = 3.0 * EI / (elem_length ** 3)
+                L = elem_length
 
-                # DOF indices
-                dof_idx = [2*node_0, 2*node_0+1, 2*node_1, 2*node_1+1]
-
-                # Build condensed 4x4 beam stiffness in local coords:
-                # K_local = [[EA/L, 0, -EA/L, 0],
-                #            [0, 3EI/L³, 0, -3EI/L³],
-                #            [-EA/L, 0, EA/L, 0],
-                #            [0, -3EI/L³, 0, 3EI/L³]]
-                # Then transform to global using direction cosines.
-                c2 = cos_t * cos_t
-                cs = cos_t * sin_t
-                s2 = sin_t * sin_t
-
-                # Global beam stiffness = T^T @ K_local @ T
-                # Axial contribution (same as truss):
-                K_axial = k_a * np.array([
-                    [ c2,  cs, -c2, -cs],
-                    [ cs,  s2, -cs, -s2],
-                    [-c2, -cs,  c2,  cs],
-                    [-cs, -s2,  cs,  s2]
+                # Build full 6x6 Euler-Bernoulli beam stiffness in local coords
+                # DOFs: [u1, v1, theta1, u2, v2, theta2]
+                # u = axial, v = transverse, theta = rotation
+                L2 = L * L
+                L3 = L2 * L
+                K_local = np.array([
+                    [ EA/L,   0.0,          0.0,        -EA/L,  0.0,          0.0       ],
+                    [ 0.0,    12*EI/L3,     6*EI/L2,     0.0,  -12*EI/L3,    6*EI/L2   ],
+                    [ 0.0,    6*EI/L2,      4*EI/L,      0.0,  -6*EI/L2,     2*EI/L    ],
+                    [-EA/L,   0.0,          0.0,         EA/L,   0.0,         0.0       ],
+                    [ 0.0,   -12*EI/L3,    -6*EI/L2,     0.0,   12*EI/L3,   -6*EI/L2   ],
+                    [ 0.0,    6*EI/L2,      2*EI/L,      0.0,  -6*EI/L2,     4*EI/L    ],
                 ])
-                # Lateral contribution (perpendicular to element axis):
-                K_lateral = k_l * np.array([
-                    [ s2, -cs, -s2,  cs],
-                    [-cs,  c2,  cs, -c2],
-                    [-s2,  cs,  s2, -cs],
-                    [ cs, -c2, -cs,  c2]
-                ])
-                K_beam = K_axial + K_lateral
 
-                k_axial_by_pile_elem.append(k_a)
-                k_lateral_by_pile_elem.append(k_l)
+                # 6x6 rotation matrix T (local -> global)
+                # local x along element, local y perpendicular
+                c = cos_t
+                s = sin_t
+                T = np.array([
+                    [ c,  s, 0, 0, 0, 0],
+                    [-s,  c, 0, 0, 0, 0],
+                    [ 0,  0, 1, 0, 0, 0],
+                    [ 0,  0, 0, c, s, 0],
+                    [ 0,  0, 0,-s, c, 0],
+                    [ 0,  0, 0, 0, 0, 1],
+                ])
+                K_beam = T.T @ K_local @ T
+
                 cos_theta_pile.append(cos_t)
                 sin_theta_pile.append(sin_t)
-                dof_indices_pile.append(dof_idx)
+                pile_node_pairs.append((node_0, node_1))
                 K_global_pile_elems.append(K_beam)
                 elem_length_by_pile_elem.append(elem_length)
+                EI_by_pile_elem.append(EI)
+                EA_by_pile_elem.append(EA)
+                pile_line_idx_by_pile_elem.append(pile_line_idx)
 
                 # Structural capacity (per-unit-width = per-pile / S)
                 V_cap_pile = pile_data.get("V_cap")
@@ -471,16 +478,73 @@ def build_fem_data(slope_data, mesh=None):
 
                 n_pile_elements += 1
 
-    k_axial_by_pile_elem = np.array(k_axial_by_pile_elem)
-    k_lateral_by_pile_elem = np.array(k_lateral_by_pile_elem)
     cos_theta_pile = np.array(cos_theta_pile)
     sin_theta_pile = np.array(sin_theta_pile)
-    dof_indices_pile = np.array(dof_indices_pile, dtype=int).reshape(-1, 4) if n_pile_elements > 0 else np.zeros((0, 4), dtype=int)
     pile_elem_indices = np.array(pile_elem_indices, dtype=int)
     V_cap_by_pile_elem = np.array(V_cap_by_pile_elem)
     M_cap_by_pile_elem = np.array(M_cap_by_pile_elem)
     elem_length_by_pile_elem = np.array(elem_length_by_pile_elem)
     S_by_pile_elem = np.array(S_by_pile_elem)
+    EI_by_pile_elem = np.array(EI_by_pile_elem)
+    EA_by_pile_elem = np.array(EA_by_pile_elem)
+    pile_line_idx_by_pile_elem = np.array(pile_line_idx_by_pile_elem, dtype=int) if n_pile_elements > 0 else np.array([], dtype=int)
+
+    # === BUILD DOF OFFSET MAP ===
+    # Pile nodes get 3 DOFs (ux, uy, theta), all other nodes get 2 DOFs (ux, uy).
+    is_pile_node = np.zeros(n_nodes, dtype=bool)
+    for p_idx in range(n_pile_elements):
+        n0, n1 = pile_node_pairs[p_idx]
+        is_pile_node[n0] = True
+        is_pile_node[n1] = True
+
+    dof_offset = np.zeros(n_nodes + 1, dtype=int)
+    for i in range(n_nodes):
+        dof_offset[i + 1] = dof_offset[i] + (3 if is_pile_node[i] else 2)
+    n_dof_total = int(dof_offset[n_nodes])
+
+    # Build 6-element DOF indices for pile elements (using dof_offset)
+    dof_indices_pile = np.zeros((n_pile_elements, 6), dtype=int) if n_pile_elements > 0 else np.zeros((0, 6), dtype=int)
+    for p_idx in range(n_pile_elements):
+        n0, n1 = pile_node_pairs[p_idx]
+        dof_indices_pile[p_idx] = [
+            dof_offset[n0], dof_offset[n0] + 1, dof_offset[n0] + 2,
+            dof_offset[n1], dof_offset[n1] + 1, dof_offset[n1] + 2,
+        ]
+
+    # Rebuild 1D truss DOF indices using dof_offset (in case any share nodes with piles)
+    for elem_idx in range(n_1d_elements):
+        if pile_elem_mask[elem_idx]:
+            continue
+        elem_nodes_1d = elements_1d[elem_idx]
+        node_0 = elem_nodes_1d[0]
+        node_1 = elem_nodes_1d[1]
+        dof_indices_1d[elem_idx] = [dof_offset[node_0], dof_offset[node_0] + 1,
+                                     dof_offset[node_1], dof_offset[node_1] + 1]
+
+    # Identify pile head nodes and their fixity for boundary conditions
+    # The pile head is the top node (highest y) of each pile line.
+    pile_head_nodes = []
+    pile_head_fixed = []
+    for pl_idx in range(n_pile_lines):
+        pile_data = pile_lines[pl_idx]
+        fixity = pile_data.get("fixity", "free")
+
+        # Collect all nodes belonging to this pile line
+        pile_nodes_for_line = set()
+        for p_idx in range(n_pile_elements):
+            if pile_line_idx_by_pile_elem[p_idx] == pl_idx:
+                n0, n1 = pile_node_pairs[p_idx]
+                pile_nodes_for_line.add(n0)
+                pile_nodes_for_line.add(n1)
+
+        if pile_nodes_for_line:
+            # Top node = highest y coordinate
+            top_node = max(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
+            pile_head_nodes.append(top_node)
+            pile_head_fixed.append(fixity == "fixed")
+
+    pile_head_nodes = np.array(pile_head_nodes, dtype=int)
+    pile_head_fixed = np.array(pile_head_fixed, dtype=bool)
 
     # Set up boundary conditions
     
@@ -665,12 +729,14 @@ def build_fem_data(slope_data, mesh=None):
         "pp_option": pp_option,
         "piezo_line_coords": piezo_line_coords,
         "gamma_water": slope_data.get("gamma_water", 9.81),
-        # Pile beam elements
+        # DOF offset map (pile nodes get 3 DOFs, others get 2)
+        "dof_offset": dof_offset,
+        "is_pile_node": is_pile_node,
+        "n_dof_total": n_dof_total,
+        # Pile beam elements (6-DOF Euler-Bernoulli)
         "n_pile_elements": n_pile_elements,
         "pile_elem_mask": pile_elem_mask,
         "pile_elem_indices": pile_elem_indices,
-        "k_axial_by_pile_elem": k_axial_by_pile_elem,
-        "k_lateral_by_pile_elem": k_lateral_by_pile_elem,
         "cos_theta_pile": cos_theta_pile,
         "sin_theta_pile": sin_theta_pile,
         "dof_indices_pile": dof_indices_pile,
@@ -679,6 +745,12 @@ def build_fem_data(slope_data, mesh=None):
         "M_cap_by_pile_elem": M_cap_by_pile_elem,
         "elem_length_by_pile_elem": elem_length_by_pile_elem,
         "S_by_pile_elem": S_by_pile_elem,
+        "EI_by_pile_elem": EI_by_pile_elem,
+        "EA_by_pile_elem": EA_by_pile_elem,
+        "pile_node_pairs": pile_node_pairs,
+        "pile_line_idx_by_pile_elem": pile_line_idx_by_pile_elem,
+        "pile_head_nodes": pile_head_nodes,
+        "pile_head_fixed": pile_head_fixed,
     }
 
 
@@ -762,7 +834,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
 
     n_nodes = len(nodes)
     n_elements = len(elements)
-    n_dof = 2 * n_nodes
+
+    # DOF offset map: pile nodes get 3 DOFs, others get 2
+    dof_offset = fem_data.get("dof_offset", None)
+    if dof_offset is not None:
+        n_dof = int(dof_offset[n_nodes])
+    else:
+        n_dof = 2 * n_nodes
 
     # Apply strength reduction (Griffiths & Lane 1999): c_r = c/F, phi_r = atan(tan(phi)/F)
     # Note: Only soil strength (c, phi) is reduced by F. Reinforcement properties
@@ -795,26 +873,30 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         if debug_level >= 1:
             print(f"  1D truss elements: {n_1d_elements}")
 
-    # Extract pile beam element data
+    # Extract pile beam element data (6-DOF Euler-Bernoulli)
     n_pile_elements = fem_data.get("n_pile_elements", 0)
     has_pile_elements = n_pile_elements > 0
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(n_1d_elements, dtype=bool))
 
     if has_pile_elements:
-        k_axial_pile = fem_data["k_axial_by_pile_elem"]
-        k_lateral_pile = fem_data["k_lateral_by_pile_elem"]
         cos_theta_pile = fem_data["cos_theta_pile"]
         sin_theta_pile = fem_data["sin_theta_pile"]
         dof_indices_pile = fem_data["dof_indices_pile"]
         V_cap_pile = fem_data["V_cap_by_pile_elem"]
         M_cap_pile = fem_data["M_cap_by_pile_elem"]
         L_pile_elem = fem_data["elem_length_by_pile_elem"]
+        EI_pile = fem_data["EI_by_pile_elem"]
+        EA_pile = fem_data["EA_by_pile_elem"]
+        pile_head_nodes = fem_data.get("pile_head_nodes", np.array([], dtype=int))
+        pile_head_fixed = fem_data.get("pile_head_fixed", np.array([], dtype=bool))
         forces_pile_axial = np.zeros(n_pile_elements)
         forces_pile_lateral = np.zeros(n_pile_elements)
-        yielded_pile = np.zeros(n_pile_elements, dtype=bool)
+        forces_pile_moment = np.zeros((n_pile_elements, 2))  # [M1, M2] at each node
+        yielded_pile_V = np.zeros(n_pile_elements, dtype=bool)
+        yielded_pile_M = np.zeros(n_pile_elements, dtype=bool)
 
         if debug_level >= 1:
-            print(f"  Pile beam elements: {n_pile_elements}")
+            print(f"  Pile beam elements: {n_pile_elements} (6-DOF Euler-Bernoulli)")
 
     # ---- Step 1: Build K_global (elastic, constant — includes 2D soil + 1D truss + pile beam) ----
     K_global = build_global_stiffness(nodes, elements, element_types,
@@ -823,25 +905,38 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
 
     # ---- Step 2: Build gravity load vector ----
     F_gravity = build_gravity_loads(nodes, elements, element_types,
-                                    element_materials, gamma_by_mat, k_seismic)
+                                    element_materials, gamma_by_mat, k_seismic,
+                                    fem_data=fem_data)
 
-    # Add boundary condition forces
+    # Add boundary condition forces (using dof_offset)
     for i in range(n_nodes):
         if bc_type[i] == 4:  # Force boundary condition
-            F_gravity[2*i] += bc_values[i, 0]
-            F_gravity[2*i+1] += bc_values[i, 1]
+            dof_x = dof_offset[i] if dof_offset is not None else 2 * i
+            F_gravity[dof_x] += bc_values[i, 0]
+            F_gravity[dof_x + 1] += bc_values[i, 1]
 
     # ---- Step 3: Identify free/constrained DOFs ONCE ----
     # Use saved constraint sets so that nodes with both a displacement constraint
     # (roller/fixed) and an applied force (bc_type overwritten to 4) are still constrained.
     constraint_dofs = []
     for i in range(n_nodes):
+        dof_x = dof_offset[i] if dof_offset is not None else 2 * i
+        dof_y = dof_x + 1
         if bc_type[i] == 1 or i in fixed_nodes:  # Fixed
-            constraint_dofs.extend([2*i, 2*i+1])
+            constraint_dofs.extend([dof_x, dof_y])
         elif bc_type[i] == 2 or i in roller_x_nodes:  # X-roller
-            constraint_dofs.append(2*i)
+            constraint_dofs.append(dof_x)
         elif bc_type[i] == 3 or i in roller_y_nodes:  # Y-roller
-            constraint_dofs.append(2*i+1)
+            constraint_dofs.append(dof_y)
+
+    # Add rotation constraints for fixed pile heads
+    if has_pile_elements:
+        for ph_idx in range(len(pile_head_nodes)):
+            if pile_head_fixed[ph_idx]:
+                ph_node = pile_head_nodes[ph_idx]
+                rot_dof = dof_offset[ph_node] + 2 if dof_offset is not None else None
+                if rot_dof is not None:
+                    constraint_dofs.append(rot_dof)
 
     constraint_set = set(constraint_dofs)
     free_dofs = np.array(sorted(set(range(n_dof)) - constraint_set))
@@ -890,7 +985,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         elem_coords = nodes[elem_nodes_idx]
 
         gp_list = []
-        dof_indices = _elem_dof_indices(elem_nodes_idx)
+        dof_indices = _elem_dof_indices(elem_nodes_idx, dof_offset=dof_offset)
         if elem_type == 3:
             B, area = compute_B_matrix_triangle(elem_coords)
             N = np.array([1.0/3.0, 1.0/3.0, 1.0/3.0])
@@ -1126,55 +1221,91 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
                       f"{n_1d_exceeded} exceeded capacity, "
                       f"{np.sum(failed_1d)} total failed")
 
-        # ---- Pile beam element force computation and capacity checks ----
+        # ---- Pile beam element force computation and capacity checks (6-DOF) ----
         if has_pile_elements:
-            n_pile_yielded = 0
+            n_pile_yielded_V = 0
+            n_pile_yielded_M = 0
             for p_idx in range(n_pile_elements):
                 dof_idx = dof_indices_pile[p_idx]
                 cos_t = cos_theta_pile[p_idx]
                 sin_t = sin_theta_pile[p_idx]
+                L = L_pile_elem[p_idx]
+                EI_val = EI_pile[p_idx]
+                EA_val = EA_pile[p_idx]
 
-                # Relative displacement
+                # Extract 6 global DOFs: [ux1, uy1, theta1, ux2, uy2, theta2]
                 u_elem = u[dof_idx]
-                du_x = u_elem[2] - u_elem[0]
-                du_y = u_elem[3] - u_elem[1]
 
-                # Axial force (projection along element axis)
-                delta_axial = du_x * cos_t + du_y * sin_t
-                T = k_axial_pile[p_idx] * delta_axial
-                forces_pile_axial[p_idx] = T
+                # Transform to local coordinates using rotation matrix T
+                c = cos_t
+                s = sin_t
+                T = np.array([
+                    [ c,  s, 0, 0, 0, 0],
+                    [-s,  c, 0, 0, 0, 0],
+                    [ 0,  0, 1, 0, 0, 0],
+                    [ 0,  0, 0, c, s, 0],
+                    [ 0,  0, 0,-s, c, 0],
+                    [ 0,  0, 0, 0, 0, 1],
+                ])
+                u_local = T @ u_elem  # [u1_axial, v1_trans, theta1, u2_axial, v2_trans, theta2]
 
-                # Lateral force (projection perpendicular to element axis)
-                delta_lateral = -du_x * sin_t + du_y * cos_t
-                V = k_lateral_pile[p_idx] * delta_lateral
+                # Axial force: T = EA/L * (u2_axial - u1_axial)
+                T_force = EA_val / L * (u_local[3] - u_local[0])
+                forces_pile_axial[p_idx] = T_force
 
-                # Structural capacity checks (V_cap and M_cap)
-                V_limit = V_cap_pile[p_idx]  # per-unit-width shear capacity
+                # Shear force: V = dM/dx, from beam theory
+                # V = 12*EI/L^3 * (v1 - v2) + 6*EI/L^2 * (theta1 + theta2)
+                L2 = L * L
+                L3 = L2 * L
+                V = 12*EI_val/L3 * (u_local[1] - u_local[4]) + 6*EI_val/L2 * (u_local[2] + u_local[5])
 
-                # Moment check: M = V * L_elem, cap at M_cap/S per unit width
-                M_cap_uw = M_cap_pile[p_idx]
-                if M_cap_uw < float('inf'):
-                    V_from_Mcap = M_cap_uw / L_pile_elem[p_idx]
-                    V_limit = min(V_limit, V_from_Mcap)
+                # Bending moments at node 1 and node 2 from K_local rows 2 and 5
+                M1 = EI_val * (6.0/L2 * u_local[1] + 4.0/L * u_local[2] - 6.0/L2 * u_local[4] + 2.0/L * u_local[5])
+                M2 = EI_val * (6.0/L2 * u_local[1] + 2.0/L * u_local[2] - 6.0/L2 * u_local[4] + 4.0/L * u_local[5])
 
+                forces_pile_moment[p_idx] = [M1, M2]
+
+                # --- V_cap check ---
+                V_limit = V_cap_pile[p_idx]
                 correction_V = 0.0
                 if abs(V) > V_limit:
                     correction_V = np.sign(V) * V_limit - V
-                    V = np.sign(V) * V_limit  # store capped value
-                    yielded_pile[p_idx] = True
-                    n_pile_yielded += 1
+                    V = np.sign(V) * V_limit
+                    yielded_pile_V[p_idx] = True
+                    n_pile_yielded_V += 1
 
                 forces_pile_lateral[p_idx] = V
 
                 if abs(correction_V) > 1e-30:
-                    # Lateral internal force pattern: [sin, -cos, -sin, cos]
-                    loads[dof_idx[0]] += correction_V * sin_t
-                    loads[dof_idx[1]] += correction_V * (-cos_t)
-                    loads[dof_idx[2]] += correction_V * (-sin_t)
-                    loads[dof_idx[3]] += correction_V * cos_t
+                    # Convert lateral correction to global nodal forces
+                    # In local coords, shear internal force pattern: [0, 1, 0, 0, -1, 0]
+                    # Transform to global: correction_V * T^T @ [0, 1, 0, 0, -1, 0]
+                    f_local = np.array([0.0, correction_V, 0.0, 0.0, -correction_V, 0.0])
+                    f_global = T.T @ f_local
+                    for k in range(6):
+                        loads[dof_idx[k]] += f_global[k]
 
-            if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5) and n_pile_yielded > 0:
-                print(f"    Pile elements: {n_pile_yielded} yielded (capacity exceeded)")
+                # --- M_cap check (plastic hinge at each node) ---
+                M_cap_uw = M_cap_pile[p_idx]
+                if M_cap_uw < float('inf'):
+                    # Node 1 moment check
+                    if abs(M1) > M_cap_uw:
+                        correction_M1 = np.sign(M1) * M_cap_uw - M1
+                        rot_dof_1 = dof_idx[2]  # theta1 DOF
+                        loads[rot_dof_1] += correction_M1
+                        yielded_pile_M[p_idx] = True
+                        n_pile_yielded_M += 1
+
+                    # Node 2 moment check
+                    if abs(M2) > M_cap_uw:
+                        correction_M2 = np.sign(M2) * M_cap_uw - M2
+                        rot_dof_2 = dof_idx[5]  # theta2 DOF
+                        loads[rot_dof_2] += correction_M2
+                        yielded_pile_M[p_idx] = True
+
+            if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
+                if n_pile_yielded_V > 0 or n_pile_yielded_M > 0:
+                    print(f"    Pile elements: {n_pile_yielded_V} V-yielded, {n_pile_yielded_M} M-yielded")
 
         # Compute unbalanced force ratio: ||VP corrections|| / ||F_gravity||
         # This measures how far the system is from force equilibrium.
@@ -1211,8 +1342,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         # Griffiths & Lane 1999 displacement-vs-F plots).
         if vp_disp_limit is not None:
             u_vp = u_new - u_elastic
-            vp_x = u_vp[0::2]
-            vp_y = u_vp[1::2]
+            # Extract translational DOFs only for VP displacement check
+            if dof_offset is not None:
+                vp_x = np.array([u_vp[dof_offset[nd]] for nd in range(n_nodes)])
+                vp_y = np.array([u_vp[dof_offset[nd] + 1] for nd in range(n_nodes)])
+            else:
+                vp_x = u_vp[0::2]
+                vp_y = u_vp[1::2]
             max_vp_disp = float(np.max(np.sqrt(vp_x**2 + vp_y**2)))
             if max_vp_disp > vp_disp_limit:
                 converged = False
@@ -1264,7 +1400,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         f_yield = check_mohr_coulomb_cp(stress_avg_cp, c_reduced[elem_idx], phi_reduced[elem_idx], u_elem_avg)
         plastic_elements[elem_idx] = f_yield > 1e-8
 
-    strains = compute_strains(nodes, elements, element_types, u)
+    strains = compute_strains(nodes, elements, element_types, u, dof_offset=dof_offset)
 
     # Compute viscoplastic max shear strain per element (averaged over Gauss points)
     # This is what Griffiths plots — zero in elastic regions, large in failure zone
@@ -1307,27 +1443,53 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
             dof_idx = dof_indices_pile[p_idx]
             cos_t = cos_theta_pile[p_idx]
             sin_t = sin_theta_pile[p_idx]
+            L = L_pile_elem[p_idx]
+            EI_val = EI_pile[p_idx]
+            EA_val = EA_pile[p_idx]
 
             u_elem = u[dof_idx]
-            du_x = u_elem[2] - u_elem[0]
-            du_y = u_elem[3] - u_elem[1]
 
-            delta_axial = du_x * cos_t + du_y * sin_t
-            forces_pile_axial[p_idx] = k_axial_pile[p_idx] * delta_axial
+            c = cos_t
+            s = sin_t
+            T = np.array([
+                [ c,  s, 0, 0, 0, 0],
+                [-s,  c, 0, 0, 0, 0],
+                [ 0,  0, 1, 0, 0, 0],
+                [ 0,  0, 0, c, s, 0],
+                [ 0,  0, 0,-s, c, 0],
+                [ 0,  0, 0, 0, 0, 1],
+            ])
+            u_local = T @ u_elem
 
-            delta_lateral = -du_x * sin_t + du_y * cos_t
-            V = k_lateral_pile[p_idx] * delta_lateral
+            # Axial force
+            T_force = EA_val / L * (u_local[3] - u_local[0])
+            forces_pile_axial[p_idx] = T_force
 
-            # Cap at structural capacity
+            # Shear force
+            L2 = L * L
+            L3 = L2 * L
+            V = 12*EI_val/L3 * (u_local[1] - u_local[4]) + 6*EI_val/L2 * (u_local[2] + u_local[5])
+
+            # Bending moments
+            M1 = EI_val * (6.0/L2 * u_local[1] + 4.0/L * u_local[2] - 6.0/L2 * u_local[4] + 2.0/L * u_local[5])
+            M2 = EI_val * (6.0/L2 * u_local[1] + 2.0/L * u_local[2] - 6.0/L2 * u_local[4] + 4.0/L * u_local[5])
+            forces_pile_moment[p_idx] = [M1, M2]
+
+            # Cap shear at V_cap
             V_limit = V_cap_pile[p_idx]
-            M_cap_uw = M_cap_pile[p_idx]
-            if M_cap_uw < float('inf'):
-                V_limit = min(V_limit, M_cap_uw / L_pile_elem[p_idx])
             if abs(V) > V_limit:
                 V = np.sign(V) * V_limit
-                yielded_pile[p_idx] = True
-
+                yielded_pile_V[p_idx] = True
             forces_pile_lateral[p_idx] = V
+
+            # Cap moments at M_cap
+            M_cap_uw = M_cap_pile[p_idx]
+            if M_cap_uw < float('inf'):
+                if abs(M1) > M_cap_uw or abs(M2) > M_cap_uw:
+                    yielded_pile_M[p_idx] = True
+                M1_capped = np.sign(M1) * min(abs(M1), M_cap_uw) if M_cap_uw < float('inf') else M1
+                M2_capped = np.sign(M2) * min(abs(M2), M_cap_uw) if M_cap_uw < float('inf') else M2
+                forces_pile_moment[p_idx] = [M1_capped, M2_capped]
 
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
@@ -1344,8 +1506,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         if has_pile_elements:
             max_axial = np.max(np.abs(forces_pile_axial))
             max_lateral = np.max(np.abs(forces_pile_lateral))
+            max_moment = np.max(np.abs(forces_pile_moment))
             print(f"  Pile elements: {n_pile_elements}, "
-                  f"max axial = {max_axial:.2f}, max shear = {max_lateral:.2f}")
+                  f"max axial = {max_axial:.2f}, max shear = {max_lateral:.2f}, "
+                  f"max moment = {max_moment:.2f}")
 
     return {
         "converged": converged,
@@ -1368,7 +1532,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=500, tolerance=1e-3
         "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
         "forces_pile_axial": forces_pile_axial if has_pile_elements else np.array([]),
         "forces_pile_lateral": forces_pile_lateral if has_pile_elements else np.array([]),
-        "yielded_pile": yielded_pile if has_pile_elements else np.array([], dtype=bool),
+        "forces_pile_moment": forces_pile_moment if has_pile_elements else np.zeros((0, 2)),
+        "yielded_pile_V": yielded_pile_V if has_pile_elements else np.array([], dtype=bool),
+        "yielded_pile_M": yielded_pile_M if has_pile_elements else np.array([], dtype=bool),
+        "yielded_pile": (yielded_pile_V | yielded_pile_M) if has_pile_elements else np.array([], dtype=bool),
     }
 
 
@@ -1495,12 +1662,17 @@ def print_pile_summary(fem_data, solution):
     pile_elem_indices = fem_data.get("pile_elem_indices", np.array([], dtype=int))
     forces_axial = solution.get("forces_pile_axial", np.zeros(n_pile))
     forces_shear = solution.get("forces_pile_lateral", np.zeros(n_pile))
+    forces_moment = solution.get("forces_pile_moment", np.zeros((n_pile, 2)))
     yielded = solution.get("yielded_pile", np.zeros(n_pile, dtype=bool))
+    yielded_V = solution.get("yielded_pile_V", np.zeros(n_pile, dtype=bool))
+    yielded_M = solution.get("yielded_pile_M", np.zeros(n_pile, dtype=bool))
     V_cap_arr = fem_data.get("V_cap_by_pile_elem", np.full(n_pile, float('inf')))
     M_cap_arr = fem_data.get("M_cap_by_pile_elem", np.full(n_pile, float('inf')))
 
     # Check if any pile has capacity limits
-    has_capacity = np.any(V_cap_arr < float('inf')) or np.any(M_cap_arr < float('inf'))
+    has_V_cap = np.any(V_cap_arr < float('inf'))
+    has_M_cap = np.any(M_cap_arr < float('inf'))
+    has_capacity = has_V_cap or has_M_cap
 
     # Group pile elements by pile line (material ID)
     pile_line_ids = {}
@@ -1515,9 +1687,15 @@ def print_pile_summary(fem_data, solution):
     S_arr = fem_data.get("S_by_pile_elem", np.ones(n_pile))
 
     print(f"\n=== Pile Summary ===")
-    print(f"{'Pile':>4}  {'Elems':>5}  {'Max |T|':>8}  {'Max |V|':>8}  "
-          f"{'V_lim':>8}  {'Yielded':>7}  {'Status'}")
-    print("-" * 62)
+    header = (f"{'Pile':>4}  {'Elems':>5}  {'Max |T|':>8}  {'Max |V|':>8}  "
+              f"{'Max |M|':>8}")
+    if has_V_cap:
+        header += f"  {'V_cap':>8}"
+    if has_M_cap:
+        header += f"  {'M_cap':>8}"
+    header += f"  {'Yielded':>7}  {'Status'}"
+    print(header)
+    print("-" * (len(header) + 2))
 
     statuses_seen = set()
     pile_num = 0
@@ -1529,29 +1707,32 @@ def print_pile_summary(fem_data, solution):
 
         max_axial = np.max(np.abs(forces_axial[indices]))
         max_shear = np.max(np.abs(forces_shear[indices]))
+        max_moment = np.max(np.abs(forces_moment[indices]))
 
-        # Effective shear limit (min of V_cap/S and M_cap/(S*L))
         v_cap = V_cap_arr[indices[0]]
         m_cap = M_cap_arr[indices[0]]
-        L_elem = L_elems[indices[0]]
-        V_limit = v_cap
-        if m_cap < float('inf') and L_elem > 0:
-            V_limit = min(V_limit, m_cap / L_elem)
-
-        vlim_str = f"{V_limit:.1f}" if V_limit < float('inf') else "-"
 
         if n_yielded > 0:
             status = "YIELDED"
-        elif V_limit < float('inf') and max_shear > 0.95 * V_limit:
+        elif (v_cap < float('inf') and max_shear > 0.95 * v_cap) or \
+             (m_cap < float('inf') and max_moment > 0.95 * m_cap):
             status = "NEAR CAP"
         else:
             status = "OK"
         statuses_seen.add(status)
 
-        print(f"{pile_num:>4}  {n_elem:>5}  {max_axial:>8.1f}  {max_shear:>8.1f}  "
-              f"{vlim_str:>8}  {n_yielded:>3}/{n_elem}  {status}")
+        row = (f"{pile_num:>4}  {n_elem:>5}  {max_axial:>8.1f}  {max_shear:>8.1f}  "
+               f"{max_moment:>8.1f}")
+        if has_V_cap:
+            vcap_str = f"{v_cap:.1f}" if v_cap < float('inf') else "-"
+            row += f"  {vcap_str:>8}"
+        if has_M_cap:
+            mcap_str = f"{m_cap:.1f}" if m_cap < float('inf') else "-"
+            row += f"  {mcap_str:>8}"
+        row += f"  {n_yielded:>3}/{n_elem}  {status}"
+        print(row)
 
-    print("-" * 62)
+    print("-" * (len(header) + 2))
 
     # Capacity calculation notes
     if has_capacity:
@@ -1563,29 +1744,25 @@ def print_pile_summary(fem_data, solution):
             v_cap = V_cap_arr[indices[0]]
             m_cap = M_cap_arr[indices[0]]
             S_pile = S_arr[indices[0]]
-            L_elem = L_elems[indices[0]]
 
             if v_cap < float('inf') or m_cap < float('inf'):
-                # Use max element length for this pile (skip zero-length elements)
-                pile_lengths = L_elems[indices]
-                L_repr = np.max(pile_lengths) if np.any(pile_lengths > 0) else 0.0
                 print(f"  Pile {pile_num} capacity (per unit width = per pile / S):")
                 if v_cap < float('inf'):
                     print(f"    V_cap/S = {v_cap:.1f}")
-                if m_cap < float('inf') and L_repr > 0:
-                    V_from_M = m_cap / L_repr
-                    print(f"    M_cap/S = {m_cap:.1f}, L_elem = {L_repr:.2f}, "
-                          f"-> V_limit from moment = M_cap/(S*L) = {V_from_M:.1f}")
-                V_limit_vcap = v_cap
-                V_limit_mcap = m_cap / L_repr if m_cap < float('inf') and L_repr > 0 else float('inf')
-                governing = "V_cap" if V_limit_vcap <= V_limit_mcap else "M_cap"
-                print(f"    Controlling limit: {governing}")
+                if m_cap < float('inf'):
+                    print(f"    M_cap/S = {m_cap:.1f}")
+                n_yV = int(np.sum(yielded_V[indices]))
+                n_yM = int(np.sum(yielded_M[indices]))
+                if n_yV > 0:
+                    print(f"    {n_yV} element(s) reached V_cap (shear hinge)")
+                if n_yM > 0:
+                    print(f"    {n_yM} element(s) reached M_cap (plastic hinge)")
 
     # Status notes
     status_notes = {
         "OK": "OK: All elements within structural capacity.",
-        "NEAR CAP": "NEAR CAP: Max shear exceeds 95% of structural capacity.",
-        "YIELDED": "YIELDED: Elements reached structural capacity; shear force capped at limit (elastic-perfectly-plastic).",
+        "NEAR CAP": "NEAR CAP: Max force/moment exceeds 95% of structural capacity.",
+        "YIELDED": "YIELDED: Elements reached structural capacity; forces capped at limit (elastic-perfectly-plastic).",
     }
     notes = [status_notes[s] for s in ["OK", "NEAR CAP", "YIELDED"] if s in statuses_seen]
     if notes:
@@ -1665,19 +1842,28 @@ def print_detailed_element_summary(fem_data, solution):
         pile_elem_indices = fem_data.get("pile_elem_indices", np.array([], dtype=int))
         forces_axial = solution.get("forces_pile_axial", np.zeros(n_pile))
         forces_lateral = solution.get("forces_pile_lateral", np.zeros(n_pile))
+        forces_moment = solution.get("forces_pile_moment", np.zeros((n_pile, 2)))
         yielded = solution.get("yielded_pile", np.zeros(n_pile, dtype=bool))
+        yielded_V = solution.get("yielded_pile_V", np.zeros(n_pile, dtype=bool))
+        yielded_M = solution.get("yielded_pile_M", np.zeros(n_pile, dtype=bool))
         V_cap_arr = fem_data.get("V_cap_by_pile_elem", np.full(n_pile, float('inf')))
         M_cap_arr = fem_data.get("M_cap_by_pile_elem", np.full(n_pile, float('inf')))
         L_elems = fem_data.get("elem_length_by_pile_elem", np.zeros(n_pile))
-        has_cap = np.any(V_cap_arr < float('inf')) or np.any(M_cap_arr < float('inf'))
+        has_V_cap = np.any(V_cap_arr < float('inf'))
+        has_M_cap = np.any(M_cap_arr < float('inf'))
+        has_cap = has_V_cap or has_M_cap
 
         print("\n=== Detailed Pile Element Summary ===")
         header = (f"{'Elem':>4}  {'X1':>8}  {'Y1':>8}  {'X2':>8}  {'Y2':>8}  "
-                  f"{'Axial':>10}  {'Shear':>10}")
+                  f"{'Axial':>10}  {'Shear':>10}  {'M1':>10}  {'M2':>10}")
+        if has_V_cap:
+            header += f"  {'V_cap':>8}"
+        if has_M_cap:
+            header += f"  {'M_cap':>8}"
         if has_cap:
-            header += f"  {'V_lim':>8}  {'Status'}"
+            header += f"  {'Status'}"
         print(header)
-        sep_len = 70 + (20 if has_cap else 0)
+        sep_len = len(header) + 2
         print("-" * sep_len)
 
         for p_idx in range(n_pile):
@@ -1687,32 +1873,41 @@ def print_detailed_element_summary(fem_data, solution):
             n1 = nodes[elem[1]]
             T = forces_axial[p_idx]
             V = forces_lateral[p_idx]
+            M1 = forces_moment[p_idx, 0]
+            M2 = forces_moment[p_idx, 1]
 
             row = (f"{p_idx:>4}  {n0[0]:>8.2f}  {n0[1]:>8.2f}  {n1[0]:>8.2f}  {n1[1]:>8.2f}  "
-                   f"{T:>10.1f}  {V:>10.1f}")
+                   f"{T:>10.1f}  {V:>10.1f}  {M1:>10.1f}  {M2:>10.1f}")
+
+            if has_V_cap:
+                vcap_str = f"{V_cap_arr[p_idx]:.1f}" if V_cap_arr[p_idx] < float('inf') else "-"
+                row += f"  {vcap_str:>8}"
+            if has_M_cap:
+                mcap_str = f"{M_cap_arr[p_idx]:.1f}" if M_cap_arr[p_idx] < float('inf') else "-"
+                row += f"  {mcap_str:>8}"
 
             if has_cap:
-                v_cap = V_cap_arr[p_idx]
-                m_cap = M_cap_arr[p_idx]
-                L_e = L_elems[p_idx]
-                V_limit = v_cap
-                if m_cap < float('inf') and L_e > 0:
-                    V_limit = min(V_limit, m_cap / L_e)
-                vlim_str = f"{V_limit:.1f}" if V_limit < float('inf') else "-"
-
                 if yielded[p_idx]:
-                    status = "YIELDED"
-                elif V_limit < float('inf') and abs(V) > 0.95 * V_limit:
+                    parts = []
+                    if yielded_V[p_idx]:
+                        parts.append("V")
+                    if yielded_M[p_idx]:
+                        parts.append("M")
+                    status = "YIELDED(" + "+".join(parts) + ")"
+                elif (has_V_cap and V_cap_arr[p_idx] < float('inf') and abs(V) > 0.95 * V_cap_arr[p_idx]) or \
+                     (has_M_cap and M_cap_arr[p_idx] < float('inf') and max(abs(M1), abs(M2)) > 0.95 * M_cap_arr[p_idx]):
                     status = "NEAR CAP"
                 else:
                     status = "OK"
-                row += f"  {vlim_str:>8}  {status}"
+                row += f"  {status}"
 
             print(row)
 
         print("-" * sep_len)
+        max_M = np.max(np.abs(forces_moment)) if n_pile > 0 else 0.0
         print(f"{'':>4}  {'':>8}  {'':>8}  {'':>8}  {'max abs:':>8}  "
-              f"{np.max(np.abs(forces_axial)):>10.1f}  {np.max(np.abs(forces_lateral)):>10.1f}")
+              f"{np.max(np.abs(forces_axial)):>10.1f}  {np.max(np.abs(forces_lateral)):>10.1f}  "
+              f"{max_M:>10.1f}")
 
 
 def _compute_B_and_detJ_quad8(coords, xi, eta):
@@ -1854,12 +2049,21 @@ def _compute_B_and_detJ_quad9(coords, xi, eta):
     return B, det_J
 
 
-def _elem_dof_indices(elem_nodes):
-    """Get global DOF indices for element nodes."""
+def _elem_dof_indices(elem_nodes, dof_offset=None):
+    """Get global DOF indices for element nodes (translational DOFs only).
+
+    If dof_offset is provided, uses it to map node -> global DOF start.
+    Otherwise falls back to the 2*node convention (no pile nodes in mesh).
+    """
     dof_idx = np.zeros(2 * len(elem_nodes), dtype=int)
-    for i, node in enumerate(elem_nodes):
-        dof_idx[2*i] = 2 * node
-        dof_idx[2*i+1] = 2 * node + 1
+    if dof_offset is not None:
+        for i, node in enumerate(elem_nodes):
+            dof_idx[2*i] = dof_offset[node]
+            dof_idx[2*i+1] = dof_offset[node] + 1
+    else:
+        for i, node in enumerate(elem_nodes):
+            dof_idx[2*i] = 2 * node
+            dof_idx[2*i+1] = 2 * node + 1
     return dof_idx
 
 
@@ -2202,6 +2406,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         print(f"  Coarse sweep points: {n_sweep}")
         print(f"  Early termination cap: {early_term_factor:.0%} of mesh height ({early_term_factor * mesh_height:.1f})")
 
+    dof_offset_local = fem_data.get("dof_offset", None)
+
     def _get_max_vp_disp(F_val):
         """Run solve_fem and return max VP (plastic) displacement magnitude."""
         sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1),
@@ -2211,8 +2417,13 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.
         u_vp = sol["displacements"] - sol["displacements_elastic"]
-        vp_x = u_vp[0::2]
-        vp_y = u_vp[1::2]
+        if dof_offset_local is not None:
+            _n = len(nodes)
+            vp_x = np.array([u_vp[dof_offset_local[nd]] for nd in range(_n)])
+            vp_y = np.array([u_vp[dof_offset_local[nd] + 1] for nd in range(_n)])
+        else:
+            vp_x = u_vp[0::2]
+            vp_y = u_vp[1::2]
         max_vp = float(np.max(np.sqrt(vp_x**2 + vp_y**2)))
         return max_vp, sol
 
@@ -2302,26 +2513,32 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
 def build_global_stiffness(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat, fem_data=None):
     """
-    Build global stiffness matrix from 2D soil elements and (optionally) 1D truss elements.
+    Build global stiffness matrix from 2D soil elements and (optionally) 1D truss + pile beam elements.
+
+    Uses dof_offset from fem_data to support mixed DOF systems (pile nodes have 3 DOFs).
     """
-    # Use existing stiffness functions (now they are in this same file after consolidation)
-    
     n_nodes = len(nodes)
-    n_dof = 2 * n_nodes
-    
+
+    # Get DOF offset map from fem_data if available
+    dof_offset = fem_data.get("dof_offset", None) if fem_data is not None else None
+    if dof_offset is not None:
+        n_dof = int(dof_offset[n_nodes])
+    else:
+        n_dof = 2 * n_nodes
+
     K_global = lil_matrix((n_dof, n_dof))
-    
+
     for elem_idx, element in enumerate(elements):
         elem_type = element_types[elem_idx]
         mat_id = element_materials[elem_idx] - 1
-        
+
         E = E_by_mat[mat_id]
         nu = nu_by_mat[mat_id]
-        
+
         # Get element coordinates
         elem_nodes = element[:elem_type]
         elem_coords = nodes[elem_nodes]
-        
+
         # Build element stiffness matrix using corrected implementation
         try:
             if elem_type == 3:
@@ -2340,20 +2557,27 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
         except Exception as e:
             print(f"Error building stiffness for element {elem_idx}, type {elem_type}: {e}")
             continue
-        
-        # Assemble into global matrix
+
+        # Assemble into global matrix using dof_offset for global DOF indices
         for i in range(elem_type):
             for j in range(elem_type):
                 node_i = elem_nodes[i]
                 node_j = elem_nodes[j]
-                
+
+                if dof_offset is not None:
+                    base_i = dof_offset[node_i]
+                    base_j = dof_offset[node_j]
+                else:
+                    base_i = 2 * node_i
+                    base_j = 2 * node_j
+
                 for di in range(2):
                     for dj in range(2):
-                        global_i = 2 * node_i + di
-                        global_j = 2 * node_j + dj
+                        global_i = base_i + di
+                        global_j = base_j + dj
                         local_i = 2 * i + di
                         local_j = 2 * j + dj
-                        
+
                         if local_i < K_elem.shape[0] and local_j < K_elem.shape[1]:
                             K_global[global_i, global_j] += K_elem[local_i, local_j]
 
@@ -2373,90 +2597,106 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
                 for j in range(4):
                     K_global[dof_idx[i], dof_idx[j]] += K_elem_1d[i, j]
 
-        # Assemble pile beam element stiffness matrices
+        # Assemble pile beam element stiffness matrices (6x6 Euler-Bernoulli)
         K_global_pile_elems = fem_data.get("K_global_pile_elems", [])
-        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 4), dtype=int))
+        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 6), dtype=int))
 
         for p_idx in range(len(K_global_pile_elems)):
             K_beam = K_global_pile_elems[p_idx]
             dof_idx = dof_indices_pile[p_idx]
 
-            for i in range(4):
-                for j in range(4):
+            for i in range(6):
+                for j in range(6):
                     K_global[dof_idx[i], dof_idx[j]] += K_beam[i, j]
 
     return K_global.tocsr()
 
 
 
-def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic):
+def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic, fem_data=None):
     """
     Build gravity load vector using Griffiths & Lane (1999) approach.
-    
-    Uses equation 3 from the paper: p(e) = γ ∫[Ve] N^T d(vol)
+
+    Uses equation 3 from the paper: p(e) = gamma * integral[Ve] N^T d(vol)
     This integrates shape functions over each element to properly distribute gravity loads.
+
+    Uses dof_offset from fem_data when available to support mixed DOF systems.
     """
     n_nodes = len(nodes)
-    F_gravity = np.zeros(2 * n_nodes)
-    
+
+    # Get DOF offset map from fem_data if available
+    dof_offset = fem_data.get("dof_offset", None) if fem_data is not None else None
+    if dof_offset is not None:
+        n_dof = int(dof_offset[n_nodes])
+    else:
+        n_dof = 2 * n_nodes
+
+    F_gravity = np.zeros(n_dof)
+
+    def _node_dof_x(node):
+        return dof_offset[node] if dof_offset is not None else 2 * node
+
+    def _node_dof_y(node):
+        return (dof_offset[node] + 1) if dof_offset is not None else 2 * node + 1
+
     for elem_idx, element in enumerate(elements):
         elem_type = element_types[elem_idx]
         mat_id = element_materials[elem_idx] - 1
         gamma = gamma_by_mat[mat_id]
-        
+
         elem_nodes = element[:elem_type]
         elem_coords = nodes[elem_nodes]
-        
+
         if elem_type == 3:  # 3-node triangle
             # For linear triangles, shape function integration gives equal distribution (1/3 each)
             x1, y1 = elem_coords[0]
             x2, y2 = elem_coords[1]
             x3, y3 = elem_coords[2]
             area = 0.5 * abs((x2-x1)*(y3-y1) - (x3-x1)*(y2-y1))
-            
+
             # Each node gets 1/3 of the element weight (exact for linear shape functions)
             for i, node in enumerate(elem_nodes):
                 load = gamma * area / 3.0
-                F_gravity[2*node + 1] -= load  # Vertical (negative = downward)
-                F_gravity[2*node] += k_seismic * load  # Horizontal seismic
-                
+                F_gravity[_node_dof_y(node)] -= load  # Vertical (negative = downward)
+                F_gravity[_node_dof_x(node)] += k_seismic * load  # Horizontal seismic
+
         elif elem_type == 8:  # 8-node quad
             # For 8-node quads, use 2x2 Gauss integration as in Griffiths
             # This properly weights corner vs midside nodes
-            
+
             # Gauss points for 2x2 integration
             gauss_coord = 1.0 / np.sqrt(3.0)
             xi_points = np.array([-gauss_coord, gauss_coord])
             eta_points = np.array([-gauss_coord, gauss_coord])
             weights = np.array([1.0, 1.0])
-            
-            # Initialize element load vector
+
+            # Initialize element load vector (local, 2 DOFs per node)
             elem_loads = np.zeros(2 * elem_type)
-            
+
             # Numerical integration over Gauss points
             for i in range(2):
                 for j in range(2):
                     xi = xi_points[i]
                     eta = eta_points[j]
                     w = weights[i] * weights[j]
-                    
+
                     # Shape functions for 8-node quad at (xi, eta)
                     N = compute_quad8_shape_functions(xi, eta)
-                    
+
                     # Jacobian for coordinate transformation
                     J = compute_quad8_jacobian(elem_coords, xi, eta)
                     det_J = np.linalg.det(J)
-                    
-                    # Accumulate load contribution: w * det(J) * γ * N
+
+                    # Accumulate load contribution: w * det(J) * gamma * N
                     for k in range(8):
                         elem_loads[2*k + 1] -= w * det_J * gamma * N[k]  # Vertical
                         elem_loads[2*k] += w * det_J * gamma * k_seismic * N[k]  # Horizontal
-            
+
             # Add element loads to global vector
             for i, node in enumerate(elem_nodes):
-                F_gravity[2*node] += elem_loads[2*i]
-                F_gravity[2*node + 1] += elem_loads[2*i + 1]
-                
+                F_gravity[_node_dof_x(node)] += elem_loads[2*i]
+                F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
+
         elif elem_type == 6:  # 6-node triangle
             gauss_pts_tri, gauss_wts_tri = get_gauss_points_tri3()
             elem_loads = np.zeros(2 * 6)
@@ -2473,8 +2713,8 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                     elem_loads[2*k + 1] -= integration_weight * gamma * N[k]
                     elem_loads[2*k] += integration_weight * gamma * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
-                F_gravity[2*node] += elem_loads[2*i]
-                F_gravity[2*node + 1] += elem_loads[2*i + 1]
+                F_gravity[_node_dof_x(node)] += elem_loads[2*i]
+                F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
 
         elif elem_type == 4:  # 4-node quad
             gauss_pts, gauss_wts = get_gauss_points_2x2()
@@ -2488,8 +2728,8 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                     elem_loads[2*k + 1] -= w * abs(det_J) * gamma * N[k]
                     elem_loads[2*k] += w * abs(det_J) * gamma * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
-                F_gravity[2*node] += elem_loads[2*i]
-                F_gravity[2*node + 1] += elem_loads[2*i + 1]
+                F_gravity[_node_dof_x(node)] += elem_loads[2*i]
+                F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
 
         elif elem_type == 9:  # 9-node quad
             gauss_pts, gauss_wts = get_gauss_points_3x3()
@@ -2503,9 +2743,9 @@ def build_gravity_loads(nodes, elements, element_types, element_materials, gamma
                     elem_loads[2*k + 1] -= w * abs(det_J) * gamma * N[k]
                     elem_loads[2*k] += w * abs(det_J) * gamma * k_seismic * N[k]
             for i, node in enumerate(elem_nodes):
-                F_gravity[2*node] += elem_loads[2*i]
-                F_gravity[2*node + 1] += elem_loads[2*i + 1]
-    
+                F_gravity[_node_dof_x(node)] += elem_loads[2*i]
+                F_gravity[_node_dof_y(node)] += elem_loads[2*i + 1]
+
     return F_gravity
 
 
@@ -2801,23 +3041,29 @@ def check_mohr_coulomb_cp(stress_cp, c, phi, u=0.0):
 
 
 
-def compute_strains(nodes, elements, element_types, displacements):
+def compute_strains(nodes, elements, element_types, displacements, dof_offset=None):
     """
     Compute element strains for visualization.
+
+    If dof_offset is provided, uses it for DOF indexing (mixed DOF system with pile nodes).
     """
     n_elements = len(elements)
     strains = np.zeros((n_elements, 4))  # [eps_x, eps_y, gamma_xy, max_shear_strain]
-    
+
     for elem_idx, element in enumerate(elements):
         elem_type = element_types[elem_idx]
         elem_nodes = element[:elem_type]
         elem_coords = nodes[elem_nodes]
-        
-        # Get element displacements
+
+        # Get element displacements (translational DOFs only)
         elem_disp = np.zeros(2 * elem_type)
         for i, node in enumerate(elem_nodes):
-            elem_disp[2*i] = displacements[2*node]
-            elem_disp[2*i+1] = displacements[2*node+1]
+            if dof_offset is not None:
+                base = dof_offset[node]
+            else:
+                base = 2 * node
+            elem_disp[2*i] = displacements[base]
+            elem_disp[2*i+1] = displacements[base + 1]
         
         # Compute strains at element centroid
         if elem_type == 3:

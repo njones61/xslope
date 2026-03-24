@@ -8,12 +8,12 @@ from xslope.slice import generate_slices
 from xslope.summary import print_ito_matsui_summary, print_rapid_drawdown_summary, print_no_solution_warning
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("nora_slope.xlsx")
+slope_data = load_slope_data("test/xslope_johnson_rapid_start.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
-num_slices = 40 # @param {"type":"integer"}
-analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
+num_slices = 30 # @param {"type":"integer"}
+analysis_type = "single_surface" # @param ["single_surface","all_methods", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}
 save_png = True # @param {"type":"boolean"}
@@ -26,7 +26,10 @@ if analysis_type == 'single_surface': # analyze the specified failure surface
   if success:
       slice_df, failure_surface = result
       results = solve_selected(method, slice_df, rapid=rapid_drawdown)
-      plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
+      if isinstance(results, dict):
+          plot_solution(slope_data, slice_df, failure_surface, results, save_png=save_png)
+      else:
+          print(f"No solution to plot.")
   else:
       print(result)
       exit()

@@ -925,93 +925,105 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             lo, hi = -np.pi/2, np.pi/2  # fallback if no valid range
         return max(lo, -np.pi/2), min(hi, np.pi/2)
 
-    # Initial guesses
+    def newton_solve(F0, theta0_rad, max_iter, tol, debug_level):
+        """Run Newton iteration with backtracking line search. Returns (converged, F, theta_rad, iteration)."""
+        theta_lo, theta_hi = safe_theta_bounds(F0)
+        if theta0_rad < theta_lo or theta0_rad > theta_hi:
+            theta0_rad = (theta_lo + theta_hi) / 2
+
+        F = F0
+        theta_rad = theta0_rad
+
+        for iteration in range(max_iter):
+            R1, R2, Q, y_q = compute_residuals(F, theta_rad)
+            residual_norm = R1**2 + R2**2
+
+            if debug_level >= 1:
+                if iteration == 0:
+                    print(f"Iteration {1} - Initial: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
+                else:
+                    print(f"Iteration {iteration + 1} - Updated: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
+
+            if abs(R1) < tol and abs(R2) < tol:
+                if debug_level >= 1:
+                    print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
+                return True, F, theta_rad, iteration
+
+            dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_derivatives(F, theta_rad, Q, y_q)
+
+            J = np.array([[dR1_dF, dR1_dtheta],
+                          [dR2_dF, dR2_dtheta]])
+
+            try:
+                cond_num = np.linalg.cond(J)
+                if cond_num > 1e12:
+                    return False, F, theta_rad, iteration
+            except:
+                return False, F, theta_rad, iteration
+
+            try:
+                delta_solution = np.linalg.solve(J, np.array([-R1, -R2]))
+                delta_F = delta_solution[0]
+                delta_theta = delta_solution[1]
+            except np.linalg.LinAlgError:
+                return False, F, theta_rad, iteration
+
+            if debug_level >= 1:
+                print(f"          Newton: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
+
+            # Backtracking line search: find step size that reduces residual norm
+            step = 1.0
+            for _ in range(20):
+                F_trial = F + step * delta_F
+                theta_trial = theta_rad + step * delta_theta
+
+                if F_trial <= 0:
+                    step *= 0.5
+                    continue
+
+                theta_lo, theta_hi = safe_theta_bounds(F_trial)
+                theta_trial = np.clip(theta_trial, theta_lo, theta_hi)
+
+                R1_trial, R2_trial, _, _ = compute_residuals(F_trial, theta_trial)
+                trial_norm = R1_trial**2 + R2_trial**2
+
+                if trial_norm < residual_norm:
+                    break
+                step *= 0.5
+
+            if debug_level >= 1 and step < 1.0:
+                print(f"          Line search: step = {step:.4f}")
+
+            F = F + step * delta_F
+            theta_rad = theta_rad + step * delta_theta
+
+            if F <= 0:
+                F = 0.1
+
+            theta_lo, theta_hi = safe_theta_bounds(F)
+            theta_rad = np.clip(theta_rad, theta_lo, theta_hi)
+
+        return False, F, theta_rad, max_iter - 1
+
+    # Try with default initial guess first
     F0 = 1.5
-    theta_lo, theta_hi = safe_theta_bounds(F0)
-    if right_facing:
-        theta0_rad = np.radians(-8.0)
-    else:
-        theta0_rad = np.radians(8)
-    # Ensure initial theta is within safe bounds
-    if theta0_rad < theta_lo or theta0_rad > theta_hi:
-        theta0_rad = (theta_lo + theta_hi) / 2
+    theta0_rad = np.radians(-8.0) if right_facing else np.radians(8)
 
-    # Newton iteration
-    F = F0
-    theta_rad = theta0_rad
+    converged, F, theta_rad, iteration = newton_solve(F0, theta0_rad, max_iter, tol, debug_level)
 
-    for iteration in range(max_iter):
-        # Compute residuals
-        R1, R2, Q, y_q = compute_residuals(F, theta_rad)
-
-        if debug_level >= 1:
-            if iteration == 0:
-                print(f"Iteration {1} - Initial: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
-            else:
-                print(f"Iteration {iteration + 1} - Updated: F = {F:.3f}, theta = {np.degrees(theta_rad):.3f}°, R1 = {R1:.6e}, R2 = {R2:.6e}")
-
-        # Check convergence
-        if abs(R1) < tol and abs(R2) < tol:
-            if debug_level >= 1:
-                print(f"Converged in {iteration + 1} iterations, R1 = {R1:.6e}, R2 = {R2:.6e}")
-            break
-
-        # Compute derivatives
-        dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta = compute_derivatives(F, theta_rad, Q, y_q)
-
-        # Basic Newton method (Equations 31-32)
-        # Build Jacobian matrix
-        J = np.array([[dR1_dF, dR1_dtheta],
-                      [dR2_dF, dR2_dtheta]])
-
-        # Check condition number for numerical stability
+    # If default guess failed, retry with Bishop's FS as initial guess
+    if not converged:
         try:
-            cond_num = np.linalg.cond(J)
-            if cond_num > 1e12:
-                return False, f"Ill-conditioned Jacobian matrix (condition number: {cond_num:.2e})"
-        except:
-            return False, "Unable to compute Jacobian condition number"
+            success_bishop, result_bishop = bishop(slice_df)
+            if success_bishop and abs(result_bishop['FS'] - F0) > 0.1:
+                F0_bishop = result_bishop['FS']
+                if debug_level >= 1:
+                    print(f"Retrying with Bishop FS = {F0_bishop:.3f} as initial guess")
+                converged, F, theta_rad, iteration = newton_solve(F0_bishop, theta0_rad, max_iter, tol, debug_level)
+        except Exception:
+            pass  # Bishop may fail for non-circular surfaces
 
-        # Solve using matrix form for better numerical stability
-        try:
-            delta_solution = np.linalg.solve(J, np.array([-R1, -R2]))
-            delta_F = delta_solution[0]
-            delta_theta = delta_solution[1]
-        except np.linalg.LinAlgError:
-            return False, "Singular Jacobian matrix in Newton iteration"
-
-        if debug_level >= 1:
-            print(f"          Newton: delta_F = {delta_F:.3f}, delta_theta = {np.degrees(delta_theta):.3f}°, {delta_theta: .3f} (rad)")
-
-        # Add step size control to prevent large jumps
-        max_delta_F = 0.5  # Maximum allowed change in F per iteration
-        max_delta_theta = np.radians(20)  # Maximum allowed change in theta per iteration (20 degrees)
-
-        # Apply step size limiting
-        if abs(delta_F) > max_delta_F:
-            delta_F = np.sign(delta_F) * max_delta_F
-            if debug_level >= 1:
-                print(f"          Step limited: delta_F clamped to {delta_F:.3f}")
-
-        if abs(delta_theta) > max_delta_theta:
-            delta_theta = np.sign(delta_theta) * max_delta_theta
-            if debug_level >= 1:
-                print(f"          Step limited: delta_theta clamped to {np.degrees(delta_theta):.3f}°")
-
-        # Update values
-        F += delta_F
-        theta_rad += delta_theta
-
-        # Ensure F stays positive
-        if F <= 0:
-            F = 0.1
-
-        # Limit theta to safe range (avoids m_alpha singularity)
-        theta_lo, theta_hi = safe_theta_bounds(F)
-        theta_rad = np.clip(theta_rad, theta_lo, theta_hi)
-    
-    # Check if we converged
-    if iteration >= max_iter - 1:
+    if not converged:
         return False, "Spencer's method did not converge within the maximum number of iterations."
     
     # Final computation of Q and y_q

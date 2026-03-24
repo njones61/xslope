@@ -625,21 +625,24 @@ def build_fem_data(slope_data, mesh=None):
             load_nodes.sort(key=lambda x: x[1])
 
             # Pass 2: Compute tributary length and load for each node
+            # Endpoint nodes extend to the actual line start/end so the
+            # full load line length is covered.
             n_load_nodes = len(load_nodes)
+            total_trib = 0.0
             for k, (node_idx, proj_dist) in enumerate(load_nodes):
-                # Tributary length: half-distance to each neighbor
                 if n_load_nodes == 1:
                     trib_length = load_total_length
                 else:
                     if k == 0:
-                        # First node: half-distance to next node
-                        trib_length = (load_nodes[k+1][1] - proj_dist) / 2.0
+                        # First node: from line start (0) to midpoint with next node
+                        trib_length = (load_nodes[k+1][1] + proj_dist) / 2.0
                     elif k == n_load_nodes - 1:
-                        # Last node: half-distance to previous node
-                        trib_length = (proj_dist - load_nodes[k-1][1]) / 2.0
+                        # Last node: from midpoint with prev node to line end
+                        trib_length = load_total_length - (proj_dist + load_nodes[k-1][1]) / 2.0
                     else:
                         # Interior node: half-distance to each neighbor
                         trib_length = (load_nodes[k+1][1] - load_nodes[k-1][1]) / 2.0
+                total_trib += trib_length
 
                 # Interpolate load value at this position along the load line
                 cumulative_length = 0
@@ -679,15 +682,27 @@ def build_fem_data(slope_data, mesh=None):
                 bc_values[node_idx, 0] = nodal_force_magnitude * nx
                 bc_values[node_idx, 1] = nodal_force_magnitude * ny
 
-            # Diagnostic: verify total applied force
+            # Sanity check: tributary lengths must sum to the full line length
+            expected_force = np.mean(load_values) * load_total_length
             total_force = np.sqrt(
                 sum(bc_values[ni, 0] for ni, _ in load_nodes)**2 +
                 sum(bc_values[ni, 1] for ni, _ in load_nodes)**2
             )
-            expected_force = np.mean(load_values) * load_total_length
+            trib_error = abs(total_trib - load_total_length) / load_total_length
+            if trib_error > 0.01:
+                warnings.warn(
+                    f"Distributed load {load_idx}: tributary lengths sum to {total_trib:.3f} "
+                    f"but load line length is {load_total_length:.3f} "
+                    f"(error {trib_error:.1%}). Check mesh resolution along load line."
+                )
+            if n_load_nodes < 2:
+                warnings.warn(
+                    f"Distributed load {load_idx}: only {n_load_nodes} mesh node(s) found "
+                    f"on load line (tolerance={tolerance}). Increase mesh density along load line."
+                )
             print(f"  Distributed load {load_idx}: {n_load_nodes} nodes, "
                   f"total force = {total_force:.1f}, expected ~{expected_force:.1f}, "
-                  f"sum(trib) = {load_total_length:.2f}")
+                  f"sum(trib) = {total_trib:.2f}")
             
     
     # Get other parameters

@@ -8,7 +8,7 @@ from xslope.slice import generate_slices
 from xslope.summary import print_ito_matsui_summary, print_rapid_drawdown_summary, print_no_solution_warning
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_piles.xlsx")
+slope_data = load_slope_data("nora_slope.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]

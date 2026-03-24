@@ -2201,6 +2201,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     F_right = F_max
 
     # Verify lower bound converges
+    if debug_level >= 1:
+        print(f"  Verifying lower bound F={F_min:.2f} converges...")
     solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor)
@@ -2210,8 +2212,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
             "error": f"F_min = {F_min} does not converge - slope unstable at F=1",
             "FS": None
         }
+    if debug_level >= 1:
+        print(f"    -> Converged in {solution_min['iterations']} iters")
 
     # Verify upper bound does not converge
+    if debug_level >= 1:
+        print(f"  Verifying upper bound F={F_max:.2f} does not converge...")
     solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor)
@@ -2224,6 +2230,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
             "last_solution": solution_max,
             "error": f"F_max = {F_max} still converges — FS > {F_max}. Increase F_max."
         }
+    if debug_level >= 1:
+        print(f"    -> Did NOT converge ({solution_max['iterations']} iters)")
 
     last_converged_solution = solution_min
     iteration = 0
@@ -2291,6 +2299,8 @@ def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     F_right = F_max
 
     # Get baseline UFR at F_min (stable slope)
+    if debug_level >= 1:
+        print(f"  Verifying lower bound F={F_min:.2f} converges...")
     solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=None)
@@ -2304,7 +2314,7 @@ def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         }
 
     if debug_level >= 1:
-        print(f"  Baseline UFR at F={F_min}: {ufr_baseline:.3e}")
+        print(f"    -> Converged in {solution_min['iterations']} iters, baseline UFR: {ufr_baseline:.3e}")
 
     # Failure = UFR exceeds threshold (absolute, not relative to baseline)
     # The baseline tells us what a "converged" UFR looks like for this problem.
@@ -2318,6 +2328,8 @@ def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         return ufr > ufr_baseline * ufr_threshold
 
     # Verify upper bound fails
+    if debug_level >= 1:
+        print(f"  Verifying upper bound F={F_max:.2f} fails...")
     solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=None)
@@ -2334,7 +2346,7 @@ def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         }
 
     if debug_level >= 1:
-        print(f"  UFR at F={F_max}: {ufr_max:.3e} (ratio to baseline: {ufr_max/ufr_baseline:.1f}x)")
+        print(f"    -> UFR at F={F_max}: {ufr_max:.3e} (ratio to baseline: {ufr_max/ufr_baseline:.1f}x)")
 
     last_converged_solution = solution_min
     iteration = 0

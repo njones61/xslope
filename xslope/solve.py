@@ -933,6 +933,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
         F = F0
         theta_rad = theta0_rad
+        stagnation_count = 0
 
         for iteration in range(max_iter):
             R1, R2, Q, y_q = compute_residuals(F, theta_rad)
@@ -994,6 +995,16 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             if debug_level >= 1 and step < 1.0:
                 print(f"          Line search: step = {step:.4f}")
 
+            # Detect stagnation (line search found no improvement)
+            if step < 1e-6:
+                stagnation_count += 1
+                if stagnation_count >= 5:
+                    if debug_level >= 1:
+                        print(f"          Stagnation detected, exiting Newton solver early")
+                    return False, F, theta_rad, iteration
+            else:
+                stagnation_count = 0
+
             F = F + step * delta_F
             theta_rad = theta_rad + step * delta_theta
 
@@ -1023,13 +1034,63 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         except Exception:
             pass  # Bishop may fail for non-circular surfaces
 
+    # Fallback: scipy.optimize.root with trust-region method and multiple starts
+    if not converged:
+        from scipy.optimize import root as scipy_root
+
+        def residual_vec(x):
+            if x[0] <= 0.01:
+                return np.array([1e10, 1e10])
+            R1_v, R2_v, _, _ = compute_residuals(x[0], x[1])
+            if not (np.isfinite(R1_v) and np.isfinite(R2_v)):
+                return np.array([1e10, 1e10])
+            return np.array([R1_v, R2_v])
+
+        def jac_mat(x):
+            if x[0] <= 0.01:
+                return np.eye(2) * 1e10
+            R1_v, R2_v, Q_v, yq_v = compute_residuals(x[0], x[1])
+            if not (np.isfinite(R1_v) and np.isfinite(R2_v)):
+                return np.eye(2) * 1e10
+            d = compute_derivatives(x[0], x[1], Q_v, yq_v)
+            return np.array([[d[0], d[1]], [d[2], d[3]]])
+
+        F_starts = [1.0, 1.5, 2.0, 0.5, 3.0]
+        try:
+            sb, rb = bishop(slice_df)
+            if sb:
+                F_starts.insert(0, rb['FS'])
+        except Exception:
+            pass
+
+        theta_starts = np.radians(np.arange(-25, 26, 5, dtype=float))
+
+        for F_try in F_starts:
+            for theta_try in theta_starts:
+                try:
+                    sol = scipy_root(residual_vec, [F_try, float(theta_try)],
+                                     jac=jac_mat, method='hybr')
+                    if sol.success and sol.x[0] > 0.01:
+                        R1_c, R2_c, _, _ = compute_residuals(sol.x[0], sol.x[1])
+                        if abs(R1_c) < tol and abs(R2_c) < tol:
+                            converged = True
+                            F = sol.x[0]
+                            theta_rad = sol.x[1]
+                            if debug_level >= 1:
+                                print(f"Converged via scipy root: F={F:.3f}, theta={np.degrees(theta_rad):.3f}°")
+                            break
+                except Exception:
+                    continue
+            if converged:
+                break
+
     if not converged:
         return False, "Spencer's method did not converge within the maximum number of iterations."
-    
+
     # Final computation of Q and y_q
     R1, R2, Q, y_q = compute_residuals(F, theta_rad)
 
-    if debug_level >= 2: 
+    if debug_level >= 2:
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
         slice_df['ma'] = ma
         slice_df['Q'] = Q

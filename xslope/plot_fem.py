@@ -35,11 +35,11 @@ def _extract_uv(disp, fem_data):
     return u, v
 
 
-def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True, 
+def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
                   label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, dpi=300):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
-    
+
     Args:
         fem_data: Dictionary containing FEM data from build_fem_data
         figsize: Figure size
@@ -50,7 +50,8 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         alpha: Transparency for element faces
         bc_symbol_size: Size factor for boundary condition symbols (as fraction of mesh size)
     """
-    
+    from matplotlib.collections import PatchCollection
+
     # Extract data from fem_data
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -58,129 +59,132 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     element_types = fem_data.get("element_types", None)
     bc_type = fem_data["bc_type"]
     bc_values = fem_data["bc_values"]
-    
+
     fig, ax = plt.subplots(figsize=figsize)
     materials = np.unique(element_materials)
-    
+
     # Import get_material_color to ensure consistent colors with plot_mesh
     from .plot import get_material_color
     mat_to_color = {mat: get_material_color(mat) for mat in materials}
-    
+
     # If element_types is not provided, assume all triangles (backward compatibility)
     if element_types is None:
         element_types = np.full(len(elements), 3)
-    
-    # Plot mesh elements with material colors
+
+    # Batch polygons and edge lines by material for efficient rendering
+    # Key: material -> list of polygon vertex arrays
+    mat_fill_polys = {mat: [] for mat in materials}
+    edge_segments = []  # for outer boundaries of quadratic elements
+
     for idx, element_nodes in enumerate(elements):
         element_type = element_types[idx]
-        color = mat_to_color[element_materials[idx]]
-        
-        if element_type == 3:  # Linear triangle
-            polygon_coords = nodes[element_nodes[:3]]
-            polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
-            ax.add_patch(polygon)
-            
-        elif element_type == 6:  # Quadratic triangle - subdivide into 4 sub-triangles
-            # Corner nodes
-            n0, n1, n2 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]]
-            # Midpoint nodes - standard GMSH pattern: n3=edge 0-1, n4=edge 1-2, n5=edge 2-0
-            n3, n4, n5 = nodes[element_nodes[3]], nodes[element_nodes[4]], nodes[element_nodes[5]]
-            
-            # Create 4 sub-triangles with standard GMSH connectivity
-            sub_triangles = [
-                [n0, n3, n5],  # Corner triangle at node 0 (uses midpoints 0-1 and 2-0)
-                [n3, n1, n4],  # Corner triangle at node 1 (uses midpoints 0-1 and 1-2)
-                [n5, n4, n2],  # Corner triangle at node 2 (uses midpoints 2-0 and 1-2)
-                [n3, n4, n5]   # Center triangle (connects all midpoints)
-            ]
-            
-            # Add all sub-triangles without internal edges
-            for sub_tri in sub_triangles:
-                polygon = Polygon(sub_tri, edgecolor='none', facecolor=color, alpha=alpha)
-                ax.add_patch(polygon)
-            
-            # Add outer boundary of the tri6 element
-            outer_boundary = [n0, n1, n2, n0]  # Close the triangle
-            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
-                   'k-', linewidth=0.5)
-                
-        elif element_type == 4:  # Linear quadrilateral
-            polygon_coords = nodes[element_nodes[:4]]
-            polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
-            ax.add_patch(polygon)
-            
-        elif element_type == 8:  # Quadratic quadrilateral - subdivide into 4 sub-quads
-            # Corner nodes
-            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
-            # Midpoint nodes
-            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
-            
-            # Calculate center point (average of all 8 nodes)
-            center = ((n0[0] + n1[0] + n2[0] + n3[0] + n4[0] + n5[0] + n6[0] + n7[0]) / 8,
-                     (n0[1] + n1[1] + n2[1] + n3[1] + n4[1] + n5[1] + n6[1] + n7[1]) / 8)
-            
-            # Create 4 sub-quadrilaterals
-            sub_quads = [
-                [n0, n4, center, n7],  # Sub-quad at corner 0
-                [n4, n1, n5, center],  # Sub-quad at corner 1
-                [center, n5, n2, n6],  # Sub-quad at corner 2
-                [n7, center, n6, n3]   # Sub-quad at corner 3
-            ]
-            
-            # Add all sub-quads without internal edges
-            for sub_quad in sub_quads:
-                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
-                ax.add_patch(polygon)
-            
-            # Add outer boundary of the quad8 element
-            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
-            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
-                   'k-', linewidth=0.5)
-                
-        elif element_type == 9:  # 9-node quadrilateral - subdivide using actual center node
-            # Corner nodes
-            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
-            # Midpoint nodes
-            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
-            # Center node
-            center = nodes[element_nodes[8]]
-            
-            # Create 4 sub-quadrilaterals using the actual center node
-            sub_quads = [
-                [n0, n4, center, n7],  # Sub-quad at corner 0
-                [n4, n1, n5, center],  # Sub-quad at corner 1
-                [center, n5, n2, n6],  # Sub-quad at corner 2
-                [n7, center, n6, n3]   # Sub-quad at corner 3
-            ]
-            
-            # Add all sub-quads without internal edges
-            for sub_quad in sub_quads:
-                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
-                ax.add_patch(polygon)
-            
-            # Add outer boundary of the quad9 element
-            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
-            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
-                   'k-', linewidth=0.5)
+        mat = element_materials[idx]
 
-        # Label element number at centroid if requested
-        if label_elements:
-            # Calculate centroid based on element type
-            if element_type in [3, 4]:
-                # For linear elements, use the polygon_coords
-                if element_type == 3:
-                    element_coords = nodes[element_nodes[:3]]
-                else:
-                    element_coords = nodes[element_nodes[:4]]
+        if element_type == 3:  # Linear triangle
+            mat_fill_polys[mat].append(nodes[element_nodes[:3]])
+
+        elif element_type == 6:  # Quadratic triangle - subdivide into 4 sub-triangles
+            n0, n1, n2 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]]
+            n3, n4, n5 = nodes[element_nodes[3]], nodes[element_nodes[4]], nodes[element_nodes[5]]
+            mat_fill_polys[mat].extend([
+                np.array([n0, n3, n5]),
+                np.array([n3, n1, n4]),
+                np.array([n5, n4, n2]),
+                np.array([n3, n4, n5]),
+            ])
+            # Outer boundary edges
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n0]])
+
+        elif element_type == 4:  # Linear quadrilateral
+            mat_fill_polys[mat].append(nodes[element_nodes[:4]])
+
+        elif element_type == 8:  # Quadratic quadrilateral - subdivide into 4 sub-quads
+            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
+            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
+            center = np.array([(n0[0]+n1[0]+n2[0]+n3[0]+n4[0]+n5[0]+n6[0]+n7[0]) / 8,
+                               (n0[1]+n1[1]+n2[1]+n3[1]+n4[1]+n5[1]+n6[1]+n7[1]) / 8])
+            mat_fill_polys[mat].extend([
+                np.array([n0, n4, center, n7]),
+                np.array([n4, n1, n5, center]),
+                np.array([center, n5, n2, n6]),
+                np.array([n7, center, n6, n3]),
+            ])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
+
+        elif element_type == 9:  # 9-node quadrilateral
+            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
+            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
+            center = nodes[element_nodes[8]]
+            mat_fill_polys[mat].extend([
+                np.array([n0, n4, center, n7]),
+                np.array([n4, n1, n5, center]),
+                np.array([center, n5, n2, n6]),
+                np.array([n7, center, n6, n3]),
+            ])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
+
+    # Render filled polygons as batched PatchCollections (one per material)
+    for mat in materials:
+        polys = mat_fill_polys[mat]
+        if not polys:
+            continue
+        has_edge = any(element_types[i] in (3, 4) for i, m in enumerate(element_materials) if m == mat)
+        has_no_edge = any(element_types[i] in (6, 8, 9) for i, m in enumerate(element_materials) if m == mat)
+        color = mat_to_color[mat]
+
+        if has_edge and not has_no_edge:
+            # All linear elements — draw with edges
+            patch_list = [Polygon(p) for p in polys]
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+            ax.add_collection(pc)
+        elif has_no_edge and not has_edge:
+            # All quadratic sub-polys — no edges on fills
+            patch_list = [Polygon(p) for p in polys]
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha)
+            ax.add_collection(pc)
+        else:
+            # Mixed — separate linear (with edges) and quadratic sub-polys (no edges)
+            linear_polys = []
+            sub_polys = []
+            sub_idx = 0
+            for i in range(len(elements)):
+                if element_materials[i] != mat:
+                    continue
+                et = element_types[i]
+                if et == 3:
+                    linear_polys.append(polys[sub_idx]); sub_idx += 1
+                elif et == 4:
+                    linear_polys.append(polys[sub_idx]); sub_idx += 1
+                elif et == 6:
+                    sub_polys.extend(polys[sub_idx:sub_idx+4]); sub_idx += 4
+                elif et in (8, 9):
+                    sub_polys.extend(polys[sub_idx:sub_idx+4]); sub_idx += 4
+            if linear_polys:
+                pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+                ax.add_collection(pc)
+            if sub_polys:
+                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha)
+                ax.add_collection(pc)
+
+    # Render outer boundary edges of quadratic elements as a single LineCollection
+    if edge_segments:
+        lc = LineCollection(edge_segments, colors='k', linewidths=0.5)
+        ax.add_collection(lc)
+
+    # Label element numbers at centroids if requested
+    if label_elements:
+        for idx, element_nodes in enumerate(elements):
+            element_type = element_types[idx]
+            if element_type == 3:
+                element_coords = nodes[element_nodes[:3]]
+            elif element_type == 4:
+                element_coords = nodes[element_nodes[:4]]
+            elif element_type == 6:
+                element_coords = nodes[element_nodes[:6]]
+            elif element_type == 8:
+                element_coords = nodes[element_nodes[:8]]
             else:
-                # For quadratic elements, use all nodes to calculate centroid
-                if element_type == 6:
-                    element_coords = nodes[element_nodes[:6]]
-                elif element_type == 8:
-                    element_coords = nodes[element_nodes[:8]]
-                else:  # element_type == 9
-                    element_coords = nodes[element_nodes[:9]]
-            
+                element_coords = nodes[element_nodes[:9]]
             centroid = np.mean(element_coords, axis=0)
             ax.text(centroid[0], centroid[1], str(idx+1),
                     ha='center', va='center', fontsize=6, color='black', alpha=0.4,
@@ -197,40 +201,43 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
 
     # Get material names if available
     material_names = fem_data.get("material_names", [])
-    
+
     legend_handles = []
     for mat in materials:
-        # Use material name if available, otherwise use "Material {mat}"
         if material_names and mat <= len(material_names):
-            label = material_names[mat - 1]  # Convert to 0-based index
+            label = material_names[mat - 1]
         else:
             label = f"Material {mat}"
-        
         legend_handles.append(
             plt.Line2D([0], [0], color=mat_to_color[mat], lw=4, label=label)
         )
 
-    # Plot 1D elements (reinforcement truss + pile beam)
+    # Plot 1D elements (reinforcement truss + pile beam) using LineCollection
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(elements_1d), dtype=bool))
     n_reinf_plotted = 0
     n_pile_plotted = 0
     if len(elements_1d) > 0:
+        reinf_segs = []
+        pile_segs = []
         for elem_idx in range(len(elements_1d)):
             elem_nodes_1d = elements_1d[elem_idx]
-            n0 = nodes[elem_nodes_1d[0]]
-            n1 = nodes[elem_nodes_1d[1]]
+            seg = [nodes[elem_nodes_1d[0]], nodes[elem_nodes_1d[1]]]
             if pile_elem_mask[elem_idx]:
-                ax.plot([n0[0], n1[0]], [n0[1], n1[1]], color='green', linewidth=3.5, zorder=5)
+                pile_segs.append(seg)
                 n_pile_plotted += 1
             else:
-                ax.plot([n0[0], n1[0]], [n0[1], n1[1]], 'r-', linewidth=2.5, zorder=5)
+                reinf_segs.append(seg)
                 n_reinf_plotted += 1
-        if n_reinf_plotted > 0:
+        if reinf_segs:
+            lc = LineCollection(reinf_segs, colors='red', linewidths=2.5, zorder=5)
+            ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({n_reinf_plotted} elements)')
             )
-        if n_pile_plotted > 0:
+        if pile_segs:
+            lc = LineCollection(pile_segs, colors='green', linewidths=3.5, zorder=5)
+            ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='green', lw=3.5, label=f'Pile ({n_pile_plotted} elements)')
             )
@@ -301,7 +308,7 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
 def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size=0.03, saved_roller_x=None):
     """
     Plot boundary condition symbols on the mesh.
-    
+
     BC types:
     0 = free (do nothing)
     1 = fixed (small triangle below node)
@@ -309,110 +316,100 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
     3 = y roller (shouldn't have any)
     4 = specified force (vector arrow)
     """
-    
+    from matplotlib.collections import PatchCollection
+
     # Get mesh bounds for symbol sizing
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
     mesh_size = min(x_max - x_min, y_max - y_min)
-    symbol_size = mesh_size * bc_symbol_size  # Adjustable symbol size
-    
+    symbol_size = mesh_size * bc_symbol_size
+
     # Fixed boundary conditions (type 1) - triangle below node
     fixed_nodes = np.where(bc_type == 1)[0]
     if len(fixed_nodes) > 0:
+        triangle_height = symbol_size
+        triangle_width = symbol_size * 0.8
+        tri_patches = []
         for node_idx in fixed_nodes:
             x, y = nodes[node_idx]
-            # Create small isosceles triangle below the node
-            triangle_height = symbol_size
-            triangle_width = symbol_size * 0.8
-            triangle = patches.Polygon([
+            tri_patches.append(patches.Polygon([
                 [x - triangle_width/2, y - triangle_height],
                 [x + triangle_width/2, y - triangle_height],
                 [x, y]
-            ], closed=True, facecolor='none', edgecolor='red', linewidth=1.5)
-            ax.add_patch(triangle)
-        
-        # Add to legend
+            ], closed=True))
+        pc = PatchCollection(tri_patches, facecolor='none', edgecolor='red', linewidth=1.5)
+        ax.add_collection(pc)
+
         legend_handles.append(
-            plt.Line2D([0], [0], marker='^', color='red', linestyle='None', 
+            plt.Line2D([0], [0], marker='^', color='red', linestyle='None',
                       markersize=8, label='Fixed (bc_type=1)')
         )
-    
+
     # X-roller boundary conditions (type 2) - circle + line on left/right sides
-    # Include nodes that were originally rollers but had bc_type overwritten to 4 (force)
     x_roller_nodes = np.where(bc_type == 2)[0]
     if saved_roller_x:
         x_roller_nodes = np.unique(np.concatenate([x_roller_nodes, np.array(sorted(saved_roller_x), dtype=int)]))
     if len(x_roller_nodes) > 0:
+        circle_radius = symbol_size * 0.4
+        line_length = symbol_size
+        x_mid = (x_min + x_max) / 2
+        circle_patches = []
+        roller_line_segs = []
         for node_idx in x_roller_nodes:
             x, y = nodes[node_idx]
-            
-            # Determine if node is on left or right side of mesh
-            is_left_side = x < (x_min + x_max) / 2
-            
-            circle_radius = symbol_size * 0.4
-            
+            is_left_side = x < x_mid
             if is_left_side:
-                # Put roller symbol on the left of node (circle touching node)
-                circle_center_x = x - circle_radius
-                line_x = circle_center_x - circle_radius
+                cx = x - circle_radius
+                lx = cx - circle_radius
             else:
-                # Put roller symbol on the right of node (circle touching node)
-                circle_center_x = x + circle_radius
-                line_x = circle_center_x + circle_radius
-            
-            # Create small hollow circle
-            circle = patches.Circle((circle_center_x, y), circle_radius, 
-                                  facecolor='none', edgecolor='blue', linewidth=1)
-            ax.add_patch(circle)
-            
-            # Create tangent line
-            line_length = symbol_size
-            ax.plot([line_x, line_x], [y - line_length/2, y + line_length/2], 
-                   'b-', linewidth=1)
-        
-        # Add to legend
+                cx = x + circle_radius
+                lx = cx + circle_radius
+            circle_patches.append(patches.Circle((cx, y), circle_radius))
+            roller_line_segs.append([[lx, y - line_length/2], [lx, y + line_length/2]])
+
+        pc = PatchCollection(circle_patches, facecolor='none', edgecolor='blue', linewidth=1)
+        ax.add_collection(pc)
+        lc = LineCollection(roller_line_segs, colors='blue', linewidths=1)
+        ax.add_collection(lc)
+
         legend_handles.append(
-            plt.Line2D([0], [0], marker='o', color='blue', linestyle='None', 
+            plt.Line2D([0], [0], marker='o', color='blue', linestyle='None',
                       markersize=6, markerfacecolor='none', markeredgewidth=1, label='Y-Roller (bc_type=3)')
         )
-    
+
     # Specified force boundary conditions (type 4) - vector arrows
     force_nodes = np.where(bc_type == 4)[0]
     if len(force_nodes) > 0:
-        # Find max force magnitude for scaling
-        force_magnitudes = []
-        for node_idx in force_nodes:
-            fx, fy = bc_values[node_idx]
-            force_magnitudes.append(np.sqrt(fx**2 + fy**2))
+        force_magnitudes = np.array([np.sqrt(bc_values[ni][0]**2 + bc_values[ni][1]**2) for ni in force_nodes])
+        max_force = force_magnitudes.max() if len(force_magnitudes) > 0 else 0
+        if max_force > 0:
+            scale = symbol_size * 3 / max_force
+            gap = symbol_size * 0.5
+            arrow_segs = []
+            tip_xs, tip_ys = [], []
 
-        if force_magnitudes:
-            max_force = max(force_magnitudes)
-            if max_force > 0:
-                scale = symbol_size * 3 / max_force
+            for node_idx in force_nodes:
+                x, y = nodes[node_idx]
+                fx, fy = bc_values[node_idx]
+                scaled_fx = fx * scale
+                scaled_fy = fy * scale
+                mag = np.sqrt(scaled_fx**2 + scaled_fy**2)
+                if mag == 0:
+                    continue
+                ux, uy = scaled_fx / mag, scaled_fy / mag
+                tail_x = x - scaled_fx
+                tail_y = y - scaled_fy
+                tip_x = x - ux * gap
+                tip_y = y - uy * gap
+                arrow_segs.append([[tail_x, tail_y], [tip_x, tip_y]])
+                tip_xs.append(tip_x)
+                tip_ys.append(tip_y)
 
-                gap = symbol_size * 0.5  # gap between arrowhead and node
+            if arrow_segs:
+                lc = LineCollection(arrow_segs, colors='green', linewidths=1.2)
+                ax.add_collection(lc)
+                ax.plot(tip_xs, tip_ys, marker='v', color='green', markersize=3, linestyle='None')
 
-                for node_idx in force_nodes:
-                    x, y = nodes[node_idx]
-                    fx, fy = bc_values[node_idx]
-                    scaled_fx = fx * scale
-                    scaled_fy = fy * scale
-
-                    # Arrow direction unit vector (from tail toward node)
-                    mag = np.sqrt(scaled_fx**2 + scaled_fy**2)
-                    if mag == 0:
-                        continue
-                    ux, uy = scaled_fx / mag, scaled_fy / mag
-
-                    # Tail and tip (tip stops short of node by gap)
-                    tail_x = x - scaled_fx
-                    tail_y = y - scaled_fy
-                    tip_x = x - ux * gap
-                    tip_y = y - uy * gap
-                    ax.plot([tail_x, tip_x], [tail_y, tip_y], color='green', lw=1.2)
-                    ax.plot(tip_x, tip_y, marker='v', color='green', markersize=3)
-
-        # Add to legend with arrow-like marker
         legend_handles.append(
             plt.Line2D([0], [0], marker=r'$\rightarrow$', color='green', linestyle='None',
                       markersize=12, label='Applied Force')

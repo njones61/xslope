@@ -67,47 +67,40 @@ Once an input file exists, you can ask for any of the following:
 Each analysis produces multiple plots (inputs, mesh/search results, and final solution) so you can verify
 every stage. The skill uses the same code patterns as `main_lem.py`, `main_seep.py`, and `main_fem.py`.
 
-## Download
-
-Download the skill file here:
-
-[xslope.md](xslope.md)
-
 ## Installation
 
-### Prerequisites
+The skill is a single markdown file (`.claude/commands/xslope.md`) that Claude Code automatically discovers
+and makes available as a `/xslope` slash command.
 
-- [Claude Code](https://claude.ai/code) installed and working
-- XSLOPE installed in your Python environment (`pip install xslope`)
-- A local clone of the xslope repository (needed for the blank template file)
+### Option 1: Clone the repo (recommended)
 
-### Install the Skill
+If you clone the xslope repository, everything is ready to go — the skill file, the blank input template,
+and the xslope package are all included:
 
-The skill is a single markdown file that goes in your project's `.claude/commands/` directory.
-Claude Code automatically discovers files in this directory and makes them available as slash commands.
+```bash
+git clone https://github.com/njones61/xslope.git
+cd xslope
+pip install -e .
+```
 
-**Option 1: If you have the xslope repo cloned**
+The only additional requirement is [Claude Code](https://claude.ai/code).
 
-The skill file is already included at `.claude/commands/xslope.md`. No additional setup is needed.
+### Option 2: Add the skill to an existing project
 
-**Option 2: Manual installation**
+If you already have xslope installed (`pip install xslope`) and want to add the skill to a different
+project directory:
 
 1. Download the skill file: [xslope.md](xslope.md)
 
-2. Create the commands directory in your project if it doesn't exist:
+2. Place it in your project's `.claude/commands/` directory:
 
 ```bash
 mkdir -p .claude/commands
-```
-
-3. Copy the downloaded file into that directory:
-
-```bash
 cp ~/Downloads/xslope.md .claude/commands/xslope.md
 ```
 
-4. Make sure the blank template is accessible. The skill expects the template at
-`docs/inputs/input_template_v10.xlsx`. If your project doesn't have this file, copy it from the xslope repository.
+3. Copy the blank input template from the xslope repository. The skill expects it at
+`docs/inputs/input_template_v10.xlsx`.
 
 ## Usage
 

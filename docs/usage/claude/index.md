@@ -21,17 +21,17 @@ claude
 
 Use the `/xslope` command to get started. For example, paste or attach a diagram and type:
 
-```
+```text
 /xslope Build an input template from this diagram
 ```
 
 Once the input file is created, ask for an analysis in plain language — no need to repeat `/xslope`:
 
-```
+```text
 Find the factor of safety using Spencer's method
 ```
 
-```
+```text
 Now run a seepage analysis
 ```
 
@@ -107,8 +107,7 @@ cp ~/Downloads/xslope.md .claude/commands/xslope.md
 ```
 
 4. Make sure the blank template is accessible. The skill expects the template at
-`docs/inputs/input_template_v10.xlsx`. If your project doesn't have this file, copy it from the xslope
-repository.
+`docs/inputs/input_template_v10.xlsx`. If your project doesn't have this file, copy it from the xslope repository.
 
 ## Usage
 
@@ -123,7 +122,7 @@ claude
 **Step 1 — Build the input file.** Use `/xslope` with a diagram or problem description. You can paste an
 image directly into the terminal (drag-and-drop or clipboard paste) or reference a file path:
 
-```
+```text
 /xslope Build an input template from this diagram. [paste/attach image]
 ```
 
@@ -133,7 +132,7 @@ a populated `.xlsx` file. It shows a summary of what was populated and a validat
 **Step 2 — Run an analysis.** Once the input file exists, just ask in plain English. No need to type `/xslope`
 again — the skill context is already loaded:
 
-```
+```text
 Find the factor of safety using Spencer's method
 ```
 
@@ -142,15 +141,15 @@ Claude will run the analysis and display all intermediate plots: the input geome
 
 **Step 3 — Iterate.** Continue the conversation to refine the problem:
 
-```
+```text
 The FS is too low. Add a 500 psf berm at the toe and re-run.
 ```
 
-```
+```text
 Change the cohesion of the clay layer to 300 psf and find the new FS.
 ```
 
-```
+```text
 Now run a seepage analysis on that same problem.
 ```
 

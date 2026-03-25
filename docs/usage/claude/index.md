@@ -13,28 +13,27 @@ The skill understands the complete XSLOPE input template format and all three an
 
 ## Quick Start
 
-1. Open a terminal in your xslope project directory
-2. Launch Claude Code:
+Open a terminal in your xslope project directory and launch Claude Code:
 
-    ```bash
-    claude
-    ```
+```bash
+claude
+```
 
-3. Use the `/xslope` command to get started. For example, paste or attach a diagram and type:
+Use the `/xslope` command to get started. For example, paste or attach a diagram and type:
 
-    ```
-    /xslope Build an input template from this diagram
-    ```
+```
+/xslope Build an input template from this diagram
+```
 
-4. Once the input file is created, ask for an analysis in plain language — no need to repeat `/xslope`:
+Once the input file is created, ask for an analysis in plain language — no need to repeat `/xslope`:
 
-    ```
-    Find the factor of safety using Spencer's method
-    ```
+```
+Find the factor of safety using Spencer's method
+```
 
-    ```
-    Now run a seepage analysis
-    ```
+```
+Now run a seepage analysis
+```
 
 The `/xslope` command loads the skill with detailed template layout and API knowledge. After the first
 invocation, that context stays in the conversation, so follow-up requests can be typed as plain English.
@@ -97,23 +96,19 @@ The skill file is already included at `.claude/commands/xslope.md`. No additiona
 
 2. Create the commands directory in your project if it doesn't exist:
 
-    ```bash
-    mkdir -p .claude/commands
-    ```
+```bash
+mkdir -p .claude/commands
+```
 
 3. Copy the downloaded file into that directory:
 
-    ```bash
-    cp ~/Downloads/xslope.md .claude/commands/xslope.md
-    ```
+```bash
+cp ~/Downloads/xslope.md .claude/commands/xslope.md
+```
 
-4. Make sure the blank template is accessible. The skill expects the template at:
-
-    ```
-    docs/inputs/input_template_v10.xlsx
-    ```
-
-    If your project doesn't have this file, copy it from the xslope repository.
+4. Make sure the blank template is accessible. The skill expects the template at
+`docs/inputs/input_template_v10.xlsx`. If your project doesn't have this file, copy it from the xslope
+repository.
 
 ## Usage
 

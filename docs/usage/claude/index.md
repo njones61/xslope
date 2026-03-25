@@ -157,27 +157,25 @@ Now run a seepage analysis on that same problem.
 
 When building an input file, Claude provides a structured summary:
 
-> **Input template created:** `inputs/earth_dam.xlsx`
->
-> **Geometry:**
->
-> - 3 profile lines defining 3 material layers (shell, core, foundation)
-> - Origin at left edge of foundation, domain extends from x=0 to x=200
-> - Max depth: 0
->
-> **Materials:**
->
-> | # | Name | gamma | c | phi | u |
-> |---|------|-------|---|-----|---|
-> | 1 | shell | 125 | 0 | 34 | none |
-> | 2 | core | 122 | 100 | 26 | none |
-> | 3 | foundation | 123 | 0 | 24 | none |
->
-> **Failure Surfaces:**
->
-> - 2 starting circles: one at toe, one at base of core
->
-> [Download: inputs/earth_dam.xlsx](inputs/earth_dam.xlsx)
+```text
+Input template created: inputs/earth_dam.xlsx
+
+Geometry:
+  - 3 profile lines defining 3 material layers (shell, core, foundation)
+  - Origin at left edge of foundation, domain extends from x=0 to x=200
+  - Max depth: 0
+
+Materials:
+  #  Name          gamma    c   phi   u
+  1  shell           125    0    34   none
+  2  core            122  100    26   none
+  3  foundation      123    0    24   none
+
+Failure Surfaces:
+  - 2 starting circles: one at toe, one at base of core
+
+Input file saved to: inputs/earth_dam.xlsx
+```
 
 ## Supported Analysis Types
 

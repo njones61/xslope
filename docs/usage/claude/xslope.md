@@ -71,34 +71,35 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    plot_inputs(slope_data, mode='lem', save_png=True)  # or mode='seep'
    ```
 
-7. **Provide a summary and download link.** After creating the file, output a structured summary of what was populated and provide a link to the file. Use this format:
+7. **Provide a summary and download link.** After creating the file, output a plain-text summary of what was populated. Use this format:
 
-   > **Input template created:** `inputs/problem_name.xlsx`
-   >
-   > **Geometry:**
-   > - N profile lines defining M material layers
-   > - Origin at (description), domain extends from x=... to x=...
-   > - Max depth: ...
-   >
-   > **Materials:**
-   > | # | Name | gamma | c | phi | u | Other |
-   > |---|------|-------|---|-----|---|-------|
-   > | 1 | ... | ... | ... | ... | ... | ... |
-   >
-   > **Failure Surfaces:** (for LEM)
-   > - N starting circles defined at ...
-   >
-   > **Boundary Conditions:** (for seepage)
-   > - Upstream head = ... at (coords)
-   > - Exit face from (coords) to (coords)
-   >
-   > **Piezometric Line:** (if applicable)
-   > - N points from (x1,y1) to (xN,yN)
-   >
-   > **Loads / Reinforcement / Piles:** (if applicable)
-   > - Description of what was added
-   >
-   > [Download: inputs/problem_name.xlsx](inputs/problem_name.xlsx)
+   ```
+   Input template created: inputs/problem_name.xlsx
+
+   Geometry:
+     - N profile lines defining M material layers
+     - Origin at (description), domain extends from x=... to x=...
+     - Max depth: ...
+
+   Materials:
+     #  Name        gamma    c   phi   u
+     1  ...           ...  ...   ...   ...
+
+   Failure Surfaces: (for LEM)
+     - N starting circles defined at ...
+
+   Boundary Conditions: (for seepage)
+     - Upstream head = ... at (coords)
+     - Exit face from (coords) to (coords)
+
+   Piezometric Line: (if applicable)
+     - N points from (x1,y1) to (xN,yN)
+
+   Loads / Reinforcement / Piles: (if applicable)
+     - Description of what was added
+
+   Input file saved to: inputs/problem_name.xlsx
+   ```
 
    Show the validation plot to the user and ask if the geometry looks correct before running analysis.
 

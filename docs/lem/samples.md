@@ -98,7 +98,7 @@ This problem features a slope submerged by 10 ft of water.
 The submerged slope is analyzed by applying a distributed load over the entire slope based on the unit weight of 
 water (62.4 lb/ft3) and the depth of the water at a particular point on the slope. 
 
-Excel input file: [xslope_submerged_slope.xlsx](files/xslope_submerged_slope.xlsx){width=900}
+Excel input file: [xslope_submerged.xlsx](files/xslope_submerged.xlsx){width=900}
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 

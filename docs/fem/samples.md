@@ -172,3 +172,50 @@ The two rows of piles increase the factor of safety from 1.19 to 1.32 — an 11%
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
 <!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.32, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5 -->
+
+### 4. Non-Circular Failure Surface with Thin Weak Layer
+
+This is the FEM counterpart of the LEM non-circular failure surface example described in the [LEM Samples](../lem/samples.md)
+page (Problem 7). The problem features a thin weak clay layer in the foundation of a slope, which controls the
+failure mechanism. This problem was also featured in the user manual for the UTEXASED slope stability analysis
+software developed by Stephen G. Wright at the University of Texas at Austin.
+
+![noncircular.png](../lem/sample_images/noncircular.png){width=900}
+
+The slope geometry and strength properties are the same as the LEM problem. Young's modulus ($E$) and Poisson's
+ratio ($\nu$) are estimated from typical correlations for each soil type:
+
+| Soil | $c'$ (psf) | $\phi'$ (deg) | $\gamma$ (pcf) | $E$ (psf) | $\nu$ |
+|------|:----------:|:--------------:|:---------------:|:---------:|:-----:|
+| Sand Fill | 0 | 37 | 120 | 1,000,000 | 0.30 |
+| Sand | 0 | 33 | 123 | 700,000 | 0.30 |
+| Soft Clay ($S_u$ = 200) | 0 ($\phi = 0$) | 0 | 118 | 60,000 | 0.40 |
+| Dense Sand | 0 | 37 | 131 | 1,500,000 | 0.28 |
+
+The soft clay is modeled as an undrained material ($\phi = 0$) with $E/S_u \approx 300$. A Poisson's ratio of 0.40
+is used rather than the theoretical undrained value of 0.5 to avoid numerical issues with near-incompressibility.
+
+Excel input file: [xslope_noncircular_fem.xlsx](files/xslope_noncircular_fem.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![non_circ_inputs.png](images/non_circ_inputs.png){width=1000}
+
+FEM mesh with boundary conditions and material zones:
+
+![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
+
+SSRM results. The computed factor of safety is **FS = 1.82**. The top plot shows the deformed mesh at the last
+converged solution (F = 1.82). The middle plot shows the viscoplastic shear strain concentration, which clearly
+reveals the non-circular failure mechanism passing through the thin weak clay layer — matching the expected behavior
+without any prior assumption about the failure surface shape. The bottom plot shows the displacement vectors,
+confirming lateral sliding of the slope mass along the clay layer.
+
+![non_circ_results.png](images/non_circ_results.png){width=1000}
+
+The FEM result of FS = 1.82 is slightly higher than the LEM result of FS = 1.74 obtained using Spencer's method.
+This is consistent with the general observation that the SSRM tends to give slightly higher factors of safety than
+LEM for non-circular mechanisms, since the FEM finds the natural failure mode through the global stress field rather
+than being constrained to a prescribed failure surface geometry.
+
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.82, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2 -->

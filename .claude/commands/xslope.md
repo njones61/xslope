@@ -56,10 +56,11 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
 3. **Derive coordinates.** If the diagram shows dimensions/angles but not explicit XY coordinates, compute them. Place the origin sensibly (e.g., toe of slope at (0,0) or left edge of foundation). Profile lines are listed top-to-bottom (shallowest first) with points left-to-right.
 
-4. **Choose starting circles** for LEM. Good strategy:
-   - One circle near the toe of the slope
-   - One circle at the base of each distinct soil layer
-   - Use `Option = "Depth"` with `Depth` = elevation of the target layer bottom minus the circle center Y, or use `Option = "Intercept"` to pass through a specific point.
+4. **Choose starting circles** for LEM. Rules:
+   - **Xo** = halfway between the toe and crest of the slope (midpoint of slope face in X)
+   - **Yo** = 2x the height of the slope, measured upward from the toe elevation (toe_elev + 2 * slope_height)
+   - **One circle per material zone** using `Option = "Depth"`, where `Depth` = the **elevation** at the bottom of that material zone (Depth is an elevation, not a distance; R = Yo - Depth)
+   - **One circle passing through the toe** using `Option = "Intercept"` with `Xi, Yi` = toe coordinates
 
 5. **Copy the template and populate it** using the Python code pattern below.
 
@@ -298,7 +299,7 @@ Circular failure surface starting points for LEM search. Row 2 is header. Data s
 | B | Xo | Center X |
 | C | Yo | Center Y |
 | D | Option | "Depth", "Intercept", or "Radius" |
-| E | Depth | Depth below ground at Xo (if Option="Depth") |
+| E | Depth | Elevation at the bottom of the circle (if Option="Depth"); R = Yo - Depth |
 | F | Xi | Intercept X (if Option="Intercept") |
 | G | Yi | Intercept Y (if Option="Intercept") |
 | H | R | Radius (if Option="Radius") |
@@ -323,11 +324,11 @@ def write_circle(ws, num, xo, yo, option="Depth", depth=None, xi=None, yi=None, 
 write_circle(ws, 1, xo=10, yo=40, option="Depth", depth=0)
 ```
 
-**Tips for choosing circles:**
-- Place Xo roughly above the midpoint or crest of the slope
-- Yo should be well above the ground surface (the center of the circle is above the slope)
-- For "Depth" option: depth=0 means the circle is tangent to the ground at Xo; larger depth = deeper circle
-- Define one circle near the toe and one at each layer base for thorough search
+**Rules for choosing circles:**
+- **Xo** = halfway between toe and crest X-coordinates (midpoint of slope face)
+- **Yo** = toe elevation + 2 * slope height
+- **One circle per material zone**: use `Option="Depth"` where `Depth` = **elevation** at the bottom of that zone (R = Yo - Depth)
+- **One circle through the toe**: use `Option="Intercept"` with `xi=toe_x, yi=toe_y`
 
 ### Sheet: non-circ
 

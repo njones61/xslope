@@ -185,6 +185,10 @@ Input file saved to: inputs/earth_dam.xlsx
 
 - **Provide clear diagrams.** The better the diagram, the more accurate the input file. Include coordinate labels,
   dimensions, material property tables, and boundary condition annotations when possible.
+- **Indicate water tables clearly.** If your slope has a water table, mark it on the diagram with the
+  standard inverted triangle symbol (&#x25BD;). A dashed line alone is not sufficient — it may be
+  interpreted as a material boundary or construction line. Label the line "WT", "GWT", or "Water Table"
+  for clarity.
 - **Specify units.** Always state whether you are working in English (ft, pcf, psf) or Metric (m, kN/m3, kPa) units.
 - **Check the validation plot.** Always review the `plot_inputs()` output before running an analysis to catch
   geometry errors early.

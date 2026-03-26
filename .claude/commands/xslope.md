@@ -56,11 +56,12 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
 3. **Derive coordinates.** If the diagram shows dimensions/angles but not explicit XY coordinates, compute them. Place the origin sensibly (e.g., toe of slope at (0,0) or left edge of foundation). Profile lines are listed top-to-bottom (shallowest first) with points left-to-right.
 
-4. **Choose starting circles** for LEM. Rules:
-   - **Xo** = halfway between the toe and crest of the slope (midpoint of slope face in X)
-   - **Yo** = 2x the height of the slope, measured upward from the toe elevation (toe_elev + 2 * slope_height)
-   - **One circle per material zone** using `Option = "Depth"`, where `Depth` = the **elevation** at the bottom of that material zone (Depth is an elevation, not a distance; R = Yo - Depth)
-   - **One circle passing through the toe** using `Option = "Intercept"` with `Xi, Yi` = toe coordinates
+4. **Choose starting circles** for LEM. Good strategy:
+   - **Center X**: Place Xo halfway between the toe and crest of the slope.
+   - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
+   - **Always include**: one circle that passes through the toe of the slope (use `Option = "Intercept"` with Xi, Yi = toe coordinates).
+   - **Always include**: one circle tangent to the base (bottom) of each distinct material layer (use `Option = "Depth"` with appropriate depth).
+   - For single-material slopes, define at least one toe circle and one base circle.
 
 5. **Copy the template and populate it** using the Python code pattern below.
 
@@ -135,11 +136,13 @@ display every plot to the user, not just the final result. The full plot sequenc
 
 After showing all plots, print the key numerical result (FS, flowrate, etc.) as a summary.
 
+**IMPORTANT — Provide the completed input template.** After analysis is complete, always remind the user of the input file path so they can download/access it. Example: "Completed input template: `inputs/problem_name.xlsx`"
+
 ---
 
 ## Template Cell Layout Reference
 
-The input template is at: `docs/inputs/input_template_v10.xlsx`
+The input template is at: `docs/inputs/input_template.xlsx`
 
 Always copy it to a working location before modifying. Use openpyxl to populate cells.
 
@@ -148,7 +151,7 @@ import shutil
 import openpyxl
 
 # Copy template
-src = "docs/inputs/input_template_v10.xlsx"  # relative to project root
+src = "docs/inputs/input_template.xlsx"  # relative to project root
 dst = "inputs/my_problem.xlsx"               # choose a descriptive name
 shutil.copy(src, dst)
 wb = openpyxl.load_workbook(dst)
@@ -324,11 +327,12 @@ def write_circle(ws, num, xo, yo, option="Depth", depth=None, xi=None, yi=None, 
 write_circle(ws, 1, xo=10, yo=40, option="Depth", depth=0)
 ```
 
-**Rules for choosing circles:**
-- **Xo** = halfway between toe and crest X-coordinates (midpoint of slope face)
-- **Yo** = toe elevation + 2 * slope height
-- **One circle per material zone**: use `Option="Depth"` where `Depth` = **elevation** at the bottom of that zone (R = Yo - Depth)
-- **One circle through the toe**: use `Option="Intercept"` with `xi=toe_x, yi=toe_y`
+**Tips for choosing circles:**
+- **Center X**: Xo = halfway between slope toe and crest (midpoint of slope in plan)
+- **Center Y**: Yo = toe elevation + 2 × slope height (double the height above the toe)
+- For "Depth" option: Depth is an **elevation** (not a distance); R = Yo - Depth. E.g., Depth=0 means the circle bottom is at elevation 0
+- **Always** define one circle passing through the toe (`Option = "Intercept"`, Xi/Yi = toe coords)
+- **Always** define one circle tangent to the base (bottom) of each material layer
 
 ### Sheet: non-circ
 
@@ -730,7 +734,8 @@ else:
 7. **When interpreting diagrams**, pay attention to:
    - Scale bars and dimension labels
    - Slope ratios (e.g., 2H:1V means for every 2 horizontal, 1 vertical)
-   - Water levels and piezometric surfaces shown as dashed/blue lines
+   - **Water table identification**: A water table is indicated by an **inverted triangle symbol** (▽) on the diagram. Do NOT assume a dashed line is a water table unless it is accompanied by this symbol or is explicitly labeled. Dashed lines may represent other features (e.g., material boundaries, construction lines).
+   - Piezometric surfaces: typically shown as dashed/blue lines with explicit labels
    - Material boundaries shown as solid lines between differently hatched/colored zones
    - Property tables typically shown in the diagram legend
 

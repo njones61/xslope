@@ -302,7 +302,7 @@ Circular failure surface starting points for LEM search. Row 2 is header. Data s
 | B | Xo | Center X |
 | C | Yo | Center Y |
 | D | Option | "Depth", "Intercept", or "Radius" |
-| E | Depth | Depth below ground at Xo (if Option="Depth") |
+| E | Depth | Elevation at the bottom of the circle (if Option="Depth"); R = Yo - Depth |
 | F | Xi | Intercept X (if Option="Intercept") |
 | G | Yi | Intercept Y (if Option="Intercept") |
 | H | R | Radius (if Option="Radius") |
@@ -330,7 +330,7 @@ write_circle(ws, 1, xo=10, yo=40, option="Depth", depth=0)
 **Tips for choosing circles:**
 - **Center X**: Xo = halfway between slope toe and crest (midpoint of slope in plan)
 - **Center Y**: Yo = toe elevation + 2 × slope height (double the height above the toe)
-- For "Depth" option: depth=0 means the circle is tangent to the ground at Xo; larger depth = deeper circle
+- For "Depth" option: Depth is an **elevation** (not a distance); R = Yo - Depth. E.g., Depth=0 means the circle bottom is at elevation 0
 - **Always** define one circle passing through the toe (`Option = "Intercept"`, Xi/Yi = toe coords)
 - **Always** define one circle tangent to the base (bottom) of each material layer
 

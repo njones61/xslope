@@ -142,7 +142,7 @@ After showing all plots, print the key numerical result (FS, flowrate, etc.) as 
 
 ## Template Cell Layout Reference
 
-The input template is at: `docs/inputs/input_template_v10.xlsx`
+The input template is at: `docs/inputs/input_template.xlsx`
 
 Always copy it to a working location before modifying. Use openpyxl to populate cells.
 
@@ -151,7 +151,7 @@ import shutil
 import openpyxl
 
 # Copy template
-src = "docs/inputs/input_template_v10.xlsx"  # relative to project root
+src = "docs/inputs/input_template.xlsx"  # relative to project root
 dst = "inputs/my_problem.xlsx"               # choose a descriptive name
 shutil.copy(src, dst)
 wb = openpyxl.load_workbook(dst)

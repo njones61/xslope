@@ -680,9 +680,13 @@ The `plot_fem_results()` function provides a flexible interface for visualizing 
 | `strain` | Von Mises equivalent strain contours computed from total strains. |
 | `yield` | Mohr-Coulomb yield function contours. Positive values indicate yielding/failure, negative values indicate an elastic state. |
 
-The default combination is `['deformation', 'shear_strain', 'displace_vector']`, which provides a comprehensive view of the failure mechanism. The following example shows the SSRM results for the Griffiths & Lane (1999) homogeneous slope from the [FEM Samples](samples.md) page (Problem 1). The top subplot shows the deformed mesh at the last converged solution, and the bottom subplot shows the viscoplastic shear strain concentration revealing the circular failure mechanism:
+The default combination is `['deformation', 'shear_strain', 'displace_vector']`, which provides a comprehensive view of the failure mechanism. The following example shows the SSRM results for the non-circular failure surface problem from the [FEM Samples](samples.md) page (Problem 4), which features a thin weak clay layer controlling the failure mechanism:
 
-![griffiths1_results.png](images/griffiths1_results.png){width=1000}
+![noncircular.png](../lem/sample_images/noncircular.png){width=900}
+
+The top subplot shows the deformed mesh at the last converged solution, the middle subplot shows the shear strain concentration through the thin weak clay layer, and the bottom subplot shows the displacement vectors confirming lateral sliding along the clay layer:
+
+![non_circ_results.png](images/non_circ_results.png){width=1000}
 
 Additional options control the appearance of all plot types:
 

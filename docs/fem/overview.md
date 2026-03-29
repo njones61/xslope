@@ -5,7 +5,7 @@
 The finite element method (FEM) provides a powerful numerical technique for slope stability analysis that overcomes
 many fundamental limitations of traditional limit equilibrium methods. While limit equilibrium approaches require the engineer to assume a failure surface geometry and then check whether equilibrium conditions are satisfied, FEM allows potential failure mechanisms to emerge naturally through rigorous stress analysis and progressive failure development (Griffiths & Lane, 1999; Duncan, 1996). Rather than imposing kinematic constraints through assumed failure surfaces, FEM solves the complete stress-strain problem throughout the slope domain. The method can capture the complex stress redistribution that occurs as soil elements progressively reach failure, leading to the natural development of failure zones without prior assumptions about their geometry or location. Perhaps most importantly, FEM uses realistic stress-strain constitutive models that can capture the actual behavior of soil materials, including nonlinear elastic behavior, plastic yielding, strain softening, and progressive failure. This provides a much more accurate representation of soil response compared to the rigid-perfectly plastic assumptions typically used in limit equilibrium methods.
 
-![plot_fem_results.png](images/plot_fem_results.png){width=1000}
+![plot_fem_results.png](images/plot_fem_results.png){width=800}
 
 ## Governing Equations
 
@@ -199,20 +199,12 @@ typically expressed as $u = 0$ and $v = 0$. These conditions are most commonly a
 
 **Free boundaries** occur along the ground surface and slope face where no external constraints are applied. These boundaries represent the natural boundary condition of zero traction, meaning that no external forces act normal or tangential to these surfaces except for applied loads such as surcharge loads or foundation pressures.
 
-For slope stability analysis, the most common displacement boundary conditions are fixed supports at the 
-base of the 
-model, roller supports (free movement in the vertical direction) along the left and right vertical boundaries, and free 
-boundaries along the slope face and ground surface. These 
-conditions ensure 
-that the 
-model 
-accurately reflects the physical constraints of the slope while allowing for realistic stress distributions and 
-potential failure mechanisms to develop. These displacement boundary conditions are automatically applied in XSLOPE.
+For slope stability analysis, the most common displacement boundary conditions are fixed supports at the base of the model, roller supports (free movement in the vertical direction) along the left and right vertical boundaries, and free boundaries along the slope face and ground surface. These conditions ensure that the model accurately reflects the physical constraints of the slope while allowing for realistic stress distributions and potential failure mechanisms to develop. These displacement boundary conditions are automatically applied in XSLOPE.
 
 ### Force Boundary Conditions
 
 Force boundary conditions specify the external loads acting on the slope. In XSLOPE, force boundary conditions 
-correspond to distributed loads which are defined in the input template as as line loads with a sequence of coordinates and corresponding load values (force per unit length). These can represent:
+correspond to distributed loads which are defined in the input template as line loads with a sequence of coordinates and corresponding load values (force per unit length). These can represent:
 
 - **Traffic loads** (vehicles, equipment)
 - **Structural loads** (buildings, foundations)  
@@ -628,17 +620,14 @@ In both cases, the structural element properties are **not reduced** during SSRM
 
 ## Integration with XSLOPE Framework
 
-The integration of finite element capabilities into the XSLOPE framework represents leverages the established infrastructure for limit equilibrium and seepage analysis while extending the analysis 
-capabilities to include 
-rigorous 
-stress-strain based slope stability assessment. 
+The integration of finite element capabilities into the XSLOPE framework leverages the established infrastructure for limit equilibrium and seepage analysis while extending the analysis capabilities to include rigorous stress-strain based slope stability assessment. 
 
 ### Input Integration
 
 The finite element implementation uses XSLOPE's  Excel-based input system. The slope geometry definitions, material 
 property specifications, and boundary condition inputs that currently support limit equilibrium analysis provide an 
 excellent foundation for finite element modeling. Material property definitions can leverage the existing cohesion 
-$c$, friction angle $\phi$, and unit weight $\gamma$ specifications that are  in the XSLOPE input system. Additional 
+$c$, friction angle $\phi$, and unit weight $\gamma$ specifications that are in the XSLOPE input system. Additional 
 parameters required for finite element analysis, such as Young's modulus $E$ and Poisson's ratio $\nu$, are included 
 in the material property table in the Material tab.
 

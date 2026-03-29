@@ -57,6 +57,8 @@ analysis:
 | Young's modulus, $E$ (psf) | 1,000,000 | 1,000,000 |
 | Poisson's ratio, $\nu$ | 0.3 | 0.3 |
 
+A 240 psf surcharge is applied along the slope crest from $x = 30$ ft to $x = 100$ ft.
+
 Six reinforcement lines are defined with the following properties:
 
 | Property | Value |

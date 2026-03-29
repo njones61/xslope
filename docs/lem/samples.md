@@ -288,7 +288,7 @@ at Austin.
 
 ![reinforce.png](sample_images/reinforce.png){width=900}
 
-For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds 
+A 240 psf surcharge is applied along the slope crest. For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds
 to (0, 0) and the top of the slope corresponds to (30, 24). 
 
 The following Excel input file illustrates the problem. The soil reinforcement is entered in the "reinforce" sheet.

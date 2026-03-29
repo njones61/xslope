@@ -146,7 +146,7 @@ Within each element, the displacement field is interpolated from the nodal displ
 The shape function matrix $[N]$ contains the interpolation functions that define how displacements vary spatially within the element, while $\{u_e\}$ and $\{v_e\}$ are vectors containing the nodal displacement values. For linear triangular elements, the shape functions are simply the area coordinates that ensure displacement compatibility between adjacent elements and provide a linear variation of displacement within each element.
 
 The choice of element type significantly impacts both accuracy and computational efficiency. Triangular elements 
-with linear shape functions are particularly well-suited for slope stability problems because they can easily conform to irregular slope geometries and provide adequate accuracy for capturing the stress distributions that govern failure development. The linear displacement variation within each element leads to constant strain and stress fields, which is appropriate for modeling the elastic-perfectly plastic soil behavior typically assumed in slope stability analysis. However, when linear triangles are used on a narrow section of a problem, there is a chance that they may result in artificial stiffness in the solution. The tools for building finite element meshes in XSLOPE are described in the [Automated Mesh Generation](mesh.md) page. 
+with linear shape functions are particularly well-suited for slope stability problems because they can easily conform to irregular slope geometries and provide adequate accuracy for capturing the stress distributions that govern failure development. The linear displacement variation within each element leads to constant strain and stress fields, which is appropriate for modeling the elastic-perfectly plastic soil behavior typically assumed in slope stability analysis. However, linear triangles are susceptible to **volumetric locking** — an artificial stiffness that can significantly overestimate the factor of safety, particularly for narrow elements or materials approaching incompressibility (see [Element Type Selection and Volumetric Locking](#element-type-selection-and-volumetric-locking) below). The tools for building finite element meshes in XSLOPE are described in the [Automated Mesh Generation](mesh.md) page. 
 
 ### Element Stiffness Matrix
 
@@ -277,6 +277,22 @@ For prescribed displacements (such as u = 0 or v = 0), the most common implement
 **Force Boundary Conditions:**
 
 Applied forces and distributed loads are incorporated directly into the global force vector {F} through the integration processes described above. The stiffness matrix [K] remains unchanged for force boundary conditions.
+
+### Automatic Boundary Condition Assignment in XSLOPE
+
+XSLOPE automatically assigns displacement boundary conditions in the `build_fem_data()` function based on the geometry of the mesh. The user does not need to specify boundary conditions manually — they are determined entirely from the node coordinates using the following rules applied in order:
+
+1. **All nodes start as free** (no displacement constraints). The ground surface, slope face, and any internal nodes are unconstrained by default, representing the natural zero-traction boundary condition.
+
+2. **Fixed supports at the base.** All nodes at the global minimum $y$-coordinate are assigned fixed boundary conditions ($u = 0$, $v = 0$). These nodes are identified by comparing each node's $y$-coordinate to the minimum value in the mesh within a small numerical tolerance ($10^{-6}$). This represents rigid bedrock or a sufficiently deep boundary where displacements are negligible.
+
+3. **X-roller supports on the left and right sides.** All nodes at the global minimum $x$-coordinate (left boundary) and maximum $x$-coordinate (right boundary) are assigned x-roller conditions ($u = 0$, $v$ free). This allows vertical settlement along the side boundaries while preventing lateral movement, reflecting the assumption that the slope extends indefinitely in both directions beyond the model domain. Corner nodes where the side boundaries meet the base retain their fixed condition — fixed supports take precedence over rollers.
+
+4. **Force boundary conditions from distributed loads.** If distributed loads are defined in the input template, nodes along the load lines are identified and assigned equivalent nodal forces computed using tributary-area integration (described above). If a force node coincides with a roller or fixed boundary, both the displacement constraint and the applied force are preserved.
+
+The figure below shows the resulting boundary conditions for the reinforced slope example from the [FEM Samples](samples.md) page (Problem 2). Fixed supports (triangles) line the base of the mesh. X-roller supports (circles) line the left and right vertical boundaries, allowing vertical movement but preventing horizontal displacement. The ground surface and slope face are free. Force boundary conditions from a 240 psf surcharge are shown as arrows along the slope crest. Reinforcement elements are shown as red lines within the slope body.
+
+![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
 ## Elastic-Plastic Behavior: Viscoplastic Algorithm
 
@@ -649,6 +665,47 @@ where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of th
 where $h$ is the hydraulic head from the seepage solution and $z$ is the elevation coordinate. These nodal pore pressures are stored in the slope data and transferred to the structural mesh during `build_fem_data()`. Negative pore pressures (suction above the phreatic surface) are clamped to zero.
 
 For both the piezometric and seepage options, pore pressures are precomputed at each Gauss point during `build_fem_data()` using the element shape functions to interpolate from nodal values (seep) or by computing the physical coordinates of each Gauss point and projecting onto the piezometric surface (piezo). These precomputed values are then used directly in the effective stress yield check during the viscoplastic iteration, avoiding repeated interpolation at each iteration step.
+
+## Visualization of Results
+
+The `plot_fem_results()` function provides a flexible interface for visualizing FEM solutions. It accepts a `plot_type` parameter that specifies one or more plot types to display as vertically stacked subplots. The available plot types are:
+
+| Plot Type | Description |
+|-----------|-------------|
+| `deformation` | Deformed mesh overlay on the original mesh. The original mesh is shown in light gray and the deformed shape in blue. Viscoplastic displacements (total minus elastic) are used when available, so the plot shows the failure mechanism rather than gravity settlement. The `deform_scale` parameter amplifies displacements for visibility and is auto-calculated by default so the maximum deformation is approximately 10% of the mesh height. |
+| `shear_strain` | Viscoplastic maximum shear strain contours. This is the most important plot for identifying the failure mechanism — high shear strain concentrations reveal the failure surface without any prior assumption about its shape or location. Falls back to total shear strain if viscoplastic data is not available. |
+| `displace_vector` | Displacement vectors at corner nodes. Like the deformed mesh plot, viscoplastic displacements are used when available to show the failure mechanism. Vectors below a threshold fraction of the maximum displacement are hidden to reduce clutter. |
+| `displace_mag` | Displacement magnitude contours using the viridis colormap. Shows total displacement magnitude at each node as filled contours. |
+| `stress` | Von Mises stress contours with yielded elements highlighted. Useful for identifying stress concentrations and the extent of the plastic zone. |
+| `strain` | Von Mises equivalent strain contours computed from total strains. |
+| `yield` | Mohr-Coulomb yield function contours. Positive values indicate yielding/failure, negative values indicate an elastic state. |
+
+The default combination is `['deformation', 'shear_strain', 'displace_vector']`, which provides a comprehensive view of the failure mechanism. The following example shows the SSRM results for the Griffiths & Lane (1999) homogeneous slope from the [FEM Samples](samples.md) page (Problem 1). The top subplot shows the deformed mesh at the last converged solution, and the bottom subplot shows the viscoplastic shear strain concentration revealing the circular failure mechanism:
+
+![griffiths1_results.png](images/griffiths1_results.png){width=1000}
+
+Additional options control the appearance of all plot types:
+
+- `show_mesh` — show or hide mesh lines (default: `True`)
+- `show_reinforcement` — show or hide reinforcement and pile elements (default: `True`)
+- `label_elements` — show element ID labels at centroids (default: `False`)
+- `figsize` — figure size as `(width, height)` in inches (default: `(12, 8)`)
+- `save_png` — save the figure to a PNG file (default: `False`)
+- `dpi` — resolution for saved PNG (default: `300`)
+
+A typical call for an SSRM analysis uses the default plot types:
+
+```python
+plot_fem_results(fem_data, result['last_solution'],
+                 plot_type=['deformation', 'shear_strain', 'displace_vector'],
+                 save_png=True)
+```
+
+A single plot type can also be specified as a string rather than a list:
+
+```python
+plot_fem_results(fem_data, solution, plot_type='shear_strain')
+```
 
 ## References
 

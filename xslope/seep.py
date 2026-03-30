@@ -2623,6 +2623,25 @@ def run_seepage_analysis(seep_data, tol=1e-6):
             kr0=kr0_per_element, h0=h0_per_element)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
+        # Flow net quality check: flowlines (grad phi) should be perpendicular
+        # to equipotential lines (grad h) in saturated zones. Compute the mean
+        # angular deviation from 90° across elements below the phreatic surface.
+        _grad_h = compute_gradient(nodes, elements, head, element_types)
+        _grad_phi = compute_gradient(nodes, elements, phi, element_types)
+        # Only check saturated nodes (head >= elevation, i.e. below phreatic)
+        _sat = head >= nodes[:, 1] - 0.1
+        _hm = np.linalg.norm(_grad_h, axis=1)
+        _pm = np.linalg.norm(_grad_phi, axis=1)
+        _valid = _sat & (_hm > 1e-10) & (_pm > 1e-10)
+        if np.any(_valid):
+            _cos = np.sum(_grad_h[_valid] * _grad_phi[_valid], axis=1) / (_hm[_valid] * _pm[_valid])
+            _cos = np.clip(_cos, -1, 1)
+            _angles = np.abs(np.degrees(np.arccos(np.abs(_cos))))  # deviation from 0° or 90°
+            _dev = np.where(_angles > 45, 90 - _angles, _angles)  # deviation from nearest right angle
+            _p90_dev = np.percentile(_dev, 90)
+            if _p90_dev > 10:
+                print(f"Warning: Flow net quality — 90th percentile orthogonality error = {_p90_dev:.1f}°.")
+                print("  Flowlines may be inaccurate near the exit face. Try a finer mesh.")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
     else:
         head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)

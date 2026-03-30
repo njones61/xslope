@@ -66,9 +66,9 @@ Six reinforcement lines are defined with the following properties:
 | $T_{max}$ | 800 lb/ft |
 | $T_{res}$ | 600 lb/ft |
 | $L_{p1}$, $L_{p2}$ | 4 ft |
-| $E$ | 100,000 psf |
+| $E$ | 800,000 psf |
 | $Area$ | 0.1 ft$^2$/ft |
-| $EA$ | 10,000 lb/ft |
+| $EA$ | 80,000 lb/ft |
 
 Excel input file: [xslope_reinforce_fem.xlsx](files/xslope_reinforce_fem.xlsx)
 

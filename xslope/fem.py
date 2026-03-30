@@ -2234,7 +2234,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     if not solution_min["converged"]:
         return {
             "converged": False,
-            "error": f"F_min = {F_min} does not converge - slope unstable at F=1",
+            "error": f"F_min = {F_min} does not converge - slope unstable at F={F_min}",
             "FS": None
         }
     if debug_level >= 1:
@@ -2334,7 +2334,7 @@ def _ssrm_unbalanced_force(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     if not solution_min["converged"]:
         return {
             "converged": False,
-            "error": f"F_min = {F_min} does not converge — slope unstable at F=1",
+            "error": f"F_min = {F_min} does not converge — slope unstable at F={F_min}",
             "FS": None
         }
 

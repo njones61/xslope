@@ -963,37 +963,32 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
     # Always store with node1_idx < node2_idx for consistency
     midside_nodes = {}
     next_node_idx = len(nodes)
-    
+    new_node_coords = []  # collect new coords, append to nodes at the end
+
     def get_or_create_midside_node(n1_idx, n2_idx):
         """Get existing midside node or create new one between n1 and n2"""
-        nonlocal next_node_idx, nodes
-        
+        nonlocal next_node_idx
+
         # Ensure consistent ordering
         if n1_idx > n2_idx:
             n1_idx, n2_idx = n2_idx, n1_idx
-            
+
         edge_key = (n1_idx, n2_idx)
-        
+
         if edge_key in midside_nodes:
             return midside_nodes[edge_key]
-        
+
         # Create new midside node at edge center
-        n1 = nodes[n1_idx]
-        n2 = nodes[n2_idx]
-        midside_coord = (n1 + n2) / 2.0
-        
-        # Add to nodes array
-        nodes_list = nodes.tolist()
-        nodes_list.append(midside_coord.tolist())
-        nodes = np.array(nodes_list)
-        
+        midside_coord = (nodes[n1_idx] + nodes[n2_idx]) / 2.0
+        new_node_coords.append(midside_coord)
+
         midside_idx = next_node_idx
         midside_nodes[edge_key] = midside_idx
         next_node_idx += 1
-        
+
         if debug and len(midside_nodes) <= 10:  # Only print first few
             print(f"  Created midside node {midside_idx} between {n1_idx}-{n2_idx} at {midside_coord}")
-        
+
         return midside_idx
     
     # Convert 2D elements
@@ -1080,10 +1075,14 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
             new_elements_1d.append(element.tolist())
             new_element_types_1d.append(element_types_1d[elem_idx])
     
+    # Append all new midside node coordinates at once
+    if new_node_coords:
+        nodes = np.vstack([nodes, np.array(new_node_coords)])
+
     if debug:
         print(f"  Added {len(midside_nodes)} midside nodes")
         print(f"  Total nodes: {len(nodes)} (was {len(mesh['nodes'])})")
-    
+
     # Create updated mesh
     updated_mesh = {
         "nodes": nodes,

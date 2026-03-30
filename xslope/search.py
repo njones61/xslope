@@ -33,6 +33,11 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
         list of dict: circle_cache - all circles tested during search
     """
 
+    if not slope_data.get('circles'):
+        print("\nERROR: Circular search requires at least one circle defined in the input.")
+        print("       Add circle data to the 'circles' sheet in the input template.")
+        raise SystemExit(1)
+
     if rapid:
         validate_rapid_drawdown(slope_data)
 
@@ -245,6 +250,11 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         converged : bool indicating if search converged
         search_path : list of surfaces evaluated during search
     """
+    if not slope_data.get('non_circ'):
+        print("\nERROR: Non-circular search requires a non-circular surface defined in the input.")
+        print("       Add surface point data to the 'circles' sheet (non-circular section) in the input template.")
+        raise SystemExit(1)
+
     if rapid:
         validate_rapid_drawdown(slope_data)
 

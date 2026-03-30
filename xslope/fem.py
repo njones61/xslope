@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 from math import degrees, sin, cos, sqrt
 
 
@@ -2161,6 +2162,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
     """
 
+    t_start = time.perf_counter()
+
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']
     has_linear = any(t in (3, 4) for t in element_types)
@@ -2179,25 +2182,32 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         print("!" * 72 + "\n")
 
     if failure_criterion == "non_convergence":
-        return _ssrm_displacement_limit(
+        result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None)
     elif failure_criterion == "displacement_increase":
-        return _ssrm_displacement_increase(
+        result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep)
     elif failure_criterion == "unbalanced_force":
-        return _ssrm_unbalanced_force(
+        result = _ssrm_unbalanced_force(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, ufr_threshold=ufr_threshold)
     else:
-        return _ssrm_displacement_limit(
+        result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor)
+
+    elapsed = time.perf_counter() - t_start
+    result["elapsed_time"] = elapsed
+    if debug_level >= 1:
+        print(f"  SSRM completed in {elapsed:.1f} seconds")
+
+    return result
 
 
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,

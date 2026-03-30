@@ -19,6 +19,29 @@ from scipy.sparse.linalg import spsolve
 from shapely.geometry import LineString, Point
 
 
+def _min_distance_to_polyline(points, polyline):
+    """Vectorized min distance from each point to a polyline (array of vertices).
+
+    For each segment of the polyline, projects all points onto the segment
+    and computes the clamped distance. Returns the minimum over all segments.
+    """
+    dists = np.full(len(points), np.inf)
+    for i in range(len(polyline) - 1):
+        a = polyline[i]
+        b = polyline[i + 1]
+        ab = b - a
+        ab_sq = np.dot(ab, ab)
+        if ab_sq < 1e-30:
+            continue
+        # Project each point onto segment ab, clamped to [0, 1]
+        ap = points - a
+        t = np.clip(ap @ ab / ab_sq, 0.0, 1.0)
+        proj = a + t[:, None] * ab
+        d = np.linalg.norm(points - proj, axis=1)
+        np.minimum(dists, d, out=dists)
+    return dists
+
+
 def build_seep_data(mesh, slope_data, seep_bc=1):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
@@ -105,40 +128,30 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
     print(f"Mesh tolerance for boundary conditions: {tolerance:.6f}")
     
     # Process specified head boundary conditions
+    # Vectorized: compute distance from all nodes to each BC line at once
     specified_heads = seepage_bc.get("specified_heads", [])
     for bc in specified_heads:
         head_value = bc["head"]
         coords = bc["coords"]
-        
+
         if len(coords) < 2:
             continue
-            
-        # Create LineString from boundary condition coordinates
-        bc_line = LineString(coords)
-        
-        # Find nodes that are close to this line (within tolerance)
-        for i, node_coord in enumerate(nodes):
-            node_point = Point(node_coord)
-            
-            # Check if node is on or very close to the boundary condition line
-            if bc_line.distance(node_point) <= tolerance:
-                bc_type[i] = 1  # Fixed head
-                bc_values[i] = head_value
-    
+
+        # Compute min distance from each node to any segment of the BC line
+        seg_coords = np.array(coords)
+        dists = _min_distance_to_polyline(nodes, seg_coords)
+        mask = dists <= tolerance
+        bc_type[mask] = 1
+        bc_values[mask] = head_value
+
     # Process seep face (exit face) boundary conditions
     exit_face_coords = seepage_bc.get("exit_face", [])
     if len(exit_face_coords) >= 2:
-        # Create LineString from exit face coordinates
-        exit_face_line = LineString(exit_face_coords)
-        
-        # Find nodes that are close to this line
-        for i, node_coord in enumerate(nodes):
-            node_point = Point(node_coord)
-            
-            # Check if node is on or very close to the exit face line
-            if exit_face_line.distance(node_point) <= tolerance:
-                bc_type[i] = 2  # Exit face
-                bc_values[i] = node_coord[1]  # Use node's y-coordinate as elevation
+        seg_coords = np.array(exit_face_coords)
+        dists = _min_distance_to_polyline(nodes, seg_coords)
+        mask = dists <= tolerance
+        bc_type[mask] = 2
+        bc_values[mask] = nodes[mask, 1]  # Use node's y-coordinate as elevation
     
     # Check for missing unsaturated parameters when exit face BCs are present
     has_exit_face = np.any(bc_type == 2)

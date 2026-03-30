@@ -421,11 +421,8 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
     head = spsolve(A.tocsr(), b)
     q = A_full.tocsr() @ head
 
-    total_flow = 0.0
-
-    for node_idx in range(len(bc_type)):
-        if q[node_idx] > 0:  # Positive flow
-            total_flow += q[node_idx]
+    # Net inflow through specified-head boundary (works for all element types)
+    total_flow = sum(q[i] for i in range(len(bc_type)) if bc_type[i] == 1)
 
     return head, A, q, total_flow
 
@@ -468,6 +465,38 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     # Track which exit face nodes are active (saturated)
     exit_face_active = np.ones(n_nodes, dtype=bool)
     exit_face_active[bc_type != 2] = False
+
+    # Build exit face edge groups for flow direction check.
+    # For quadratic elements, individual node q values from K@h can oscillate
+    # along an edge. The edge-net q correctly represents physical flow direction.
+    from collections import defaultdict as _defaultdict
+    _exit_edge_groups = []       # each entry: list of node indices on the edge
+    _node_exit_edges = _defaultdict(list)  # node -> list of edge group indices
+    _seen_edges = set()
+    for _idx, _en in enumerate(elements):
+        _et = element_types[_idx]
+        if _et == 3:
+            _ledges = [(0, 1), (1, 2), (2, 0)]
+        elif _et == 6:
+            _ledges = [(0, 3, 1), (1, 4, 2), (2, 5, 0)]
+        elif _et == 4:
+            _ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        elif _et in (8, 9):
+            _ledges = [(0, 4, 1), (1, 5, 2), (2, 6, 3), (3, 7, 0)]
+        else:
+            continue
+        for _le in _ledges:
+            _gnodes = [_en[i] for i in _le]
+            _corners = (_gnodes[0], _gnodes[-1])
+            _ekey = tuple(sorted(_corners))
+            if _ekey in _seen_edges:
+                continue
+            if bc_type[_corners[0]] == 2 and bc_type[_corners[1]] == 2:
+                _seen_edges.add(_ekey)
+                _eidx = len(_exit_edge_groups)
+                _exit_edge_groups.append(_gnodes)
+                for _n in _gnodes:
+                    _node_exit_edges[_n].append(_eidx)
 
     # Store previous iteration values
     h_last = h.copy()
@@ -677,15 +706,23 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         n_active_before = np.sum(exit_face_active)
         hyst = 0.001 * (ymax - ymin)  # Hysteresis threshold
 
+        # Compute edge-net q for exit face activation check.
+        # Using net flow per edge avoids quadratic element oscillations
+        # that can give misleading q signs at individual midside nodes.
+        _edge_net_q = [sum(q[n] for n in eg) for eg in _exit_edge_groups]
+
         for node_idx in range(n_nodes):
             if bc_type[node_idx] == 2:
+                _edges = _node_exit_edges.get(node_idx)
+                _net_q = np.mean([_edge_net_q[e] for e in _edges]) if _edges else q[node_idx]
+
                 if exit_face_active[node_idx]:
                     # Check if node should become inactive
-                    if h_new[node_idx] < y[node_idx] - hyst or q[node_idx] > 0:
+                    if h_new[node_idx] < y[node_idx] - hyst or _net_q > 0:
                         exit_face_active[node_idx] = False
                 else:
                     # Check if node should become active again
-                    if h_new[node_idx] >= y[node_idx] + hyst and q[node_idx] <= 0:
+                    if h_new[node_idx] >= y[node_idx] + hyst and _net_q <= 0:
                         exit_face_active[node_idx] = True
                         h_new[node_idx] = y[node_idx]  # Reset to elevation
 
@@ -719,31 +756,25 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     q_final = q
 
-    # Flow potential closure check - FORTRAN-style
-    total_inflow = 0.0
-    total_outflow = 0.0
-    
+    # Flow closure check — use NET flow at each boundary type.
+    # For quadratic elements, consistent nodal forces can oscillate along an edge
+    # (positive at midside, negative at corners or vice versa). Splitting
+    # positive/negative per node inflates both totals. Summing all q at each
+    # boundary type gives the correct net flux regardless of element order.
+    total_inflow = 0.0   # net flow entering through specified-head boundary
+    total_outflow = 0.0  # net flow leaving through active exit face
+
     for node_idx in range(n_nodes):
-        if bc_type[node_idx] == 1:  # Fixed head boundary
-            if q_final[node_idx] > 0:
-                total_inflow += q_final[node_idx]
-            elif q_final[node_idx] < 0:
-                total_outflow -= q_final[node_idx]
-        elif bc_type[node_idx] == 2 and exit_face_active[node_idx]:  # Active exit face
-            if q_final[node_idx] < 0:
-                total_outflow -= q_final[node_idx]
+        if bc_type[node_idx] == 1:
+            total_inflow += q_final[node_idx]
+        elif bc_type[node_idx] == 2:
+            total_outflow -= q_final[node_idx]
 
     closure_error = abs(total_inflow - total_outflow)
-    print(f"Flow potential closure check: error = {closure_error:.6e}")
-    print(f"Total inflow: {total_inflow:.6e}")
-    print(f"Total outflow: {total_outflow:.6e}")
+    print(f"Flow closure check: inflow = {total_inflow:.6e}, outflow = {total_outflow:.6e}, error = {closure_error:.6e}")
 
     if closure_error > 0.01 * max(abs(total_inflow), abs(total_outflow)):
-        print(f"Warning: Large flow potential closure error = {closure_error:.6e}")
-        print("This may indicate:")
-        print("  - Non-conservative flow field")
-        print("  - Incorrect boundary identification")
-        print("  - Numerical issues in the flow solution")
+        print(f"Warning: Large flow closure error = {closure_error:.6e}")
         print(f"Try reducing the tolerance (tol) parameter. Current value: {tol:.6e}")
 
     return h, A, q_final, total_inflow
@@ -875,21 +906,42 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
         print("=== FLOW POTENTIAL BC DEBUG ===")
 
     # Step 1: Build edge dictionary and count how many times each edge appears
+    # For quadratic elements, split edges at midside nodes so the boundary walk
+    # includes them and their flow contributions are captured in the closure check.
     edge_counts = defaultdict(list)
     for idx, element_nodes in enumerate(elements):
         element_type = element_types[idx]
-        
-        if element_type in [3, 6]:
-            # Triangular elements: 3 edges (use corner nodes only for boundary detection)
+
+        if element_type == 3:
+            # Linear triangle: 3 edges
             i, j, k = element_nodes[:3]
             edges = [(i, j), (j, k), (k, i)]
-        elif element_type in [4, 8, 9]:
-            # Quadrilateral elements: 4 edges (use corner nodes only for boundary detection)
+        elif element_type == 6:
+            # Quadratic triangle: split each edge at midside node
+            # Corner: 0,1,2  Midside: 3(0-1), 4(1-2), 5(2-0)
+            i, j, k = element_nodes[:3]
+            m01, m12, m20 = element_nodes[3], element_nodes[4], element_nodes[5]
+            edges = [(i, m01), (m01, j), (j, m12), (m12, k), (k, m20), (m20, i)]
+        elif element_type == 4:
+            # Linear quadrilateral: 4 edges
             i, j, k, l = element_nodes[:4]
             edges = [(i, j), (j, k), (k, l), (l, i)]
+        elif element_type == 8:
+            # Quadratic quad: split each edge at midside node
+            # Corner: 0,1,2,3  Midside: 4(0-1), 5(1-2), 6(2-3), 7(3-0)
+            i, j, k, l = element_nodes[:4]
+            m01, m12, m23, m30 = element_nodes[4], element_nodes[5], element_nodes[6], element_nodes[7]
+            edges = [(i, m01), (m01, j), (j, m12), (m12, k),
+                     (k, m23), (m23, l), (l, m30), (m30, i)]
+        elif element_type == 9:
+            # 9-node quad: same edge structure as quad8 (center node is interior)
+            i, j, k, l = element_nodes[:4]
+            m01, m12, m23, m30 = element_nodes[4], element_nodes[5], element_nodes[6], element_nodes[7]
+            edges = [(i, m01), (m01, j), (j, m12), (m12, k),
+                     (k, m23), (m23, l), (l, m30), (m30, i)]
         else:
             continue  # Skip unknown element types
-            
+
         for a, b in edges:
             edge = tuple(sorted((a, b)))
             edge_counts[edge].append(idx)

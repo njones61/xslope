@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+from matplotlib.collections import LineCollection, PatchCollection
+from matplotlib.patches import Polygon
 from matplotlib.ticker import MaxNLocator
 import numpy as np
 
@@ -8,7 +10,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
-    
+
     Args:
         seep_data: Dictionary containing seep data from import_seep2d
         show_nodes: If True, plot node points
@@ -17,18 +19,16 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         label_nodes: If True, label each node with its number just above and to the right
     """
 
-    from matplotlib.patches import Polygon
-
     # Extract data from seep_data
     nodes = seep_data["nodes"]
     elements = seep_data["elements"]
     element_materials = seep_data["element_materials"]
-    element_types = seep_data.get("element_types", None)  # New field for element types
+    element_types = seep_data.get("element_types", None)
     bc_type = seep_data["bc_type"]
 
     fig, ax = plt.subplots(figsize=figsize)
     materials = np.unique(element_materials)
-    
+
     # Import get_material_color to ensure consistent colors with plot_mesh
     from .plot import get_material_color
     mat_to_color = {mat: get_material_color(mat) for mat in materials}
@@ -37,116 +37,111 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     if element_types is None:
         element_types = np.full(len(elements), 3)
 
+    # Batch polygons and edge lines by material for efficient rendering
+    mat_fill_polys = {mat: [] for mat in materials}
+    edge_segments = []
+
     for idx, element_nodes in enumerate(elements):
         element_type = element_types[idx]
-        color = mat_to_color[element_materials[idx]]
-        
-        if element_type == 3:  # Linear triangle
-            polygon_coords = nodes[element_nodes[:3]]
-            polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
-            ax.add_patch(polygon)
-            
-        elif element_type == 6:  # Quadratic triangle - subdivide into 4 sub-triangles
-            # Corner nodes
-            n0, n1, n2 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]]
-            # Midpoint nodes - standard GMSH pattern: n3=edge 0-1, n4=edge 1-2, n5=edge 2-0
-            n3, n4, n5 = nodes[element_nodes[3]], nodes[element_nodes[4]], nodes[element_nodes[5]]
-            
-            # Create 4 sub-triangles with standard GMSH connectivity
-            sub_triangles = [
-                [n0, n3, n5],  # Corner triangle at node 0 (uses midpoints 0-1 and 2-0)
-                [n3, n1, n4],  # Corner triangle at node 1 (uses midpoints 0-1 and 1-2)
-                [n5, n4, n2],  # Corner triangle at node 2 (uses midpoints 2-0 and 1-2)
-                [n3, n4, n5]   # Center triangle (connects all midpoints)
-            ]
-            
-            # Add all sub-triangles without internal edges
-            for sub_tri in sub_triangles:
-                polygon = Polygon(sub_tri, edgecolor='none', facecolor=color, alpha=alpha)
-                ax.add_patch(polygon)
-            
-            # Add outer boundary of the tri6 element
-            outer_boundary = [n0, n1, n2, n0]  # Close the triangle
-            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
-                   'k-', linewidth=0.5)
-                
-        elif element_type == 4:  # Linear quadrilateral
-            polygon_coords = nodes[element_nodes[:4]]
-            polygon = Polygon(polygon_coords, edgecolor='k', facecolor=color, linewidth=0.5, alpha=alpha)
-            ax.add_patch(polygon)
-            
-        elif element_type == 8:  # Quadratic quadrilateral - subdivide into 4 sub-quads
-            # Corner nodes
-            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
-            # Midpoint nodes
-            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
-            
-            # Calculate center point (average of all 8 nodes)
-            center = ((n0[0] + n1[0] + n2[0] + n3[0] + n4[0] + n5[0] + n6[0] + n7[0]) / 8,
-                     (n0[1] + n1[1] + n2[1] + n3[1] + n4[1] + n5[1] + n6[1] + n7[1]) / 8)
-            
-            # Create 4 sub-quadrilaterals
-            sub_quads = [
-                [n0, n4, center, n7],  # Sub-quad at corner 0
-                [n4, n1, n5, center],  # Sub-quad at corner 1
-                [center, n5, n2, n6],  # Sub-quad at corner 2
-                [n7, center, n6, n3]   # Sub-quad at corner 3
-            ]
-            
-            # Add all sub-quads without internal edges
-            for sub_quad in sub_quads:
-                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
-                ax.add_patch(polygon)
-            
-            # Add outer boundary of the quad8 element
-            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
-            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
-                   'k-', linewidth=0.5)
-                
-        elif element_type == 9:  # 9-node quadrilateral - subdivide using actual center node
-            # Corner nodes
-            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
-            # Midpoint nodes
-            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
-            # Center node
-            center = nodes[element_nodes[8]]
-            
-            # Create 4 sub-quadrilaterals using the actual center node
-            sub_quads = [
-                [n0, n4, center, n7],  # Sub-quad at corner 0
-                [n4, n1, n5, center],  # Sub-quad at corner 1
-                [center, n5, n2, n6],  # Sub-quad at corner 2
-                [n7, center, n6, n3]   # Sub-quad at corner 3
-            ]
-            
-            # Add all sub-quads without internal edges
-            for sub_quad in sub_quads:
-                polygon = Polygon(sub_quad, edgecolor='none', facecolor=color, alpha=alpha)
-                ax.add_patch(polygon)
-            
-            # Add outer boundary of the quad9 element
-            outer_boundary = [n0, n1, n2, n3, n0]  # Close the quadrilateral
-            ax.plot([p[0] for p in outer_boundary], [p[1] for p in outer_boundary], 
-                   'k-', linewidth=0.5)
+        mat = element_materials[idx]
 
-        # Label element number at centroid if requested
-        if label_elements:
-            # Calculate centroid based on element type
-            if element_type in [3, 4]:
-                # For linear elements, use the polygon_coords
-                if element_type == 3:
-                    element_coords = nodes[element_nodes[:3]]
-                else:
-                    element_coords = nodes[element_nodes[:4]]
+        if element_type == 3:  # Linear triangle
+            mat_fill_polys[mat].append(nodes[element_nodes[:3]])
+
+        elif element_type == 6:  # Quadratic triangle - subdivide into 4 sub-triangles
+            n0, n1, n2 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]]
+            n3, n4, n5 = nodes[element_nodes[3]], nodes[element_nodes[4]], nodes[element_nodes[5]]
+            mat_fill_polys[mat].extend([
+                np.array([n0, n3, n5]),
+                np.array([n3, n1, n4]),
+                np.array([n5, n4, n2]),
+                np.array([n3, n4, n5]),
+            ])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n0]])
+
+        elif element_type == 4:  # Linear quadrilateral
+            mat_fill_polys[mat].append(nodes[element_nodes[:4]])
+
+        elif element_type == 8:  # Quadratic quadrilateral - subdivide into 4 sub-quads
+            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
+            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
+            center = np.array([(n0[0]+n1[0]+n2[0]+n3[0]+n4[0]+n5[0]+n6[0]+n7[0]) / 8,
+                               (n0[1]+n1[1]+n2[1]+n3[1]+n4[1]+n5[1]+n6[1]+n7[1]) / 8])
+            mat_fill_polys[mat].extend([
+                np.array([n0, n4, center, n7]),
+                np.array([n4, n1, n5, center]),
+                np.array([center, n5, n2, n6]),
+                np.array([n7, center, n6, n3]),
+            ])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
+
+        elif element_type == 9:  # 9-node quadrilateral
+            n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
+            n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
+            center = nodes[element_nodes[8]]
+            mat_fill_polys[mat].extend([
+                np.array([n0, n4, center, n7]),
+                np.array([n4, n1, n5, center]),
+                np.array([center, n5, n2, n6]),
+                np.array([n7, center, n6, n3]),
+            ])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
+
+    # Render filled polygons as batched PatchCollections (one per material)
+    for mat in materials:
+        polys = mat_fill_polys[mat]
+        if not polys:
+            continue
+        has_edge = any(element_types[i] in (3, 4) for i, m in enumerate(element_materials) if m == mat)
+        has_no_edge = any(element_types[i] in (6, 8, 9) for i, m in enumerate(element_materials) if m == mat)
+        color = mat_to_color[mat]
+
+        if has_edge and not has_no_edge:
+            patch_list = [Polygon(p) for p in polys]
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+            ax.add_collection(pc)
+        elif has_no_edge and not has_edge:
+            patch_list = [Polygon(p) for p in polys]
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha)
+            ax.add_collection(pc)
+        else:
+            linear_polys = []
+            sub_polys = []
+            sub_idx = 0
+            for i in range(len(elements)):
+                if element_materials[i] != mat:
+                    continue
+                et = element_types[i]
+                if et in (3, 4):
+                    linear_polys.append(polys[sub_idx]); sub_idx += 1
+                elif et in (6, 8, 9):
+                    sub_polys.extend(polys[sub_idx:sub_idx+4]); sub_idx += 4
+            if linear_polys:
+                pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+                ax.add_collection(pc)
+            if sub_polys:
+                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha)
+                ax.add_collection(pc)
+
+    # Render outer boundary edges of quadratic elements as a single LineCollection
+    if edge_segments:
+        lc = LineCollection(edge_segments, colors='k', linewidths=0.5)
+        ax.add_collection(lc)
+
+    # Label element numbers at centroids if requested
+    if label_elements:
+        for idx, element_nodes in enumerate(elements):
+            element_type = element_types[idx]
+            if element_type == 3:
+                element_coords = nodes[element_nodes[:3]]
+            elif element_type == 4:
+                element_coords = nodes[element_nodes[:4]]
+            elif element_type == 6:
+                element_coords = nodes[element_nodes[:6]]
+            elif element_type == 8:
+                element_coords = nodes[element_nodes[:8]]
             else:
-                # For quadratic elements, use all nodes to calculate centroid
-                if element_type == 6:
-                    element_coords = nodes[element_nodes[:6]]
-                elif element_type == 8:
-                    element_coords = nodes[element_nodes[:8]]
-                else:  # element_type == 9
-                    element_coords = nodes[element_nodes[:9]]
-            
+                element_coords = nodes[element_nodes[:9]]
             centroid = np.mean(element_coords, axis=0)
             ax.text(centroid[0], centroid[1], str(idx+1),
                     ha='center', va='center', fontsize=6, color='black', alpha=0.4,
@@ -291,12 +286,6 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     - The title includes flowrate information if available in the solution dictionary and
       variable="head".
     """
-    import matplotlib.pyplot as plt
-    import matplotlib.tri as tri
-    from matplotlib.ticker import MaxNLocator
-    from matplotlib.patches import Polygon
-    import numpy as np
-
     # Validate variable parameter
     valid_variables = ["head", "u", "v_mag", "i_mag"]
     if variable not in valid_variables:
@@ -344,83 +333,64 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     # Plot material zones first (if element_materials provided)
     if element_materials is not None:
         materials = np.unique(element_materials)
-        
+
         # Import get_material_color to ensure consistent colors with plot_mesh
         from .plot import get_material_color
         mat_to_color = {mat: get_material_color(mat) for mat in materials}
 
-        # Plot all elements with proper subdivision for quadratic elements
+        # Batch polygons by material for efficient rendering
+        mat_fill_polys = {mat: [] for mat in materials}
+
         for idx, element_nodes in enumerate(elements):
             element_type = element_types[idx]
-            color = mat_to_color[element_materials[idx]]
-            
+            mat = element_materials[idx]
+
             if element_type == 3:  # Linear triangle
-                polygon = nodes[element_nodes[:3]]
-                ax.fill(*zip(*polygon), edgecolor='none', facecolor=color, alpha=alpha)
-                
+                mat_fill_polys[mat].append(nodes[element_nodes[:3]])
+
             elif element_type == 6:  # Quadratic triangle - subdivide into 4 sub-triangles
-                # Corner nodes
                 n0, n1, n2 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]]
-                # Midpoint nodes - standard GMSH pattern: n3=edge 0-1, n4=edge 1-2, n5=edge 2-0
                 n3, n4, n5 = nodes[element_nodes[3]], nodes[element_nodes[4]], nodes[element_nodes[5]]
-                
-                # Create 4 sub-triangles with standard GMSH connectivity
-                sub_triangles = [
-                    [n0, n3, n5],  # Corner triangle at node 0 (uses midpoints 0-1 and 2-0)
-                    [n3, n1, n4],  # Corner triangle at node 1 (uses midpoints 0-1 and 1-2)
-                    [n5, n4, n2],  # Corner triangle at node 2 (uses midpoints 2-0 and 1-2)
-                    [n3, n4, n5]   # Center triangle (connects all midpoints)
-                ]
-                
-                # Plot all sub-triangles
-                for sub_tri in sub_triangles:
-                    ax.fill(*zip(*sub_tri), edgecolor='none', facecolor=color, alpha=alpha)
-                    
+                mat_fill_polys[mat].extend([
+                    np.array([n0, n3, n5]),
+                    np.array([n3, n1, n4]),
+                    np.array([n5, n4, n2]),
+                    np.array([n3, n4, n5]),
+                ])
+
             elif element_type == 4:  # Linear quadrilateral
-                polygon = nodes[element_nodes[:4]]
-                ax.fill(*zip(*polygon), edgecolor='none', facecolor=color, alpha=alpha)
-                
+                mat_fill_polys[mat].append(nodes[element_nodes[:4]])
+
             elif element_type == 8:  # Quadratic quadrilateral - subdivide into 4 sub-quads
-                # Corner nodes
                 n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
-                # Midpoint nodes
                 n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
-                
-                # Calculate center point (average of all 8 nodes)
-                center = ((n0[0] + n1[0] + n2[0] + n3[0] + n4[0] + n5[0] + n6[0] + n7[0]) / 8,
-                         (n0[1] + n1[1] + n2[1] + n3[1] + n4[1] + n5[1] + n6[1] + n7[1]) / 8)
-                
-                # Create 4 sub-quadrilaterals
-                sub_quads = [
-                    [n0, n4, center, n7],  # Sub-quad at corner 0
-                    [n4, n1, n5, center],  # Sub-quad at corner 1
-                    [center, n5, n2, n6],  # Sub-quad at corner 2
-                    [n7, center, n6, n3]   # Sub-quad at corner 3
-                ]
-                
-                # Plot all sub-quads
-                for sub_quad in sub_quads:
-                    ax.fill(*zip(*sub_quad), edgecolor='none', facecolor=color, alpha=alpha)
-                    
-            elif element_type == 9:  # 9-node quadrilateral - subdivide using actual center node
-                # Corner nodes
+                center = np.array([(n0[0]+n1[0]+n2[0]+n3[0]+n4[0]+n5[0]+n6[0]+n7[0]) / 8,
+                                   (n0[1]+n1[1]+n2[1]+n3[1]+n4[1]+n5[1]+n6[1]+n7[1]) / 8])
+                mat_fill_polys[mat].extend([
+                    np.array([n0, n4, center, n7]),
+                    np.array([n4, n1, n5, center]),
+                    np.array([center, n5, n2, n6]),
+                    np.array([n7, center, n6, n3]),
+                ])
+
+            elif element_type == 9:  # 9-node quadrilateral
                 n0, n1, n2, n3 = nodes[element_nodes[0]], nodes[element_nodes[1]], nodes[element_nodes[2]], nodes[element_nodes[3]]
-                # Midpoint nodes
                 n4, n5, n6, n7 = nodes[element_nodes[4]], nodes[element_nodes[5]], nodes[element_nodes[6]], nodes[element_nodes[7]]
-                # Center node
                 center = nodes[element_nodes[8]]
-                
-                # Create 4 sub-quadrilaterals using the actual center node
-                sub_quads = [
-                    [n0, n4, center, n7],  # Sub-quad at corner 0
-                    [n4, n1, n5, center],  # Sub-quad at corner 1
-                    [center, n5, n2, n6],  # Sub-quad at corner 2
-                    [n7, center, n6, n3]   # Sub-quad at corner 3
-                ]
-                
-                # Plot all sub-quads
-                for sub_quad in sub_quads:
-                    ax.fill(*zip(*sub_quad), edgecolor='none', facecolor=color, alpha=alpha)
+                mat_fill_polys[mat].extend([
+                    np.array([n0, n4, center, n7]),
+                    np.array([n4, n1, n5, center]),
+                    np.array([center, n5, n2, n6]),
+                    np.array([n7, center, n6, n3]),
+                ])
+
+        # Render as batched PatchCollections (one per material)
+        for mat in materials:
+            polys = mat_fill_polys[mat]
+            if polys:
+                patch_list = [Polygon(p) for p in polys]
+                pc = PatchCollection(patch_list, facecolor=mat_to_color[mat], edgecolor='none', alpha=alpha)
+                ax.add_collection(pc)
 
     # Set up contour levels
     vmin = np.min(contour_data)
@@ -535,26 +505,26 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
 
     # Plot element edges if requested
     if mesh:
-        # Draw all element edges
+        mesh_segments = []
         for element, elem_type in zip(elements, element_types if element_types is not None else [3]*len(elements)):
-            if elem_type == 3:
-                # Triangle: connect nodes 0-1-2-0
-                edge_nodes = [element[0], element[1], element[2], element[0]]
-            elif elem_type == 4:
-                # Quadrilateral: connect nodes 0-1-2-3-0
-                edge_nodes = [element[0], element[1], element[2], element[3], element[0]]
-            elif elem_type == 6:
-                # 6-node triangle: only connect corner nodes 0-1-2-0
-                edge_nodes = [element[0], element[1], element[2], element[0]]
-            elif elem_type in [8, 9]:
-                # Higher-order quads: only connect corner nodes 0-1-2-3-0
-                edge_nodes = [element[0], element[1], element[2], element[3], element[0]]
-            else:
-                continue  # Skip unknown element types
-                
-            # Get coordinates of edge nodes
-            edge_coords = nodes[edge_nodes]
-            ax.plot(edge_coords[:, 0], edge_coords[:, 1], color="darkgray", linewidth=0.5, alpha=0.7)
+            if elem_type in (3, 6):
+                # Triangle: corner edges 0-1, 1-2, 2-0
+                mesh_segments.extend([
+                    [nodes[element[0]], nodes[element[1]]],
+                    [nodes[element[1]], nodes[element[2]]],
+                    [nodes[element[2]], nodes[element[0]]],
+                ])
+            elif elem_type in (4, 8, 9):
+                # Quad: corner edges 0-1, 1-2, 2-3, 3-0
+                mesh_segments.extend([
+                    [nodes[element[0]], nodes[element[1]]],
+                    [nodes[element[1]], nodes[element[2]]],
+                    [nodes[element[2]], nodes[element[3]]],
+                    [nodes[element[3]], nodes[element[0]]],
+                ])
+        if mesh_segments:
+            lc = LineCollection(mesh_segments, colors='darkgray', linewidths=0.5, alpha=0.7)
+            ax.add_collection(lc)
 
     # Plot the mesh boundary
     try:

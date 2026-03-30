@@ -467,7 +467,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         base_k = np.sqrt(base_k1 * base_k2)
         ne = levels - 1
         nf = (flowrate * ne) / (base_k * hdrop)
-        phi_levels = round(nf) + 1
+        phi_levels = max(round(nf) + 1, 2)  # at least 2 levels to draw contours
         print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (flowrate={flowrate:.3f}, base k={base_k:.4f}, head drop={hdrop:.3f})")
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
         ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")

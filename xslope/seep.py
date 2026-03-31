@@ -1733,12 +1733,10 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
 
             # For the stream function equation, we need K/det(K), not K^(-1)
             Kmat_flow = Kmat / np.linalg.det(Kmat)
-            # Assemble using the inverse of kr_elem and Kmat_flow
-            # If kr_elem is very small, avoid division by zero
             if kr_elem > 1e-12:
                 ke = (1.0 / kr_elem) * area * grad.T @ Kmat_flow @ grad
             else:
-                ke = 1e12 * area * grad.T @ Kmat_flow @ grad  # Large value for near-zero kr
+                ke = 1e12 * area * grad.T @ Kmat_flow @ grad
 
             for a in range(3):
                 for b_ in range(3):

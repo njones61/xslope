@@ -832,7 +832,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b)  # Equation (3) + pile moment
     
     # ========== BEGIN SOLUTION ==========
-    
+
     def compute_Q_and_yQ(F, theta_rad):
         """Compute Q and y_Q for given F and theta values."""
         # Equation (24): m_alpha
@@ -853,13 +853,13 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     def compute_residuals(F, theta_rad):
         """Compute residuals R1 and R2 for given F and theta values."""
         Q, y_q = compute_Q_and_yQ(F, theta_rad)
-        
+
         # Equation (27): R1 = sum(Q)
         R1 = np.sum(Q)
-        
+
         # Equation (28): R2 = sum(Q * (x_b * sin(theta) - y_Q * cos(theta)))
         R2 = np.sum(Q * (x_b * np.sin(theta_rad) - y_q * np.cos(theta_rad)))
-        
+
         return R1, R2, Q, y_q
 
 
@@ -903,11 +903,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         # First-order partial derivatives of R1 (Equations 35-36)
         dR1_dF = np.sum(dQ_dF)
         dR1_dtheta = np.sum(dQ_dtheta)
-        
+
         # First-order partial derivatives of R2 (Equations 40-41)
         dR2_dF = np.sum(dQ_dF * (x_b * sin_theta - y_q * cos_theta)) - np.sum(Q * dyQ_dF * cos_theta)
         dR2_dtheta = np.sum(dQ_dtheta * (x_b * sin_theta - y_q * cos_theta)) + np.sum(Q * (x_b * cos_theta + y_q * sin_theta - dyQ_dtheta * cos_theta))
-        
+
         return dR1_dF, dR1_dtheta, dR2_dF, dR2_dtheta
 
     
@@ -1016,25 +1016,65 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
         return False, F, theta_rad, max_iter - 1
 
-    # Try with default initial guess first
+    def max_tension_ratio(F_val, theta_val):
+        """Compute max base tension as a multiple of cohesive capacity (c*dl) per slice.
+        Tension beyond what cohesion can sustain is physically anomalous."""
+        _, _, Q_val, _ = compute_residuals(F_val, theta_val)
+        N_eff_val = -Fv * cos_a + Fh * sin_a + Q_val * np.sin(alpha - theta_val) - u * dl
+        tension_mask = N_eff_val < 0
+        if not np.any(tension_mask):
+            return 0.0
+        cohesive_capacity = np.abs(c) * dl  # use abs(c) in case of right_facing sign flip
+        ratios = np.where(
+            tension_mask & (cohesive_capacity > 0),
+            np.abs(N_eff_val) / cohesive_capacity,
+            0.0
+        )
+        return np.max(ratios)
+
+    MAX_TENSION_RATIO = 2.0  # reject if tension exceeds 2x cohesive capacity on any slice
+    best_candidate = None  # (F, theta_rad, tension_ratio) — fallback if no clean solution
+
+    def accept_or_save(F_val, theta_val, label=""):
+        """Accept solution if tension magnitude is reasonable; otherwise save as fallback."""
+        nonlocal best_candidate
+        tr = max_tension_ratio(F_val, theta_val)
+        if tr <= MAX_TENSION_RATIO:
+            return True
+        if best_candidate is None or tr < best_candidate[2]:
+            best_candidate = (F_val, theta_val, tr)
+        if debug_level >= 1:
+            print(f"  {label}F={F_val:.3f}, θ={np.degrees(theta_val):.1f}° → "
+                  f"max tension {tr:.1f}x cohesive capacity — continuing search")
+        return False
+
+    # Strategy 1: Newton with default initial guess
     F0 = 1.5
     theta0_rad = np.radians(-8.0) if right_facing else np.radians(8)
 
     converged, F, theta_rad, iteration = newton_solve(F0, theta0_rad, max_iter, tol, debug_level)
+    if converged and not accept_or_save(F, theta_rad, "Newton default: "):
+        converged = False
 
-    # If default guess failed, retry with Bishop's FS as initial guess
+    # Strategy 2: Newton with Bishop's FS and multiple theta starts
     if not converged:
         try:
             success_bishop, result_bishop = bishop(slice_df)
-            if success_bishop and abs(result_bishop['FS'] - F0) > 0.1:
+            if success_bishop:
                 F0_bishop = result_bishop['FS']
                 if debug_level >= 1:
                     print(f"Retrying with Bishop FS = {F0_bishop:.3f} as initial guess")
-                converged, F, theta_rad, iteration = newton_solve(F0_bishop, theta0_rad, max_iter, tol, debug_level)
+                theta_tries = [theta0_rad, -theta0_rad, 0.0, np.radians(15), np.radians(-15)]
+                for theta_try in theta_tries:
+                    conv_b, F_b, theta_b, _ = newton_solve(F0_bishop, theta_try, max_iter, tol, debug_level)
+                    if conv_b:
+                        if accept_or_save(F_b, theta_b, "Newton Bishop: "):
+                            converged, F, theta_rad = True, F_b, theta_b
+                            break
         except Exception:
             pass  # Bishop may fail for non-circular surfaces
 
-    # Fallback: scipy.optimize.root with trust-region method and multiple starts
+    # Strategy 3: scipy.optimize.root with multiple starts (ordered by |theta|)
     if not converged:
         from scipy.optimize import root as scipy_root
 
@@ -1063,7 +1103,8 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         except Exception:
             pass
 
-        theta_starts = np.radians(np.arange(-25, 26, 5, dtype=float))
+        # Order by |theta| to prefer physically reasonable solutions first
+        theta_starts = np.radians(np.array([0, 5, -5, 10, -10, 15, -15, 20, -20, 25, -25], dtype=float))
 
         for F_try in F_starts:
             for theta_try in theta_starts:
@@ -1073,18 +1114,23 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
                     if sol.success and sol.x[0] > 0.01:
                         R1_c, R2_c, _, _ = compute_residuals(sol.x[0], sol.x[1])
                         if abs(R1_c) < tol and abs(R2_c) < tol:
-                            converged = True
-                            F = sol.x[0]
-                            theta_rad = sol.x[1]
-                            if debug_level >= 1:
-                                print(f"Converged via scipy root: F={F:.3f}, theta={np.degrees(theta_rad):.3f}°")
-                            break
+                            if accept_or_save(sol.x[0], sol.x[1], "scipy: "):
+                                converged = True
+                                F = sol.x[0]
+                                theta_rad = sol.x[1]
+                                if debug_level >= 1:
+                                    print(f"Converged via scipy root: F={F:.3f}, theta={np.degrees(theta_rad):.3f}°")
+                                break
                 except Exception:
                     continue
             if converged:
                 break
 
     if not converged:
+        if best_candidate is not None:
+            return False, (f"Spencer's method: only solutions with anomalous base tension found "
+                           f"({best_candidate[2]:.1f}x cohesive capacity, "
+                           f"θ={np.degrees(best_candidate[1]):.1f}°)")
         return False, "Spencer's method did not converge within the maximum number of iterations."
 
     # Final computation of Q and y_q

@@ -577,24 +577,20 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 R = np.array([[c, s], [-s, c]])
                 Kmat = R.T @ np.diag([k1, k2]) @ R
 
-                # Compute element pressure (centroid)
-                p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
-
-                # Get kr for this element based on its material properties
-                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-
-                # Element stiffness matrix with kr
-                ke = kr_elem * area * grad.T @ Kmat @ grad
+                # Element stiffness with per-Gauss-point kr
+                nodes_elem = nodes[[i, j, k], :]
+                p_elem_nodes = p_nodes[np.array([i, j, k])]
+                ke = tri3_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0[idx], h0[idx], mode='head')
 
                 # Assembly
                 for row in range(3):
                     for col in range(3):
                         A[element_nodes[row], element_nodes[col]] += ke[row, col]
-                        
+
             elif element_type == 6:
                 # 6-node triangle (quadratic)
                 nodes_elem = nodes[element_nodes[:6], :]
-                
+
                 # Get material properties for this element
                 k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
                 k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
@@ -603,19 +599,16 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 c, s = np.cos(theta_rad), np.sin(theta_rad)
                 R = np.array([[c, s], [-s, c]])
                 Kmat = R.T @ np.diag([k1, k2]) @ R
-                
-                # Compute element pressure using quadratic shape functions at centroid
-                p_elem = compute_tri6_centroid_pressure(p_nodes, element_nodes)
-                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-                
-                # Get stiffness matrix and scale by kr
-                ke = kr_elem * tri6_stiffness_matrix(nodes_elem, Kmat)
-                
+
+                # Element stiffness with per-Gauss-point kr
+                p_elem_nodes = p_nodes[element_nodes[:6]]
+                ke = tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0[idx], h0[idx], mode='head')
+
                 # Assembly
                 for a in range(6):
                     for b_ in range(6):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                            
+
             elif element_type == 4:
                 # Quadrilateral: use all 4 nodes
                 i, j, k, l = element_nodes[:4]
@@ -627,16 +620,15 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 c, s = np.cos(theta_rad), np.sin(theta_rad)
                 R = np.array([[c, s], [-s, c]])
                 Kmat = R.T @ np.diag([k1, k2]) @ R
-                # Compute element pressure (centroid)
-                p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
-                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-                
-                ke = kr_elem * quad4_stiffness_matrix(nodes_elem, Kmat)
-                
+
+                # Element stiffness with per-Gauss-point kr
+                p_elem_nodes = p_nodes[np.array([i, j, k, l])]
+                ke = quad4_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0[idx], h0[idx], mode='head')
+
                 for a in range(4):
                     for b_ in range(4):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                        
+
             elif element_type == 8:
                 # 8-node quadrilateral (serendipity)
                 nodes_elem = nodes[element_nodes[:8], :]
@@ -647,17 +639,15 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 c, s = np.cos(theta_rad), np.sin(theta_rad)
                 R = np.array([[c, s], [-s, c]])
                 Kmat = R.T @ np.diag([k1, k2]) @ R
-                
-                # Compute element pressure using serendipity shape functions at centroid
-                p_elem = compute_quad8_centroid_pressure(p_nodes, element_nodes)
-                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-                
-                ke = kr_elem * quad8_stiffness_matrix(nodes_elem, Kmat)
-                
+
+                # Element stiffness with per-Gauss-point kr
+                p_elem_nodes = p_nodes[element_nodes[:8]]
+                ke = quad8_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0[idx], h0[idx], mode='head')
+
                 for a in range(8):
                     for b_ in range(8):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                            
+
             elif element_type == 9:
                 # 9-node quadrilateral (Lagrange)
                 nodes_elem = nodes[element_nodes[:9], :]
@@ -668,13 +658,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 c, s = np.cos(theta_rad), np.sin(theta_rad)
                 R = np.array([[c, s], [-s, c]])
                 Kmat = R.T @ np.diag([k1, k2]) @ R
-                
-                # Compute element pressure using biquadratic shape functions at centroid
-                p_elem = compute_quad9_centroid_pressure(p_nodes, element_nodes)
-                kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-                
-                ke = kr_elem * quad9_stiffness_matrix(nodes_elem, Kmat)
-                
+
+                # Element stiffness with per-Gauss-point kr
+                p_elem_nodes = p_nodes[element_nodes[:9]]
+                ke = quad9_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0[idx], h0[idx], mode='head')
+
                 for a in range(9):
                     for b_ in range(9):
                         A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
@@ -1727,28 +1715,22 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             theta_rad = np.radians(theta)
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
-            Kmat = R.T @ np.diag([k1, k2]) @ R  # Kmat is (2,2)
-
-            # Compute element pressure (centroid)
-            p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k]) / 3.0
-            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-
-            # For the stream function equation, we need K/det(K), not K^(-1)
+            Kmat = R.T @ np.diag([k1, k2]) @ R
             Kmat_flow = Kmat / np.linalg.det(Kmat)
-            if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * area * grad.T @ Kmat_flow @ grad
-            else:
-                ke = 1e12 * area * grad.T @ Kmat_flow @ grad
+
+            # Element stiffness with per-Gauss-point 1/kr
+            nodes_elem = nodes[[i, j, k], :]
+            p_elem_nodes = p_nodes[np.array([i, j, k])]
+            ke = tri3_stiffness_matrix_kr(nodes_elem, Kmat_flow, p_elem_nodes, kr0[idx], h0[idx], mode='stream')
 
             for a in range(3):
                 for b_ in range(3):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                    
+
         elif element_type == 6:
             # 6-node triangle (quadratic)
             nodes_elem = nodes[element_nodes[:6], :]
 
-            # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -1756,28 +1738,21 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            # For the stream function equation, we need K/det(K), not K^(-1)
             Kmat_flow = Kmat / np.linalg.det(Kmat)
 
-            # Compute element pressure using quadratic shape functions at centroid
-            p_elem = compute_tri6_centroid_pressure(p_nodes, element_nodes)
-            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-
-            if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
-            else:
-                ke = 1e12 * tri6_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
+            # Element stiffness with per-Gauss-point 1/kr
+            p_elem_nodes = p_nodes[element_nodes[:6]]
+            ke = tri6_stiffness_matrix_kr(nodes_elem, Kmat_flow, p_elem_nodes, kr0[idx], h0[idx], mode='stream')
 
             for a in range(6):
                 for b_ in range(6):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                        
+
         elif element_type == 4:
             # 4-node quadrilateral (bilinear)
             i, j, k, l = element_nodes[:4]
             nodes_elem = nodes[[i, j, k, l], :]
 
-            # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -1785,27 +1760,20 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            # For the stream function equation, we need K/det(K), not K^(-1)
             Kmat_flow = Kmat / np.linalg.det(Kmat)
 
-            # Get kr for this element based on its material properties (use centroid)
-            p_elem = (p_nodes[i] + p_nodes[j] + p_nodes[k] + p_nodes[l]) / 4.0
-            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
+            # Element stiffness with per-Gauss-point 1/kr
+            p_elem_nodes = p_nodes[np.array([i, j, k, l])]
+            ke = quad4_stiffness_matrix_kr(nodes_elem, Kmat_flow, p_elem_nodes, kr0[idx], h0[idx], mode='stream')
 
-            # Assemble using the inverse of kr_elem and Kmat_flow
-            if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad4_stiffness_matrix(nodes_elem, Kmat_flow)
-            else:
-                ke = 1e12 * quad4_stiffness_matrix(nodes_elem, Kmat_flow)
             for a in range(4):
                 for b_ in range(4):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                    
+
         elif element_type == 8:
             # 8-node quadrilateral (serendipity)
             nodes_elem = nodes[element_nodes[:8], :]
 
-            # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -1813,27 +1781,20 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            # For the stream function equation, we need K/det(K), not K^(-1)
             Kmat_flow = Kmat / np.linalg.det(Kmat)
 
-            # Compute element pressure using serendipity shape functions at centroid
-            p_elem = compute_quad8_centroid_pressure(p_nodes, element_nodes)
-            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-
-            if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
-            else:
-                ke = 1e12 * quad8_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
+            # Element stiffness with per-Gauss-point 1/kr
+            p_elem_nodes = p_nodes[element_nodes[:8]]
+            ke = quad8_stiffness_matrix_kr(nodes_elem, Kmat_flow, p_elem_nodes, kr0[idx], h0[idx], mode='stream')
 
             for a in range(8):
                 for b_ in range(8):
                     A[element_nodes[a], element_nodes[b_]] += ke[a, b_]
-                        
+
         elif element_type == 9:
             # 9-node quadrilateral (Lagrange)
             nodes_elem = nodes[element_nodes[:9], :]
 
-            # Get material properties for this element
             k1 = k1_vals[idx] if hasattr(k1_vals, '__len__') else k1_vals
             k2 = k2_vals[idx] if hasattr(k2_vals, '__len__') else k2_vals
             theta = angles[idx] if hasattr(angles, '__len__') else angles
@@ -1841,17 +1802,11 @@ def solve_flow_function_unsaturated(nodes, elements, head, k1_vals, k2_vals, ang
             c, s = np.cos(theta_rad), np.sin(theta_rad)
             R = np.array([[c, s], [-s, c]])
             Kmat = R.T @ np.diag([k1, k2]) @ R
-            # For the stream function equation, we need K/det(K), not K^(-1)
             Kmat_flow = Kmat / np.linalg.det(Kmat)
 
-            # Compute element pressure using biquadratic shape functions at centroid
-            p_elem = compute_quad9_centroid_pressure(p_nodes, element_nodes)
-            kr_elem = kr_frontal(p_elem, kr0[idx], h0[idx])
-
-            if kr_elem > 1e-12:
-                ke = (1.0 / kr_elem) * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
-            else:
-                ke = 1e12 * quad9_stiffness_matrix_inverse_k(nodes_elem, Kmat_flow)
+            # Element stiffness with per-Gauss-point 1/kr
+            p_elem_nodes = p_nodes[element_nodes[:9]]
+            ke = quad9_stiffness_matrix_kr(nodes_elem, Kmat_flow, p_elem_nodes, kr0[idx], h0[idx], mode='stream')
 
             for a in range(9):
                 for b_ in range(9):
@@ -2539,6 +2494,326 @@ def quad4_stiffness_matrix(nodes_elem, Kmat):
     
     return ke
 
+
+def _kr_factor(p, kr0, h0, mode):
+    """Compute kr weighting factor at a point for head or stream mode."""
+    kr = kr_frontal(p, kr0, h0)
+    if mode == 'head':
+        return kr
+    else:  # stream
+        return 1.0 / kr if kr > 1e-12 else 1e10
+
+
+def tri3_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
+    """
+    Tri3 element stiffness with centroid kr evaluation.
+
+    For tri3 (constant gradient), per-Gauss-point kr offers no sub-element
+    resolution benefit — it just produces a different scalar average that can
+    break head/stream consistency. We use centroid kr, matching the standard
+    approach for constant-strain triangles.
+
+    Per-Gauss-point kr is used for higher-order elements (tri6, quad4, quad8,
+    quad9) where gradient varies within the element.
+
+    Args:
+        nodes_elem: (3,2) nodal coordinates
+        Kmat: (2,2) conductivity matrix (Kmat for head, Kmat_flow for stream)
+        p_elem_nodes: (3,) nodal pressure values
+        kr0, h0: unsaturated parameters
+        mode: 'head' (multiply by kr) or 'stream' (multiply by 1/kr)
+    """
+    xi, yi = nodes_elem[0]
+    xj, yj = nodes_elem[1]
+    xk, yk = nodes_elem[2]
+
+    area = 0.5 * abs((xj - xi) * (yk - yi) - (xk - xi) * (yj - yi))
+    if area <= 0:
+        return np.zeros((3, 3))
+
+    beta = np.array([yj - yk, yk - yi, yi - yj])
+    gamma = np.array([xk - xj, xi - xk, xj - xi])
+    grad = np.array([beta, gamma]) / (2 * area)
+
+    # Centroid pressure and kr
+    p_centroid = (p_elem_nodes[0] + p_elem_nodes[1] + p_elem_nodes[2]) / 3.0
+    kr_elem = kr_frontal(p_centroid, kr0, h0)
+
+    if mode == 'head':
+        factor = kr_elem
+    else:  # stream
+        factor = 1.0 / kr_elem if kr_elem > 1e-12 else 1e10
+
+    return factor * area * grad.T @ Kmat @ grad
+
+
+def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
+    """
+    Tri6 element stiffness with per-Gauss-point kr evaluation.
+
+    At each Gauss point, pressure is interpolated using quadratic shape functions,
+    kr is computed, and the stiffness contribution is weighted accordingly.
+
+    Args:
+        nodes_elem: (6,2) nodal coordinates
+        Kmat: (2,2) conductivity matrix (Kmat for head, Kmat_flow for stream)
+        p_elem_nodes: (6,) nodal pressure values
+        kr0, h0: unsaturated parameters
+        mode: 'head' or 'stream'
+    """
+    # 3-point Gauss quadrature for triangles
+    gauss_pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
+    weights = [1/3, 1/3, 1/3]
+
+    ke = np.zeros((6, 6))
+
+    # Precompute area coordinate derivatives (constant for the triangle)
+    x0, y0 = nodes_elem[0]
+    x1, y1 = nodes_elem[1]
+    x2, y2 = nodes_elem[2]
+
+    J = np.array([[x0 - x2, x1 - x2],
+                  [y0 - y2, y1 - y2]])
+    detJ = np.linalg.det(J)
+    if abs(detJ) < 1e-10:
+        return ke
+
+    total_area = 0.5 * abs(detJ)
+    dL1_dx = (y1 - y2) / (2 * total_area)
+    dL1_dy = (x2 - x1) / (2 * total_area)
+    dL2_dx = (y2 - y0) / (2 * total_area)
+    dL2_dy = (x0 - x2) / (2 * total_area)
+    dL3_dx = (y0 - y1) / (2 * total_area)
+    dL3_dy = (x1 - x0) / (2 * total_area)
+
+    for (L1, L2, L3), w in zip(gauss_pts, weights):
+        # Quadratic shape function derivatives w.r.t. area coordinates
+        dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
+        dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
+        dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
+
+        gradN = np.zeros((2, 6))
+        for i in range(6):
+            gradN[0, i] = dN_dL1[i]*dL1_dx + dN_dL2[i]*dL2_dx + dN_dL3[i]*dL3_dx
+            gradN[1, i] = dN_dL1[i]*dL1_dy + dN_dL2[i]*dL2_dy + dN_dL3[i]*dL3_dy
+
+        # Interpolate pressure at Gauss point using quadratic shape functions
+        N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                      4*L1*L2, 4*L2*L3, 4*L3*L1])
+        p_gp = N @ p_elem_nodes
+        factor = _kr_factor(p_gp, kr0, h0, mode)
+
+        ke += factor * (gradN.T @ Kmat @ gradN) * total_area * w
+
+    return ke
+
+
+def quad4_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
+    """
+    Quad4 element stiffness with per-Gauss-point kr evaluation.
+
+    Args:
+        nodes_elem: (4,2) nodal coordinates
+        Kmat: (2,2) conductivity matrix (Kmat for head, Kmat_flow for stream)
+        p_elem_nodes: (4,) nodal pressure values
+        kr0, h0: unsaturated parameters
+        mode: 'head' or 'stream'
+    """
+    gauss_pts = [(-1/np.sqrt(3), -1/np.sqrt(3)),
+                 (1/np.sqrt(3), -1/np.sqrt(3)),
+                 (1/np.sqrt(3), 1/np.sqrt(3)),
+                 (-1/np.sqrt(3), 1/np.sqrt(3))]
+    weights = [1, 1, 1, 1]
+    ke = np.zeros((4, 4))
+
+    for (xi, eta), w in zip(gauss_pts, weights):
+        dN_dxi = np.array([-(1-eta), (1-eta), (1+eta), -(1+eta)]) * 0.25
+        dN_deta = np.array([-(1-xi), -(1+xi), (1+xi), (1-xi)]) * 0.25
+
+        J = np.zeros((2, 2))
+        for a in range(4):
+            J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+            J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+            J[1,0] += dN_deta[a] * nodes_elem[a,0]
+            J[1,1] += dN_deta[a] * nodes_elem[a,1]
+
+        detJ = np.linalg.det(J)
+        if detJ <= 0:
+            continue
+        Jinv = np.linalg.inv(J)
+
+        dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+        dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+        gradN = np.vstack((dN_dx, dN_dy))
+
+        # Interpolate pressure at Gauss point
+        N = np.array([0.25*(1-xi)*(1-eta), 0.25*(1+xi)*(1-eta),
+                      0.25*(1+xi)*(1+eta), 0.25*(1-xi)*(1+eta)])
+        p_gp = N @ p_elem_nodes
+        factor = _kr_factor(p_gp, kr0, h0, mode)
+
+        ke += factor * (gradN.T @ Kmat @ gradN) * detJ * w
+
+    return ke
+
+
+def quad8_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
+    """
+    Quad8 (serendipity) element stiffness with per-Gauss-point kr evaluation.
+
+    Args:
+        nodes_elem: (8,2) nodal coordinates
+        Kmat: (2,2) conductivity matrix (Kmat for head, Kmat_flow for stream)
+        p_elem_nodes: (8,) nodal pressure values
+        kr0, h0: unsaturated parameters
+        mode: 'head' or 'stream'
+    """
+    pts_1d = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
+    wts_1d = [5/9, 8/9, 5/9]
+
+    ke = np.zeros((8, 8))
+
+    for i_gp, xi in enumerate(pts_1d):
+        for j_gp, eta in enumerate(pts_1d):
+            w = wts_1d[i_gp] * wts_1d[j_gp]
+
+            # Serendipity shape function derivatives
+            dN_dxi = np.array([
+                -0.25*(1-eta)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta),
+                0.25*(1-eta)*(xi-eta-1) + 0.25*(1+xi)*(1-eta),
+                0.25*(1+eta)*(xi+eta-1) + 0.25*(1+xi)*(1+eta),
+                -0.25*(1+eta)*(-xi+eta-1) - 0.25*(1-xi)*(1+eta),
+                -xi*(1-eta),
+                0.5*(1-eta*eta),
+                -xi*(1+eta),
+                -0.5*(1-eta*eta)
+            ])
+            dN_deta = np.array([
+                -0.25*(1-xi)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta),
+                -0.25*(1+xi)*(xi-eta-1) - 0.25*(1+xi)*(1-eta),
+                0.25*(1+xi)*(xi+eta-1) + 0.25*(1+xi)*(1+eta),
+                0.25*(1-xi)*(-xi+eta-1) + 0.25*(1-xi)*(1+eta),
+                -0.5*(1-xi*xi),
+                -eta*(1+xi),
+                0.5*(1-xi*xi),
+                -eta*(1-xi)
+            ])
+
+            J = np.zeros((2, 2))
+            for a in range(8):
+                J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+                J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+                J[1,0] += dN_deta[a] * nodes_elem[a,0]
+                J[1,1] += dN_deta[a] * nodes_elem[a,1]
+
+            detJ = np.linalg.det(J)
+            if detJ <= 0:
+                continue
+            Jinv = np.linalg.inv(J)
+
+            dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+            dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+            gradN = np.vstack((dN_dx, dN_dy))
+
+            # Serendipity shape function values for pressure interpolation
+            N = np.array([
+                0.25*(1-xi)*(1-eta)*(-xi-eta-1),
+                0.25*(1+xi)*(1-eta)*(xi-eta-1),
+                0.25*(1+xi)*(1+eta)*(xi+eta-1),
+                0.25*(1-xi)*(1+eta)*(-xi+eta-1),
+                0.5*(1-xi*xi)*(1-eta),
+                0.5*(1+xi)*(1-eta*eta),
+                0.5*(1-xi*xi)*(1+eta),
+                0.5*(1-xi)*(1-eta*eta)
+            ])
+            p_gp = N @ p_elem_nodes
+            factor = _kr_factor(p_gp, kr0, h0, mode)
+
+            ke += factor * (gradN.T @ Kmat @ gradN) * detJ * w
+
+    return ke
+
+
+def quad9_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
+    """
+    Quad9 (Lagrange) element stiffness with per-Gauss-point kr evaluation.
+
+    Args:
+        nodes_elem: (9,2) nodal coordinates
+        Kmat: (2,2) conductivity matrix (Kmat for head, Kmat_flow for stream)
+        p_elem_nodes: (9,) nodal pressure values
+        kr0, h0: unsaturated parameters
+        mode: 'head' or 'stream'
+    """
+    pts_1d = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
+    wts_1d = [5/9, 8/9, 5/9]
+
+    ke = np.zeros((9, 9))
+
+    for i_gp, xi in enumerate(pts_1d):
+        for j_gp, eta in enumerate(pts_1d):
+            w = wts_1d[i_gp] * wts_1d[j_gp]
+
+            # Lagrange shape function derivatives (biquadratic)
+            dN_dxi = np.array([
+                0.25*(2*xi-1)*eta*(eta-1),
+                0.25*(2*xi+1)*eta*(eta-1),
+                0.25*(2*xi+1)*eta*(eta+1),
+                0.25*(2*xi-1)*eta*(eta+1),
+                -xi*eta*(eta-1),
+                0.5*(2*xi+1)*(1-eta*eta),
+                -xi*eta*(eta+1),
+                0.5*(2*xi-1)*(1-eta*eta),
+                -2*xi*(1-eta*eta)
+            ])
+            dN_deta = np.array([
+                0.25*xi*(xi-1)*(2*eta-1),
+                0.25*xi*(xi+1)*(2*eta-1),
+                0.25*xi*(xi+1)*(2*eta+1),
+                0.25*xi*(xi-1)*(2*eta+1),
+                0.5*(1-xi*xi)*(2*eta-1),
+                -eta*xi*(xi+1),
+                0.5*(1-xi*xi)*(2*eta+1),
+                -eta*xi*(xi-1),
+                -2*eta*(1-xi*xi)
+            ])
+
+            J = np.zeros((2, 2))
+            for a in range(9):
+                J[0,0] += dN_dxi[a] * nodes_elem[a,0]
+                J[0,1] += dN_dxi[a] * nodes_elem[a,1]
+                J[1,0] += dN_deta[a] * nodes_elem[a,0]
+                J[1,1] += dN_deta[a] * nodes_elem[a,1]
+
+            detJ = np.linalg.det(J)
+            if detJ <= 0:
+                continue
+            Jinv = np.linalg.inv(J)
+
+            dN_dx = Jinv[0,0]*dN_dxi + Jinv[0,1]*dN_deta
+            dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
+            gradN = np.vstack((dN_dx, dN_dy))
+
+            # Lagrange shape function values for pressure interpolation
+            N = np.array([
+                0.25*xi*(xi-1)*eta*(eta-1),
+                0.25*xi*(xi+1)*eta*(eta-1),
+                0.25*xi*(xi+1)*eta*(eta+1),
+                0.25*xi*(xi-1)*eta*(eta+1),
+                0.5*(1-xi*xi)*eta*(eta-1),
+                0.5*xi*(xi+1)*(1-eta*eta),
+                0.5*(1-xi*xi)*eta*(eta+1),
+                0.5*xi*(xi-1)*(1-eta*eta),
+                (1-xi*xi)*(1-eta*eta)
+            ])
+            p_gp = N @ p_elem_nodes
+            factor = _kr_factor(p_gp, kr0, h0, mode)
+
+            ke += factor * (gradN.T @ Kmat @ gradN) * detJ * w
+
+    return ke
+
+
 def run_seepage_analysis(seep_data, tol=1e-6):
     """
     Standalone function to run seep analysis.
@@ -2625,25 +2900,6 @@ def run_seepage_analysis(seep_data, tol=1e-6):
             kr0=kr0_per_element, h0=h0_per_element)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
-        # Flow net quality check: flowlines (grad phi) should be perpendicular
-        # to equipotential lines (grad h) in saturated zones. Compute the mean
-        # angular deviation from 90° across elements below the phreatic surface.
-        _grad_h = compute_gradient(nodes, elements, head, element_types)
-        _grad_phi = compute_gradient(nodes, elements, phi, element_types)
-        # Only check saturated nodes (head >= elevation, i.e. below phreatic)
-        _sat = head >= nodes[:, 1] - 0.1
-        _hm = np.linalg.norm(_grad_h, axis=1)
-        _pm = np.linalg.norm(_grad_phi, axis=1)
-        _valid = _sat & (_hm > 1e-10) & (_pm > 1e-10)
-        if np.any(_valid):
-            _cos = np.sum(_grad_h[_valid] * _grad_phi[_valid], axis=1) / (_hm[_valid] * _pm[_valid])
-            _cos = np.clip(_cos, -1, 1)
-            _angles = np.abs(np.degrees(np.arccos(np.abs(_cos))))  # deviation from 0° or 90°
-            _dev = np.where(_angles > 45, 90 - _angles, _angles)  # deviation from nearest right angle
-            _p90_dev = np.percentile(_dev, 90)
-            if _p90_dev > 10:
-                print(f"Warning: Flow net quality — 90th percentile orthogonality error = {_p90_dev:.1f}°.")
-                print("  Flowlines may be inaccurate near the exit face. Try a finer mesh.")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
     else:
         head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)

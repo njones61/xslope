@@ -5,7 +5,7 @@ from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
-input_file = "test/xslope_reinforce_KEY.xlsx"
+input_file = "test/xslope_earth_dam_fem_KEY.xlsx"
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
@@ -14,7 +14,7 @@ input_path = Path(input_file)
 auto_size = True # @param {"type":"boolean"}
 target_size = 1 # Desired target element size for meshing (adjust as needed for finer/coarser mesh)
 element_type = 'tri6' # @param ["quad4","quad8","tri3","tri6"]
-remesh = True # @param {"type":"boolean"}
+remesh = False # @param {"type":"boolean"}
 
 # Use existing mesh from slope_data if available, otherwise build a new one
 if slope_data.get("mesh") is not None and not remesh:
@@ -29,7 +29,7 @@ else:
     if auto_size:
         # find the x-range of the ground_surface and use it to set the target size
         x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
-        target_size = (x_range[1] - x_range[0]) / 60
+        target_size = (x_range[1] - x_range[0]) / 50
         print(f"Auto-calculated target element size: {target_size:.3f}")
 
     mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=constraint_lines)
@@ -45,8 +45,8 @@ analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
 
 F = 1.7     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
-F_min=1.4  # Minimum FS for SSRM search (adjust as needed)
-F_max=1.8   # Maximum FS for SSRM search (adjust as needed)
+F_min=1.1  # Minimum FS for SSRM search (adjust as needed)
+F_max=1.2   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)

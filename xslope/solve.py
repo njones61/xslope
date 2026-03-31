@@ -1025,9 +1025,10 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         if not np.any(tension_mask):
             return 0.0
         cohesive_capacity = np.abs(c) * dl  # use abs(c) in case of right_facing sign flip
+        safe_capacity = np.where(cohesive_capacity > 0, cohesive_capacity, 1.0)
         ratios = np.where(
             tension_mask & (cohesive_capacity > 0),
-            np.abs(N_eff_val) / cohesive_capacity,
+            np.abs(N_eff_val) / safe_capacity,
             0.0
         )
         return np.max(ratios)

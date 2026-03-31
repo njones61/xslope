@@ -2506,22 +2506,19 @@ def _kr_factor(p, kr0, h0, mode):
 
 def tri3_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
     """
-    Tri3 element stiffness with centroid kr evaluation.
+    Tri3 element stiffness with high-order kr quadrature.
 
-    For tri3 (constant gradient), per-Gauss-point kr offers no sub-element
-    resolution benefit — it just produces a different scalar average that can
-    break head/stream consistency. We use centroid kr, matching the standard
-    approach for constant-strain triangles.
-
-    Per-Gauss-point kr is used for higher-order elements (tri6, quad4, quad8,
-    quad9) where gradient varies within the element.
+    Gradient is constant for tri3, so ke = factor * area * grad^T @ K @ grad.
+    We use 13-point triangle quadrature to integrate the nonlinear kr function
+    over the element area, matching SEEP2D's approach of over-integrating kr.
+    kr_avg and 1/kr_avg are used for head/stream to maintain consistency.
 
     Args:
         nodes_elem: (3,2) nodal coordinates
         Kmat: (2,2) conductivity matrix (Kmat for head, Kmat_flow for stream)
         p_elem_nodes: (3,) nodal pressure values
         kr0, h0: unsaturated parameters
-        mode: 'head' (multiply by kr) or 'stream' (multiply by 1/kr)
+        mode: 'head' (multiply by kr_avg) or 'stream' (multiply by 1/kr_avg)
     """
     xi, yi = nodes_elem[0]
     xj, yj = nodes_elem[1]
@@ -2535,24 +2532,46 @@ def tri3_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
     gamma = np.array([xk - xj, xi - xk, xj - xi])
     grad = np.array([beta, gamma]) / (2 * area)
 
-    # Centroid pressure and kr
-    p_centroid = (p_elem_nodes[0] + p_elem_nodes[1] + p_elem_nodes[2]) / 3.0
-    kr_elem = kr_frontal(p_centroid, kr0, h0)
+    # 7-point symmetric triangle quadrature (degree 5)
+    # Over-integrates kr for better resolution of the phreatic transition.
+    a1 = 0.059715871789770
+    b1 = 0.470142064105115
+    a2 = 0.797426985353087
+    b2 = 0.101286507323456
+    w0 = 0.1125
+    w1 = 0.066197076394253
+    w2 = 0.062969590272414
+    gauss_pts = [
+        (1/3, 1/3, 1/3, w0),
+        (a1, b1, b1, w1), (b1, a1, b1, w1), (b1, b1, a1, w1),
+        (a2, b2, b2, w2), (b2, a2, b2, w2), (b2, b2, a2, w2),
+    ]
+
+    # Weighted average of kr (weights sum to 0.5 for unit triangle)
+    kr_wsum = 0.0
+    wsum = 0.0
+    for L1, L2, L3, w in gauss_pts:
+        p_gp = L1 * p_elem_nodes[0] + L2 * p_elem_nodes[1] + L3 * p_elem_nodes[2]
+        kr_wsum += w * kr_frontal(p_gp, kr0, h0)
+        wsum += w
+    kr_avg = kr_wsum / wsum
 
     if mode == 'head':
-        factor = kr_elem
+        factor = kr_avg
     else:  # stream
-        factor = 1.0 / kr_elem if kr_elem > 1e-12 else 1e10
+        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
 
     return factor * area * grad.T @ Kmat @ grad
 
 
 def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
     """
-    Tri6 element stiffness with per-Gauss-point kr evaluation.
+    Tri6 element stiffness with averaged kr from Gauss points.
 
-    At each Gauss point, pressure is interpolated using quadratic shape functions,
-    kr is computed, and the stiffness contribution is weighted accordingly.
+    Averages kr at 3 Gauss points (using quadratic shape function interpolation
+    of pressure), then uses kr_avg for head and 1/kr_avg for stream. This avoids
+    the 1/kr blowup that occurs with per-GP evaluation when individual GPs fall
+    deep in the unsaturated zone.
 
     Args:
         nodes_elem: (6,2) nodal coordinates
@@ -2561,13 +2580,29 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
         kr0, h0: unsaturated parameters
         mode: 'head' or 'stream'
     """
-    # 3-point Gauss quadrature for triangles
+    # 3-point Gauss quadrature for triangles (exact for degree 2 polynomials)
     gauss_pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
     weights = [1/3, 1/3, 1/3]
 
+    # First pass: compute kr_avg from Gauss points using quadratic interpolation
+    kr_wsum = 0.0
+    wsum = 0.0
+    for (L1, L2, L3), w in zip(gauss_pts, weights):
+        N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                      4*L1*L2, 4*L2*L3, 4*L3*L1])
+        p_gp = N @ p_elem_nodes
+        kr_wsum += w * kr_frontal(p_gp, kr0, h0)
+        wsum += w
+    kr_avg = kr_wsum / wsum
+
+    if mode == 'head':
+        factor = kr_avg
+    else:  # stream
+        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
+
+    # Second pass: assemble stiffness with uniform kr factor
     ke = np.zeros((6, 6))
 
-    # Precompute area coordinate derivatives (constant for the triangle)
     x0, y0 = nodes_elem[0]
     x1, y1 = nodes_elem[1]
     x2, y2 = nodes_elem[2]
@@ -2587,7 +2622,6 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
     dL3_dy = (x1 - x0) / (2 * total_area)
 
     for (L1, L2, L3), w in zip(gauss_pts, weights):
-        # Quadratic shape function derivatives w.r.t. area coordinates
         dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
         dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
         dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
@@ -2597,20 +2631,19 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
             gradN[0, i] = dN_dL1[i]*dL1_dx + dN_dL2[i]*dL2_dx + dN_dL3[i]*dL3_dx
             gradN[1, i] = dN_dL1[i]*dL1_dy + dN_dL2[i]*dL2_dy + dN_dL3[i]*dL3_dy
 
-        # Interpolate pressure at Gauss point using quadratic shape functions
-        N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
-                      4*L1*L2, 4*L2*L3, 4*L3*L1])
-        p_gp = N @ p_elem_nodes
-        factor = _kr_factor(p_gp, kr0, h0, mode)
+        ke += (gradN.T @ Kmat @ gradN) * total_area * w
 
-        ke += factor * (gradN.T @ Kmat @ gradN) * total_area * w
-
-    return ke
+    return factor * ke
 
 
 def quad4_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
     """
-    Quad4 element stiffness with per-Gauss-point kr evaluation.
+    Quad4 element stiffness with averaged kr from Gauss points.
+
+    Uses 4x4 Gauss quadrature (matching SEEP2D's qdflow subroutine) to sample
+    kr at 16 interior points, then averages to get kr_avg. Uses kr_avg for head
+    and 1/kr_avg for stream to maintain head/stream consistency and avoid
+    1/kr blowup at individual Gauss points.
 
     Args:
         nodes_elem: (4,2) nodal coordinates
@@ -2619,6 +2652,29 @@ def quad4_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
         kr0, h0: unsaturated parameters
         mode: 'head' or 'stream'
     """
+    # 4-point Gauss rule (matching SEEP2D) for kr sampling
+    pts_1d = [-0.86113631, -0.33998104, 0.33998104, 0.86113631]
+    wts_1d = [0.34785485, 0.65214516, 0.65214516, 0.34785485]
+
+    # First pass: weighted average of kr at 4x4 Gauss points
+    kr_wsum = 0.0
+    wsum = 0.0
+    for i_gp, xi in enumerate(pts_1d):
+        for j_gp, eta in enumerate(pts_1d):
+            w = wts_1d[i_gp] * wts_1d[j_gp]
+            N = np.array([0.25*(1-xi)*(1-eta), 0.25*(1+xi)*(1-eta),
+                          0.25*(1+xi)*(1+eta), 0.25*(1-xi)*(1+eta)])
+            p_gp = N @ p_elem_nodes
+            kr_wsum += w * kr_frontal(p_gp, kr0, h0)
+            wsum += w
+    kr_avg = kr_wsum / wsum
+
+    if mode == 'head':
+        factor = kr_avg
+    else:  # stream
+        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
+
+    # Second pass: assemble stiffness with standard 2x2 quadrature
     gauss_pts = [(-1/np.sqrt(3), -1/np.sqrt(3)),
                  (1/np.sqrt(3), -1/np.sqrt(3)),
                  (1/np.sqrt(3), 1/np.sqrt(3)),
@@ -2646,20 +2702,14 @@ def quad4_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
         dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
         gradN = np.vstack((dN_dx, dN_dy))
 
-        # Interpolate pressure at Gauss point
-        N = np.array([0.25*(1-xi)*(1-eta), 0.25*(1+xi)*(1-eta),
-                      0.25*(1+xi)*(1+eta), 0.25*(1-xi)*(1+eta)])
-        p_gp = N @ p_elem_nodes
-        factor = _kr_factor(p_gp, kr0, h0, mode)
+        ke += (gradN.T @ Kmat @ gradN) * detJ * w
 
-        ke += factor * (gradN.T @ Kmat @ gradN) * detJ * w
-
-    return ke
+    return factor * ke
 
 
 def quad8_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
     """
-    Quad8 (serendipity) element stiffness with per-Gauss-point kr evaluation.
+    Quad8 (serendipity) element stiffness with averaged kr from Gauss points.
 
     Args:
         nodes_elem: (8,2) nodal coordinates
@@ -2671,13 +2721,39 @@ def quad8_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
     pts_1d = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
     wts_1d = [5/9, 8/9, 5/9]
 
+    # First pass: weighted average of kr at 3x3 Gauss points
+    kr_wsum = 0.0
+    wsum = 0.0
+    for i_gp, xi in enumerate(pts_1d):
+        for j_gp, eta in enumerate(pts_1d):
+            w = wts_1d[i_gp] * wts_1d[j_gp]
+            N = np.array([
+                0.25*(1-xi)*(1-eta)*(-xi-eta-1),
+                0.25*(1+xi)*(1-eta)*(xi-eta-1),
+                0.25*(1+xi)*(1+eta)*(xi+eta-1),
+                0.25*(1-xi)*(1+eta)*(-xi+eta-1),
+                0.5*(1-xi*xi)*(1-eta),
+                0.5*(1+xi)*(1-eta*eta),
+                0.5*(1-xi*xi)*(1+eta),
+                0.5*(1-xi)*(1-eta*eta)
+            ])
+            p_gp = N @ p_elem_nodes
+            kr_wsum += w * kr_frontal(p_gp, kr0, h0)
+            wsum += w
+    kr_avg = kr_wsum / wsum
+
+    if mode == 'head':
+        factor = kr_avg
+    else:  # stream
+        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
+
+    # Second pass: assemble stiffness
     ke = np.zeros((8, 8))
 
     for i_gp, xi in enumerate(pts_1d):
         for j_gp, eta in enumerate(pts_1d):
             w = wts_1d[i_gp] * wts_1d[j_gp]
 
-            # Serendipity shape function derivatives
             dN_dxi = np.array([
                 -0.25*(1-eta)*(-xi-eta-1) - 0.25*(1-xi)*(1-eta),
                 0.25*(1-eta)*(xi-eta-1) + 0.25*(1+xi)*(1-eta),
@@ -2715,28 +2791,14 @@ def quad8_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
             dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
             gradN = np.vstack((dN_dx, dN_dy))
 
-            # Serendipity shape function values for pressure interpolation
-            N = np.array([
-                0.25*(1-xi)*(1-eta)*(-xi-eta-1),
-                0.25*(1+xi)*(1-eta)*(xi-eta-1),
-                0.25*(1+xi)*(1+eta)*(xi+eta-1),
-                0.25*(1-xi)*(1+eta)*(-xi+eta-1),
-                0.5*(1-xi*xi)*(1-eta),
-                0.5*(1+xi)*(1-eta*eta),
-                0.5*(1-xi*xi)*(1+eta),
-                0.5*(1-xi)*(1-eta*eta)
-            ])
-            p_gp = N @ p_elem_nodes
-            factor = _kr_factor(p_gp, kr0, h0, mode)
+            ke += (gradN.T @ Kmat @ gradN) * detJ * w
 
-            ke += factor * (gradN.T @ Kmat @ gradN) * detJ * w
-
-    return ke
+    return factor * ke
 
 
 def quad9_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
     """
-    Quad9 (Lagrange) element stiffness with per-Gauss-point kr evaluation.
+    Quad9 (Lagrange) element stiffness with averaged kr from Gauss points.
 
     Args:
         nodes_elem: (9,2) nodal coordinates
@@ -2748,13 +2810,40 @@ def quad9_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
     pts_1d = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
     wts_1d = [5/9, 8/9, 5/9]
 
+    # First pass: weighted average of kr at 3x3 Gauss points
+    kr_wsum = 0.0
+    wsum = 0.0
+    for i_gp, xi in enumerate(pts_1d):
+        for j_gp, eta in enumerate(pts_1d):
+            w = wts_1d[i_gp] * wts_1d[j_gp]
+            N = np.array([
+                0.25*xi*(xi-1)*eta*(eta-1),
+                0.25*xi*(xi+1)*eta*(eta-1),
+                0.25*xi*(xi+1)*eta*(eta+1),
+                0.25*xi*(xi-1)*eta*(eta+1),
+                0.5*(1-xi*xi)*eta*(eta-1),
+                0.5*xi*(xi+1)*(1-eta*eta),
+                0.5*(1-xi*xi)*eta*(eta+1),
+                0.5*xi*(xi-1)*(1-eta*eta),
+                (1-xi*xi)*(1-eta*eta)
+            ])
+            p_gp = N @ p_elem_nodes
+            kr_wsum += w * kr_frontal(p_gp, kr0, h0)
+            wsum += w
+    kr_avg = kr_wsum / wsum
+
+    if mode == 'head':
+        factor = kr_avg
+    else:  # stream
+        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
+
+    # Second pass: assemble stiffness
     ke = np.zeros((9, 9))
 
     for i_gp, xi in enumerate(pts_1d):
         for j_gp, eta in enumerate(pts_1d):
             w = wts_1d[i_gp] * wts_1d[j_gp]
 
-            # Lagrange shape function derivatives (biquadratic)
             dN_dxi = np.array([
                 0.25*(2*xi-1)*eta*(eta-1),
                 0.25*(2*xi+1)*eta*(eta-1),
@@ -2794,24 +2883,9 @@ def quad9_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
             dN_dy = Jinv[1,0]*dN_dxi + Jinv[1,1]*dN_deta
             gradN = np.vstack((dN_dx, dN_dy))
 
-            # Lagrange shape function values for pressure interpolation
-            N = np.array([
-                0.25*xi*(xi-1)*eta*(eta-1),
-                0.25*xi*(xi+1)*eta*(eta-1),
-                0.25*xi*(xi+1)*eta*(eta+1),
-                0.25*xi*(xi-1)*eta*(eta+1),
-                0.5*(1-xi*xi)*eta*(eta-1),
-                0.5*xi*(xi+1)*(1-eta*eta),
-                0.5*(1-xi*xi)*eta*(eta+1),
-                0.5*xi*(xi-1)*(1-eta*eta),
-                (1-xi*xi)*(1-eta*eta)
-            ])
-            p_gp = N @ p_elem_nodes
-            factor = _kr_factor(p_gp, kr0, h0, mode)
+            ke += (gradN.T @ Kmat @ gradN) * detJ * w
 
-            ke += factor * (gradN.T @ Kmat @ gradN) * detJ * w
-
-    return ke
+    return factor * ke
 
 
 def run_seepage_analysis(seep_data, tol=1e-6):

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.sparse import lil_matrix, csr_matrix
@@ -2556,6 +2558,8 @@ def run_seepage_analysis(seep_data, tol=1e-6):
         - 'phi': numpy array of stream function/flow potential values at each node
         - 'flowrate': scalar total flow rate
     """
+    start_time = time.time()
+
     # Check for missing unsaturated parameters
     if seep_data.get("missing_unsat_params", False):
         print("\n" + "="*70)
@@ -2670,6 +2674,9 @@ def run_seepage_analysis(seep_data, tol=1e-6):
         "phi": phi,
         "flowrate": total_flow
     }
+
+    elapsed = time.time() - start_time
+    print(f"Seepage analysis completed in {elapsed:.2f} seconds.")
 
     return solution
 

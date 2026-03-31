@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -300,10 +302,12 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         tuple: (success, result) where result contains reliability analysis results
     """
     
+    start_time = time.time()
+
     # Import search functions and solve module here to avoid circular import
     from .search import circular_search, noncircular_search
     from . import solve
-    
+
     if debug_level >= 1:
         print("=== RELIABILITY ANALYSIS ===")
         print(f"Method: {method}")
@@ -488,5 +492,8 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         'critical_surface': critical_surface,
         'critical_slices': critical_slices
     }
-    
+
+    elapsed = time.time() - start_time
+    print(f"\nReliability analysis completed in {elapsed:.2f} seconds.")
+
     return True, result

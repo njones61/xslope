@@ -1037,11 +1037,9 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
             n6 = get_or_create_midside_node(n2, n3)  # edge 2-3
             n7 = get_or_create_midside_node(n3, n0)  # edge 3-0
             
-            # Create center node
+            # Create center node (append to new_node_coords like midside nodes)
             center_coord = (nodes[n0] + nodes[n1] + nodes[n2] + nodes[n3]) / 4.0
-            nodes_list = nodes.tolist()
-            nodes_list.append(center_coord.tolist())
-            nodes = np.array(nodes_list)
+            new_node_coords.append(center_coord)
             n8 = next_node_idx
             next_node_idx += 1
             

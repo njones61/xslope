@@ -436,8 +436,8 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
     head = spsolve(A.tocsr(), b)
     q = A_full.tocsr() @ head
 
-    # Net inflow through specified-head boundary (works for all element types)
-    total_flow = sum(q[i] for i in range(len(bc_type)) if bc_type[i] == 1)
+    # Sum only positive q at specified-head nodes (inflow)
+    total_flow = sum(q[i] for i in range(len(bc_type)) if bc_type[i] == 1 and q[i] > 0)
 
     return head, A, q, total_flow
 
@@ -481,12 +481,12 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     exit_face_active = np.ones(n_nodes, dtype=bool)
     exit_face_active[bc_type != 2] = False
 
-    # Build exit face edge groups for flow direction check.
-    # For quadratic elements, individual node q values from K@h can oscillate
-    # along an edge. The edge-net q correctly represents physical flow direction.
-    from collections import defaultdict as _defaultdict
-    _exit_edge_groups = []       # each entry: list of node indices on the edge
-    _node_exit_edges = _defaultdict(list)  # node -> list of edge group indices
+
+    # Build corner/midside maps for exit face nodes.
+    # Corner nodes use per-node q for activation checks (matching SEEP2D).
+    # Midside nodes inherit state from adjacent corners to avoid oscillations.
+    _exit_is_corner = np.zeros(n_nodes, dtype=bool)
+    _exit_midside_to_corners = {}  # midside node -> (corner1, corner2)
     _seen_edges = set()
     for _idx, _en in enumerate(elements):
         _et = element_types[_idx]
@@ -502,16 +502,17 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             continue
         for _le in _ledges:
             _gnodes = [_en[i] for i in _le]
-            _corners = (_gnodes[0], _gnodes[-1])
-            _ekey = tuple(sorted(_corners))
+            _c1, _c2 = _gnodes[0], _gnodes[-1]
+            _ekey = tuple(sorted((_c1, _c2)))
             if _ekey in _seen_edges:
                 continue
-            if bc_type[_corners[0]] == 2 and bc_type[_corners[1]] == 2:
+            if bc_type[_c1] == 2 and bc_type[_c2] == 2:
                 _seen_edges.add(_ekey)
-                _eidx = len(_exit_edge_groups)
-                _exit_edge_groups.append(_gnodes)
-                for _n in _gnodes:
-                    _node_exit_edges[_n].append(_eidx)
+                _exit_is_corner[_c1] = True
+                _exit_is_corner[_c2] = True
+                if len(_gnodes) == 3:  # has midside node
+                    _mid = _gnodes[1]
+                    _exit_midside_to_corners[_mid] = (_c1, _c2)
 
     # Store previous iteration values
     h_last = h.copy()
@@ -709,25 +710,24 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         n_active_before = np.sum(exit_face_active)
         hyst = 0.001 * (ymax - ymin)  # Hysteresis threshold
 
-        # Compute edge-net q for exit face activation check.
-        # Using net flow per edge avoids quadratic element oscillations
-        # that can give misleading q signs at individual midside nodes.
-        _edge_net_q = [sum(q[n] for n in eg) for eg in _exit_edge_groups]
-
+        # Check exit face activation at corner nodes using per-node q
+        # (matching SEEP2D). Midside nodes inherit from adjacent corners.
         for node_idx in range(n_nodes):
-            if bc_type[node_idx] == 2:
-                _edges = _node_exit_edges.get(node_idx)
-                _net_q = np.mean([_edge_net_q[e] for e in _edges]) if _edges else q[node_idx]
-
+            if bc_type[node_idx] == 2 and _exit_is_corner[node_idx]:
                 if exit_face_active[node_idx]:
-                    # Check if node should become inactive
-                    if h_new[node_idx] < y[node_idx] - hyst or _net_q > 0:
+                    if h_new[node_idx] < y[node_idx] - hyst or q[node_idx] > 0:
                         exit_face_active[node_idx] = False
                 else:
-                    # Check if node should become active again
-                    if h_new[node_idx] >= y[node_idx] + hyst and _net_q <= 0:
+                    if h_new[node_idx] >= y[node_idx] + hyst and q[node_idx] <= 0:
                         exit_face_active[node_idx] = True
-                        h_new[node_idx] = y[node_idx]  # Reset to elevation
+                        h_new[node_idx] = y[node_idx]
+
+        # Midside nodes: active if either adjacent corner is active
+        for mid, (c1, c2) in _exit_midside_to_corners.items():
+            was_active = exit_face_active[mid]
+            exit_face_active[mid] = exit_face_active[c1] or exit_face_active[c2]
+            if exit_face_active[mid] and not was_active:
+                h_new[mid] = y[mid]
 
         n_active_after = np.sum(exit_face_active)
 
@@ -759,26 +759,14 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     q_final = q
 
-    # Flow closure check — use NET flow at each boundary type.
-    # For quadratic elements, consistent nodal forces can oscillate along an edge
-    # (positive at midside, negative at corners or vice versa). Splitting
-    # positive/negative per node inflates both totals. Summing all q at each
-    # boundary type gives the correct net flux regardless of element order.
-    total_inflow = 0.0   # net flow entering through specified-head boundary
-    total_outflow = 0.0  # net flow leaving through active exit face
+    # Flowrate: sum of positive q at specified-head nodes
+    total_inflow = sum(q_final[i] for i in range(n_nodes) if bc_type[i] == 1 and q_final[i] > 0)
 
-    for node_idx in range(n_nodes):
-        if bc_type[node_idx] == 1:
-            total_inflow += q_final[node_idx]
-        elif bc_type[node_idx] == 2:
-            total_outflow -= q_final[node_idx]
-
-    closure_error = abs(total_inflow - total_outflow)
-    print(f"Flow closure check: inflow = {total_inflow:.6e}, outflow = {total_outflow:.6e}, error = {closure_error:.6e}")
-
-    if closure_error > 0.01 * max(abs(total_inflow), abs(total_outflow)):
-        print(f"Warning: Large flow closure error = {closure_error:.6e}")
-        print(f"Try reducing the tolerance (tol) parameter. Current value: {tol:.6e}")
+    # Closure check: net flow at each boundary type (handles quadratic element oscillations)
+    net_inflow = sum(q_final[i] for i in range(n_nodes) if bc_type[i] == 1)
+    net_outflow = -sum(q_final[i] for i in range(n_nodes) if bc_type[i] == 2)
+    closure_error = abs(net_inflow - net_outflow)
+    print(f"Flow closure check: inflow = {net_inflow:.6e}, outflow = {net_outflow:.6e}, error = {closure_error:.6e}")
 
     # Final consistency solve: q was computed before the last exit face update,
     # so inactive nodes retain stale reaction forces. Re-solve with the final
@@ -1112,7 +1100,7 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
 
 def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                                            k1_vals, k2_vals, angles,
-                                           kr0=None, h0=None):
+                                           kr0=None, h0=None, total_flow=None):
     """
     Generates Dirichlet BCs for flow potential φ by integrating the Darcy
     velocity flux along each boundary edge from the owning element's shape
@@ -1337,19 +1325,6 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
             v = -kr_elem * Kmat @ grad_h
             segment_flux[c1] = -v[1]*dx + v[0]*dy
 
-    # Step 3b: Cap extreme segment fluxes at the phreatic exit singularity.
-    # Quadratic elements capture the sharp velocity there more accurately,
-    # producing one or two segments with flux much larger than neighbors.
-    # Cap at 3x the mean of the inflow (positive) segments.
-    pos_fluxes = [f for f in segment_flux.values() if f > 1e-12]
-    if pos_fluxes:
-        cap = 3.0 * np.mean(pos_fluxes)
-        for k in segment_flux:
-            if segment_flux[k] > cap:
-                segment_flux[k] = cap
-            elif segment_flux[k] < -cap:
-                segment_flux[k] = -cap
-
     # Step 4: Determine walk orientation from signed area
     signed_area = 0.0
     for i in range(n):
@@ -1359,11 +1334,20 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
     if signed_area < 0:
         segment_flux = {k: -v for k, v in segment_flux.items()}
 
+    # Step 4b: Scale all segment fluxes so positive sum matches the known flowrate.
+    # This preserves the relative flux distribution (including the phreatic exit
+    # singularity that quadratic elements capture) while ensuring phi_range ≈ flowrate.
+    if total_flow is not None:
+        pos_sum = sum(f for f in segment_flux.values() if f > 0)
+        if pos_sum > 1e-30:
+            flux_scale = total_flow / pos_sum
+            segment_flux = {k: v * flux_scale for k, v in segment_flux.items()}
+
     # Step 5: Find starting point (max inflow)
     start_idx = max(range(n), key=lambda i: segment_flux.get(ordered_nodes[i], 0))
 
     # Step 6: Accumulate phi at corners
-    total_q = sum(f for f in segment_flux.values() if f > 0)
+    total_q = total_flow if total_flow is not None else sum(f for f in segment_flux.values() if f > 0)
     phi_val = total_q
     phi = {}
     for i in range(n):
@@ -2989,14 +2973,15 @@ def run_seepage_analysis(seep_data, tol=1e-6):
         # Compute phi BCs from element-level boundary flux (avoids reaction force artifacts)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
-            kr0=kr0_per_element, h0=h0_per_element)
+            kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
     else:
         head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
-            nodes, elements, element_types, head, k1, k2, angle)
+            nodes, elements, element_types, head, k1, k2, angle,
+            total_flow=total_flow)
         phi = solve_flow_function_confined(nodes, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, element_types=element_types)

@@ -148,7 +148,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
                     zorder=10)
 
     if show_nodes:
-        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=0.75)
 
     # Label node numbers if requested
     if label_nodes:

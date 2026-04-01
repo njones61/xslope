@@ -12,6 +12,7 @@ plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
 
 input_path = Path(input_file)
 auto_size = True # @param {"type":"boolean"}
+size_divisions = 50 # @param {"type":"number"}
 target_size = 1 # Desired target element size for meshing (adjust as needed for finer/coarser mesh)
 element_type = 'tri6' # @param ["quad4","quad8","tri3","tri6"]
 remesh = False # @param {"type":"boolean"}
@@ -29,7 +30,7 @@ else:
     if auto_size:
         # find the x-range of the ground_surface and use it to set the target size
         x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
-        target_size = (x_range[1] - x_range[0]) / 50
+        target_size = (x_range[1] - x_range[0]) / size_divisions
         print(f"Auto-calculated target element size: {target_size:.3f}")
 
     mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=constraint_lines)
@@ -41,10 +42,11 @@ fem_data = build_fem_data(slope_data, mesh)
 plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
               label_elements=False, label_nodes=False, save_png=True)
 
-analysis_type = "ssrm" # @param ["single","ssrm"]
+analysis_type = "single" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
+deform_percent = 20 # @param {"type":"number"} for plotting deformation results - percentage of slope height
 
-F = 1.7     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
+F = 1.14     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
 F_min=1.1  # Minimum FS for SSRM search (adjust as needed)
 F_max=1.2   # Maximum FS for SSRM search (adjust as needed)
 
@@ -54,7 +56,7 @@ if analysis_type == "single":
     print_reinforcement_summary(fem_data, solution)
     print_pile_summary(fem_data, solution)
     print_detailed_element_summary(fem_data, solution)
-    plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], save_png=True)
+    plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_percent=deform_percent, save_png=True)
 elif analysis_type == "ssrm":
     result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05, debug_level=1,
                         failure_criterion=failure_criterion)
@@ -65,7 +67,7 @@ elif analysis_type == "ssrm":
         print_pile_summary(fem_data, result['last_solution'])
         print_detailed_element_summary(fem_data, result['last_solution'])
         plot_fem_results(fem_data, result['last_solution'],
-                         plot_type=['deformation', 'shear_strain', 'displace_vector'], save_png=True)
+                         plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_percent=deform_percent, save_png=True)
     else:
         print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 

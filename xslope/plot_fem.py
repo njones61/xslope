@@ -415,8 +415,8 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                       markersize=12, label='Applied Force')
         )
 
-def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_scale=None, 
-                    show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
+def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
+                    deform_percent=20, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=False, save_png=False, dpi=300):
     """
@@ -433,8 +433,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             'strain' - equivalent strain contours
             'shear_strain' - viscoplastic max shear strain contours
             'yield' - Mohr-Coulomb yield function contours
-        deform_scale: Scale factor for deformed mesh. If None, auto-calculates
-            so max deformation is ~10% of mesh height.
+        deform_percent: Target deformation as percentage of mesh height (default 20).
         show_mesh: Show mesh lines
         show_reinforcement: Show reinforcement elements
         figsize: Figure size (width, height)
@@ -465,18 +464,17 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if pt not in valid_types:
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
     
-    # Auto-calculate deformation scale so max displacement is ~10% of mesh height
+    # Auto-calculate deformation scale so max displacement is deform_percent of mesh height
     # Use VP displacement if available (matches what plot_deformed_mesh will plot)
-    if deform_scale is None:
-        disp_elastic = solution.get("displacements_elastic", None)
-        disp_for_scale = displacements - disp_elastic if disp_elastic is not None else displacements
-        u_arr, v_arr = _extract_uv(disp_for_scale, fem_data)
-        max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
-        mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-        if max_disp > 1e-30:
-            deform_scale = max(1.0, (mesh_height * 0.10) / max_disp)
-        else:
-            deform_scale = 1.0
+    disp_elastic = solution.get("displacements_elastic", None)
+    disp_for_scale = displacements - disp_elastic if disp_elastic is not None else displacements
+    u_arr, v_arr = _extract_uv(disp_for_scale, fem_data)
+    max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
+    mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+    if max_disp > 1e-30:
+        deform_scale = max(1.0, (mesh_height * deform_percent / 100) / max_disp)
+    else:
+        deform_scale = 1.0
     
     # Create subplots based on number of plot types
     # When the first plot is 'deformation', add a thin extra row for its legend

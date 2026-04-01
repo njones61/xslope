@@ -16,7 +16,8 @@ slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=True)
 
-element_type = 'tri3'
+element_type = 'tri6'
+size_divisions = 100
 re_mesh = True
 
 # Use existing mesh from slope_data if available, otherwise build a new one
@@ -29,7 +30,7 @@ else:
 
     # find the x-range of the ground_surface and use it to set the target size
     x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]
-    target_size = (x_range[1] - x_range[0]) / 120
+    target_size = (x_range[1] - x_range[0]) / size_divisions
     print(f"Auto-calculated target element size: {target_size:.3f}")
 
     mesh = build_mesh_from_polygons(polygons, target_size, element_type)

@@ -1315,9 +1315,27 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
             v = -kr_elem * Kmat @ grad_h
             segment_flux[c1] = -v[1]*dx + v[0]*dy
 
-        else:
-            # quad8/quad9: use centroid approximation (same as quad4)
-            segment_flux[c1] = 0.0
+        elif et in (8, 9):
+            # quad8/quad9: use corner nodes same as quad4
+            nodes_elem = nodes[en[:4]]
+            h_elem = head[en[:4]]
+            xi,yi = nodes_elem[0]; xj,yj = nodes_elem[1]; xk,yk = nodes_elem[2]; xl,yl = nodes_elem[3]
+            area1 = 0.5*abs((xj-xi)*(yk-yi)-(xk-xi)*(yj-yi))
+            area2 = 0.5*abs((xk-xi)*(yl-yi)-(xl-xi)*(yk-yi))
+            if area1+area2 < 1e-30:
+                segment_flux[c1] = 0.0
+                continue
+            beta1 = np.array([yj-yk, yk-yi, yi-yj])
+            gamma1 = np.array([xk-xj, xi-xk, xj-xi])
+            grad1 = np.array([beta1, gamma1])/(2*area1)
+            grad_h1 = grad1 @ h_elem[:3]
+            beta2 = np.array([yk-yl, yl-yi, yi-yk])
+            gamma2 = np.array([xl-xk, xi-xl, xk-xi])
+            grad2 = np.array([beta2, gamma2])/(2*area2)
+            grad_h2 = grad2 @ h_elem[[0,2,3]]
+            grad_h = (grad_h1*area1 + grad_h2*area2)/(area1+area2)
+            v = -kr_elem * Kmat @ grad_h
+            segment_flux[c1] = -v[1]*dx + v[0]*dy
 
     # Step 3b: Cap extreme segment fluxes at the phreatic exit singularity.
     # Quadratic elements capture the sharp velocity there more accurately,

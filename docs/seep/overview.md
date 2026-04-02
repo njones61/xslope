@@ -174,6 +174,8 @@ XSLOPE implements a robust algorithm for handling exit face conditions:
 
 This iterative approach ensures that the final solution satisfies the correct boundary conditions while accurately locating the phreatic surface.
 
+For higher-order boundary elements (`tri6`, `quad8`, and `quad9`), XSLOPE applies the seepage-face active set on a **boundary-edge basis** rather than activating midside nodes independently. Corner nodes are still checked with the usual head/flow criteria, but a quadratic boundary side is only treated as an active seepage edge when both corner nodes and the midside node satisfy the active criterion. This prevents partially active quadratic edges, keeps the seepage transition at element corners, and improves compatibility between the higher-order head solution and the resulting flow net near exit-face corners.
+
 ## Solution Process
 
 ### Finite Element Formulation
@@ -242,6 +244,7 @@ When **exit face boundary conditions are present** (i.e., any nodes with `bc_typ
 
 - **Convergence Criteria:** Based on change in hydraulic head between iterations, with tolerance scaled to domain size
 - **Exit Face Handling:** Iteratively determines which nodes experience seepage discharge vs. no-flow conditions
+- **Higher-Order Exit Faces:** For `tri6`, `quad8`, and `quad9` meshes, seepage activity is updated edge-by-edge so a quadratic exit-face side is either fully active or fully inactive
 - **Computational Cost:** Significantly higher than saturated analysis due to nonlinear iterations
 
 #### Solution Algorithm Selection

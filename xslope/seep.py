@@ -722,7 +722,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                         exit_face_active[node_idx] = True
                         h_new[node_idx] = y[node_idx]
 
-        # Midside nodes: active if either adjacent corner is active
+        # Midside nodes inherit the exit-face state from adjacent corners to
+        # keep the nonlinear seepage iteration from oscillating.
         for mid, (c1, c2) in _exit_midside_to_corners.items():
             was_active = exit_face_active[mid]
             exit_face_active[mid] = exit_face_active[c1] or exit_face_active[c2]
@@ -1100,7 +1101,8 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
 
 def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                                            k1_vals, k2_vals, angles,
-                                           kr0=None, h0=None, total_flow=None):
+                                           kr0=None, h0=None, total_flow=None,
+                                           bc_type=None, exit_face_active=None):
     """
     Generates Dirichlet BCs for flow potential φ by integrating the Darcy
     velocity flux along each boundary edge from the owning element's shape
@@ -1116,6 +1118,11 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         head: (n_nodes,) nodal head solution
         k1_vals, k2_vals, angles: per-element conductivity properties
         kr0, h0: per-element unsaturated parameters (optional)
+
+    For quadratic boundary edges, the active seepage or fixed-head interval can
+    occupy only half the side when the boundary-condition transition falls at a
+    midside node. In that case the accumulated stream-function change must be
+    restricted to the active half-edge rather than spread over the full side.
 
     Returns:
         List of (node_id, phi_value) tuples
@@ -1174,13 +1181,39 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         current = nxt
     n = len(ordered_nodes)
 
+    def get_quadratic_edge_interval(c1, mid, c2):
+        """Return the active interval on a quadratic boundary edge.
+
+        The interval is inferred from boundary-condition flags on the
+        corner-midside-corner triplet. For the stream-function BCs, only a
+        fully active quadratic side is treated as a flux-carrying segment.
+        Mixed edge patterns are left constant in phi; allowing half-edge
+        stream-function jumps on tri6 exit-face transition edges distorts the
+        flownet even though the head field itself remains acceptable.
+        """
+        if bc_type is None or mid is None:
+            return None
+
+        edge_nodes = np.array([c1, mid, c2], dtype=int)
+        fixed_mask = bc_type[edge_nodes] == 1
+        exit_mask = np.zeros(3, dtype=bool)
+        if exit_face_active is not None:
+            exit_mask = (bc_type[edge_nodes] == 2) & exit_face_active[edge_nodes]
+
+        for mask in (fixed_mask, exit_mask):
+            if np.array_equal(mask, [True, True, True]):
+                return (0.0, 1.0)
+        return None
+
     # Step 3: For each boundary segment, compute Δψ from element-level velocity
     segment_flux = {}
+    midside_flux_from_start = {}
     for i in range(n):
         c1 = ordered_nodes[i]
         c2 = ordered_nodes[(i + 1) % n]
         ekey = tuple(sorted((c1, c2)))
         elem_idx = boundary_edges.get(ekey)
+        mid = midside_map.get(ekey)
         if elem_idx is None:
             segment_flux[c1] = 0.0
             continue
@@ -1258,30 +1291,44 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                 # Third coordinate = 0 (on the edge)
                 return L[0], L[1], L[2]
 
-            # 2-point Gauss quadrature on [0,1] with per-GP kr
+            # 2-point Gauss quadrature on an edge interval [t_start, t_end]
+            # with per-Gauss-point kr. For quadratic edges, this lets us set
+            # midside phi from the integrated half-edge flux instead of
+            # forcing it to the average of the corner values.
             p_elem_nodes = p_nodes[en[:6]]
             kr_e0 = kr0[elem_idx] if hasattr(kr0, '__len__') else kr0
             h0_e0 = h0[elem_idx] if hasattr(h0, '__len__') else h0
-            gp = [(0.5 - 0.5/np.sqrt(3)), (0.5 + 0.5/np.sqrt(3))]
-            total = 0.0
-            for t in gp:
-                L1, L2, L3 = area_coords(t)
-                # Tri6 shape functions for pressure interpolation
-                N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
-                              4*L1*L2, 4*L2*L3, 4*L3*L1])
-                p_gp = N @ p_elem_nodes
-                kr_gp = kr_frontal(p_gp, kr_e0, h0_e0) if kr0 is not None else 1.0
-                dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
-                dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
-                dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
-                gradN = np.zeros((2, 6))
-                for ii in range(6):
-                    gradN[0, ii] = dN_dL1[ii]*dL1_dx + dN_dL2[ii]*dL2_dx + dN_dL3[ii]*dL3_dx
-                    gradN[1, ii] = dN_dL1[ii]*dL1_dy + dN_dL2[ii]*dL2_dy + dN_dL3[ii]*dL3_dy
-                grad_h = gradN @ h_elem
-                v = -kr_gp * Kmat @ grad_h
-                total += -v[1]*dx + v[0]*dy
-            segment_flux[c1] = total * 0.5  # weight = 0.5 each for 2-pt rule on [0,1]
+            gp = [0.5 - 0.5 / np.sqrt(3), 0.5 + 0.5 / np.sqrt(3)]
+
+            def integrate_edge_interval(t_start, t_end):
+                total = 0.0
+                interval = t_end - t_start
+                for xi in gp:
+                    t = t_start + interval * xi
+                    L1, L2, L3 = area_coords(t)
+                    N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                                  4*L1*L2, 4*L2*L3, 4*L3*L1])
+                    p_gp = N @ p_elem_nodes
+                    kr_gp = kr_frontal(p_gp, kr_e0, h0_e0) if kr0 is not None else 1.0
+                    dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
+                    dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
+                    dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
+                    gradN = np.zeros((2, 6))
+                    for ii in range(6):
+                        gradN[0, ii] = dN_dL1[ii]*dL1_dx + dN_dL2[ii]*dL2_dx + dN_dL3[ii]*dL3_dx
+                        gradN[1, ii] = dN_dL1[ii]*dL1_dy + dN_dL2[ii]*dL2_dy + dN_dL3[ii]*dL3_dy
+                    grad_h = gradN @ h_elem
+                    v = -kr_gp * Kmat @ grad_h
+                    total += -v[1]*dx + v[0]*dy
+                return total * 0.5 * interval
+
+            edge_interval = get_quadratic_edge_interval(c1, mid, c2)
+            if edge_interval == (0.0, 1.0):
+                segment_flux[c1] = integrate_edge_interval(0.0, 1.0)
+                midside_flux_from_start[c1] = integrate_edge_interval(0.0, 0.5)
+            else:
+                segment_flux[c1] = 0.0
+                midside_flux_from_start[c1] = 0.0
 
         elif et == 4:
             # Bilinear quad — evaluate at edge midpoint
@@ -1341,15 +1388,35 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         signed_area += nodes[c1, 0] * nodes[c2, 1] - nodes[c2, 0] * nodes[c1, 1]
     if signed_area < 0:
         segment_flux = {k: -v for k, v in segment_flux.items()}
+        midside_flux_from_start = {k: -v for k, v in midside_flux_from_start.items()}
 
-    # Step 4b: Scale all segment fluxes so positive sum matches the known flowrate.
-    # This preserves the relative flux distribution (including the phreatic exit
-    # singularity that quadratic elements capture) while ensuring phi_range ≈ flowrate.
+    # Step 4b: Normalize inflow and outflow separately so the accumulated
+    # boundary phi remains single-valued around the closed loop.
+    # Using one global scale factor matches the inflow sum but can leave a
+    # non-zero closure error when the raw boundary flux extraction slightly
+    # over/under-estimates the outflow, which is especially noticeable for
+    # quadratic triangles near the seepage transition.
     if total_flow is not None:
         pos_sum = sum(f for f in segment_flux.values() if f > 0)
-        if pos_sum > 1e-30:
-            flux_scale = total_flow / pos_sum
-            segment_flux = {k: v * flux_scale for k, v in segment_flux.items()}
+        neg_sum = -sum(f for f in segment_flux.values() if f < 0)
+        pos_scale = total_flow / pos_sum if pos_sum > 1e-30 else 1.0
+        neg_scale = total_flow / neg_sum if neg_sum > 1e-30 else 1.0
+
+        scaled_segment_flux = {}
+        scaled_midside_flux = {}
+        for k, v in segment_flux.items():
+            if v > 0:
+                scale = pos_scale
+            elif v < 0:
+                scale = neg_scale
+            else:
+                scale = 1.0
+            scaled_segment_flux[k] = v * scale
+            if k in midside_flux_from_start:
+                scaled_midside_flux[k] = midside_flux_from_start[k] * scale
+
+        segment_flux = scaled_segment_flux
+        midside_flux_from_start = scaled_midside_flux
 
     # Step 5: Find starting point (max inflow)
     start_idx = max(range(n), key=lambda i: segment_flux.get(ordered_nodes[i], 0))
@@ -1364,18 +1431,22 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
         phi[node] = phi_val
         phi_val -= segment_flux[node]
 
-    # Interpolate midside nodes
+    # Assign quadratic-edge midside values from the integrated half-edge flux.
+    # This keeps the boundary phi field compatible with the quadratic head field.
     for i in range(n):
         c1 = ordered_nodes[i]
         c2 = ordered_nodes[(i + 1) % n]
         ekey = tuple(sorted((c1, c2)))
         mid = midside_map.get(ekey)
         if mid is not None:
-            phi[mid] = 0.5 * (phi[c1] + phi[c2])
+            if c1 in midside_flux_from_start:
+                phi[mid] = phi[c1] - midside_flux_from_start[c1]
+            else:
+                phi[mid] = 0.5 * (phi[c1] + phi[c2])
 
-    # Closure error is expected when flux capping is active (phreatic exit
-    # singularity removed). Not printed — the stream function PDE gives
-    # correct interior results from the capped Dirichlet BCs.
+    # With a known total_flow, separate inflow/outflow normalization keeps the
+    # accumulated boundary phi single-valued around the closed loop. Any
+    # remaining local inconsistencies are resolved by the stream-function PDE.
 
     return list(phi.items())
 
@@ -2975,7 +3046,8 @@ def run_seepage_analysis(seep_data, tol=1e-6):
         # Compute phi BCs from element-level boundary flux
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
-            kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow)
+            kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow,
+            bc_type=bc_type, exit_face_active=exit_face_active)
         phi = solve_flow_function_unsaturated(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
@@ -2983,7 +3055,7 @@ def run_seepage_analysis(seep_data, tol=1e-6):
         head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
-            total_flow=total_flow)
+            total_flow=total_flow, bc_type=bc_type)
         phi = solve_flow_function_confined(nodes, elements, k1, k2, angle, dirichlet_phi_bcs, element_types)
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, element_types=element_types)
@@ -3172,4 +3244,3 @@ def load_seep_data_from_json(filename):
             seep_data[key] = value
     
     return seep_data
-

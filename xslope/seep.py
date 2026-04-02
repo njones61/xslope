@@ -482,11 +482,15 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     exit_face_active[bc_type != 2] = False
 
 
-    # Build corner/midside maps for exit face nodes.
-    # Corner nodes use per-node q for activation checks (matching SEEP2D).
-    # Midside nodes inherit state from adjacent corners to avoid oscillations.
+    # Build exit-face topology for the active-set update.
+    # Corner nodes keep the existing per-node h/q test. For quadratic boundary
+    # edges, however, the active set is tracked per edge instead of letting the
+    # midside inherit `corner1 OR corner2`. This keeps a quadratic seepage-face
+    # side either fully active or fully inactive, so the transition can occur
+    # at a corner but not in the middle of a tri6 boundary edge.
     _exit_is_corner = np.zeros(n_nodes, dtype=bool)
-    _exit_midside_to_corners = {}  # midside node -> (corner1, corner2)
+    _exit_linear_corners = np.zeros(n_nodes, dtype=bool)
+    _exit_quadratic_edges = []  # [(corner1, midside, corner2), ...]
     _seen_edges = set()
     for _idx, _en in enumerate(elements):
         _et = element_types[_idx]
@@ -511,8 +515,10 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 _exit_is_corner[_c1] = True
                 _exit_is_corner[_c2] = True
                 if len(_gnodes) == 3:  # has midside node
-                    _mid = _gnodes[1]
-                    _exit_midside_to_corners[_mid] = (_c1, _c2)
+                    _exit_quadratic_edges.append((_c1, _gnodes[1], _c2))
+                else:
+                    _exit_linear_corners[_c1] = True
+                    _exit_linear_corners[_c2] = True
 
     # Store previous iteration values
     h_last = h.copy()
@@ -711,24 +717,39 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         hyst = 0.001 * (ymax - ymin)  # Hysteresis threshold
 
         # Check exit face activation at corner nodes using per-node q
-        # (matching SEEP2D). Midside nodes inherit from adjacent corners.
+        # (matching SEEP2D). Quadratic exit-face sides are then updated from
+        # these corner candidates plus the midside candidate so the whole side
+        # remains edge-consistent.
+        corner_candidate = np.zeros(n_nodes, dtype=bool)
         for node_idx in range(n_nodes):
             if bc_type[node_idx] == 2 and _exit_is_corner[node_idx]:
                 if exit_face_active[node_idx]:
                     if h_new[node_idx] < y[node_idx] - hyst or q[node_idx] > 0:
-                        exit_face_active[node_idx] = False
+                        corner_candidate[node_idx] = False
+                    else:
+                        corner_candidate[node_idx] = True
                 else:
                     if h_new[node_idx] >= y[node_idx] + hyst and q[node_idx] <= 0:
-                        exit_face_active[node_idx] = True
-                        h_new[node_idx] = y[node_idx]
+                        corner_candidate[node_idx] = True
 
-        # Midside nodes inherit the exit-face state from adjacent corners to
-        # keep the nonlinear seepage iteration from oscillating.
-        for mid, (c1, c2) in _exit_midside_to_corners.items():
-            was_active = exit_face_active[mid]
-            exit_face_active[mid] = exit_face_active[c1] or exit_face_active[c2]
-            if exit_face_active[mid] and not was_active:
-                h_new[mid] = y[mid]
+        new_exit_face_active = np.zeros(n_nodes, dtype=bool)
+        new_exit_face_active[_exit_linear_corners] = corner_candidate[_exit_linear_corners]
+
+        for c1, mid, c2 in _exit_quadratic_edges:
+            if exit_face_active[mid]:
+                mid_candidate = not (h_new[mid] < y[mid] - hyst or q[mid] > 0)
+            else:
+                mid_candidate = (h_new[mid] >= y[mid] + hyst and q[mid] <= 0)
+
+            edge_active = bool(corner_candidate[c1] and mid_candidate and corner_candidate[c2])
+            if edge_active:
+                new_exit_face_active[c1] = True
+                new_exit_face_active[mid] = True
+                new_exit_face_active[c2] = True
+
+        newly_active = new_exit_face_active & ~exit_face_active
+        h_new[newly_active] = y[newly_active]
+        exit_face_active = new_exit_face_active
 
         n_active_after = np.sum(exit_face_active)
 

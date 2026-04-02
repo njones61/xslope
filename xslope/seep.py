@@ -885,7 +885,7 @@ def diagnose_exit_face(nodes, bc_type, h, q, bc_values):
             print(f"Approximate exit elevation: {y_intersect:.3f}")
             break
 
-def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None):
+def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None, total_flow=None):
     """
     Generates Dirichlet BCs for flow potential φ by marching around the boundary
     and accumulating q to assign φ, ensuring closed-loop conservation.
@@ -1049,8 +1049,8 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
         net = q[c1] + (q[mid] if mid is not None else 0)
         edge_net_q[c1] = net
 
-    # Calculate total flow to determine starting phi value
-    total_q = sum(v for v in edge_net_q.values() if v > 0)
+    # Use known flowrate if provided, otherwise sum positive edge-net flows
+    total_q = total_flow if total_flow is not None else sum(v for v in edge_net_q.values() if v > 0)
     phi_val = total_q  # Start with total flow at inlet
 
     if debug:
@@ -1075,7 +1075,7 @@ def create_flow_potential_bc(nodes, elements, q, debug=False, element_types=None
         if mid is not None:
             phi[mid] = 0.5 * (phi[c1] + phi[c2])
 
-    # Check closure - should be close to zero for a proper flow field
+    # Check closure
     starting_phi = phi[ordered_nodes[start_idx]]
     closure_error = phi_val - starting_phi
 
@@ -1258,11 +1258,19 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                 # Third coordinate = 0 (on the edge)
                 return L[0], L[1], L[2]
 
-            # 2-point Gauss quadrature on [0,1]
+            # 2-point Gauss quadrature on [0,1] with per-GP kr
+            p_elem_nodes = p_nodes[en[:6]]
+            kr_e0 = kr0[elem_idx] if hasattr(kr0, '__len__') else kr0
+            h0_e0 = h0[elem_idx] if hasattr(h0, '__len__') else h0
             gp = [(0.5 - 0.5/np.sqrt(3)), (0.5 + 0.5/np.sqrt(3))]
             total = 0.0
             for t in gp:
                 L1, L2, L3 = area_coords(t)
+                # Tri6 shape functions for pressure interpolation
+                N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                              4*L1*L2, 4*L2*L3, 4*L3*L1])
+                p_gp = N @ p_elem_nodes
+                kr_gp = kr_frontal(p_gp, kr_e0, h0_e0) if kr0 is not None else 1.0
                 dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
                 dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
                 dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
@@ -1271,7 +1279,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                     gradN[0, ii] = dN_dL1[ii]*dL1_dx + dN_dL2[ii]*dL2_dx + dN_dL3[ii]*dL3_dx
                     gradN[1, ii] = dN_dL1[ii]*dL1_dy + dN_dL2[ii]*dL2_dy + dN_dL3[ii]*dL3_dy
                 grad_h = gradN @ h_elem
-                v = -kr_elem * Kmat @ grad_h
+                v = -kr_gp * Kmat @ grad_h
                 total += -v[1]*dx + v[0]*dy
             segment_flux[c1] = total * 0.5  # weight = 0.5 each for 2-pt rule on [0,1]
 
@@ -2586,23 +2594,6 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
     gauss_pts = [(1/6, 1/6, 2/3), (1/6, 2/3, 1/6), (2/3, 1/6, 1/6)]
     weights = [1/3, 1/3, 1/3]
 
-    # First pass: compute kr_avg from Gauss points using quadratic interpolation
-    kr_wsum = 0.0
-    wsum = 0.0
-    for (L1, L2, L3), w in zip(gauss_pts, weights):
-        N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
-                      4*L1*L2, 4*L2*L3, 4*L3*L1])
-        p_gp = N @ p_elem_nodes
-        kr_wsum += w * kr_frontal(p_gp, kr0, h0)
-        wsum += w
-    kr_avg = kr_wsum / wsum
-
-    if mode == 'head':
-        factor = kr_avg
-    else:  # stream
-        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
-
-    # Second pass: assemble stiffness with uniform kr factor
     ke = np.zeros((6, 6))
 
     x0, y0 = nodes_elem[0]
@@ -2624,6 +2615,17 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
     dL3_dy = (x1 - x0) / (2 * total_area)
 
     for (L1, L2, L3), w in zip(gauss_pts, weights):
+        # Compute kr at this Gauss point
+        N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                      4*L1*L2, 4*L2*L3, 4*L3*L1])
+        p_gp = N @ p_elem_nodes
+        kr_gp = kr_frontal(p_gp, kr0, h0)
+
+        if mode == 'head':
+            factor = kr_gp
+        else:  # stream — per-GP 1/kr (matching SEEP2D)
+            factor = 1.0 / kr_gp if kr_gp > 1e-6 else 1e6
+
         dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
         dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
         dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
@@ -2633,9 +2635,9 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
             gradN[0, i] = dN_dL1[i]*dL1_dx + dN_dL2[i]*dL2_dx + dN_dL3[i]*dL3_dx
             gradN[1, i] = dN_dL1[i]*dL1_dy + dN_dL2[i]*dL2_dy + dN_dL3[i]*dL3_dy
 
-        ke += (gradN.T @ Kmat @ gradN) * total_area * w
+        ke += factor * (gradN.T @ Kmat @ gradN) * total_area * w
 
-    return factor * ke
+    return ke
 
 
 def quad4_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head'):
@@ -2970,7 +2972,7 @@ def run_seepage_analysis(seep_data, tol=1e-6):
             element_types=element_types,
             tol=tol
         )
-        # Compute phi BCs from element-level boundary flux (avoids reaction force artifacts)
+        # Compute phi BCs from element-level boundary flux
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
             kr0=kr0_per_element, h0=h0_per_element, total_flow=total_flow)

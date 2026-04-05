@@ -1,5 +1,3 @@
-from sklearn import base
-
 import numpy as np
 from pathlib import Path
 
@@ -17,7 +15,7 @@ slope_data = load_slope_data(input_file)
 plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=True)
 
 element_type = 'tri6'
-size_divisions = 120
+size_divisions = 100
 re_mesh = True
 
 # Use existing mesh from slope_data if available, otherwise build a new one

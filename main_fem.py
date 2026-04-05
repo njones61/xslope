@@ -44,7 +44,7 @@ plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
 
 analysis_type = "single" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
-deform_percent = 20 # @param {"type":"number"} for plotting deformation results - percentage of slope height
+deform_percent = 15 # @param {"type":"number"} for plotting deformation results - percentage of slope height
 
 F = 1.14     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
 F_min=1.1  # Minimum FS for SSRM search (adjust as needed)

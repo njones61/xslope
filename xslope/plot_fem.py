@@ -416,7 +416,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
         )
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
-                    deform_percent=20, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
+                    deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=False, save_png=False, dpi=300):
     """
@@ -433,7 +433,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             'strain' - equivalent strain contours
             'shear_strain' - viscoplastic max shear strain contours
             'yield' - Mohr-Coulomb yield function contours
-        deform_percent: Target deformation as percentage of mesh height (default 20).
+        deform_percent: Target deformation as percentage of mesh height (default 15).
         show_mesh: Show mesh lines
         show_reinforcement: Show reinforcement elements
         figsize: Figure size (width, height)

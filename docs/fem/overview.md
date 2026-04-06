@@ -702,6 +702,74 @@ A single plot type can also be specified as a string rather than a list:
 plot_fem_results(fem_data, solution, plot_type='shear_strain')
 ```
 
+## Exported Files
+
+After a FEM analysis is run, XSLOPE can write the analysis outputs to files that share the input file stem. The mesh file is written when a new mesh is generated. The two CSV files are written with the following function call:
+
+```python
+export_fem_solution(fem_data, solution, output_stem)
+``` 
+
+The two CSV files contain the primary nodal and element results used for post-processing.
+
+| File | Description |
+|------|-------------|
+| `*_mesh.json` | Finite element mesh definition used by the analysis. This allows the generated mesh to be reused in later runs. |
+| `*_fem_nodes.csv` | One row per node containing displacement results. |
+| `*_fem_elements.csv` | One row per 2D element containing stress, strain, and yielding results. |
+
+### Mesh File Contents
+
+`*_mesh.json` stores the mesh arrays needed to rebuild the model geometry and connectivity.
+
+| Field | Description |
+|-------|-------------|
+| `nodes` | Node coordinates. |
+| `elements` | Element connectivity. |
+| `element_types` | Number of active nodes in each element. |
+| `element_materials` | Material id assigned to each 2D element. |
+| `elements_1d` | 1D reinforcement or pile element connectivity, when present. |
+| `element_types_1d` | Number of active nodes in each 1D element, when present. |
+| `element_materials_1d` | Reinforcement or pile line id for each 1D element, when present. |
+
+### Nodal Results Columns
+
+`*_fem_nodes.csv` stores one row per node.
+
+| Column | Description |
+|--------|-------------|
+| `node_id` | 1-based node number. |
+| `x` | x-coordinate of the node. |
+| `y` | y-coordinate of the node. |
+| `u_x` | Total horizontal displacement. |
+| `u_y` | Total vertical displacement. |
+| `u_mag` | Magnitude of the total displacement vector. |
+| `u_x_vp` | Viscoplastic horizontal displacement, computed as total minus elastic displacement. |
+| `u_y_vp` | Viscoplastic vertical displacement, computed as total minus elastic displacement. |
+| `u_mag_vp` | Magnitude of the viscoplastic displacement vector. |
+
+### Element Results Columns
+
+`*_fem_elements.csv` stores one row per 2D element.
+
+| Column | Description |
+|--------|-------------|
+| `element_id` | 1-based element number. |
+| `material_id` | Material id assigned to the element. |
+| `x_centroid` | x-coordinate of the element centroid. |
+| `y_centroid` | y-coordinate of the element centroid. |
+| `sigma_x` | Average element normal stress in the x direction. |
+| `sigma_y` | Average element normal stress in the y direction. |
+| `tau_xy` | Average element shear stress. |
+| `sigma_vm` | Von Mises stress. |
+| `eps_x` | Average element normal strain in the x direction. |
+| `eps_y` | Average element normal strain in the y direction. |
+| `gamma_xy` | Average engineering shear strain. |
+| `max_shear_strain` | Maximum shear strain derived from the strain state. |
+| `vp_shear_strain` | Viscoplastic maximum shear strain. |
+| `plastic` | Boolean flag indicating whether the element yielded. |
+| `yield_function` | Value of the Mohr-Coulomb yield function for the final stress state. |
+
 ## References
 
 Dawson, E.M., Roth, W.H., & Drescher, A. (1999). Slope stability analysis by strength reduction. *Géotechnique*, 49(6), 835-840.

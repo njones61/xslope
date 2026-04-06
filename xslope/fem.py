@@ -22,6 +22,92 @@ from scipy.sparse.linalg import splu
 from shapely.geometry import LineString, Point
 
 
+def _extract_nodal_uv(disp, fem_data):
+    """Extract per-node translational displacements from a mixed-DOF vector."""
+    dof_offset = fem_data.get("dof_offset", None)
+    if dof_offset is not None:
+        n_nodes = len(fem_data["nodes"])
+        u = np.array([disp[dof_offset[i]] for i in range(n_nodes)])
+        v = np.array([disp[dof_offset[i] + 1] for i in range(n_nodes)])
+    else:
+        u = disp[0::2]
+        v = disp[1::2]
+    return u, v
+
+
+def export_fem_solution(fem_data, solution, output_stem):
+    """Export FEM nodal and element results to CSV files using a common stem."""
+    import pandas as pd
+    from pathlib import Path
+
+    output_stem = Path(output_stem)
+    nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
+    elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
+
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    element_materials = fem_data["element_materials"]
+
+    disp_total = solution["displacements"]
+    ux_total, uy_total = _extract_nodal_uv(disp_total, fem_data)
+    u_mag_total = np.sqrt(ux_total**2 + uy_total**2)
+
+    disp_elastic = solution.get("displacements_elastic")
+    if disp_elastic is not None:
+        disp_vp = disp_total - disp_elastic
+        ux_vp, uy_vp = _extract_nodal_uv(disp_vp, fem_data)
+    else:
+        ux_vp = np.zeros(len(nodes))
+        uy_vp = np.zeros(len(nodes))
+    u_mag_vp = np.sqrt(ux_vp**2 + uy_vp**2)
+
+    node_df = pd.DataFrame({
+        "node_id": np.arange(1, len(nodes) + 1),
+        "x": nodes[:, 0],
+        "y": nodes[:, 1],
+        "u_x": ux_total,
+        "u_y": uy_total,
+        "u_mag": u_mag_total,
+        "u_x_vp": ux_vp,
+        "u_y_vp": uy_vp,
+        "u_mag_vp": u_mag_vp,
+    })
+
+    with open(nodes_file, "w") as f:
+        node_df.to_csv(f, index=False)
+
+    centroids = np.zeros((len(elements), 2))
+    for i, elem_nodes in enumerate(elements):
+        active_nodes = elem_nodes[:element_types[i]]
+        coords = nodes[active_nodes]
+        centroids[i] = np.mean(coords, axis=0)
+
+    element_df = pd.DataFrame({
+        "element_id": np.arange(1, len(elements) + 1),
+        "material_id": element_materials,
+        "x_centroid": centroids[:, 0],
+        "y_centroid": centroids[:, 1],
+        "sigma_x": solution["stresses"][:, 0],
+        "sigma_y": solution["stresses"][:, 1],
+        "tau_xy": solution["stresses"][:, 2],
+        "sigma_vm": solution["stresses"][:, 3],
+        "eps_x": solution["strains"][:, 0],
+        "eps_y": solution["strains"][:, 1],
+        "gamma_xy": solution["strains"][:, 2],
+        "max_shear_strain": solution["strains"][:, 3],
+        "vp_shear_strain": solution["vp_shear_strain"],
+        "plastic": solution["plastic_elements"],
+        "yield_function": solution["yield_function"],
+    })
+
+    with open(elements_file, "w") as f:
+        element_df.to_csv(f, index=False)
+
+    print(f"Exported FEM nodal results to {nodes_file}")
+    print(f"Exported FEM element results to {elements_file}")
+
+
 def build_fem_data(slope_data, mesh=None):
     """
     Build a fem_data dictionary from slope_data and optional mesh.

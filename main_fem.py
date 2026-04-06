@@ -1,11 +1,11 @@
 from pathlib import Path
-from xslope.fem import build_fem_data, solve_fem, solve_ssrm, print_reinforcement_summary, print_pile_summary, print_detailed_element_summary
+from xslope.fem import build_fem_data, solve_fem, solve_ssrm, print_reinforcement_summary, print_pile_summary, print_detailed_element_summary, export_fem_solution
 from xslope.fileio import load_slope_data
 from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_constraint_line_geometry
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
-input_file = "test/xslope_earth_dam_fem_KEY.xlsx"
+input_file = "test/xslope_johnson_res_fem_KEY.xlsx"
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
@@ -42,13 +42,13 @@ fem_data = build_fem_data(slope_data, mesh)
 plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
               label_elements=False, label_nodes=False, save_png=True)
 
-analysis_type = "single" # @param ["single","ssrm"]
+analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase","unbalanced_force"]
 deform_percent = 15 # @param {"type":"number"} for plotting deformation results - percentage of slope height
 
 F = 1.14     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
-F_min=1.1  # Minimum FS for SSRM search (adjust as needed)
-F_max=1.2   # Maximum FS for SSRM search (adjust as needed)
+F_min=1.2  # Minimum FS for SSRM search (adjust as needed)
+F_max=1.4   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)
@@ -57,6 +57,7 @@ if analysis_type == "single":
     print_pile_summary(fem_data, solution)
     print_detailed_element_summary(fem_data, solution)
     plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_percent=deform_percent, save_png=True)
+    export_fem_solution(fem_data, solution, input_path.parent / input_path.stem)
 elif analysis_type == "ssrm":
     result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05, debug_level=1,
                         failure_criterion=failure_criterion)
@@ -68,6 +69,6 @@ elif analysis_type == "ssrm":
         print_detailed_element_summary(fem_data, result['last_solution'])
         plot_fem_results(fem_data, result['last_solution'],
                          plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_percent=deform_percent, save_png=True)
+        export_fem_solution(fem_data, result['last_solution'], input_path.parent / input_path.stem)
     else:
         print(f"SSRM failed: {result.get('error', 'Unknown error')}")
-

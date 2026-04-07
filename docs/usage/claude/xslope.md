@@ -44,6 +44,9 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - At least one specified head boundary condition
    - For partially saturated problems: kr0 and h0 for every material
 
+   **Required for reliability:**
+   - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns L-Q). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
+
    **Required for FEM:**
    - Young's modulus (E) and Poisson's ratio (nu) for every material
 

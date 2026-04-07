@@ -304,6 +304,16 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
     
     start_time = time.time()
 
+    # Validate that at least one material has non-zero standard deviations
+    has_std = any(
+        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
+        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
+        for m in slope_data['materials']
+    )
+    if not has_std:
+        return False, ("Reliability analysis requires standard deviations for at least one "
+                        "material property (columns L-Q in the mat sheet). None were provided.")
+
     # Import search functions and solve module here to avoid circular import
     from .search import circular_search, noncircular_search
     from . import solve

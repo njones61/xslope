@@ -1344,12 +1344,13 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                 return total * 0.5 * interval
 
             edge_interval = get_quadratic_edge_interval(c1, mid, c2)
+            segment_flux[c1] = integrate_edge_interval(0.0, 1.0)
             if edge_interval == (0.0, 1.0):
-                segment_flux[c1] = integrate_edge_interval(0.0, 1.0)
                 midside_flux_from_start[c1] = integrate_edge_interval(0.0, 0.5)
-            else:
-                segment_flux[c1] = 0.0
-                midside_flux_from_start[c1] = 0.0
+            # Transition edges: segment_flux is kept (correct corner phi walk)
+            # but midside_flux_from_start is omitted so the midside node gets
+            # linear interpolation between corners, avoiding half-edge phi
+            # jumps that distort the flownet on mixed BC edges.
 
         elif et == 4:
             # Bilinear quad — evaluate at edge midpoint
@@ -2706,18 +2707,25 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
     dL3_dx = (y0 - y1) / (2 * total_area)
     dL3_dy = (x1 - x0) / (2 * total_area)
 
+    # Average kr across Gauss points first, then apply kr_avg or 1/kr_avg.
+    # This matches the tri3 approach and avoids 1/kr blowup when individual
+    # GPs fall in the unsaturated zone (where kr → 0 makes 1/kr → ∞).
+    kr_wsum = 0.0
+    wsum = 0.0
     for (L1, L2, L3), w in zip(gauss_pts, weights):
-        # Compute kr at this Gauss point
         N = np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
                       4*L1*L2, 4*L2*L3, 4*L3*L1])
         p_gp = N @ p_elem_nodes
-        kr_gp = kr_frontal(p_gp, kr0, h0)
+        kr_wsum += w * kr_frontal(p_gp, kr0, h0)
+        wsum += w
+    kr_avg = kr_wsum / wsum
 
-        if mode == 'head':
-            factor = kr_gp
-        else:  # stream — per-GP 1/kr (matching SEEP2D)
-            factor = 1.0 / kr_gp if kr_gp > 1e-6 else 1e6
+    if mode == 'head':
+        factor = kr_avg
+    else:  # stream
+        factor = 1.0 / kr_avg if kr_avg > 1e-12 else 1e10
 
+    for (L1, L2, L3), w in zip(gauss_pts, weights):
         dN_dL1 = np.array([4*L1-1, 0, 0, 4*L2, 0, 4*L3])
         dN_dL2 = np.array([0, 4*L2-1, 0, 4*L1, 4*L3, 0])
         dN_dL3 = np.array([0, 0, 4*L3-1, 0, 4*L2, 4*L1])
@@ -2727,8 +2735,9 @@ def tri6_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='head
             gradN[0, i] = dN_dL1[i]*dL1_dx + dN_dL2[i]*dL2_dx + dN_dL3[i]*dL3_dx
             gradN[1, i] = dN_dL1[i]*dL1_dy + dN_dL2[i]*dL2_dy + dN_dL3[i]*dL3_dy
 
-        ke += factor * (gradN.T @ Kmat @ gradN) * total_area * w
+        ke += (gradN.T @ Kmat @ gradN) * total_area * w
 
+    ke *= factor
     return ke
 
 

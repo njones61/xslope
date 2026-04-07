@@ -8,7 +8,7 @@ The xslope software was developed by Norman L Jones, PhD, a professor in the Civ
 
 The limit equilibrium method (LEM) represents the fundamental approach to slope stability analysis, evaluating stability by examining the equilibrium of forces acting on a potential failure mass. A slope remains stable when the resisting forces, primarily the shear strength of the soil along the failure surface, exceed the driving forces such as weight and other destabilizing influences. The factor of safety is expressed as the ratio of available shear strength to the shear stress required for equilibrium.
 
-![xslope_results_single.png](lem/images/xslope_results_single.png){width="1200"}
+![xslope_results_single.png](lem/sample_images/earth_dam_up_results.png){width="1200"}
 
 xslope employs the method of slices, a numerical technique that divides the potential failure mass into a series of vertical slices. Rather than analyzing the entire mass as a single unit, each slice is examined individually, with the overall stability determined by summing the forces and moments acting on all slices. This approach allows for the analysis of complex geometries, varying soil conditions, and multiple loading scenarios including distributed surface loads, seismic forces, reinforcement, and tension cracks.
 

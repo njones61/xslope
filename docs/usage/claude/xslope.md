@@ -476,18 +476,26 @@ Non-circular failure surface points. Row 2 is header. Data starts row 3.
 | B | Y |
 | C | Movement ("Free", "Horiz", or "Fixed") |
 
+**Non-circular surface design rules:**
+- Entry and exit points must have **explicit Y values on the ground surface** and Movement="Free". Do NOT leave Y blank/None — always compute the ground surface elevation at the X coordinate.
+- Interior points in a weak layer use Movement="Horiz" so the search optimizer slides them horizontally within the layer.
+- The surface must slope from the ground surface down to the weak layer and back up — it should NOT be purely horizontal.
+- Points are ordered left-to-right (ascending X).
+
 ```python
 updates['non-circ'] = {}
+# Example: slope with weak clay at y=-6.5, toe at (0,0), crest at (40,20)
+# Ground surface: y=0 for x<0, y=20 for x>40
 points = [
-    (50, None, "Free"),     # entry point (auto-computed Y)
-    (100, 35, "Horiz"),     # interior point, moves horizontally
-    (200, 35, "Horiz"),     # interior point in weak layer
-    (250, None, "Free"),    # exit point (auto-computed Y)
+    (-20, 0,    "Free"),    # on ground surface, left of toe
+    (-5,  -6.5, "Horiz"),   # enter weak layer
+    (20,  -6.5, "Horiz"),   # mid weak layer
+    (45,  -6.5, "Horiz"),   # exit weak layer
+    (70,  20,   "Free"),    # on ground surface, right of crest
 ]
 for i, (x, y, movement) in enumerate(points):
     updates['non-circ'][cell_ref(3 + i, 1)] = x
-    if y is not None:
-        updates['non-circ'][cell_ref(3 + i, 2)] = y
+    updates['non-circ'][cell_ref(3 + i, 2)] = y
     updates['non-circ'][cell_ref(3 + i, 3)] = movement
 ```
 

@@ -144,17 +144,91 @@ After showing all plots, print the key numerical result (FS, flowrate, etc.) as 
 
 The input template is at: `docs/inputs/input_template.xlsx`
 
-Always copy it to a working location before modifying. Use openpyxl to populate cells.
+Always copy it to a working location before modifying. Use `write_cells_to_xlsx()` (defined below) to populate cells — it modifies the xlsx at the zip/XML level, preserving all formatting, charts, and drawings. Do NOT use openpyxl to load/save the template, as it destroys formatting on round-trip.
 
 ```python
 import shutil
-import openpyxl
+import zipfile
+import re
+from io import BytesIO
+from lxml import etree
 
-# Copy template
+# --- Surgical xlsx writer (preserves all formatting) ---
+
+_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+_R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+_PKG_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+
+def _col_num_to_letter(n):
+    result = ''
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        result = chr(65 + rem) + result
+    return result
+
+def cell_ref(row, col):
+    """Convert 1-based (row, col) to cell reference, e.g. cell_ref(8, 4) -> 'D8'."""
+    return f'{_col_num_to_letter(col)}{row}'
+
+def _set_cell(sheet_xml, ref, value):
+    sd = sheet_xml.find('{%s}sheetData' % _NS)
+    m = re.match(r'^([A-Z]+)(\d+)$', ref)
+    row_num = int(m.group(2))
+    row_el, insert_after = None, None
+    for r in sd.findall('{%s}row' % _NS):
+        rn = int(r.get('r'))
+        if rn == row_num: row_el = r; break
+        elif rn < row_num: insert_after = r
+    if row_el is None:
+        row_el = etree.SubElement(sd, '{%s}row' % _NS)
+        row_el.set('r', str(row_num)); row_el.set('spans', '1:30')
+        if insert_after is not None: insert_after.addnext(row_el)
+    cell_el = None
+    for c in row_el.findall('{%s}c' % _NS):
+        if c.get('r') == ref: cell_el = c; break
+    if cell_el is None:
+        cell_el = etree.SubElement(row_el, '{%s}c' % _NS); cell_el.set('r', ref)
+    for tag in ['v', 'is', 'f']:
+        old = cell_el.find('{%s}%s' % (_NS, tag))
+        if old is not None: cell_el.remove(old)
+    if isinstance(value, str):
+        cell_el.set('t', 'inlineStr')
+        is_el = etree.SubElement(cell_el, '{%s}is' % _NS)
+        t_el = etree.SubElement(is_el, '{%s}t' % _NS); t_el.text = value
+    else:
+        if cell_el.get('t') in ('s', 'inlineStr'): del cell_el.attrib['t']
+        v_el = etree.SubElement(cell_el, '{%s}v' % _NS); v_el.text = str(value)
+
+def write_cells_to_xlsx(filepath, updates):
+    """Surgically update cell values in xlsx without losing formatting.
+    updates: {sheet_name: {cell_ref: value, ...}, ...}
+    """
+    with open(filepath, 'rb') as f: data = f.read()
+    zin = zipfile.ZipFile(BytesIO(data))
+    wb_xml = etree.fromstring(zin.read('xl/workbook.xml'))
+    rels_xml = etree.fromstring(zin.read('xl/_rels/workbook.xml.rels'))
+    rid_map = {r.get('Id'): r.get('Target')
+               for r in rels_xml.iter('{%s}Relationship' % _PKG_NS)}
+    sheet_paths = {}
+    for s in wb_xml.iter('{%s}sheet' % _NS):
+        rid = s.get('{%s}id' % _R_NS)
+        if rid and rid in rid_map:
+            sheet_paths[s.get('name')] = f'xl/{rid_map[rid]}'
+    modified = {}
+    for name, cells in updates.items():
+        path = sheet_paths[name]
+        xml = etree.fromstring(zin.read(path))
+        for ref, val in cells.items(): _set_cell(xml, ref, val)
+        modified[path] = etree.tostring(xml, xml_declaration=True, encoding='UTF-8', standalone=True)
+    with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.namelist():
+            zout.writestr(item, modified.get(item, zin.read(item)))
+    zin.close()
+
+# --- Copy template ---
 src = "docs/inputs/input_template.xlsx"  # relative to project root
 dst = "inputs/my_problem.xlsx"               # choose a descriptive name
 shutil.copy(src, dst)
-wb = openpyxl.load_workbook(dst)
 ```
 
 ### Sheet: main
@@ -168,11 +242,14 @@ wb = openpyxl.load_workbook(dst)
 | D11 | Seismic coefficient (k) | 0 if no seismic |
 
 ```python
-ws = wb['main']
-ws['D8'] = 62.4      # gamma_water
-ws['D9'] = 0         # tension crack depth
-ws['D10'] = 0        # water in crack
-ws['D11'] = 0        # seismic k
+# Build a dict of all updates, then call write_cells_to_xlsx once at the end
+updates = {}
+updates['main'] = {
+    'D8': 62.4,      # gamma_water
+    'D9': 0,         # tension crack depth
+    'D10': 0,        # water in crack
+    'D11': 0,        # seismic k
+}
 ```
 
 ### Sheet: mat
@@ -202,30 +279,38 @@ Row 8 is the header row. Data starts at row 9. Columns:
 | X | n | Poisson's ratio (FEM) |
 
 ```python
-ws = wb['mat']
+updates['mat'] = {}
+def write_material(row, mat_num, name, gamma, option, c, phi, u,
+                   cp=None, r_elev=None, d=None, psi=None,
+                   k1=None, k2=None, alpha=None, kr0=None, h0=None,
+                   E=None, nu=None):
+    cells = {
+        cell_ref(row, 1): mat_num, cell_ref(row, 2): name,
+        cell_ref(row, 3): gamma, cell_ref(row, 4): option,
+        cell_ref(row, 5): c, cell_ref(row, 6): phi, cell_ref(row, 11): u,
+    }
+    if cp is not None: cells[cell_ref(row, 7)] = cp
+    if r_elev is not None: cells[cell_ref(row, 8)] = r_elev
+    if d is not None: cells[cell_ref(row, 9)] = d
+    if psi is not None: cells[cell_ref(row, 10)] = psi
+    if k1 is not None: cells[cell_ref(row, 18)] = k1
+    if k2 is not None: cells[cell_ref(row, 19)] = k2
+    if alpha is not None: cells[cell_ref(row, 20)] = alpha
+    if kr0 is not None: cells[cell_ref(row, 21)] = kr0
+    if h0 is not None: cells[cell_ref(row, 22)] = h0
+    if E is not None: cells[cell_ref(row, 23)] = E
+    if nu is not None: cells[cell_ref(row, 24)] = nu
+    updates['mat'].update(cells)
+
 # Material 1 example
-row = 9  # first material
-ws.cell(row=row, column=1, value=1)           # mat number
-ws.cell(row=row, column=2, value="clay")      # name
-ws.cell(row=row, column=3, value=120)         # gamma
-ws.cell(row=row, column=4, value="mc")        # option
-ws.cell(row=row, column=5, value=200)         # c
-ws.cell(row=row, column=6, value=28)          # phi
-ws.cell(row=row, column=11, value="piezo")    # u option
-# Seepage properties (if needed)
-ws.cell(row=row, column=18, value=0.5)        # k1
-ws.cell(row=row, column=19, value=0.2)        # k2
-ws.cell(row=row, column=20, value=0)          # alpha
-ws.cell(row=row, column=21, value=0.001)      # kr0
-ws.cell(row=row, column=22, value=-1)         # h0
-# FEM properties (if needed)
-ws.cell(row=row, column=23, value=1000000)    # E
-ws.cell(row=row, column=24, value=0.3)        # nu
+write_material(9, 1, "clay", 120, "mc", c=200, phi=28, u="piezo",
+               k1=0.5, k2=0.2, alpha=0, kr0=0.001, h0=-1,  # seepage
+               E=1000000, nu=0.3)                             # FEM
 ```
 
-For total stress analysis (undrained, Su analysis): set option="mc", c=Su, f=0, u="none".
-For effective stress with piezometric line: set option="mc", c=c', f=phi', u="piezo".
-For effective stress with seepage solution: set option="mc", c=c', f=phi', u="seep".
+For total stress analysis (undrained, Su analysis): set option="mc", c=Su, phi=0, u="none".
+For effective stress with piezometric line: set option="mc", c=c', phi=phi', u="piezo".
+For effective stress with seepage solution: set option="mc", c=c', phi=phi', u="seep".
 
 ### Sheet: profile
 
@@ -245,36 +330,28 @@ Profile lines define slope geometry. Each line = top of a soil layer. Draw top-t
 - Row 8+: XY coordinate data
 
 ```python
-ws = wb['profile']
-ws['B2'] = 0  # max depth
+updates['profile'] = {'B2': 0}  # max depth
 
-def write_profile_line(ws, line_num, mat_id, mat_name, points):
-    """Write a profile line to the profile sheet.
-
-    Args:
-        ws: openpyxl worksheet
-        line_num: 1-based profile line number
-        mat_id: material ID (1-based, references mat sheet)
-        mat_name: material name string
-        points: list of (x, y) tuples, left-to-right
+def write_profile_line(line_num, mat_id, mat_name, points):
+    """Add a profile line to updates dict.
+    line_num: 1-based profile line number
+    mat_id: material ID (1-based, references mat sheet)
+    mat_name: material name string
+    points: list of (x, y) tuples, left-to-right
     """
     col_offset = (line_num - 1) * 3  # 0, 3, 6, 9, ...
     x_col = 1 + col_offset            # A=1, D=4, G=7, J=10, ...
     y_col = 2 + col_offset            # B=2, E=5, H=8, K=11, ...
-
-    # Row 5: Mat ID
-    ws.cell(row=5, column=y_col, value=mat_id)
-    # Row 6: Material name
-    ws.cell(row=6, column=x_col, value=mat_name)
-    # Row 8+: XY data
+    updates['profile'][cell_ref(5, y_col)] = mat_id
+    updates['profile'][cell_ref(6, x_col)] = mat_name
     for i, (x, y) in enumerate(points):
-        ws.cell(row=8 + i, column=x_col, value=x)
-        ws.cell(row=8 + i, column=y_col, value=y)
+        updates['profile'][cell_ref(8 + i, x_col)] = x
+        updates['profile'][cell_ref(8 + i, y_col)] = y
 
 # Example: 3-layer slope
-write_profile_line(ws, 1, 1, "soil 1", [(0, 84), (150, 84), (174.7, 64)])
-write_profile_line(ws, 2, 2, "soil 2", [(0, 64), (174.7, 64), (204.3, 40)])
-write_profile_line(ws, 3, 3, "soil 3", [(0, 40), (320, 40)])
+write_profile_line(1, 1, "soil 1", [(0, 84), (150, 84), (174.7, 64)])
+write_profile_line(2, 2, "soil 2", [(0, 64), (174.7, 64), (204.3, 40)])
+write_profile_line(3, 3, "soil 3", [(0, 40), (320, 40)])
 ```
 
 ### Sheet: piezo
@@ -285,11 +362,11 @@ Piezometric lines for pore pressure (used when material u="piezo").
 - Piezo Line 2: columns D-E, data starts row 4 (only for rapid drawdown)
 
 ```python
-ws = wb['piezo']
+updates['piezo'] = {}
 piezo_points = [(0, 80), (75, 79), (140, 70), (204, 40), (320, 40)]
 for i, (x, y) in enumerate(piezo_points):
-    ws.cell(row=4 + i, column=1, value=x)  # A
-    ws.cell(row=4 + i, column=2, value=y)  # B
+    updates['piezo'][cell_ref(4 + i, 1)] = x  # A
+    updates['piezo'][cell_ref(4 + i, 2)] = y  # B
 ```
 
 ### Sheet: circles
@@ -308,23 +385,23 @@ Circular failure surface starting points for LEM search. Row 2 is header. Data s
 | H | R | Radius (if Option="Radius") |
 
 ```python
-ws = wb['circles']
-def write_circle(ws, num, xo, yo, option="Depth", depth=None, xi=None, yi=None, radius=None):
+updates['circles'] = {}
+def write_circle(num, xo, yo, option="Depth", depth=None, xi=None, yi=None, radius=None):
     row = 2 + num  # circle 1 -> row 3
-    ws.cell(row=row, column=1, value=num)
-    ws.cell(row=row, column=2, value=xo)
-    ws.cell(row=row, column=3, value=yo)
-    ws.cell(row=row, column=4, value=option)
+    updates['circles'].update({
+        cell_ref(row, 1): num, cell_ref(row, 2): xo,
+        cell_ref(row, 3): yo, cell_ref(row, 4): option,
+    })
     if option == "Depth" and depth is not None:
-        ws.cell(row=row, column=5, value=depth)
+        updates['circles'][cell_ref(row, 5)] = depth
     elif option == "Intercept":
-        ws.cell(row=row, column=6, value=xi)
-        ws.cell(row=row, column=7, value=yi)
+        updates['circles'][cell_ref(row, 6)] = xi
+        updates['circles'][cell_ref(row, 7)] = yi
     elif option == "Radius" and radius is not None:
-        ws.cell(row=row, column=8, value=radius)
+        updates['circles'][cell_ref(row, 8)] = radius
 
 # Example: circle centered above slope, passing through toe
-write_circle(ws, 1, xo=10, yo=40, option="Depth", depth=0)
+write_circle(1, xo=10, yo=40, option="Depth", depth=0)
 ```
 
 **Tips for choosing circles:**
@@ -345,7 +422,7 @@ Non-circular failure surface points. Row 2 is header. Data starts row 3.
 | C | Movement ("Free", "Horiz", or "Fixed") |
 
 ```python
-ws = wb['non-circ']
+updates['non-circ'] = {}
 points = [
     (50, None, "Free"),     # entry point (auto-computed Y)
     (100, 35, "Horiz"),     # interior point, moves horizontally
@@ -353,10 +430,10 @@ points = [
     (250, None, "Free"),    # exit point (auto-computed Y)
 ]
 for i, (x, y, movement) in enumerate(points):
-    ws.cell(row=3 + i, column=1, value=x)
+    updates['non-circ'][cell_ref(3 + i, 1)] = x
     if y is not None:
-        ws.cell(row=3 + i, column=2, value=y)
-    ws.cell(row=3 + i, column=3, value=movement)
+        updates['non-circ'][cell_ref(3 + i, 2)] = y
+    updates['non-circ'][cell_ref(3 + i, 3)] = movement
 ```
 
 ### Sheet: dloads
@@ -368,20 +445,20 @@ Distributed loads. Each load block is 3 columns (X, Y, Normal) with a 1-column g
 - Load N: columns at offset (N-1)*4 + 2 from col A
 
 ```python
-ws = wb['dloads']
-def write_dload(ws, load_num, points):
+updates['dloads'] = {}
+def write_dload(load_num, points):
     """points: list of (x, y, normal_stress)"""
     col_offset = (load_num - 1) * 4
     x_col = 2 + col_offset   # B=2, F=6, J=10
     y_col = 3 + col_offset
     n_col = 4 + col_offset
     for i, (x, y, n) in enumerate(points):
-        ws.cell(row=4 + i, column=x_col, value=x)
-        ws.cell(row=4 + i, column=y_col, value=y)
-        ws.cell(row=4 + i, column=n_col, value=n)
+        updates['dloads'][cell_ref(4 + i, x_col)] = x
+        updates['dloads'][cell_ref(4 + i, y_col)] = y
+        updates['dloads'][cell_ref(4 + i, n_col)] = n
 
 # Example: surcharge load of 500 psf on top of slope
-write_dload(ws, 1, [(20, 20, 500), (60, 20, 500)])
+write_dload(1, [(20, 20, 500), (60, 20, 500)])
 ```
 
 ### Sheet: reinforce
@@ -403,20 +480,17 @@ Reinforcement lines. Row 2 is header. Data starts row 3.
 | K | Area | cross-section area (FEM) |
 
 ```python
-ws = wb['reinforce']
-def write_reinforce(ws, num, x1, y1, x2, y2, tmax, tres=None, lp1=0, lp2=0, E=None, area=None):
+updates['reinforce'] = {}
+def write_reinforce(num, x1, y1, x2, y2, tmax, tres=None, lp1=0, lp2=0, E=None, area=None):
     row = 2 + num
-    ws.cell(row=row, column=1, value=num)
-    ws.cell(row=row, column=2, value=x1)
-    ws.cell(row=row, column=3, value=y1)
-    ws.cell(row=row, column=4, value=x2)
-    ws.cell(row=row, column=5, value=y2)
-    ws.cell(row=row, column=6, value=tmax)
-    if tres is not None: ws.cell(row=row, column=7, value=tres)
-    ws.cell(row=row, column=8, value=lp1)
-    ws.cell(row=row, column=9, value=lp2)
-    if E is not None: ws.cell(row=row, column=10, value=E)
-    if area is not None: ws.cell(row=row, column=11, value=area)
+    updates['reinforce'].update({
+        cell_ref(row, 1): num, cell_ref(row, 2): x1, cell_ref(row, 3): y1,
+        cell_ref(row, 4): x2, cell_ref(row, 5): y2, cell_ref(row, 6): tmax,
+        cell_ref(row, 8): lp1, cell_ref(row, 9): lp2,
+    })
+    if tres is not None: updates['reinforce'][cell_ref(row, 7)] = tres
+    if E is not None: updates['reinforce'][cell_ref(row, 10)] = E
+    if area is not None: updates['reinforce'][cell_ref(row, 11)] = area
 ```
 
 ### Sheet: piles (v10 template only)
@@ -443,22 +517,20 @@ Pile support elements. Row 2 is header. Data starts row 3.
 | P | Fixity | "Free" or "Fixed" (FEM head condition) |
 
 ```python
-ws = wb['piles']
-def write_pile(ws, num, label, x1, y1, x2, y2, D, S, E=None, Vcap=None, Mcap=None, fixity="Free", H=None):
+updates['piles'] = {}
+def write_pile(num, label, x1, y1, x2, y2, D, S, E=None, Vcap=None, Mcap=None, fixity="Free", H=None):
     row = 2 + num
-    ws.cell(row=row, column=1, value=num)
-    ws.cell(row=row, column=2, value=label)
-    ws.cell(row=row, column=3, value=x1)
-    ws.cell(row=row, column=4, value=y1)
-    ws.cell(row=row, column=5, value=x2)
-    ws.cell(row=row, column=6, value=y2)
-    if H is not None: ws.cell(row=row, column=7, value=H)
-    ws.cell(row=row, column=9, value=D)
-    ws.cell(row=row, column=10, value=S)
-    if E is not None: ws.cell(row=row, column=11, value=E)
-    if Vcap is not None: ws.cell(row=row, column=14, value=Vcap)
-    if Mcap is not None: ws.cell(row=row, column=15, value=Mcap)
-    ws.cell(row=row, column=16, value=fixity)
+    updates['piles'].update({
+        cell_ref(row, 1): num, cell_ref(row, 2): label,
+        cell_ref(row, 3): x1, cell_ref(row, 4): y1,
+        cell_ref(row, 5): x2, cell_ref(row, 6): y2,
+        cell_ref(row, 9): D, cell_ref(row, 10): S,
+        cell_ref(row, 16): fixity,
+    })
+    if H is not None: updates['piles'][cell_ref(row, 7)] = H
+    if E is not None: updates['piles'][cell_ref(row, 11)] = E
+    if Vcap is not None: updates['piles'][cell_ref(row, 14)] = Vcap
+    if Mcap is not None: updates['piles'][cell_ref(row, 15)] = Mcap
 ```
 
 ### Sheet: seep bc
@@ -471,35 +543,38 @@ Seepage boundary conditions.
 - Specified Head N: head at col (2 + N*3), XY at cols (1 + N*3)-(2 + N*3), each starting row 5
 
 ```python
-ws = wb['seep bc']
+updates['seep bc'] = {}
 
-def write_exit_face(ws, points):
+def write_exit_face(points):
     """points: list of (x, y)"""
     for i, (x, y) in enumerate(points):
-        ws.cell(row=5 + i, column=2, value=x)  # B
-        ws.cell(row=5 + i, column=3, value=y)  # C
+        updates['seep bc'][cell_ref(5 + i, 2)] = x  # B
+        updates['seep bc'][cell_ref(5 + i, 3)] = y  # C
 
-def write_specified_head(ws, head_num, head_value, points):
+def write_specified_head(head_num, head_value, points):
     """head_num: 1-based. points: list of (x, y)"""
     col_offset = 2 + head_num * 3  # head 1 -> col 5 (E), head 2 -> col 8 (H)
     x_col = col_offset
     y_col = col_offset + 1
     head_col = col_offset + 1  # head value goes in row 3 of the y column
-    ws.cell(row=3, column=head_col, value=head_value)
+    updates['seep bc'][cell_ref(3, head_col)] = head_value
     for i, (x, y) in enumerate(points):
-        ws.cell(row=5 + i, column=x_col, value=x)
-        ws.cell(row=5 + i, column=y_col, value=y)
+        updates['seep bc'][cell_ref(5 + i, x_col)] = x
+        updates['seep bc'][cell_ref(5 + i, y_col)] = y
 
 # Example: earth dam seepage
-write_exit_face(ws, [(59, 22), (105, 2)])
-write_specified_head(ws, 1, 18, [(0, 0), (42, 18)])     # upstream head = 18
-write_specified_head(ws, 2, 2, [(105, 2), (110, 0)])     # downstream head = 2
+write_exit_face([(59, 22), (105, 2)])
+write_specified_head(1, 18, [(0, 0), (42, 18)])     # upstream head = 18
+write_specified_head(2, 2, [(105, 2), (110, 0)])     # downstream head = 2
 ```
 
 ### Saving
 
 ```python
-wb.save(dst)
+# Write all updates to the xlsx (only modifies cells, preserves all formatting)
+# Only include sheets that have updates (skip empty dicts)
+updates = {k: v for k, v in updates.items() if v}
+write_cells_to_xlsx(dst, updates)
 print(f"Input file saved to: {dst}")
 ```
 
@@ -735,6 +810,7 @@ else:
    - Scale bars and dimension labels
    - Slope ratios (e.g., 2H:1V means for every 2 horizontal, 1 vertical)
    - **Water table identification**: A water table is indicated by an **inverted triangle symbol** (▽) on the diagram. Do NOT assume a dashed line is a water table unless it is accompanied by this symbol or is explicitly labeled. Dashed lines may represent other features (e.g., material boundaries, construction lines).
+   - **Ponded/standing water**: If the water table (▽) is shown ABOVE the ground surface, there is ponded water. This MUST be modeled as a distributed load (dloads) on the ground surface. The normal stress at each surface point = γ_w × (water_elevation - ground_elevation). This applies even for phi=0 total stress analyses — the water load is part of the problem definition, not an optional refinement. Never skip it.
    - Piezometric surfaces: typically shown as dashed/blue lines with explicit labels
    - Material boundaries shown as solid lines between differently hatched/colored zones
    - Property tables typically shown in the diagram legend

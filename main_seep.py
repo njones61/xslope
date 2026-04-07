@@ -7,15 +7,15 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-input_file = "docs/lem/files/xslope_earth_dam_rapid.xlsx"
+input_file = "../ce544/docs/unit2/12_fem/files/xslope_johnson_res_fem_KEY.xlsx"
 input_path = Path(input_file)
 
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, figsize=(12, 6), mode='seep', mat_table=False, tab_loc='top', save_png=True)
 
-element_type = 'tri3'
-size_divisions = 120
+element_type = 'tri6'
+size_divisions = 80
 re_mesh = True
 
 # Use existing mesh from slope_data if available, otherwise build a new one

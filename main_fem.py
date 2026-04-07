@@ -5,7 +5,7 @@ from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
-input_file = "test/xslope_johnson_res_fem_KEY.xlsx"
+input_file = "../ce544/docs/unit2/12_fem/files/xslope_earth_dam_fem_KEY.xlsx"
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
@@ -47,8 +47,8 @@ failure_criterion = "non_convergence" # @param ["non_convergence","displacement_
 deform_percent = 15 # @param {"type":"number"} for plotting deformation results - percentage of slope height
 
 F = 1.14     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
-F_min=1.2  # Minimum FS for SSRM search (adjust as needed)
-F_max=1.4   # Maximum FS for SSRM search (adjust as needed)
+F_min=1.4  # Minimum FS for SSRM search (adjust as needed)
+F_max=1.6   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)

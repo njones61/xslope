@@ -150,10 +150,16 @@ Always copy it to a working location before modifying. Use `write_cells_to_xlsx(
 import shutil
 import zipfile
 import re
+import os
+import tempfile
+import subprocess
 from io import BytesIO
 from lxml import etree
 
 # --- Surgical xlsx writer (preserves all formatting) ---
+# Modifies cell values via regex on raw XML, then uses system `zip` to update
+# entries in-place. This avoids re-serializing XML (which corrupts namespaces)
+# and avoids rebuilding the zip archive (which corrupts the OPC package structure).
 
 _NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 _R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
@@ -170,60 +176,110 @@ def cell_ref(row, col):
     """Convert 1-based (row, col) to cell reference, e.g. cell_ref(8, 4) -> 'D8'."""
     return f'{_col_num_to_letter(col)}{row}'
 
-def _set_cell(sheet_xml, ref, value):
-    sd = sheet_xml.find('{%s}sheetData' % _NS)
+def _parse_cell_ref(ref):
     m = re.match(r'^([A-Z]+)(\d+)$', ref)
-    row_num = int(m.group(2))
-    row_el, insert_after = None, None
-    for r in sd.findall('{%s}row' % _NS):
-        rn = int(r.get('r'))
-        if rn == row_num: row_el = r; break
-        elif rn < row_num: insert_after = r
-    if row_el is None:
-        row_el = etree.SubElement(sd, '{%s}row' % _NS)
-        row_el.set('r', str(row_num)); row_el.set('spans', '1:30')
-        if insert_after is not None: insert_after.addnext(row_el)
-    cell_el = None
-    for c in row_el.findall('{%s}c' % _NS):
-        if c.get('r') == ref: cell_el = c; break
-    if cell_el is None:
-        cell_el = etree.SubElement(row_el, '{%s}c' % _NS); cell_el.set('r', ref)
-    for tag in ['v', 'is', 'f']:
-        old = cell_el.find('{%s}%s' % (_NS, tag))
-        if old is not None: cell_el.remove(old)
+    col_str, row = m.group(1), int(m.group(2))
+    col = 0
+    for c in col_str:
+        col = col * 26 + (ord(c) - ord('A') + 1)
+    return row, col
+
+def _modify_existing_cell(cell_xml, value):
+    """Modify an existing cell's value, preserving its style attributes."""
+    if isinstance(value, float):
+        value = round(value, 10)
+    open_match = re.match(r'(<c\s[^>]*?)(/?>)', cell_xml)
+    if not open_match:
+        return cell_xml
+    open_tag_attrs = open_match.group(1)
+    open_tag_attrs = re.sub(r'\s+t="[^"]*"', '', open_tag_attrs)
     if isinstance(value, str):
-        cell_el.set('t', 'inlineStr')
-        is_el = etree.SubElement(cell_el, '{%s}is' % _NS)
-        t_el = etree.SubElement(is_el, '{%s}t' % _NS); t_el.text = value
+        return f'{open_tag_attrs} t="inlineStr"><is><t>{value}</t></is></c>'
     else:
-        if cell_el.get('t') in ('s', 'inlineStr'): del cell_el.attrib['t']
-        v_el = etree.SubElement(cell_el, '{%s}v' % _NS); v_el.text = str(value)
+        return f'{open_tag_attrs}><v>{value}</v></c>'
+
+def _build_new_cell(ref, value):
+    """Build a new cell XML fragment (no style — use only for rows without templates)."""
+    if isinstance(value, float):
+        value = round(value, 10)
+    if isinstance(value, str):
+        return f'<c r="{ref}" t="inlineStr"><is><t>{value}</t></is></c>'
+    else:
+        return f'<c r="{ref}"><v>{value}</v></c>'
+
+def _modify_sheet_xml(xml_bytes, cells):
+    """Modify cell values in sheet XML bytes via regex, preserving all formatting."""
+    xml_text = xml_bytes.decode('utf-8')
+    rows_data = {}
+    for ref, value in cells.items():
+        row_num, col_num = _parse_cell_ref(ref)
+        if row_num not in rows_data:
+            rows_data[row_num] = []
+        rows_data[row_num].append((ref, col_num, value))
+    for row_num in rows_data:
+        rows_data[row_num].sort(key=lambda x: x[1])
+    for row_num, row_cells in sorted(rows_data.items()):
+        row_pattern = re.compile(
+            r'(<row\s+r="%d"[^>]*>)(.*?)(</row>)' % row_num, re.DOTALL)
+        row_match = row_pattern.search(xml_text)
+        if row_match:
+            row_open = row_match.group(1)
+            row_content = row_match.group(2)
+            row_close = row_match.group(3)
+            for ref, col_num, value in row_cells:
+                cell_pattern = re.compile(
+                    r'<c\s+r="%s"(?:\s[^>]*)*/>' % re.escape(ref) +
+                    r'|<c\s+r="%s"(?:\s[^>]*)?>.*?</c>' % re.escape(ref), re.DOTALL)
+                cell_match = cell_pattern.search(row_content)
+                if cell_match:
+                    new_cell = _modify_existing_cell(cell_match.group(0), value)
+                    row_content = (row_content[:cell_match.start()] +
+                                   new_cell + row_content[cell_match.end():])
+                else:
+                    row_content = row_content + _build_new_cell(ref, value)
+            new_row = row_open + row_content + row_close
+            xml_text = xml_text[:row_match.start()] + new_row + xml_text[row_match.end():]
+        else:
+            cells_xml = ''.join(_build_new_cell(ref, value) for ref, _, value in row_cells)
+            new_row = f'<row r="{row_num}">{cells_xml}</row>'
+            sd_close = xml_text.rfind('</sheetData>')
+            xml_text = xml_text[:sd_close] + new_row + xml_text[sd_close:]
+    return xml_text.encode('utf-8')
 
 def write_cells_to_xlsx(filepath, updates):
     """Surgically update cell values in xlsx without losing formatting.
+    Uses system `zip` command to update entries in-place within the archive.
     updates: {sheet_name: {cell_ref: value, ...}, ...}
+    IMPORTANT: Never write to cells that contain formulas (causes calcChain.xml mismatch).
     """
-    with open(filepath, 'rb') as f: data = f.read()
-    zin = zipfile.ZipFile(BytesIO(data))
-    wb_xml = etree.fromstring(zin.read('xl/workbook.xml'))
-    rels_xml = etree.fromstring(zin.read('xl/_rels/workbook.xml.rels'))
-    rid_map = {r.get('Id'): r.get('Target')
-               for r in rels_xml.iter('{%s}Relationship' % _PKG_NS)}
-    sheet_paths = {}
-    for s in wb_xml.iter('{%s}sheet' % _NS):
-        rid = s.get('{%s}id' % _R_NS)
-        if rid and rid in rid_map:
-            sheet_paths[s.get('name')] = f'xl/{rid_map[rid]}'
-    modified = {}
-    for name, cells in updates.items():
-        path = sheet_paths[name]
-        xml = etree.fromstring(zin.read(path))
-        for ref, val in cells.items(): _set_cell(xml, ref, val)
-        modified[path] = etree.tostring(xml, xml_declaration=True, encoding='UTF-8', standalone=True)
-    with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zout:
-        for item in zin.namelist():
-            zout.writestr(item, modified.get(item, zin.read(item)))
-    zin.close()
+    with zipfile.ZipFile(filepath) as zf:
+        wb_xml = etree.fromstring(zf.read('xl/workbook.xml'))
+        rels_xml = etree.fromstring(zf.read('xl/_rels/workbook.xml.rels'))
+        rid_map = {r.get('Id'): r.get('Target')
+                   for r in rels_xml.iter('{%s}Relationship' % _PKG_NS)}
+        sheet_paths = {}
+        for s in wb_xml.iter('{%s}sheet' % _NS):
+            rid = s.get('{%s}id' % _R_NS)
+            if rid and rid in rid_map:
+                sheet_paths[s.get('name')] = f'xl/{rid_map[rid]}'
+    tmpdir = tempfile.mkdtemp()
+    abs_filepath = os.path.abspath(filepath)
+    try:
+        for sheet_name, cells in updates.items():
+            path = sheet_paths[sheet_name]
+            with zipfile.ZipFile(filepath) as zf:
+                orig_xml = zf.read(path)
+            modified_xml = _modify_sheet_xml(orig_xml, cells)
+            out_path = os.path.join(tmpdir, path)
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, 'wb') as f:
+                f.write(modified_xml)
+        for sheet_name in updates:
+            path = sheet_paths[sheet_name]
+            subprocess.run(['zip', abs_filepath, path],
+                           cwd=tmpdir, capture_output=True, text=True)
+    finally:
+        shutil.rmtree(tmpdir)
 
 # --- Copy template ---
 src = "docs/inputs/input_template.xlsx"  # relative to project root
@@ -325,33 +381,32 @@ Profile lines define slope geometry. Each line = top of a soil layer. Draw top-t
   - Line N: columns at offset (N-1)*3 from A
 - Row 4: "Profile Line #N" header
 - Row 5: "Mat ID:" label + mat id value
-- Row 6: Material name (looked up from mat sheet; can set or leave blank)
+- Row 6: Material name (FORMULA — auto-populated via XLOOKUP from mat sheet. Do NOT overwrite.)
 - Row 7: "x" and "y" headers
 - Row 8+: XY coordinate data
 
 ```python
 updates['profile'] = {'B2': 0}  # max depth
 
-def write_profile_line(line_num, mat_id, mat_name, points):
+def write_profile_line(line_num, mat_id, points):
     """Add a profile line to updates dict.
     line_num: 1-based profile line number
     mat_id: material ID (1-based, references mat sheet)
-    mat_name: material name string
     points: list of (x, y) tuples, left-to-right
     """
     col_offset = (line_num - 1) * 3  # 0, 3, 6, 9, ...
     x_col = 1 + col_offset            # A=1, D=4, G=7, J=10, ...
     y_col = 2 + col_offset            # B=2, E=5, H=8, K=11, ...
     updates['profile'][cell_ref(5, y_col)] = mat_id
-    updates['profile'][cell_ref(6, x_col)] = mat_name
+    # Row 6 has XLOOKUP formula — do NOT write to it
     for i, (x, y) in enumerate(points):
         updates['profile'][cell_ref(8 + i, x_col)] = x
         updates['profile'][cell_ref(8 + i, y_col)] = y
 
 # Example: 3-layer slope
-write_profile_line(1, 1, "soil 1", [(0, 84), (150, 84), (174.7, 64)])
-write_profile_line(2, 2, "soil 2", [(0, 64), (174.7, 64), (204.3, 40)])
-write_profile_line(3, 3, "soil 3", [(0, 40), (320, 40)])
+write_profile_line(1, 1, [(0, 84), (150, 84), (174.7, 64)])
+write_profile_line(2, 2, [(0, 64), (174.7, 64), (204.3, 40)])
+write_profile_line(3, 3, [(0, 40), (320, 40)])
 ```
 
 ### Sheet: piezo
@@ -815,7 +870,9 @@ else:
    - Material boundaries shown as solid lines between differently hatched/colored zones
    - Property tables typically shown in the diagram legend
 
-8. **Always validate** by plotting inputs before running analysis. If geometry looks wrong, fix the template first.
+8. **Never overwrite formula cells.** The template contains XLOOKUP formulas (e.g., row 6 in the profile sheet auto-populates material names from the mat sheet). Overwriting a formula cell with a plain value causes the `calcChain.xml` to become inconsistent, and Excel will show a recovery error. Only write to data-entry cells.
+
+9. **Always validate** by plotting inputs before running analysis. If geometry looks wrong, fix the template first.
 
 9. **Seepage material properties**: For fully saturated problems, kr0 and h0 are ignored but must still have placeholder values. For partially saturated (unconfined) problems, typical values are kr0=0.001 to 0.01 and h0=-1.
 

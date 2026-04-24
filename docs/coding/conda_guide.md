@@ -183,7 +183,7 @@ Once your package is on conda-forge, updates are managed through the feedstock r
 
 Conda-forge has bots that automatically detect new PyPI releases and create PRs:
 
-1. Publish new version to PyPI (following `pypi_guide.md`)
+1. Publish new version to PyPI
 2. Wait a few hours for the bot to detect the new version
 3. A PR will be automatically created at `https://github.com/conda-forge/xslope-feedstock`
 4. Review the PR and merge if everything looks good

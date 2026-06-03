@@ -249,11 +249,74 @@ def _modify_sheet_xml(xml_bytes, cells):
             xml_text = xml_text[:sd_close] + new_row + xml_text[sd_close:]
     return xml_text.encode('utf-8')
 
+def _reset_view(xml_bytes):
+    """Reset a sheet's saved scroll position/selection to A1 so populated cells are
+    visible on open. The template ships some sheets (e.g. polygon) scrolled far right
+    (topLeftCell="AA1", activeCell="AA8") — Excel then opens to an empty-looking region
+    and the populated left-hand columns appear blank until you scroll back."""
+    t = xml_bytes.decode('utf-8')
+    t = re.sub(r'\s+topLeftCell="[^"]*"', '', t)
+    t = re.sub(r'<selection\b[^>]*/>', '<selection activeCell="A1" sqref="A1"/>', t)
+    return t.encode('utf-8')
+
+
+def _force_full_recalc(xml_text):
+    """Set fullCalcOnLoad="1" on <calcPr> in workbook.xml so Excel recomputes every
+    formula's cached value when the file is opened. Required because writing cell
+    values at the XML level cannot fire a recalc event — without this, formulas that
+    depend on the cells we changed (e.g. the XLOOKUP material-name lookups in the
+    profile/polygon sheets) keep their stale cached <v/> and display blank."""
+    m = re.search(r'<calcPr\b[^>]*?/?>', xml_text)
+    if m:
+        tag = m.group(0)
+        if 'fullCalcOnLoad=' in tag:
+            new_tag = re.sub(r'fullCalcOnLoad="[^"]*"', 'fullCalcOnLoad="1"', tag)
+        elif tag.endswith('/>'):
+            new_tag = tag[:-2] + ' fullCalcOnLoad="1"/>'
+        else:
+            new_tag = tag[:-1] + ' fullCalcOnLoad="1">'
+        return xml_text[:m.start()] + new_tag + xml_text[m.end():]
+    # No <calcPr> element — insert one (after <sheets>, per schema ordering)
+    insert = '<calcPr calcId="191029" fullCalcOnLoad="1"/>'
+    idx = xml_text.find('</sheets>')
+    pos = (idx + len('</sheets>')) if idx != -1 else xml_text.find('</workbook>')
+    return xml_text[:pos] + insert + xml_text[pos:]
+
+def _drop_calcchain(tmpdir, paths_to_zip, zf_read):
+    """Stage edits that remove xl/calcChain.xml and its two references.
+
+    The cached calcChain becomes stale the moment we change a formula's precedent
+    cell at the XML level (e.g. writing a Mat ID in row 5 that the row-6 XLOOKUP
+    depends on). Excel then "recovers" the affected sheet and silently discards our
+    edits — the classic symptom is a sheet we populated opening completely blank.
+    Deleting calcChain.xml and its references makes Excel rebuild it from scratch,
+    which is safe because we also set fullCalcOnLoad="1" (every formula recomputed
+    on open). Returns True if a calcChain part was present and must be zip-deleted."""
+    ct = zf_read('[Content_Types].xml').decode('utf-8')
+    if 'calcChain' not in ct:
+        return False
+    ct = re.sub(r'<Override\s+PartName="/xl/calcChain\.xml"[^>]*/>', '', ct)
+    out = os.path.join(tmpdir, '[Content_Types].xml')
+    with open(out, 'wb') as f:
+        f.write(ct.encode('utf-8'))
+    paths_to_zip.append('[Content_Types].xml')
+    rels = zf_read('xl/_rels/workbook.xml.rels').decode('utf-8')
+    rels = re.sub(r'<Relationship\s+[^>]*Target="calcChain\.xml"[^>]*/>', '', rels)
+    out = os.path.join(tmpdir, 'xl/_rels/workbook.xml.rels')
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, 'wb') as f:
+        f.write(rels.encode('utf-8'))
+    paths_to_zip.append('xl/_rels/workbook.xml.rels')
+    return True
+
 def write_cells_to_xlsx(filepath, updates):
     """Surgically update cell values in xlsx without losing formatting.
     Uses system `zip` command to update entries in-place within the archive.
     updates: {sheet_name: {cell_ref: value, ...}, ...}
-    IMPORTANT: Never write to cells that contain formulas (causes calcChain.xml mismatch).
+    IMPORTANT: Never write directly to formula cells. Writing a formula's PRECEDENT
+    cell is fine and expected (e.g. Mat IDs feeding the row-6 XLOOKUP names) — this
+    function handles the resulting stale calcChain by removing it and forcing a full
+    recalc on open, so dependent formulas refresh instead of opening blank.
     """
     with zipfile.ZipFile(filepath) as zf:
         wb_xml = etree.fromstring(zf.read('xl/workbook.xml'))
@@ -268,19 +331,34 @@ def write_cells_to_xlsx(filepath, updates):
     tmpdir = tempfile.mkdtemp()
     abs_filepath = os.path.abspath(filepath)
     try:
+        paths_to_zip = []
         for sheet_name, cells in updates.items():
             path = sheet_paths[sheet_name]
             with zipfile.ZipFile(filepath) as zf:
                 orig_xml = zf.read(path)
-            modified_xml = _modify_sheet_xml(orig_xml, cells)
+            modified_xml = _reset_view(_modify_sheet_xml(orig_xml, cells))
             out_path = os.path.join(tmpdir, path)
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             with open(out_path, 'wb') as f:
                 f.write(modified_xml)
-        for sheet_name in updates:
-            path = sheet_paths[sheet_name]
+            paths_to_zip.append(path)
+        # Force Excel to recalc formula caches on open (e.g. XLOOKUP material names)
+        with zipfile.ZipFile(filepath) as zf:
+            wb_text = zf.read('xl/workbook.xml').decode('utf-8')
+        wb_out = os.path.join(tmpdir, 'xl/workbook.xml')
+        os.makedirs(os.path.dirname(wb_out), exist_ok=True)
+        with open(wb_out, 'wb') as f:
+            f.write(_force_full_recalc(wb_text).encode('utf-8'))
+        paths_to_zip.append('xl/workbook.xml')
+        # Drop the now-stale calcChain so Excel rebuilds it (prevents blank-sheet recovery)
+        with zipfile.ZipFile(filepath) as zf:
+            drop_cc = _drop_calcchain(tmpdir, paths_to_zip, zf.read)
+        for path in paths_to_zip:
             subprocess.run(['zip', abs_filepath, path],
                            cwd=tmpdir, capture_output=True, text=True)
+        if drop_cc:
+            subprocess.run(['zip', '-d', abs_filepath, 'xl/calcChain.xml'],
+                           capture_output=True, text=True)
     finally:
         shutil.rmtree(tmpdir)
 

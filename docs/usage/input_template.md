@@ -33,7 +33,7 @@ This function reads all worksheets, validates the data, and returns a dictionary
 
 ## Template Structure
 
-The template consists of 11 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
+The template consists of 12 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
@@ -41,6 +41,7 @@ The template consists of 11 worksheets, each serving a specific purpose. Differe
 | **plot** | Auto-generated geometry preview | X   | X    | X   |
 | **mat** | Material properties including strength, permeability, and stiffness | X   | X    | X   |
 | **profile** | XY coordinates of profile lines defining slope geometry | X   | X    | X   |
+| **polygon** | Material zones defined as closed polygons (alternative to **profile**) | X   | X    | X   |
 | **piezo** | Piezometric lines for pore pressure calculations | X   |      | X   |
 | **circles** | Circular failure surface definitions | X   |      |     |
 | **non-circ** | Non-circular failure surface coordinates | X   |      |     |
@@ -175,6 +176,54 @@ During analysis, xslope uses these lines to:
 2. Determine slice geometry when a failure surface is intersected with the profile
 3. Assign material properties to slices based on which layer they fall within
 4. Build polygons for finite element meshing in seepage or FEM analysis
+
+---
+
+## Worksheet: polygon
+
+The **polygon** worksheet is an **alternative to the profile worksheet** for defining slope
+geometry. Instead of describing each soil layer as a left-to-right line, each material zone is
+described as a **closed polygon** — a self-contained region with an assigned material. Use whichever
+method best fits the geometry; do **not** fill in both the **profile** and **polygon** worksheets in
+the same file.
+
+![alt text](images/polygon.png)
+
+Polygons are well suited to geometries that are awkward to express as stacked profile lines, such as:
+
+- Irregular or dipping bedrock surfaces
+- Lenticular deposits (lens-shaped inclusions) embedded within another material
+- Complex fill geometries such as zoned dam cross-sections
+- Geometry imported from CAD software, which is typically drawn as closed regions
+
+Each polygon is defined in its own table, organized horizontally just like the profile tables. For
+each polygon you provide:
+
+- A **Material ID** in row 5, which references one of the materials in the **mat** worksheet. As with
+  the profile sheet, the material name in row 6 is filled in automatically by looking up the material
+  ID in the materials table.
+- The polygon **vertices** as XY coordinates starting in row 8, one vertex per row.
+
+A few rules govern how the vertices are interpreted:
+
+- **Winding order does not matter** — vertices may be listed clockwise or counter-clockwise.
+- **Polygons are closed automatically** — the last vertex is connected back to the first, so you do
+  not need to repeat the starting point.
+- **Nesting is detected from the geometry** — if one polygon lies entirely inside another (for example
+  a sand lens within a clay deposit), the inner polygon overrides the outer one in the overlap region.
+  No parent/child bookkeeping is required.
+- Each polygon must have at least three vertices, and the polygons together should tile the cross
+  section without overlaps or gaps.
+
+The template includes tables for 15 polygons, organized horizontally, and you can copy additional
+tables to the right as needed. Each table includes room for many vertices, and you can add as many
+rows as required.
+
+Unlike the profile worksheet, the **polygon** worksheet does **not** use a Max Depth parameter. The
+overall extent of the model — including the ground surface and the bottom boundary — is derived from
+the **union of all polygons** (the domain polygon). The ground surface is taken from the upper edge of
+that union, and during an automated limit equilibrium search the failure surface is constrained to
+stay within the domain polygon, which can therefore represent an irregular bedrock surface directly.
 
 ---
 

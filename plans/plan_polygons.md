@@ -380,7 +380,14 @@ Convert profiles to polygons early, then use one code path:
    to the profile path on the LEM regression suite, and identical slices with
    `profile_lines` emptied (polygon-sheet input). Remaining `profile_lines` use:
    only the Ito & Matsui pile auto-H feature (to be migrated later).
-4. **`search.py`**: Replace `depth >= max_depth` with `domain_polygon.contains(failure_surface)` check; add prepared geometry optimization
+4. **[done] domain containment**: `generate_slices()` rejects any failure surface
+   (circular or non-circular) that leaves the domain polygon, via a cached
+   `prep(domain).covers(clipped_surface)` check. Flat-bottomed domains (all
+   profile-line inputs, and polygon inputs with a horizontal base) take a fast path
+   that skips the geometric test — the scalar `max_depth` clamp already bounds them
+   — so existing analyses are unchanged (LEM regression identical). Only irregular
+   bottoms (e.g. dipping bedrock) incur the containment check. `max_depth` is now
+   the domain's minimum elevation for every input.
 5. **`mesh.py`**: Add direct polygon input path (skip `build_polygons()` when polygons provided)
 6. **`plot.py`**: Add polygon visualization (filled material zones with colors)
 7. **Testing**: Verify polygon-based results match profile-based results for equivalent geometries

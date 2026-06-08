@@ -532,6 +532,39 @@ def _build_polygon_edges(polygons):
     return edges
 
 
+def _domain_bottom_is_flat(domain, n=24, tol=1e-6):
+    """True if the lower boundary of the domain polygon is horizontal.
+
+    Sampled by vertical lines: the domain is flat-bottomed when its minimum y at
+    every x equals the global minimum y. Flat bottoms (profile-line inputs and
+    polygon inputs with a horizontal base) can use the cheap scalar depth clamp
+    instead of a geometric containment check (plan_polygons.md §5.4).
+    """
+    minx, miny, maxx, maxy = domain.bounds
+    span = maxx - minx
+    if span <= 0:
+        return True
+    for x in np.linspace(minx + 0.01 * span, maxx - 0.01 * span, n):
+        inter = domain.intersection(LineString([(x, miny - 1.0), (x, maxy + 1.0)]))
+        if inter.is_empty or abs(inter.bounds[1] - miny) > tol:
+            return False
+    return True
+
+
+def _domain_containment(slope_data):
+    """Return a prepared domain polygon for fast repeated containment checks, or
+    None when no check is needed (flat bottom, or no domain). Cached on slope_data
+    so the prep() and flatness test run once per search, not per trial surface."""
+    if '_domain_check' not in slope_data:
+        domain = slope_data.get('domain_polygon')
+        if domain is None or _domain_bottom_is_flat(domain):
+            slope_data['_domain_check'] = None
+        else:
+            from shapely.prepared import prep
+            slope_data['_domain_check'] = prep(domain)
+    return slope_data['_domain_check']
+
+
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True):
 
     """
@@ -630,6 +663,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         x_min, x_max, y_left, y_right, clipped_surface = result
     else:
         return False, "Failed to generate surface:" + result
+
+    # Reject failure surfaces that leave the domain polygon (plan_polygons.md §5.4).
+    # For a flat-bottomed domain (all profile-line inputs, and polygon inputs whose
+    # bottom is horizontal) the search's scalar depth clamp already enforces this, so
+    # _domain_containment() returns None and the (more expensive) geometric check is
+    # skipped. Only irregular bottoms (e.g. dipping bedrock) need the covers() test.
+    prepared_domain = _domain_containment(slope_data)
+    if prepared_domain is not None and not prepared_domain.covers(clipped_surface):
+        return False, "Failure surface extends outside the domain polygon"
 
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right

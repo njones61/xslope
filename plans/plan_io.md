@@ -273,6 +273,33 @@ DWG requires Autodesk libraries or the ODA File Converter. DGN is niche. Add bas
 on user demand. Naming the module `cad.py` (rather than `dxf.py`) leaves room for
 these formats without a rename.
 
+### 3.6 Documentation
+
+A **new documentation section** is required for this feature (the MkDocs site
+under `docs/`), covering **both directions**.
+
+**Import (`import_dxf`):**
+- How to organize a CAD drawing for import — the layer-per-material convention,
+  closed polylines, and the reserved feature-layer names (§3.3).
+- The workflow: read → validate-and-assign materials → write the `polygons` sheet.
+- The scope limitation (import is polygons-only; §3.2) so users know to enter
+  piezo/loads/circles in the template directly.
+- Handling of messy inputs (auto-close, arc flattening, LINE stitching) and any
+  warnings the importer emits.
+
+**Export (`export_dxf`):**
+- Use cases — produce a layered CAD drawing of a *complete* model for
+  documentation, for handing geometry to a CAD user, or as a starting point they
+  edit and re-import.
+- What gets written: the full entity→layer mapping (§3.3) — polygons on
+  per-material layers, plus profiles, failure surfaces, search circles,
+  reinforcement, loads, and piezo on their reserved layers.
+- Note that export is *fuller* than import (it writes feature layers that the
+  polygons-only import ignores), and the DXF version produced (R2010).
+
+This complements the polygon-input documentation tracked in
+`plan_polygons.md` §11.
+
 
 ## 4. Interop: Other Software Packages (`xslope/interop.py`) — STUB
 

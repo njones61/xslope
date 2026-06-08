@@ -191,6 +191,57 @@ def _add_profile_index_label(ax, line, index, color):
         zorder=10
     )
 
+
+def plot_polygons_on_ax(ax, polygons, materials=None, labels=False):
+    """
+    Fill the material-zone polygons on an existing Axes (the polygon analog of
+    plot_profile_lines). Used by plot_inputs when geometry is defined by polygons
+    rather than profile lines.
+
+    Parameters:
+        ax: matplotlib Axes object
+        polygons: list of dicts with a 'polygon' (shapely Polygon) and 'mat_id' key
+        materials: list of material dicts (for color + legend names), optional
+        labels: if True, place the material number at each polygon centroid
+    """
+    seen_labels = set()
+    for i, poly in enumerate(polygons):
+        geom = poly['polygon'] if isinstance(poly, dict) else poly
+        mat_idx = poly.get('mat_id') if isinstance(poly, dict) else i
+        if mat_idx is None:
+            mat_idx = i
+        color = get_material_color(mat_idx)
+
+        # Legend label: material name if available, once per material.
+        mat_name = None
+        if materials and 0 <= mat_idx < len(materials):
+            item = materials[mat_idx]
+            mat_name = item.get('name') if isinstance(item, dict) else item
+        label = mat_name if mat_name else f'Material {mat_idx + 1}'
+        legend_label = label if label not in seen_labels else None
+        if legend_label:
+            seen_labels.add(label)
+
+        xs, ys = geom.exterior.xy
+        ax.fill(xs, ys, color=color, alpha=0.6, label=legend_label)
+        ax.plot(xs, ys, color=color, linewidth=1)
+        # Draw any interior rings (holes) as outlines.
+        for ring in geom.interiors:
+            rx, ry = ring.xy
+            ax.plot(rx, ry, color=color, linewidth=1, linestyle='--')
+
+        if labels:
+            c = geom.representative_point()
+            ax.text(
+                c.x, c.y, str(mat_idx + 1),
+                fontsize=7, color='black', fontfamily='monospace',
+                ha='center', va='center',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                          edgecolor=color, linewidth=0.8),
+                zorder=10,
+            )
+
+
 def plot_max_depth(ax, profile_lines, max_depth):
     """
     Plots a horizontal line representing the maximum depth limit with hash marks.
@@ -1496,9 +1547,13 @@ def plot_inputs(
             lc = LineCollection(lines, colors='gray', alpha=0.25, linewidths=0.5)
             ax.add_collection(lc)
 
-    # Plot contents
-    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
-    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    # Plot geometry: profile lines if provided (drawn as before), otherwise the
+    # material-zone polygons.
+    if slope_data.get('profile_lines'):
+        plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
+        plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    elif slope_data.get('polygons'):
+        plot_polygons_on_ax(ax, slope_data['polygons'], materials=slope_data.get('materials'), labels=True)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data)
     if mode == "seep":

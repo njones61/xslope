@@ -23,9 +23,10 @@ import zipfile
 import numpy as np
 import pandas as pd
 from lxml import etree
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import unary_union
 
-from .mesh import import_mesh_from_json
+from .mesh import import_mesh_from_json, build_polygons
 
 def build_ground_surface(profile_lines):
     """
@@ -99,8 +100,139 @@ def build_ground_surface(profile_lines):
     # Ensure we have at least 2 points
     if len(ground_surface_points) < 2:
         return LineString([])
-    
+
     return LineString(ground_surface_points)
+
+
+def build_ground_surface_from_polygons(polygons):
+    """
+    Derive the ground surface and domain polygon from material-zone polygons.
+
+    The domain polygon is the union of all input polygons (the total extent of the
+    model). The ground surface is the upper boundary of that union, traced from the
+    top-left corner to the top-right corner (see plans/plan_polygons.md §4).
+
+    Parameters:
+        polygons (list of dict): each dict has a 'polygon' key (shapely Polygon).
+
+    Returns:
+        tuple(LineString, shapely.geometry.Polygon): the ground surface (empty
+        LineString if it cannot be formed) and the domain polygon.
+    """
+    domain = unary_union([p['polygon'] for p in polygons])
+    if domain.geom_type == 'MultiPolygon':
+        # Disjoint zones: use the largest connected component for the surface.
+        domain = max(domain.geoms, key=lambda g: g.area)
+
+    ring = list(domain.exterior.coords)[:-1]  # drop the closing duplicate vertex
+    n = len(ring)
+    if n < 3:
+        return LineString([]), domain
+
+    # The leftmost and rightmost vertices (ties broken by highest elevation) split
+    # the exterior ring into two arcs; the one with the higher mean elevation is
+    # the top boundary.
+    imin = min(range(n), key=lambda i: (ring[i][0], -ring[i][1]))
+    imax = max(range(n), key=lambda i: (ring[i][0], ring[i][1]))
+
+    def arc(a, b):
+        path, i = [], a
+        while True:
+            path.append(ring[i])
+            if i == b:
+                break
+            i = (i + 1) % n
+        return path
+
+    arc1, arc2 = arc(imin, imax), arc(imax, imin)
+    mean_y = lambda a: sum(p[1] for p in a) / len(a)
+    upper = arc1 if mean_y(arc1) >= mean_y(arc2) else arc2
+
+    # Order the surface left-to-right.
+    if upper[0][0] > upper[-1][0]:
+        upper = upper[::-1]
+
+    return LineString(upper), domain
+
+
+def _parse_polygon_sheet(xls, materials):
+    """
+    Parse the optional 'polygon' sheet into a list of material-zone polygons.
+
+    The sheet uses the same block layout as the 'profile' sheet: polygon p occupies
+    columns (x_col, y_col) with x_col = 3*p, a "Polygon #N" header in row 4, the
+    Mat ID in row 5 of the y column, and (x, y) vertices from row 8 down. mat_id is
+    stored 0-based to match the profile_lines / materials indexing convention.
+
+    Returns:
+        list of dict: [{'polygon': shapely Polygon, 'mat_id': int}, ...], empty if
+        the sheet is absent or contains no polygons.
+    """
+    if 'polygon' not in xls.sheet_names:
+        return []
+
+    df = xls.parse('polygon', header=None)
+    header_row, mat_id_row, coords_start_row = 3, 4, 7  # Excel rows 4, 5, 8
+    polygons = []
+
+    col = 0
+    while col + 1 < df.shape[1]:
+        x_col, y_col = col, col + 1
+
+        # Stop when the block header is empty (no further polygon blocks).
+        try:
+            header_val = str(df.iloc[header_row, x_col]).strip()
+        except Exception:
+            break
+        if not header_val or header_val.lower() == 'nan':
+            break
+
+        # Read vertices (row 8 down) until the first fully empty row.
+        coords = []
+        row = coords_start_row
+        while row < df.shape[0]:
+            try:
+                x_val, y_val = df.iloc[row, x_col], df.iloc[row, y_col]
+            except Exception:
+                break
+            if pd.isna(x_val) and pd.isna(y_val):
+                break
+            if pd.notna(x_val) and pd.notna(y_val):
+                coords.append((float(x_val), float(y_val)))
+            row += 1
+
+        # A header with no vertices is an unused block (template default) — skip.
+        if coords:
+            if len(coords) >= 2 and coords[0] == coords[-1]:
+                coords = coords[:-1]  # drop explicit closing vertex (Shapely closes)
+            col_letter = chr(65 + col) if col < 26 else f"col {col + 1}"
+            if len(coords) < 3:
+                raise ValueError(
+                    f"Each polygon must have at least 3 vertices. Polygon in block "
+                    f"starting at column {col_letter} has {len(coords)}.")
+
+            mat_id_val = df.iloc[mat_id_row, y_col]
+            try:
+                mat_id = int(float(mat_id_val)) - 1  # 1-based sheet -> 0-based
+            except (ValueError, TypeError):
+                mat_id = None
+            if mat_id is None or mat_id < 0 or mat_id >= len(materials):
+                raise ValueError(
+                    f"Polygon in block starting at column {col_letter} has an invalid "
+                    f"Mat ID ({mat_id_val!r}); it must reference a material in the "
+                    f"'mat' sheet (1..{len(materials)}).")
+
+            poly = Polygon(coords)
+            if not poly.is_valid:
+                raise ValueError(
+                    f"Polygon in block starting at column {col_letter} is not a valid "
+                    f"polygon (self-intersecting or degenerate).")
+
+            polygons.append({'polygon': poly, 'mat_id': mat_id})
+
+        col += 3  # next block (A->D->G->...)
+
+    return polygons
 
 
 
@@ -217,14 +349,8 @@ def load_slope_data(filepath):
         # Move to next profile line (skip 3 columns: A->D, D->G, etc.)
         col += 3
 
-    # === BUILD GROUND SURFACE FROM PROFILE LINES ===
-    ground_surface = build_ground_surface(profile_lines)
-
-    # === BUILD TENSILE CRACK LINE ===
-
-    tcrack_surface = None
-    if tcrack_depth > 0:
-        tcrack_surface = LineString([(x, y - tcrack_depth) for (x, y) in ground_surface.coords])
+    # Ground surface, domain polygon, and tensile-crack line are built from the
+    # unified polygon representation after materials are parsed — see below.
 
     # === MATERIALS (Optimized Parsing) ===
     mat_df = xls.parse('mat', header=7)  # header=7 because the header row is row 8 in Excel (0-indexed row 7)
@@ -283,6 +409,45 @@ def load_slope_data(filepath):
             "E": _num(row.get('E', 0)),
             "nu": _num(row.get('n', 0))
         })
+
+    # === UNIFIED POLYGON REPRESENTATION ===
+    # Geometry is always represented internally as material-zone polygons (see
+    # plans/plan_polygons.md §5.1, §9.2). If the 'polygon' sheet is populated it is
+    # used directly; otherwise the profile lines are converted to polygons via
+    # build_polygons(). All downstream code (slicing, search) works from polygons.
+    polygons_from_sheet = _parse_polygon_sheet(xls, materials)
+
+    if polygons_from_sheet:
+        if profile_lines:
+            raise ValueError(
+                "Both the 'profile' and 'polygon' sheets contain data. Use one "
+                "geometry method, not both.")
+        polygons = polygons_from_sheet
+    elif profile_lines:
+        # Convert profile lines -> polygons (mat_id is 0-based in both).
+        polygons = [
+            {'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+            for p in build_polygons(slope_data={'profile_lines': profile_lines,
+                                                'max_depth': max_depth})
+        ]
+    else:
+        polygons = []
+
+    # Derive the ground surface and domain polygon from the polygons. With polygons
+    # the domain polygon defines the bottom boundary, so max_depth (a profile-sheet
+    # concept) becomes the domain's minimum elevation.
+    domain_polygon = None
+    if polygons:
+        ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
+        max_depth = domain_polygon.bounds[1]
+    else:
+        ground_surface = LineString([])
+
+    # === BUILD TENSILE CRACK LINE ===
+    tcrack_surface = None
+    if tcrack_depth > 0 and not ground_surface.is_empty:
+        tcrack_surface = LineString(
+            [(x, y - tcrack_depth) for (x, y) in ground_surface.coords])
 
     # === MESH AND SEEPAGE ANALYSIS FILES ===
     base, _ = os.path.splitext(filepath)
@@ -906,8 +1071,8 @@ def load_slope_data(filepath):
     # Only require circular/non-circular data if this is NOT a seep-only analysis
     if not is_seepage_only and not circular and len(non_circ) == 0:
         raise ValueError("Input must include either circular or non-circular surface data.")
-    if not profile_lines:
-        raise ValueError("Profile lines sheet is empty or invalid.")
+    if not polygons:
+        raise ValueError("Geometry is missing: provide either the 'profile' sheet or the 'polygon' sheet.")
     if not materials:
         raise ValueError("Materials sheet is empty.")
         
@@ -920,6 +1085,8 @@ def load_slope_data(filepath):
     globals_data["k_seismic"] = k_seismic
     globals_data["max_depth"] = max_depth
     globals_data["profile_lines"] = profile_lines
+    globals_data["polygons"] = polygons
+    globals_data["domain_polygon"] = domain_polygon
     globals_data["ground_surface"] = ground_surface
     globals_data["tcrack_surface"] = tcrack_surface
     globals_data["materials"] = materials

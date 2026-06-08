@@ -93,9 +93,13 @@ def ito_matsui_coefficients(D1, D, phi_deg):
     return A1, A2
 
 
-def intersect_pile_with_materials(pile_x, y_ground, y_failure, profile_lines, materials):
+def intersect_pile_with_materials(pile_x, y_ground, y_failure, polygons, materials):
     """
     Find soil layers along the pile between the ground surface and failure surface.
+
+    Uses the unified material-zone polygon representation (see
+    plans/plan_polygons.md): each polygon's vertical extent at the pile location
+    gives a layer band, the same way slice weights are computed.
 
     Parameters
     ----------
@@ -105,8 +109,9 @@ def intersect_pile_with_materials(pile_x, y_ground, y_failure, profile_lines, ma
         Y-coordinate of the ground surface at the pile location.
     y_failure : float
         Y-coordinate of the failure surface at the pile location.
-    profile_lines : list
-        List of profile line dicts with 'coords' and 'mat_id' keys.
+    polygons : list
+        slope_data['polygons'] — list of dicts with 'polygon' (shapely Polygon)
+        and 'mat_id' (0-based) keys.
     materials : list
         List of material property dicts with 'c', 'phi', 'gamma' keys.
 
@@ -120,32 +125,23 @@ def intersect_pile_with_materials(pile_x, y_ground, y_failure, profile_lines, ma
         - 'phi': friction angle (degrees)
         - 'gamma': unit weight
     """
-    # Interpolate each profile line's y-coordinate at pile_x
-    profile_y = []
-    for line in profile_lines:
-        coords = np.array(line['coords'])
-        xs = coords[:, 0]
-        ys = coords[:, 1]
-        sort_idx = np.argsort(xs)
-        profile_y.append(np.interp(pile_x, xs[sort_idx], ys[sort_idx], left=np.nan, right=np.nan))
+    # Build the per-polygon top/bottom boundary tables (shared with slice.py).
+    from .slice import _build_polygon_edges
+    poly_edges = _build_polygon_edges(polygons)
 
-    # Build segments using the same layer-stacking logic as slice weight calculation:
-    # for each profile line, the layer top is the profile line itself, and the
-    # layer bottom is the highest of all lower profile lines (or the failure surface).
+    # For each polygon, its vertical extent at pile_x defines the layer band; clip
+    # that to [failure surface, ground surface] (polygons are ordered top-to-bottom).
     segments = []
-    for idx, layer_top_y in enumerate(profile_y):
-        if np.isnan(layer_top_y):
+    for idx, pe in enumerate(poly_edges):
+        if not (pe['xmin'] - 1e-9 <= pile_x <= pe['xmax'] + 1e-9):
+            continue
+        poly_top = np.interp(pile_x, pe['txs'], pe['tys'])
+        poly_bot = np.interp(pile_x, pe['bxs'], pe['bys'])
+        if np.isnan(poly_top) or np.isnan(poly_bot):
             continue
 
-        # Bottom: highest of all lower profile lines, or failure surface
-        layer_bot_y = y_failure
-        for j in range(idx + 1, len(profile_y)):
-            if not np.isnan(profile_y[j]) and profile_y[j] > layer_bot_y:
-                layer_bot_y = profile_y[j]
-
-        # Clip to [y_failure, y_ground]
-        overlap_top = min(y_ground, layer_top_y)
-        overlap_bot = max(y_failure, layer_bot_y)
+        overlap_top = min(y_ground, poly_top)
+        overlap_bot = max(y_failure, poly_bot)
         h = overlap_top - overlap_bot
         if h <= 0:
             continue
@@ -154,7 +150,7 @@ def intersect_pile_with_materials(pile_x, y_ground, y_failure, profile_lines, ma
         z_top = y_ground - overlap_top
         z_bot = y_ground - overlap_bot
 
-        mat_id = profile_lines[idx].get('mat_id')
+        mat_id = pe['mat_id']
         if mat_id is not None and 0 <= mat_id < len(materials):
             mat_index = mat_id
         else:

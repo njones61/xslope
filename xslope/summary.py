@@ -47,7 +47,7 @@ def print_ito_matsui_summary(slope_data, slice_df):
         depth = y_gnd - ps['y_pile']
         segments = intersect_pile_with_materials(
             ps['x_pile'], y_gnd, ps['y_pile'],
-            slope_data['profile_lines'], slope_data['materials'])
+            slope_data['polygons'], slope_data['materials'])
         H_val, F_pile = compute_ito_matsui_force(D_p, S_p, segments)
         A1, A2 = ito_matsui_coefficients(D1, D_p, segments[0]['phi']) if segments else (0, 0)
 

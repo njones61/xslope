@@ -466,6 +466,72 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl):
     return D, d_x, d_y
 
 
+def _polygon_y_extent_at(ring, x):
+    """Return (min_y, max_y) of a polygon's boundary at a given x.
+
+    `ring` is the exterior coordinate list (without the closing duplicate).
+    Considers every edge that spans x (including vertical edges), so it works
+    for y-simple material-zone polygons regardless of vertex ordering.
+    """
+    ys = []
+    n = len(ring)
+    for i in range(n):
+        x1, y1 = ring[i]
+        x2, y2 = ring[(i + 1) % n]
+        if (x1 <= x <= x2) or (x2 <= x <= x1):
+            if x1 == x2:
+                ys.append(y1)
+                ys.append(y2)
+            else:
+                t = (x - x1) / (x2 - x1)
+                ys.append(y1 + t * (y2 - y1))
+    if not ys:
+        return None, None
+    return min(ys), max(ys)
+
+
+def _polygon_top_bottom(polygon):
+    """Decompose a material-zone polygon into top and bottom boundary tables.
+
+    Returns (txs, tys, bxs, bys) as numpy arrays sampled at the polygon's unique
+    vertex x-values, suitable for fast np.interp. The top boundary is the upper
+    envelope (max y at each x); the bottom is the lower envelope (min y). Between
+    vertex x-values the boundary is linear, so interpolation is exact.
+    """
+    ring = list(polygon.exterior.coords)
+    if len(ring) > 1 and ring[0] == ring[-1]:
+        ring = ring[:-1]
+    xs = sorted(set(p[0] for p in ring))
+    txs, tys, bys = [], [], []
+    for x in xs:
+        lo, hi = _polygon_y_extent_at(ring, x)
+        if lo is None:
+            continue
+        txs.append(x)
+        tys.append(hi)
+        bys.append(lo)
+    return np.array(txs), np.array(tys), np.array(txs), np.array(bys)
+
+
+def _build_polygon_edges(polygons):
+    """Precompute per-polygon top/bottom boundary tables and x-range once per
+    generate_slices call, so slice weights can be computed with fast numpy
+    interpolation instead of per-slice geometric intersection."""
+    edges = []
+    for poly in polygons:
+        geom = poly['polygon']
+        txs, tys, bxs, bys = _polygon_top_bottom(geom)
+        if len(txs) < 2:
+            continue
+        edges.append({
+            'mat_id': poly['mat_id'],
+            'txs': txs, 'tys': tys, 'bxs': bxs, 'bys': bys,
+            'xmin': float(txs[0]), 'xmax': float(txs[-1]),
+            'exterior': geom.exterior,
+        })
+    return edges
+
+
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True):
 
     """
@@ -500,7 +566,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         return False, "All materials have empty strength properties (c, phi, gamma). Check your input template."
 
     # Unpack data
-    profile_lines = slope_data["profile_lines"]
+    # Geometry is represented internally as material-zone polygons (see
+    # plans/plan_polygons.md §5.1). Slice weights, base material, layer heights,
+    # and slice-boundary breakpoints are all computed from these polygons.
+    polygons = slope_data["polygons"]
+    poly_edges = _build_polygon_edges(polygons)
     ground_surface = slope_data["ground_surface"]
     piezo_line = slope_data["piezo_line"]
     piezo_line2 = slope_data.get("piezo_line2", [])  # Second piezometric line
@@ -566,23 +636,24 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     # === BEGIN : Find set of points that should correspond to slice boundaries. ===
 
-    # Find set of points that are on the profile lines if the points are above the failure surface.
+    # Find set of points that are on the polygon boundaries if the points are above
+    # the failure surface (these become slice-boundary breakpoints).
     fixed_xs = set()
-    
-    # Vectorized approach for profile line points
-    for line in profile_lines:
-        line_coords = np.array(line['coords'])
-        x_coords = line_coords[:, 0]
-        y_coords = line_coords[:, 1]
-        
+
+    # Vectorized approach for polygon boundary vertices
+    for pe in poly_edges:
+        poly_coords = np.array(pe['exterior'].coords)
+        x_coords = poly_coords[:, 0]
+        y_coords = poly_coords[:, 1]
+
         # Filter points within x-range
         mask = (x_coords >= x_min) & (x_coords <= x_max)
         x_filtered = x_coords[mask]
         y_filtered = y_coords[mask]
-        
+
         if len(x_filtered) == 0:
             continue
-            
+
         # Check if points are above the failure surface
         if circular:
             # Use parametric equation for circular failure surface
@@ -596,7 +667,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 failure_y = get_y_from_intersection(clipped_surface.intersection(vertical_line))
                 if failure_y is not None and y > failure_y:
                     above_mask[i] = True
-        
+
         # Add points that are above the failure surface
         fixed_xs.update(x_filtered[above_mask])
     
@@ -623,18 +694,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if x_min <= pt['X'] <= x_max
         )
 
-    # Find intersections with profile lines and failure surface
+    # Find intersections between material-zone boundaries and the failure surface
     if circular:
         # For circular failure surfaces, we can use a more efficient approach
         # by creating a dense circle representation and finding intersections
-        for line in profile_lines:
-            line_geom = LineString(line['coords'])
-            # Create a dense circle representation for intersection
-            theta_range = np.linspace(np.pi, 2 * np.pi, 200)
-            circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
-            circle_line = LineString(circle_coords)
-            
-            intersection = line_geom.intersection(circle_line)
+        theta_range = np.linspace(np.pi, 2 * np.pi, 200)
+        circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
+        circle_line = LineString(circle_coords)
+        for pe in poly_edges:
+            intersection = pe['exterior'].intersection(circle_line)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
                     if x_min <= intersection.x <= x_max:
@@ -645,8 +713,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                             fixed_xs.add(geom.x)
     else:
         # For non-circular failure surfaces, use the original approach
-        for i in range(len(profile_lines)):
-            intersection = LineString(profile_lines[i]['coords']).intersection(clipped_surface)
+        for pe in poly_edges:
+            intersection = pe['exterior'].intersection(clipped_surface)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
                     if x_min <= intersection.x <= x_max:
@@ -757,8 +825,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     y_rt_all = get_ground_surface_y_coordinates(slice_x_coords[1:], ground_surface)
     y_ct_all = get_ground_surface_y_coordinates(slice_centers, ground_surface)
 
-    # Get profile layer y-coordinates
-    profile_y_coords = get_profile_layer_y_coordinates(slice_centers, profile_lines)
+    # Precompute each polygon's top/bottom boundary at every slice center, plus an
+    # in-range mask. This is the polygon-based replacement for per-layer profile
+    # heights — fast numpy interpolation, no per-slice geometric intersection.
+    centers_arr = np.asarray(slice_centers)
+    poly_top_all = []
+    poly_bot_all = []
+    poly_inrange = []
+    for pe in poly_edges:
+        poly_top_all.append(np.interp(centers_arr, pe['txs'], pe['tys']))
+        poly_bot_all.append(np.interp(centers_arr, pe['bxs'], pe['bys']))
+        poly_inrange.append((centers_arr >= pe['xmin'] - 1e-9) &
+                            (centers_arr <= pe['xmax'] + 1e-9))
 
     # Get piezometric y-coordinates
     piezo_y_all = get_piezometric_y_coordinates(slice_centers, piezo_line)
@@ -807,60 +885,44 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # Calculate dl for the top surface (for distributed loads)
         dl_top = sqrt((x_r - x_l)**2 + (y_rt - y_lt)**2)
 
-        # Calculate layer heights using pre-computed profile coordinates
+        # Calculate layer heights and weight from the material-zone polygons.
+        # Each polygon's vertical extent at the slice center gives the layer band;
+        # overlapping it with [failure surface, ground surface] gives the height —
+        # the polygon equivalent of the former profile-layer calculation.
         heights = []
         soil_weight = 0
         base_material_idx = None
         sum_gam_h_y = 0  # for calculating center of gravity of slice
         sum_gam_h = 0    # ditto
-        
-        for profile_idx, layer_y in enumerate(profile_y_coords):
-            layer_top_y = layer_y[i]
-            
-            # Bottom: highest of all other profile lines at x, or failure surface
-            layer_bot_y = y_cb  # Start with failure surface as default bottom
-            for j in range(profile_idx + 1, len(profile_y_coords)):
-                next_y = profile_y_coords[j][i]
-                if not np.isnan(next_y) and next_y > layer_bot_y:
-                    # Take the highest of the lower profile lines
-                    layer_bot_y = next_y
 
-            if np.isnan(layer_top_y) or np.isnan(layer_bot_y):
-                h = 0
-            else:
-                overlap_top = min(y_ct, layer_top_y)
-                overlap_bot = max(y_cb, layer_bot_y)
-                h = max(0, overlap_top - overlap_bot)
-                
-                # Get material index from mat_id in profile line (already 0-based)
-                mat_id = profile_lines[profile_idx].get('mat_id')
-                if mat_id is not None and 0 <= mat_id < len(materials):
-                    mat_index = mat_id
-                else:
-                    # Fallback to profile index if no mat_id or out of range
-                    mat_index = profile_idx
-                
-                sum_gam_h_y += h * materials[mat_index]['gamma'] * (overlap_top + overlap_bot) / 2
-                sum_gam_h += h * materials[mat_index]['gamma']
-
-            heights.append(h)
-            
-            # Get material index for soil weight calculation (already 0-based)
-            mat_id = profile_lines[profile_idx].get('mat_id')
+        for p_idx, pe in enumerate(poly_edges):
+            # Material index (0-based); fall back to polygon order if unset/out of range
+            mat_id = pe['mat_id']
             if mat_id is not None and 0 <= mat_id < len(materials):
                 mat_index = mat_id
             else:
-                mat_index = profile_idx
-            
-            soil_weight += h * materials[mat_index]['gamma'] * dx
+                mat_index = p_idx
+
+            poly_top = poly_top_all[p_idx][i]
+            poly_bot = poly_bot_all[p_idx][i]
+            if (not poly_inrange[p_idx][i]) or np.isnan(poly_top) or np.isnan(poly_bot):
+                heights.append(0)
+                continue
+
+            # Layer band [poly_bot, poly_top] clipped to [failure surface, ground]
+            overlap_top = min(y_ct, poly_top)
+            overlap_bot = max(y_cb, poly_bot)
+            h = max(0, overlap_top - overlap_bot)
+            heights.append(h)
 
             if h > 0:
-                # Get material index for base material (already 0-based)
-                mat_id = profile_lines[profile_idx].get('mat_id')
-                if mat_id is not None and 0 <= mat_id < len(materials):
-                    base_material_idx = mat_id
-                else:
-                    base_material_idx = profile_idx
+                gamma = materials[mat_index]['gamma']
+                sum_gam_h_y += h * gamma * (overlap_top + overlap_bot) / 2
+                sum_gam_h += h * gamma
+                soil_weight += h * gamma * dx
+                # Deepest layer present determines the base material (polygons are
+                # ordered top-to-bottom, so the last h>0 layer wins).
+                base_material_idx = mat_index
 
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
@@ -979,7 +1041,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     y_ground_at_pile = np.interp(intersec.x, gs_coords[:, 0], gs_coords[:, 1])
                     ito_segments = intersect_pile_with_materials(
                         intersec.x, y_ground_at_pile, intersec.y,
-                        profile_lines, materials
+                        polygons, materials
                     )
                     pile_H, F_pile_single = compute_ito_matsui_force(pl["D_pile"], pl["S"], ito_segments)
                     pile_H_was_auto = True

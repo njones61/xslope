@@ -362,9 +362,24 @@ Convert profiles to polygons early, then use one code path:
 
 ## 10. Implementation Order
 
-1. **`fileio.py`**: Add `polygons` sheet parser; output `slope_data['polygons']`
-2. **`fileio.py`**: Add ground surface extraction from polygon union
-3. **`slice.py`**: Implement polygon-based slice generation (intersection approach)
+1. **[done] `fileio.py`**: Unified convert-early representation. Geometry is always
+   stored as `slope_data['polygons']` (list of `{'polygon': Polygon, 'mat_id': int}`,
+   mat_id 0-based): the `polygons` sheet is used directly if present, otherwise
+   profile lines are converted via `build_polygons()`. Profiles optional;
+   both-specified raises an error.
+2. **[done] `fileio.py`**: `build_ground_surface_from_polygons()` derives the
+   ground surface (upper boundary of the polygon union) and the domain polygon
+   (`slope_data['domain_polygon']`) from the unified polygons; `max_depth` becomes
+   the domain's min elevation. Verified the union-derived ground surface is
+   identical to the old `build_ground_surface()` for profile inputs.
+3. **[done] `slice.py`**: Polygon-based slice generation. `generate_slices()`
+   computes layer heights, weight, centre of gravity, and base material from each
+   polygon's vertical extent at the slice centre (fast numpy interpolation via
+   `_build_polygon_edges`), and takes slice-boundary breakpoints from polygon
+   vertices. Equivalence-preserving (plan §12.3): produces bit-for-bit identical FS
+   to the profile path on the LEM regression suite, and identical slices with
+   `profile_lines` emptied (polygon-sheet input). Remaining `profile_lines` use:
+   only the Ito & Matsui pile auto-H feature (to be migrated later).
 4. **`search.py`**: Replace `depth >= max_depth` with `domain_polygon.contains(failure_surface)` check; add prepared geometry optimization
 5. **`mesh.py`**: Add direct polygon input path (skip `build_polygons()` when polygons provided)
 6. **`plot.py`**: Add polygon visualization (filled material zones with colors)

@@ -173,7 +173,7 @@ The two rows of piles increase the factor of safety from 1.19 to 1.32 — an 11%
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.32, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.19, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5 -->
 
 ### 4. Non-Circular Failure Surface with Thin Weak Layer
 

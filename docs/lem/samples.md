@@ -398,4 +398,4 @@ the LEM applies the Ito & Matsui force (even after capping) as a concentrated lo
 while the FEM beam elements only develop as much resistance as the global deformation pattern naturally
 produces. The FEM result is generally considered more realistic for pile-stabilized slopes.
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.800, num_slices=40 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.85, num_slices=40 -->

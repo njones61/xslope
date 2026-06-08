@@ -121,12 +121,32 @@ entity belongs to a **layer** (e.g. "CLAY_FILL", "BEDROCK", "SAND_LENS");
 geotechnical drawings organize material zones by layer, so layer names drive
 material assignment.
 
-**Note on scope**: in practice the commercial packages use a *targeted* import —
-they instruct the user to name/organize features in a specific way before export,
-and some require exporting one zone per file. Importing an arbitrary, unstructured
-DXF of a full cross-section is not realistic. xslope's convention is the
-layer-per-material organization above; the importer validates against it rather
-than trying to guess structure.
+**Background — commercial patterns**: the commercial packages use one of two
+*targeted* approaches: (1) import one feature at a time (separate command per
+feature type), or (2) require features to follow a reserved layer-naming
+convention and route entities by layer. Importing an arbitrary, unstructured DXF
+of a full cross-section is not realistic in either case.
+
+**Scope & strategy (decided)**:
+
+- **Import is polygons-only.** `import_dxf` reads *material zones* and nothing
+  else. Rationale: polygons are the only feature where CAD geometry saves real
+  work — a material zone is a complex closed shape that is painful to type. Piezo
+  lines (~5 points), distributed loads (a few values), and search circles (3
+  numbers) are faster to enter directly in the template than to round-trip
+  through a precisely-structured CAD file, so they stay as spreadsheet entry.
+- **Per-feature primitive.** `import_dxf` is a thin wrapper over a
+  `dxf_to_polygons(path, layers=...)` primitive. Keeping that primitive separate
+  leaves the door open to add `dxf_to_piezo`, `dxf_to_dloads`, etc. later (the
+  per-feature pattern) without restructuring — but we do **not** build them now.
+- **Material identity = bare layer name.** Layer `CLAY_CORE` → a material named
+  `CLAY_CORE`; the user confirms or remaps in the validation step (Step 3). This
+  matches the fixtures we already generate. Reserved feature-layer names (used by
+  export, §3.3) are the only ones treated specially; everything else is a
+  material zone. (Collision risk — a material literally named `PIEZO` — is
+  negligible and surfaces in the validation table anyway.)
+- **Export stays full** (§3.3) and **shares one layer convention** with import,
+  so any future per-feature importer is the exact inverse of what export writes.
 
 **Workflow**: a standalone utility that reads a DXF, helps the user validate and
 assign materials, and writes the `polygons` sheet.
@@ -205,20 +225,26 @@ The reverse direction turns a complete xslope model into a layered CAD drawing �
 useful for documentation, sharing with CAD users, and round-trip testing. Each
 entity class goes on its own layer:
 
-| Source data | DXF entity | Layer(s) |
-|-------------|-----------|----------|
-| Polygons (`polygons` sheet) | closed LWPOLYLINE | one per material (e.g. `CLAY_CORE`) |
-| Profile lines | LWPOLYLINE (open) | `PROFILE_<mat>` |
-| Failure surface(s) | LWPOLYLINE | `FAILURE_SURFACE` |
-| Search circles (centers + radii) | CIRCLE + POINT | `SEARCH_CIRCLES` |
-| Reinforcement lines | LINE | `REINFORCEMENT` |
-| Distributed loads | LWPOLYLINE | `DLOADS` |
-| Piezo / water table | LWPOLYLINE | `PIEZO` |
+| Source data | DXF entity | Layer(s) | Reserved? |
+|-------------|-----------|----------|-----------|
+| Polygons (`polygons` sheet) | closed LWPOLYLINE | one per material (e.g. `CLAY_CORE`) | no — material name |
+| Profile lines | LWPOLYLINE (open) | `PROFILE_<mat>` | yes |
+| Failure surface(s) | LWPOLYLINE | `FAILURE_SURFACE` | yes |
+| Search circles (centers + radii) | CIRCLE + POINT | `SEARCH_CIRCLES` | yes |
+| Reinforcement lines | LINE | `REINFORCEMENT` | yes |
+| Distributed loads | LWPOLYLINE | `DLOADS` | yes |
+| Piezo / water table | LWPOLYLINE | `PIEZO` | yes |
 
-The layer-name convention is shared with import (uppercase, spaces/illegal DXF
-chars → underscores; DXF disallows `< > / \ " : ; ? * | = ``). The polygon path is
-exactly the clean-fixture logic from `_build_dxf_from_poly.py`, generalized to the
-other entity types.
+**Shared layer convention.** The reserved layer names above are the single
+vocabulary shared between export and import. On import (§3.2) any layer matching a
+reserved name is a non-polygon feature; **every other layer is a material zone
+named by the layer**. The current polygons-only importer simply *ignores* the
+reserved feature layers; if per-feature importers are added later, they consume
+exactly these names — making import the precise inverse of export. Layer naming:
+uppercase, spaces/illegal DXF chars → underscores (DXF disallows `< > / \ " : ; ? * | = ``).
+
+The polygon path is exactly the clean-fixture logic from `_build_dxf_from_poly.py`,
+generalized to the other entity types.
 
 ```python
 def export_dxf(slope_data, dxf_path, version="R2010"):
@@ -230,11 +256,16 @@ def export_dxf(slope_data, dxf_path, version="R2010"):
 ### 3.4 Implementation Order (CAD)
 
 1. `export_dxf` polygon path — lift directly from `_build_dxf_from_poly.py`.
-2. `import_dxf` happy path — clean fixtures → `polygons` sheet, validation plot/table.
+2. `dxf_to_polygons(path, layers=...)` primitive + `import_dxf` wrapper — read
+   material zones from the clean fixtures, ignoring reserved feature layers;
+   validation plot/table; write the `polygons` sheet. (Polygons-only — no
+   per-feature importers; see §3.2 scope decision.)
 3. `import_dxf` robustness — POLYLINE, bulge flattening, auto-close, LINE stitching
    (the messy fixtures).
-4. `export_dxf` remaining entity types (profiles, failure surfaces, circles, etc.).
-5. Round-trip tests: export → import reproduces geometry.
+4. `export_dxf` remaining entity types (profiles, failure surfaces, circles, etc.)
+   on their reserved layers.
+5. Round-trip test: export → re-import reproduces the polygon geometry (feature
+   layers are written by export but ignored by the polygons-only import).
 
 ### 3.5 Future: DWG, DGN
 

@@ -398,21 +398,30 @@ Convert profiles to polygons early, then use one code path:
    hatched domain base via `plot_domain_base`, and a shared `plot_base_geometry`
    used by `plot_inputs`/`plot_solution`/search-results plots; `compute_ylim` and
    `get_plot_elements_bounds` handle polygon inputs.
-7. **Testing**: Verify polygon-based results match profile-based results for equivalent geometries
+7. **[done] Testing**: Polygon-based results match profile-based results for
+   equivalent geometries — `generate_slices()` produces bit-for-bit identical FS on
+   the LEM regression suite (profile path and `profile_lines`-emptied polygon path),
+   and the Levee seep sample gives an identical flowrate (1.4312) for both its
+   profile-line (`xslope_levee_full.xlsx`) and polygon-sheet (`xslope_levee_poly.xlsx`)
+   versions.
 8. **[done] CAD import/export** (`xslope/cad.py`): see [`plan_io.md`](plan_io.md) §3.
    `export_dxf` writes a layered DXF; `dxf_to_polygons`/`import_dxf` read material
    zones (robust to LWPOLYLINE/POLYLINE, arc bulges, unclosed rings, loose LINE
    segments) and write the `polygons` sheet, seeding material names. Verified against
    all `poly_test/` fixtures and a full export→read round-trip (areas match exactly).
-9. **Documentation**: Input template, sample problems, migration guide
+9. **[done] Documentation**: `polygons` sheet documented in the input template
+   guide; LEM overview notes the profile-vs-polygon choice and how the ground
+   surface / domain boundary are derived; sample problems added (LEM sloping-bottom
+   #11, polygon-sheet Levee seep sample); CAD import/export documented in
+   `docs/usage/dxf.md`.
 
 
 ## 11. Documentation Updates
 
-- **Input template** (`docs/usage/input_template.md`): Add `polygons` sheet section with column definitions, examples, and guidance on when to use polygons vs. profiles
-- **LEM overview** (`docs/lem/overview.md`): Add note on polygon geometry support; explain how ground surface and domain boundary are derived
-- **Sample problems**: Add at least one polygon-based example (same slope as an existing profile-based example, to show equivalence)
-- **FEM/Seepage**: Note that polygons can be used directly without profile-to-polygon conversion
+- **[done] Input template** (`docs/usage/input_template.md`): `polygons` sheet section with column definitions, examples, and guidance on when to use polygons vs. profiles
+- **[done] LEM overview** (`docs/lem/overview.md`): note on polygon geometry support, explaining how the ground surface and domain boundary are derived
+- **[done] Sample problems**: polygon-based examples added — LEM sloping-bottom (samples #11) and the polygon-sheet Levee seep sample (same geometry as the profile version, verified equivalent)
+- **[done] FEM/Seepage**: polygons used directly via `get_material_polygons()` (no profile-to-polygon conversion for polygon-sheet input)
 - **[done] CAD import/export**: `docs/usage/dxf.md` documents the import/export
   workflow, layer convention, code snippets, and a sample DXF (linked under the
   Usage Guide, below "Claude Code Skill").

@@ -214,6 +214,24 @@ XSLOPE includes an option to perform a reliability analysis with any of the supp
 
 To perform a limit equilibrium analsysi in XSLOPE, the user must first define the slope geometry, material properties, distributed loads, etc using the Excel Input Template as described in the [Input Template](../usage/input_template.md) page. The input template can then be loaded into Python using the 'load_slope_data' function. This function loads the input file and returns a dictionary containing the data from each sheet. The data can then be accessed using the sheet name as the key. For example:
 
+!!! note "Defining geometry: profile lines or polygons"
+    Slope geometry can be defined two ways. The traditional approach uses **profile
+    lines** — material boundaries ordered top-to-bottom, with a horizontal
+    `max_depth` as the bottom boundary. Alternatively, the **`polygons`** sheet
+    defines each material zone as a closed polygon, which handles irregular bottom
+    boundaries (e.g. dipping bedrock), lens-shaped inclusions, and cross-sections
+    imported from CAD. The two are mutually exclusive — specifying both raises an
+    error.
+
+    Internally the two converge on a single representation: profile lines are
+    converted to polygons when the file is loaded, so all downstream analysis
+    (slice generation, search, seepage, FEM) operates on polygons. With polygon
+    input, the **ground surface** is derived as the upper boundary of the polygon
+    union, and the **domain polygon** (the union itself) becomes the boundary that
+    a failure surface may not cross — taking over the role `max_depth` plays for
+    profile-line input. See the [Input Template](../usage/input_template.md) page
+    for the `polygons` sheet layout.
+
 ```python
 import xslope as xslope
 from xslope.fileio import load_slope_data

@@ -3,8 +3,7 @@
 XSLOPE exchanges geometry with CAD software through the **DXF** format, using the
 `xslope.cad` module. There are three things you can do:
 
-- **Export a model to DXF** — write a complete model (from the Excel input
-  template) out to a layered DXF for documentation, sharing, or editing in CAD
+- **Export a model to DXF** — write a complete model out to a layered DXF for documentation, sharing, or editing in CAD
   (`export_dxf`).
 - **Import polygons from a DXF** — read material-zone polygons from a DXF and write
   them to the `polygons` sheet of an input template (`import_dxf`).
@@ -15,9 +14,9 @@ XSLOPE exchanges geometry with CAD software through the **DXF** format, using th
 The common thread across all three is **layers**: when XSLOPE *writes* a DXF it
 places each feature or plotted artifact on its own named layer, and when it
 *reads* a DXF it uses layer names to identify materials. Layer names are
-uppercased, with spaces and DXF-illegal characters (`< > / \ " : ; ? * | = `` ` ``)
-replaced by underscores — so a material named "Silty Clay" becomes layer
-`SILTY_CLAY`.
+uppercased, with spaces and DXF-illegal characters (`< > / \ " : ; ? * | =` plus
+the backtick) replaced by underscores — so a material named "Silty Clay" becomes
+layer `SILTY_CLAY`.
 
 ---
 

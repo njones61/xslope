@@ -253,19 +253,24 @@ def export_dxf(slope_data, dxf_path, version="R2010"):
     ...
 ```
 
-### 3.4 Implementation Order (CAD)
+### 3.4 Implementation Order (CAD) — done
 
-1. `export_dxf` polygon path — lift directly from `_build_dxf_from_poly.py`.
-2. `dxf_to_polygons(path, layers=...)` primitive + `import_dxf` wrapper — read
-   material zones from the clean fixtures, ignoring reserved feature layers;
-   validation plot/table; write the `polygons` sheet. (Polygons-only — no
-   per-feature importers; see §3.2 scope decision.)
-3. `import_dxf` robustness — POLYLINE, bulge flattening, auto-close, LINE stitching
-   (the messy fixtures).
-4. `export_dxf` remaining entity types (profiles, failure surfaces, circles, etc.)
-   on their reserved layers.
-5. Round-trip test: export → re-import reproduces the polygon geometry (feature
-   layers are written by export but ignored by the polygons-only import).
+All implemented in `xslope/cad.py` and verified against the `poly_test/` fixtures:
+
+1. **[done]** `export_dxf(slope_data, path)` — polygons on per-material layers, plus
+   profile lines / search circles / reinforcement / dloads / piezo on reserved layers.
+2. **[done]** `dxf_to_polygons(path, layers=...)` primitive + `import_dxf` wrapper —
+   read material zones (ignoring reserved feature layers), write the `polygons` sheet,
+   seed material names. `summarize_dxf()` prints the validation table.
+3. **[done]** robustness — LWPOLYLINE + POLYLINE, arc-bulge tessellation, unclosed
+   auto-close, loose-LINE stitching.
+4. **[done]** export of the remaining entity types on reserved layers.
+5. **[done]** round-trip verified: export → re-import reproduces polygon areas exactly.
+
+> **ezdxf API note:** `LWPolyline` has **no** `.flattening()` method (contrary to the
+> §3.2 sketch). Use `ezdxf.path.make_path(entity).flattening(sag)` instead — it works
+> for both `LWPOLYLINE` and `POLYLINE` and tessellates arc bulges. Reading raw
+> `get_points()` silently drops bulges and corrupts areas.
 
 ### 3.5 Future: DWG, DGN
 

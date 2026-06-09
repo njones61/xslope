@@ -378,8 +378,9 @@ Convert profiles to polygons early, then use one code path:
    `_build_polygon_edges`), and takes slice-boundary breakpoints from polygon
    vertices. Equivalence-preserving (plan §12.3): produces bit-for-bit identical FS
    to the profile path on the LEM regression suite, and identical slices with
-   `profile_lines` emptied (polygon-sheet input). Remaining `profile_lines` use:
-   only the Ito & Matsui pile auto-H feature (to be migrated later).
+   `profile_lines` emptied (polygon-sheet input). The Ito & Matsui pile auto-H
+   feature (`intersect_pile_with_materials`) was also migrated to polygons, so
+   `generate_slices()` no longer reads `profile_lines` at all.
 4. **[done] domain containment**: `generate_slices()` rejects any failure surface
    (circular or non-circular) that leaves the domain polygon, via a cached
    `prep(domain).covers(clipped_surface)` check. Flat-bottomed domains (all
@@ -398,7 +399,11 @@ Convert profiles to polygons early, then use one code path:
    used by `plot_inputs`/`plot_solution`/search-results plots; `compute_ylim` and
    `get_plot_elements_bounds` handle polygon inputs.
 7. **Testing**: Verify polygon-based results match profile-based results for equivalent geometries
-8. **CAD import/export** (`xslope/cad.py`): see [`plan_io.md`](plan_io.md) §3 — `import_dxf` (DXF → `polygons` sheet, robust reader for POLYLINE/bulges/unclosed/loose-LINE) and `export_dxf` (template → layered DXF). Test against the fixtures in `poly_test/`.
+8. **[done] CAD import/export** (`xslope/cad.py`): see [`plan_io.md`](plan_io.md) §3.
+   `export_dxf` writes a layered DXF; `dxf_to_polygons`/`import_dxf` read material
+   zones (robust to LWPOLYLINE/POLYLINE, arc bulges, unclosed rings, loose LINE
+   segments) and write the `polygons` sheet, seeding material names. Verified against
+   all `poly_test/` fixtures and a full export→read round-trip (areas match exactly).
 9. **Documentation**: Input template, sample problems, migration guide
 
 

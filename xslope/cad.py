@@ -33,9 +33,32 @@ arc bulges (flattened), unclosed rings (auto-closed), and loose LINE segments
 import re
 
 import ezdxf
+from ezdxf import colors as ezcolors
 from ezdxf import path as ezpath
 
 from .fileio import write_cells_to_xlsx, cell_ref
+
+# Standard AutoCAD Color Index palette (index -> RGB), for mapping plot colors to
+# an ACI color. ACI (code 62) is honored by essentially every CAD viewer, whereas
+# layer true-color (code 420) is not.
+_ACI_RGB = [ezcolors.int2rgb(ezcolors.DXF_DEFAULT_COLORS[i]) for i in range(256)]
+
+
+def _nearest_aci(rgb):
+    """Nearest AutoCAD Color Index to an (r, g, b) 0-255 color. Near-black maps to
+    ACI 7 (the conventional black/white that renders dark on a light background)."""
+    r, g, b = rgb
+    if max(r, g, b) < 40:
+        return 7
+    best, best_d = 7, None
+    for aci in range(1, 256):
+        if aci == 7:
+            continue
+        cr, cg, cb = _ACI_RGB[aci]
+        d = (cr - r) ** 2 + (cg - g) ** 2 + (cb - b) ** 2
+        if best_d is None or d < best_d:
+            best, best_d = aci, d
+    return best
 
 
 # Reserved layer names used by export for non-polygon features. On import these
@@ -383,10 +406,12 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             name = lbl if (lbl and not lbl.startswith('_')) else default
         name = _layer_name(name, 0)
         if name not in doc.layers:
-            lyr = doc.layers.add(name=name)
             rgb = artist_rgb(artist)   # color the layer like the plotted artist
             if rgb is not None:
-                lyr.rgb = rgb
+                lyr = doc.layers.add(name=name, color=_nearest_aci(rgb))
+                lyr.rgb = rgb          # also set exact true-color where supported
+            else:
+                doc.layers.add(name=name)
         return name
 
     # Line2D artists: failure surface, thrust line, slices, profiles, piezo, etc.

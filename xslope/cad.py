@@ -104,6 +104,18 @@ def _dedupe_closing_vertex(coords):
     return coords
 
 
+def _dedupe_consecutive(coords):
+    """Remove consecutive duplicate vertices (zero-length segments). Some CAD
+    importers choke on degenerate polylines and drop them and their neighbours."""
+    out = []
+    for c in coords:
+        p = (float(c[0]), float(c[1]))
+        if out and abs(out[-1][0] - p[0]) < 1e-9 and abs(out[-1][1] - p[1]) < 1e-9:
+            continue
+        out.append(p)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Reading
 # ---------------------------------------------------------------------------
@@ -543,7 +555,7 @@ def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
         mat_id = poly['mat_id']
         lname = mat_layer(mat_id)
         _ensure_layer(doc, lname, _ACI_PALETTE[(mat_id or 0) % len(_ACI_PALETTE)])
-        coords = _dedupe_closing_vertex(list(poly['polygon'].exterior.coords))
+        coords = _dedupe_consecutive(_dedupe_closing_vertex(list(poly['polygon'].exterior.coords)))
         msp.add_lwpolyline(coords, close=True, dxfattribs={'layer': lname})
 
     # Profile lines (open LWPOLYLINE) on PROFILE_<mat>.
@@ -551,7 +563,7 @@ def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
         mat_id = line.get('mat_id')
         lname = f"PROFILE_{mat_layer(mat_id)}"
         _ensure_layer(doc, lname, 7)
-        msp.add_lwpolyline(list(line['coords']), close=False, dxfattribs={'layer': lname})
+        msp.add_lwpolyline(_dedupe_consecutive(line['coords']), close=False, dxfattribs={'layer': lname})
 
     # Search circles on SEARCH_CIRCLES: write the clipped failure-surface arc (the
     # portion within the slope), as plot_inputs does — not the full circle — plus a
@@ -569,7 +581,7 @@ def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
                                                    circle=c, tcrack_depth=tcrack_depth)
                 if ok:
                     clipped = res[4]
-                    arc = [(x, y) for x, y in clipped.coords]
+                    arc = _dedupe_consecutive(clipped.coords)
             if arc and len(arc) >= 2:
                 msp.add_lwpolyline(arc, dxfattribs={'layer': 'SEARCH_CIRCLES'})
             elif c.get('R'):
@@ -588,7 +600,7 @@ def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
     # Distributed loads (LWPOLYLINE) on DLOADS.
     for key in ('dloads', 'dloads2'):
         for line in slope_data.get(key) or []:
-            pts = [(p['X'], p['Y']) for p in line]
+            pts = _dedupe_consecutive([(p['X'], p['Y']) for p in line])
             if len(pts) >= 2:
                 _ensure_layer(doc, 'DLOADS', 3)
                 msp.add_lwpolyline(pts, close=False, dxfattribs={'layer': 'DLOADS'})
@@ -596,7 +608,7 @@ def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
     # Piezometric lines (LWPOLYLINE) on PIEZO.
     for key in ('piezo_line', 'piezo_line2'):
         pl = slope_data.get(key) or []
-        pts = [(x, y) for x, y in pl]
+        pts = _dedupe_consecutive(pl)
         if len(pts) >= 2:
             _ensure_layer(doc, 'PIEZO', 5)
             msp.add_lwpolyline(pts, close=False, dxfattribs={'layer': 'PIEZO'})

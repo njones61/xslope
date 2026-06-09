@@ -22,7 +22,7 @@ layer `SILTY_CLAY`.
 
 ## Exporting a model to DXF
 
-`export_dxf` writes everything present in the loaded model to a layered DXF:
+The `export_dxf` function in the `xslope.cad` module writes everything present in the loaded model to a layered DXF:
 
 ```python
 from xslope.fileio import load_slope_data
@@ -32,18 +32,22 @@ slope_data = load_slope_data("my_slope.xlsx")
 export_dxf(slope_data, "my_slope.dxf")          # DXF version R2010 by default
 ```
 
-Material zones go on **one layer per material** (named after the material);
-every other feature goes on a fixed **reserved** layer:
+Each feature in the model is written to a named layer:
 
 | Model feature | DXF entity | Layer |
 |---------------|-----------|-------|
-| Material zones | closed `LWPOLYLINE` | one per material (e.g. `CLAY_CORE`) |
+| Material zones | closed `LWPOLYLINE` | one per material, named after it (e.g. `CLAY_CORE`) |
 | Profile lines | open `LWPOLYLINE` | `PROFILE_<material>` |
 | Failure surface | `LWPOLYLINE` | `FAILURE_SURFACE` |
 | Search circles | `CIRCLE` + `POINT` | `SEARCH_CIRCLES` |
 | Reinforcement lines | `LINE` | `REINFORCEMENT` |
 | Distributed loads | `LWPOLYLINE` | `DLOADS` |
 | Piezometric / water table | `LWPOLYLINE` | `PIEZO` |
+
+Material-zone layers are named after the material itself. Every other layer above
+(the `PROFILE_` prefix and the fixed feature names) is a **reserved** name — these
+are the layers that import recognizes and skips, since import reads only material
+zones (see below).
 
 The result opens directly in any CAD program, with each feature on a layer you can
 show, hide, or restyle.

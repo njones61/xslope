@@ -57,9 +57,17 @@ A real example, exported from the [Earth Dam sample](../lem/samples.md#8-earth-d
 (`SHELL`, `CORE`, `CLAY`, `SAND`), the profile lines, the piezometric line, the
 distributed load, and the search circles, each on its own layer.
 
-![Placeholder: the exported DXF opened in CAD, showing material zones on per-material layers and the reserved feature layers.](images/dxf_export_example.png)
+Excel input file: [xslope_earth_dam_up.xlsx](../lem/files/xslope_earth_dam_up.xlsx)
 
-*Placeholder — the exported `my_slope.dxf` in CAD.*
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![earth_dam_up_inputs.png](../lem/sample_images/earth_dam_up_inputs.png){width=800}
+
+Exported DXF file: [xslope_earth_dam_up.dxf](files/xslope_earth_dam_up.dxf)
+
+Exported DXF file opened in CAD:
+
+![alt text](images/dxf_earth_dam_export.png)
 
 ---
 
@@ -89,10 +97,6 @@ importer is tolerant of common real-world variations:
 - **unclosed** polylines — closed automatically (with a warning),
 - a zone drawn as **loose `LINE` segments** — stitched into a ring by shared
   endpoints.
-
-![Placeholder: a slope cross-section in CAD with each material zone on its own named layer (CLAY_CORE, SAND, BEDROCK, …).](images/dxf_cad_layers.png)
-
-*Placeholder — a layered cross-section ready for import.*
 
 ### Step 2 — Review the extracted zones
 
@@ -157,10 +161,6 @@ Import seeds only the material **names**. Open the generated `my_slope.xlsx`, go
 the `mat` sheet, and fill in the strength and other properties for each material.
 The file is not analysis-ready until the material properties are provided.
 
-![Placeholder: the imported input file rendered with plot_inputs(), showing filled material zones and the hatched domain base.](images/dxf_import_result.png)
-
-*Placeholder — the imported geometry rendered with `plot_inputs()`.*
-
 ---
 
 ## Saving a plot to DXF
@@ -206,27 +206,13 @@ Each plotted artifact lands on its own layer:
     Velocity and displacement **vector (quiver) fields** do not export cleanly to
     DXF — the rest of that plot's geometry is written, but the arrows are omitted.
 
-![Placeholder: a saved plot_solution DXF in CAD with the layer panel showing SLICES, EFF_NORMAL_STRESS, FAILURE_SURFACE, etc. on separate layers.](images/dxf_save_plot_layers.png)
+PNG generated from the plot_solution function:
 
-*Placeholder — a saved solution DXF in CAD, one artifact per layer.*
+![alt text](files/xslope_earth_dam_up_solution.png){width=900}
 
----
+DXF file generated from the same plot using the `save_dxf` option:
 
-## Sample files
-
-A sample exported DXF (a two-material slope on a sloping base) is provided for
-experimentation:
-
-- [sample_polygons.dxf](files/sample_polygons.dxf) — two material zones
-  (`EMBANKMENT`, `FOUNDATION`) on separate layers.
-
-Try it:
-
-```python
-from xslope.cad import summarize_dxf, import_dxf
-summarize_dxf("sample_polygons.dxf")
-import_dxf("sample_polygons.dxf", "docs/inputs/input_template.xlsx", "sample.xlsx")
-```
+![alt text](images/dxf_earth_dam_solution.png)
 
 ---
 

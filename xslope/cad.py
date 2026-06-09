@@ -46,10 +46,11 @@ _ACI_RGB = [ezcolors.int2rgb(ezcolors.DXF_DEFAULT_COLORS[i]) for i in range(256)
 
 def _nearest_aci(rgb):
     """Nearest AutoCAD Color Index to an (r, g, b) 0-255 color. Near-black maps to
-    ACI 7 (the conventional black/white that renders dark on a light background)."""
+    ACI 250 (pure black in the palette) rather than ACI 7 — ACI 7 is *white* in the
+    palette and many viewers render it gray, not black, on a light background."""
     r, g, b = rgb
     if max(r, g, b) < 40:
-        return 7
+        return 250
     best, best_d = 7, None
     for aci in range(1, 256):
         if aci == 7:

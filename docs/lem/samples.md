@@ -400,16 +400,33 @@ produces. The FEM result is generally considered more realistic for pile-stabili
 
 <!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.85, num_slices=40 -->
 
-### 11. Slope on a Sloping (Irregular) Bottom
+### 11. Polygon Input with a Sloping Bottom
 
-This problem demonstrates **polygon-based geometry** with an irregular lower boundary.
-Instead of profile lines and a horizontal `max_depth`, the cross-section is defined
-directly as two material-zone polygons — an embankment over a foundation — whose shared
-base dips from left to right (from elevation −15 on the left to −5 on the right). The
-failure surface is constrained to stay within the domain polygon: trial circles that would
-dip below the sloping base are automatically rejected during the search, so the critical
-surface follows the dipping bedrock rather than a fictitious flat cutoff.
+This problem demonstrates two features together: **polygon-based geometry input** and a
+**sloping (non-horizontal) bottom boundary**. Rather than profile lines and a horizontal
+`max_depth`, the cross-section is defined directly on the `polygons` sheet as two
+material-zone polygons — an embankment over a foundation — whose shared base dips from
+left to right (elevation −15 on the left to −5 on the right). With polygon input there is
+no `max_depth`; the union of the polygons forms the **domain polygon**, and its lower
+boundary is the dipping base shown by the hatched line.
+
+The failure surface is constrained to stay within the domain polygon. During the search,
+trial circles that would dip below the sloping base are automatically rejected, so the
+critical surface follows the dipping foundation rather than a fictitious flat cutoff.
 
 Excel input file: [xslope_sloping_bottom.xlsx](files/xslope_sloping_bottom.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function (filled material zones and a hatched
+sloping base, instead of profile lines and a horizontal max-depth line):
+
+![sloping_bottom_inputs.png](sample_images/sloping_bottom_inputs.png){width=900}
+
+Search results:
+
+![sloping_bottom_search_results.png](sample_images/sloping_bottom_search_results.png){width=900}
+
+Solution (critical surface and factor of safety):
+
+![sloping_bottom_results.png](sample_images/sloping_bottom_results.png){width=900}
 
 <!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, method=spencer, expected_fs=1.244, num_slices=30 -->

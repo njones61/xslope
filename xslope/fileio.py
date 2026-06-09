@@ -423,8 +423,11 @@ def load_slope_data(filepath):
                 "Both the 'profile' and 'polygon' sheets contain data. Use one "
                 "geometry method, not both.")
         polygons = polygons_from_sheet
+        # max_depth is a profile-sheet concept; it has no meaning for polygon input.
+        max_depth = None
     elif profile_lines:
-        # Convert profile lines -> polygons (mat_id is 0-based in both).
+        # Convert profile lines -> polygons. max_depth is used ONLY here, as the
+        # bottom boundary for build_polygons (mat_id is 0-based in both).
         polygons = [
             {'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
             for p in build_polygons(slope_data={'profile_lines': profile_lines,
@@ -433,13 +436,12 @@ def load_slope_data(filepath):
     else:
         polygons = []
 
-    # Derive the ground surface and domain polygon from the polygons. With polygons
-    # the domain polygon defines the bottom boundary, so max_depth (a profile-sheet
-    # concept) becomes the domain's minimum elevation.
+    # Derive the ground surface and domain polygon from the polygons. The domain
+    # polygon (not max_depth) defines the bottom/side boundaries for all downstream
+    # use (slice generation, search containment).
     domain_polygon = None
     if polygons:
         ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
-        max_depth = domain_polygon.bounds[1]
     else:
         ground_surface = LineString([])
 

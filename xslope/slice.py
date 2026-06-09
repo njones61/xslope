@@ -613,7 +613,6 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     k_seismic = slope_data['k_seismic']
     dloads = slope_data["dloads"]
     dloads2 = slope_data.get("dloads2", [])
-    max_depth = slope_data["max_depth"]
 
     # Warn once if seep pore pressure is selected but seep data is missing
     has_seep_materials = any(m["u"] == "seep" for m in materials)

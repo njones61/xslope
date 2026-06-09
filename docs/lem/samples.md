@@ -399,3 +399,17 @@ while the FEM beam elements only develop as much resistance as the global deform
 produces. The FEM result is generally considered more realistic for pile-stabilized slopes.
 
 <!-- test: file=files/xslope_piles.xlsx, type=circular_search, method=spencer, expected_fs=1.85, num_slices=40 -->
+
+### 11. Slope on a Sloping (Irregular) Bottom
+
+This problem demonstrates **polygon-based geometry** with an irregular lower boundary.
+Instead of profile lines and a horizontal `max_depth`, the cross-section is defined
+directly as two material-zone polygons — an embankment over a foundation — whose shared
+base dips from left to right (from elevation −15 on the left to −5 on the right). The
+failure surface is constrained to stay within the domain polygon: trial circles that would
+dip below the sloping base are automatically rejected during the search, so the critical
+surface follows the dipping bedrock rather than a fictitious flat cutoff.
+
+Excel input file: [xslope_sloping_bottom.xlsx](files/xslope_sloping_bottom.xlsx)
+
+<!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, method=spencer, expected_fs=1.244, num_slices=30 -->

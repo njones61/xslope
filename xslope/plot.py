@@ -272,6 +272,73 @@ def plot_max_depth(ax, profile_lines, max_depth):
     for x in x_hashes:
         ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1)
 
+
+def _domain_lower_envelope(domain):
+    """Return the lower boundary of the domain polygon as (x, y) points, left to
+    right, sampled at the exterior vertex x-values (piecewise-linear between)."""
+    ring = list(domain.exterior.coords)
+    if len(ring) > 1 and ring[0] == ring[-1]:
+        ring = ring[:-1]
+    n = len(ring)
+    pts = []
+    for x in sorted(set(p[0] for p in ring)):
+        ys = []
+        for i in range(n):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % n]
+            if (x1 <= x <= x2) or (x2 <= x <= x1):
+                if x1 == x2:
+                    ys.extend([y1, y2])
+                else:
+                    ys.append(y1 + (x - x1) / (x2 - x1) * (y2 - y1))
+        if ys:
+            pts.append((x, min(ys)))
+    return pts
+
+
+def plot_domain_base(ax, domain_polygon, label='Max Depth'):
+    """Draw the domain's lower boundary as a hatched base line (the polygon
+    analog of plot_max_depth). Works for a flat bottom — reproducing the old
+    horizontal hatched 'Max Depth' line — and for an irregular/sloping bottom,
+    where the hatch marks follow the base."""
+    if domain_polygon is None:
+        return
+    base = _domain_lower_envelope(domain_polygon)
+    if len(base) < 2:
+        return
+    bx = np.array([p[0] for p in base])
+    by = np.array([p[1] for p in base])
+    ax.plot(bx, by, color='black', linewidth=1.5, label=label)
+
+    x_min, x_max = bx[0], bx[-1]
+    x_diff = x_max - x_min
+    if x_diff <= 0:
+        return
+    spacing = x_diff / 100
+    length = x_diff / 80
+    angle_rad = np.radians(60)
+    dx = length * np.cos(angle_rad)
+    dy = length * np.sin(angle_rad)
+    for x in np.arange(x_min, x_max, spacing)[1:]:
+        y = np.interp(x, bx, by)
+        ax.plot([x, x - dx], [y, y - dy], color='black', linewidth=1)
+
+
+def plot_base_geometry(ax, slope_data, labels=False):
+    """Plot the base geometry on an Axes: profile lines + max-depth line when the
+    input uses profile lines, or filled material polygons + a hatched domain base
+    when it uses polygons. Shared by plot_inputs and all the solution/search plots
+    so both geometry types render consistently everywhere."""
+    if slope_data.get('profile_lines'):
+        plot_profile_lines(ax, slope_data['profile_lines'],
+                           materials=slope_data.get('materials'), labels=labels)
+        plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    elif slope_data.get('polygons'):
+        plot_polygons_on_ax(ax, slope_data['polygons'],
+                            materials=slope_data.get('materials'))
+        plot_domain_base(ax, slope_data.get('domain_polygon'))
+
+
 def plot_failure_surface(ax, failure_surface):
     """
     Plots the failure surface as a black line.
@@ -1368,6 +1435,14 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
     if "max_depth" in data and data["max_depth"] is not None:
         y_vals.append(data["max_depth"])
 
+    # 2b) include the full vertical extent of the domain polygon. This is the
+    # geometry source for polygon inputs (where profile_lines/max_depth are empty),
+    # and is a no-op for profile inputs (the domain spans ground..max_depth).
+    domain = data.get('domain_polygon')
+    if domain is not None:
+        _, dy0, _, dy1 = domain.bounds
+        y_vals.extend([dy0, dy1])
+
     if not y_vals:
         return 0.0, 1.0
 
@@ -1549,11 +1624,7 @@ def plot_inputs(
 
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
-    if slope_data.get('profile_lines'):
-        plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'), labels=True)
-        plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
-    elif slope_data.get('polygons'):
-        plot_polygons_on_ax(ax, slope_data['polygons'], materials=slope_data.get('materials'), labels=True)
+    plot_base_geometry(ax, slope_data, labels=True)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data)
     if mode == "seep":
@@ -1786,8 +1857,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ax.set_ylabel("y")
     ax.grid(False)
 
-    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
-    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_base_geometry(ax, slope_data)
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
@@ -1997,8 +2067,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
     """
     fig, ax = plt.subplots(figsize=figsize)
 
-    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
-    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_base_geometry(ax, slope_data)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
         plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
@@ -2067,8 +2136,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     fig, ax = plt.subplots(figsize=figsize)
 
     # Plot basic profile elements
-    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
-    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_base_geometry(ax, slope_data)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
         plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)
@@ -2141,8 +2209,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     fig, ax = plt.subplots(figsize=figsize)
 
     # Plot basic slope elements (same as other search functions)
-    plot_profile_lines(ax, slope_data['profile_lines'], materials=slope_data.get('materials'))
-    plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+    plot_base_geometry(ax, slope_data)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
         plot_piezo_line(ax, slope_data)
     plot_dloads(ax, slope_data)

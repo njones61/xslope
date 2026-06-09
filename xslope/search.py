@@ -49,16 +49,19 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
     ground_surface = slope_data['ground_surface']
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
     y_max = max(y for _, y in ground_surface.coords)
-    y_min = slope_data['max_depth']
+    # The deepest allowable failure-surface elevation is the bottom of the domain
+    # polygon (not max_depth, which is only a profile-sheet input). Circles below an
+    # irregular bottom are rejected by the containment check in generate_slices.
+    depth_floor = slope_data['domain_polygon'].bounds[1]
+    y_min = depth_floor
     delta_y = y_max - y_min
     tol = delta_y * depth_tol_frac
 
     circles = slope_data['circles']
-    max_depth = slope_data['max_depth']
 
     def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, circle_cache, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
-        best_depth = max(depth_guess, max_depth)
+        best_depth = max(depth_guess, depth_floor)
         best_fs = fs_fail
         best_result = None
         depth_tol = depth_step * tol_frac
@@ -66,7 +69,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
 
         while depth_step > depth_tol:
             depths = [
-                max(best_depth - depth_step, max_depth),
+                max(best_depth - depth_step, depth_floor),
                 best_depth,
                 best_depth + depth_step
             ]
@@ -400,7 +403,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
                     continue
                 
                 # Try to move the point
-                if move_point(test_points, i, dx, dy, movements[i], ground_surface, slope_data['max_depth']):
+                if move_point(test_points, i, dx, dy, movements[i], ground_surface, slope_data['domain_polygon'].bounds[1]):
                     # Evaluate new surface
                     FS, df_slices, failure_surface, solver_result, fs_cache = evaluate_surface(
                         test_points, movement_distance, fs_cache)

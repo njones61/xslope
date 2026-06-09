@@ -263,7 +263,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
 
     # Get the solver function from solve module
     solver = getattr(solve, method_name)
-    def move_point(points, i, dx, dy, movement_type, ground_surface, max_depth):
+    def move_point(points, i, dx, dy, movement_type, ground_surface, depth_floor):
         """Move a point while respecting constraints"""
         # Get current point
         point = points[i]
@@ -282,10 +282,12 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
                 return False
             new_y = y
         else:
-            # For middle points, ensure they stay below ground surface but above max_depth
+            # For middle points, ensure they stay below ground surface but above the
+            # domain floor (surfaces leaving an irregular bottom are rejected later
+            # by the containment check in generate_slices).
             if new_y > ground_surface.interpolate(ground_surface.project(Point(new_x, new_y))).y:
                 return False
-            if new_y < max_depth:
+            if new_y < depth_floor:
                 return False
         
         # Check x-ordering constraints

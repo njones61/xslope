@@ -1,7 +1,7 @@
 from pathlib import Path
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm, print_reinforcement_summary, print_pile_summary, print_detailed_element_summary, export_fem_solution
 from xslope.fileio import load_slope_data
-from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_constraint_line_geometry
+from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_constraint_line_geometry
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
@@ -24,7 +24,7 @@ if slope_data.get("mesh") is not None and not remesh:
 else:
     print("No existing mesh found in slope_data or remeshing enabled, building new mesh from profile line data.")
     constraint_lines, n_reinf, n_pile = extract_constraint_line_geometry(slope_data)
-    polygons = build_polygons(slope_data, reinf_lines=constraint_lines)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
     print(f"Building mesh with {len(polygons)} polygons, {n_reinf} reinforcement lines, {n_pile} pile lines.")
 
     if auto_size:

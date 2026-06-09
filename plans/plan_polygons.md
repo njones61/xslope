@@ -388,8 +388,15 @@ Convert profiles to polygons early, then use one code path:
    — so existing analyses are unchanged (LEM regression identical). Only irregular
    bottoms (e.g. dipping bedrock) incur the containment check. `max_depth` is now
    the domain's minimum elevation for every input.
-5. **`mesh.py`**: Add direct polygon input path (skip `build_polygons()` when polygons provided)
-6. **`plot.py`**: Add polygon visualization (filled material zones with colors)
+5. **[done] `mesh.py`**: `get_material_polygons(slope_data, reinf_lines)` returns
+   mesh-ready polygons — the stored `slope_data['polygons']` for polygon inputs
+   (skipping `build_polygons()`), or `build_polygons()` for profile inputs (with
+   reinforcement integration). `main_seep`/`main_fem`/`main_mesh` use it, so FEM and
+   seepage run on polygon-sheet inputs (verified end-to-end on the seep fixtures).
+6. **[done] `plot.py`**: filled material-zone polygons via `plot_polygons_on_ax`,
+   hatched domain base via `plot_domain_base`, and a shared `plot_base_geometry`
+   used by `plot_inputs`/`plot_solution`/search-results plots; `compute_ylim` and
+   `get_plot_elements_bounds` handle polygon inputs.
 7. **Testing**: Verify polygon-based results match profile-based results for equivalent geometries
 8. **CAD import/export** (`xslope/cad.py`): see [`plan_io.md`](plan_io.md) §3 — `import_dxf` (DXF → `polygons` sheet, robust reader for POLYLINE/bulges/unclosed/loose-LINE) and `export_dxf` (template → layered DXF). Test against the fixtures in `poly_test/`.
 9. **Documentation**: Input template, sample problems, migration guide

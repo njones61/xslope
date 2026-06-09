@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 from xslope.fileio import load_slope_data, print_dictionary
-from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json
+from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json
 from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_separately
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
@@ -24,7 +24,7 @@ if slope_data.get("mesh") is not None and not re_mesh:
     mesh = slope_data["mesh"]
 else:
     print("No existing mesh found in slope_data, building new mesh from profile line data.")
-    polygons = build_polygons(slope_data, debug=True)
+    polygons = get_material_polygons(slope_data)
 
     # find the x-range of the ground_surface and use it to set the target size
     x_range = [min(x for x, _ in slope_data['ground_surface'].coords), max(x for x, _ in slope_data['ground_surface'].coords)]

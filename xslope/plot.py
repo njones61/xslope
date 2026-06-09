@@ -2663,14 +2663,18 @@ def get_plot_elements_bounds(ax, slope_data):
     y_min, y_max = ax.get_ylim()
     
     # Profile lines bounds
-    if 'profile_lines' in slope_data:
+    if slope_data.get('profile_lines'):
         for line in slope_data['profile_lines']:
             if line:
                 coords = line['coords']
                 xs = [p[0] for p in coords]
                 ys = [p[1] for p in coords]
                 bounds.append((min(xs), max(xs), min(ys), max(ys)))
-    
+    elif slope_data.get('domain_polygon') is not None:
+        # Polygon input: use the domain polygon's bounding box.
+        dx0, dy0, dx1, dy1 = slope_data['domain_polygon'].bounds
+        bounds.append((dx0, dx1, dy0, dy1))
+
     # Distributed loads bounds
     if 'dloads' in slope_data and slope_data['dloads']:
         for dload_set in slope_data['dloads']:

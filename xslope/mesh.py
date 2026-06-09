@@ -1759,6 +1759,30 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
     
     return polygons
 
+
+def get_material_polygons(slope_data, reinf_lines=None):
+    """
+    Return material-zone polygons for mesh generation, in the format the mesher
+    expects: a list of dicts with 'coords' (closed (x, y) list) and 'mat_id'.
+
+    Unified entry point that works for both geometry inputs (plan_polygons.md §6):
+      - Polygon input: use slope_data['polygons'] directly (the polygons ARE the
+        geometry — no profile lines to convert).
+      - Profile input: convert profile lines via build_polygons(), which also
+        integrates reinforcement-line vertices when reinf_lines is provided.
+
+    Callers (main_seep/main_fem/main_mesh) should use this instead of calling
+    build_polygons() directly, so they work on polygon-sheet inputs.
+    """
+    if slope_data.get('profile_lines'):
+        return build_polygons(slope_data, reinf_lines=reinf_lines)
+    polygons = slope_data.get('polygons') or []
+    return [
+        {'coords': list(p['polygon'].exterior.coords), 'mat_id': p['mat_id']}
+        for p in polygons
+    ]
+
+
 def add_dload_points_to_polygons(polygons, slope_data):
     """
     Add distributed load points to polygon edges if they are coincident with edges 

@@ -118,37 +118,6 @@ def get_ground_surface_y_coordinates(x_coords, ground_surface):
     return y_coords
 
 
-def get_profile_layer_y_coordinates(x_coords, profile_lines):
-    """
-    Get y-coordinates for each profile layer at given x-coordinates.
-    
-    Parameters:
-        x_coords (array-like): X-coordinates to evaluate
-        profile_lines (list): List of profile line dicts, each with 'coords' key containing coordinate tuples
-        
-    Returns:
-        list: List of arrays, each containing y-coordinates for a profile layer
-    """
-    x_coords = np.asarray(x_coords)
-    layer_y_coords = []
-    
-    for line in profile_lines:
-        line_coords = np.array(line['coords'])
-        line_x = line_coords[:, 0]
-        line_y = line_coords[:, 1]
-        
-        # Sort by x to ensure proper interpolation
-        sort_idx = np.argsort(line_x)
-        line_x = line_x[sort_idx]
-        line_y = line_y[sort_idx]
-        
-        # Interpolate y-coordinates
-        y_coords = np.interp(x_coords, line_x, line_y, left=np.nan, right=np.nan)
-        layer_y_coords.append(y_coords)
-    
-    return layer_y_coords
-
-
 def get_piezometric_y_coordinates(x_coords, piezo_line):
     """
     Get y-coordinates on the piezometric surface for given x-coordinates.

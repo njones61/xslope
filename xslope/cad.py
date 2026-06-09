@@ -380,6 +380,16 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
         return [(float(x), float(y)) for x, y in zip(xs, ys)
                 if np.isfinite(x) and np.isfinite(y)]
 
+    def add_open_path(pts, att):
+        """Add an open polyline. A 2-point segment is written as a LINE entity
+        rather than a 2-vertex LWPOLYLINE: some CAD viewers cull an axis-aligned
+        LWPOLYLINE with a zero-height/zero-width bounding box (e.g. the perfectly
+        horizontal max-depth line), but a LINE always renders."""
+        if len(pts) == 2:
+            msp.add_line(pts[0], pts[1], dxfattribs=att)
+        elif len(pts) >= 2:
+            msp.add_lwpolyline(pts, dxfattribs=att)
+
     def artist_rgb(artist):
         """The artist's display color as an (r, g, b) 0-255 tuple, or None. Prefers
         the fill color, then the edge, then the line color — so a blue-filled patch
@@ -436,7 +446,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
         ls = ln.get_linestyle()
         has_line = ls not in ('None', 'none', ' ', '', None) and (ln.get_linewidth() or 0) > 0
         if has_line and len(pts) >= 2:
-            msp.add_lwpolyline(pts, dxfattribs=att)
+            add_open_path(pts, att)
         else:
             for pt in pts:
                 msp.add_point(pt, dxfattribs=att)
@@ -458,7 +468,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             for seg in segs:
                 pts = finite_pts(seg[:, 0], seg[:, 1])
                 if len(pts) >= 2:
-                    msp.add_lwpolyline(pts, dxfattribs=att)
+                    add_open_path(pts, att)
             continue
 
         if isinstance(coll, PathCollection):

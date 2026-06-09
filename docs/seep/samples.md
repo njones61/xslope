@@ -125,9 +125,12 @@ The coordinate geometry is shown here:
 
 ![levee_coords.png](images/levee_coords.png)
 
-The following file illustrates how to prepare the inputs:
+The following file illustrates how to prepare the inputs. Unlike the other
+samples, this one defines the geometry with the **`polygon` sheet** — each
+material zone (levee, grout curtain, foundation) is entered as a closed polygon
+rather than as profile lines:
 
-[xslope_levee_full.xlsx](files/xslope_levee_full.xlsx)
+[xslope_levee_poly.xlsx](files/xslope_levee_poly.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
@@ -137,4 +140,4 @@ Solution:
 
 ![levee_results.png](images/levee_results.png){width=1200px}
 
-<!-- test: file=files/xslope_levee_full.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->
+<!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->

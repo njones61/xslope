@@ -850,14 +850,14 @@ def plot_dloads(ax, slope_data):
                     if head_length > arrow_length:
                         # Draw a simple line without arrowhead
                         ax.plot([arrow_start_x, x], [arrow_start_y, y], 
-                               color=color, linewidth=2, alpha=0.7)
+                               color=color, linewidth=2, alpha=0.7, gid='DLOADS')
                     else:
                         # Draw arrow with head
                         ax.arrow(arrow_start_x, arrow_start_y, 
                                 x - arrow_start_x, y - arrow_start_y,
                                 head_width=head_width, head_length=head_length, 
                                 fc=color, ec=color, alpha=0.7,
-                                length_includes_head=True)
+                                length_includes_head=True, gid='DLOADS')
                 
                 # Add end point if it's the last segment and load is zero
                 if i == len(line) - 2 and n2 == 0:
@@ -866,7 +866,7 @@ def plot_dloads(ax, slope_data):
                 
                 # Draw connecting line at arrow tops
                 if top_xs:
-                    ax.plot(top_xs, top_ys, color=color, linewidth=1.5, alpha=0.8)
+                    ax.plot(top_xs, top_ys, color=color, linewidth=1.5, alpha=0.8, gid='DLOADS')
             
             # Draw the surface line itself
             ax.plot(xs, ys, color=color, linewidth=1.5, alpha=0.8, label=label, gid='DLOADS')

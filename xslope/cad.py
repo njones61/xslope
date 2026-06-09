@@ -345,6 +345,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
     without re-deriving anything.
     """
     import numpy as np
+    import matplotlib.colors as mcolors
     from matplotlib.collections import PathCollection
     from matplotlib.patches import Circle as MplCircle
 
@@ -355,6 +356,26 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
         return [(float(x), float(y)) for x, y in zip(xs, ys)
                 if np.isfinite(x) and np.isfinite(y)]
 
+    def artist_rgb(artist):
+        """The artist's display color as an (r, g, b) 0-255 tuple, or None. Prefers
+        the fill color, then the edge, then the line color — so a blue-filled patch
+        with a black outline (e.g. pore pressure) reads as blue, while an unfilled
+        patch (e.g. the hatched stress bars) reads as its edge color."""
+        def rgb_of(getter):
+            f = getattr(artist, getter, None)
+            if f is None:
+                return None
+            try:
+                rgba = mcolors.to_rgba_array(f())
+            except (ValueError, TypeError):
+                return None
+            if len(rgba) == 0 or rgba[0][3] <= 0:   # missing or fully transparent
+                return None
+            r, g, b, _ = rgba[0]
+            return (int(round(r * 255)), int(round(g * 255)), int(round(b * 255)))
+
+        return rgb_of('get_facecolor') or rgb_of('get_edgecolor') or rgb_of('get_color')
+
     def layer_of(artist, default):
         name = artist.get_gid()
         if not name:
@@ -362,7 +383,10 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             name = lbl if (lbl and not lbl.startswith('_')) else default
         name = _layer_name(name, 0)
         if name not in doc.layers:
-            doc.layers.add(name=name)
+            lyr = doc.layers.add(name=name)
+            rgb = artist_rgb(artist)   # color the layer like the plotted artist
+            if rgb is not None:
+                lyr.rgb = rgb
         return name
 
     # Line2D artists: failure surface, thrust line, slices, profiles, piezo, etc.

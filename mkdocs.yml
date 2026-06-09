@@ -33,6 +33,7 @@ nav:
     - Input Template: usage/input_template.md
     - Colab Notebooks: usage/notebooks.md
     - Claude Code Skill: usage/claude/index.md
+    - DXF Import/Export: usage/dxf.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

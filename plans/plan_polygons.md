@@ -413,7 +413,9 @@ Convert profiles to polygons early, then use one code path:
 - **LEM overview** (`docs/lem/overview.md`): Add note on polygon geometry support; explain how ground surface and domain boundary are derived
 - **Sample problems**: Add at least one polygon-based example (same slope as an existing profile-based example, to show equivalence)
 - **FEM/Seepage**: Note that polygons can be used directly without profile-to-polygon conversion
-- **CAD import**: New section documenting the DXF import workflow
+- **[done] CAD import/export**: `docs/usage/dxf.md` documents the import/export
+  workflow, layer convention, code snippets, and a sample DXF (linked under the
+  Usage Guide, below "Claude Code Skill").
 
 
 ## 12. Open Questions

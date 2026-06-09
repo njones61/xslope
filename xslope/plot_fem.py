@@ -36,7 +36,7 @@ def _extract_uv(disp, fem_data):
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
-                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, dpi=300):
+                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
 
@@ -135,12 +135,12 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         if has_edge and not has_no_edge:
             # All linear elements — draw with edges
             patch_list = [Polygon(p) for p in polys]
-            pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
             ax.add_collection(pc)
         elif has_no_edge and not has_edge:
             # All quadratic sub-polys — no edges on fills
             patch_list = [Polygon(p) for p in polys]
-            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha)
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
             ax.add_collection(pc)
         else:
             # Mixed — separate linear (with edges) and quadratic sub-polys (no edges)
@@ -160,15 +160,15 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
                 elif et in (8, 9):
                     sub_polys.extend(polys[sub_idx:sub_idx+4]); sub_idx += 4
             if linear_polys:
-                pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+                pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
                 ax.add_collection(pc)
             if sub_polys:
-                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha)
+                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
                 ax.add_collection(pc)
 
     # Render outer boundary edges of quadratic elements as a single LineCollection
     if edge_segments:
-        lc = LineCollection(edge_segments, colors='k', linewidths=0.5)
+        lc = LineCollection(edge_segments, colors='k', linewidths=0.5, gid='MESH')
         ax.add_collection(lc)
 
     # Label element numbers at centroids if requested
@@ -191,7 +191,7 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
                     zorder=10)
 
     if show_nodes:
-        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2)
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=2, gid='MESH_NODES')
 
     # Label node numbers if requested
     if label_nodes:
@@ -230,13 +230,13 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
                 reinf_segs.append(seg)
                 n_reinf_plotted += 1
         if reinf_segs:
-            lc = LineCollection(reinf_segs, colors='red', linewidths=2.5, zorder=5)
+            lc = LineCollection(reinf_segs, colors='red', linewidths=2.5, zorder=5, gid='REINFORCEMENT')
             ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='red', lw=2.5, label=f'Reinforcement ({n_reinf_plotted} elements)')
             )
         if pile_segs:
-            lc = LineCollection(pile_segs, colors='green', linewidths=3.5, zorder=5)
+            lc = LineCollection(pile_segs, colors='green', linewidths=3.5, zorder=5, gid='PILES')
             ax.add_collection(lc)
             legend_handles.append(
                 plt.Line2D([0], [0], color='green', lw=3.5, label=f'Pile ({n_pile_plotted} elements)')
@@ -298,10 +298,13 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     ax.set_title(title)
     plt.tight_layout()
     
+    base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:
-        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '') + '.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
-    
+        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, base_name + '.dxf')
+
     plt.show()
 
 
@@ -418,7 +421,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=False, save_png=False, dpi=300):
+                    scale_vectors=False, save_png=False, save_dxf=False, dpi=300):
     """
     Plot FEM results with various visualization options.
 
@@ -570,8 +573,13 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              frameon=False)
 
     if save_png:
-        filename = 'fem_results.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        # One DXF per panel (each plot type), since the figure is multi-panel.
+        for i, pt in enumerate(plot_types):
+            if i < len(axes):
+                axes_to_dxf(axes[i], f'fem_results_{pt}.dxf')
     
     plt.show()
     
@@ -615,7 +623,8 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
         triangles = np.array(triangles)
         
         # Create contour plot
-        tcf = ax.tricontourf(nodes[:, 0], nodes[:, 1], triangles, disp_mag, 
+        tcf = ax.tricontourf(nodes[:, 0], nodes[:, 1], triangles, disp_mag, gid='DISPLACEMENT_CONTOURS',
+                         
                            levels=20, cmap='viridis', alpha=0.8)
         
         # Colorbar
@@ -767,14 +776,14 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
         print("Warning: All displacements below tolerance")
         return
 
-    ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask],
+    _q = ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask], gid='DISPLACE_VECTORS',
               angles='xy', color='black', alpha=0.7,
               scale=None, width=0.002, headwidth=3, headlength=4,
               headaxislength=3, pivot='tail')
 
     # Plot node dots if requested
     if plot_nodes:
-        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=1, alpha=0.4)
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=1, alpha=0.4, gid='MESH_NODES')
 
     # Plot reinforcement
     if show_reinforcement and 'elements_1d' in fem_data:
@@ -853,7 +862,7 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         from matplotlib.collections import PatchCollection
         
         # Create patch collection
-        p = PatchCollection(patches_list, alpha=0.8, edgecolors='none')
+        p = PatchCollection(patches_list, alpha=0.8, edgecolors='none', gid='STRESS_CONTOURS')
         p.set_array(np.array(stress_values))
         p.set_cmap('plasma')
         ax.add_collection(p)
@@ -1033,7 +1042,7 @@ def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=1.0, label
             lines.append(line_coords)
     
     if lines:
-        lc = LineCollection(lines, colors=color, alpha=alpha, linewidths=linewidth, label=label)
+        lc = LineCollection(lines, colors=color, alpha=alpha, linewidths=linewidth, label=label, gid='MESH')
         ax.add_collection(lc)
 
 
@@ -1061,11 +1070,11 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, lin
                 reinf_lines.append(line_coords)
 
     if reinf_lines:
-        lc = LineCollection(reinf_lines, colors=color, alpha=alpha, linewidths=linewidth, label=label)
+        lc = LineCollection(reinf_lines, colors=color, alpha=alpha, linewidths=linewidth, label=label, gid='REINFORCEMENT')
         ax.add_collection(lc)
     if pile_lines:
         pile_label = label.replace('Reinforcement', 'Pile') if label and 'Reinforcement' in label else None
-        lc = LineCollection(pile_lines, colors='green', alpha=alpha, linewidths=linewidth + 1, label=pile_label)
+        lc = LineCollection(pile_lines, colors='green', alpha=alpha, linewidths=linewidth + 1, label=pile_label, gid='PILES')
         ax.add_collection(lc)
 
 
@@ -1757,7 +1766,9 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
     if np.max(nodal_values) > np.min(nodal_values):  # Only plot if there's variation
         levels = np.linspace(np.min(nodal_values), np.max(nodal_values), 20)
         cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap)
-        
+        # DXF layer named after the plotted quantity (e.g. "VP Max Shear Strain").
+        cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
+
         # Add colorbar
         cbar = plt.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
         cbar.set_label(label, rotation=270, labelpad=20)

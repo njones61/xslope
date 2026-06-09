@@ -6,7 +6,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, dpi=300):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -98,11 +98,11 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
 
         if has_edge and not has_no_edge:
             patch_list = [Polygon(p) for p in polys]
-            pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
             ax.add_collection(pc)
         elif has_no_edge and not has_edge:
             patch_list = [Polygon(p) for p in polys]
-            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha)
+            pc = PatchCollection(patch_list, facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
             ax.add_collection(pc)
         else:
             linear_polys = []
@@ -117,15 +117,15 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
                 elif et in (6, 8, 9):
                     sub_polys.extend(polys[sub_idx:sub_idx+4]); sub_idx += 4
             if linear_polys:
-                pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha)
+                pc = PatchCollection([Polygon(p) for p in linear_polys], facecolor=color, edgecolor='k', linewidth=0.5, alpha=alpha, gid='MESH_FILL')
                 ax.add_collection(pc)
             if sub_polys:
-                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha)
+                pc = PatchCollection([Polygon(p) for p in sub_polys], facecolor=color, edgecolor='none', alpha=alpha, gid='MESH_FILL')
                 ax.add_collection(pc)
 
     # Render outer boundary edges of quadratic elements as a single LineCollection
     if edge_segments:
-        lc = LineCollection(edge_segments, colors='k', linewidths=0.5)
+        lc = LineCollection(edge_segments, colors='k', linewidths=0.5, gid='MESH')
         ax.add_collection(lc)
 
     # Label element numbers at centroids if requested
@@ -148,7 +148,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
                     zorder=10)
 
     if show_nodes:
-        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=0.75)
+        ax.plot(nodes[:, 0], nodes[:, 1], 'k.', markersize=0.75, gid='MESH_NODES')
 
     # Label node numbers if requested
     if label_nodes:
@@ -175,10 +175,10 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         bc1 = nodes[bc_type == 1]
         bc2 = nodes[bc_type == 2]
         if len(bc1) > 0:
-            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'bs', label="Fixed Head (bc_type=1)")
+            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'bs', label="Fixed Head (bc_type=1)", gid='SEEP_FIXED_HEAD')
             legend_handles.append(h1)
         if len(bc2) > 0:
-            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)")
+            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)", gid='SEEP_EXIT_FACE')
             legend_handles.append(h2)
 
     # Single combined legend outside the plot
@@ -211,14 +211,17 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
     plt.tight_layout()
     
+    base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:
-        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '') + '.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, base_name + '.dxf')
     
     plt.show()
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, dpi=300):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, save_dxf=False, dpi=300):
     """
     Plot seep analysis results including head contours, flowlines, and phreatic surface.
     
@@ -389,7 +392,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
             polys = mat_fill_polys[mat]
             if polys:
                 patch_list = [Polygon(p) for p in polys]
-                pc = PatchCollection(patch_list, facecolor=mat_to_color[mat], edgecolor='none', alpha=alpha)
+                pc = PatchCollection(patch_list, facecolor=mat_to_color[mat], edgecolor='none', alpha=alpha, gid='ZONE_FILL')
                 ax.add_collection(pc)
 
     # Set up contour levels
@@ -431,12 +434,14 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     # Filled contours (only if fill_contours=True)
     if fill_contours:
         contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax, alpha=0.5)
+        contourf.set_gid('CONTOUR_FILL')
         cbar = plt.colorbar(contourf, ax=ax, label=variable_label, shrink=0.8, pad=0.02)
         cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
         cbar.update_ticks()
 
     # Solid lines for contours
-    ax.tricontour(triang, contour_data, levels=contour_levels, colors="k", linewidths=0.5)
+    _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k", linewidths=0.5)
+    _cs.set_gid('HEAD_CONTOURS')
 
     # Phreatic surface (pressure head = 0)
     # Check if phreatic surface exists (pore pressure must be negative somewhere)
@@ -447,7 +452,8 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         if u is not None and np.min(u) < 0:
             elevation = nodes[:, 1]  # y-coordinate is elevation
             pressure_head = head - elevation
-            ax.tricontour(triang, pressure_head, levels=[0], colors="black", linewidths=2.0)
+            _csp = ax.tricontour(triang, pressure_head, levels=[0], colors="black", linewidths=2.0)
+            _csp.set_gid('PHREATIC')
             has_phreatic = True
 
     # Overlay flowlines if variable is head and phi is available
@@ -470,7 +476,8 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         phi_levels = max(round(nf) + 1, 2)
         print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (flowrate={flowrate:.3f}, base k={base_k:.4f}, head drop={hdrop:.3f})")
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
-        ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
+        _csf = ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
+        _csf.set_gid('FLOWLINES')
 
     # Plot velocity vectors if requested
     if vectors:
@@ -499,9 +506,10 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
                 velocity_scaled = velocity
             
             # Plot vectors using quiver
-            ax.quiver(nodes[:, 0], nodes[:, 1], velocity_scaled[:, 0], velocity_scaled[:, 1],
+            _q = ax.quiver(nodes[:, 0], nodes[:, 1], velocity_scaled[:, 0], velocity_scaled[:, 1],
                      angles='xy', scale_units='xy', scale=1, width=0.002, headwidth=2.5,
                      headlength=3, headaxislength=2.5, color='black', alpha=0.7)
+            _q.set_gid('VELOCITY')
 
     # Plot element edges if requested
     if mesh:
@@ -523,13 +531,13 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
                     [nodes[element[3]], nodes[element[0]]],
                 ])
         if mesh_segments:
-            lc = LineCollection(mesh_segments, colors='darkgray', linewidths=0.5, alpha=0.7)
+            lc = LineCollection(mesh_segments, colors='darkgray', linewidths=0.5, alpha=0.7, gid='MESH')
             ax.add_collection(lc)
 
     # Plot the mesh boundary
     try:
         boundary = get_ordered_mesh_boundary(nodes, elements, element_types)
-        ax.plot(boundary[:, 0], boundary[:, 1], color="black", linewidth=1.0, label="Mesh Boundary")
+        ax.plot(boundary[:, 0], boundary[:, 1], color="black", linewidth=1.0, label="Mesh Boundary", gid='MESH_BOUNDARY')
     except Exception as e:
         print(f"Warning: Could not plot mesh boundary: {e}")
 
@@ -561,9 +569,12 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     # plt.tight_layout()
     # plt.subplots_adjust(top=0.78)
     
+    base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('—', '').replace('(', '').replace(')', '')
     if save_png:
-        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('—', '').replace('(', '').replace(')', '') + '.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, base_name + '.dxf')
     
     plt.show()
 

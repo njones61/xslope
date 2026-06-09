@@ -345,7 +345,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
     without re-deriving anything.
     """
     import numpy as np
-    from matplotlib.collections import LineCollection
+    from matplotlib.collections import PathCollection
     from matplotlib.patches import Circle as MplCircle
 
     doc = ezdxf.new(version)
@@ -366,37 +366,59 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
         return name
 
     # Line2D artists: failure surface, thrust line, slices, profiles, piezo, etc.
+    # A marker-only line (linestyle 'None', e.g. 'k.' node markers, 'bs'/'ro' BC
+    # markers) is emitted as points, not a connecting polyline.
     for ln in ax.get_lines():
         pts = finite_pts(ln.get_xdata(), ln.get_ydata())
+        if not pts:
+            continue
         layer = layer_of(ln, 'LINES')
-        if len(pts) >= 2:
+        ls = ln.get_linestyle()
+        has_line = ls not in ('None', 'none', ' ', '', None) and (ln.get_linewidth() or 0) > 0
+        if has_line and len(pts) >= 2:
             msp.add_lwpolyline(pts, dxfattribs={'layer': layer})
-        elif len(pts) == 1:
-            msp.add_point(pts[0], dxfattribs={'layer': layer})
+        else:
+            for pt in pts:
+                msp.add_point(pt, dxfattribs={'layer': layer})
 
-    # Collections: LineCollection (tricontour, mesh edges), PathCollection
-    # (scatter points), PolyCollection (filled contours / fills).
+    # Collections: line collections (tricontour lines, mesh edges), scatter
+    # offsets (points), and polygon collections (filled contours / element fills).
     for coll in ax.collections:
         layer = layer_of(coll, 'COLLECTION')
-        if isinstance(coll, LineCollection):
-            for seg in coll.get_segments():
+
+        # Open polylines: anything that exposes segments (LineCollection and the
+        # line ContourSets from tricontour) — never force-closed.
+        segs = None
+        if hasattr(coll, 'get_segments'):
+            try:
+                segs = coll.get_segments()
+            except Exception:
+                segs = None
+        if segs:
+            for seg in segs:
                 pts = finite_pts(seg[:, 0], seg[:, 1])
                 if len(pts) >= 2:
                     msp.add_lwpolyline(pts, dxfattribs={'layer': layer})
             continue
-        # scatter/marker offsets -> points
-        try:
-            offsets = coll.get_offsets()
-        except Exception:
-            offsets = []
-        for xy in np.atleast_2d(offsets):
-            if len(xy) == 2 and np.isfinite(xy[0]) and np.isfinite(xy[1]):
-                msp.add_point((float(xy[0]), float(xy[1])), dxfattribs={'layer': layer})
-        # filled polygons (PolyCollection paths), already in data coords
+
+        if isinstance(coll, PathCollection):
+            # Scatter: the offsets are the data points (the single path is just the
+            # marker shape).
+            for xy in np.atleast_2d(coll.get_offsets()):
+                if len(xy) == 2 and np.isfinite(xy[0]) and np.isfinite(xy[1]):
+                    msp.add_point((float(xy[0]), float(xy[1])), dxfattribs={'layer': layer})
+            continue
+
+        # PatchCollection / PolyCollection / contour fills: the paths are the
+        # geometry (in data coords). Close a ring only if its vertices actually
+        # close, so open contour lines stay open.
         for path in getattr(coll, 'get_paths', lambda: [])():
-            pts = finite_pts(path.vertices[:, 0], path.vertices[:, 1])
+            v = path.vertices
+            pts = finite_pts(v[:, 0], v[:, 1])
             if len(pts) >= 2:
-                msp.add_lwpolyline(pts, close=True, dxfattribs={'layer': layer})
+                closed = (abs(pts[0][0] - pts[-1][0]) < 1e-9 and
+                          abs(pts[0][1] - pts[-1][1]) < 1e-9)
+                msp.add_lwpolyline(pts, close=closed, dxfattribs={'layer': layer})
 
     # Patches: filled material zones / stress bars (ax.fill -> Polygon), circles.
     for p in ax.patches:

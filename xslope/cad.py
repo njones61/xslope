@@ -411,16 +411,14 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             name = lbl if (lbl and not lbl.startswith('_')) else default
         name = _layer_name(name, 0)
         rgb = artist_rgb(artist)
+        aci = _nearest_aci(rgb) if rgb is not None else None
         if name not in doc.layers:
-            if rgb is not None:
-                lyr = doc.layers.add(name=name, color=_nearest_aci(rgb))
-                lyr.rgb = rgb
-            else:
-                doc.layers.add(name=name)
+            # ACI color only (like export_dxf) — true_color is unreliable across CAD
+            # viewers (renders gray / is ignored), so we don't set it.
+            doc.layers.add(name=name, color=aci) if aci is not None else doc.layers.add(name=name)
         att = {'layer': name}
-        if rgb is not None:
-            att['color'] = _nearest_aci(rgb)
-            att['true_color'] = ezcolors.rgb2int(rgb)
+        if aci is not None:
+            att['color'] = aci
         return att
 
     # Line2D artists: failure surface, thrust line, slices, profiles, piezo, etc.

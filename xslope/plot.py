@@ -83,7 +83,7 @@ def plot_profile_lines(ax, profile_lines, materials=None, labels=False):
             # Fallback to index-based color if no materials or mat_id
             color = get_material_color(i)
         
-        ax.plot(xs, ys, color=color, linewidth=1, label=f'Profile {i+1}', gid='PROFILE_LINES')
+        ax.plot(xs, ys, color=color, linewidth=1, label=f'Profile {i+1}', gid=f'PROFILE_{i+1}')
 
         if labels:
             _add_profile_index_label(ax, coords, i + 1, color)

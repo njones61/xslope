@@ -377,8 +377,21 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
     msp = doc.modelspace()
 
     def finite_pts(xs, ys):
-        return [(float(x), float(y)) for x, y in zip(xs, ys)
-                if np.isfinite(x) and np.isfinite(y)]
+        """Finite (x, y) pairs with consecutive duplicates removed. Adjacent slices
+        share boundaries, so polylines like the line of thrust, failure surface, and
+        slice outlines repeat points — producing zero-length segments. Some CAD
+        importers choke on such degenerate polylines, dropping not only that entity
+        but neighboring ones (observed: the thrust line's duplicate vertices caused
+        the entire max-depth line to vanish on import)."""
+        out = []
+        for x, y in zip(xs, ys):
+            if not (np.isfinite(x) and np.isfinite(y)):
+                continue
+            p = (float(x), float(y))
+            if out and abs(out[-1][0] - p[0]) < 1e-9 and abs(out[-1][1] - p[1]) < 1e-9:
+                continue
+            out.append(p)
+        return out
 
     def add_open_path(pts, att):
         """Add an open polyline. A 2-point segment is written as a LINE entity

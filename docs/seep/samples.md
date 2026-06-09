@@ -136,6 +136,13 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![levee_inputs.png](images/levee_inputs.png){width=1200px}
 
+!!! note
+    The finite-element mesh is shown overlaid on the material zones above because
+    this model has already been run — the mesh is generated during the seepage
+    solve and stored with the model. `plot_inputs()` draws the mesh whenever one is
+    present; for a model that has not yet been meshed, only the polygon geometry is
+    shown.
+
 Solution:
 
 ![levee_results.png](images/levee_results.png){width=1200px}

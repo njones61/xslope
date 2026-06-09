@@ -326,6 +326,98 @@ def _ensure_layer(doc, name, color):
         doc.layers.add(name=name, color=color)
 
 
+# ---------------------------------------------------------------------------
+# Generic matplotlib Axes -> DXF (backs the save_dxf option on plot functions)
+# ---------------------------------------------------------------------------
+
+def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
+    """Write the geometry drawn on a matplotlib Axes to a layered DXF.
+
+    Walks the Axes artists (Line2D, collections, patches) and emits each as DXF
+    geometry, **layered by artist gid, then label, then a type-based default**.
+    Plot functions tag their draw calls with gid='LAYER_NAME' so e.g. slices,
+    stress bars, the failure surface, and material zones each land on their own
+    layer. Axes chrome (spines, ticks, gridlines, legend, title) is not an artist
+    in ax.lines/collections/patches and is therefore skipped.
+
+    Curve geometry that matplotlib already computed (e.g. contour LineCollections
+    from tricontour) is captured directly, so contour/flow-net plots export
+    without re-deriving anything.
+    """
+    import numpy as np
+    from matplotlib.collections import LineCollection
+    from matplotlib.patches import Circle as MplCircle
+
+    doc = ezdxf.new(version)
+    msp = doc.modelspace()
+
+    def finite_pts(xs, ys):
+        return [(float(x), float(y)) for x, y in zip(xs, ys)
+                if np.isfinite(x) and np.isfinite(y)]
+
+    def layer_of(artist, default):
+        name = artist.get_gid()
+        if not name:
+            lbl = artist.get_label()
+            name = lbl if (lbl and not lbl.startswith('_')) else default
+        name = _layer_name(name, 0)
+        if name not in doc.layers:
+            doc.layers.add(name=name)
+        return name
+
+    # Line2D artists: failure surface, thrust line, slices, profiles, piezo, etc.
+    for ln in ax.get_lines():
+        pts = finite_pts(ln.get_xdata(), ln.get_ydata())
+        layer = layer_of(ln, 'LINES')
+        if len(pts) >= 2:
+            msp.add_lwpolyline(pts, dxfattribs={'layer': layer})
+        elif len(pts) == 1:
+            msp.add_point(pts[0], dxfattribs={'layer': layer})
+
+    # Collections: LineCollection (tricontour, mesh edges), PathCollection
+    # (scatter points), PolyCollection (filled contours / fills).
+    for coll in ax.collections:
+        layer = layer_of(coll, 'COLLECTION')
+        if isinstance(coll, LineCollection):
+            for seg in coll.get_segments():
+                pts = finite_pts(seg[:, 0], seg[:, 1])
+                if len(pts) >= 2:
+                    msp.add_lwpolyline(pts, dxfattribs={'layer': layer})
+            continue
+        # scatter/marker offsets -> points
+        try:
+            offsets = coll.get_offsets()
+        except Exception:
+            offsets = []
+        for xy in np.atleast_2d(offsets):
+            if len(xy) == 2 and np.isfinite(xy[0]) and np.isfinite(xy[1]):
+                msp.add_point((float(xy[0]), float(xy[1])), dxfattribs={'layer': layer})
+        # filled polygons (PolyCollection paths), already in data coords
+        for path in getattr(coll, 'get_paths', lambda: [])():
+            pts = finite_pts(path.vertices[:, 0], path.vertices[:, 1])
+            if len(pts) >= 2:
+                msp.add_lwpolyline(pts, close=True, dxfattribs={'layer': layer})
+
+    # Patches: filled material zones / stress bars (ax.fill -> Polygon), circles.
+    for p in ax.patches:
+        layer = layer_of(p, 'PATCHES')
+        if isinstance(p, MplCircle):
+            c = p.center
+            msp.add_circle((float(c[0]), float(c[1])), float(p.radius),
+                           dxfattribs={'layer': layer})
+            continue
+        try:
+            verts = p.get_path().transformed(p.get_patch_transform()).vertices
+        except Exception:
+            continue
+        pts = finite_pts(verts[:, 0], verts[:, 1])
+        if len(pts) >= 2:
+            msp.add_lwpolyline(pts, close=True, dxfattribs={'layer': layer})
+
+    doc.saveas(dxf_path)
+    return dxf_path
+
+
 def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
     """Write an xslope model to a layered DXF (see plans/plan_io.md §3.3).
 

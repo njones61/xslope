@@ -83,7 +83,7 @@ def plot_profile_lines(ax, profile_lines, materials=None, labels=False):
             # Fallback to index-based color if no materials or mat_id
             color = get_material_color(i)
         
-        ax.plot(xs, ys, color=color, linewidth=1, label=f'Profile {i+1}')
+        ax.plot(xs, ys, color=color, linewidth=1, label=f'Profile {i+1}', gid='PROFILE_LINES')
 
         if labels:
             _add_profile_index_label(ax, coords, i + 1, color)
@@ -223,12 +223,12 @@ def plot_polygons_on_ax(ax, polygons, materials=None, labels=False):
             seen_labels.add(label)
 
         xs, ys = geom.exterior.xy
-        ax.fill(xs, ys, color=color, alpha=0.6, label=legend_label)
-        ax.plot(xs, ys, color=color, linewidth=1)
+        ax.fill(xs, ys, color=color, alpha=0.6, label=legend_label, gid=label)
+        ax.plot(xs, ys, color=color, linewidth=1, gid=label)
         # Draw any interior rings (holes) as outlines.
         for ring in geom.interiors:
             rx, ry = ring.xy
-            ax.plot(rx, ry, color=color, linewidth=1, linestyle='--')
+            ax.plot(rx, ry, color=color, linewidth=1, linestyle='--', gid=label)
 
         if labels:
             c = geom.representative_point()
@@ -259,7 +259,7 @@ def plot_max_depth(ax, profile_lines, max_depth):
     x_vals = [x for line in profile_lines for x, _ in line['coords']]
     x_min = min(x_vals)
     x_max = max(x_vals)
-    ax.hlines(max_depth, x_min, x_max, colors='black', linewidth=1.5, label='Max Depth')
+    ax.hlines(max_depth, x_min, x_max, colors='black', linewidth=1.5, label='Max Depth', gid='MAX_DEPTH')
 
     x_diff = x_max - x_min
     spacing = x_diff / 100
@@ -270,7 +270,7 @@ def plot_max_depth(ax, profile_lines, max_depth):
     dy = length * np.sin(angle_rad)
     x_hashes = np.arange(x_min, x_max, spacing)[1:]
     for x in x_hashes:
-        ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1)
+        ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1, gid='MAX_DEPTH')
 
 
 def _domain_lower_envelope(domain):
@@ -308,7 +308,7 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth'):
         return
     bx = np.array([p[0] for p in base])
     by = np.array([p[1] for p in base])
-    ax.plot(bx, by, color='black', linewidth=1.5, label=label)
+    ax.plot(bx, by, color='black', linewidth=1.5, label=label, gid='MAX_DEPTH')
 
     x_min, x_max = bx[0], bx[-1]
     x_diff = x_max - x_min
@@ -321,7 +321,7 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth'):
     dy = length * np.sin(angle_rad)
     for x in np.arange(x_min, x_max, spacing)[1:]:
         y = np.interp(x, bx, by)
-        ax.plot([x, x - dx], [y, y - dy], color='black', linewidth=1)
+        ax.plot([x, x - dx], [y, y - dy], color='black', linewidth=1, gid='MAX_DEPTH')
 
 
 def plot_base_geometry(ax, slope_data, labels=False):
@@ -352,7 +352,7 @@ def plot_failure_surface(ax, failure_surface):
     """
     if failure_surface:
         x_clip, y_clip = zip(*failure_surface.coords)
-        ax.plot(x_clip, y_clip, 'k-', linewidth=2, label="Failure Surface")
+        ax.plot(x_clip, y_clip, 'k-', linewidth=2, label="Failure Surface", gid="FAILURE_SURFACE")
 
 def plot_slices(ax, slice_df, fill=True):
     """
@@ -371,11 +371,11 @@ def plot_slices(ax, slice_df, fill=True):
             if fill:
                 xs = [row['x_l'], row['x_l'], row['x_r'], row['x_r'], row['x_l']]
                 ys = [row['y_lb'], row['y_lt'], row['y_rt'], row['y_rb'], row['y_lb']]
-                ax.plot(xs, ys, 'r-')
-                ax.fill(xs, ys, color='red', alpha=0.1)
+                ax.plot(xs, ys, 'r-', gid='SLICES')
+                ax.fill(xs, ys, color='red', alpha=0.1, gid='SLICES')
             else:
-                ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5)
-                ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5)
+                ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5, gid='SLICES')
+                ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5, gid='SLICES')
 
 def plot_slice_numbers(ax, slice_df):
     """
@@ -441,7 +441,7 @@ def plot_piezo_line(ax, slope_data):
             return
             
         piezo_xs, piezo_ys = zip(*piezo_line)
-        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=2, label=label)
+        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=2, label=label, gid='PIEZO')
         
         # Find middle x-coordinate and corresponding y value
         if len(piezo_xs) > 1:
@@ -605,7 +605,7 @@ def plot_tcrack_surface(ax, slope_data):
     if max_depth is None:
         # No clipping needed
         x_vals, y_vals = tcrack_surface.xy
-        ax.plot(x_vals, y_vals, linestyle=linestyle, color=color, linewidth=linewidth, label='Tension Crack Depth')
+        ax.plot(x_vals, y_vals, linestyle=linestyle, color=color, linewidth=linewidth, label='Tension Crack Depth', gid='TENSION_CRACK')
         return
 
     # Get coordinates and clip to max_depth with interpolation
@@ -633,7 +633,7 @@ def plot_tcrack_surface(ax, slope_data):
                 y_clipped.append(max_depth)
 
     if x_clipped:
-        ax.plot(x_clipped, y_clipped, linestyle=linestyle, color=color, linewidth=linewidth, label='Tension Crack Depth')
+        ax.plot(x_clipped, y_clipped, linestyle=linestyle, color=color, linewidth=linewidth, label='Tension Crack Depth', gid='TENSION_CRACK')
 
 
 def plot_tcrack_water_force(ax, slice_df, slope_data):
@@ -869,7 +869,7 @@ def plot_dloads(ax, slope_data):
                     ax.plot(top_xs, top_ys, color=color, linewidth=1.5, alpha=0.8)
             
             # Draw the surface line itself
-            ax.plot(xs, ys, color=color, linewidth=1.5, alpha=0.8, label=label)
+            ax.plot(xs, ys, color=color, linewidth=1.5, alpha=0.8, label=label, gid='DLOADS')
     
     dloads = slope_data['dloads']
     dloads2 = slope_data.get('dloads2', [])
@@ -910,10 +910,10 @@ def plot_circles(ax, slope_data):
         if not isinstance(clipped_surface, LineString):
             clipped_surface = LineString(clipped_surface)
         x_clip, y_clip = zip(*clipped_surface.coords)
-        ax.plot(x_clip, y_clip, 'r--', label="Circle")
+        ax.plot(x_clip, y_clip, 'r--', label="Circle", gid='CIRCLES')
 
         # Center marker
-        ax.plot(Xo, Yo, 'r+', markersize=10)
+        ax.plot(Xo, Yo, 'r+', markersize=10, gid='CIRCLES')
 
         # Arrow direction: point from center to midpoint of failure surface
         mid_idx = len(x_clip) // 2
@@ -1345,7 +1345,7 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         poly_y = [y1, y2, y2_top, y1_top]
 
         ax.fill(poly_x, poly_y, facecolor='none', edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....',
-                linewidth=1)
+                linewidth=1, gid='EFF_NORMAL_STRESS')
 
         # --- Pore pressure trapezoid ---
         u_len = (pore / max_stress) * max_bar_len
@@ -1359,7 +1359,7 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         poly_ux = [x1, x2, ux2_top, ux1_top]
         poly_uy = [y1, y2, uy2_top, uy1_top]
 
-        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1)
+        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1, gid='PORE_PRESSURE')
 
 
 def plot_thrust_line_from_df(ax, slice_df,
@@ -1403,7 +1403,8 @@ def plot_thrust_line_from_df(ax, slice_df,
             color=color,
             linestyle=linestyle,
             linewidth=linewidth,
-            label=label)
+            label=label,
+            gid='LINE_OF_THRUST')
 
 def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
     """
@@ -1553,6 +1554,7 @@ def plot_inputs(
     figsize=(12, 6),
     mat_table=False,
     save_png=False,
+    save_dxf=False,
     dpi=300,
     mode="lem",
     tab_loc="top",
@@ -1829,16 +1831,19 @@ def plot_inputs(
 
     plt.subplots_adjust(bottom=bottom_margin)
     plt.tight_layout()
-    
+
+    base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:
-        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '') + '.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
-    
+        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, base_name + '.dxf')
+
     plt.show()
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, dpi=300):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -1986,9 +1991,12 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
 
     plt.tight_layout()
     
+    base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg')
     if save_png:
-        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg') + '.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, base_name + '.dxf')
     
     plt.show()
 
@@ -2012,7 +2020,8 @@ def plot_failure_surfaces(ax, fs_cache):
         x, y = zip(*surface.coords)
         color = 'red' if i == 0 else 'gray'
         lw = 2 if i == 0 else 1
-        ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6)
+        ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6,
+                gid='CRITICAL_SURFACE' if i == 0 else 'TESTED_SURFACES')
 
 def plot_circle_centers(ax, fs_cache):
     """
@@ -2026,7 +2035,7 @@ def plot_circle_centers(ax, fs_cache):
         None
     """
     for result in fs_cache:
-        ax.plot(result['Xo'], result['Yo'], 'ko', markersize=3, alpha=0.6)
+        ax.plot(result['Xo'], result['Yo'], 'ko', markersize=3, alpha=0.6, gid='CIRCLE_CENTERS')
 
 def plot_search_path(ax, search_path):
     """
@@ -2048,9 +2057,10 @@ def plot_search_path(ax, search_path):
         dx = end['x'] - start['x']
         dy = end['y'] - start['y']
         ax.arrow(start['x'], start['y'], dx, dy,
-                 head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True)
+                 head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True,
+                 gid='SEARCH_PATH')
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, dpi=300):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -2082,7 +2092,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
                 continue
             x, y = zip(*surface.coords)
             label = 'Tested Circle' if first_plotted else None
-            ax.plot(x, y, color='gray', linestyle='-', linewidth=0.5, alpha=0.5, label=label)
+            ax.plot(x, y, color='gray', linestyle='-', linewidth=0.5, alpha=0.5, label=label, gid='TESTED_SURFACES')
             first_plotted = False
 
     # Plot only the critical circle from fs_cache (red)
@@ -2091,9 +2101,9 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         surface = critical.get('failure_surface')
         if surface is not None and not surface.is_empty:
             x, y = zip(*surface.coords)
-            ax.plot(x, y, color='red', linestyle='-', linewidth=2, label='Critical Circle')
+            ax.plot(x, y, color='red', linestyle='-', linewidth=2, label='Critical Circle', gid='CRITICAL_SURFACE')
         # Plot critical circle center
-        ax.plot(critical['Xo'], critical['Yo'], 'ro', markersize=5)
+        ax.plot(critical['Xo'], critical['Yo'], 'ro', markersize=5, gid='CIRCLE_CENTERS')
 
     # Plot all circle centers from fs_cache
     plot_circle_centers(ax, fs_cache)
@@ -2114,12 +2124,14 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
     plt.tight_layout()
     
     if save_png:
-        filename = 'plot_circular_search_results.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig('plot_circular_search_results.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, 'plot_circular_search_results.dxf')
     
     plt.show()
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, dpi=300):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -2151,11 +2163,11 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         x, y = zip(*surface.coords)
         if i == 0:
             # Critical surface
-            ax.plot(x, y, color='red', linestyle='-', linewidth=2, alpha=1.0, label='Critical Surface')
+            ax.plot(x, y, color='red', linestyle='-', linewidth=2, alpha=1.0, label='Critical Surface', gid='CRITICAL_SURFACE')
         else:
             # Tested surfaces
             label = 'Tested Surface' if first_tested else None
-            ax.plot(x, y, color='gray', linestyle='-', linewidth=1, alpha=0.6, label=label)
+            ax.plot(x, y, color='gray', linestyle='-', linewidth=1, alpha=0.6, label=label, gid='TESTED_SURFACES')
             first_tested = False
 
     # Plot search path if provided
@@ -2174,7 +2186,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
                 if abs(dx) > 1e-6 or abs(dy) > 1e-6:  # Only plot if point moved
                     ax.arrow(start_points[j, 0], start_points[j, 1], dx, dy,
                             head_width=1, head_length=2, fc='green', ec='green',
-                            length_includes_head=True, alpha=0.6)
+                            length_includes_head=True, alpha=0.6, gid='SEARCH_PATH')
 
     ax.set_aspect('equal')
     ax.set_xlabel("x")
@@ -2189,8 +2201,10 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     plt.tight_layout()
 
     if save_png:
-        filename = 'plot_noncircular_search_results.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig('plot_noncircular_search_results.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, 'plot_noncircular_search_results.dxf')
     
     plt.show()
 
@@ -2285,7 +2299,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     
     plt.show()
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, dpi=300):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300):
     """
     Plot the finite element mesh with material regions.
     
@@ -2375,7 +2389,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     # Plot 2D elements SECOND (middle layer)
     for mid, elements_list in material_elements.items():
         # Create polygon collection for this material
-        poly_collection = PolyCollection(elements_list, 
+        poly_collection = PolyCollection(elements_list, gid='MESH',
                                        facecolor=get_material_color(mid),
                                        edgecolor='k',
                                        alpha=0.4,
@@ -2474,8 +2488,10 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     plt.tight_layout()
     
     if save_png:
-        filename = 'plot_mesh.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
+        plt.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, 'plot_mesh.dxf')
     
     plt.show()
 
@@ -2488,6 +2504,7 @@ def plot_polygons(
     title="Material Zone Polygons",
     figsize=(10, 6),
     save_png=False,
+    save_dxf=False,
     dpi=300,
 ):
     """
@@ -2520,8 +2537,8 @@ def plot_polygons(
             elif isinstance(item, str):
                 mat_name = item
         label = mat_name if mat_name else f"Material {mat_idx}"
-        ax.fill(xs, ys, color=get_material_color(mat_idx), alpha=0.6, label=label)
-        ax.plot(xs, ys, color=get_material_color(mat_idx), linewidth=1)
+        ax.fill(xs, ys, color=get_material_color(mat_idx), alpha=0.6, label=label, gid=label)
+        ax.plot(xs, ys, color=get_material_color(mat_idx), linewidth=1, gid=label)
         if nodes:
             # Avoid legend clutter by not adding a label here.
             ax.scatter(xs, ys, color='k', s=30, marker='o', zorder=3)
@@ -2534,10 +2551,13 @@ def plot_polygons(
     ax.set_aspect('equal')
     plt.tight_layout()
     
+    base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:
-        filename = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '') + '.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
-    
+        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, base_name + '.dxf')
+
     plt.show()
 
 

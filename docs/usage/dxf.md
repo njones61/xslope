@@ -153,6 +153,55 @@ provided.
 
 *Placeholder — the imported geometry rendered with `plot_inputs()`.*
 
+## Saving plots as DXF
+
+Beyond importing/exporting geometry, every XSLOPE geometry plot can be saved
+**directly to a layered DXF** using a `save_dxf=True` argument — the exact analog
+of the existing `save_png` option. This captures *what the plot shows* (slices,
+stress diagrams, contours, the mesh, …), not just the input geometry, so it works
+for results and search plots too.
+
+```python
+from xslope.plot import plot_solution, plot_circular_search_results, plot_inputs
+
+plot_inputs(slope_data, save_dxf=True)                 # geometry
+plot_solution(slope_data, slice_df, surface, results, save_dxf=True)   # full solution
+plot_circular_search_results(slope_data, fs_cache, save_dxf=True)      # search
+```
+
+Seepage and FEM plots support it as well:
+
+```python
+from xslope.plot_seep import plot_seep_solution
+from xslope.plot_fem import plot_fem_results
+
+plot_seep_solution(seep_data, solution, save_dxf=True)   # flow net + contours
+plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain'],
+                 save_dxf=True)                           # one DXF per panel
+```
+
+The DXF file is named like the PNG the plot would save (e.g.
+`plot_spencer_fs_=_1.242.dxf`). FEM result figures are multi-panel, so they write
+**one DXF per plot type** (`fem_results_deformation.dxf`, `fem_results_shear_strain.dxf`, …).
+
+**Each artifact lands on its own layer**, so you can show/hide or restyle them in
+CAD. Layers include:
+
+| Plot | DXF layers |
+|------|-----------|
+| Inputs / solution | material-zone layers (one per material), `MAX_DEPTH`, `SLICES`, `FAILURE_SURFACE`, `EFF_NORMAL_STRESS`, `PORE_PRESSURE`, `LINE_OF_THRUST`, `PIEZO`, `DLOADS`, `TENSION_CRACK`, `CIRCLES` |
+| Search results | `CRITICAL_SURFACE`, `TESTED_SURFACES`, `CIRCLE_CENTERS`, `SEARCH_PATH` |
+| Seepage | `HEAD_CONTOURS`, `FLOWLINES`, `PHREATIC`, `CONTOUR_FILL`, `ZONE_FILL`, `MESH`, `MESH_BOUNDARY`, `MESH_NODES`, `SEEP_FIXED_HEAD`, `SEEP_EXIT_FACE` |
+| FEM | `MESH`, `MESH_FILL`, `<quantity>_CONTOURS` (e.g. `VP_MAX_SHEAR_STRAIN_CONTOURS`), `STRESS_CONTOURS`, `REINFORCEMENT`, `PILES` |
+
+!!! note "Vector fields"
+    Velocity and displacement **vector (quiver) fields** do not export cleanly to
+    DXF — the rest of that plot's geometry is written, but the arrows are omitted.
+
+![Placeholder: a plot_solution DXF opened in CAD with the layer panel showing SLICES, EFF_NORMAL_STRESS, FAILURE_SURFACE, etc. on separate layers.](images/dxf_save_plot_layers.png)
+
+*Placeholder — a saved solution DXF in CAD, one artifact per layer.*
+
 ## Sample files
 
 A sample exported DXF (a two-material slope on a sloping base) is provided for

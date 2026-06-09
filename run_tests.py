@@ -112,7 +112,7 @@ def run_fem_test(test):
     """Run a single FEM SSRM test."""
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, solve_ssrm
-    from xslope.mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
@@ -122,7 +122,7 @@ def run_fem_test(test):
     slope_data = load_slope_data(file_path)
 
     reinf_geom = extract_reinforcement_line_geometry(slope_data)
-    polygons = build_polygons(slope_data, reinf_lines=reinf_geom)
+    polygons = get_material_polygons(slope_data, reinf_lines=reinf_geom)
     mesh = build_mesh_from_polygons(
         polygons, target_size=target_size, element_type=element_type, lines=reinf_geom
     )
@@ -141,13 +141,13 @@ def run_fem_test(test):
 def run_seep_test(test):
     """Run a single seepage test."""
     from xslope.fileio import load_slope_data
-    from xslope.mesh import build_polygons, build_mesh_from_polygons
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from xslope.seep import build_seep_data, run_seepage_analysis
 
     file_path = test['file']
     slope_data = load_slope_data(file_path)
 
-    polygons = build_polygons(slope_data)
+    polygons = get_material_polygons(slope_data)
     x_coords = [x for x, _ in slope_data['ground_surface'].coords]
     target_size = (max(x_coords) - min(x_coords)) / 120
     mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')

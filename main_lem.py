@@ -8,7 +8,7 @@ from xslope.slice import generate_slices
 from xslope.summary import print_ito_matsui_summary, print_rapid_drawdown_summary, print_no_solution_warning
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("../ce544/docs/unit2/12_fem/files/xslope_earth_dam_fem_KEY.xlsx")
+slope_data = load_slope_data("docs/lem/files/xslope_sloping_bottom.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]

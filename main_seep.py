@@ -7,7 +7,7 @@ from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_sep
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
 
-input_file = "../ce544/docs/unit2/12_fem/files/xslope_johnson_res_fem_KEY.xlsx"
+input_file = "poly_test/xslope_levee_poly.xlsx"
 input_path = Path(input_file)
 
 slope_data = load_slope_data(input_file)
@@ -41,7 +41,7 @@ plot_seep_data(seep_data, figsize=(12, 6), show_nodes=True, show_bc=True, label_
 
 solution = run_seepage_analysis(seep_data, tol=1e-4)
 
-base_mat = 3
+base_mat = 2
 
 plot_seep_solution(seep_data, solution, figsize=(12, 6), variable="head", vectors=False, flowlines=True, 
                           mesh=False, levels=20, base_mat=base_mat, fill_contours=False, phreatic=True, save_png=True)

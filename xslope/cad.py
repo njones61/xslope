@@ -471,14 +471,28 @@ def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
         _ensure_layer(doc, lname, 7)
         msp.add_lwpolyline(list(line['coords']), close=False, dxfattribs={'layer': lname})
 
-    # Search circles (CIRCLE + center POINT) on SEARCH_CIRCLES.
+    # Search circles on SEARCH_CIRCLES: write the clipped failure-surface arc (the
+    # portion within the slope), as plot_inputs does — not the full circle — plus a
+    # center marker. Falls back to a full CIRCLE if the arc can't be formed.
     circles = slope_data.get('circles') or []
+    ground_surface = slope_data.get('ground_surface')
     if circles:
+        from .slice import generate_failure_surface
         _ensure_layer(doc, 'SEARCH_CIRCLES', 1)
+        tcrack_depth = slope_data.get('tcrack_depth', 0) or 0
         for c in circles:
-            if c.get('R'):
+            arc = None
+            if ground_surface is not None:
+                ok, res = generate_failure_surface(ground_surface, circular=True,
+                                                   circle=c, tcrack_depth=tcrack_depth)
+                if ok:
+                    clipped = res[4]
+                    arc = [(x, y) for x, y in clipped.coords]
+            if arc and len(arc) >= 2:
+                msp.add_lwpolyline(arc, dxfattribs={'layer': 'SEARCH_CIRCLES'})
+            elif c.get('R'):
                 msp.add_circle((c['Xo'], c['Yo']), c['R'], dxfattribs={'layer': 'SEARCH_CIRCLES'})
-                msp.add_point((c['Xo'], c['Yo']), dxfattribs={'layer': 'SEARCH_CIRCLES'})
+            msp.add_point((c['Xo'], c['Yo']), dxfattribs={'layer': 'SEARCH_CIRCLES'})
 
     # Reinforcement lines (LINE) on REINFORCEMENT.
     reinforce = slope_data.get('reinforce_lines') or []

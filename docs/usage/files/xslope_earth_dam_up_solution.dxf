@@ -489,7 +489,7 @@ $SKPOLY
   9
 $TDCREATE
  40
-2461201.4818402776
+2461201.4845949076
   9
 $TDUCREATE
  40
@@ -497,7 +497,7 @@ $TDUCREATE
   9
 $TDUPDATE
  40
-2461201.4818402776
+2461201.4845949076
   9
 $TDUUPDATE
  40
@@ -929,11 +929,11 @@ $PSTYLEMODE
   9
 $FINGERPRINTGUID
   2
-{997F18EB-591A-489E-BBC0-DCF0AD9358C8}
+{56E059E7-0732-41A8-9129-3E3114BC0D0A}
   9
 $VERSIONGUID
   2
-{5D08AC62-8CE0-46FA-A6E0-CAC2829B736F}
+{94934124-8064-410F-BCBC-CF6C5E36B288}
   9
 $EXTNAMES
 290
@@ -1616,6 +1616,8 @@ PROFILE_1
 0
  62
 142
+420
+2062260
   6
 Continuous
 370
@@ -1640,6 +1642,8 @@ PROFILE_2
 0
  62
 30
+420
+16744206
   6
 Continuous
 370
@@ -1664,6 +1668,8 @@ PROFILE_3
 0
  62
 95
+420
+2924588
   6
 Continuous
 370
@@ -1688,6 +1694,8 @@ PROFILE_4
 0
  62
 240
+420
+14034728
   6
 Continuous
 370
@@ -1712,6 +1720,8 @@ MAX_DEPTH
 0
  62
 7
+420
+0
   6
 Continuous
 370
@@ -1736,6 +1746,8 @@ SLICES
 0
  62
 7
+420
+0
   6
 Continuous
 370
@@ -1760,6 +1772,8 @@ FAILURE_SURFACE
 0
  62
 7
+420
+0
   6
 Continuous
 370
@@ -1784,6 +1798,8 @@ PIEZO
 0
  62
 5
+420
+255
   6
 Continuous
 370
@@ -1808,6 +1824,8 @@ LINES
 0
  62
 5
+420
+255
   6
 Continuous
 370
@@ -1832,6 +1850,8 @@ DLOADS
 0
  62
 214
+420
+8388736
   6
 Continuous
 370
@@ -1856,6 +1876,8 @@ LINE_OF_THRUST
 0
  62
 1
+420
+16711680
   6
 Continuous
 370
@@ -1880,6 +1902,8 @@ EFF_NORMAL_STRESS
 0
  62
 93
+420
+3329330
   6
 Continuous
 370
@@ -1904,6 +1928,8 @@ PORE_PRESSURE
 0
  62
 5
+420
+255
   6
 Continuous
 370
@@ -2346,6 +2372,8 @@ AcDbEntity
 PROFILE_1
  62
 142
+420
+2062260
 100
 AcDbPolyline
  90
@@ -2380,6 +2408,8 @@ AcDbEntity
 PROFILE_2
  62
 30
+420
+16744206
 100
 AcDbPolyline
  90
@@ -2414,6 +2444,8 @@ AcDbEntity
 PROFILE_3
  62
 95
+420
+2924588
 100
 AcDbPolyline
  90
@@ -2440,6 +2472,8 @@ AcDbEntity
 PROFILE_4
  62
 240
+420
+14034728
 100
 AcDbPolyline
  90
@@ -2466,6 +2500,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2492,6 +2528,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2518,6 +2556,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2544,6 +2584,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2570,6 +2612,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2596,6 +2640,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2622,6 +2668,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2648,6 +2696,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2674,6 +2724,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2700,6 +2752,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2726,6 +2780,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2752,6 +2808,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2778,6 +2836,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2804,6 +2864,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2830,6 +2892,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2856,6 +2920,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2882,6 +2948,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2908,6 +2976,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2934,6 +3004,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2960,6 +3032,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -2986,6 +3060,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3012,6 +3088,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3038,6 +3116,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3064,6 +3144,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3090,6 +3172,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3116,6 +3200,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3142,6 +3228,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3168,6 +3256,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3194,6 +3284,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3220,6 +3312,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3246,6 +3340,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3272,6 +3368,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3298,6 +3396,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3324,6 +3424,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3350,6 +3452,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3376,6 +3480,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3402,6 +3508,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3428,6 +3536,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3454,6 +3564,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3480,6 +3592,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3506,6 +3620,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3532,6 +3648,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3558,6 +3676,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3584,6 +3704,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3610,6 +3732,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3636,6 +3760,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3662,6 +3788,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3688,6 +3816,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3714,6 +3844,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3740,6 +3872,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3766,6 +3900,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3792,6 +3928,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3818,6 +3956,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3844,6 +3984,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3870,6 +4012,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3896,6 +4040,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3922,6 +4068,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3948,6 +4096,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -3974,6 +4124,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4000,6 +4152,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4026,6 +4180,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4052,6 +4208,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4078,6 +4236,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4104,6 +4264,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4130,6 +4292,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4156,6 +4320,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4182,6 +4348,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4208,6 +4376,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4234,6 +4404,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4260,6 +4432,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4286,6 +4460,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4312,6 +4488,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4338,6 +4516,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4364,6 +4544,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4390,6 +4572,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4416,6 +4600,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4442,6 +4628,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4468,6 +4656,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4494,6 +4684,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4520,6 +4712,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4546,6 +4740,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4572,6 +4768,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4598,6 +4796,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4624,6 +4824,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4650,6 +4852,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4676,6 +4880,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4702,6 +4908,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4728,6 +4936,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4754,6 +4964,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4780,6 +4992,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4806,6 +5020,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4832,6 +5048,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4858,6 +5076,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4884,6 +5104,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4910,6 +5132,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4936,6 +5160,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4962,6 +5188,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -4988,6 +5216,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5014,6 +5244,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5040,6 +5272,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5066,6 +5300,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5092,6 +5328,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5118,6 +5356,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5144,6 +5384,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5170,6 +5412,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5196,6 +5440,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5222,6 +5468,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5248,6 +5496,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5274,6 +5524,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5300,6 +5552,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5326,6 +5580,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5352,6 +5608,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5378,6 +5636,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5404,6 +5664,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5430,6 +5692,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5456,6 +5720,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5482,6 +5748,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5508,6 +5776,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5534,6 +5804,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5560,6 +5832,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5586,6 +5860,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5612,6 +5888,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5638,6 +5916,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5664,6 +5944,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5690,6 +5972,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5716,6 +6000,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5742,6 +6028,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5768,6 +6056,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5794,6 +6084,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5820,6 +6112,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5846,6 +6140,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5872,6 +6168,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5898,6 +6196,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5924,6 +6224,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5950,6 +6252,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -5976,6 +6280,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6002,6 +6308,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6028,6 +6336,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6054,6 +6364,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6080,6 +6392,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6106,6 +6420,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6132,6 +6448,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6158,6 +6476,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6184,6 +6504,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6210,6 +6532,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6236,6 +6560,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6262,6 +6588,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6288,6 +6616,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6314,6 +6644,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6340,6 +6672,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6366,6 +6700,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6392,6 +6728,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6418,6 +6756,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6444,6 +6784,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6470,6 +6812,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6496,6 +6840,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6522,6 +6868,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6548,6 +6896,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6574,6 +6924,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6600,6 +6952,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6626,6 +6980,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6652,6 +7008,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6678,6 +7036,8 @@ AcDbEntity
 SLICES
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6704,6 +7064,8 @@ AcDbEntity
 FAILURE_SURFACE
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -6894,6 +7256,8 @@ AcDbEntity
 PIEZO
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -6936,6 +7300,8 @@ AcDbEntity
 LINES
  62
 5
+420
+255
 100
 AcDbPoint
  10
@@ -6956,6 +7322,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7026,6 +7394,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7052,6 +7422,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7150,6 +7522,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7180,6 +7554,8 @@ AcDbEntity
 LINE_OF_THRUST
  62
 1
+420
+16711680
 100
 AcDbPolyline
  90
@@ -7454,6 +7830,8 @@ AcDbEntity
 MAX_DEPTH
  62
 7
+420
+0
 100
 AcDbPolyline
  90
@@ -7480,6 +7858,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7530,6 +7910,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7580,6 +7962,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7630,6 +8014,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7680,6 +8066,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7730,6 +8118,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7780,6 +8170,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7830,6 +8222,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7880,6 +8274,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7930,6 +8326,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7980,6 +8378,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8030,6 +8430,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8080,6 +8482,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8130,6 +8534,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8180,6 +8586,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8230,6 +8638,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8280,6 +8690,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8330,6 +8742,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8380,6 +8794,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8430,6 +8846,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8480,6 +8898,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8530,6 +8950,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8580,6 +9002,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8630,6 +9054,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8680,6 +9106,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8730,6 +9158,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8780,6 +9210,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8830,6 +9262,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8880,6 +9314,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8930,6 +9366,8 @@ AcDbEntity
 DLOADS
  62
 214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8980,6 +9418,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9018,6 +9458,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9056,6 +9498,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9094,6 +9538,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9132,6 +9578,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9170,6 +9618,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9208,6 +9658,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9246,6 +9698,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9284,6 +9738,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9322,6 +9778,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9360,6 +9818,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9398,6 +9858,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9436,6 +9898,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9474,6 +9938,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9512,6 +9978,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9550,6 +10018,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9588,6 +10058,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9626,6 +10098,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9664,6 +10138,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9702,6 +10178,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9740,6 +10218,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9778,6 +10258,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9816,6 +10298,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9854,6 +10338,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9892,6 +10378,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9930,6 +10418,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -9968,6 +10458,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10006,6 +10498,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10044,6 +10538,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10082,6 +10578,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10120,6 +10618,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10158,6 +10658,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10196,6 +10698,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10234,6 +10738,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10272,6 +10778,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10310,6 +10818,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10348,6 +10858,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10386,6 +10898,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10424,6 +10938,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10462,6 +10978,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10500,6 +11018,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10538,6 +11058,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10576,6 +11098,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10614,6 +11138,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10652,6 +11178,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10690,6 +11218,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10728,6 +11258,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10766,6 +11298,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10804,6 +11338,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10842,6 +11378,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10880,6 +11418,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10918,6 +11458,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -10956,6 +11498,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10994,6 +11538,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -11032,6 +11578,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -11070,6 +11618,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -11108,6 +11658,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -11146,6 +11698,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -11184,6 +11738,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -11222,6 +11778,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -11260,6 +11818,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -11298,6 +11858,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -11332,6 +11894,8 @@ AcDbEntity
 EFF_NORMAL_STRESS
  62
 93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -11370,6 +11934,8 @@ AcDbEntity
 PORE_PRESSURE
  62
 5
+420
+255
 100
 AcDbPolyline
  90
@@ -12395,7 +12961,7 @@ DictionaryVariables
 280
 0
   1
-1.4.4 @ 2026-06-09T17:33:51.151791+00:00
+1.4.4 @ 2026-06-09T17:37:49.003418+00:00
   0
 DICTIONARYVAR
   5
@@ -12407,7 +12973,7 @@ DictionaryVariables
 280
 0
   1
-1.4.4 @ 2026-06-09T17:33:51.186529+00:00
+1.4.4 @ 2026-06-09T17:37:49.039243+00:00
   0
 ENDSEC
   0

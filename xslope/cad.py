@@ -399,20 +399,29 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
 
         return rgb_of('get_facecolor') or rgb_of('get_edgecolor') or rgb_of('get_color')
 
-    def layer_of(artist, default):
+    def attribs(artist, default):
+        """Return dxfattribs (layer + per-entity color) for an artist. The layer is
+        gid -> label -> default; the color is the artist's own color set on *each
+        entity* (ACI for universal CAD support, plus exact true-color) so artists
+        that share a layer but differ in color (e.g. the profile lines) each keep
+        their own color."""
         name = artist.get_gid()
         if not name:
             lbl = artist.get_label()
             name = lbl if (lbl and not lbl.startswith('_')) else default
         name = _layer_name(name, 0)
+        rgb = artist_rgb(artist)
         if name not in doc.layers:
-            rgb = artist_rgb(artist)   # color the layer like the plotted artist
             if rgb is not None:
                 lyr = doc.layers.add(name=name, color=_nearest_aci(rgb))
-                lyr.rgb = rgb          # also set exact true-color where supported
+                lyr.rgb = rgb
             else:
                 doc.layers.add(name=name)
-        return name
+        att = {'layer': name}
+        if rgb is not None:
+            att['color'] = _nearest_aci(rgb)
+            att['true_color'] = ezcolors.rgb2int(rgb)
+        return att
 
     # Line2D artists: failure surface, thrust line, slices, profiles, piezo, etc.
     # A marker-only line (linestyle 'None', e.g. 'k.' node markers, 'bs'/'ro' BC
@@ -421,19 +430,19 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
         pts = finite_pts(ln.get_xdata(), ln.get_ydata())
         if not pts:
             continue
-        layer = layer_of(ln, 'LINES')
+        att = attribs(ln, 'LINES')
         ls = ln.get_linestyle()
         has_line = ls not in ('None', 'none', ' ', '', None) and (ln.get_linewidth() or 0) > 0
         if has_line and len(pts) >= 2:
-            msp.add_lwpolyline(pts, dxfattribs={'layer': layer})
+            msp.add_lwpolyline(pts, dxfattribs=att)
         else:
             for pt in pts:
-                msp.add_point(pt, dxfattribs={'layer': layer})
+                msp.add_point(pt, dxfattribs=att)
 
     # Collections: line collections (tricontour lines, mesh edges), scatter
     # offsets (points), and polygon collections (filled contours / element fills).
     for coll in ax.collections:
-        layer = layer_of(coll, 'COLLECTION')
+        att = attribs(coll, 'COLLECTION')
 
         # Open polylines: anything that exposes segments (LineCollection and the
         # line ContourSets from tricontour) — never force-closed.
@@ -447,7 +456,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             for seg in segs:
                 pts = finite_pts(seg[:, 0], seg[:, 1])
                 if len(pts) >= 2:
-                    msp.add_lwpolyline(pts, dxfattribs={'layer': layer})
+                    msp.add_lwpolyline(pts, dxfattribs=att)
             continue
 
         if isinstance(coll, PathCollection):
@@ -455,7 +464,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             # marker shape).
             for xy in np.atleast_2d(coll.get_offsets()):
                 if len(xy) == 2 and np.isfinite(xy[0]) and np.isfinite(xy[1]):
-                    msp.add_point((float(xy[0]), float(xy[1])), dxfattribs={'layer': layer})
+                    msp.add_point((float(xy[0]), float(xy[1])), dxfattribs=att)
             continue
 
         # PatchCollection / PolyCollection / contour fills: the paths are the
@@ -467,15 +476,14 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             if len(pts) >= 2:
                 closed = (abs(pts[0][0] - pts[-1][0]) < 1e-9 and
                           abs(pts[0][1] - pts[-1][1]) < 1e-9)
-                msp.add_lwpolyline(pts, close=closed, dxfattribs={'layer': layer})
+                msp.add_lwpolyline(pts, close=closed, dxfattribs=att)
 
     # Patches: filled material zones / stress bars (ax.fill -> Polygon), circles.
     for p in ax.patches:
-        layer = layer_of(p, 'PATCHES')
+        att = attribs(p, 'PATCHES')
         if isinstance(p, MplCircle):
             c = p.center
-            msp.add_circle((float(c[0]), float(c[1])), float(p.radius),
-                           dxfattribs={'layer': layer})
+            msp.add_circle((float(c[0]), float(c[1])), float(p.radius), dxfattribs=att)
             continue
         try:
             verts = p.get_path().transformed(p.get_patch_transform()).vertices
@@ -483,7 +491,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
             continue
         pts = finite_pts(verts[:, 0], verts[:, 1])
         if len(pts) >= 2:
-            msp.add_lwpolyline(pts, close=True, dxfattribs={'layer': layer})
+            msp.add_lwpolyline(pts, close=True, dxfattribs=att)
 
     doc.saveas(dxf_path)
     return dxf_path

@@ -489,7 +489,7 @@ $SKPOLY
   9
 $TDCREATE
  40
-2461201.473263889
+2461201.478078704
   9
 $TDUCREATE
  40
@@ -497,7 +497,7 @@ $TDUCREATE
   9
 $TDUPDATE
  40
-2461201.473263889
+2461201.478078704
   9
 $TDUUPDATE
  40
@@ -929,11 +929,11 @@ $PSTYLEMODE
   9
 $FINGERPRINTGUID
   2
-{FEEEA674-B031-4864-8489-071ED8C1AA97}
+{6F9567D4-945B-4465-990E-E37AA9F22E22}
   9
 $VERSIONGUID
   2
-{40414BA0-8DD1-4427-A771-39287A3BD7B3}
+{E6DE2FC0-F3EE-487D-AA69-91A51B5FFF2E}
   9
 $EXTNAMES
 290
@@ -2292,6 +2292,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PROFILE_LINES
+ 62
+142
+420
+2062260
 100
 AcDbPolyline
  90
@@ -2324,6 +2328,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PROFILE_LINES
+ 62
+30
+420
+16744206
 100
 AcDbPolyline
  90
@@ -2356,6 +2364,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PROFILE_LINES
+ 62
+95
+420
+2924588
 100
 AcDbPolyline
  90
@@ -2380,6 +2392,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PROFILE_LINES
+ 62
+240
+420
+14034728
 100
 AcDbPolyline
  90
@@ -2404,6 +2420,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2428,6 +2448,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2452,6 +2476,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2476,6 +2504,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2500,6 +2532,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2524,6 +2560,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2548,6 +2588,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2572,6 +2616,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2596,6 +2644,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2620,6 +2672,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2644,6 +2700,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2668,6 +2728,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2692,6 +2756,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2716,6 +2784,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2740,6 +2812,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2764,6 +2840,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2788,6 +2868,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2812,6 +2896,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2836,6 +2924,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2860,6 +2952,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2884,6 +2980,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2908,6 +3008,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2932,6 +3036,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2956,6 +3064,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -2980,6 +3092,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3004,6 +3120,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3028,6 +3148,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3052,6 +3176,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3076,6 +3204,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3100,6 +3232,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3124,6 +3260,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3148,6 +3288,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3172,6 +3316,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3196,6 +3344,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3220,6 +3372,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3244,6 +3400,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3268,6 +3428,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3292,6 +3456,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3316,6 +3484,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3340,6 +3512,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3364,6 +3540,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3388,6 +3568,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3412,6 +3596,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3436,6 +3624,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3460,6 +3652,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3484,6 +3680,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3508,6 +3708,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3532,6 +3736,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3556,6 +3764,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3580,6 +3792,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3604,6 +3820,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3628,6 +3848,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3652,6 +3876,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3676,6 +3904,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3700,6 +3932,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3724,6 +3960,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3748,6 +3988,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3772,6 +4016,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3796,6 +4044,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3820,6 +4072,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3844,6 +4100,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3868,6 +4128,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3892,6 +4156,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3916,6 +4184,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3940,6 +4212,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3964,6 +4240,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -3988,6 +4268,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4012,6 +4296,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4036,6 +4324,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4060,6 +4352,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4084,6 +4380,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4108,6 +4408,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4132,6 +4436,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4156,6 +4464,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4180,6 +4492,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4204,6 +4520,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4228,6 +4548,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4252,6 +4576,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4276,6 +4604,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4300,6 +4632,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4324,6 +4660,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4348,6 +4688,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4372,6 +4716,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4396,6 +4744,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4420,6 +4772,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4444,6 +4800,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4468,6 +4828,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4492,6 +4856,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4516,6 +4884,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4540,6 +4912,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4564,6 +4940,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4588,6 +4968,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4612,6 +4996,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4636,6 +5024,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4660,6 +5052,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4684,6 +5080,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4708,6 +5108,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4732,6 +5136,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4756,6 +5164,10 @@ LWPOLYLINE
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4780,6 +5192,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4804,6 +5220,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4828,6 +5248,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4852,6 +5276,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4876,6 +5304,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4900,6 +5332,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4924,6 +5360,10 @@ LWPOLYLINE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4948,6 +5388,10 @@ A0
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4972,6 +5416,10 @@ A1
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -4996,6 +5444,10 @@ A2
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5020,6 +5472,10 @@ A3
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5044,6 +5500,10 @@ A4
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5068,6 +5528,10 @@ A5
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5092,6 +5556,10 @@ A6
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5116,6 +5584,10 @@ A7
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5140,6 +5612,10 @@ A8
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5164,6 +5640,10 @@ A9
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5188,6 +5668,10 @@ AA
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5212,6 +5696,10 @@ AB
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5236,6 +5724,10 @@ AC
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5260,6 +5752,10 @@ AD
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5284,6 +5780,10 @@ AE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5308,6 +5808,10 @@ AF
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5332,6 +5836,10 @@ B0
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5356,6 +5864,10 @@ B1
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5380,6 +5892,10 @@ B2
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5404,6 +5920,10 @@ B3
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5428,6 +5948,10 @@ B4
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5452,6 +5976,10 @@ B5
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5476,6 +6004,10 @@ B6
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5500,6 +6032,10 @@ B7
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5524,6 +6060,10 @@ B8
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5548,6 +6088,10 @@ B9
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5572,6 +6116,10 @@ BA
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5596,6 +6144,10 @@ BB
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5620,6 +6172,10 @@ BC
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5644,6 +6200,10 @@ BD
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5668,6 +6228,10 @@ BE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5692,6 +6256,10 @@ BF
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5716,6 +6284,10 @@ C0
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5740,6 +6312,10 @@ C1
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5764,6 +6340,10 @@ C2
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5788,6 +6368,10 @@ C3
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5812,6 +6396,10 @@ C4
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5836,6 +6424,10 @@ C5
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5860,6 +6452,10 @@ C6
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5884,6 +6480,10 @@ C7
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5908,6 +6508,10 @@ C8
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5932,6 +6536,10 @@ C9
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5956,6 +6564,10 @@ CA
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -5980,6 +6592,10 @@ CB
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6004,6 +6620,10 @@ CC
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6028,6 +6648,10 @@ CD
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6052,6 +6676,10 @@ CE
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6076,6 +6704,10 @@ CF
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6100,6 +6732,10 @@ D0
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6124,6 +6760,10 @@ D1
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6148,6 +6788,10 @@ D2
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6172,6 +6816,10 @@ D3
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6196,6 +6844,10 @@ D4
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6220,6 +6872,10 @@ D5
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6244,6 +6900,10 @@ D6
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6268,6 +6928,10 @@ D7
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6292,6 +6956,10 @@ D8
 AcDbEntity
   8
 SLICES
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6316,6 +6984,10 @@ DA
 AcDbEntity
   8
 FAILURE_SURFACE
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -6504,6 +7176,10 @@ DC
 AcDbEntity
   8
 PIEZO
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -6544,6 +7220,10 @@ DE
 AcDbEntity
   8
 LINES
+ 62
+5
+420
+255
 100
 AcDbPoint
  10
@@ -6562,6 +7242,10 @@ E0
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -6630,6 +7314,10 @@ E1
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -6654,6 +7342,10 @@ E2
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -6750,6 +7442,10 @@ E3
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -6778,6 +7474,10 @@ E5
 AcDbEntity
   8
 LINE_OF_THRUST
+ 62
+1
+420
+16711680
 100
 AcDbPolyline
  90
@@ -7050,6 +7750,10 @@ E6
 AcDbEntity
   8
 MAX_DEPTH
+ 62
+7
+420
+0
 100
 AcDbPolyline
  90
@@ -7074,6 +7778,10 @@ E7
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7122,6 +7830,10 @@ E8
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7170,6 +7882,10 @@ E9
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7218,6 +7934,10 @@ EA
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7266,6 +7986,10 @@ EB
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7314,6 +8038,10 @@ EC
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7362,6 +8090,10 @@ ED
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7410,6 +8142,10 @@ EE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7458,6 +8194,10 @@ EF
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7506,6 +8246,10 @@ F0
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7554,6 +8298,10 @@ F1
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7602,6 +8350,10 @@ F2
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7650,6 +8402,10 @@ F3
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7698,6 +8454,10 @@ F4
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7746,6 +8506,10 @@ F5
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7794,6 +8558,10 @@ F6
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7842,6 +8610,10 @@ F7
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7890,6 +8662,10 @@ F8
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7938,6 +8714,10 @@ F9
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -7986,6 +8766,10 @@ FA
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8034,6 +8818,10 @@ FB
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8082,6 +8870,10 @@ FC
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8130,6 +8922,10 @@ FD
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8178,6 +8974,10 @@ FE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8226,6 +9026,10 @@ FF
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8274,6 +9078,10 @@ LWPOLYLINE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8322,6 +9130,10 @@ LWPOLYLINE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8370,6 +9182,10 @@ LWPOLYLINE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8418,6 +9234,10 @@ LWPOLYLINE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8466,6 +9286,10 @@ LWPOLYLINE
 AcDbEntity
   8
 DLOADS
+ 62
+214
+420
+8388736
 100
 AcDbPolyline
  90
@@ -8514,6 +9338,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8550,6 +9378,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -8586,6 +9418,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8622,6 +9458,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -8658,6 +9498,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8694,6 +9538,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -8730,6 +9578,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8766,6 +9618,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -8802,6 +9658,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8838,6 +9698,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -8874,6 +9738,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8910,6 +9778,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -8946,6 +9818,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -8982,6 +9858,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9018,6 +9898,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9054,6 +9938,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9090,6 +9978,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9126,6 +10018,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9162,6 +10058,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9198,6 +10098,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9234,6 +10138,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9270,6 +10178,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9306,6 +10218,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9342,6 +10258,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9378,6 +10298,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9414,6 +10338,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9450,6 +10378,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9486,6 +10418,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9522,6 +10458,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9558,6 +10498,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9594,6 +10538,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9630,6 +10578,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9666,6 +10618,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9702,6 +10658,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9738,6 +10698,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9774,6 +10738,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9810,6 +10778,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9846,6 +10818,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9882,6 +10858,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9918,6 +10898,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -9954,6 +10938,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -9990,6 +10978,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10026,6 +11018,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10062,6 +11058,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10098,6 +11098,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10134,6 +11138,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10170,6 +11178,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10206,6 +11218,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10242,6 +11258,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10278,6 +11298,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10314,6 +11338,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10350,6 +11378,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10386,6 +11418,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10422,6 +11458,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10458,6 +11498,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10494,6 +11538,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10530,6 +11578,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10566,6 +11618,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10602,6 +11658,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10638,6 +11698,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10674,6 +11738,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10710,6 +11778,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -10742,6 +11814,10 @@ LWPOLYLINE
 AcDbEntity
   8
 EFF_NORMAL_STRESS
+ 62
+93
+420
+3329330
 100
 AcDbPolyline
  90
@@ -10778,6 +11854,10 @@ LWPOLYLINE
 AcDbEntity
   8
 PORE_PRESSURE
+ 62
+5
+420
+255
 100
 AcDbPolyline
  90
@@ -11803,7 +12883,7 @@ DictionaryVariables
 280
 0
   1
-1.4.4 @ 2026-06-09T17:21:30.089445+00:00
+1.4.4 @ 2026-06-09T17:28:26.912044+00:00
   0
 DICTIONARYVAR
   5
@@ -11815,7 +12895,7 @@ DictionaryVariables
 280
 0
   1
-1.4.4 @ 2026-06-09T17:21:30.101661+00:00
+1.4.4 @ 2026-06-09T17:28:26.948524+00:00
   0
 ENDSEC
   0

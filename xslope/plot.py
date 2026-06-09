@@ -268,14 +268,9 @@ def plot_max_depth(ax, profile_lines, max_depth):
     angle_rad = np.radians(60)
     dx = length * np.cos(angle_rad)
     dy = length * np.sin(angle_rad)
-    # Detach the tick tops slightly from the line. The ticks otherwise share their
-    # top endpoint with the line, and some CAD importers weld/absorb a line that is
-    # subdivided by coincident endpoints (the line vanishes on DXF export). The gap
-    # is negligible visually.
-    gap = dy * 0.2
     x_hashes = np.arange(x_min, x_max, spacing)[1:]
     for x in x_hashes:
-        ax.plot([x, x - dx], [max_depth - gap, max_depth - dy - gap], color='black', linewidth=1, gid='MAX_DEPTH')
+        ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1, gid='MAX_DEPTH')
 
 
 def _domain_lower_envelope(domain):
@@ -324,10 +319,9 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth'):
     angle_rad = np.radians(60)
     dx = length * np.cos(angle_rad)
     dy = length * np.sin(angle_rad)
-    gap = dy * 0.2   # detach ticks from the base line (see plot_max_depth note)
     for x in np.arange(x_min, x_max, spacing)[1:]:
         y = np.interp(x, bx, by)
-        ax.plot([x, x - dx], [y - gap, y - dy - gap], color='black', linewidth=1, gid='MAX_DEPTH')
+        ax.plot([x, x - dx], [y, y - dy], color='black', linewidth=1, gid='MAX_DEPTH')
 
 
 def plot_base_geometry(ax, slope_data, labels=False):

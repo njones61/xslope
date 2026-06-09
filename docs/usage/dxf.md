@@ -52,6 +52,11 @@ zones (see below).
 The result opens directly in any CAD program, with each feature on a layer you can
 show, hide, or restyle.
 
+A real example, exported from the [Earth Dam sample](../lem/samples.md#8-earth-dam):
+[xslope_earth_dam_up.dxf](../lem/files/xslope_earth_dam_up.dxf) — material zones
+(`SHELL`, `CORE`, `CLAY`, `SAND`), the profile lines, the piezometric line, the
+distributed load, and the search circles, each on its own layer.
+
 ![Placeholder: the exported DXF opened in CAD, showing material zones on per-material layers and the reserved feature layers.](images/dxf_export_example.png)
 
 *Placeholder — the exported `my_slope.dxf` in CAD.*

@@ -7,6 +7,7 @@ Scans docs/{lem,fem,seep}/samples.md for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, expected_fs=1.234, num_slices=30 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
+    <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
 
 Runs each test and compares results against expected values.
 As new samples are added with test tags, they automatically become part of the suite.
@@ -148,9 +149,12 @@ def run_seep_test(test):
     slope_data = load_slope_data(file_path)
 
     polygons = get_material_polygons(slope_data)
-    x_coords = [x for x, _ in slope_data['ground_surface'].coords]
-    target_size = (max(x_coords) - min(x_coords)) / 120
-    mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
+    element_type = test.get('element_type', 'tri3')
+    target_size = test.get('target_size')
+    if target_size is None:
+        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(x_coords) - min(x_coords)) / 120
+    mesh = build_mesh_from_polygons(polygons, target_size, element_type)
 
     seep_data = build_seep_data(mesh, slope_data)
     solution = run_seepage_analysis(seep_data, tol=1e-4)

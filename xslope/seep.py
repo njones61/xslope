@@ -311,12 +311,24 @@ def import_seep2d(filepath):
             
             element_mats.append(mat)
 
+    nodes_arr = np.array(coords)
+    elements_arr = np.array(elements, dtype=int)  # Already 0-based
+    element_types_arr = np.array(element_types, dtype=int)
+
+    # Defensive: normalize any clockwise elements to CCW (the tri3 assembly
+    # skips CW elements). SEEP2D/GMS meshes are normally CCW already.
+    from xslope.mesh import ensure_ccw_elements
+    ensure_ccw_elements(nodes_arr, elements_arr, element_types_arr)
+    # restore the repeat-last-node padding convention for triangles
+    tri_rows = element_types_arr == 3
+    elements_arr[tri_rows, 3] = elements_arr[tri_rows, 2]
+
     return {
-        "nodes": np.array(coords),
+        "nodes": nodes_arr,
         "bc_type": np.array(bc_type, dtype=int),
         "bc_values": np.array(bc_values),
-        "elements": np.array(elements, dtype=int),  # Already 0-based
-        "element_types": np.array(element_types, dtype=int),
+        "elements": elements_arr,
+        "element_types": element_types_arr,
         "element_materials": np.array(element_mats),
         "k1_by_mat": k1_array,
         "k2_by_mat": k2_array,

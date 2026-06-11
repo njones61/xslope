@@ -2021,7 +2021,12 @@ def import_mesh_from_json(filename):
             mesh[key] = np.array(value)
         else:
             mesh[key] = value
-    
+
+    # Defensive: normalize winding for meshes exported before CCW normalization
+    # was added to build_mesh_from_polygons (or edited externally).
+    if 'elements' in mesh and 'element_types' in mesh and 'nodes' in mesh:
+        ensure_ccw_elements(mesh['nodes'], mesh['elements'], mesh['element_types'])
+
     return mesh
 
 def remove_duplicate_endpoint(poly, tol=1e-8):

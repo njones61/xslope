@@ -171,3 +171,16 @@ exact (confined) seepage anchor is the confined-radial case in
 `benchmarks/build_seep.py`.
 
 <!-- test: file=files/xslope_kozeny_dam.xlsx, type=seep, expected_flowrate=3.81, tolerance=0.05 -->
+
+### 8. Confined Radial Flow (verification — exact)
+
+A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer arc
+(r = 30) at head 10, straight radial edges as no-flow streamlines. Steady saturated
+flow has the exact solution `q = k*(pi/2)*(h1-h2)/ln(r2/r1) = 28.596` (k = 1) and a
+logarithmic head profile. Built via the **polygon** input by
+`benchmarks/build_seep.py::build_confined_radial`; this is the analytical anchor for
+the seepage verification suite.
+
+[xslope_confined_radial.xlsx](files/xslope_confined_radial.xlsx)
+
+<!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01 -->

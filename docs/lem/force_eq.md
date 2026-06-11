@@ -229,5 +229,15 @@ using one of the following methods:
 
 ![uscoe_theta.png](images/uscoe_theta.png){width=500px }
 
-In xslope, first method shown above is used. That is, all interslice forces are parallel to a line connecting the 
-bottom of the failure surface to the top of the failure surface. 
+Both conventions are available in xslope through the `variant` argument of `corps_engineers`:
+
+- **variant 1** — a single constant inclination parallel to a line connecting the bottom of the failure surface to
+  the top of the failure surface (the crest-to-toe chord). This matches the "Corps of Engineers #1" option in
+  commercial packages.
+- **variant 2 (default)** — the inclination at each slice boundary is parallel to the ground surface at the top of
+  that slice (the "Corps of Engineers #2" option).
+
+xslope defaults to **variant 2**. Because xslope can drive its own non-circular search, a single fixed inclination
+(variant 1) can return a spuriously low factor of safety on surfaces with steep segments — the search will seek out
+exactly those surfaces. The per-slice ground-parallel inclination (variant 2) is robust to this and is the safer
+default; variant 1 remains available to reproduce the "#1" results reported by other codes on a fixed surface.

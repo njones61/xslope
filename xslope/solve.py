@@ -624,38 +624,61 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(slice_df, debug=False):
+def corps_engineers(slice_df, variant=2, debug=False):
     """
-    Corps of Engineers style force equilibrium solver.
+    Corps of Engineers (Modified Swedish) force-equilibrium solver.
 
-    1. Computes a single θ from the slope between
-       (x_l[0], y_lt[0]) and (x_r[-1], y_rt[-1]).
-    2. Builds a constant θ array of length n+1.
-    3. Calls force_equilibrium(slice_df, theta_array).
+    The interslice forces are assumed parallel at an inclination set by one of the
+    two standard Corps conventions (USACE EM 1110-2-1902). Both are offered by
+    commercial codes (e.g. SLOPE/W "Corps of Engineers #1/#2"):
+
+      variant=1: a single constant θ = inclination of the line from the bottom to
+                 the top of the failure surface (the crest-to-toe chord).
+      variant=2 (default): θ at each slice boundary parallel to the GROUND SURFACE
+                 (slice top). Robust under an unconstrained non-circular search;
+                 variant 1 uses one fixed θ everywhere and can return a spuriously
+                 low FS on surfaces with steep segments (the search exploits this),
+                 so variant 2 is the default for self-searching use.
 
     Parameters:
-        slice_df (pd.DataFrame): Must include at least ['x_l','y_lt','x_r','y_rt']
-                           plus all the columns required by force_equilibrium:
-                           ['alpha','phi','c','dl','w','u','dx'].
+        slice_df (pd.DataFrame): Must include ['x_l','y_lt','x_r','y_rt'] plus all
+                           columns required by force_equilibrium.
+        variant (int): 1 = crest-to-toe chord, 2 = per-slice ground-parallel.
 
     Returns:
         Tuple(bool, dict or str): Whatever force_equilibrium returns.
     """
-    # endpoints of the slip surface
-    x0, y0 = slice_df['x_l'].iat[0], slice_df['y_lt'].iat[0]
-    x1, y1 = slice_df['x_r'].iat[-1], slice_df['y_rt'].iat[-1]
-
-    # compute positive slope‐angle
-    dx = x1 - x0
-    dy = y1 - y0
-    if abs(dx) < 1e-12:
-        theta_deg = 90.0
-    else:
-        theta_deg = abs(np.degrees(np.arctan2(dy, dx)))
-
-    # one theta per slice boundary
     n = len(slice_df)
-    theta_list = np.full(n+1, theta_deg)
+
+    if variant == 1:
+        # endpoints of the slip surface -> one constant θ
+        x0, y0 = slice_df['x_l'].iat[0], slice_df['y_lt'].iat[0]
+        x1, y1 = slice_df['x_r'].iat[-1], slice_df['y_rt'].iat[-1]
+        dx = x1 - x0
+        dy = y1 - y0
+        if abs(dx) < 1e-12:
+            theta_deg = 90.0
+        else:
+            theta_deg = abs(np.degrees(np.arctan2(dy, dx)))
+        theta_list = np.full(n+1, theta_deg)
+        theta_out = theta_deg
+    else:
+        # per-boundary θ parallel to the ground surface (slice top)
+        x_l = slice_df['x_l'].values
+        y_lt = slice_df['y_lt'].values
+        x_r = slice_df['x_r'].values
+        y_rt = slice_df['y_rt'].values
+        slope_top = (y_rt - y_lt) / (x_r - x_l)   # signed ground-surface slope per slice
+        theta_list = np.zeros(n+1)
+        for j in range(n+1):
+            if j == 0:
+                s = slope_top[0]
+            elif j == n:
+                s = slope_top[-1]
+            else:
+                s = 0.5*(slope_top[j-1] + slope_top[j])
+            theta_list[j] = np.degrees(np.arctan(s))
+        theta_out = float(np.mean(theta_list))
 
     slice_df['theta'] = theta_list[:-1]  # store theta in slice_df. Adjust length to n slices.
 
@@ -665,7 +688,7 @@ def corps_engineers(slice_df, debug=False):
         return success, results
     else:
         results['method'] = 'corps_engineers'  # append method
-        results['theta'] = theta_deg           # append theta
+        results['theta'] = theta_out           # append theta (mean for variant 2)
         return success, results
 
 def lowe_karafiath(slice_df, debug=False):

@@ -148,3 +148,26 @@ Solution:
 ![levee_results.png](images/levee_results.png){width=1200px}
 
 <!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->
+
+### 7. Kozeny Dam (verification — retained for scrutiny)
+
+This is a homogeneous earth dam on an impervious base with a horizontal toe drain,
+built so the upstream face follows the **exact confocal-parabola equipotential** of
+the Kozeny flow net. It is a verification problem: the discharge has the closed
+form `q = k*y0`, with `y0 = sqrt(d^2 + h^2) - d`. For this geometry (focus-to-entry
+`d = 48`, reservoir depth `h = 20`), `y0 = 4` so the analytical `q = 4.0` (k = 1).
+
+The input file is built by `benchmarks/build_seep.py::build_kozeny_dam`:
+
+[xslope_kozeny_dam.xlsx](files/xslope_kozeny_dam.xlsx)
+
+Note: the FE discharge for a horizontal-toe-drain dam is **sensitive** to where the
+drain-start boundary lands relative to the point where the free surface meets the
+base (the parabola vertex). xslope brackets the closed form within about ±4%
+(drain at the focus over-predicts ~+4%, drain at the vertex under-predicts ~-4%);
+the default build puts the drain at the vertex and yields ~3.81 on the standard
+test mesh. This sample is retained so that sensitivity can be studied further; the
+exact (confined) seepage anchor is the confined-radial case in
+`benchmarks/build_seep.py`.
+
+<!-- test: file=files/xslope_kozeny_dam.xlsx, type=seep, expected_flowrate=3.81, tolerance=0.05 -->

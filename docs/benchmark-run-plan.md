@@ -29,7 +29,8 @@ difference and report values back for the manuscript tables.
 | LEM-2 | Limit equilibrium, non-circular (weak layer) | `tab:lem` companion | code/consensus cross-check |
 | LEM-2b | Limit equilibrium (6 methods), circular | `tab:lem` companion | published literature |
 | LEM-3 (optional) | Limit equilibrium, method ordering | supplemental / text | published literature |
-| SEEP-1 | FE seepage, analytical | `tab:seep` | analytical anchor |
+| SEEP-1 | FE seepage, confined analytical | `tab:seep` | analytical anchor (exact) |
+| SEEP-1b | FE seepage, unconfined free surface | sample / text | analytical (Kozeny, ±4%) |
 | SEEP-2 | FE seepage, code cross-check | `tab:seep` | established code (SEEP2D) |
 | SSRM-1 | FE slope stability | `tab:ssrm` | published (G&L Ex. 1) |
 | SSRM-2 | FE slope stability | `tab:ssrm` | published (G&L Ex. 6) |
@@ -59,11 +60,11 @@ completeness only; they are legacy/educational, not recommended for design.)
   | Ordinary (OMS) | 0.942 | 1.00 | -5.8 |
   | Bishop's Simplified | 0.987 | 1.00 | -1.3 |
   | Simplified Janbu | 0.992 | 1.00 | -0.8 |
-  | Corps of Engineers | 0.990 | 1.00 | -1.0 |
-  | Lowe & Karafiath | 0.986 | 1.00 | -1.4 |
+  | Corps of Engineers | 0.991 | 1.00 | -0.9 |
+  | Lowe & Karafiath | 0.987 | 1.00 | -1.3 |
   | Spencer | 0.986 | 1.00 | -1.4 |
 
-  *xslope FOS = automated critical-circle search, 20 slices, each method searched
+  *xslope FOS = automated critical-circle search, 50 slices, each method searched
   independently. Corps of Engineers uses variant 2 (per-slice ground-parallel
   side forces; see note under LEM-2).*
 
@@ -113,12 +114,12 @@ completeness only; they are legacy/educational, not recommended for design.)
 
   | Method | xslope FOS | Reference FOS | Diff (%) |
   |---|---|---|---|
-  | Ordinary (OMS) | 1.340 | 1.451 | -7.7 |
-  | Bishop's Simplified | 1.403 | 1.451 | -3.3 |
-  | Simplified Janbu | 1.436 | 1.451 | -1.0 |
-  | Corps of Engineers | 1.474 | 1.451 | +1.6 |
-  | Lowe & Karafiath | 1.436 | 1.451 | -1.0 |
-  | Spencer | 1.400 | 1.451 | -3.5 |
+  | Ordinary (OMS) | 1.344 | 1.451 | -7.4 |
+  | Bishop's Simplified | 1.404 | 1.451 | -3.2 |
+  | Simplified Janbu | 1.441 | 1.451 | -0.7 |
+  | Corps of Engineers | 1.477 | 1.451 | +1.8 |
+  | Lowe & Karafiath | 1.439 | 1.451 | -0.8 |
+  | Spencer | 1.402 | 1.451 | -3.4 |
 
 ### LEM-3 (optional) — Fredlund & Krahn (1977) method ordering
 - **Source:** Fredlund & Krahn (1977), Can. Geotech. J. 14(3):429-439.
@@ -131,20 +132,47 @@ completeness only; they are legacy/educational, not recommended for design.)
 
 ## Mode 2 — FE Seepage
 
-### SEEP-1 — Kozeny / Casagrande analytical anchor
-- **Source:** Kozeny (1931) basic parabola + Casagrande entrance correction;
-  Polubarinova-Kochina (1962) for rigorous free-surface checks.
-- **Problem:** homogeneous earth dam with horizontal toe drain (the classic
-  unconfined free-surface case with a closed-form phreatic surface and discharge).
-- **What to compare:**
-  - Discharge `q` (per unit length) vs Kozeny closed form.
-  - Phreatic surface position (entrance corrected) vs the basic parabola.
-- **Capture:**
+### SEEP-1 — Confined radial flow (analytical anchor, saturated)
+- **Source:** steady confined (saturated) flow; exact solution of Laplace's
+  equation in polar coordinates (radial flow between two concentric equipotential
+  arcs). Standard analytical solution (e.g. Bear, *Dynamics of Fluids in Porous
+  Media*).
+- **Problem:** a quarter-annulus confined aquifer (impervious base/cap implied by
+  plane strain); inner arc r1=10 at head h1=30, outer arc r2=30 at head h2=10, the
+  two straight radial edges are no-flow streamlines. Built via the **polygon**
+  input (`benchmarks/build_seep.py::build_confined_radial`). Chosen as the
+  analytical anchor instead of an unconfined dam because it is *exact* with no
+  free-surface tangency: the discharge integral for a toe-drain Kozeny dam is
+  sensitive (~±4%) to where the drain-start boundary lands relative to the point
+  where the free surface meets the base.
+- **Closed form:**
+  - head:  `h(r) = h1 + (h2 - h1)*ln(r/r1)/ln(r2/r1)`
+  - discharge (sector angle alpha):  `q = k*alpha*(h1 - h2)/ln(r2/r1)`
+    = `(pi/2)*20/ln 3` = **28.596** (k=1).
+- **Capture** (tri6; tri3/linear elements fail on this geometry — singular factor,
+  worth a separate look):
 
   | Quantity | xslope | Analytical | Diff (%) |
   |---|---|---|---|
-  | Discharge q | ____ | ____ | ____ |
-  | Phreatic exit / surface point | ____ | ____ | ____ |
+  | Discharge q | 28.596 | 28.596 | <0.01 |
+  | Max nodal head error | 0.004 | 0 (exact) | 0.02 (of 20-unit drop) |
+
+  *Mesh-converged: tri6 q = 28.5961 at both 2k and 6k nodes. The only error is
+  faceting of the curved equipotential arcs by the polygon boundary.*
+
+### SEEP-1b — Kozeny dam (free-surface sample, retained for scrutiny)
+- **Source:** Kozeny (1931) basic parabola + Casagrande entrance correction.
+- **Problem:** homogeneous earth dam, horizontal toe drain, impervious base. Built
+  with the upstream face as the **exact confocal-parabola equipotential** of the
+  Kozeny flow net (`build_seep.py::build_kozeny_dam`), which removes the entrance
+  error of a straight face. Kept as a seepage *sample* (see `docs/seep/samples.md`)
+  and a free-surface check, not the headline analytical anchor.
+- **Findings:** with the confocal face, xslope *brackets* the closed-form
+  q = k*y0 = 4.0 within ±4% — drain at the focus gives +3.8%, drain at the free-
+  surface/base vertex gives -4% — the spread being the drain-start tangency
+  sensitivity, not a solver bias. The FE free surface tracks the analytical
+  parabola `x = 90 - y^2/8` to ~1-2 length units. (A straight 2.5:1 face instead
+  gives a converged -7%, the classic basic-parabola entrance over-prediction.)
 
 ### SEEP-2 — SEEP2D code cross-check (Johnson Reservoir)
 - **Source:** SEEP2D (USACE/WES, Fred Tracy), via GMS. Author has access.

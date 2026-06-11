@@ -231,6 +231,23 @@ def profile_line_cells(line_num, mat_id, points):
     return cells
 
 
+def polygon_cells(poly_num, mat_id, points):
+    """Cells for the 'polygon' sheet: explicit closed boundary ring.
+
+    Mat ID value sits at row 5 (col = 2 + 3*(poly_num-1)); points start at row 8
+    with x/y in cols (1,2) for polygon #1, (4,5) for #2, etc. Points may be CW or
+    CCW; repeat the first point at the end to close explicitly.
+    """
+    col_offset = (poly_num - 1) * 3
+    x_col = 1 + col_offset
+    y_col = 2 + col_offset
+    cells = {cell_ref(5, y_col): mat_id}
+    for i, (x, y) in enumerate(points):
+        cells[cell_ref(8 + i, x_col)] = x
+        cells[cell_ref(8 + i, y_col)] = y
+    return cells
+
+
 def circle_cells(num, xo, yo, option="Depth", depth=None, xi=None, yi=None, radius=None):
     row = 2 + num
     cells = {cell_ref(row, 1): num, cell_ref(row, 2): xo,
@@ -260,4 +277,32 @@ def piezo_cells(points):
     for i, (x, y) in enumerate(points):
         cells[cell_ref(4 + i, 1)] = x
         cells[cell_ref(4 + i, 2)] = y
+    return cells
+
+
+def seep_bc_cells(exit_face=None, head1=None, head1_pts=None,
+                  head2=None, head2_pts=None):
+    """Cells for the 'seep bc' sheet.
+
+    Layout (1-based cols): Exit Face x/y = cols 2/3; Specified Head #1 value at
+    (row 3, col 6), points x/y = cols 5/6; Specified Head #2 value at (row 3,
+    col 9), points x/y = cols 8/9. All polyline points start at row 5.
+    """
+    cells = {}
+    if exit_face:
+        for i, (x, y) in enumerate(exit_face):
+            cells[cell_ref(5 + i, 2)] = x
+            cells[cell_ref(5 + i, 3)] = y
+    if head1 is not None:
+        cells[cell_ref(3, 6)] = head1
+    if head1_pts:
+        for i, (x, y) in enumerate(head1_pts):
+            cells[cell_ref(5 + i, 5)] = x
+            cells[cell_ref(5 + i, 6)] = y
+    if head2 is not None:
+        cells[cell_ref(3, 9)] = head2
+    if head2_pts:
+        for i, (x, y) in enumerate(head2_pts):
+            cells[cell_ref(5 + i, 8)] = x
+            cells[cell_ref(5 + i, 9)] = y
     return cells

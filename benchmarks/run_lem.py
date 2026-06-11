@@ -27,7 +27,7 @@ CASES = [
 ]
 
 
-def run_case(case, num_slices=20):
+def run_case(case, num_slices=50):
     slope_data = load_slope_data(case["file"])
     methods = CIRC_METHODS if case["surface"] == "circular" else NONCIRC_METHODS
     out = {}
@@ -38,7 +38,7 @@ def run_case(case, num_slices=20):
                     slope_data, method, num_slices=num_slices, diagnostic=False)
             else:
                 fs_cache, converged, _ = noncircular_search(
-                    slope_data, method, diagnostic=False)
+                    slope_data, method, num_slices=num_slices, diagnostic=False)
             if fs_cache:
                 res = fs_cache[0].get("solver_result")
                 fs = res.get("FS") if isinstance(res, dict) else None

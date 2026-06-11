@@ -149,16 +149,22 @@ completeness only; they are legacy/educational, not recommended for design.)
   - head:  `h(r) = h1 + (h2 - h1)*ln(r/r1)/ln(r2/r1)`
   - discharge (sector angle alpha):  `q = k*alpha*(h1 - h2)/ln(r2/r1)`
     = `(pi/2)*20/ln 3` = **28.596** (k=1).
-- **Capture** (tri6; tri3/linear elements fail on this geometry — singular factor,
-  worth a separate look):
+- **Capture:**
 
   | Quantity | xslope | Analytical | Diff (%) |
   |---|---|---|---|
-  | Discharge q | 28.596 | 28.596 | <0.01 |
-  | Max nodal head error | 0.004 | 0 (exact) | 0.02 (of 20-unit drop) |
+  | Discharge q (tri6) | 28.5961 | 28.596 | <0.01 |
+  | Discharge q (tri3) | 28.6001 | 28.596 | +0.01 |
+  | Max nodal head error (tri6) | 0.004 | 0 (exact) | 0.02 (of 20-unit drop) |
 
-  *Mesh-converged: tri6 q = 28.5961 at both 2k and 6k nodes. The only error is
-  faceting of the curved equipotential arcs by the polygon boundary.*
+  *Mesh-converged: tri6 q = 28.5961 at both 2k and 6k nodes; quad8 identical. The
+  only error is faceting of the curved equipotential arcs by the polygon boundary.*
+  *Note: this case initially produced a singular system with tri3 elements, which
+  exposed a real bug — gmsh inherits the winding of the input polygon ring, and
+  the linear-triangle assembly silently skips clockwise elements (`area <= 0`).
+  Fixed by normalizing all 2D elements to CCW in `build_mesh_from_polygons`
+  (`xslope/mesh.py::ensure_ccw_elements`); CW polygon input now meshes correctly
+  for every element type.*
 
 ### SEEP-1b — Kozeny dam (free-surface sample, retained for scrutiny)
 - **Source:** Kozeny (1931) basic parabola + Casagrande entrance correction.

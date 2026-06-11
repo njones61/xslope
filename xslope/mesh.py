@@ -54,6 +54,49 @@ def _get_gmsh():
     return _gmsh
 
 
+def ensure_ccw_elements(nodes, elements, element_types):
+    """
+    Flip any clockwise 2D element to counter-clockwise winding, in place.
+
+    Downstream assembly routines assume positive (CCW) signed areas — the
+    linear-triangle seepage stiffness, for example, skips elements with
+    area <= 0, so a fully CW mesh assembles a singular system. Corner nodes
+    are reversed and midside nodes remapped per element type.
+
+    Parameters:
+        nodes : (n_nodes, 2+) array of node coordinates
+        elements : (n_elements, 9) padded element node indices (modified in place)
+        element_types : (n_elements,) number of nodes per element (3/4/6/8/9)
+
+    Returns:
+        int: number of elements flipped
+    """
+    # node-order permutations that reverse winding per element type
+    flip_orders = {
+        3: [0, 2, 1],
+        4: [0, 3, 2, 1],
+        6: [0, 2, 1, 5, 4, 3],
+        8: [0, 3, 2, 1, 7, 6, 5, 4],
+        9: [0, 3, 2, 1, 7, 6, 5, 4, 8],
+    }
+    nodes = np.asarray(nodes)
+    n_flipped = 0
+    for i in range(len(elements)):
+        etype = int(element_types[i])
+        n_corner = 3 if etype in (3, 6) else 4
+        corners = elements[i, :n_corner]
+        p = nodes[corners, :2]
+        # shoelace signed area (x2)
+        signed = 0.0
+        for a in range(n_corner):
+            b = (a + 1) % n_corner
+            signed += p[a, 0] * p[b, 1] - p[b, 0] * p[a, 1]
+        if signed < 0:
+            elem = elements[i, :etype].copy()
+            elements[i, :etype] = elem[flip_orders[etype]]
+            n_flipped += 1
+    return n_flipped
+
 
 def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None):
     """
@@ -898,6 +941,15 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     elements_array = np.array(elements, dtype=int)
     element_types = np.array(element_node_counts, dtype=int)
     element_materials = np.array(mat_ids, dtype=int) + 1  # Make 1-based
+
+    # Normalize winding: downstream assembly routines (e.g. the linear-triangle
+    # seepage stiffness) assume CCW elements with positive signed area. Gmsh
+    # inherits the orientation of the input polygon ring, so polygon coordinates
+    # entered clockwise would otherwise propagate CW elements and silently drop
+    # out of the assembly.
+    n_flipped = ensure_ccw_elements(nodes, elements_array, element_types)
+    if debug and n_flipped:
+        print(f"Flipped {n_flipped} clockwise elements to CCW winding")
 
     mesh = {
         "nodes": nodes,

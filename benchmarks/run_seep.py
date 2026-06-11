@@ -48,7 +48,7 @@ if __name__ == "__main__":
     qc_ref = CONFINED["q"]
     conf = []
     with contextlib.redirect_stdout(io.StringIO()):
-        for et, ts in [("tri6", 2.0), ("tri6", 1.0)]:
+        for et, ts in [("tri6", 2.0), ("tri6", 1.0), ("tri3", 0.5)]:
             try:
                 q, n, he = run_confined(target_size=ts, element_type=et)
                 conf.append((et, ts, n, q, 100.0 * (q - qc_ref) / qc_ref, he))

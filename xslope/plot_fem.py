@@ -484,8 +484,27 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     n_plots = len(plot_types)
     has_deform_legend = n_plots > 1 and plot_types[0] == 'deformation'
 
+    # Mesh bounds (used below for axis limits and single-plot figure sizing)
+    nodes = fem_data["nodes"]
+    x_min, x_max = np.min(nodes[:, 0]), np.max(nodes[:, 0])
+    y_min, y_max = np.min(nodes[:, 1]), np.max(nodes[:, 1])
+    x_margin = (x_max - x_min) * 0.05
+    y_margin = (y_max - y_min) * 0.05
+
     if n_plots == 1:
-        fig, ax = plt.subplots(figsize=figsize, layout='constrained')
+        # With equal aspect, a wide/short slope only fills a thin band of a tall
+        # figure, leaving the colorbar towering over the actual plot. Size the
+        # figure height to the data aspect ratio so the image fills the figure
+        # and the colorbar matches its height.
+        data_w = (x_max - x_min) + 2 * x_margin
+        data_h = (y_max - y_min) + 2 * y_margin
+        if data_w > 0:
+            single_height = figsize[0] * (data_h / data_w)
+            # Clamp to a sensible range so very flat/steep slopes stay readable
+            single_height = float(np.clip(single_height, 2.0, figsize[1]))
+        else:
+            single_height = figsize[1]
+        fig, ax = plt.subplots(figsize=(figsize[0], single_height), layout='constrained')
         axes = [ax]
         legend_ax = None
     else:
@@ -512,15 +531,6 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             axes = list(axes)
 
 
-    # Calculate overall mesh bounds for consistent axis limits
-    nodes = fem_data["nodes"]
-    x_min, x_max = np.min(nodes[:, 0]), np.max(nodes[:, 0])
-    y_min, y_max = np.min(nodes[:, 1]), np.max(nodes[:, 1])
-    
-    # Add small margin
-    x_margin = (x_max - x_min) * 0.05
-    y_margin = (y_max - y_min) * 0.05
-    
     # Plot each type
     for i, pt in enumerate(plot_types):
         ax = axes[i]

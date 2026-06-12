@@ -267,12 +267,13 @@ vs the strength-reduction factor F (G&L Figs 2/18).
   gamma*H*0.05 — same dimensionless group, English units).
 - **Reference FOS:** G&L FE = 1.4 (their algorithm converges at 1.35 and
   fails at 1.40, Table 2); Bishop & Morgenstern (1960) chart = 1.380.
-- **Capture:** xslope FOS = **1.41** (quad8, target_size 3.5,
-  displacement-catastrophe criterion, S&G 4-component flow rule).
-  **+0.8%** vs G&L's FE value 1.4; +2.2% vs the B&M chart. The
-  displacement-vs-F sweep shows the upturn exactly at F ~ 1.40
-  (max|u| flat 0.17-0.21 through F = 1.35, then 0.29 / 0.65 / 1.16 / 2.39
-  at F = 1.40 / 1.45 / 1.5 / 1.6).
+- **Capture (final, tol 0.01):** xslope FOS = **1.36** under the strict
+  true-equilibrium criterion (CHECON + plastic-settled); the
+  displacement-vs-F upturn sits at **F ~ 1.40**, matching G&L's reported
+  1.4 (their tolerant convergence corresponds to the upturn) and within
+  -1.5% of the B&M chart 1.380. All readings agree within +/-3%. Sweep:
+  max|u| flat 0.17-0.21 through F = 1.35, then 0.29 / 0.65 / 1.16 / 2.39
+  at F = 1.40 / 1.45 / 1.5 / 1.6.
 
 ### SSRM-2 — Griffiths & Lane (1999) Example 6 (earth dam, free surface)
 - **Source:** G&L (1999) Example 6, Figs 16-21; original cross-section from
@@ -297,10 +298,10 @@ vs the strength-reduction factor F (G&L Figs 2/18).
 
   | Case | xslope FOS | G&L FOS | Diff (%) |
   |---|---|---|---|
-  | Example 6 (full reservoir, free surface) | 2.08 | ~1.9 | +10 |
-  | Example 6 (no free surface) | 2.55 | ~2.4 | +6 |
+  | Example 6 (full reservoir, free surface) | 2.10 | ~1.9 | +11 |
+  | Example 6 (no free surface) | 2.45 | ~2.4 | +2 |
 
-  *Notes: (1) The wet result is mesh-converged — identical FS (2.083) at
+  *Notes: (1) The wet result is mesh-converged — identical FS (~2.1) at
   target_size 3.5 and 2.0. (2) The input model is independently validated:
   xslope's Spencer on the same file gives FOS = 1.915 vs G&L's limit-
   equilibrium companion value 1.90 (+0.8%), with the critical circle on the

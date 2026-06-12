@@ -322,6 +322,25 @@ under the reservoir load — the benign artifacts discussed below.)
 
 ![griffiths6_full_results.png](images/griffiths6_full_results.png){width=1000}
 
+The two upstream strain features deserve explanation, because the cause is not
+what it might appear. They are **low-effective-stress zones**, not zones loaded
+by the reservoir: under the upstream face the free surface sits at reservoir
+level, so the pore pressure is essentially full hydrostatic, and the reservoir
+pressure applied to the submerged boundary is offset almost one-for-one by that
+pore pressure. In effective-stress terms the water weight provides nearly no
+confinement — the thin skin along the upstream face and the foundation beneath
+the reservoir floor carry only buoyant-weight stresses of a few kPa, so at the
+reduced strength ($c'/F \approx 7$ kPa) they sit at the yield surface.
+Seepage force plays little role here: the head loss occurs across the dam, so
+the hydraulic gradient near the upstream face is small. Part of the intensity
+is also numerical — the one-shot elastic stress recipe with prescribed pore
+pressures does not perfectly satisfy local effective-stress equilibrium at
+submerged boundaries, so these marginal zones creep slowly without bound at
+*any* strength-reduction factor. That F-independence is diagnostic: a true
+mechanism switches on sharply with $F$ (as the downstream band does at the
+knee), while the upstream features look nearly the same at F = 1.5 as at 1.91
+and never connect into a through-going surface.
+
 The wet-case result uses the **characteristic-point** displacement measure,
 auto-selected by the displacement-catastrophe criterion (it lands on the
 downstream toe, where the failure mechanism exits). The distinction matters
@@ -332,7 +351,7 @@ characteristic-point sweep is unambiguous: flat to F = 1.8, onset at 1.9, and
 a tenfold jump by 2.0. The input model is independently validated by XSLOPE's
 own Spencer analysis (1.915 vs the paper's limit-equilibrium 1.90, with the
 same downstream critical surface), and the relative reservoir effect matches
-the paper (wet/dry = 0.80 vs 0.79). See the
+the paper (wet/dry = 0.78 vs 0.79). See the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
 <!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=1.5, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->

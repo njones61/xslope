@@ -203,7 +203,7 @@ high. The characteristic-point displacement is flat to
 F = 1.8 and jumps tenfold between 1.9 and 2.0. The input model is
 independently validated by XSLOPE's Spencer analysis (1.915 vs the paper's
 limit-equilibrium 1.90), and the relative reservoir effect matches the paper
-(wet/dry = 0.80 vs 0.79).
+(wet/dry = 0.78 vs 0.79).
 
 ---
 

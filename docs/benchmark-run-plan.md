@@ -337,9 +337,12 @@ robustness checks if room allows.
    the worked-example seepage field directly.
 3. **Units per case:** G&L/Arai & Tagyo are SI; Johnson Reservoir is English.
    Keep each case internally consistent and label units in the tables.
-4. **LEM-vs-SSRM gap:** the worked example shows Spencer 1.26 vs SSRM 1.40 on
-   Johnson Reservoir (~11%). If an internal consistency check is wanted, confirm
-   the two methods are locating the same mechanism.
+4. **LEM-vs-SSRM gap:** RESOLVED (June 2026). The worked example's Spencer 1.26
+   vs SSRM 1.40 (~11%) was the same reservoir-artifact measurement contamination
+   found on G&L Ex. 6: with the true-equilibrium solver and the characteristic-
+   point displacement measure (downstream face, char_point=(465,140)), the
+   Johnson FEM knee is at FS ~ 1.27 vs Spencer 1.26 (+0.8%) — both methods
+   locate the same downstream mechanism.
 
 ---
 

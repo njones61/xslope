@@ -2395,7 +2395,7 @@ def compute_flow_vector_tp(stress_tp, psi=0.0):
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
-               staged=False, tension_cutoff=False):
+               staged=False, tension_cutoff=False, char_point=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2471,7 +2471,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
-            convergence_tol=convergence_tol, n_sweep=n_sweep)
+            convergence_tol=convergence_tol, n_sweep=n_sweep,
+            tension_cutoff=tension_cutoff, char_point=char_point)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -2590,7 +2591,15 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
 def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                                  debug_level=0, max_iterations=500,
-                                 convergence_tol=1e-3, n_sweep=10):
+                                 convergence_tol=1e-3, n_sweep=10,
+                                 tension_cutoff=False, char_point=None):
+    # char_point (x, y): when given, the displacement measure is the
+    # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
+    # maximum. Essential for submerged-boundary problems, where benign
+    # boundary-corner artifact creep dominates the global maximum and masks
+    # the true mechanism's onset (the wet-dam global-max reading was ~2.1
+    # while the downstream characteristic point shows the knee at ~1.95,
+    # matching G&L's ~1.9 and Spencer's 1.915).
     """
     SSRM using Sun et al. (2021) displacement catastrophe method.
 
@@ -2616,15 +2625,29 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
     dof_offset_local = fem_data.get("dof_offset", None)
 
+    # Resolve the characteristic point to its nearest node (if requested)
+    cp_node = None
+    if char_point is not None:
+        cp_node = int(np.argmin(np.hypot(nodes[:, 0] - char_point[0],
+                                         nodes[:, 1] - char_point[1])))
+        if debug_level >= 1:
+            print(f"  Characteristic point: node {cp_node} at "
+                  f"({nodes[cp_node, 0]:.2f}, {nodes[cp_node, 1]:.2f})")
+
     def _get_max_vp_disp(F_val):
-        """Run solve_fem and return max VP (plastic) displacement magnitude."""
+        """Run solve_fem; return the displacement measure (global max VP, or
+        the characteristic-point VP displacement when char_point is set)."""
         sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1),
                         max_iterations=max_iterations, tolerance=convergence_tol,
-                        max_disp_factor=early_term_factor)
+                        max_disp_factor=early_term_factor,
+                        tension_cutoff=tension_cutoff)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.
         u_vp = sol["displacements"] - sol["displacements_elastic"]
+        if cp_node is not None:
+            d0 = dof_offset_local[cp_node] if dof_offset_local is not None else 2 * cp_node
+            return float(np.hypot(u_vp[d0], u_vp[d0 + 1])), sol
         if dof_offset_local is not None:
             _n = len(nodes)
             vp_x = np.array([u_vp[dof_offset_local[nd]] for nd in range(_n)])

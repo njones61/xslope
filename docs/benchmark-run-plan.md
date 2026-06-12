@@ -299,7 +299,7 @@ vs the strength-reduction factor F (G&L Figs 2/18).
 
   | Case | xslope FOS | G&L FOS | Diff (%) |
   |---|---|---|---|
-  | Example 6 (full reservoir, free surface) | 2.10 | ~1.9 | +11 |
+  | Example 6 (full reservoir, free surface) | 1.95 | ~1.9 | +2 |
   | Example 6 (no free surface) | 2.45 | ~2.4 | +2 |
 
   *Notes: (1) The wet result is mesh-converged — identical FS (~2.1) at

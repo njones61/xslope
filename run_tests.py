@@ -143,6 +143,8 @@ def run_fem_test(test):
         kwargs['max_iterations'] = int(test['max_iter'])
     if test.get('cutoff', '').lower() in ('true', '1', 'yes'):
         kwargs['tension_cutoff'] = True
+    if 'char_x' in test and 'char_y' in test:
+        kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
     result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
                         debug_level=0, **kwargs)
 

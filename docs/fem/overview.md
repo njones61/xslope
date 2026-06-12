@@ -457,7 +457,7 @@ Sweeps $F$ values, locates the sharpest upturn of displacement versus $F$ (the e
 | Problem class | Criterion | Why |
 |---|---|---|
 | Dry slopes, reinforced slopes, no reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior |
-| Submerged boundaries / reservoir loading | `displacement_increase` + `tension_cutoff=True` | Boundary-corner artifact creep defeats both the settled test and (with large budgets) the displacement limit; the displacement-vs-F upturn is the robust signature — read it from the sweep |
+| Submerged boundaries / reservoir loading | `displacement_increase` + `tension_cutoff=True` + `char_point=(x, y)` on the failure slope | Boundary-corner artifact creep contaminates every *global* displacement measure (settled test, displacement limit, and global-max sweep all read high); the displacement-vs-F upturn at a characteristic point on the mechanism is the clean signature (G&L Ex. 6 wet: global max reads ~2.1, characteristic point 1.95 vs published ~1.9) |
 | Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve; read the upturn |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.

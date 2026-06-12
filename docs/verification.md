@@ -190,18 +190,18 @@ as a boundary pressure — both per the paper).
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 2.10 | ~1.9 | +11% |
+| Full reservoir (free surface) | 1.95 | ~1.9 | +2% |
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
-Three observations support the XSLOPE results: the wet-case FOS is
-mesh-converged (identical at two mesh densities); the relative reservoir
-effect matches the paper (wet/dry = 0.82 vs 0.79); and the input model is
-independently validated by XSLOPE's own Spencer analysis, which gives 1.915
-against the paper's limit-equilibrium companion value of 1.90 (+0.8%) with the
-same downstream critical surface. The remaining offset is consistent with the
-general FEM-above-LEM tendency observed across problems of this class and with
-the sensitivity of the published values to the original code's numerical
-regime, which the paper does not fully document.
+The wet case is measured at a characteristic point on the downstream face
+(where the mechanism develops) rather than by the global displacement maximum:
+submerged-boundary problems carry a benign boundary-corner creep artifact that
+dominates the global maximum and, read naively, biases the apparent failure
+point about 10% high. The characteristic-point displacement is flat to
+F = 1.8 and jumps tenfold between 1.9 and 2.0. The input model is
+independently validated by XSLOPE's Spencer analysis (1.915 vs the paper's
+limit-equilibrium 1.90), and the relative reservoir effect matches the paper
+(wet/dry = 0.80 vs 0.79).
 
 ---
 

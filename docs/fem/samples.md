@@ -291,19 +291,20 @@ Results:
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 2.10 | ~1.9 | +11% |
+| Full reservoir (free surface) | 1.95 | ~1.9 | +2% |
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
-Three observations support the XSLOPE results: the wet-case FOS is
-mesh-converged (identical at two mesh densities); the relative reservoir
-effect matches the paper (wet/dry = 0.82 vs 0.79); and the input model is
-independently validated by XSLOPE's own Spencer analysis, which gives 1.915
-against the paper's limit-equilibrium companion value of 1.90 (+0.8%) with the
-same downstream critical surface. The remaining offset is consistent with the
-general FEM-above-LEM tendency observed across problems of this class and with
-the sensitivity of the published values to the original code's numerical
-regime, which the paper does not fully document. See the
+The wet-case result uses the **characteristic-point** displacement measure
+(`char_point` on the downstream face, where the failure mechanism develops):
+submerged-boundary problems carry a benign corner-creep artifact in the
+upstream foundation that dominates the *global* maximum displacement and masks
+the mechanism's onset — read globally, the apparent knee sits ~10% high. The
+characteristic-point sweep is unambiguous: flat to F = 1.8, onset at 1.9, and
+a tenfold jump by 2.0. The input model is independently validated by XSLOPE's
+own Spencer analysis (1.915 vs the paper's limit-equilibrium 1.90, with the
+same downstream critical surface), and the relative reservoir effect matches
+the paper (wet/dry = 0.80 vs 0.79). See the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
 <!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.10, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.4, f_max=2.6, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.95, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.4, f_max=2.4, max_iter=4000, criterion=displacement_increase, cutoff=true, char_x=132.5, char_y=18, benchmark=SSRM-2 -->

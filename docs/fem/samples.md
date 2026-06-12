@@ -40,7 +40,7 @@ prior assumption about its shape or location.
 
 ![griffiths1_results.png](images/griffiths1_results.png){width=1000}
 
-<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8, benchmark=SSRM-1 -->
 
 ### 2. Reinforced Slope with Geogrid Reinforcement
 
@@ -229,3 +229,43 @@ LEM for non-circular mechanisms, since the FEM finds the natural failure mode th
 than being constrained to a prescribed failure surface geometry.
 
 <!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=2.00, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2 -->
+
+
+### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam
+
+The second SSRM verification benchmark, from Griffiths & Lane (1999),
+*Géotechnique* 49(3), Example 6: an actual earth dam cross-section (Torres &
+Coffman, 1997) with homogenized properties, analyzed both with the reservoir
+full (free surface sloping from the upstream face to the downstream toe) and
+before filling (no free surface).
+
+| Property | Value |
+|---|---|
+| Cohesion, $c'$ | 13.8 kPa |
+| Friction angle, $\phi'$ | 37° |
+| Unit weight, $\gamma$ | 18.2 kN/m³ (above and below the water table) |
+| Foundation layer | 7.3 m thick |
+| Dam height | 21.3 m above foundation, crest 7.3 m wide |
+| Faces | upstream ≈ 18°, downstream ≈ 23° |
+| Reservoir | 17.1 m above foundation level |
+
+Pore pressures are taken as $\gamma_w$ × vertical depth below the free surface
+(a piezometric line, per the paper), and the reservoir water load is applied as
+a normal pressure on the submerged upstream boundary — both exactly as
+described by Griffiths & Lane.
+
+Excel input files:
+[xslope_griffiths6_full.xlsx](files/xslope_griffiths6_full.xlsx) (reservoir full),
+[xslope_griffiths6_dry.xlsx](files/xslope_griffiths6_dry.xlsx) (before filling)
+
+![griffiths6_full_inputs.png](images/griffiths6_full_inputs.png){width=1000}
+
+XSLOPE gives **FS = 2.08** for the full-reservoir case (Griffiths & Lane ≈ 1.9)
+and **FS = 2.55** for the dam before filling (≈ 2.4). The wet result is
+mesh-converged, the wet/dry ratio matches the paper (0.82 vs 0.79), and the
+input model is independently validated by XSLOPE's Spencer analysis (1.915 vs
+the paper's limit-equilibrium value 1.90). See the
+[Verification](../verification.md) page for the full discussion.
+
+<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.55, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.8, f_max=3.0, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.08, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.4, f_max=2.6, benchmark=SSRM-2 -->

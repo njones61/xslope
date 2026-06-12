@@ -170,7 +170,9 @@ test mesh. This sample is retained so that sensitivity can be studied further; t
 exact (confined) seepage anchor is the confined-radial case in
 `benchmarks/build_seep.py`.
 
-<!-- test: file=files/xslope_kozeny_dam.xlsx, type=seep, expected_flowrate=3.81, tolerance=0.05 -->
+![kozeny_dam_solution.png](images/kozeny_dam_solution.png){width=1100}
+
+<!-- test: file=files/xslope_kozeny_dam.xlsx, type=seep, expected_flowrate=3.81, tolerance=0.05, benchmark=SEEP-1b -->
 
 ### 8. Confined Radial Flow (verification — exact)
 
@@ -183,7 +185,9 @@ the seepage verification suite.
 
 [xslope_confined_radial.xlsx](files/xslope_confined_radial.xlsx)
 
-<!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01 -->
+![confined_radial_solution.png](images/confined_radial_solution.png){width=800}
+
+<!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01, benchmark=SEEP-1 -->
 
 ### 9. Partially Penetrating Sheetpile (verification — exact)
 
@@ -198,4 +202,8 @@ the clay-blanket sample. Built by `benchmarks/build_seep.py::build_sheetpile`
 
 [xslope_sheetpile_s50.xlsx](files/xslope_sheetpile_s50.xlsx)
 
-<!-- test: file=files/xslope_sheetpile_s50.xlsx, type=seep, expected_flowrate=5.0, element_type=tri6, target_size=1.0, tolerance=0.01 -->
+The flow net (head contours and flowlines) for the s/T = 0.5 case:
+
+![sheetpile_s50_solution.png](images/sheetpile_s50_solution.png){width=1100}
+
+<!-- test: file=files/xslope_sheetpile_s50.xlsx, type=seep, expected_flowrate=5.0, element_type=tri6, target_size=1.0, tolerance=0.01, benchmark=SEEP-1c -->

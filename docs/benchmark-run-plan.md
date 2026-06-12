@@ -16,12 +16,13 @@ difference and report values back for the manuscript tables.
   estimate geometry from figures.
 - ACADS "correct" answers are consensus/averaged values: report agreement as
   "within the accepted band," not against a single true value.
-- For SSRM, use the **displacement-catastrophe** criterion (upturn of converged
-  displacement vs F — the evidence G&L themselves publish, their Figs 2/18).
-  Systematic testing showed the literal non-convergence criterion is not
-  transferable between codes: it depends on the dt x tolerance x iteration-
-  ceiling regime, which G&L's paper does not fully document (see
-  docs/fem/overview.md, "Choosing a Failure Criterion").
+- For SSRM: default **non_convergence** criterion (bisection on true
+  viscoplastic equilibrium — CHECON + plastic-settled); for submerged/
+  reservoir problems use **displacement_increase** (the displacement-vs-F
+  upturn, the evidence G&L themselves publish, Figs 2/18) with
+  tension_cutoff. The literal iteration-ceiling form of non-convergence is
+  not transferable between codes (see docs/fem/overview.md, "Choosing a
+  Failure Criterion").
 - Record the units used per case (the sources mix SI and English).
 
 ---

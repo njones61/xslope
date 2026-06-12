@@ -159,7 +159,7 @@ criterion (see [FEM Overview](fem/overview.md)).
 
 ### Griffiths & Lane (1999) Example 1 — homogeneous slope
 
-Full details: [FEM sample problem 1](fem/samples.md#verification-griffiths1).
+Full details: [FEM sample problem 4](fem/samples.md#verification-griffiths1).
 
 The canonical FE slope stability benchmark: 2:1 slope, φ′ = 20°,
 c′/γH = 0.05, no foundation layer.

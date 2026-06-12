@@ -7,55 +7,7 @@ the Shear Strength Reduction Method (SSRM). Each of the Excel input files below 
 
 The FEM implementation is described in the [FEM Overview](overview.md) page.
 
-### 1. Verification: Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
-
-This is the benchmark problem from Griffiths & Lane (1999), "Slope stability analysis by finite elements,"
-*Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
-
-| Property | Value |
-|----------|-------|
-| Cohesion, $c$ | 312.5 psf |
-| Friction angle, $\phi$ | 20 degrees |
-| Unit weight, $\gamma$ | 125 pcf |
-| Young's modulus, $E$ | 700,000 psf |
-| Poisson's ratio, $\nu$ | 0.3 |
-
-The dimensionless parameter $c/\gamma H = 0.05$ with $\phi = 20°$ gives an expected factor of safety of
-approximately 1.4 (Griffiths & Lane, 1999, Table 1).
-
-Excel input file: [xslope_griffiths1.xlsx](files/xslope_griffiths1.xlsx)
-
-Inputs plotted with the XSLOPE plot_inputs() function:
-
-![griffiths1_inputs.png](images/griffiths1_inputs.png){width=1000}
-
-FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rollers (circles) on the sides:
-
-![griffiths1_mesh.png](images/griffiths1_mesh.png){width=1000}
-
-SSRM results. The computed factor of safety is **FS = 1.41**, in close agreement with the
-published finite-element result of 1.4 from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387) (their algorithm converges at
-F = 1.35 and fails at F = 1.40, Table 2) and within +2.2% of the
-[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability-chart value of 1.380. The top plot shows the deformed mesh at the
-last converged solution just below failure. The bottom plot shows the viscoplastic shear strain
-concentration, which reveals the circular failure mechanism without any prior assumption about
-its shape or location.
-
-![griffiths1_results.png](images/griffiths1_results.png){width=1000}
-
-The displacement-versus-F sweep — the failure evidence Griffiths & Lane themselves present
-(their Fig. 2) — shows the upturn exactly at F ≈ 1.40:
-
-| F | 1.0 | 1.2 | 1.3 | 1.35 | 1.40 | 1.45 | 1.5 | 1.6 |
-|---|---|---|---|---|---|---|---|---|
-| max displacement (ft) | 0.17 | 0.19 | 0.20 | 0.21 | 0.29 | 0.65 | 1.16 | 2.39 |
-
-This benchmark also appears on the
-[Verification](../verification.md#finite-element-slope-stability-ssrm) page.
-
-<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8, benchmark=SSRM-1 -->
-
-### 2. Reinforced Slope with Geogrid Reinforcement
+### 1. Reinforced Slope with Geogrid Reinforcement
 
 This problem features an engineered slope with six layers of geogrid reinforcement. It is the FEM counterpart of
 the LEM reinforced slope example described in the [LEM Samples](../lem/samples.md) page (Problem 9). The slope
@@ -134,7 +86,7 @@ The results show that reinforcement lines 2-6 experience pullout failure at the 
 surface intersects the reinforcement. Line 4 has one element that has yielded to residual capacity. The maximum
 mobilized force is 780 lb/ft (line 5), which is close to but below the $T_{max}$ of 800 lb/ft.
 
-### 3. Slope Stabilized with Drilled Shaft Piles
+### 2. Slope Stabilized with Drilled Shaft Piles
 
 This problem features a 1:1 slope in a medium-stiff clay stabilized by two rows of drilled shafts.
 
@@ -196,7 +148,7 @@ This is typical behavior for piles in relatively weak soil — the pile is much 
 
 <!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.21, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5 -->
 
-### 4. Non-Circular Failure Surface with Thin Weak Layer
+### 3. Non-Circular Failure Surface with Thin Weak Layer
 
 This is the FEM counterpart of the LEM non-circular failure surface example described in the [LEM Samples](../lem/samples.md)
 page (Problem 7). The problem features a thin weak clay layer in the foundation of a slope, which controls the
@@ -243,6 +195,61 @@ than being constrained to a prescribed failure surface geometry.
 
 <!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=2.00, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2 -->
 
+
+---
+
+The remaining problems are **verification benchmarks**: published or
+analytically-anchored cases used to validate the FEM-SSRM implementation.
+Each is locked into the automated regression suite. See also the
+[Verification](../verification.md) page.
+
+### 4. Verification: Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
+
+This is the benchmark problem from Griffiths & Lane (1999), "Slope stability analysis by finite elements,"
+*Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
+
+| Property | Value |
+|----------|-------|
+| Cohesion, $c$ | 312.5 psf |
+| Friction angle, $\phi$ | 20 degrees |
+| Unit weight, $\gamma$ | 125 pcf |
+| Young's modulus, $E$ | 700,000 psf |
+| Poisson's ratio, $\nu$ | 0.3 |
+
+The dimensionless parameter $c/\gamma H = 0.05$ with $\phi = 20°$ gives an expected factor of safety of
+approximately 1.4 (Griffiths & Lane, 1999, Table 1).
+
+Excel input file: [xslope_griffiths1.xlsx](files/xslope_griffiths1.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![griffiths1_inputs.png](images/griffiths1_inputs.png){width=1000}
+
+FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rollers (circles) on the sides:
+
+![griffiths1_mesh.png](images/griffiths1_mesh.png){width=1000}
+
+SSRM results. The computed factor of safety is **FS = 1.41**, in close agreement with the
+published finite-element result of 1.4 from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387) (their algorithm converges at
+F = 1.35 and fails at F = 1.40, Table 2) and within +2.2% of the
+[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability-chart value of 1.380. The top plot shows the deformed mesh at the
+last converged solution just below failure. The bottom plot shows the viscoplastic shear strain
+concentration, which reveals the circular failure mechanism without any prior assumption about
+its shape or location.
+
+![griffiths1_results.png](images/griffiths1_results.png){width=1000}
+
+The displacement-versus-F sweep — the failure evidence Griffiths & Lane themselves present
+(their Fig. 2) — shows the upturn exactly at F ≈ 1.40:
+
+| F | 1.0 | 1.2 | 1.3 | 1.35 | 1.40 | 1.45 | 1.5 | 1.6 |
+|---|---|---|---|---|---|---|---|---|
+| max displacement (ft) | 0.17 | 0.19 | 0.20 | 0.21 | 0.29 | 0.65 | 1.16 | 2.39 |
+
+This benchmark also appears on the
+[Verification](../verification.md#finite-element-slope-stability-ssrm) page.
+
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8, benchmark=SSRM-1 -->
 
 ### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 

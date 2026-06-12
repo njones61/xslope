@@ -431,6 +431,12 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, method=spencer, expected_fs=1.244, num_slices=30 -->
 
+---
+
+The remaining problems are **verification benchmarks**: published cases used to
+validate the limit-equilibrium implementation. Each is locked into the
+automated regression suite. See also the [Verification](../verification.md) page.
+
 ### 12. Verification: ACADS Simple Homogeneous Slope {#verification-acads-simple}
 
 This is the headline limit-equilibrium verification benchmark, from the ACADS

@@ -166,6 +166,12 @@ Solution:
 
 <!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->
 
+---
+
+The remaining problems are **verification benchmarks**: analytically-anchored
+cases used to validate the seepage implementation. Each is locked into the
+automated regression suite. See also the [Verification](../verification.md) page.
+
 ### 7. Verification: Kozeny Dam with Toe Drain {#verification-kozeny}
 
 This is a homogeneous earth dam on an impervious base with a horizontal toe drain,

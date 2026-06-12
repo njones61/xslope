@@ -2428,8 +2428,15 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                 ever passing; pair with tension_cutoff=True. See
                 docs/fem/overview.md, "Choosing a Failure Criterion".
             "displacement_increase" - Displacement-catastrophe sweep (cf. Sun,
-                Wang & Zhang 2021): locate the upturn of displacement vs F.
-                Best used as evidence/diagnostic alongside the other criteria.
+                Wang & Zhang 2021): locate the upturn of displacement vs F,
+                measured at a characteristic point on the failure mechanism
+                (auto-selected as the node with the largest plastic-displacement
+                growth across the sweep, or supplied via char_point). The
+                criterion of choice for submerged-boundary problems, where
+                boundary-corner artifact creep contaminates global measures.
+        char_point (tuple or None): (x, y) of a characteristic point for the
+            "displacement_increase" measure. Default None = automatic
+            selection after the coarse sweep.
         n_sweep (int): Number of points in coarse sweep for "displacement_increase". Default 10.
 
     Returns:
@@ -2625,29 +2632,25 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
     dof_offset_local = fem_data.get("dof_offset", None)
 
-    # Resolve the characteristic point to its nearest node (if requested)
-    cp_node = None
+    # Characteristic-point holder. If char_point is given, resolve it now;
+    # otherwise it is selected AUTOMATICALLY after the coarse sweep (the node
+    # whose plastic displacement grows fastest across the sweep — i.e. a node
+    # on the failure mechanism). The automatic selection makes the criterion
+    # robust for submerged-boundary problems, where benign boundary-corner
+    # artifact creep dominates the GLOBAL displacement maximum and masks the
+    # mechanism's onset (G&L Ex. 6 wet read ~2.1 globally vs 1.95 at the
+    # mechanism; Johnson Reservoir ~1.4 vs 1.27, matching Spencer 1.26).
+    cp_holder = [None]
     if char_point is not None:
-        cp_node = int(np.argmin(np.hypot(nodes[:, 0] - char_point[0],
-                                         nodes[:, 1] - char_point[1])))
+        cp_holder[0] = int(np.argmin(np.hypot(nodes[:, 0] - char_point[0],
+                                              nodes[:, 1] - char_point[1])))
         if debug_level >= 1:
-            print(f"  Characteristic point: node {cp_node} at "
-                  f"({nodes[cp_node, 0]:.2f}, {nodes[cp_node, 1]:.2f})")
+            print(f"  Characteristic point (user): node {cp_holder[0]} at "
+                  f"({nodes[cp_holder[0], 0]:.2f}, {nodes[cp_holder[0], 1]:.2f})")
 
-    def _get_max_vp_disp(F_val):
-        """Run solve_fem; return the displacement measure (global max VP, or
-        the characteristic-point VP displacement when char_point is set)."""
-        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1),
-                        max_iterations=max_iterations, tolerance=convergence_tol,
-                        max_disp_factor=early_term_factor,
-                        tension_cutoff=tension_cutoff)
-        # Use VP displacement (total - elastic) to isolate plastic deformation.
-        # The elastic component is roughly constant regardless of F and masks
-        # the catastrophic growth in plastic displacement at failure.
+    def _node_vp_disp(sol):
+        """Per-node VP displacement magnitudes for a solution."""
         u_vp = sol["displacements"] - sol["displacements_elastic"]
-        if cp_node is not None:
-            d0 = dof_offset_local[cp_node] if dof_offset_local is not None else 2 * cp_node
-            return float(np.hypot(u_vp[d0], u_vp[d0 + 1])), sol
         if dof_offset_local is not None:
             _n = len(nodes)
             vp_x = np.array([u_vp[dof_offset_local[nd]] for nd in range(_n)])
@@ -2655,8 +2658,23 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         else:
             vp_x = u_vp[0::2]
             vp_y = u_vp[1::2]
-        max_vp = float(np.max(np.sqrt(vp_x**2 + vp_y**2)))
-        return max_vp, sol
+        return np.sqrt(vp_x**2 + vp_y**2)
+
+    def _measure(sol):
+        d = _node_vp_disp(sol)
+        return float(d[cp_holder[0]]) if cp_holder[0] is not None else float(d.max())
+
+    def _get_max_vp_disp(F_val):
+        """Run solve_fem; return the displacement measure (characteristic-point
+        VP displacement, or global max before the point is selected)."""
+        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1),
+                        max_iterations=max_iterations, tolerance=convergence_tol,
+                        max_disp_factor=early_term_factor,
+                        tension_cutoff=tension_cutoff)
+        # Use VP displacement (total - elastic) to isolate plastic deformation.
+        # The elastic component is roughly constant regardless of F and masks
+        # the catastrophic growth in plastic displacement at failure.
+        return _measure(sol), sol
 
     # Phase 1: Coarse sweep
     F_values = np.linspace(F_min, F_max, n_sweep)
@@ -2673,6 +2691,23 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         if debug_level >= 1:
             print(f"    F = {F_val:.4f}  max_vp_disp = {max_vp:.2f}  "
                   f"(iters={sol['iterations']}, converged={sol['converged']})")
+
+    # Automatic characteristic-point selection: pick the node whose plastic
+    # displacement grew the most (ratio) from the first to the last sweep
+    # point — a mechanism node — then re-read the sweep curve at that node.
+    # Nodes essentially elastic at the high end are excluded via a floor.
+    if cp_holder[0] is None and len(solutions) >= 2:
+        d_lo = _node_vp_disp(solutions[0])
+        d_hi = _node_vp_disp(solutions[-1])
+        floor = 1e-4 * mesh_height
+        ratio = d_hi / np.maximum(d_lo, floor)
+        ratio[d_hi < 10 * floor] = 0.0
+        cp_holder[0] = int(np.argmax(ratio))
+        if debug_level >= 1:
+            print(f"  Characteristic point (auto): node {cp_holder[0]} at "
+                  f"({nodes[cp_holder[0], 0]:.2f}, {nodes[cp_holder[0], 1]:.2f}), "
+                  f"growth ratio {ratio[cp_holder[0]]:.1f}x")
+        displacements = [_measure(sol) for sol in solutions]
 
     # Phase 2: Find catastrophe interval (largest displacement ratio).
     # Noise floor: ratios computed from a near-zero (essentially elastic)

@@ -190,11 +190,13 @@ as a boundary pressure — both per the paper).
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 1.95 | ~1.9 | +2% |
+| Full reservoir (free surface) | 1.94 | ~1.9 | +2% |
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
-The wet case is measured at a characteristic point on the downstream face
-(where the mechanism develops) rather than by the global displacement maximum:
+The wet case is measured at an automatically-selected characteristic point on
+the failure mechanism (the criterion picks the node with the fastest plastic-
+displacement growth — here the downstream toe) rather than by the global
+displacement maximum:
 submerged-boundary problems carry a benign boundary-corner creep artifact that
 dominates the global maximum and, read naively, biases the apparent failure
 point about 10% high. The characteristic-point displacement is flat to

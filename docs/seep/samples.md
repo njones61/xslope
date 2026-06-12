@@ -184,3 +184,18 @@ the seepage verification suite.
 [xslope_confined_radial.xlsx](files/xslope_confined_radial.xlsx)
 
 <!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01 -->
+
+### 9. Partially Penetrating Sheetpile (verification — exact)
+
+A single sheetpile cutoff of depth s = 10 in a homogeneous confined stratum of
+thickness T = 20, head loss H = 10 across the wall, k = 1. Pavlovsky's exact
+conformal-mapping solution gives `q = k*H*K(lam')/(2*K(lam))` with
+`lam = sin(pi*s/(2T))`; at s/T = 1/2 the modulus is self-dual so **q = k*H/2 = 5.0
+exactly**. A second exact check: the head on the wall plane below the tip is
+exactly (H1+H2)/2 by antisymmetry. The wall uses the same V-notch crack idiom as
+the clay-blanket sample. Built by `benchmarks/build_seep.py::build_sheetpile`
+(s/T = 0.75 companion file also available, exact q = 3.4032).
+
+[xslope_sheetpile_s50.xlsx](files/xslope_sheetpile_s50.xlsx)
+
+<!-- test: file=files/xslope_sheetpile_s50.xlsx, type=seep, expected_flowrate=5.0, element_type=tri6, target_size=1.0, tolerance=0.01 -->

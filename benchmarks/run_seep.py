@@ -10,7 +10,30 @@ import numpy as np
 from xslope.fileio import load_slope_data
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons
 from xslope.seep import build_seep_data, run_seepage_analysis
-from benchmarks.build_seep import KOZENY, CONFINED
+from benchmarks.build_seep import (KOZENY, CONFINED, T_SP, H1_SP, H2_SP,
+                                   sheetpile_q_exact)
+
+
+def run_sheetpile(s_over_T, target_size=1.0, element_type="tri6", tol=1e-10):
+    """Partially penetrating sheetpile. Returns (q, n_nodes, head error below tip).
+
+    Second exact check: by antisymmetry the head on the wall plane below the tip
+    is exactly (H1+H2)/2.
+    """
+    sfx = str(int(round(100 * s_over_T)))
+    sd = load_slope_data(f"docs/seep/files/xslope_sheetpile_s{sfx}.xlsx")
+    polygons = get_material_polygons(sd)
+    mesh = build_mesh_from_polygons(polygons, target_size=target_size,
+                                    element_type=element_type)
+    seep = build_seep_data(mesh, sd, seep_bc=1)
+    sol = run_seepage_analysis(seep, tol=tol)
+    nodes = np.array(mesh["nodes"])
+    # nodes on the wall plane below the tip (x ~ 0, y < T - s)
+    tip_y = T_SP - s_over_T * T_SP
+    m = (np.abs(nodes[:, 0]) < 1e-6) & (nodes[:, 1] < tip_y - 1e-6)
+    h_mid = 0.5 * (H1_SP + H2_SP)
+    err = float(np.max(np.abs(sol["head"][m] - h_mid))) if m.any() else float("nan")
+    return sol["flowrate"], len(nodes), err
 
 
 def run_confined(target_size=1.0, element_type="tri6", tol=1e-10):
@@ -62,6 +85,25 @@ if __name__ == "__main__":
             print(f"  {et+' ts='+str(ts):<16} ERROR: {he}")
         else:
             print(f"  {et+' ts='+str(ts):<16}{n:>8}{q:>12.4f}{diff:>9.2f}{he:>10.4f}")
+
+    # SEEP-1c: partially penetrating sheetpile (Pavlovsky exact form factor).
+    sp = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        for sT in [0.5, 0.75]:
+            try:
+                q, n, he = run_sheetpile(sT, target_size=1.0)
+                qe = sheetpile_q_exact(sT)
+                sp.append((sT, n, q, qe, 100.0 * (q - qe) / qe, he))
+            except Exception as e:
+                sp.append((sT, None, None, None, None, str(e)))
+    print(f"\nSEEP-1c  Sheetpile cutoff (Pavlovsky exact, confined)")
+    print(f"  {'s/T':<8}{'nodes':>8}{'xslope q':>12}{'exact q':>10}{'diff %':>9}"
+          f"{'|dh| below tip':>16}")
+    for sT, n, q, qe, diff, he in sp:
+        if q is None:
+            print(f"  {sT:<8} ERROR: {he}")
+        else:
+            print(f"  {sT:<8}{n:>8}{q:>12.4f}{qe:>10.4f}{diff:>9.2f}{he:>16.4f}")
 
     # Kozeny dam (free-surface sample, retained for scrutiny -- see samples.md).
     qk_ref = KOZENY["q"]

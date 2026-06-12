@@ -30,6 +30,7 @@ difference and report values back for the manuscript tables.
 | LEM-2b | Limit equilibrium (6 methods), circular | `tab:lem` companion | published literature |
 | LEM-3 (optional) | Limit equilibrium, method ordering | supplemental / text | published literature |
 | SEEP-1 | FE seepage, confined analytical | `tab:seep` | analytical anchor (exact) |
+| SEEP-1c | FE seepage, sheetpile cutoff | `tab:seep` | analytical anchor (Pavlovsky) |
 | SEEP-1b | FE seepage, unconfined free surface | sample / text | analytical (Kozeny, ±4%) |
 | SEEP-2 | FE seepage, code cross-check | `tab:seep` | established code (SEEP2D) |
 | SSRM-1 | FE slope stability | `tab:ssrm` | published (G&L Ex. 1) |
@@ -165,6 +166,34 @@ completeness only; they are legacy/educational, not recommended for design.)
   Fixed by normalizing all 2D elements to CCW in `build_mesh_from_polygons`
   (`xslope/mesh.py::ensure_ccw_elements`); CW polygon input now meshes correctly
   for every element type.*
+
+### SEEP-1c — Partially penetrating sheetpile (confined, exact)
+- **Source:** Pavlovsky's conformal-mapping solution for a single cutoff wall in a
+  homogeneous confined stratum of finite thickness; Harr, *Groundwater and
+  Seepage* (1962); Polubarinova-Kochina (1962).
+- **Problem:** wall of depth s in a stratum of thickness T = 20, head loss
+  H = 10 across it (25/15), k = 1, horizontal extent 4T each side (truncation
+  error ~ exp(-pi*L/T) ~ 3e-6). Wall modeled with the V-notch crack idiom
+  (w/T = 0.005), as in the clay-blanket sample. Built by
+  `benchmarks/build_seep.py::build_sheetpile` for s/T = 0.5 and 0.75.
+- **Closed form:** `q = k*H*K(lam')/(2*K(lam))`, `lam = sin(pi*s/(2T))`. At
+  s/T = 1/2 the modulus is self-dual, so **q = k*H/2 exactly** (no elliptic
+  integrals in the headline number). Second exact check: by antisymmetry the
+  head on the wall plane below the tip is exactly (H1+H2)/2.
+- **Capture** (tri6):
+
+  | Case | xslope q | Exact q | Diff (%) | Head below tip |
+  |---|---|---|---|---|
+  | s/T = 0.5, 15k nodes | 5.0288 | 5.0000 | +0.58 | 20.0000 (exact) |
+  | s/T = 0.5, 59k nodes | 5.0101 | 5.0000 | +0.20 | 20.0000 (exact) |
+  | s/T = 0.75, 15k nodes | 3.4246 | 3.4032 | +0.63 | 20.0000 (exact) |
+  | s/T = 0.75, 59k nodes | 3.4122 | 3.4032 | +0.27 | 20.0000 (exact) |
+
+  *Error halves with mesh refinement (first order, set by the r^-1/2 tip
+  singularity) and converges to the exact value from above; the residual is the
+  finite notch width plus tip discretization. This case complements the radial
+  anchor: it exercises a thin internal barrier with a singular tip — the
+  geometry cutoff-wall analyses actually involve.*
 
 ### SEEP-1b — Kozeny dam (free-surface sample, retained for scrutiny)
 - **Source:** Kozeny (1931) basic parabola + Casagrande entrance correction.

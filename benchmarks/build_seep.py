@@ -18,7 +18,7 @@ Run from the repo root:  PYTHONPATH=. python3 benchmarks/build_seep.py
 """
 from benchmarks._xlsx_writer import (
     new_file, write_cells_to_xlsx,
-    main_cells, material_cells, polygon_cells, seep_bc_cells,
+    main_cells, material_cells, polygon_cells, profile_line_cells, seep_bc_cells,
 )
 
 TEMPLATE = "docs/inputs/input_template.xlsx"
@@ -127,7 +127,56 @@ def build_confined_radial():
     return dst
 
 
+# --- SEEP-1c : partially penetrating sheetpile (confined, exact) -------------
+# Pavlovsky's conformal-mapping solution (Harr 1962; Polubarinova-Kochina 1962)
+# for a single cutoff wall of depth s in a homogeneous confined stratum of
+# thickness T with head loss H across the wall:
+#   q = k*H*K(lam')/(2*K(lam)),  lam = sin(pi*s/(2T)),  lam' = cos(pi*s/(2T))
+# (K = complete elliptic integral of the first kind). At s/T = 1/2 the modulus
+# is self-dual (lam = lam') so q = k*H/2 EXACTLY. A second exact check: by
+# antisymmetry the head on the wall plane below the tip is exactly (H1+H2)/2.
+T_SP = 20.0      # stratum thickness
+L_SP = 80.0      # horizontal extent each side of the wall (4T: truncation
+                 # error ~ exp(-pi*L/T) ~ 3e-6)
+H1_SP, H2_SP = 25.0, 15.0
+W_SP = 0.1       # notch width at the surface (V-notch crack idiom, w/T = 0.005)
+
+
+def sheetpile_q_exact(s_over_T, k=1.0, H=H1_SP - H2_SP):
+    from scipy.special import ellipk   # takes the PARAMETER m = modulus^2
+    import math
+    lam2 = math.sin(math.pi * s_over_T / 2.0) ** 2
+    return k * H * ellipk(1.0 - lam2) / (2.0 * ellipk(lam2))
+
+
+def build_sheetpile(s_over_T=0.5):
+    sfx = str(int(round(100 * s_over_T)))
+    dst = f"{OUTDIR}/xslope_sheetpile_s{sfx}.xlsx"
+    new_file(dst, TEMPLATE)
+    s = s_over_T * T_SP
+    u = {}
+    u['main'] = main_cells(gamma_w=9.81)
+    u['mat'] = material_cells(9, 1, "Sand", 20.0, "mc", c=0.0, phi=30.0, u="seep",
+                              k1=1.0, k2=1.0, alpha=0.0, kr0=0.01, h0=-1.0)
+    # ground surface with V-notch for the wall (same idiom as the clay-blanket
+    # sample: profile dips to the wall tip and back up, leaving a crack)
+    prof = {'B2': 0}
+    prof.update(profile_line_cells(1, 1, [
+        (-L_SP, T_SP), (-W_SP / 2, T_SP), (0.0, T_SP - s), (W_SP / 2, T_SP),
+        (L_SP, T_SP)]))
+    u['profile'] = prof
+    u['seep bc'] = seep_bc_cells(
+        head1=H1_SP, head1_pts=[(-L_SP, T_SP), (-W_SP / 2, T_SP)],
+        head2=H2_SP, head2_pts=[(W_SP / 2, T_SP), (L_SP, T_SP)],
+    )
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst, f"| s/T={s_over_T} | q_exact={sheetpile_q_exact(s_over_T):.4f}")
+    return dst
+
+
 if __name__ == "__main__":
     build_kozeny_dam()
     build_confined_radial()
+    build_sheetpile(0.5)
+    build_sheetpile(0.75)
     print("\nSEEP benchmark input files built.")

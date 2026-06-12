@@ -52,11 +52,12 @@ sharp displacement catastrophe — sweeps to F = 2.6 confirm steady growth with 
 single SSRM factor of safety is therefore not well defined for this system in the way it is
 for unreinforced slopes; the displacement-catastrophe criterion reports the onset of
 significant plastic deformation at **F ≈ 1.2**, while the companion LEM analysis (fixed
-reinforcement forces) gives FS = 1.55 using Janbu's method. Defining an appropriate SSRM
+reinforcement forces) gives **FS = 1.59** by Spencer's method (see
+[LEM sample problem 9](../lem/samples.md)). Defining an appropriate SSRM
 failure measure for ductile reinforced systems is an open item (see
 `plans/plan_comprehensive_audit.md`).
 
-The plots below show the state at **F = 1.50**, comparable to the LEM factor of safety. The
+The plots below show the state at **F = 1.50**, just below the LEM (Spencer) factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
 middle plot shows the viscoplastic shear strain concentration with reinforcement elements
 colored by axial force (blue = low, red = high); green elements are inactive (no tension)
@@ -247,11 +248,11 @@ its shape or location.
 ![griffiths1_results.png](images/griffiths1_results.png){width=1000}
 
 The displacement-versus-F sweep — the failure evidence Griffiths & Lane themselves present
-(their Fig. 2) — shows the upturn exactly at F ≈ 1.40:
+(their Fig. 2) — shows the upturn exactly at F ≈ 1.40: the maximum displacement is
+essentially flat through F = 1.35, then grows by 3× between F = 1.40 and 1.45 and an
+order of magnitude by F = 1.6.
 
-| F | 1.0 | 1.2 | 1.3 | 1.35 | 1.40 | 1.45 | 1.5 | 1.6 |
-|---|---|---|---|---|---|---|---|---|
-| max displacement (ft) | 0.17 | 0.19 | 0.20 | 0.21 | 0.29 | 0.65 | 1.16 | 2.39 |
+![griffiths1_sweep.png](images/griffiths1_sweep.png){width=700}
 
 This benchmark also appears on the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.

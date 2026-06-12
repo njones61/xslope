@@ -170,7 +170,8 @@ chart gives 1.380.
 
 | | XSLOPE | Reference | Diff |
 |---|---|---|---|
-| FOS | 1.41 | 1.4 (G&L FE) | +0.8% |
+| FOS (equilibrium criterion) | 1.36 | 1.4 (G&L FE) | −2.9% |
+| FOS (displacement upturn) | ~1.40 | 1.4 (G&L FE) | ~0% |
 
 The displacement-versus-F sweep shows the failure upturn exactly at F ≈ 1.40:
 the maximum displacement is essentially flat through F = 1.35, then grows by
@@ -189,8 +190,8 @@ as a boundary pressure — both per the paper).
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 2.08 | ~1.9 | +10% |
-| Before filling (no free surface) | 2.55 | ~2.4 | +6% |
+| Full reservoir (free surface) | 2.10 | ~1.9 | +11% |
+| Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
 Three observations support the XSLOPE results: the wet-case FOS is
 mesh-converged (identical at two mesh densities); the relative reservoir

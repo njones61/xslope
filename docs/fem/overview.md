@@ -490,7 +490,7 @@ The key parameters of `solve_ssrm()` are:
 
 >- **`F_min`** (default 1.0): Lower bound for the bisection search. The slope must be stable (converge) at this reduction factor.<br>
 >- **`F_max`** (default 2.0): Upper bound for the bisection search. The slope should be unstable (not converge) at this reduction factor.<br>
->- **`tolerance`** (default 0.05): Bisection stops when $F_{right} - F_{left} <$ tolerance. The critical FS is reported as $F_{left}$ (the last stable value).<br>
+>- **`tolerance`** (default 0.01): Bisection stops when $F_{right} - F_{left} <$ tolerance. The reported FS is the midpoint of the final bracket (± tolerance/2); the bracket is returned in `final_interval`.<br>
 >- **`failure_criterion`** (default `"displacement_increase"`): Selects the failure criterion — `"displacement_increase"` or `"non_convergence"` as described above (see *Choosing a Failure Criterion*).<br>
 >- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>
 >- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>

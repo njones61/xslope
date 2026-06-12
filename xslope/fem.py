@@ -2392,7 +2392,7 @@ def compute_flow_vector_tp(stress_tp, psi=0.0):
     return np.array([flow_x_tp, flow_y_tp, flow_xy_tp])
 
 
-def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
+def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
                staged=False, tension_cutoff=False):
@@ -2406,7 +2406,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         fem_data (dict): FEM data from build_fem_data
         F_min (float): Lower bound for F (must converge). Default 1.0.
         F_max (float): Upper bound for F (should not converge). Default 2.0.
-        tolerance (float): Bisection stops when F_right - F_left < tolerance. Default 0.05.
+        tolerance (float): Bisection stops when F_right - F_left < tolerance. Default 0.01.
+            The reported FS is the midpoint of the final bracket (+/- tolerance/2);
+            the bracket itself is returned in 'final_interval'.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Max viscoplastic iterations passed to solve_fem
         convergence_tol (float): Convergence tolerance passed to solve_fem
@@ -2567,7 +2569,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
         iteration += 1
 
-    critical_FS = F_left
+    # Report the midpoint of the final bracket (unbiased, +/- tolerance/2);
+    # the full bracket is returned in 'final_interval'.
+    critical_FS = 0.5 * (F_left + F_right)
 
     if debug_level >= 1:
         print(f"\n  SSRM result: FS = {critical_FS:.4f}")

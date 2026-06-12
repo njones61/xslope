@@ -60,7 +60,7 @@ if analysis_type == "single":
     # plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'], deform_percent=deform_percent, save_png=True)
     export_fem_solution(fem_data, solution, input_path.parent / input_path.stem)
 elif analysis_type == "ssrm":
-    result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05, debug_level=1,
+    result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.01, debug_level=1,
                         failure_criterion=failure_criterion)
     if result.get("converged", False):
         print(f"\nFactor of Safety: {result['FS']:.2f}")

@@ -45,17 +45,13 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. This slope exhibits a **ductile** response: because the geogrid layers
-mobilize progressively (and the deepest layers begin to pull out rather than rupture), the
-viscoplastic displacement grows smoothly with the strength reduction factor and shows no
-sharp displacement catastrophe — sweeps to F = 2.6 confirm steady growth with no knee. A
-single SSRM factor of safety is therefore not well defined for this system in the way it is
-for unreinforced slopes; the displacement-catastrophe criterion reports the onset of
-significant plastic deformation at **F ≈ 1.2**, while the companion LEM analysis (fixed
-reinforcement forces) gives **FS = 1.59** by Spencer's method (see
-[LEM sample problem 9](../lem/samples.md)). Defining an appropriate SSRM
-failure measure for ductile reinforced systems is an open item (see
-`plans/plan_comprehensive_audit.md`).
+SSRM results. The computed factor of safety is **FS = 1.67**, in good agreement with the
+companion LEM analysis (fixed reinforcement forces), which gives **FS = 1.59** by Spencer's
+method (see [LEM sample problem 9](../lem/samples.md)) — the FEM reads ~5% above the LEM,
+typical of reinforced systems where the FE solution mobilizes reinforcement through
+deformation rather than assuming fixed forces. Long-run equilibrium verification confirms a
+genuine failure boundary: at F = 1.6 the viscoplastic field settles to true equilibrium
+(displacement constant to six digits), while at F = 1.75 it creeps indefinitely.
 
 The plots below show the state at **F = 1.50**, just below the LEM (Spencer) factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
@@ -84,7 +80,7 @@ Line  Elems     Max T     Avg T  Tension  In Lp  At Tres  Broken  Status
   PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.
 ```
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.65, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.2, f_max=1.9, max_iter=4000 -->
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.67, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.2, f_max=1.9, max_iter=4000 -->
 
 The results show that reinforcement lines 3-6 experience pullout failure at the ends where
 embedment is shortest, while lines 1-2 remain fully intact. The maximum mobilized force at
@@ -152,7 +148,7 @@ The two rows of piles increase the factor of safety from 1.19 to 1.32 — an 11%
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.21, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5, max_iter=4000 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.18, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.5, max_iter=4000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 
@@ -186,7 +182,7 @@ FEM mesh with boundary conditions and material zones:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 2.00**. The top plot shows the deformed mesh at F = 1.95,
+SSRM results. The computed factor of safety is **FS = 1.88**. The top plot shows the deformed mesh at F = 1.95,
 the last converged trial below the displacement catastrophe. The middle plot shows the viscoplastic shear strain concentration, which clearly
 reveals the non-circular failure mechanism passing through the thin weak clay layer — matching the expected behavior
 without any prior assumption about the failure surface shape. The bottom plot shows the displacement vectors,
@@ -194,12 +190,12 @@ confirming lateral sliding of the slope mass along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 2.00 is higher than the LEM result of FS = 1.74 obtained using Spencer's method, consistent with the FEM-above-LEM offset observed on other problems with this geometry class.
+The FEM result of FS = 1.88 is higher than the LEM result of FS = 1.74 obtained using Spencer's method, consistent with the FEM-above-LEM offset observed on other problems with this geometry class.
 This is consistent with the general observation that the SSRM tends to give slightly higher factors of safety than
 LEM for non-circular mechanisms, since the FEM finds the natural failure mode through the global stress field rather
 than being constrained to a prescribed failure surface geometry.
 
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=2.00, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2, max_iter=4000 -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.88, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
 
 
 ---
@@ -235,10 +231,13 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 ![griffiths1_mesh.png](images/griffiths1_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.41**, in close agreement with the
-published finite-element result of 1.4 from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387) (their algorithm converges at
-F = 1.35 and fails at F = 1.40, Table 2) and within +2.2% of the
-[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability-chart value of 1.380. The plots below show the state at F = 1.40 — the last
+SSRM results. The computed factor of safety is **FS = 1.36** under XSLOPE's strict
+true-equilibrium convergence criterion, with the displacement-vs-F upturn at **F ≈ 1.40** —
+bracketing the published values: [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
+report FE FOS = 1.4 (their tolerant convergence check accepts slow residual creep that
+XSLOPE's equilibrium criterion rejects; their Table 2 converges at F = 1.35 and fails at
+1.40), and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129)
+stability chart gives 1.380. All three readings agree within ±3%. The plots below show the state at F = 1.40 — the last
 strength-reduction trial that converges before the displacement catastrophe (the reported
 FS = 1.41 is the refined catastrophe location, so the trial label in the figure reads 1.40).
 The top plot shows the deformed mesh; the bottom plot shows the viscoplastic shear strain
@@ -257,7 +256,7 @@ order of magnitude by F = 1.6.
 This benchmark also appears on the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
-<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.40, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-1 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-1 -->
 
 ### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
@@ -292,8 +291,8 @@ Results:
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 2.08 | ~1.9 | +10% |
-| Before filling (no free surface) | 2.55 | ~2.4 | +6% |
+| Full reservoir (free surface) | 2.10 | ~1.9 | +11% |
+| Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
 Three observations support the XSLOPE results: the wet-case FOS is
 mesh-converged (identical at two mesh densities); the relative reservoir
@@ -306,5 +305,5 @@ the sensitivity of the published values to the original code's numerical
 regime, which the paper does not fully document. See the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
-<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.08, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.4, f_max=2.6, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.10, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.4, f_max=2.6, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->

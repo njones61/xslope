@@ -57,7 +57,8 @@ nav:
     - Piles and Concrete Piers: fem/piles.md
     - Mesh Generation: fem/mesh.md
     - Sample Problems: fem/samples.md
-  - Verification: verification.md
+  - Verification:
+    - Verification and Validation: verification.md
   - API:
       - Advanced: api/advanced.md
       - FEM: api/fem.md

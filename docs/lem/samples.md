@@ -431,11 +431,11 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, method=spencer, expected_fs=1.244, num_slices=30 -->
 
-### 12. Verification: ACADS Simple Homogeneous Slope
+### 12. Verification: ACADS Simple Homogeneous Slope {#verification-acads-simple}
 
 This is the headline limit-equilibrium verification benchmark, from the ACADS
 slope stability program review (Donald & Giam, 1989; Giam & Donald, 1992), as
-documented in the GeoStudio SLOPE/W Verification Manual (Oct 2022). A simple
+documented in the [GeoStudio SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf). A simple
 homogeneous slope analyzed with a circular search; the ACADS consensus answer
 is FOS ≈ 1.00, making percent differences easy to read.
 
@@ -451,20 +451,40 @@ Excel input file: [xslope_acads_simple.xlsx](files/xslope_acads_simple.xlsx)
 
 ![acads_simple_inputs.png](images/acads_simple_inputs.png){width=900}
 
-Critical circle from the automated search (Spencer's method shown). XSLOPE
-results for all six methods fall within the ACADS accepted band — Spencer
-0.986, Bishop 0.987, Corps of Engineers 0.991, Lowe & Karafiath 0.987, Janbu
-0.992, OMS 0.942 (OMS reads low, as expected for the legacy method). See the
-[Verification](../verification.md) page for the full comparison table.
+Critical circle from the automated search (Spencer's method shown):
 
 ![acads_simple_solution.png](images/acads_simple_solution.png){width=900}
+
+XSLOPE results for all six methods (automated critical-circle search, 50
+slices, each method searched independently):
+
+| Method | XSLOPE FOS | Reference | Diff |
+|---|---|---|---|
+| Ordinary (OMS) | 0.942 | 1.00 | -5.8% |
+| Bishop's Simplified | 0.987 | 1.00 | -1.3% |
+| Simplified Janbu | 0.992 | 1.00 | -0.8% |
+| Corps of Engineers | 0.991 | 1.00 | -0.9% |
+| Lowe & Karafiath | 0.987 | 1.00 | -1.3% |
+| Spencer | 0.986 | 1.00 | -1.4% |
+
+All rigorous methods fall within the ACADS accepted band; OMS reads low, as
+expected for the legacy method (its conservative bias on this class of problem
+is why it is reported for completeness only). This benchmark also appears on
+the [Verification](../verification.md#limit-equilibrium) page.
+
+**Sources:** Donald, I.B. & Giam, P. (1989), *Soil slope stability programs
+review*, ACADS, Melbourne; Giam, P. & Donald, I.B. (1992); GeoStudio
+[SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+ACADS suite.
 
 <!-- test: file=files/xslope_acads_simple.xlsx, type=circular_search, method=spencer, expected_fs=0.986, num_slices=50, benchmark=LEM-1 -->
 <!-- test: file=files/xslope_acads_simple.xlsx, type=circular_search, method=bishop, expected_fs=0.987, num_slices=50, benchmark=LEM-1 -->
 
-### 13. Verification: ACADS Weak-Layer Slope (Non-Circular)
+### 13. Verification: ACADS Weak-Layer Slope (Non-Circular) {#verification-acads-weak-layer}
 
-The ACADS weak-layer case (SLOPE/W Verification Manual sec. 2.7): a 2:1 slope
+The ACADS weak-layer case
+([SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
+sec. 2.7): a 2:1 slope
 crossed by a thin low-strength interlayer with a piezometric line at its base.
 The critical surface is non-circular, sliding along the weak layer with a back
 scarp to the crest — this is the non-circular search verification test. The
@@ -480,27 +500,66 @@ Excel input file: [xslope_acads_weak_layer.xlsx](files/xslope_acads_weak_layer.x
 
 ![acads_weak_layer_inputs.png](images/acads_weak_layer_inputs.png){width=900}
 
-Critical non-circular surface (Spencer FS = 1.279, +1.5% on the accepted band;
-Lowe & Karafiath 1.268, Janbu 1.278, Corps of Engineers 1.355):
+Critical non-circular surface (Spencer's method shown):
 
 ![acads_weak_layer_solution.png](images/acads_weak_layer_solution.png){width=900}
 
+Results for the methods applicable to non-circular surfaces:
+
+| Method | XSLOPE FOS | Reference | Diff |
+|---|---|---|---|
+| Spencer | 1.279 | ~1.26 | +1.5% |
+| Corps of Engineers | 1.355 | ~1.26 | +7.6% |
+| Lowe & Karafiath | 1.268 | ~1.26 | +0.6% |
+| Simplified Janbu | 1.278 | ~1.26 | +1.4% |
+
+Corps of Engineers reads modestly high here, consistent with ground-parallel
+side-force inclinations on a surface with a steep back scarp (XSLOPE uses the
+standard "Corps #2" convention — see
+[Force Equilibrium Methods](force_eq.md)). This benchmark also appears on the
+[Verification](../verification.md#limit-equilibrium) page.
+
+**Sources:** GeoStudio [SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
+
 <!-- test: file=files/xslope_acads_weak_layer.xlsx, type=noncircular_search, method=spencer, expected_fs=1.279, num_slices=50, benchmark=LEM-2 -->
 
-### 14. Verification: Arai & Tagyo Homogeneous Slope
+### 14. Verification: Arai & Tagyo Homogeneous Slope {#verification-arai-tagyo}
 
-From Arai & Tagyo (1985), *Soils and Foundations* 25(1), and republished by
-Greco (1996), Malkawi et al. (2001), and Kim et al. (2002); also SLOPE/W
-Verification Manual sec. 2.11. A homogeneous 1.5:1 slope, 20 m high, with
+From [Arai & Tagyo (1985)](https://doi.org/10.3208/sandf1972.25.43), *Soils
+and Foundations* 25(1), and republished by Greco (1996), Malkawi et al.
+(2001), and Kim et al. (2002); also
+[SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
+sec. 2.11. A homogeneous 1.5:1 slope, 20 m high, with
 c = 41.65 kPa, φ = 15.0°, γ = 18.82 kN/m³ (total stress). Published FOS ≈ 1.451.
 
 Excel input file: [xslope_arai_tagyo.xlsx](files/xslope_arai_tagyo.xlsx)
 
 ![arai_tagyo_inputs.png](images/arai_tagyo_inputs.png){width=900}
 
-Critical circle (Spencer FS = 1.402; Bishop 1.404, Janbu 1.441, Corps of
-Engineers 1.477, Lowe & Karafiath 1.439, OMS 1.344):
+Critical circle (Spencer's method shown):
 
 ![arai_tagyo_solution.png](images/arai_tagyo_solution.png){width=900}
+
+Results for all six methods (automated critical-circle search, 50 slices):
+
+| Method | XSLOPE FOS | Reference | Diff |
+|---|---|---|---|
+| Ordinary (OMS) | 1.344 | 1.451 | -7.4% |
+| Bishop's Simplified | 1.404 | 1.451 | -3.2% |
+| Simplified Janbu | 1.441 | 1.451 | -0.7% |
+| Corps of Engineers | 1.477 | 1.451 | +1.8% |
+| Lowe & Karafiath | 1.439 | 1.451 | -0.8% |
+| Spencer | 1.402 | 1.451 | -3.4% |
+
+This benchmark also appears on the
+[Verification](../verification.md#limit-equilibrium) page.
+
+**Source:** Arai, K. & Tagyo, K. (1985). Determination of noncircular slip
+surface giving the minimum factor of safety in slope stability analysis.
+*Soils and Foundations* 25(1):43-51.
+[doi:10.3208/sandf1972.25.43](https://doi.org/10.3208/sandf1972.25.43).
+Republished in Greco (1996), Malkawi et al. (2001), and Kim et al. (2002);
+also SLOPE/W Verification Manual sec. 2.11.
 
 <!-- test: file=files/xslope_arai_tagyo.xlsx, type=circular_search, method=spencer, expected_fs=1.402, num_slices=50, benchmark=LEM-2b -->

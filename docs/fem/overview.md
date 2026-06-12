@@ -444,7 +444,7 @@ This criterion appears theoretically pure, but the "does it converge within N it
 
 #### 2. Displacement Catastrophe (`"displacement_increase"`)
 
-This criterion implements the displacement mutation method described by Sun et al. (2021). Rather than using a fixed displacement threshold, it detects the **sudden acceleration** in displacement growth as the strength reduction factor increases — a hallmark of catastrophic failure.
+This criterion belongs to the displacement-catastrophe family of SSRM failure criteria (cf. [Sun, Wang & Zhang, 2021](https://doi.org/10.1007/s10064-021-02237-y), whose average-residual-displacement-increment criterion is the closest published relative). Rather than using a fixed displacement threshold, it detects the **sudden acceleration** in displacement growth as the strength reduction factor increases — a hallmark of catastrophic failure.
 
 The procedure has three phases:
 

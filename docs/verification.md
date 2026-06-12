@@ -21,8 +21,10 @@ suite (`run_tests.py`).
 
 ### ACADS simple homogeneous slope (circular search)
 
-Source: GeoStudio SLOPE/W Verification Manual (Oct 2022), ACADS suite (Donald &
-Giam, 1989; Giam & Donald, 1992). Single soil, c′ = 3.0 kPa, φ′ = 19.6°,
+Source: [GeoStudio SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+ACADS suite (Donald & Giam, 1989; Giam & Donald, 1992). Full problem
+description, input file, and figures:
+[LEM sample problem 12](lem/samples.md#verification-acads-simple). Single soil, c′ = 3.0 kPa, φ′ = 19.6°,
 γ = 20.0 kN/m³; 2:1 slope, 10 m high; automated critical-circle search with 50
 slices per method. The ACADS consensus answer is FOS ≈ 1.00.
 
@@ -41,7 +43,9 @@ problems is why it is reported for completeness only).
 
 ### ACADS weak-layer slope (non-circular search)
 
-Source: SLOPE/W Verification Manual, ACADS weak-layer case (sec. 2.7). A 2:1
+Source: [SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+ACADS weak-layer case (sec. 2.7). Full details:
+[LEM sample problem 13](lem/samples.md#verification-acads-weak-layer). A 2:1
 slope with a thin c′ = 0, φ′ = 10° interlayer and piezometric line; the
 critical surface runs along the weak layer. ACADS accepted band ≈ 1.26.
 
@@ -58,8 +62,10 @@ convention — see [Force Equilibrium Methods](lem/force_eq.md)).
 
 ### Arai & Tagyo homogeneous slope (circular search)
 
-Source: Arai & Tagyo (1985), Soils and Foundations 25(1); republished in Greco
-(1996), Malkawi et al. (2001), Kim et al. (2002). Homogeneous 1.5:1 slope,
+Source: [Arai & Tagyo (1985)](https://doi.org/10.3208/sandf1972.25.43), Soils
+and Foundations 25(1); republished in Greco (1996), Malkawi et al. (2001), Kim
+et al. (2002). Full details:
+[LEM sample problem 14](lem/samples.md#verification-arai-tagyo). Homogeneous 1.5:1 slope,
 20 m high, c = 41.65 kPa, φ = 15.0°, γ = 18.82 kN/m³. Published FOS ≈ 1.451.
 
 | Method | XSLOPE FOS | Reference | Diff |
@@ -77,6 +83,8 @@ Source: Arai & Tagyo (1985), Soils and Foundations 25(1); republished in Greco
 
 ### Confined radial flow (analytical anchor — exact)
 
+Full details: [seepage sample problem 8](seep/samples.md#verification-confined-radial).
+
 A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer
 arc (r = 30) at head 10, straight radial edges as no-flow streamlines. Steady
 saturated flow has the exact solution q = k·(π/2)·Δh / ln(r₂/r₁) = 28.596
@@ -91,6 +99,8 @@ Mesh-converged (identical at 2k and 6k nodes); quad8 gives the same result.
 The only error source is faceting of the curved arcs by the polygon boundary.
 
 ### Partially penetrating sheetpile (analytical anchor — exact)
+
+Full details: [seepage sample problem 9](seep/samples.md#verification-sheetpile).
 
 Pavlovsky's conformal-mapping solution for a cutoff wall of depth s in a
 confined stratum of thickness T (Harr, 1962; Polubarinova-Kochina, 1962):
@@ -117,10 +127,12 @@ flow net. The computed free surface tracks the analytical parabola, and the
 discharge brackets the closed form q = k·y₀ = 4.0 within about ±4% — the
 spread reflecting the sensitivity of the discharge to exactly where the
 drain-start boundary lands relative to the free-surface/base tangent point, a
-known feature of this idealization rather than a solver characteristic. See
-[Seepage Sample Problems](seep/samples.md) #7.
+known feature of this idealization rather than a solver characteristic. Full
+details: [seepage sample problem 7](seep/samples.md#verification-kozeny).
 
 ### SEEP2D cross-check — Johnson Reservoir (established code)
+
+Full details: [seepage sample problem 4](seep/samples.md#johnson-reservoir).
 
 The Johnson Reservoir zoned earth dam (permeable shell, low-permeability core,
 foundation; reservoir at el. 160 ft, tailwater at el. 100 ft) was exported to a
@@ -147,9 +159,14 @@ criterion (see [FEM Overview](fem/overview.md)).
 
 ### Griffiths & Lane (1999) Example 1 — homogeneous slope
 
+Full details: [FEM sample problem 1](fem/samples.md#verification-griffiths1).
+
 The canonical FE slope stability benchmark: 2:1 slope, φ′ = 20°,
-c′/γH = 0.05, no foundation layer. Griffiths & Lane report FE FOS = 1.4;
-the Bishop & Morgenstern (1960) chart gives 1.380.
+c′/γH = 0.05, no foundation layer.
+[Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) report
+FE FOS = 1.4; the
+[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129)
+chart gives 1.380.
 
 | | XSLOPE | Reference | Diff |
 |---|---|---|---|
@@ -161,6 +178,8 @@ the maximum displacement is essentially flat through F = 1.35, then grows by
 diagnostic Griffiths & Lane present (their Fig. 2).
 
 ### Griffiths & Lane (1999) Example 6 — two-sided earth dam
+
+Full details: [FEM sample problem 5](fem/samples.md#verification-griffiths6).
 
 An actual dam cross-section (Torres & Coffman, 1997), homogenized: c′ = 13.8
 kPa, φ′ = 37°, γ = 18.2 kN/m³, 7.3-m foundation layer, reservoir 17.1 m above

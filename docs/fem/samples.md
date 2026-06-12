@@ -7,7 +7,7 @@ the Shear Strength Reduction Method (SSRM). Each of the Excel input files below 
 
 The FEM implementation is described in the [FEM Overview](overview.md) page.
 
-### 1. Griffiths & Lane (1999) Example 1: Homogeneous Slope
+### 1. Verification: Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
 
 This is the benchmark problem from Griffiths & Lane (1999), "Slope stability analysis by finite elements,"
 *Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
@@ -33,12 +33,25 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 ![griffiths1_mesh.png](images/griffiths1_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.41**, in close agreement with the published result of
-approximately 1.4. The top plot shows the deformed mesh at the last converged solution (F = 1.375). The bottom
-plot shows the viscoplastic shear strain concentration, which reveals the circular failure mechanism without any
-prior assumption about its shape or location.
+SSRM results. The computed factor of safety is **FS = 1.41**, in close agreement with the
+published finite-element result of 1.4 from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387) (their algorithm converges at
+F = 1.35 and fails at F = 1.40, Table 2) and within +2.2% of the
+[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability-chart value of 1.380. The top plot shows the deformed mesh at the
+last converged solution just below failure. The bottom plot shows the viscoplastic shear strain
+concentration, which reveals the circular failure mechanism without any prior assumption about
+its shape or location.
 
 ![griffiths1_results.png](images/griffiths1_results.png){width=1000}
+
+The displacement-versus-F sweep — the failure evidence Griffiths & Lane themselves present
+(their Fig. 2) — shows the upturn exactly at F ≈ 1.40:
+
+| F | 1.0 | 1.2 | 1.3 | 1.35 | 1.40 | 1.45 | 1.5 | 1.6 |
+|---|---|---|---|---|---|---|---|---|
+| max displacement (ft) | 0.17 | 0.19 | 0.20 | 0.21 | 0.29 | 0.65 | 1.16 | 2.39 |
+
+This benchmark also appears on the
+[Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
 <!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8, benchmark=SSRM-1 -->
 
@@ -231,13 +244,13 @@ than being constrained to a prescribed failure surface geometry.
 <!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=2.00, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2 -->
 
 
-### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam
+### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
-The second SSRM verification benchmark, from Griffiths & Lane (1999),
-*Géotechnique* 49(3), Example 6: an actual earth dam cross-section (Torres &
-Coffman, 1997) with homogenized properties, analyzed both with the reservoir
-full (free surface sloping from the upstream face to the downstream toe) and
-before filling (no free surface).
+The second SSRM verification benchmark, from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387), *Géotechnique* 49(3),
+Example 6: an actual earth dam cross-section (Torres & Coffman, 1997) with
+homogenized properties, analyzed both with the reservoir full (free surface
+sloping from the upstream face to the downstream toe) and before filling (no
+free surface).
 
 | Property | Value |
 |---|---|
@@ -260,12 +273,23 @@ Excel input files:
 
 ![griffiths6_full_inputs.png](images/griffiths6_full_inputs.png){width=1000}
 
-XSLOPE gives **FS = 2.08** for the full-reservoir case (Griffiths & Lane ≈ 1.9)
-and **FS = 2.55** for the dam before filling (≈ 2.4). The wet result is
-mesh-converged, the wet/dry ratio matches the paper (0.82 vs 0.79), and the
-input model is independently validated by XSLOPE's Spencer analysis (1.915 vs
-the paper's limit-equilibrium value 1.90). See the
-[Verification](../verification.md) page for the full discussion.
+Results:
+
+| Case | XSLOPE FOS | G&L FOS | Diff |
+|---|---|---|---|
+| Full reservoir (free surface) | 2.08 | ~1.9 | +10% |
+| Before filling (no free surface) | 2.55 | ~2.4 | +6% |
+
+Three observations support the XSLOPE results: the wet-case FOS is
+mesh-converged (identical at two mesh densities); the relative reservoir
+effect matches the paper (wet/dry = 0.82 vs 0.79); and the input model is
+independently validated by XSLOPE's own Spencer analysis, which gives 1.915
+against the paper's limit-equilibrium companion value of 1.90 (+0.8%) with the
+same downstream critical surface. The remaining offset is consistent with the
+general FEM-above-LEM tendency observed across problems of this class and with
+the sensitivity of the published values to the original code's numerical
+regime, which the paper does not fully document. See the
+[Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
 <!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.55, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.8, f_max=3.0, benchmark=SSRM-2 -->
 <!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.08, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.4, f_max=2.6, benchmark=SSRM-2 -->

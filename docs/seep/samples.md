@@ -70,7 +70,7 @@ The solution should look something like this:
 
 <!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.342, tolerance=0.05 -->
 
-### 4. Johnson Reservoir
+### 4. Johnson Reservoir {#johnson-reservoir}
 
 This is another earth dam problem with a shell, a core, and a foundation. 
 
@@ -87,7 +87,24 @@ The solution should look something like this:
 
 ![johnson_res_solution.png](images/johnson_res_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.953, tolerance=0.05 -->
+**Verification — SEEP2D cross-check.** This problem doubles as a verification
+benchmark against an established code: it was exported to a SEEP2D input file
+with the **exact same tri3 mesh topology, boundary conditions, and material
+parameters** (`benchmarks/run_seep2d_compare.py`) and solved with the original
+USACE/WES SEEP2D Fortran program (Tracy, USACE Waterways Experiment Station).
+Identical-mesh comparison over all 2,604 nodes:
+
+| Quantity | XSLOPE | SEEP2D | Diff |
+|---|---|---|---|
+| Total discharge q (ft³/day per ft) | 1.9575 | 1.9603 | -0.14% |
+| Nodal heads | RMS Δh = 0.105 ft | (60-ft head range) | 0.18% |
+
+The largest local head difference (~2 ft) occurs adjacent to the free surface,
+where the two codes' unsaturated relative-permeability treatments differ in
+detail; the bulk flow field agrees to about 0.1 ft. See the
+[Verification](../verification.md#finite-element-seepage) page.
+
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.953, tolerance=0.05, benchmark=SEEP-2 -->
 
 ### 5. Earth Dam with Core and Filter
 
@@ -149,7 +166,7 @@ Solution:
 
 <!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->
 
-### 7. Kozeny Dam (verification — retained for scrutiny)
+### 7. Verification: Kozeny Dam with Toe Drain {#verification-kozeny}
 
 This is a homogeneous earth dam on an impervious base with a horizontal toe drain,
 built so the upstream face follows the **exact confocal-parabola equipotential** of
@@ -167,14 +184,19 @@ base (the parabola vertex). xslope brackets the closed form within about ±4%
 (drain at the focus over-predicts ~+4%, drain at the vertex under-predicts ~-4%);
 the default build puts the drain at the vertex and yields ~3.81 on the standard
 test mesh. This sample is retained so that sensitivity can be studied further; the
-exact (confined) seepage anchor is the confined-radial case in
-`benchmarks/build_seep.py`.
+exact (confined) seepage anchors are the confined-radial and sheetpile cases
+below. The computed free surface itself tracks the analytical Kozeny parabola
+(x = 90 - y²/8 in model coordinates) to within one to two length units. See
+the [Verification](../verification.md#finite-element-seepage) page.
+
+**Sources:** Kozeny (1931) basic parabola; Casagrande entrance correction;
+Harr, M.E. (1962), *Groundwater and Seepage*, McGraw-Hill.
 
 ![kozeny_dam_solution.png](images/kozeny_dam_solution.png){width=1100}
 
 <!-- test: file=files/xslope_kozeny_dam.xlsx, type=seep, expected_flowrate=3.81, tolerance=0.05, benchmark=SEEP-1b -->
 
-### 8. Confined Radial Flow (verification — exact)
+### 8. Verification: Confined Radial Flow {#verification-confined-radial}
 
 A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer arc
 (r = 30) at head 10, straight radial edges as no-flow streamlines. Steady saturated
@@ -187,9 +209,24 @@ the seepage verification suite.
 
 ![confined_radial_solution.png](images/confined_radial_solution.png){width=800}
 
+Results against the exact solution:
+
+| Quantity | XSLOPE (tri6) | Exact | Diff |
+|---|---|---|---|
+| Discharge q | 28.5961 | 28.5960 | <0.01% |
+| Max nodal head error | 0.004 | 0 | 0.02% of total drop |
+
+The result is mesh-converged (identical at 2k and 6k nodes; quad8 gives the
+same value), and tri3 linear elements agree to +0.01%. The only error source
+is faceting of the curved arcs by the polygon boundary. See the
+[Verification](../verification.md#finite-element-seepage) page.
+
+**Source:** standard exact solution of Laplace's equation in polar coordinates
+(e.g. Bear, *Dynamics of Fluids in Porous Media*).
+
 <!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01, benchmark=SEEP-1 -->
 
-### 9. Partially Penetrating Sheetpile (verification — exact)
+### 9. Verification: Partially Penetrating Sheetpile {#verification-sheetpile}
 
 A single sheetpile cutoff of depth s = 10 in a homogeneous confined stratum of
 thickness T = 20, head loss H = 10 across the wall, k = 1. Pavlovsky's exact
@@ -205,5 +242,25 @@ the clay-blanket sample. Built by `benchmarks/build_seep.py::build_sheetpile`
 The flow net (head contours and flowlines) for the s/T = 0.5 case:
 
 ![sheetpile_s50_solution.png](images/sheetpile_s50_solution.png){width=1100}
+
+Results against the exact form factor (tri6, two mesh densities):
+
+| Case | XSLOPE q | Exact q | Diff | Head below wall tip |
+|---|---|---|---|---|
+| s/T = 0.50 (59k nodes) | 5.010 | 5.000 | +0.20% | 20.0000 (exact: 20) |
+| s/T = 0.75 (59k nodes) | 3.412 | 3.403 | +0.27% | 20.0000 (exact: 20) |
+
+The error halves with mesh refinement (set by the r^-1/2 singularity at the
+wall tip) and converges to the exact value from above. The head on the wall
+plane below the tip equals (h1+h2)/2 exactly — an antisymmetry property of the
+exact solution that the FE solution reproduces to four decimals. The
+Pavlovsky form factor itself was additionally confirmed by an independent
+finite-difference solution of the same boundary-value problem (~0.4-0.5%
+agreement at three penetration ratios). See the
+[Verification](../verification.md#finite-element-seepage) page.
+
+**Sources:** Harr, M.E. (1962), *Groundwater and Seepage*, McGraw-Hill;
+Polubarinova-Kochina, P.Ya. (1962), *Theory of Ground Water Movement*,
+Princeton University Press.
 
 <!-- test: file=files/xslope_sheetpile_s50.xlsx, type=seep, expected_flowrate=5.0, element_type=tri6, target_size=1.0, tolerance=0.01, benchmark=SEEP-1c -->

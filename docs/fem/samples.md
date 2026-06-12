@@ -232,8 +232,10 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 SSRM results. The computed factor of safety is **FS = 1.41**, in close agreement with the
 published finite-element result of 1.4 from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387) (their algorithm converges at
 F = 1.35 and fails at F = 1.40, Table 2) and within +2.2% of the
-[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability-chart value of 1.380. The top plot shows the deformed mesh at the
-last converged solution just below failure. The bottom plot shows the viscoplastic shear strain
+[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability-chart value of 1.380. The plots below show the state at F = 1.40 — the last
+strength-reduction trial that converges before the displacement catastrophe (the reported
+FS = 1.41 is the refined catastrophe location, so the trial label in the figure reads 1.40).
+The top plot shows the deformed mesh; the bottom plot shows the viscoplastic shear strain
 concentration, which reveals the circular failure mechanism without any prior assumption about
 its shape or location.
 

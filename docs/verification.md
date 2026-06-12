@@ -194,12 +194,12 @@ as a boundary pressure — both per the paper).
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
 The wet case is measured at an automatically-selected characteristic point on
-the failure mechanism (the criterion picks the node with the fastest plastic-
-displacement growth — here the downstream toe) rather than by the global
-displacement maximum:
-submerged-boundary problems carry a benign boundary-corner creep artifact that
-dominates the global maximum and, read naively, biases the apparent failure
-point about 10% high. The characteristic-point displacement is flat to
+the failure mechanism — the criterion picks the node with the fastest plastic-
+displacement growth, which lands on the downstream toe — rather than by the
+global displacement maximum. The distinction matters here: submerged-boundary
+problems carry a benign boundary-corner creep artifact that dominates the
+global maximum and, read naively, biases the apparent failure point about 10%
+high. The characteristic-point displacement is flat to
 F = 1.8 and jumps tenfold between 1.9 and 2.0. The input model is
 independently validated by XSLOPE's Spencer analysis (1.915 vs the paper's
 limit-equilibrium 1.90), and the relative reservoir effect matches the paper

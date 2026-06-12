@@ -296,8 +296,8 @@ Results:
 
 The wet-case result uses the **characteristic-point** displacement measure,
 auto-selected by the displacement-catastrophe criterion (it lands on the
-downstream toe, where the failure mechanism exits):
-submerged-boundary problems carry a benign corner-creep artifact in the
+downstream toe, where the failure mechanism exits). The distinction matters
+here: submerged-boundary problems carry a benign corner-creep artifact in the
 upstream foundation that dominates the *global* maximum displacement and masks
 the mechanism's onset — read globally, the apparent knee sits ~10% high. The
 characteristic-point sweep is unambiguous: flat to F = 1.8, onset at 1.9, and

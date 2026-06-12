@@ -446,9 +446,7 @@ Validated against: Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), th
 
 #### 2. Displacement Limit (`"displacement_limit"`)
 
-Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. This is the appropriate criterion for **submerged-boundary (reservoir) problems**, where boundary-corner artifact creep prevents the plastic-settled test from ever passing (see the convergence-criterion caveat): benign corner creep accumulates displacement orders of magnitude too slowly to reach the limit, while true failure accelerates and trips it. Pair with `tension_cutoff=True`, which relaxes the unphysical corner tension and sharpens the discrimination.
-
-Validated against: Griffiths & Lane Example 6 with full reservoir (FS ≈ 1.95-2.0 vs published ~1.9, with the input model independently validated by Spencer at 1.915 vs their limit-equilibrium 1.90).
+Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. A simple physical backstop, but note that for submerged-boundary problems the verdict is coupled to the iteration budget: the benign boundary-corner artifact creep also accumulates displacement (slowly but without bound), so with a large enough ceiling every trial eventually trips. Treat results from this criterion as budget-conditioned, and prefer the displacement-catastrophe sweep for submerged problems.
 
 #### 3. Displacement Catastrophe (`"displacement_increase"`)
 
@@ -459,7 +457,7 @@ Sweeps $F$ values, locates the sharpest upturn of displacement versus $F$ (the e
 | Problem class | Criterion | Why |
 |---|---|---|
 | Dry slopes, reinforced slopes, no reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior |
-| Submerged boundaries / reservoir loading | `displacement_limit` + `tension_cutoff=True` | Boundary-corner artifact creep defeats the settled test; the displacement limit separates slow benign creep from accelerating failure |
+| Submerged boundaries / reservoir loading | `displacement_increase` + `tension_cutoff=True` | Boundary-corner artifact creep defeats both the settled test and (with large budgets) the displacement limit; the displacement-vs-F upturn is the robust signature — read it from the sweep |
 | Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve; read the upturn |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.

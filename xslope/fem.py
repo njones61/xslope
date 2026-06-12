@@ -1213,6 +1213,35 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         n_nonzero = sum(1 for v in all_u if v > 0.0)
         print(f"  Pore pressure ({pp_option}): max u_gp = {max_u:.3f}, {n_nonzero}/{len(all_u)} GPs with u > 0")
 
+    # ---- Step 6c: Flatten Gauss-point data into per-element-type groups for
+    # vectorized iteration (the per-GP Python loop dominated runtime; batched
+    # numpy is 10-50x faster). Groups are needed because the B-matrix width
+    # differs by element type. ----
+    gp_groups = []
+    _by_ndof = {}
+    for _e in range(n_elements):
+        for _g, _gpd in enumerate(elem_gp_data[_e]):
+            _nd = len(_gpd['dof_indices'])
+            _by_ndof.setdefault(_nd, []).append((_e, _g))
+    for _nd, _pairs in _by_ndof.items():
+        G = len(_pairs)
+        grp = {
+            'pairs': _pairs,
+            'B': np.array([elem_gp_data[e][g]['B'] for e, g in _pairs]),
+            'D4': np.array([elem_gp_data[e][g]['D4'] for e, g in _pairs]),
+            'w': np.array([elem_gp_data[e][g]['weight'] for e, g in _pairs]),
+            'dof': np.array([elem_gp_data[e][g]['dof_indices'] for e, g in _pairs], dtype=int),
+            'c_r': np.array([c_reduced[e] for e, g in _pairs]),
+            'phi_r': np.array([phi_reduced[e] for e, g in _pairs]),
+            'dt_t': np.array([dt_t[e] for e, g in _pairs]),
+            'evp': np.zeros((G, 4)),
+        }
+        grp['snph'] = np.sin(grp['phi_r'])
+        grp['csph'] = np.cos(grp['phi_r'])
+        gp_groups.append(grp)
+    n_total_gp = sum(len(g['pairs']) for g in gp_groups)
+
+
     # ---- Step 7: Displacement-limit setup ----
     mesh_height = float(np.max(nodes[:, 1]) - np.min(nodes[:, 1]))
     if max_disp_factor is not None and mesh_height > 0:
@@ -1257,6 +1286,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         if debug_level >= 1 and stage_label is not None:
             print(f"  {stage_label}")
 
+        # flatten this stage's per-GP pore pressures into the groups
+        for grp in gp_groups:
+            grp['u_gp'] = np.array([u_gp_active[e][g] for e, g in grp['pairs']])
+
         # per-stage elastic reference (pure elastic response to this stage's loads)
         u_e_free = K_factor.solve(base_loads[free_dofs])
         u_elastic = np.zeros(n_dof)
@@ -1279,76 +1312,69 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             loads = base_loads.copy()
 
             n_yielding = 0
-            n_total_gp = 0
 
-            for elem_idx in range(n_elements):
-                gp_data_list = elem_gp_data[elem_idx]
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
+            for grp in gp_groups:
+                Bg, D4g, wg = grp['B'], grp['D4'], grp['w']
+                dofg, evpg = grp['dof'], grp['evp']
+                u_e = u[dofg]                                   # (G, ndof)
+                eps = np.einsum('gij,gj->gi', Bg, u_e)          # (G, 3)
+                eps4 = np.empty((len(wg), 4))
+                eps4[:, :3] = eps - evpg[:, :3]
+                eps4[:, 3] = -evpg[:, 3]
+                sig4 = np.einsum('gij,gj->gi', D4g, eps4)       # (G, 4) tension-positive
+                sig_eff = sig4.copy()
+                sig_eff[:, [0, 1, 3]] += grp['u_gp'][:, None]
 
-                for gp_idx, gp_data in enumerate(gp_data_list):
-                    B = gp_data['B']
-                    D4 = gp_data['D4']
-                    weight = gp_data['weight']
-                    dof_idx = gp_data['dof_indices']
-                    n_total_gp += 1
+                sx, sy, txy, sz = sig_eff.T
+                sigm = (sx + sy + sz) / 3.0
+                dsbar = np.sqrt(((sx - sy)**2 + (sy - sz)**2 + (sz - sx)**2
+                                 + 6.0 * txy**2) / 2.0)
+                dxv, dyv, dzv = sx - sigm, sy - sigm, sz - sigm
+                ds3 = np.maximum(dsbar, 1e-10)**3
+                sine = np.clip(np.where(dsbar > 1e-10,
+                                        -13.5 * (dxv * dyv * dzv - dzv * txy**2) / ds3,
+                                        0.0), -1.0, 1.0)
+                theta = np.arcsin(sine) / 3.0
+                snth, csth = np.sin(theta), np.cos(theta)
+                sq3 = np.sqrt(3.0)
+                f = (sigm * grp['snph']
+                     + dsbar * (csth / sq3 - snth * grp['snph'] / 3.0)
+                     - grp['c_r'] * grp['csph'])
 
-                    # a. Total strains from current displacements: eps = B * u_elem
-                    u_elem = u[dof_idx]
-                    eps_total = B @ u_elem
+                m = (f > 0) & (dsbar > 1e-20)
+                n_yielding += int(np.count_nonzero(m))
+                if np.any(m):
+                    # vectorized MOCOUQ flow, psi = 0 (dq1 = 0); corner freeze
+                    dsb, th = dsbar[m], theta[m]
+                    snt, cst = snth[m], csth[m]
+                    dxm, dym, dzm, txm = dxv[m], dyv[m], dzv[m], txy[m]
+                    xj2 = dsb**2 / 3.0
+                    a2 = (3.0 / (2.0 * dsb))[:, None] * np.stack(
+                        [dxm, dym, 2.0 * txm, dzm], axis=1)
+                    a3 = np.stack([dxm**2 + txm**2 - (2.0/3.0) * xj2,
+                                   dym**2 + txm**2 - (2.0/3.0) * xj2,
+                                   -2.0 * dzm * txm,
+                                   dzm**2 - (2.0/3.0) * xj2], axis=1)
+                    corner = np.abs(snt) > 0.49
+                    cs3, tn3 = np.cos(3.0 * th), np.tan(np.where(corner, 0.0, 3.0 * th))
+                    K = cst / sq3
+                    Kp = -snt / sq3
+                    C2 = np.where(corner, 0.5, K - Kp * tn3)
+                    C3 = np.where(corner, 0.0,
+                                  -4.5 * Kp / (np.where(corner, 1.0, cs3) * dsb**2))
+                    flow = C2[:, None] * a2 + C3[:, None] * a3
+                    evpg[m] += (f[m] * dt)[:, None] * flow
 
-                    # b. Elastic strains = total - viscoplastic (Smith & Griffiths p62.f90).
-                    #    4-component plane strain: total eps_z = 0, so elastic
-                    #    eps_z = -evp_z.
-                    evp_gp = evp[elem_idx][gp_idx]
-                    eps_elastic4 = np.array([
-                        eps_total[0] - evp_gp[0],
-                        eps_total[1] - evp_gp[1],
-                        eps_total[2] - evp_gp[2],
-                        -evp_gp[3],
-                    ])
+                if tension_cutoff:
+                    tm = sigm > 0.0
+                    if np.any(tm):
+                        evpg[tm] += (sigm[tm] * grp['dt_t'][tm])[:, None] * \
+                            np.array([1.0/3.0, 1.0/3.0, 0.0, 1.0/3.0])
 
-                    # c. Actual 4-comp stress from elastic strains (tension-positive)
-                    sigma4_tp = D4 @ eps_elastic4
-
-                    # d. Effective stress: tension-positive, so ADD u to the normals
-                    u_val = u_gp_active[elem_idx][gp_idx]
-                    sig4_eff = sigma4_tp + np.array([u_val, u_val, 0.0, u_val])
-
-                    # e. Mohr-Coulomb yield in invariant form (S&G MOCOUF)
-                    c_r = c_reduced[elem_idx]
-                    phi_r = phi_reduced[elem_idx]
-                    sigm, dsbar, theta = stress_invariants(sig4_eff)
-                    f_yield = mc_yield_invariants(sigm, dsbar, theta, c_r, phi_r)
-
-                    # f. If yielding, viscoplastic strain increment along dQ/dsigma
-                    #    (S&G MOCOUQ flow with Lode-angle corner handling, psi=0)
-                    if f_yield > 0:
-                        n_yielding += 1
-                        flow4 = mc_flow_vector_4(sig4_eff, psi=0.0)
-                        evp_gp += f_yield * flow4 * dt
-
-                    # f2. Tension cutoff (second viscoplastic mechanism): the psi=0
-                    #     MC flow is purely deviatoric, so a state with effective
-                    #     mean TENSION near/beyond the MC apex can never be returned
-                    #     to the envelope by shear flow alone — it creeps forever
-                    #     (seen under reservoir loading, where the elastic total-
-                    #     stress field minus u overshoots into tension). Relax mean
-                    #     tension volumetrically with its own stable timestep
-                    #     (volumetric stiffness K = E/(3(1-2nu)), dt_t < 2/K).
-                    if tension_cutoff:
-                        sigm_eff = (sig4_eff[0] + sig4_eff[1] + sig4_eff[3]) / 3.0
-                        if sigm_eff > 0.0:   # tension-positive: mean effective tension
-                            n_yielding += 0  # (not counted as shear yield)
-                            evp_gp += sigm_eff * dt_t[elem_idx] * np.array(
-                                [1.0/3.0, 1.0/3.0, 0.0, 1.0/3.0])
-
-                    # g. Body load correction: loads += B^T * (D4 * evp4)[:3] * weight
-                    #    (the eps_z row of B is zero, so only the in-plane components
-                    #    of the stress correction enter the equilibrium correction)
-                    if np.any(np.abs(evp_gp) > 1e-30):
-                        correction = B.T @ ((D4 @ evp_gp)[:3]) * weight
-                        loads[dof_idx] += correction
+                # body-load correction: B^T (D4 evp)[:3] * w, scattered to dofs
+                s4 = np.einsum('gij,gj->gi', D4g, evpg)
+                contrib = np.einsum('gij,gi->gj', Bg, s4[:, :3]) * wg[:, None]
+                np.add.at(loads, dofg.ravel(), contrib.ravel())
 
             # ---- 1D Truss element body-force corrections ----
             if has_1d_elements:
@@ -1607,6 +1633,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
     if not converged and debug_level >= 1:
         print(f"  Did NOT converge after {max_iterations} iterations (max|du|/max|u| = {relative_change:.3e})")
+
+    # Copy grouped viscoplastic strains back into the per-element list used by
+    # the post-processing blocks below.
+    for grp in gp_groups:
+        for k, (e, g) in enumerate(grp['pairs']):
+            evp[e][g][:] = grp['evp'][k]
 
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
     final_stresses = np.zeros((n_elements, 4))  # [sig_x, sig_y, tau_xy, sig_vm] compression-positive

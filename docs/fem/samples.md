@@ -307,4 +307,4 @@ regime, which the paper does not fully document. See the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
 <!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.95, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.5, f_max=2.4, max_iter=4000, criterion=displacement_limit, cutoff=true, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.08, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.4, f_max=2.6, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->

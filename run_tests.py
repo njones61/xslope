@@ -9,6 +9,10 @@ Scans docs/{lem,fem,seep}/samples.md for test tags of the form:
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
 
+An optional benchmark=<ID> key (e.g. benchmark=SSRM-2) marks a verification
+benchmark; these can be excluded with --skip-benchmarks for quicker routine
+runs.
+
 Runs each test and compares results against expected values.
 As new samples are added with test tags, they automatically become part of the suite.
 
@@ -18,6 +22,7 @@ Usage:
     python run_tests.py --fem        # run only FEM tests
     python run_tests.py --seep       # run only seepage tests
     python run_tests.py --tolerance 0.02  # custom FS tolerance (default 0.01)
+    python run_tests.py --skip-benchmarks # exclude verification benchmarks (faster)
     python run_tests.py --verbose    # print details for passing tests too
 """
 
@@ -182,6 +187,10 @@ def main():
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
                         help='Print details for passing tests')
+    parser.add_argument('--skip-benchmarks', action='store_true',
+                        help='Skip verification benchmark tests (annotations '
+                             'carrying a benchmark=<ID> tag), e.g. the slow '
+                             'SSRM dam cases')
     args = parser.parse_args()
 
     # If no specific flags, run all
@@ -204,6 +213,13 @@ def main():
         seep_samples = Path('docs/seep/samples.md')
         if seep_samples.exists():
             tests.extend(parse_test_tags(seep_samples))
+
+    if args.skip_benchmarks:
+        n_before = len(tests)
+        tests = [t for t in tests if 'benchmark' not in t]
+        n_skipped = n_before - len(tests)
+        if n_skipped:
+            print(f"Skipping {n_skipped} benchmark tests (--skip-benchmarks)")
 
     if not tests:
         print("No test tags found in documentation files.")

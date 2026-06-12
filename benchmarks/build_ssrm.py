@@ -76,6 +76,42 @@ def _build(dst, wet):
     return dst
 
 
+def build_griffiths6_seep():
+    """Full-reservoir case with pore pressures from an actual FE seepage
+    solution instead of the piezometric-line shortcut. G&L's simplified
+    u = gamma_w x (vertical depth below the free surface) is statically
+    inconsistent with the elastic field at the upstream boundary and sustains
+    a permanent corner creep; the coupled seepage field is consistent.
+    Seepage BCs: reservoir head on the submerged upstream boundary, exit face
+    on the downstream face and apron."""
+    from benchmarks._xlsx_writer import seep_bc_cells
+    dst = f"{OUTDIR}/xslope_griffiths6_seep.xlsx"
+    new_file(dst, TEMPLATE)
+    u = {}
+    u['main'] = main_cells(gamma_w=GAMMA_W)
+    u['mat'] = material_cells(9, 1, "Embankment", 18.2, "mc", c=13.8, phi=37.0,
+                              u="seep", k1=1.0, k2=1.0, alpha=0.0,
+                              kr0=0.01, h0=-1.0, E=1.0e5, nu=0.3)
+    prof = {'B2': 0}
+    prof.update(profile_line_cells(1, 1, GROUND))
+    u['profile'] = prof
+    u['circles'] = circle_cells(1, 130, 60, option="Depth", depth=Y_FND)
+    u['seep bc'] = seep_bc_cells(
+        head1=Y_RES,
+        head1_pts=[(0, Y_FND), (X_TOE_US, Y_FND), (round(X_WL, 3), Y_RES)],
+        exit_face=[(X_CREST_R, Y_CREST), (X_TOE_DS, Y_FND), (X_R, Y_FND)],
+    )
+    p_res = (Y_RES - Y_FND) * GAMMA_W
+    u['dloads'] = dload_cells(1, [
+        (0, Y_FND, round(p_res, 3)),
+        (X_TOE_US, Y_FND, round(p_res, 3)),
+        (round(X_WL, 3), Y_RES, 0.0),
+    ])
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst)
+    return dst
+
+
 def build_griffiths6_full():
     return _build(f"{OUTDIR}/xslope_griffiths6_full.xlsx", wet=True)
 
@@ -87,5 +123,6 @@ def build_griffiths6_dry():
 if __name__ == "__main__":
     build_griffiths6_full()
     build_griffiths6_dry()
+    build_griffiths6_seep()
     print(f"\nwaterline on upstream face: x = {X_WL:.3f}")
     print("SSRM benchmark input files built.")

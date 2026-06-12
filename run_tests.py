@@ -136,7 +136,15 @@ def run_fem_test(test):
     fem_data = build_fem_data(slope_data, mesh)
     f_min = test.get('f_min', 0.5)
     f_max = test.get('f_max', 3.0)
-    result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance, debug_level=0)
+    kwargs = {}
+    if 'criterion' in test:
+        kwargs['failure_criterion'] = test['criterion']
+    if 'max_iter' in test:
+        kwargs['max_iterations'] = int(test['max_iter'])
+    if test.get('cutoff', '').lower() in ('true', '1', 'yes'):
+        kwargs['tension_cutoff'] = True
+    result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
+                        debug_level=0, **kwargs)
 
     if result.get('converged', False):
         return result['FS'], None

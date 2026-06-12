@@ -360,19 +360,21 @@ Each iteration builds a corrected load vector and solves the full system:
 
 ### Convergence Criterion
 
-The viscoplastic iteration loop requires a convergence criterion to determine when the stress redistribution has reached equilibrium. XSLOPE uses Smith & Griffiths' CHECON test — the maximum-norm relative change in the displacement vector between iterations:
+The viscoplastic iteration loop requires a convergence criterion to determine when the stress redistribution has reached equilibrium. A displacement-change test alone is not sufficient: a slope past its critical strength-reduction factor can creep slowly enough that the per-iteration displacement change drops below any tolerance while the slope is in fact failing — a "converged" flag from such a test is a snapshot of ongoing creep, not equilibrium. XSLOPE therefore requires **two conditions simultaneously**:
+
+1. **Displacement settled** — Smith & Griffiths' CHECON test, the maximum-norm relative change in the displacement vector between iterations:
 
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
 
+2. **Plastic flow stopped** — the per-iteration change of the accumulated viscoplastic body-load vector (measured by the unbalanced force ratio, dUFR) must decay below 1% of its own peak for the solve. At true equilibrium no Gauss point is yielding, the body loads freeze, and dUFR → 0; a failing state pumps body loads at a constant rate indefinitely. Because the threshold is *relative to the solve's own peak*, the test is dimensionless and scale-free — independent of unit system, domain size, and the size of the yielding zone. The measured separation between settled and creeping states is roughly two to three orders of magnitude.
+
 **Implementation in XSLOPE:**
 
->- Default tolerance: $\text{tol} = 10^{-3}$<br>
->- Maximum iterations: 1000 (Griffiths & Lane's ceiling)<br>
->- Optional displacement limit: viscoplastic displacement > `max_disp_factor` × mesh height ⇒ failed
+>- Default tolerance: $\text{tol} = 10^{-3}$; plastic-settled threshold: 1% of the per-solve dUFR peak<br>
+>- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point)<br>
+>- Displacement limit: viscoplastic displacement > `max_disp_factor` (default 0.1) × mesh height ⇒ failed, regardless of the convergence tests
 
-**An important caveat — convergence is not a robust failure detector.** The per-iteration displacement increment scales directly with the pseudo-timestep $\Delta t$, so whether a marginally-stable trial "converges within N iterations" depends jointly on $\Delta t$, the tolerance, and the iteration ceiling. Griffiths & Lane's pure *non-convergence* failure criterion (declare failure when the iteration ceiling is hit) works inside their code's specific numerical regime, but it is not transferable: in XSLOPE's stable-$\Delta t$ regime, a slope slightly past its critical strength-reduction factor can still creep slowly enough that the CHECON ratio dips below tolerance before the ceiling — reading "converged" — while a benignly-creeping stable state under reservoir loading can do the reverse. Systematic testing on Griffiths & Lane's Examples 1 and 6 showed that no combination of convergence normalization, iteration ceiling, and timestep reproduces the published non-convergence behavior in both directions.
-
-For this reason, XSLOPE's SSRM uses the **displacement-catastrophe criterion** by default (see SSRM Failure Criteria below): the converged displacement magnitude as a function of the strength-reduction factor $F$ exhibits a sharp upturn at the true critical factor — the same diagnostic Griffiths & Lane themselves present as evidence (their Figs 2 and 18, dimensionless displacement versus FOS). The converged displacement is a physical quantity, independent of $\Delta t$ and the iteration ceiling, which makes the upturn location robust where iteration-count-based criteria are not.
+**A caveat for submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) develop a small number of Gauss points at boundary corners where the elastic total-stress field minus $u$ is locally inconsistent — a known artifact of the standard one-step gravity treatment, which Griffiths & Lane's recipe leaves untreated. These corner points sustain a permanent low-rate creep that never satisfies the plastic-settled test at *any* strength-reduction factor, even far below failure. For this problem class the **displacement-limit failure criterion** is the appropriate choice: benign corner creep accumulates displacement far too slowly to reach the limit, while true failure accelerates and trips it. See *Choosing a Failure Criterion* below.
 
 ### The `solve_fem()` Function
 
@@ -434,45 +436,31 @@ The critical factor of safety is determined when the iterative solution process 
 
 ### SSRM Failure Criteria
 
-Determining the critical factor of safety in the SSRM requires a criterion to distinguish stable from unstable configurations as the strength reduction factor $F$ increases. The choice of failure criterion can significantly influence the computed factor of safety. XSLOPE implements two failure criteria, selectable via the `failure_criterion` parameter in `solve_ssrm()`. The default is `"displacement_increase"` (the displacement-catastrophe method), which is robust to the numerical parameters of the viscoplastic algorithm — see the Convergence Criterion discussion above for why iteration-count-based criteria are not.
+Determining the critical factor of safety in the SSRM requires a criterion to distinguish stable from unstable configurations as the strength reduction factor $F$ increases. XSLOPE implements three failure criteria, selectable via the `failure_criterion` parameter in `solve_ssrm()`.
 
-#### 1. Non-Convergence (`"non_convergence"`)
+#### 1. Non-Convergence (`"non_convergence"`, default)
 
-This is the classical approach of Griffiths & Lane (1999). The viscoplastic iteration loop is run with no displacement limit; failure is identified purely by whether the solver converges within the maximum number of iterations. The SSRM bisection brackets the transition between convergence (stable) and non-convergence (failure).
+The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and the plastic-flow-stopped test are satisfied (see Convergence Criterion above) — so the bisection brackets the genuine boundary between states that reach static equilibrium and states that creep indefinitely. The result is insensitive to the pseudo-timestep, tolerance, and ceiling because the settled test is scale-free and the creeping states never satisfy it at any ceiling.
 
-This criterion appears theoretically pure, but the "does it converge within N iterations" question is not a property of the mechanical problem alone — it depends jointly on the pseudo-timestep $\Delta t$, the convergence tolerance, and the iteration ceiling (the per-iteration displacement change scales with $\Delta t$). It reproduces published results only inside the original code's numerical regime, and is retained for comparison purposes.
+Validated against: Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), their Example 6 dam without free surface (≈ 2.4-2.5 vs published ~2.4), and the geogrid-reinforced slope (≈ 1.65 vs the limit-equilibrium Spencer value 1.59 on the same model).
 
-#### 2. Displacement Catastrophe (`"displacement_increase"`)
+#### 2. Displacement Limit (`"displacement_limit"`)
 
-This criterion belongs to the displacement-catastrophe family of SSRM failure criteria (cf. [Sun, Wang & Zhang, 2021](https://doi.org/10.1007/s10064-021-02237-y), whose average-residual-displacement-increment criterion is the closest published relative). Rather than using a fixed displacement threshold, it detects the **sudden acceleration** in displacement growth as the strength reduction factor increases — a hallmark of catastrophic failure.
+Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. This is the appropriate criterion for **submerged-boundary (reservoir) problems**, where boundary-corner artifact creep prevents the plastic-settled test from ever passing (see the convergence-criterion caveat): benign corner creep accumulates displacement orders of magnitude too slowly to reach the limit, while true failure accelerates and trips it. Pair with `tension_cutoff=True`, which relaxes the unphysical corner tension and sharpens the discrimination.
 
-The procedure has three phases:
+Validated against: Griffiths & Lane Example 6 with full reservoir (FS ≈ 1.95-2.0 vs published ~1.9, with the input model independently validated by Spencer at 1.915 vs their limit-equilibrium 1.90).
 
->**Phase 1 — Coarse sweep:** The solver runs at $n$ evenly-spaced values of $F$ from $F_{min}$ to $F_{max}$, recording the maximum VP displacement at each. A generous displacement cap (50% of mesh height) is used solely as an early termination to avoid wasting iterations on obviously failed cases.
+#### 3. Displacement Catastrophe (`"displacement_increase"`)
 
->**Phase 2 — Catastrophe detection:** The ratio of VP displacement between consecutive $F$ values is computed. The interval with the largest ratio identifies where the displacement growth accelerates most rapidly — the catastrophe point. Ratios are only evaluated where the baseline displacement exceeds a noise floor ($10^{-4}$ × mesh height): a ratio computed from an essentially-elastic near-zero baseline is meaningless and would otherwise dominate (this matters for reinforced slopes, whose VP displacement grows smoothly from zero as reinforcement progressively mobilizes).
-
->**Phase 3 — Refinement:** The catastrophe interval is refined by bisection, using displacement ratios to determine which half contains the sharper transition, until the interval width falls below the specified tolerance.
-
-This criterion is self-calibrating in that it does not require an absolute displacement threshold. However, it requires the displacement-versus-$F$ curve to exhibit a sufficiently sharp inflection. For problems where the displacement grows smoothly (gradual transition rather than sudden catastrophe), the method may identify the acceleration zone at a higher $F$ than other criteria.
-
-#### Comparison of Failure Criteria
-
-The following table summarizes the characteristics of each criterion:
-
-| Criterion | Basis | Arbitrary Parameter | Strengths | Limitations |
-|---|---|---|---|---|
-| Non-convergence | Iteration behavior | Tolerance, max iterations, $\Delta t$ (implicitly) | Matches the classical G&L description | Result depends on the numerical regime ($\Delta t$ × tolerance × ceiling), not just the mechanics; not transferable between codes |
-| Displacement catastrophe | Rate of displacement growth vs $F$ | `n_sweep` points | Robust to $\Delta t$/tolerance/ceiling; self-calibrating; mirrors the displacement-vs-FOS evidence G&L publish | Requires a discernible inflection in the displacement curve; costs ~`n_sweep` extra solves |
+Sweeps $F$ values, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement-increment criterion of [Sun, Wang & Zhang (2021)](https://doi.org/10.1007/s10064-021-02237-y). Ratios are only evaluated above a noise floor ($10^{-4}$ × mesh height). The sweep is valuable as *evidence* — a plotted displacement-vs-F curve communicates the failure margin better than a single number — but as an automatic FS-finder it requires a discernible knee, and its per-trial displacement values are only meaningful at trials that genuinely converged. Prefer it as a companion diagnostic to criterion 1 or 2.
 
 #### Choosing a Failure Criterion
 
-The **displacement catastrophe** criterion (`"displacement_increase"`) is the default in XSLOPE, and is recommended for general use. The reasoning, established by systematic testing against Griffiths & Lane's published examples:
-
-- **Why not non-convergence, despite its pedigree?** "Failure = the solver stops converging" sounds parameter-free, but it is not: the per-iteration displacement change scales with the viscoplastic pseudo-timestep $\Delta t$, so whether a marginal trial crosses the convergence tolerance before the iteration ceiling depends on the *numerical regime*, not only on the mechanics. The same problem can read "stable" or "failed" at the same $F$ under different (all individually reasonable) choices of $\Delta t$, tolerance, and ceiling. Griffiths & Lane's own results are reproducible with this criterion only inside their code's specific regime, which their paper does not fully document. It is retained for comparison and study, not for production use.
-- **Why displacement catastrophe?** The *converged displacement* at each $F$ is a physical quantity — independent of $\Delta t$, tolerance, and ceiling. Its sharp upturn at the critical $F$ is precisely the evidence Griffiths & Lane present (their Figs 2 and 18 are displacement-versus-FOS curves), and on their Example 1 this criterion reproduces the published FOS ≈ 1.4 directly. The cost is a coarse sweep (~`n_sweep` solves) before refinement.
-
-For verification work, run the displacement catastrophe criterion and, where practical, plot the displacement-versus-$F$ sweep itself — the location and sharpness of the upturn communicates more than any single FS number.
+| Problem class | Criterion | Why |
+|---|---|---|
+| Dry slopes, reinforced slopes, no reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior |
+| Submerged boundaries / reservoir loading | `displacement_limit` + `tension_cutoff=True` | Boundary-corner artifact creep defeats the settled test; the displacement limit separates slow benign creep from accelerating failure |
+| Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve; read the upturn |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.
 

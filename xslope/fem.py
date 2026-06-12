@@ -872,8 +872,9 @@ def build_fem_data(slope_data, mesh=None):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
-def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=1000, tolerance=1e-3,
-              max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0):
+def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
+              max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
+              early_exit=True):
     """
     Solve FEM using Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1268,7 +1269,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=1000, tolerance=1e-
         norm_F_gravity = np.linalg.norm(base_loads)
         converged = False
         unbalanced_force_ratio = 0.0
-        ufr_prev = 0.0   # previous-iteration UFR for the dUFR diagnostic
+        ufr_prev = 0.0       # previous-iteration UFR
+        ufr_rate_peak = 0.0  # per-solve peak of dUFR (reference for settled test)
+        ufr_rate_best = float('inf')   # lowest dUFR since the peak
+        last_progress_iter = 0         # iteration of last meaningful dUFR improvement
 
         for iteration in range(max_iterations):
             # Build body load correction from accumulated viscoplastic strains
@@ -1524,13 +1528,39 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=1000, tolerance=1e-
             else:
                 relative_change = norm_diff
 
-            # Diagnostic: rate of change of the accumulated body-load vector.
-            # delta UFR -> 0 exactly when viscoplastic flow has ceased (true
-            # equilibrium); a persistently creeping zone keeps pumping body loads.
-            # Currently reported in debug output only (see docs/fem/overview.md,
-            # convergence discussion).
+            # Plastic-settled condition: the rate of change of the accumulated
+            # body-load vector (dUFR) decays to zero when viscoplastic flow has
+            # genuinely ceased, while a failing (permanently creeping) state
+            # plateaus at a constant rate. The threshold is PEAK-RELATIVE — each
+            # solve provides its own reference — so the test is dimensionless
+            # and scale-free (independent of units, domain size, and yielding-
+            # zone fraction). Measured separation between settled and creeping
+            # states is ~700x; the 1%-of-peak threshold has wide margin.
             ufr_rate = abs(unbalanced_force_ratio - ufr_prev)
             ufr_prev = unbalanced_force_ratio
+            if ufr_rate > ufr_rate_peak:
+                ufr_rate_peak = ufr_rate
+            plastic_settled = ufr_rate <= max(0.01 * ufr_rate_peak, 1e-14)
+
+            # No-progress early exit: a settling state's dUFR keeps decaying
+            # toward the threshold; a failing state's dUFR plateaus. If 500
+            # iterations pass with no meaningful improvement (>1%) of the best
+            # dUFR seen, the trial cannot settle - declare failure early
+            # rather than burning the ceiling. Disabled in displacement-limit
+            # mode, where failure is defined by the limit trip itself.
+            if ufr_rate < 0.99 * ufr_rate_best:
+                ufr_rate_best = ufr_rate
+                last_progress_iter = iteration
+            if (early_exit and not plastic_settled
+                    and iteration - last_progress_iter > 500):
+                converged = False
+                u = u_new
+                if debug_level >= 1:
+                    print(f"  Early exit at iteration {iteration+1}: no dUFR "
+                          f"progress for 500 iterations (plateau "
+                          f"{ufr_rate:.2e} vs settled target "
+                          f"{0.01*ufr_rate_peak:.2e}) - declared FAILED")
+                break
 
             if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
                 print(f"  Iter {iteration+1:4d}: max|du|/max|u| = {relative_change:.3e}, "
@@ -1559,12 +1589,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=1000, tolerance=1e-
                               f"max VP disp = {max_vp_disp:.2f} > limit {vp_disp_limit:.2f}")
                     break
 
-            if relative_change < tolerance:
+            if relative_change < tolerance and plastic_settled:
                 converged = True
                 u = u_new
                 if debug_level >= 1:
                     print(f"  Converged after {iteration+1} iterations "
-                          f"(max|du|/max|u| = {relative_change:.3e})")
+                          f"(max|du|/max|u| = {relative_change:.3e}, "
+                          f"dUFR = {ufr_rate:.2e} <= 1% of peak {ufr_rate_peak:.2e})")
                 break
 
             u = u_new
@@ -2330,9 +2361,9 @@ def compute_flow_vector_tp(stress_tp, psi=0.0):
 
 
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
-               max_iterations=1000, convergence_tol=1e-3, max_disp_factor=0.1,
-               failure_criterion="displacement_increase", n_sweep=10,
-               staged=False):
+               max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
+               failure_criterion="non_convergence", n_sweep=10,
+               staged=False, tension_cutoff=False):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2350,17 +2381,21 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
             backstop/early-termination cap inside solve_fem trials (default 0.1).
         failure_criterion (str): How to determine failure.
-            "displacement_increase" (default) - Displacement-catastrophe method
-                (Sun et al., 2021): sweep F values, locate the sharp upturn of the
-                converged VP displacement vs F, refine around it. Robust to the
-                viscoplastic numerical parameters (dt, tolerance, iteration
-                ceiling); mirrors the displacement-vs-FOS evidence of Griffiths &
-                Lane (1999), Figs 2/18.
-            "non_convergence" - Classical Griffiths & Lane bisection on whether the
-                viscoplastic iteration converges within the ceiling. Retained for
-                comparison studies only: the outcome depends on the numerical
-                regime (dt x tolerance x ceiling), not just the mechanics - see
+            "non_convergence" (default) - Bisection on TRUE viscoplastic
+                equilibrium: a trial converges only if both the CHECON
+                displacement test and the plastic-flow-stopped test (dUFR
+                below 1% of its per-solve peak) are satisfied. Scale-free and
+                insensitive to dt/tolerance/ceiling. Use for problems without
+                reservoir loading.
+            "displacement_limit" - Bisection on whether the max VP displacement
+                exceeds max_disp_factor x mesh height within the iteration
+                budget. Use for submerged-boundary (reservoir) problems, where
+                boundary-corner artifact creep prevents the settled test from
+                ever passing; pair with tension_cutoff=True. See
                 docs/fem/overview.md, "Choosing a Failure Criterion".
+            "displacement_increase" - Displacement-catastrophe sweep (cf. Sun,
+                Wang & Zhang 2021): locate the upturn of displacement vs F.
+                Best used as evidence/diagnostic alongside the other criteria.
         n_sweep (int): Number of points in coarse sweep for "displacement_increase". Default 10.
 
     Returns:
@@ -2390,7 +2425,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
-            convergence_tol=convergence_tol, max_disp_factor=None, staged=staged)
+            convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
+            tension_cutoff=tension_cutoff)
+    elif failure_criterion == "displacement_limit":
+        result = _ssrm_displacement_limit(
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            debug_level=debug_level, max_iterations=max_iterations,
+            convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
+            staged=staged, tension_cutoff=tension_cutoff)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
@@ -2399,9 +2441,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
-            "'displacement_increase' (default; displacement-catastrophe upturn) "
-            "and 'non_convergence' (classical G&L, for comparison studies only "
-            "- see docs/fem/overview.md).")
+            "'non_convergence' (default; bisection on true viscoplastic "
+            "equilibrium), 'displacement_limit' (for submerged/reservoir "
+            "problems with residual boundary-corner creep), and "
+            "'displacement_increase' (displacement-catastrophe sweep) - see "
+            "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
 
     elapsed = time.perf_counter() - t_start
     result["elapsed_time"] = elapsed
@@ -2414,7 +2458,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=0,
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                               debug_level=0, max_iterations=500,
                               convergence_tol=1e-3, max_disp_factor=0.1,
-                              staged=False):
+                              staged=False, tension_cutoff=False):
     """SSRM using fixed VP displacement limit as failure criterion."""
 
     if debug_level >= 1:
@@ -2432,7 +2476,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         print(f"  Verifying lower bound F={F_min:.2f} converges...")
     solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
-                             max_disp_factor=max_disp_factor, staged=staged)
+                             max_disp_factor=max_disp_factor, staged=staged,
+                             tension_cutoff=tension_cutoff,
+                             early_exit=(max_disp_factor is None))
     if not solution_min["converged"]:
         return {
             "converged": False,
@@ -2447,7 +2493,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         print(f"  Verifying upper bound F={F_max:.2f} does not converge...")
     solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
-                             max_disp_factor=max_disp_factor, staged=staged)
+                             max_disp_factor=max_disp_factor, staged=staged,
+                             tension_cutoff=tension_cutoff,
+                             early_exit=(max_disp_factor is None))
     if solution_max["converged"]:
         if debug_level >= 1:
             print(f"\nSSRM failed: F_max = {F_max} still converges — FS > {F_max}. Increase F_max.")
@@ -2471,7 +2519,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
         solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1),
                              max_iterations=max_iterations, tolerance=convergence_tol,
-                             max_disp_factor=max_disp_factor, staged=staged)
+                             max_disp_factor=max_disp_factor, staged=staged,
+                             tension_cutoff=tension_cutoff,
+                             early_exit=(max_disp_factor is None))
 
         if solution["converged"]:
             F_left = F_mid

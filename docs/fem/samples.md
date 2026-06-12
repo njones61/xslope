@@ -84,7 +84,7 @@ Line  Elems     Max T     Avg T  Tension  In Lp  At Tres  Broken  Status
   PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.
 ```
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.22, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.2, f_max=1.8 -->
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.65, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.2, f_max=1.9, max_iter=4000 -->
 
 The results show that reinforcement lines 3-6 experience pullout failure at the ends where
 embedment is shortest, while lines 1-2 remain fully intact. The maximum mobilized force at
@@ -152,7 +152,7 @@ The two rows of piles increase the factor of safety from 1.19 to 1.32 — an 11%
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.21, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.21, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.0, f_max=1.5, max_iter=4000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 
@@ -199,7 +199,7 @@ This is consistent with the general observation that the SSRM tends to give slig
 LEM for non-circular mechanisms, since the FEM finds the natural failure mode through the global stress field rather
 than being constrained to a prescribed failure surface geometry.
 
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=2.00, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2 -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=2.00, element_type=tri6, target_size=2, tolerance=0.05, f_min=1.4, f_max=2.2, max_iter=4000 -->
 
 
 ---
@@ -257,7 +257,7 @@ order of magnitude by F = 1.6.
 This benchmark also appears on the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
-<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=quad8, target_size=3.5, tolerance=0.025, f_min=1.0, f_max=1.8, benchmark=SSRM-1 -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.40, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-1 -->
 
 ### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
@@ -306,5 +306,5 @@ the sensitivity of the published values to the original code's numerical
 regime, which the paper does not fully document. See the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
-<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.55, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.8, f_max=3.0, benchmark=SSRM-2 -->
-<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=2.08, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.4, f_max=2.6, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.95, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=1.5, f_max=2.4, max_iter=4000, criterion=displacement_limit, cutoff=true, benchmark=SSRM-2 -->

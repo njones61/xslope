@@ -235,9 +235,17 @@ completeness only; they are legacy/educational, not recommended for design.)
 
   | Quantity | xslope | SEEP2D | Diff (%) |
   |---|---|---|---|
-  | Total discharge q | ____ | ____ | ____ |
-  | Phreatic surface (sampled x) | ____ | ____ | ____ |
-  | Head at check node(s) | ____ | ____ | ____ |
+  | Total discharge q | 1.9575 | 1.9603 | -0.14 |
+  | Nodal heads (all 2604 nodes) | RMS dh = 0.105 ft | (60-ft head range) | 0.18 |
+
+  *DONE — and stronger than originally planned: rather than comparing against a
+  separate GMS run on a different mesh, the original USACE/WES SEEP2D Fortran
+  code (ref_docs/ref_docs_seep) was compiled with gfortran and run on the EXACT
+  same tri3 mesh topology, BCs, and material parameters, exported from xslope
+  via `benchmarks/run_seep2d_compare.py` (RCM-renumbered for SEEP2D's banded
+  solver). Identical-mesh comparison: q within 0.14%, nodal heads RMS 0.105 ft
+  over a 60-ft range; max |dh| ~ 2 ft localized near the free surface, where
+  the codes' unsaturated-kr details differ.*
 
 ---
 

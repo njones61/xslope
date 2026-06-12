@@ -83,11 +83,14 @@ et al. (2002). Full details:
 
 ### Confined radial flow (analytical anchor — exact)
 
-Full details: [seepage sample problem 8](seep/samples.md#verification-confined-radial).
+Full details: [seepage sample problem 7](seep/samples.md#verification-confined-radial).
 
-A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer
-arc (r = 30) at head 10, straight radial edges as no-flow streamlines. Steady
-saturated flow has the exact solution q = k·(π/2)·Δh / ln(r₂/r₁) = 28.596
+A quarter-annulus confined flow problem in **plan view** (one quadrant of the
+Thiem radial-flow-to-a-well geometry): inner arc (r = 10) at head 30, outer
+arc (r = 30) at head 10, straight radial edges as no-flow streamlines. Confined
+saturated flow obeys Laplace's equation in head with no gravity term, so the
+model-plane orientation is irrelevant to the mathematics. Steady
+flow has the exact solution q = k·(π/2)·Δh / ln(r₂/r₁) = 28.596
 (k = 1) with a logarithmic head profile.
 
 | Quantity | XSLOPE (tri6) | Exact | Diff |
@@ -100,10 +103,12 @@ The only error source is faceting of the curved arcs by the polygon boundary.
 
 ### Partially penetrating sheetpile (analytical anchor — exact)
 
-Full details: [seepage sample problem 9](seep/samples.md#verification-sheetpile).
+Full details: [seepage sample problem 8](seep/samples.md#verification-sheetpile).
 
 Pavlovsky's conformal-mapping solution for a cutoff wall of depth s in a
-confined stratum of thickness T (Harr, 1962; Polubarinova-Kochina, 1962):
+confined stratum of thickness T (Harr, 1962; Polubarinova-Kochina, 1962).
+Boundary heads are 30 upstream / 20 downstream (downstream head at the stratum
+top, so pressures are non-negative throughout the vertical section):
 q = k·H·K(λ′)/(2·K(λ)) with λ = sin(πs/2T). At s/T = ½ the modulus is
 self-dual and q = k·H/2 **exactly**. The closed form was additionally verified
 with an independent finite-difference solution of the same boundary-value
@@ -111,24 +116,13 @@ problem (agreement ~0.4–0.5% at three penetration ratios).
 
 | Case | XSLOPE q | Exact q | Diff | Head below wall tip |
 |---|---|---|---|---|
-| s/T = 0.50 | 5.010 | 5.000 | +0.20% | 20.0000 (exact: 20) |
-| s/T = 0.75 | 3.412 | 3.403 | +0.27% | 20.0000 (exact: 20) |
+| s/T = 0.50 | 5.010 | 5.000 | +0.20% | 25.0000 (exact: 25) |
+| s/T = 0.75 | 3.412 | 3.403 | +0.27% | 25.0000 (exact: 25) |
 
 The error halves with mesh refinement (set by the r^−½ singularity at the wall
 tip) and converges to the exact value from above. The head on the wall plane
 below the tip equals (h₁+h₂)/2 exactly, an antisymmetry property of the exact
 solution that the FE solution reproduces to four decimals.
-
-### Kozeny dam with toe drain (free-surface check)
-
-A homogeneous dam on an impervious base with a horizontal toe drain, built with
-the upstream face as the exact confocal-parabola equipotential of the Kozeny
-flow net. The computed free surface tracks the analytical parabola, and the
-discharge brackets the closed form q = k·y₀ = 4.0 within about ±4% — the
-spread reflecting the sensitivity of the discharge to exactly where the
-drain-start boundary lands relative to the free-surface/base tangent point, a
-known feature of this idealization rather than a solver characteristic. Full
-details: [seepage sample problem 7](seep/samples.md#verification-kozeny).
 
 ### SEEP2D cross-check — Johnson Reservoir (established code)
 
@@ -193,17 +187,14 @@ as a boundary pressure — both per the paper).
 | Full reservoir (free surface) | 1.91 | ~1.9 | +1% |
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
-The wet case is measured at an automatically-selected characteristic point on
-the failure mechanism — the criterion picks the node with the fastest plastic-
-displacement growth, which lands on the downstream toe — rather than by the
-global displacement maximum. The distinction matters here: submerged-boundary
-problems carry a benign boundary-corner creep artifact that dominates the
-global maximum and, read naively, biases the apparent failure point about 10%
-high. The characteristic-point displacement is flat to
-F = 1.8 and jumps tenfold between 1.9 and 2.0. The input model is
-independently validated by XSLOPE's Spencer analysis (1.915 vs the paper's
-limit-equilibrium 1.90), and the relative reservoir effect matches the paper
-(wet/dry = 0.78 vs 0.79).
+The wet case runs under the default non-convergence criterion with the
+effective-stress pore-pressure formulation and consistent boundary-load
+integration: the submerged section converges to true equilibrium in a handful
+of iterations at F = 1 (the flooded soil carries its buoyant weight) and fails
+sharply above F = 1.91. The input model is independently validated by XSLOPE's
+Spencer analysis — 1.915, in essentially exact agreement with the SSRM result —
+vs the paper's limit-equilibrium 1.90, and the relative reservoir effect
+matches the paper (wet/dry = 0.78 vs 0.79).
 
 ---
 

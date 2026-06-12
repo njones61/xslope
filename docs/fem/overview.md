@@ -282,7 +282,7 @@ XSLOPE automatically assigns displacement boundary conditions in the `build_fem_
 
 3. **X-roller supports on the left and right sides.** All nodes at the global minimum $x$-coordinate (left boundary) and maximum $x$-coordinate (right boundary) are assigned x-roller conditions ($u = 0$, $v$ free). This allows vertical settlement along the side boundaries while preventing lateral movement, reflecting the assumption that the slope extends indefinitely in both directions beyond the model domain. Corner nodes where the side boundaries meet the base retain their fixed condition — fixed supports take precedence over rollers.
 
-4. **Force boundary conditions from distributed loads.** If distributed loads are defined in the input template, nodes along the load lines are identified and assigned equivalent nodal forces computed using tributary-area integration (described above). If a force node coincides with a roller or fixed boundary, both the displacement constraint and the applied force are preserved.
+4. **Force boundary conditions from distributed loads.** If distributed loads are defined in the input template, the boundary element edges along each load line are identified and assigned **consistent** equivalent nodal forces, $f_i = \int N_i\, p\, d\Gamma$ integrated edge-by-edge with Gauss quadrature (for a uniform pressure on a quadratic edge this is the 1/6–2/3–1/6 corner–midside–corner split). Simple tributary-length lumping is not used: on quadratic edges it misallocates corner and midside forces, leaving a chain of self-equilibrated nodal couples of order $pL/6$ along the boundary that appears as spurious near-surface stress oscillation — strong enough to falsely yield the skin elements when the applied pressure is large compared to the soil strength (e.g., reservoir loading). If a force node coincides with a roller or fixed boundary, both the displacement constraint and the applied force are preserved.
 
 The figure below shows the resulting boundary conditions for the reinforced slope example from the [FEM Samples](samples.md) page (Problem 2). Fixed supports (triangles) line the base of the mesh. X-roller supports (circles) line the left and right vertical boundaries, allowing vertical movement but preventing horizontal displacement. The ground surface and slope face are free. Force boundary conditions from a 240 psf surcharge are shown as arrows along the slope crest. Reinforcement elements are shown as red lines within the slope body.
 
@@ -339,18 +339,20 @@ Each iteration builds a corrected load vector and solves the full system:
 
 **Pore Pressure at Gauss Points:**
 
->The pore pressure $u$ in the yield function is evaluated at each Gauss point using the pore pressure option specified for each material in the input template. Three options are available:
+>The pore pressure $u$ is evaluated at each Gauss point using the pore pressure option specified for each material in the input template. Three options are available:
 >
 >- **None** ($u = 0$): No pore pressure. The yield check uses total stress.
 >- **Piezometric line** (`"piezo"`): The physical coordinates of the Gauss point are computed via the shape functions ($x_{gp} = \sum N_i x_i$, $y_{gp} = \sum N_i y_i$), and the pore pressure is calculated as $u = \gamma_w (z_{piezo} - y_{gp})$ where $z_{piezo}$ is the elevation of the piezometric surface at the Gauss point's horizontal position. Negative values (above the piezometric surface) are clamped to zero.
 >- **Seepage solution** (`"seep"`): Pore pressures from a prior seepage analysis (stored as nodal values) are interpolated to each Gauss point using the element shape functions: $u_{gp} = \sum N_i \cdot u_i$. Negative values are clamped to zero, since the FEM stress analysis uses effective stress and suction (negative pore pressure) is conservatively ignored.
+>
+>The pore pressures enter the analysis through the **effective-stress formulation** (`pp_formulation="effective"`, the default): the equilibrium statement for total stress, $\int B^T (\sigma' - u\, m)\, dV = F_{ext}$ with $m = [1, 1, 0, 1]^T$, moves the pore-pressure term to the load vector, $\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u\, dV$, so the stresses computed from the displacement solution are **effective stresses directly** and the yield check uses them as-is. Physically, the added load term converts the body force in submerged soil to its buoyant weight (plus seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a flooded boundary come out compressive ($\sigma'_v = \gamma' z$, $\sigma'_h = K_0 \sigma'_v$) and level flooded ground sits elastically at rest. The alternative legacy recipe (`pp_formulation="total"`), in which the total-stress elastic problem is solved and $u$ is subtracted at each Gauss point before the yield check, leaves a spurious effective-tension zone of magnitude $\frac{1-2\nu}{1-\nu}u$ at submerged boundaries — the lateral elastic response to a water load is only $\frac{\nu}{1-\nu}$ of it, while the pore pressure subtracts all of it — which yields and creeps at any strength-reduction factor.
 
 **Key Parameters:**<br>
 
 >- **Time step** $\Delta t$: A numerical parameter (not physical time) that controls stability. Following Smith & Griffiths (their Program 6.1 form): $\Delta t = \dfrac{4(1+\nu)}{3E}$. The Mohr-Coulomb stability bound $\Delta t = \dfrac{4(1+\nu)(1-2\nu)}{E(1-2\nu+\sin^2\phi)}$ is ~2.6× larger and was found to drive a sustained limit cycle at Gauss points in mild effective tension beneath reservoir loading (the per-iteration redistribution overshoots and never settles); the smaller value is in the stable regime. Note that the per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and failure criterion are calibrated jointly with it.<br>
 >- **Flow rule** $\dfrac{\partial Q}{\partial \sigma}$: non-associated flow with dilation angle $\psi = 0$ (no plastic volume change), evaluated from the full invariant form with Lode-angle corner treatment as described above. The gradient implementation is verified against finite differences of $Q$ to machine precision.<br>
 >- **Maximum iterations**: 1000 (Griffiths & Lane's ceiling; hundreds of iterations may be needed near the critical factor of safety)<br>
->- **Tension cutoff** (optional, default off): a second viscoplastic mechanism that relaxes effective mean tension volumetrically. The $\psi = 0$ flow is purely deviatoric and cannot return a stress state near or beyond the Mohr-Coulomb apex; such states can arise beneath reservoir loading where the one-step elastic total-stress field minus $u$ overshoots into tension. Griffiths & Lane (1999) include no tension treatment.
+>- **Tension cutoff** (optional, default off): a second viscoplastic mechanism that relaxes effective mean tension volumetrically. The $\psi = 0$ flow is purely deviatoric and cannot return a stress state near or beyond the Mohr-Coulomb apex. With the effective-stress pore-pressure formulation such states rarely arise below failure; the option remains for genuine tension zones (e.g., steep crests at low confinement). Griffiths & Lane (1999) include no tension treatment.
 
 **Key Points:**<br>
 >- **Constant stiffness**: $[K]$ never changes — all nonlinearity enters through the body load corrections<br>
@@ -374,7 +376,7 @@ The viscoplastic iteration loop requires a convergence criterion to determine wh
 >- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point)<br>
 >- Displacement limit: viscoplastic displacement > `max_disp_factor` (default 0.1) × mesh height ⇒ failed, regardless of the convergence tests
 
-**A caveat for submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) develop a small number of Gauss points at boundary corners where the elastic total-stress field minus $u$ is locally inconsistent — a known artifact of the standard one-step gravity treatment, which Griffiths & Lane's recipe leaves untreated. These corner points sustain a permanent low-rate creep that never satisfies the plastic-settled test at *any* strength-reduction factor, even far below failure — and their displacement contaminates every *global* displacement measure. For this problem class use the **displacement-catastrophe criterion**, whose automatic characteristic-point selection measures the displacement upturn on the failure mechanism itself, away from the artifact. See *Choosing a Failure Criterion* below.
+**Submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) converge like any other problem under the effective-stress pore-pressure formulation combined with consistent boundary-load integration: the submerged soil carries its buoyant weight, the flooded surface skin is in compression, and trials below the critical strength-reduction factor reach true equilibrium (the G&L Example 6 dam at $F = 1$ settles in a handful of iterations). A useful sanity check for any submerged model is to run a single solve at $F = 1$ and confirm it converges quickly with an essentially elastic strain field — flooded ground at working strength must sit quietly; if it does not, suspect the inputs (loads inconsistent with boundary pore pressures) rather than tightening solver knobs. Two numerical requirements matter for this problem class: quadratic **triangles** (tri6) are preferred over quad8 (the 2×2 reduced-integration quad has a zero-energy hourglass mode that persistent near-surface forcing can excite), and the boundary tractions must be integrated **consistently** over the element edges (XSLOPE does this automatically; see *Boundary Conditions* above).
 
 ### The `solve_fem()` Function
 
@@ -446,21 +448,20 @@ Validated against: Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), th
 
 #### 2. Displacement Limit (`"displacement_limit"`)
 
-Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. A simple physical backstop, but note that for submerged-boundary problems the verdict is coupled to the iteration budget: the benign boundary-corner artifact creep also accumulates displacement (slowly but without bound), so with a large enough ceiling every trial eventually trips. Treat results from this criterion as budget-conditioned, and prefer the displacement-catastrophe sweep for submerged problems.
+Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. A simple physical backstop; note that the verdict is coupled to the iteration budget for any state that creeps slowly rather than racing, so prefer the equilibrium-based default criterion.
 
 #### 3. Displacement Catastrophe (`"displacement_increase"`)
 
 Sweeps $F$ values, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement-increment criterion of [Sun, Wang & Zhang (2021)](https://doi.org/10.1007/s10064-021-02237-y) — and like that criterion, it reads the displacement at a **characteristic point** rather than the global maximum. The characteristic point is selected **automatically**: after the coarse sweep, the node whose plastic displacement grew fastest between the lowest and highest $F$ — a node on the developing failure mechanism — becomes the measurement point, and the sweep curve is re-read there before refinement. (A specific point can also be supplied via `char_point=(x, y)`.)
 
-This automatic selection is what makes the criterion robust for **submerged-boundary problems**: the benign boundary-corner artifact creep grows steadily at *all* $F$ and therefore has a low growth ratio, while mechanism nodes grow explosively near failure — so the selection naturally lands on the mechanism and sees past the artifact. Measured globally instead, the artifact background masks the mechanism's onset and biases the apparent failure point high by roughly 10% on the dam benchmarks. Ratios are only evaluated above a noise floor ($10^{-4}$ × mesh height).
+The automatic selection makes the criterion robust against any localized background deformation that grows steadily at *all* $F$ (such zones have a low growth ratio, while mechanism nodes grow explosively near failure), so the measurement lands on the mechanism. Ratios are only evaluated above a noise floor ($10^{-4}$ × mesh height).
 
 #### Choosing a Failure Criterion
 
 | Problem class | Criterion | Why |
 |---|---|---|
-| Dry slopes, reinforced slopes, no reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior |
-| Submerged boundaries / reservoir loading | `displacement_increase` + `tension_cutoff=True` | Boundary-corner artifact creep contaminates every *global* displacement measure (settled test, displacement limit, and global-max readings all bias high); the criterion's automatic characteristic-point selection reads the upturn on the mechanism itself (validated: G&L Ex. 6 wet 1.91 vs published ~1.9; Johnson Reservoir 1.28 vs Spencer 1.26) |
-| Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve; read the upturn |
+| All slope problems, including submerged boundaries / reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior. With the effective-stress pore-pressure formulation and consistent boundary loads, submerged problems converge cleanly below the critical factor (validated: G&L Ex. 6 wet 1.91 vs Spencer 1.915 and published ~1.9; Johnson Reservoir 1.30 vs Spencer 1.26) |
+| Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve (the failure evidence Griffiths & Lane present); read the upturn at the automatically selected characteristic point |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.
 
@@ -478,7 +479,7 @@ result = solve_ssrm(
     F_max=2.0,
     tolerance=0.05,
     debug_level=1,
-)   # failure_criterion defaults to "displacement_increase"
+)   # failure_criterion defaults to "non_convergence"
 
 if result['converged']:
     print(f"Factor of Safety: {result['FS']:.2f}")
@@ -493,7 +494,9 @@ The key parameters of `solve_ssrm()` are:
 >- **`F_min`** (default 1.0): Lower bound for the bisection search. The slope must be stable (converge) at this reduction factor.<br>
 >- **`F_max`** (default 2.0): Upper bound for the bisection search. The slope should be unstable (not converge) at this reduction factor.<br>
 >- **`tolerance`** (default 0.01): Bisection stops when $F_{right} - F_{left} <$ tolerance. The reported FS is the midpoint of the final bracket (± tolerance/2); the bracket is returned in `final_interval`.<br>
->- **`failure_criterion`** (default `"displacement_increase"`): Selects the failure criterion — `"displacement_increase"` or `"non_convergence"` as described above (see *Choosing a Failure Criterion*).<br>
+>- **`failure_criterion`** (default `"non_convergence"`): Selects the failure criterion — `"non_convergence"` or `"displacement_increase"` as described above (see *Choosing a Failure Criterion*).<br>
+>- **`pp_formulation`** (default `"effective"`): How pore pressures enter the analysis — `"effective"` moves $u$ into the load vector so the computed stresses are effective stresses directly (recommended); `"total"` is the legacy subtract-at-Gauss-point recipe (see *Pore Pressure at Gauss Points*).<br>
+>- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed).<br>
 >- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>
 >- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>
 >- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 1000): Passed through to `solve_fem()` for each trial.

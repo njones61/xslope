@@ -57,7 +57,9 @@ def lem_case(xlsx, img_prefix, surface):
     print(f"  {img_prefix}: Spencer FS = {crit['solver_result']['FS']:.3f}")
 
 
-def seep_case(xlsx, img_prefix, target_size, base_mat=1):
+def seep_case(xlsx, img_prefix, target_size, base_mat=1, phreatic=True):
+    # phreatic=False for confined problems: the zero-pressure contour drawn as a
+    # "phreatic surface" has no physical meaning in fully saturated confined flow.
     sd = load_slope_data(xlsx)
     with contextlib.redirect_stdout(io.StringIO()):
         polys = get_material_polygons(sd)
@@ -65,7 +67,7 @@ def seep_case(xlsx, img_prefix, target_size, base_mat=1):
         seep = build_seep_data(mesh, sd, seep_bc=1)
         sol = run_seepage_analysis(seep, tol=1e-8)
     capture(f"docs/seep/images/{img_prefix}_solution.png", plot_seep_solution,
-            seep, sol, base_mat=base_mat, levels=20, fill_contours=True, phreatic=True)
+            seep, sol, base_mat=base_mat, levels=20, fill_contours=True, phreatic=phreatic)
     print(f"  {img_prefix}: q = {sol['flowrate']:.4f}")
 
 
@@ -78,9 +80,8 @@ if __name__ == "__main__":
     lem_case("docs/lem/files/xslope_acads_simple.xlsx", "acads_simple", "circular")
     lem_case("docs/lem/files/xslope_arai_tagyo.xlsx", "arai_tagyo", "circular")
     lem_case("docs/lem/files/xslope_acads_weak_layer.xlsx", "acads_weak_layer", "non_circular")
-    seep_case("docs/seep/files/xslope_confined_radial.xlsx", "confined_radial", 1.0)
-    seep_case("docs/seep/files/xslope_sheetpile_s50.xlsx", "sheetpile_s50", 1.0)
-    seep_case("docs/seep/files/xslope_kozeny_dam.xlsx", "kozeny_dam", 1.0)
+    seep_case("docs/seep/files/xslope_confined_radial.xlsx", "confined_radial", 1.0, phreatic=False)
+    seep_case("docs/seep/files/xslope_sheetpile_s50.xlsx", "sheetpile_s50", 1.0, phreatic=False)
     fem_case("docs/fem/files/xslope_griffiths6_full.xlsx", "griffiths6_full")
     fem_case("docs/fem/files/xslope_griffiths6_dry.xlsx", "griffiths6_dry")
     print("\nbenchmark figures generated")

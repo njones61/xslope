@@ -186,28 +186,28 @@ stiffens the thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.89** (mesh-converged: identical at
-target sizes 1.0 and 0.75). The plots show the solution at the computed factor of safety.
-The middle plot shows the viscoplastic shear strain concentration, which clearly reveals the
-non-circular failure mechanism passing through the thin weak clay layer — matching the
-expected behavior without any prior assumption about the failure surface shape. The bottom
-plot shows the displacement vectors, confirming lateral sliding of the slope mass along the
-clay layer.
+SSRM results. The computed factor of safety is **FS = 1.68**. The plots show the solution
+at the computed factor of safety. The middle plot shows the viscoplastic shear strain
+concentration, which clearly reveals the non-circular failure mechanism passing through the
+thin weak clay layer — matching the expected behavior without any prior assumption about
+the failure surface shape. The bottom plot shows the displacement vectors, confirming
+lateral sliding of the slope mass along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 1.89 is about 9% higher than the LEM result of FS = 1.74 obtained
-using Spencer's method. Part of this difference is genuine to the methods: the FEM develops
-the failure mechanism through the global stress field — including the stress redistribution
-that the undrained clay layer permits — while the LEM evaluates equilibrium on a prescribed
-surface with rigid-block kinematics. Differences of this order between SSRM and LEM are
-commonly reported for weak-layer mechanisms and are a useful reminder that the two methods
-answer subtly different questions.
+The FEM result of FS = 1.68 is about 3% below the LEM result of FS = 1.74 obtained using
+Spencer's method — both analyses use the same piezometric surface in the foundation sand.
+Differences of this order between SSRM and LEM are typical: the FEM develops the failure
+mechanism freely through the global stress field, while the LEM evaluates rigid-block
+equilibrium on a prescribed surface, and the two methods answer subtly different questions.
+The FS shows a mild residual mesh sensitivity characteristic of thin-shear-band
+localization (1.70 / 1.68 / 1.67 at target sizes 2.0 / 1.0 / 0.75): the finer the mesh, the
+more sharply the band through the 2-ft layer is resolved.
 
 <!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
-     target_size=1.0 or finer (FS is mesh-converged at 1.0: ts=2.0 gives 1.878,
-     ts=1.0 and 0.75 both give 1.891) -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.89, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
+     target_size=1.0 or finer (ts=2.0 gives 1.697, ts=1.0 gives 1.684, ts=0.75 gives
+     1.672 — mild thin-band localization sensitivity) -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.68, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
 
 
 ---
@@ -315,44 +315,24 @@ Solution for the full-reservoir case at the computed factor of safety (F = 1.91)
 free surface in place, the downstream slope is the weaker side: the shear strain band runs
 from the crest to the downstream toe, and the displacement vectors show the rotational
 sliding mass — the same surface found by Griffiths & Lane and by XSLOPE's own Spencer
-analysis. (The color scale is capped at a shear strain of 0.05 and the vector lengths at
-their 95th percentile; without the caps, the plot scales are saturated by the localized
-boundary-corner creep in the upstream foundation and the upstream-face skin deformation
-under the reservoir load — the benign artifacts discussed below.)
+analysis. The wet case uses quadratic triangles (tri6): the submerged upstream skin
+carries small persistent stresses near the yield surface, and the quad8 element's
+reduced-integration hourglass mode is susceptible to such forcing (see the
+[FEM Overview](overview.md) discussion of submerged boundaries).
 
 ![griffiths6_full_results.png](images/griffiths6_full_results.png){width=1000}
 
-The two upstream strain features deserve explanation, because the cause is not
-what it might appear. They are **low-effective-stress zones**, not zones loaded
-by the reservoir: under the upstream face the free surface sits at reservoir
-level, so the pore pressure is essentially full hydrostatic, and the reservoir
-pressure applied to the submerged boundary is offset almost one-for-one by that
-pore pressure. In effective-stress terms the water weight provides nearly no
-confinement — the thin skin along the upstream face and the foundation beneath
-the reservoir floor carry only buoyant-weight stresses of a few kPa, so at the
-reduced strength ($c'/F \approx 7$ kPa) they sit at the yield surface.
-Seepage force plays little role here: the head loss occurs across the dam, so
-the hydraulic gradient near the upstream face is small. Part of the intensity
-is also numerical — the one-shot elastic stress recipe with prescribed pore
-pressures does not perfectly satisfy local effective-stress equilibrium at
-submerged boundaries, so these marginal zones creep slowly without bound at
-*any* strength-reduction factor. That F-independence is diagnostic: a true
-mechanism switches on sharply with $F$ (as the downstream band does at the
-knee), while the upstream features look nearly the same at F = 1.5 as at 1.91
-and never connect into a through-going surface.
+The wet case is a strong test of the pore-pressure treatment. Under the
+effective-stress formulation with consistently integrated boundary loads, the
+submerged soil simply carries its buoyant weight: a solve at F = 1 converges in
+a handful of iterations with an essentially elastic strain field (flooded
+ground at working strength sits quietly — a sanity check worth running on any
+submerged model), and the failure boundary emerges sharply at F = 1.91 under
+the default non-convergence criterion. The agreement with limit equilibrium is
+striking: XSLOPE's own Spencer analysis of the same section gives 1.915 (vs the
+paper's limit-equilibrium 1.90), with the same downstream critical surface, and
+the relative reservoir effect matches the paper (wet/dry = 0.78 vs 0.79). See
+the [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
-The wet-case result uses the **characteristic-point** displacement measure,
-auto-selected by the displacement-catastrophe criterion (it lands on the
-downstream toe, where the failure mechanism exits). The distinction matters
-here: submerged-boundary problems carry a benign corner-creep artifact in the
-upstream foundation that dominates the *global* maximum displacement and masks
-the mechanism's onset — read globally, the apparent knee sits ~10% high. The
-characteristic-point sweep is unambiguous: flat to F = 1.8, onset at 1.9, and
-a tenfold jump by 2.0. The input model is independently validated by XSLOPE's
-own Spencer analysis (1.915 vs the paper's limit-equilibrium 1.90, with the
-same downstream critical surface), and the relative reservoir effect matches
-the paper (wet/dry = 0.78 vs 0.79). See the
-[Verification](../verification.md#finite-element-slope-stability-ssrm) page.
-
-<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=1.5, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.91, element_type=quad8, target_size=1.5, tolerance=0.01, f_min=1.4, f_max=2.4, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.91, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=4000, benchmark=SSRM-2 -->

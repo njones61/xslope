@@ -711,6 +711,102 @@ def build_fem_data(slope_data, mesh=None):
             # Sort by projected distance along the load line
             load_nodes.sort(key=lambda x: x[1])
 
+            # Interpolate the traction magnitude at a projected distance
+            def _p_at(proj_dist):
+                cumulative_length = 0
+                val = load_values[-1]
+                for j in range(len(load_coords) - 1):
+                    seg_length = np.linalg.norm(np.array(load_coords[j+1]) - np.array(load_coords[j]))
+                    cumulative_length += seg_length
+                    if proj_dist <= cumulative_length:
+                        local_distance = proj_dist - (cumulative_length - seg_length)
+                        ratio = local_distance / seg_length if seg_length > 0 else 0
+                        val = load_values[j] * (1 - ratio) + load_values[j+1] * ratio
+                        break
+                return val
+
+            # Pass 2a: CONSISTENT edge-load integration. Tributary lumping is
+            # wrong for quadratic edges (consistent distribution is 1/6-2/3-1/6
+            # corner-mid-corner, not 1/4-1/2-1/4): the difference is a chain of
+            # self-equilibrated nodal force couples of magnitude ~p*L/6 along
+            # the loaded boundary, which shows up as spurious near-surface
+            # stress oscillations of order p/6. For submerged faces where the
+            # traction p is large compared to the soil strength (reservoir
+            # loading), those oscillations are strong enough to yield the skin
+            # elements and prevent convergence. Integrating N_i * p over each
+            # boundary edge eliminates the couples exactly.
+            node_proj = dict(load_nodes)
+            on_line = set(node_proj)
+            _seen_edges = set()
+            _load_edges = []
+            for _eidx, _elem in enumerate(elements):
+                _et = element_types[_eidx]
+                if _et == 3:
+                    _ledges = [(0, 1), (1, 2), (2, 0)]
+                elif _et == 6:
+                    _ledges = [(0, 3, 1), (1, 4, 2), (2, 5, 0)]
+                elif _et == 4:
+                    _ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+                elif _et in (8, 9):
+                    _ledges = [(0, 4, 1), (1, 5, 2), (2, 6, 3), (3, 7, 0)]
+                else:
+                    continue
+                for _le in _ledges:
+                    _gn = [int(_elem[i]) for i in _le]
+                    if all(n in on_line for n in _gn):
+                        _key = tuple(sorted((_gn[0], _gn[-1])))
+                        if _key in _seen_edges:
+                            continue
+                        _seen_edges.add(_key)
+                        _load_edges.append(_gn)
+
+            if _load_edges:
+                nodal_fx = {}
+                nodal_fy = {}
+                _g = 1.0 / np.sqrt(3.0)
+                for _gn in _load_edges:
+                    c1, c2 = _gn[0], _gn[-1]
+                    # orient the edge along increasing projection so the
+                    # inward normal (tangent rotated 90 degrees CW) points
+                    # into the slope for a left-to-right ground surface
+                    if node_proj[c1] > node_proj[c2]:
+                        _gn = list(reversed(_gn))
+                        c1, c2 = _gn[0], _gn[-1]
+                    x1, y1 = nodes[c1]
+                    x2, y2 = nodes[c2]
+                    L = float(np.hypot(x2 - x1, y2 - y1))
+                    if L < 1e-12:
+                        continue
+                    tx, ty = (x2 - x1) / L, (y2 - y1) / L
+                    nx, ny = ty, -tx
+                    for tg in ((1.0 - _g) / 2.0, (1.0 + _g) / 2.0):
+                        wg = 0.5
+                        d = node_proj[c1] * (1.0 - tg) + node_proj[c2] * tg
+                        pmag = _p_at(d)
+                        if len(_gn) == 3:
+                            Nvals = ((2*tg - 1)*(tg - 1), 4*tg*(1 - tg), tg*(2*tg - 1))
+                        else:
+                            Nvals = (1.0 - tg, tg)
+                        for node, Nv in zip(_gn, Nvals):
+                            f = pmag * L * wg * Nv
+                            nodal_fx[node] = nodal_fx.get(node, 0.0) + f * nx
+                            nodal_fy[node] = nodal_fy.get(node, 0.0) + f * ny
+
+                for node, fx in nodal_fx.items():
+                    bc_type[node] = 4
+                    bc_values[node, 0] += fx
+                    bc_values[node, 1] += nodal_fy[node]
+
+                expected_force = np.mean(load_values) * load_total_length
+                total_force = np.sqrt(
+                    sum(nodal_fx.values())**2 + sum(nodal_fy.values())**2)
+                print(f"  Distributed load {load_idx}: {len(_load_edges)} edges / "
+                      f"{len(load_nodes)} nodes (consistent), "
+                      f"total force = {total_force:.1f}, expected ~{expected_force:.1f}")
+                continue
+
+            # Pass 2b (fallback when no boundary edges found on the line):
+            # tributary lumping per node.
             # Pass 2: Compute tributary length and load for each node
             # Endpoint nodes extend to the actual line start/end so the
             # full load line length is covered.
@@ -874,6 +970,7 @@ def build_fem_data(slope_data, mesh=None):
 
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
+              pp_formulation='effective',
               early_exit=True):
     """
     Solve FEM using Griffiths & Lane (1999) viscoplastic algorithm.
@@ -900,6 +997,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             the slope is declared as failed regardless of convergence. This prevents false
             convergence when large displacements make the relative change appear small.
             Set to None to disable.
+        pp_formulation (str): How pore pressures enter the analysis.
+            'effective' (default): u is moved into the load vector
+            (K du = F_ext + int B^T m u dV) and the elastic stresses are
+            EFFECTIVE stresses directly. This is the standard effective-stress
+            formulation (Potts & Zdravkovic); under a flooded boundary it
+            yields sigma'_v = gamma'*z with compressive lateral stresses.
+            'total': legacy recipe — solve the total-stress elastic problem
+            and subtract u pointwise at Gauss points before the yield check.
+            With nu < 0.5 this produces a spurious effective-tension zone of
+            magnitude ~(1-2*nu)/(1-nu)*u at submerged boundaries (the lateral
+            elastic response to the water load is nu/(1-nu) of it while u
+            subtracts all of it), which yields and creeps indefinitely.
         tension_cutoff (bool): If True (default False), states with effective mean
             TENSION are relaxed volumetrically as a second viscoplastic mechanism
             (damped, ~10% per iteration). The psi=0 Mohr-Coulomb flow is purely
@@ -1290,6 +1399,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         for grp in gp_groups:
             grp['u_gp'] = np.array([u_gp_active[e][g] for e, g in grp['pairs']])
 
+        if pp_formulation == 'effective':
+            # Effective-stress formulation: equilibrium of sigma_total =
+            # sigma_eff - u*m (tension-positive) gives
+            #   int B^T sigma_eff dV = F_ext + int B^T m u dV,
+            # so the pore-pressure term joins the load vector and D*B*u is the
+            # EFFECTIVE stress directly (no subtraction at the yield check).
+            F_u = np.zeros(n_dof)
+            for grp in gp_groups:
+                contrib = (grp['w'] * grp['u_gp'])[:, None] * (
+                    grp['B'][:, 0, :] + grp['B'][:, 1, :])
+                np.add.at(F_u, grp['dof'], contrib)
+                grp['u_gp'] = np.zeros_like(grp['u_gp'])
+            base_loads = base_loads + F_u
+
         # per-stage elastic reference (pure elastic response to this stage's loads)
         u_e_free = K_factor.solve(base_loads[free_dofs])
         u_elastic = np.zeros(n_dof)
@@ -1538,13 +1661,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # Convergence check: max|du| / max|u| < tolerance — Smith & Griffiths'
             # CHECON test (infinity norms), exactly as in p62.f90. The max-norm
             # matters: a small cluster of Gauss points sustaining benign localized
-            # creep (e.g. mild effective tension under reservoir loading — an
-            # artifact of the one-step elastic total-stress-minus-u recipe that
-            # G&L deliberately leave untreated) produces a bounded per-iteration
-            # du measured against the GLOBAL maximum displacement, so the ratio
-            # decays and the stable state is accepted within the iteration
-            # ceiling. A true failure mechanism keeps feeding the global du and
-            # stays above tolerance. False convergence from large failure
+            # creep (possible under pp_formulation='total', whose subtract-at-GP
+            # recipe leaves mild effective tension at submerged boundaries)
+            # produces a bounded per-iteration du measured against the GLOBAL
+            # maximum displacement, so the ratio decays and the stable state is
+            # accepted within the iteration ceiling. A true failure mechanism
+            # keeps feeding the global du and stays above tolerance. False
+            # convergence from large failure
             # displacements is guarded by the max_disp_factor limit below.
             norm_diff = np.max(np.abs(u_new - u))
             norm_u_new = np.max(np.abs(u_new))
@@ -1672,14 +1795,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             stress_avg_tp4 += D4 @ eps_elastic4
 
         stress_avg_tp4 /= n_gp
+        u_elem_avg = sum(u_gp[elem_idx]) / len(u_gp[elem_idx]) if u_gp[elem_idx] else 0.0
+        if pp_formulation == 'effective':
+            # D*B*u is effective; report total stresses for output (legacy
+            # convention) and use the stresses as-is for the yield check.
+            stress_total_tp4 = stress_avg_tp4 - np.array(
+                [u_elem_avg, u_elem_avg, 0.0, u_elem_avg])
+            sig_eff4 = stress_avg_tp4
+        else:
+            stress_total_tp4 = stress_avg_tp4
+            sig_eff4 = stress_avg_tp4 + np.array(
+                [u_elem_avg, u_elem_avg, 0.0, u_elem_avg])
         # compression-positive in-plane components for output; sig_vm = dsbar
-        sig_x, sig_y = -stress_avg_tp4[0], -stress_avg_tp4[1]
-        tau_xy = stress_avg_tp4[2]
-        _, sig_vm, _ = stress_invariants(stress_avg_tp4)
+        sig_x, sig_y = -stress_total_tp4[0], -stress_total_tp4[1]
+        tau_xy = stress_total_tp4[2]
+        _, sig_vm, _ = stress_invariants(stress_total_tp4)
         final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
 
-        u_elem_avg = sum(u_gp[elem_idx]) / len(u_gp[elem_idx]) if u_gp[elem_idx] else 0.0
-        sig_eff4 = stress_avg_tp4 + np.array([u_elem_avg, u_elem_avg, 0.0, u_elem_avg])
         sigm, dsbar, theta = stress_invariants(sig_eff4)
         f_yield = mc_yield_invariants(sigm, dsbar, theta,
                                       c_reduced[elem_idx], phi_reduced[elem_idx])
@@ -2400,7 +2532,8 @@ def compute_flow_vector_tp(stress_tp, psi=0.0):
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
-               staged=False, tension_cutoff=False, char_point=None):
+               staged=False, tension_cutoff=False, char_point=None,
+               pp_formulation='effective', dt_scale=1.0):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2428,17 +2561,15 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                 reservoir loading.
             "displacement_limit" - Bisection on whether the max VP displacement
                 exceeds max_disp_factor x mesh height within the iteration
-                budget. Use for submerged-boundary (reservoir) problems, where
-                boundary-corner artifact creep prevents the settled test from
-                ever passing; pair with tension_cutoff=True. See
-                docs/fem/overview.md, "Choosing a Failure Criterion".
+                budget. A simple physical backstop; verdict is coupled to the
+                iteration budget for slowly creeping states.
             "displacement_increase" - Displacement-catastrophe sweep (cf. Sun,
                 Wang & Zhang 2021): locate the upturn of displacement vs F,
                 measured at a characteristic point on the failure mechanism
                 (auto-selected as the node with the largest plastic-displacement
-                growth across the sweep, or supplied via char_point). The
-                criterion of choice for submerged-boundary problems, where
-                boundary-corner artifact creep contaminates global measures.
+                growth across the sweep, or supplied via char_point). Produces
+                the displacement-vs-F evidence curve; also robust against any
+                localized background creep contaminating global measures.
         char_point (tuple or None): (x, y) of a characteristic point for the
             "displacement_increase" measure. Default None = automatic
             selection after the coarse sweep.
@@ -2472,25 +2603,25 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
-            tension_cutoff=tension_cutoff)
+            tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
-            staged=staged, tension_cutoff=tension_cutoff)
+            staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
-            tension_cutoff=tension_cutoff, char_point=char_point)
+            tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
             "'non_convergence' (default; bisection on true viscoplastic "
-            "equilibrium), 'displacement_limit' (for submerged/reservoir "
-            "problems with residual boundary-corner creep), and "
+            "equilibrium), 'displacement_limit' (displacement-budget "
+            "backstop), and "
             "'displacement_increase' (displacement-catastrophe sweep) - see "
             "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
 
@@ -2505,7 +2636,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                               debug_level=0, max_iterations=500,
                               convergence_tol=1e-3, max_disp_factor=0.1,
-                              staged=False, tension_cutoff=False):
+                              staged=False, tension_cutoff=False,
+                 pp_formulation='effective',
+                 dt_scale=1.0):
     """SSRM using fixed VP displacement limit as failure criterion."""
 
     if debug_level >= 1:
@@ -2521,7 +2654,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # Verify lower bound converges
     if debug_level >= 1:
         print(f"  Verifying lower bound F={F_min:.2f} converges...")
-    solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1),
+    solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor, staged=staged,
                              tension_cutoff=tension_cutoff,
@@ -2538,7 +2671,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # Verify upper bound does not converge
     if debug_level >= 1:
         print(f"  Verifying upper bound F={F_max:.2f} does not converge...")
-    solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1),
+    solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor, staged=staged,
                              tension_cutoff=tension_cutoff,
@@ -2564,7 +2697,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         if debug_level >= 1:
             print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
 
-        solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1),
+        solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor, staged=staged,
                              tension_cutoff=tension_cutoff,
@@ -2604,14 +2737,13 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                                  debug_level=0, max_iterations=500,
                                  convergence_tol=1e-3, n_sweep=10,
-                                 tension_cutoff=False, char_point=None):
+                                 tension_cutoff=False, char_point=None,
+                 pp_formulation='effective',
+                 dt_scale=1.0):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
-    # maximum. Essential for submerged-boundary problems, where benign
-    # boundary-corner artifact creep dominates the global maximum and masks
-    # the true mechanism's onset (the wet-dam global-max reading was ~2.1
-    # while the downstream characteristic point shows the knee at ~1.95,
-    # matching G&L's ~1.9 and Spencer's 1.915).
+    # maximum — robust when localized background creep away from the
+    # mechanism contaminates the global maximum.
     """
     SSRM using Sun et al. (2021) displacement catastrophe method.
 
@@ -2640,11 +2772,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # Characteristic-point holder. If char_point is given, resolve it now;
     # otherwise it is selected AUTOMATICALLY after the coarse sweep (the node
     # whose plastic displacement grows fastest across the sweep — i.e. a node
-    # on the failure mechanism). The automatic selection makes the criterion
-    # robust for submerged-boundary problems, where benign boundary-corner
-    # artifact creep dominates the GLOBAL displacement maximum and masks the
-    # mechanism's onset (G&L Ex. 6 wet read ~2.1 globally vs 1.95 at the
-    # mechanism; Johnson Reservoir ~1.4 vs 1.27, matching Spencer 1.26).
+    # on the failure mechanism). Background zones that creep steadily at all F
+    # have a low growth ratio, so the selection lands on the mechanism.
     cp_holder = [None]
     if char_point is not None:
         cp_holder[0] = int(np.argmin(np.hypot(nodes[:, 0] - char_point[0],
@@ -2672,7 +2801,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     def _get_max_vp_disp(F_val):
         """Run solve_fem; return the displacement measure (characteristic-point
         VP displacement, or global max before the point is selected)."""
-        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1),
+        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
                         tension_cutoff=tension_cutoff)

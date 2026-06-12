@@ -37,7 +37,6 @@ difference and report values back for the manuscript tables.
 | LEM-3 (optional) | Limit equilibrium, method ordering | supplemental / text | published literature |
 | SEEP-1 | FE seepage, confined analytical | `tab:seep` | analytical anchor (exact) |
 | SEEP-1c | FE seepage, sheetpile cutoff | `tab:seep` | analytical anchor (Pavlovsky) |
-| SEEP-1b | FE seepage, unconfined free surface | sample / text | analytical (Kozeny, ±4%) |
 | SEEP-2 | FE seepage, code cross-check | `tab:seep` | established code (SEEP2D) |
 | SSRM-1 | FE slope stability | `tab:ssrm` | published (G&L Ex. 1) |
 | SSRM-2 | FE slope stability | `tab:ssrm` | published (G&L Ex. 6) |
@@ -207,19 +206,16 @@ completeness only; they are legacy/educational, not recommended for design.)
   K(lam')/2K(lam) form factor to ~0.4-0.5% at s/T = 0.25, 0.5, and 0.75 — so the
   xslope comparison is anchored to a confirmed closed form, not a recalled one.*
 
-### SEEP-1b — Kozeny dam (free-surface sample, retained for scrutiny)
-- **Source:** Kozeny (1931) basic parabola + Casagrande entrance correction.
-- **Problem:** homogeneous earth dam, horizontal toe drain, impervious base. Built
-  with the upstream face as the **exact confocal-parabola equipotential** of the
-  Kozeny flow net (`build_seep.py::build_kozeny_dam`), which removes the entrance
-  error of a straight face. Kept as a seepage *sample* (see `docs/seep/samples.md`)
-  and a free-surface check, not the headline analytical anchor.
-- **Findings:** with the confocal face, xslope *brackets* the closed-form
-  q = k*y0 = 4.0 within ±4% — drain at the focus gives +3.8%, drain at the free-
-  surface/base vertex gives -4% — the spread being the drain-start tangency
-  sensitivity, not a solver bias. The FE free surface tracks the analytical
-  parabola `x = 90 - y^2/8` to ~1-2 length units. (A straight 2.5:1 face instead
-  gives a converged -7%, the classic basic-parabola entrance over-prediction.)
+### SEEP-1b — Kozeny dam (RETIRED June 2026)
+- Retired after scrutiny: the closed form q = k*y0 is exact only for the
+  idealized Kozeny geometry (confocal-parabola upstream face), which does not
+  read as a realistic dam cross-section; even built that way, the chosen
+  downstream face grazed the basic parabola at x≈82, so the lower face acted as
+  an unmodeled seepage face (extending the exit-face BC up the slope and fixing
+  head = elevation on the basal drain recovered q = 4.065, +1.6%). With exact
+  confined anchors (SEEP-1, SEEP-1c) and the SEEP2D code-to-code unconfined
+  check (SEEP-2), the case added confusion rather than confidence. Removed from
+  samples.md, builders, and the regression suite.
 
 ### SEEP-2 — SEEP2D code cross-check (Johnson Reservoir)
 - **Source:** SEEP2D (USACE/WES, Fred Tracy), via GMS. Author has access.

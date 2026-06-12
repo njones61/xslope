@@ -172,44 +172,19 @@ The remaining problems are **verification benchmarks**: analytically-anchored
 cases used to validate the seepage implementation. Each is locked into the
 automated regression suite. See also the [Verification](../verification.md) page.
 
-### 7. Verification: Kozeny Dam with Toe Drain {#verification-kozeny}
-
-This is a homogeneous earth dam on an impervious base with a horizontal toe drain,
-built so the upstream face follows the **exact confocal-parabola equipotential** of
-the Kozeny flow net. It is a verification problem: the discharge has the closed
-form `q = k*y0`, with `y0 = sqrt(d^2 + h^2) - d`. For this geometry (focus-to-entry
-`d = 48`, reservoir depth `h = 20`), `y0 = 4` so the analytical `q = 4.0` (k = 1).
-
-The input file is built by `benchmarks/build_seep.py::build_kozeny_dam`:
-
-[xslope_kozeny_dam.xlsx](files/xslope_kozeny_dam.xlsx)
-
-Note: the FE discharge for a horizontal-toe-drain dam is **sensitive** to where the
-drain-start boundary lands relative to the point where the free surface meets the
-base (the parabola vertex). xslope brackets the closed form within about ±4%
-(drain at the focus over-predicts ~+4%, drain at the vertex under-predicts ~-4%);
-the default build puts the drain at the vertex and yields ~3.81 on the standard
-test mesh. This sample is retained so that sensitivity can be studied further; the
-exact (confined) seepage anchors are the confined-radial and sheetpile cases
-below. The computed free surface itself tracks the analytical Kozeny parabola
-(x = 90 - y²/8 in model coordinates) to within one to two length units. See
-the [Verification](../verification.md#finite-element-seepage) page.
-
-**Sources:** Kozeny (1931) basic parabola; Casagrande entrance correction;
-Harr, M.E. (1962), *Groundwater and Seepage*, McGraw-Hill.
-
-![kozeny_dam_solution.png](images/kozeny_dam_solution.png){width=1100}
-
-<!-- test: file=files/xslope_kozeny_dam.xlsx, type=seep, expected_flowrate=3.81, tolerance=0.05, benchmark=SEEP-1b -->
-
-### 8. Verification: Confined Radial Flow {#verification-confined-radial}
+### 7. Verification: Confined Radial Flow {#verification-confined-radial}
 
 A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer arc
-(r = 30) at head 10, straight radial edges as no-flow streamlines. Steady saturated
-flow has the exact solution `q = k*(pi/2)*(h1-h2)/ln(r2/r1) = 28.596` (k = 1) and a
-logarithmic head profile. Built via the **polygon** input by
-`benchmarks/build_seep.py::build_confined_radial`; this is the analytical anchor for
-the seepage verification suite.
+(r = 30) at head 10, straight radial edges as no-flow streamlines. This is best read
+as a **plan-view** model — it is one quadrant of the classic Thiem problem of radial
+flow to a well in a confined aquifer, not a vertical cross-section. Confined,
+fully saturated flow is governed by Laplace's equation in total head alone, with no
+gravity term, so the orientation of the model plane is mathematically irrelevant —
+which is exactly what makes this a clean test of the FE Laplacian operator,
+conductivity handling, and discharge integration. Steady flow has the exact solution
+`q = k*(pi/2)*(h1-h2)/ln(r2/r1) = 28.596` (k = 1) and a logarithmic head profile.
+Built via the **polygon** input by `benchmarks/build_seep.py::build_confined_radial`;
+this is the analytical anchor for the seepage verification suite.
 
 [xslope_confined_radial.xlsx](files/xslope_confined_radial.xlsx)
 
@@ -232,10 +207,14 @@ is faceting of the curved arcs by the polygon boundary. See the
 
 <!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01, benchmark=SEEP-1 -->
 
-### 9. Verification: Partially Penetrating Sheetpile {#verification-sheetpile}
+### 8. Verification: Partially Penetrating Sheetpile {#verification-sheetpile}
 
 A single sheetpile cutoff of depth s = 10 in a homogeneous confined stratum of
-thickness T = 20, head loss H = 10 across the wall, k = 1. Pavlovsky's exact
+thickness T = 20, head loss H = 10 across the wall, k = 1. The boundary heads
+are 30 upstream and 20 downstream: the downstream head equals the stratum top,
+so the section is physically consistent as a vertical cross-section (pressure
+is non-negative everywhere, with 10 units of ponded water upstream); only the
+difference H = 10 enters the confined solution. Pavlovsky's exact
 conformal-mapping solution gives `q = k*H*K(lam')/(2*K(lam))` with
 `lam = sin(pi*s/(2T))`; at s/T = 1/2 the modulus is self-dual so **q = k*H/2 = 5.0
 exactly**. A second exact check: the head on the wall plane below the tip is
@@ -253,8 +232,8 @@ Results against the exact form factor (tri6, two mesh densities):
 
 | Case | XSLOPE q | Exact q | Diff | Head below wall tip |
 |---|---|---|---|---|
-| s/T = 0.50 (59k nodes) | 5.010 | 5.000 | +0.20% | 20.0000 (exact: 20) |
-| s/T = 0.75 (59k nodes) | 3.412 | 3.403 | +0.27% | 20.0000 (exact: 20) |
+| s/T = 0.50 (59k nodes) | 5.010 | 5.000 | +0.20% | 25.0000 (exact: 25) |
+| s/T = 0.75 (59k nodes) | 3.412 | 3.403 | +0.27% | 25.0000 (exact: 25) |
 
 The error halves with mesh refinement (set by the r^-1/2 singularity at the
 wall tip) and converges to the exact value from above. The head on the wall

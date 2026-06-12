@@ -280,6 +280,19 @@ def piezo_cells(points):
     return cells
 
 
+def dload_cells(load_num, points):
+    """Cells for the 'dloads' sheet. points: list of (x, y, n) — normal stress n
+    applied to the ground surface, linearly interpolated between points.
+    Layout: 4-column blocks starting at col 2 (X, Y, N), points from row 4."""
+    col0 = 2 + (load_num - 1) * 4
+    cells = {}
+    for i, (x, y, n) in enumerate(points):
+        cells[cell_ref(4 + i, col0)] = x
+        cells[cell_ref(4 + i, col0 + 1)] = y
+        cells[cell_ref(4 + i, col0 + 2)] = n
+    return cells
+
+
 def seep_bc_cells(exit_face=None, head1=None, head1_pts=None,
                   head2=None, head2_pts=None):
     """Cells for the 'seep bc' sheet.

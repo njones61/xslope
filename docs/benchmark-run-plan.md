@@ -16,7 +16,12 @@ difference and report values back for the manuscript tables.
   estimate geometry from figures.
 - ACADS "correct" answers are consensus/averaged values: report agreement as
   "within the accepted band," not against a single true value.
-- For SSRM, replicate Griffiths & Lane's **non-convergence** failure criterion.
+- For SSRM, use the **displacement-catastrophe** criterion (upturn of converged
+  displacement vs F — the evidence G&L themselves publish, their Figs 2/18).
+  Systematic testing showed the literal non-convergence criterion is not
+  transferable between codes: it depends on the dt x tolerance x iteration-
+  ceiling regime, which G&L's paper does not fully document (see
+  docs/fem/overview.md, "Choosing a Failure Criterion").
 - Record the units used per case (the sources mix SI and English).
 
 ---
@@ -195,6 +200,12 @@ completeness only; they are legacy/educational, not recommended for design.)
   anchor: it exercises a thin internal barrier with a singular tip — the
   geometry cutoff-wall analyses actually involve.*
 
+  *Formula independently verified: a from-scratch finite-difference solution of
+  the same BVP (5-point Laplacian on the antisymmetric half-domain, flux through
+  the throat below the tip, sqrt(h)-Richardson extrapolation) reproduces the
+  K(lam')/2K(lam) form factor to ~0.4-0.5% at s/T = 0.25, 0.5, and 0.75 — so the
+  xslope comparison is anchored to a confirmed closed form, not a recalled one.*
+
 ### SEEP-1b — Kozeny dam (free-surface sample, retained for scrutiny)
 - **Source:** Kozeny (1931) basic parabola + Casagrande entrance correction.
 - **Problem:** homogeneous earth dam, horizontal toe drain, impervious base. Built
@@ -232,32 +243,68 @@ completeness only; they are legacy/educational, not recommended for design.)
 
 ## Mode 3 — FE Slope Stability (SSRM)
 
-Elastic-perfectly-plastic Mohr-Coulomb, plane strain, viscoplastic algorithm.
-Failure = non-convergence at the critical strength reduction factor (match G&L).
+Elastic-perfectly-plastic Mohr-Coulomb, plane strain, viscoplastic algorithm
+(Smith & Griffiths 4-component formulation with Lode-angle corner handling).
+Failure = displacement catastrophe: sharp upturn of the converged displacement
+vs the strength-reduction factor F (G&L Figs 2/18).
 
-### SSRM-1 — Griffiths & Lane (1999) Example 1 (homogeneous)  [already matched]
-- **Source:** Griffiths & Lane (1999), Geotechnique 49(3):387-403; Rocscience
-  re-run (Sec. 3) with tabulated geometry:
+### SSRM-1 — Griffiths & Lane (1999) Example 1 (homogeneous)  [DONE]
+- **Source:** Griffiths & Lane (1999), Geotechnique 49(3):387-403, Example 1
+  (paper in `ref_docs/ref_docs_fem/`); Rocscience re-run:
   https://www.rocscience.com/assets/resources/learning/papers/Application-of-the-Finite-Element-Method-to-Slope-Stability.pdf
-- **Geometry/materials:** homogeneous slope; E = 100000, nu = 0.3, gamma = 20,
-  phi = 20 deg, c = 10 (consistent SI), dimensionless group c/(gamma*H) = 0.05.
-- **Reference FOS:** Bishop 1.40 / Griffiths FE 1.42.
-- **Status:** xslope already reproduces ~1.42 in the code; confirm and record.
-- **Capture:** xslope FOS = ____ (target ~1.42), Diff (%) = ____.
+- **Geometry/materials:** homogeneous 2:1 slope (26.57 deg), D = 1 (no
+  foundation), crest width 1.2H, slope run 2H; phi' = 20 deg, c'/(gamma*H) =
+  0.05, nominal E and nu; left rollers, fixed base; psi = 0. Existing model:
+  `docs/fem/files/xslope_griffiths1.xlsx` (H = 50, gamma = 125, c' =
+  gamma*H*0.05 — same dimensionless group, English units).
+- **Reference FOS:** G&L FE = 1.4 (their algorithm converges at 1.35 and
+  fails at 1.40, Table 2); Bishop & Morgenstern (1960) chart = 1.380.
+- **Capture:** xslope FOS = **1.41** (quad8, target_size 3.5,
+  displacement-catastrophe criterion, S&G 4-component flow rule).
+  **+0.8%** vs G&L's FE value 1.4; +2.2% vs the B&M chart. The
+  displacement-vs-F sweep shows the upturn exactly at F ~ 1.40
+  (max|u| flat 0.17-0.21 through F = 1.35, then 0.29 / 0.65 / 1.16 / 2.39
+  at F = 1.40 / 1.45 / 1.5 / 1.6).
 
 ### SSRM-2 — Griffiths & Lane (1999) Example 6 (earth dam, free surface)
-- **Source:** G&L (1999); Rocscience App. Ex. V tabulated geometry.
-- **Geometry/materials:** two-sided earth dam with free surface; c = 13.8 kPa,
-  phi = 37 deg, gamma = 18.2 kN/m3.
-- **Reference FOS:** full reservoir FE ~2.45; reservoir empty ~1.85.
-- **What to run:** SSRM with the seepage free surface for the full-reservoir case,
-  and the empty/no-pool case.
-- **Capture:**
+- **Source:** G&L (1999) Example 6, Figs 16-21; original cross-section from
+  Torres & Coffman (1997); Rocscience re-run appendix.
+- **Geometry/materials (Fig. 16, metres):** two-sided embankment on a 7.3-m
+  foundation layer; dam height H = 21.3 above foundation level; crest width
+  7.3; upstream face 18 deg, downstream face 23 deg; dam base 124.4 with
+  33.5 aprons each side. Homogeneous: c' = 13.8 kPa, phi' = 37 deg,
+  gamma = 18.2 kN/m3 above and below the water table. Free surface from
+  reservoir level (17.1 above foundation) at the upstream face down to the
+  downstream toe at foundation level; pore pressure = gamma_w x vertical
+  depth below free surface (G&L's simplification = xslope piezo line).
+  Reservoir water load applied as normal stress on the submerged upstream
+  face (xslope dload). Rollers on the foundation ends, fixed base.
+- **Reference FOS (paper, Figs 18-19):** **with free surface (reservoir
+  full) ~1.9; no free surface (before filling) ~2.4** — both confirmed by
+  the companion limit-equilibrium runs (1.90 / 2.42). (Earlier note had
+  these two swapped; failure is on the steeper downstream face, so the wet
+  dam is the weaker case.)
+- **What to run:** SSRM for both cases.
+- **Capture** (quad8, displacement-catastrophe criterion):
 
   | Case | xslope FOS | G&L FOS | Diff (%) |
   |---|---|---|---|
-  | Example 6 (full reservoir) | ____ | 2.45 | ____ |
-  | Example 6 (empty) | ____ | 1.85 | ____ |
+  | Example 6 (full reservoir, free surface) | 2.08 | ~1.9 | +10 |
+  | Example 6 (no free surface) | 2.55 | ~2.4 | +6 |
+
+  *Notes: (1) The wet result is mesh-converged — identical FS (2.083) at
+  target_size 3.5 and 2.0. (2) The input model is independently validated:
+  xslope's Spencer on the same file gives FOS = 1.915 vs G&L's limit-
+  equilibrium companion value 1.90 (+0.8%), with the critical circle on the
+  downstream face as published. (3) The relative reservoir effect matches:
+  wet/dry = 0.82 (xslope) vs 0.79 (G&L). (4) The +6-10% FEM-high offset
+  mirrors the pre-existing internal LEM-vs-SSRM gap on the Johnson
+  Reservoir worked example (Spencer 1.26 vs SSRM ~1.40, ~+11%) — a
+  consistent xslope-FEM-vs-LEM characteristic to discuss in the manuscript,
+  not a per-case anomaly. (5) G&L's published FE values were obtained with
+  their non-convergence criterion inside their code's numerical regime,
+  which is not fully documented in the paper and was found to be
+  non-transferable (see docs/fem/overview.md).*
 
 ### SSRM-3 (optional) — Rocscience tabulated cross-checks
 Clean tabulated geometry + FOS, easy to reproduce; good as supplemental

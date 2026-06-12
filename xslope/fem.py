@@ -1577,13 +1577,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             if ufr_rate < 0.99 * ufr_rate_best:
                 ufr_rate_best = ufr_rate
                 last_progress_iter = iteration
+            # Window calibration: genuinely settling states can stall for
+            # >500 iterations mid-decay (reinforced slope at F=1.6 settles at
+            # ~2900 iters with a ~1000-iter dUFR plateau on the way), so the
+            # window must be generous; post-vectorization the extra iterations
+            # cost seconds.
             if (early_exit and not plastic_settled
-                    and iteration - last_progress_iter > 500):
+                    and iteration - last_progress_iter > 1500):
                 converged = False
                 u = u_new
                 if debug_level >= 1:
                     print(f"  Early exit at iteration {iteration+1}: no dUFR "
-                          f"progress for 500 iterations (plateau "
+                          f"progress for 1500 iterations (plateau "
                           f"{ufr_rate:.2e} vs settled target "
                           f"{0.01*ufr_rate_peak:.2e}) - declared FAILED")
                 break

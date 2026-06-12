@@ -190,7 +190,7 @@ as a boundary pressure — both per the paper).
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 1.94 | ~1.9 | +2% |
+| Full reservoir (free surface) | 1.91 | ~1.9 | +1% |
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
 
 The wet case is measured at an automatically-selected characteristic point on

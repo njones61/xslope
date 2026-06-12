@@ -2,7 +2,8 @@
 """
 Regression test suite for xslope.
 
-Scans docs/{lem,fem,seep}/samples.md for test tags of the form:
+Scans docs/{lem,fem,seep}/samples.md and docs/seep/seep_slope.md for test
+tags of the form:
 
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, expected_fs=1.234, num_slices=30 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
@@ -118,7 +119,7 @@ def run_fem_test(test):
     """Run a single FEM SSRM test."""
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, solve_ssrm
-    from xslope.mesh import get_material_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons, extract_constraint_line_geometry
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
@@ -127,11 +128,23 @@ def run_fem_test(test):
 
     slope_data = load_slope_data(file_path)
 
-    reinf_geom = extract_reinforcement_line_geometry(slope_data)
-    polygons = get_material_polygons(slope_data, reinf_lines=reinf_geom)
-    mesh = build_mesh_from_polygons(
-        polygons, target_size=target_size, element_type=element_type, lines=reinf_geom
-    )
+    # Seepage-coupled models (material u option = 'seep') must run on the SAME
+    # mesh as the stored seepage solution: seep_u is nodal, and build_fem_data
+    # silently zeroes the pore pressures if the node count differs.
+    uses_seep = any(str(m.get('u', '')).strip().lower() == 'seep'
+                    for m in slope_data.get('materials', []))
+    if uses_seep and slope_data.get('mesh') is not None:
+        mesh = slope_data['mesh']
+    else:
+        # constraint lines include BOTH reinforcement and pile axes — pile
+        # beam elements require their axis lines in the mesh (a
+        # reinforcement-only extraction silently drops the piles)
+        constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+        polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+        mesh = build_mesh_from_polygons(
+            polygons, target_size=target_size, element_type=element_type,
+            lines=constraint_lines
+        )
 
     fem_data = build_fem_data(slope_data, mesh)
     f_min = test.get('f_min', 0.5)
@@ -223,6 +236,21 @@ def main():
         seep_samples = Path('docs/seep/samples.md')
         if seep_samples.exists():
             tests.extend(parse_test_tags(seep_samples))
+
+    # docs/seep/seep_slope.md mixes seepage, LEM, and FEM tests (the combined
+    # Johnson Reservoir example) — always scan it and route each test by type.
+    seep_slope = Path('docs/seep/seep_slope.md')
+    if seep_slope.exists():
+        for t in parse_test_tags(seep_slope):
+            ttype = t.get('type', '')
+            if ttype == 'fem_ssrm':
+                if run_fem:
+                    tests.append(t)
+            elif ttype == 'seep':
+                if run_seep:
+                    tests.append(t)
+            elif run_lem:
+                tests.append(t)
 
     if args.skip_benchmarks:
         n_before = len(tests)

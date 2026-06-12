@@ -315,10 +315,16 @@ The Excel file is then loaded for a LEM analysis, and the inputs are plotted aga
 
 ![seep_slope_lem_inputs.png](images/seep_slope_lem_inputs.png){width=1200px}
 
-Note the mesh display in the background. This indicates that the mesh file and the seep solution file) are automatically loaded when the Excel file is imported. These two files are used to define pore pressures for the LEM analysis. In this case, all three materials have the 'seep' option selected for pore pressures in the materials table. This is the resulting solution:
+Note the mesh display in the background. This indicates that the mesh file and the seep solution file are automatically loaded when the Excel file is imported. These two files are used to define pore pressures for the LEM analysis. In this case, all three materials have the 'seep' option selected for pore pressures in the materials table. A critical-circle search with Spencer's method gives **FS = 1.26**:
 
 ![seep_slope_lem_results.png](images/seep_slope_lem_results.png){width=1200px}
 
-Finally, the same Excel file and the corresponding mesh and seep solution file are imported again for a FEM slope stability analysis. The results are as follows:
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.26, tolerance=0.02 -->
+
+Finally, the same Excel file and the corresponding mesh and seepage solution files are imported again for a FEM slope stability analysis. The shear strength reduction method (SSRM) is run with the `displacement_increase` failure criterion and the tension cutoff enabled — the recommended settings for problems with a submerged slope face, where the reservoir load produces localized boundary deformation that never fully settles (see [Failure Criteria](../fem/overview.md) for details). The interpolated pore pressures from the seepage solution are applied at every Gauss point, so the FEM analysis uses exactly the same pore pressure field as the LEM analysis. The result is **FS = 1.28**, and the plots below show the solution at the computed factor of safety:
 
 ![seep_slope_fem_results.png](images/seep_slope_fem_results.png){width=1200px}
+
+<!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.28, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=4000, criterion=displacement_increase, cutoff=true -->
+
+The deformed mesh and displacement vectors show a deep-seated mechanism through the embankment and into the foundation, consistent with the critical circle found by the LEM search. The FEM factor of safety of 1.28 agrees with the Spencer's method result of 1.26 to within about 2% — typical of the agreement between SSRM and a well-converged limit equilibrium solution when both use the same strength and pore pressure inputs. Since neither method depends on the other (the LEM prescribes a circular surface, while the FEM develops the failure mechanism from the stress field alone), this agreement provides a strong mutual check on the combined seepage and slope stability workflow.

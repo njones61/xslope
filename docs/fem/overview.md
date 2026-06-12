@@ -459,7 +459,7 @@ This automatic selection is what makes the criterion robust for **submerged-boun
 | Problem class | Criterion | Why |
 |---|---|---|
 | Dry slopes, reinforced slopes, no reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior |
-| Submerged boundaries / reservoir loading | `displacement_increase` + `tension_cutoff=True` | Boundary-corner artifact creep contaminates every *global* displacement measure (settled test, displacement limit, and global-max readings all bias high); the criterion's automatic characteristic-point selection reads the upturn on the mechanism itself (validated: G&L Ex. 6 wet 1.94 vs published ~1.9; Johnson Reservoir 1.30 vs Spencer 1.26) |
+| Submerged boundaries / reservoir loading | `displacement_increase` + `tension_cutoff=True` | Boundary-corner artifact creep contaminates every *global* displacement measure (settled test, displacement limit, and global-max readings all bias high); the criterion's automatic characteristic-point selection reads the upturn on the mechanism itself (validated: G&L Ex. 6 wet 1.91 vs published ~1.9; Johnson Reservoir 1.28 vs Spencer 1.26) |
 | Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve; read the upturn |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.

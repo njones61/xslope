@@ -53,7 +53,7 @@ deformation rather than assuming fixed forces. Long-run equilibrium verification
 genuine failure boundary: at F = 1.6 the viscoplastic field settles to true equilibrium
 (displacement constant to six digits), while at F = 1.75 it creeps indefinitely.
 
-The plots below show the state at **F = 1.50**, just below the LEM (Spencer) factor of safety. The
+The plots below show the solution at the computed factor of safety (**F = 1.67**). The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
 middle plot shows the viscoplastic shear strain concentration with reinforcement elements
 colored by axial force (blue = low, red = high); green elements are inactive (no tension)
@@ -68,25 +68,25 @@ Reinforcement summary:
 === Reinforcement Summary ===
 Line  Elems     Max T     Avg T  Tension  In Lp  At Tres  Broken  Status
 --------------------------------------------------------------------------------
-   1      9     259.6     129.6        8      4        0       0  OK
-   2      9     484.3     330.2        8      4        0       0  OK
-   3      9     574.1     453.9        7      4        0       1  PULLOUT
-   4      9     640.3     492.9        7      4        0       1  PULLOUT
-   5      9     663.5     479.8        7      4        0       1  PULLOUT
-   6      9     556.6     412.1        7      4        0       1  PULLOUT
+   1      9     722.8     497.9        7      4        3       2  YIELDED
+   2      9     663.1     569.0        6      4        4       2  YIELDED
+   3      9     644.0     489.4        7      4        4       2  YIELDED
+   4      9     774.7     524.2        7      4        4       2  YIELDED
+   5      9     696.1     523.8        7      4        4       2  YIELDED
+   6      9     725.5     596.4        7      4        0       1  PULLOUT
 --------------------------------------------------------------------------------
 
-  OK: All elements within allowable capacity, no failures.
   PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.
+  YIELDED: One or more elements have exceeded Tallow and dropped to residual capacity Tres. The line is still carrying load at reduced strength.
 ```
 
 <!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.67, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.2, f_max=1.9, max_iter=4000 -->
 
-The results show that reinforcement lines 3-6 experience pullout failure at the ends where
-embedment is shortest, while lines 1-2 remain fully intact. The maximum mobilized force at
-this stage is 664 lb/ft (line 5), below the $T_{max}$ of 800 lb/ft — consistent with the
-ductile character of the response: capacity is mobilized progressively rather than lost
-abruptly.
+At the factor of safety, the reinforcement is heavily mobilized: lines 1-5 have yielded
+(interior elements at residual capacity $T_{res}$ = 600 lb/ft) and line 6 shows end pullout,
+with peak forces of 644-775 lb/ft approaching $T_{max}$ = 800 lb/ft. This is the expected
+state at incipient failure — the system fails when the soil's reduced strength and the
+reinforcement's residual capacity can no longer balance the driving forces together.
 
 ### 2. Slope Stabilized with Drilled Shaft Piles
 
@@ -125,11 +125,11 @@ FEM mesh with boundary conditions. The piles are shown as green line elements al
 
 ![piles_fem_mesh.png](images/piles_fem_mesh.png){width=1000}
 
-SSRM results without piles (**FS = 1.19**). The shear strain concentration shows a failure mechanism passing through the toe:
+SSRM results without piles (**FS = 1.18**). The shear strain concentration shows a failure mechanism passing through the toe:
 
 ![piles_fem_results_no_pile.png](images/piles_fem_results_no_pile.png){width=1000}
 
-SSRM results with two rows of piles (**FS = 1.32**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
+SSRM results with two rows of piles (**FS = 1.38**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
@@ -139,16 +139,16 @@ Pile summary:
 === Pile Summary ===
 Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
 --------------------------------------------------------------------------------
-   1      7    1316.9    1277.3    5473.8    7666.7   10000.0    0/7  OK
-   2      9    2512.0     583.4    2522.8    7666.7   10000.0    0/9  OK
+   1      7     482.1    2116.7    6352.4    7666.7   10000.0    0/7  OK
+   2      9    1280.6    2323.6    7227.6    7666.7   10000.0    0/9  OK
 --------------------------------------------------------------------------------
 ```
 
-The two rows of piles increase the factor of safety from 1.19 to 1.32 — an 11% improvement. The maximum bending moment (5474 per unit width in Pile 1) reaches about 55% of the moment capacity ($M_{\text{cap}}/S$ = 10,000), indicating that the structural capacity does not govern for this problem. The soil's ability to transfer lateral load to the piles is the limiting factor, not the pile strength.
+The two rows of piles increase the factor of safety from 1.18 to 1.38 — a 17% improvement. The maximum bending moment (7228 per unit width in Pile 2) reaches about 72% of the moment capacity ($M_{\text{cap}}/S$ = 10,000), and the maximum shear about 30% of $V_{\text{cap}}/S$, so the structural capacity does not govern for this problem. The soil's ability to transfer lateral load to the piles is the limiting factor, not the pile strength.
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.18, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.5, max_iter=4000 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=4000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 
@@ -178,24 +178,36 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![non_circ_inputs.png](images/non_circ_inputs.png){width=1000}
 
-FEM mesh with boundary conditions and material zones:
+FEM mesh with boundary conditions and material zones. **Mesh resolution matters for this
+problem**: the soft clay layer is only 2 ft thick, and the mesh must place at least two
+elements through its thickness to resolve the shear band that controls the failure
+mechanism — a target element size of 1.0 ft (or finer) is required. A coarser mesh
+stiffens the thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.88**. The top plot shows the deformed mesh at F = 1.95,
-the last converged trial below the displacement catastrophe. The middle plot shows the viscoplastic shear strain concentration, which clearly
-reveals the non-circular failure mechanism passing through the thin weak clay layer — matching the expected behavior
-without any prior assumption about the failure surface shape. The bottom plot shows the displacement vectors,
-confirming lateral sliding of the slope mass along the clay layer.
+SSRM results. The computed factor of safety is **FS = 1.89** (mesh-converged: identical at
+target sizes 1.0 and 0.75). The plots show the solution at the computed factor of safety.
+The middle plot shows the viscoplastic shear strain concentration, which clearly reveals the
+non-circular failure mechanism passing through the thin weak clay layer — matching the
+expected behavior without any prior assumption about the failure surface shape. The bottom
+plot shows the displacement vectors, confirming lateral sliding of the slope mass along the
+clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 1.88 is higher than the LEM result of FS = 1.74 obtained using Spencer's method, consistent with the FEM-above-LEM offset observed on other problems with this geometry class.
-This is consistent with the general observation that the SSRM tends to give slightly higher factors of safety than
-LEM for non-circular mechanisms, since the FEM finds the natural failure mode through the global stress field rather
-than being constrained to a prescribed failure surface geometry.
+The FEM result of FS = 1.89 is about 9% higher than the LEM result of FS = 1.74 obtained
+using Spencer's method. Part of this difference is genuine to the methods: the FEM develops
+the failure mechanism through the global stress field — including the stress redistribution
+that the undrained clay layer permits — while the LEM evaluates equilibrium on a prescribed
+surface with rigid-block kinematics. Differences of this order between SSRM and LEM are
+commonly reported for weak-layer mechanisms and are a useful reminder that the two methods
+answer subtly different questions.
 
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.88, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
+<!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
+     target_size=1.0 or finer (FS is mesh-converged at 1.0: ts=2.0 gives 1.878,
+     ts=1.0 and 0.75 both give 1.891) -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.89, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
 
 
 ---
@@ -237,12 +249,11 @@ bracketing the published values: [Griffiths & Lane (1999)](https://doi.org/10.16
 report FE FOS = 1.4 (their tolerant convergence check accepts slow residual creep that
 XSLOPE's equilibrium criterion rejects; their Table 2 converges at F = 1.35 and fails at
 1.40), and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129)
-stability chart gives 1.380. All three readings agree within ±3%. The plots below show the state at F = 1.40 — the last
-strength-reduction trial that converges before the displacement catastrophe (the reported
-FS = 1.41 is the refined catastrophe location, so the trial label in the figure reads 1.40).
-The top plot shows the deformed mesh; the bottom plot shows the viscoplastic shear strain
-concentration, which reveals the circular failure mechanism without any prior assumption about
-its shape or location.
+stability chart gives 1.380. All three readings agree within ±3%. The plots below show the
+solution at the computed factor of safety (F = 1.36). The top plot shows the deformed mesh;
+the middle plot shows the viscoplastic shear strain concentration, which reveals the circular
+failure mechanism without any prior assumption about its shape or location; the bottom plot
+shows the displacement vectors.
 
 ![griffiths1_results.png](images/griffiths1_results.png){width=1000}
 
@@ -291,8 +302,25 @@ Results:
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 1.94 | ~1.9 | +2% |
+| Full reservoir (free surface) | 1.91 | ~1.9 | +1% |
 | Before filling (no free surface) | 2.45 | ~2.4 | +2% |
+
+Solution for the before-filling (dry) case at the computed factor of safety (F = 2.45). The
+shear strain concentration and displacement vectors show the critical mechanism passing
+beneath the crest and exiting on the downstream face:
+
+![griffiths6_dry_results.png](images/griffiths6_dry_results.png){width=1000}
+
+Solution for the full-reservoir case at the computed factor of safety (F = 1.91). With the
+free surface in place, the downstream slope is the weaker side: the shear strain band runs
+from the crest to the downstream toe, and the displacement vectors show the rotational
+sliding mass — the same surface found by Griffiths & Lane and by XSLOPE's own Spencer
+analysis. (The color scale is capped at a shear strain of 0.05 and the vector lengths at
+their 95th percentile; without the caps, the plot scales are saturated by the localized
+boundary-corner creep in the upstream foundation and the upstream-face skin deformation
+under the reservoir load — the benign artifacts discussed below.)
+
+![griffiths6_full_results.png](images/griffiths6_full_results.png){width=1000}
 
 The wet-case result uses the **characteristic-point** displacement measure,
 auto-selected by the displacement-catastrophe criterion (it lands on the
@@ -307,5 +335,5 @@ same downstream critical surface), and the relative reservoir effect matches
 the paper (wet/dry = 0.80 vs 0.79). See the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
-<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.94, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.4, f_max=2.4, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=1.5, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
+<!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.91, element_type=quad8, target_size=1.5, tolerance=0.01, f_min=1.4, f_max=2.4, max_iter=4000, criterion=displacement_increase, cutoff=true, benchmark=SSRM-2 -->

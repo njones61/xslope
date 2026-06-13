@@ -319,7 +319,7 @@ Note the mesh display in the background. This indicates that the mesh file and t
 
 ![seep_slope_lem_results.png](images/seep_slope_lem_results.png){width=1200px}
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.25, tolerance=0.02 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, expected_fs=1.25, num_slices=50, tolerance=0.02 -->
 
 Finally, the same Excel file and the corresponding mesh and seepage solution files are imported again for a FEM slope stability analysis. The pore pressures from the seepage solution are interpolated to every Gauss point and enter the analysis through the effective-stress formulation (see [FEM Overview](../fem/overview.md)), so the FEM uses exactly the same pore pressure field as the LEM analysis, and the reservoir water above the submerged upstream face is applied as a consistent boundary pressure. The shear strength reduction method (SSRM) is run with the default non-convergence criterion. The result is **FS = 1.29**, and the plots below show the solution at the computed factor of safety:
 

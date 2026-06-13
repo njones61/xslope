@@ -146,12 +146,19 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         bc_type[mask] = 1
         bc_values[mask] = head_value
 
-    # Process seep face (exit face) boundary conditions
+    # Process seep face (exit face) boundary conditions.
+    # A node that already carries a specified head (bc_type == 1) keeps it:
+    # specified head is a true Dirichlet condition and must win over the
+    # free-boundary exit face at shared corner nodes (e.g. the downstream toe,
+    # which lies on both the exit-face line and the tailwater head line). If
+    # the exit face is allowed to claim that corner, the active-set logic can
+    # deactivate it and the fixed tailwater head floats free, raising the whole
+    # downstream field and depressing the through-flow.
     exit_face_coords = seepage_bc.get("exit_face", [])
     if len(exit_face_coords) >= 2:
         seg_coords = np.array(exit_face_coords)
         dists = _min_distance_to_polyline(nodes, seg_coords)
-        mask = dists <= tolerance
+        mask = (dists <= tolerance) & (bc_type != 1)
         bc_type[mask] = 2
         bc_values[mask] = nodes[mask, 1]  # Use node's y-coordinate as elevation
     
@@ -566,14 +573,6 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         residual = np.max(np.abs(h_new - h)) / (np.max(np.abs(h)) + 1e-10)
         residuals.append(residual)
 
-        # Flow-closure error, measured against the kr-CONSISTENT matrix: the
-        # conductivities are rebuilt from the heads just computed, and the
-        # closure asks whether those heads still balance flow through that
-        # matrix. (Flows from the matrix the heads were SOLVED with balance
-        # identically — the imbalance the closure check has historically
-        # reported is exactly this kr lag plus relaxation.) The rebuilt data
-        # also serves as next iteration's matrix, so the only extra cost is
-        # one matvec.
         # Flow-closure probe, measured on the UNRELAXED iterate: q_chk =
         # A(kr(h_solved)) . h_solved. The free rows of A(kr_prev) . h_solved
         # are zero by construction, so this residual isolates the pure

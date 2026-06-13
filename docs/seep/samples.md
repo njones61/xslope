@@ -68,7 +68,7 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.342, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.44, tolerance=0.05 -->
 
 ### 4. Johnson Reservoir {#johnson-reservoir}
 
@@ -104,7 +104,7 @@ where the two codes' unsaturated relative-permeability treatments differ in
 detail; the bulk flow field agrees to about 0.1 ft. See the
 [Verification](../verification.md#finite-element-seepage) page.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.953, tolerance=0.05, benchmark=SEEP-2 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.958, tolerance=0.05, benchmark=SEEP-2 -->
 
 ### 5. Earth Dam with Core and Filter
 
@@ -122,7 +122,7 @@ The solution should look something like this:
 
 ![earth_dam2_solution.png](images/earth_dam2_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, expected_flowrate=1.269, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, expected_flowrate=1.275, tolerance=0.05 -->
 
 ### 6. Levee with Grouted Foundation
 

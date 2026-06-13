@@ -239,10 +239,13 @@ When **exit face boundary conditions are present** (i.e., any nodes with `bc_typ
   3. Evaluate relative conductivity using linear front method: $k_r = kr_{frontal}(\psi, kr_0, h_0)$<br>
   4. Assemble modified conductivity matrix: $[K_{modified}] = k_r [K]$<br>
   5. Solve linear system with current conductivity matrix<br>
-  6. Check convergence: $||h_{new} - h_{old}|| < tolerance$<br>
+  6. Check convergence (see below)<br>
   7. Repeat steps 2-6 until convergence or maximum iterations reached
 
-- **Convergence Criteria:** Based on change in hydraulic head between iterations, with tolerance scaled to domain size
+- **Convergence Criteria:** A **hybrid** test — all three conditions must hold simultaneously:
+  1. *Head change*: $||h_{new} - h_{old}||_\infty <$ tolerance (scaled to domain height). A head-change test alone is not sufficient: how a given head tolerance maps to mass-balance error varies from problem to problem, so a tolerance that gives good flow closure on one model can leave a percent-level imbalance on another.
+  2. *Flow closure*: the unsigned nodal flow residual at free nodes, evaluated with the conductivity matrix rebuilt from the current (unrelaxed) heads, must drop below `closure_tol` (default 0.1%) of the inflow. This measures the remaining nonlinear (k_r) lag directly in flow units, so the reported flowrate balances to `closure_tol` on every problem regardless of the head tolerance — the converged discharge is tolerance-independent.
+  3. *Exit-face stability*: the seepage-face active set must be unchanged from the previous iteration (the flowrate is not meaningful while exit nodes are still switching).
 - **Exit Face Handling:** Iteratively determines which nodes experience seepage discharge vs. no-flow conditions
 - **Higher-Order Exit Faces:** For `tri6`, `quad8`, and `quad9` meshes, seepage activity is updated edge-by-edge so a quadratic exit-face side is either fully active or fully inactive
 - **Computational Cost:** Significantly higher than saturated analysis due to nonlinear iterations

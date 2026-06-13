@@ -148,8 +148,15 @@ detail; the bulk flow field agrees to about 0.1 ft.
 ## Finite-Element Slope Stability (SSRM)
 
 The SSRM implementation uses the Smith & Griffiths 4-component plane-strain
-Mohr-Coulomb viscoplastic formulation with the displacement-catastrophe failure
-criterion (see [FEM Overview](fem/overview.md)).
+Mohr-Coulomb viscoplastic formulation. The factor of safety is found by
+bisection on the **equilibrium (non-convergence) criterion** — the default —
+which brackets the strength reduction at which the viscoplastic iteration can
+no longer reach true equilibrium. The displacement-versus-$F$ catastrophe sweep
+is available as a secondary diagnostic and is shown below for Example 1. Pore
+pressures (where present) enter through the effective-stress formulation, and
+reservoir loads are applied as consistent boundary tractions, so submerged
+problems converge without any special criterion (see
+[FEM Overview](fem/overview.md)).
 
 ### Griffiths & Lane (1999) Example 1 — homogeneous slope
 

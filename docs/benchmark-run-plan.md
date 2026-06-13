@@ -65,7 +65,7 @@ completeness only; they are legacy/educational, not recommended for design.)
   |---|---|---|---|
   | Ordinary (OMS) | 0.942 | 1.00 | -5.8 |
   | Bishop's Simplified | 0.987 | 1.00 | -1.3 |
-  | Simplified Janbu | 0.992 | 1.00 | -0.8 |
+  | Simplified Janbu | 0.987 | 1.00 | -1.3 |
   | Corps of Engineers | 0.991 | 1.00 | -0.9 |
   | Lowe & Karafiath | 0.987 | 1.00 | -1.3 |
   | Spencer | 0.986 | 1.00 | -1.4 |
@@ -94,7 +94,7 @@ completeness only; they are legacy/educational, not recommended for design.)
   | Spencer | 1.279 | ~1.26 | +1.5 |
   | Corps of Engineers | 1.355 | ~1.26 | +7.6 |
   | Lowe & Karafiath | 1.268 | ~1.26 | +0.6 |
-  | Simplified Janbu | 1.278 | ~1.26 | +1.4 |
+  | Simplified Janbu | 1.297 | ~1.26 | +2.9 |
 
   *Corps of Engineers uses **variant 2** (side forces parallel to the ground
   surface at each slice top — the standard "Corps of Engineers #2" convention;
@@ -122,7 +122,7 @@ completeness only; they are legacy/educational, not recommended for design.)
   |---|---|---|---|
   | Ordinary (OMS) | 1.344 | 1.451 | -7.4 |
   | Bishop's Simplified | 1.404 | 1.451 | -3.2 |
-  | Simplified Janbu | 1.441 | 1.451 | -0.7 |
+  | Simplified Janbu | 1.412 | 1.451 | -2.7 |
   | Corps of Engineers | 1.477 | 1.451 | +1.8 |
   | Lowe & Karafiath | 1.439 | 1.451 | -0.8 |
   | Spencer | 1.402 | 1.451 | -3.4 |

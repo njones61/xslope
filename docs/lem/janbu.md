@@ -6,37 +6,28 @@ The forces on the slice considered by the Janbu method are as follows:
 
 >>![oms_slice.png](images/oms_slice.png){width=200px}
 
-For the Janbu method, the side forces are assumed to cancel each other and are therefore ignored. The method does not satisfy moment equilibrium and only partially satisfies force equilibrium. It can be used on both circular and non-circular failure surfaces. 
+For the Janbu method, the inter-slice **shear** forces are assumed to be zero (the inter-slice normal forces are retained). The method satisfies overall **horizontal force equilibrium** of the sliding mass but does not satisfy moment equilibrium. It can be used on both circular and non-circular failure surfaces.
 
-From the basic theory of limit equilibrium, the factor of safety $F$ is defined as the ratio of the resisting forces to the driving forces acting on the sliding mass, or:
+!!! note "Janbu's method is not the Ordinary Method of Slices"
+    Because the inter-slice shear is neglected, the base normal force must be obtained from **vertical equilibrium of each slice**, which makes the factor of safety iterative — exactly as in Bishop's method. Using the simpler Ordinary (Fellenius) normal force $N = W\cos\alpha$ together with a $\sum W\sin\alpha$ denominator does **not** give Janbu's method; it gives the Ordinary Method of Slices. XSLOPE solves the iterative vertical-equilibrium normal below.
 
->>$F = \dfrac{\sum \text{Resisting Forces}}{\sum \text{Driving Forces}}$
+**Base normal force (vertical equilibrium).** Summing forces vertically on a slice, neglecting the inter-slice shear, with the mobilized base shear $S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$:
 
-For the Janbu simplified method, equilibrium is analyzed along the base of each slice. The resisting forces are the shear resistance at the base of each slice, while the driving forces are the weight of each slice acting parallel to the base of the slice. The  shear force on the base of each slice is given by:
+>>$N\cos\alpha + S\sin\alpha = W$
 
->>$S = c \Delta \ell + (N - u \Delta \ell) \tan\phi   \qquad (1)$
+Solving for the (total) base normal force $N$ gives the Bishop/Janbu form, with $F$ appearing through $m_\alpha$:
 
-To get the normal force N, we sum forces in perpendicular to the base of the slice. The normal force N is given by:
+>>$N = \dfrac{W - \dfrac{1}{F}\left(c\,\Delta\ell - u\,\Delta\ell\tan\phi\right)\sin\alpha}{m_\alpha}, \qquad m_\alpha = \cos\alpha + \dfrac{\sin\alpha\,\tan\phi}{F}  \qquad (1)$
 
->>$N = W \cos\alpha  \qquad (2)$
+The mobilized base shear capacity (resisting force along the base) uses the effective normal $N' = N - u\,\Delta\ell$:
 
->>$N' = W \cos\alpha - u \Delta \ell  \qquad (3)$
+>>$S\,F = c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi   \qquad (2)$
 
-Therefore, the shear force becomes:
+**Factor of safety (horizontal force equilibrium).** Summing horizontal forces over the whole sliding mass, the inter-slice normal forces cancel and the horizontal components of the base normal ($N\sin\alpha$) and base shear ($S\cos\alpha$) must balance, $\sum S\cos\alpha = \sum N\sin\alpha$. With $S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$ this gives:
 
->>$S = c \Delta \ell + N' \tan\phi$
+>>$F = \dfrac{\sum \left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]\cos\alpha}{\sum N\sin\alpha}     \qquad (3)$
 
->>$S = c \Delta \ell + (W \cos\alpha - u \Delta \ell) \tan\phi  \qquad (4)$
-
-This represents the resisting force on the base of the slice. The driving force is the component of the weight acting parallel to the base of the slice, which is given by:
-
->>$W \sin\alpha     \qquad (5)$
-
-So the factor of safety can be expressed as:
-
->>$F = \dfrac{resisting force}{driving force}   \qquad (6)$
-
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - u \Delta \ell) \tan\phi\right]}{\sum W \sin\alpha}     \qquad (7)$
+Because $N$ depends on $F$ through $m_\alpha$ in equation (1), equations (1) and (3) are solved by iteration (repeated substitution, starting from $F = 1$) until $F$ converges. This base value is then multiplied by Janbu's correction factor $f_o$ below. (This formulation matches the force-equilibrium factor of safety $F_f$ at zero inter-slice-shear, i.e. the Janbu Simplified value reported by codes such as GeoStudio SLOPE/W.)
 
 ## Correction Factor $f_o$
 
@@ -48,7 +39,7 @@ The correction factor $f_o$ is based on the following relationship:
 
 The d/L ratio is the ratio of the distance from the center of the failure surface to the point of interest (d) and the length of the failure surface (L). The correction factor is used to account for the fact that the Janbu method does not satisfy moment equilibrium. The correction factor is a function of the d/L ratio and is calculated using the following equation:
 
->>$f_o = 1 + b_1  * \left[\dfrac{d}{L} - 1.4 * \left(\dfrac{d}{L}\right)^2\right]    \qquad (8)$
+>>$f_o = 1 + b_1  * \left[\dfrac{d}{L} - 1.4 * \left(\dfrac{d}{L}\right)^2\right]    \qquad (4)$
 
 The $b_1$ value is a function of the soils in the slope and is found as follows:
 
@@ -59,11 +50,13 @@ The $b_1$ value is a function of the soils in the slope and is found as follows:
 | c-$\phi$ soil                       | 0.5   |
 | $\phi$-only soil (no cohesion)      | 0.31  |
 
-This correction attempts to mimic the effects of moment balance and interslice forces without modeling them directly. Thus, the final factor of safety equation for Janbu's Simplified Method becomes:
+The polynomial in equation (4) is a fit to Janbu's design chart and is only valid up to the chart domain. It reaches a maximum at $d/L = 1/2.8 \approx 0.357$ and turns over (eventually dropping below 1) for larger $d/L$, which is unphysical. Since $d/L$ is geometrically unbounded, XSLOPE clamps it to that peak so $f_o$ saturates at its maximum rather than decreasing for very deep surfaces. Typical slip surfaces have $d/L$ well below the peak (the verification benchmarks are $\approx 0.13$–$0.20$), so this only guards pathological geometries.
 
->>$F_{corr} = f_o \cdot F   \qquad (9)$
+This correction attempts to mimic the effects of moment balance and interslice forces without modeling them directly. Thus, the final factor of safety for Janbu's Simplified Method becomes:
 
-Where $F_{corr}$ is the corrected factor of safety, $F$ is the factor of safety calculated using equation (7), and $f_o$ is the correction factor.
+>>$F_{corr} = f_o \cdot F   \qquad (5)$
+
+Where $F_{corr}$ is the corrected factor of safety, $F$ is the base factor of safety from equation (3), and $f_o$ is the correction factor.
 
 ## Complete Formulation with Extra Forces
 
@@ -82,31 +75,21 @@ $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 
-Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, and $H$ are included in the Janbu simplified method factor of safety equation as follows:
+Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The external forces enter in two places: their **vertical** components modify the base normal force (vertical equilibrium of the slice), and their **horizontal** components enter the overall horizontal force balance.
 
-To revise the factor of safety equation for Janbu's method to include the $D$, $kw$, $P$, $T$, and $H$ forces, we first need to consider how these forces affect the calculation of the effective normal force $N'$ (equation 3 above). To do this, we again sum forces perpendicular to the base of the slice. The equation for N' then becomes:
+**Effective base normal (vertical equilibrium with external forces).** Adding the vertical components of the distributed load ($D\cos\beta$), reinforcement ($P\sin\alpha$), and pile force ($H\sin\theta_p$) to the vertical equilibrium of equation (1) gives the effective base normal $N'$:
 
->>$N'  = W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell  \qquad (10)$
+>>$N'  = \dfrac{W + D\cos\beta - P\sin\alpha - H\sin\theta_p - u\,\Delta\ell\cos\alpha - \dfrac{1}{F}c\,\Delta\ell\sin\alpha}{m_\alpha}  \qquad (6)$
 
-The resisting force parallel to the base of the slice is the shear force $S$:
+The total base normal is $N = N' + u\,\Delta\ell$, and the mobilized base shear capacity is $c\,\Delta\ell + N'\tan\phi$.
 
->>$S = c \Delta \ell + N' \tan\phi$
+**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces: the seismic force $kW$ (horizontal), the distributed-load horizontal component $D\sin\beta$, and the tension-crack water force $T$ are driving; the reinforcement $P$ and the pile horizontal component $H\cos\theta_p$ are resisting. The reinforcement and pile forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator:
 
-Substituting equation (10) into this gives:
+>>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum D\sin\beta + \sum T - \sum P - \sum H\cos\theta_p}   \qquad (7)$
 
->>$S = c \Delta \ell + (W \cos \alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi   \qquad (11)$
+with $N = N' + u\,\Delta\ell$. As in the basic case, equations (6) and (7) are solved together by iteration on $F$. Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
 
-Next, we need to update the driving force parallel to the base of the slice. Updating equation (5) above gives:
-
->>$W \sin \alpha + kW \cos \alpha  - D \sin (\beta - \alpha)  + T \cos \alpha   \qquad (12)$
-
-The reinforcement force $P$ and the pile force $H$ are known applied forces, not shear strength. They must not be divided by the factor of safety. Therefore, they are subtracted from the driving forces in the denominator rather than added to the resisting forces in the numerator. Since all forces in the denominator are resolved parallel to the base of the slice, the pile force is resolved as $H \cos(\alpha - \theta_p)$ — the component of $H$ tangential to the base. The factor of safety is found by substituting the updated resisting and driving forces into equation (6):
-
->>$F = \dfrac{\sum \left[c \Delta \ell + (W \cos\alpha - kW \sin \alpha + D \cos (\beta - \alpha) - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell) \tan\phi\right]}{\sum (W \sin\alpha + kW \cos\alpha  - D \sin (\beta - \alpha)  + T \cos \alpha) - \sum P - \sum H \cos (\alpha - \theta_p)}   \qquad (13)$
-
-Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
-
-Once again, we apply the correction factor $f_o$ to account for the neglect of interslice forces and moment equilibrium as shown in equation (9) above.
+Once again, the correction factor $f_o$ is applied to account for the neglect of inter-slice shear as shown in equation (5) above.
 
 ---
 

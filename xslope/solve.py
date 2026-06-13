@@ -387,20 +387,36 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
 
     return False, "Bishop method did not converge within the maximum number of iterations."
 
-def janbu(slice_df, debug=False):
+def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     """
-    Computes FS using Janbu's Simplified Method with correction factor (Equation 7).
+    Computes FS using Janbu's Simplified Method with the f0 correction factor.
 
-    Implements the complete formulation including distributed loads, seismic forces,
-    reinforcement, and tension crack water forces. Applies Janbu correction factor
-    based on d/L ratio and soil type.
+    Janbu's Simplified Method satisfies overall HORIZONTAL FORCE equilibrium of
+    the sliding mass with the inter-slice shear forces neglected. The effective
+    base normal force is obtained from VERTICAL equilibrium of each slice — the
+    same m_alpha = cosα + sinα·tanφ/F relation used by Bishop's method — which
+    makes the factor of safety iterative in F. The base (uncorrected) factor of
+    safety is then multiplied by Janbu's empirical correction factor
+    f0(d/L, soil type), which compensates for neglecting the inter-slice shear.
+
+    This is the standard Janbu Simplified formulation (matching e.g. GeoStudio
+    SLOPE/W's F_f at lambda=0). It is NOT the Ordinary/Fellenius normal force —
+    using N = W·cosα − u·dl with a ΣW·sinα denominator (an earlier xslope error)
+    collapses the base FS onto the Ordinary Method of Slices.
+
+    Implements the full slice force budget: distributed loads (dload at the load
+    inclination beta), seismic force (kw, horizontal), tension-crack water force
+    (t, horizontal), line reinforcement (p), and pile forces (h_pile/theta_p).
 
     Parameters:
         slice_df : pandas.DataFrame with required columns (see OMS spec)
         debug : bool, if True prints diagnostic info
+        tol : float, convergence tolerance on F
+        max_iter : int, maximum fixed-point iterations
 
     Returns:
-        (bool, dict | str): (True, {'method': 'janbu_simplified', 'FS': value, 'fo': correction_factor})
+        (bool, dict | str): (True, {'method': 'janbu', 'FS': corrected_value,
+                            'fo': correction_factor, 'FS_base': uncorrected_value})
                            or (False, error message)
     """
 
@@ -426,24 +442,48 @@ def janbu(slice_df, debug=False):
     sin_alpha = np.sin(alpha)
     cos_alpha = np.cos(alpha)
     tan_phi = np.tan(phi)
-    sin_beta_alpha = np.sin(beta - alpha)
-    cos_beta_alpha = np.cos(beta - alpha)
+    cos_beta = np.cos(beta)
+    sin_beta = np.sin(beta)
 
-    # Effective normal forces — pile force resolved normal to base: +H·sin(α−θp)
-    N_eff = W * cos_alpha - kw * sin_alpha + D * cos_beta_alpha - T * sin_alpha - u * dl + H_pile * np.sin(alpha - theta_p)
+    # Pile force components: vertical H·sin(θp) into vertical equilibrium,
+    # horizontal H·cos(θp) into the horizontal force balance.
+    H_sin_tp = H_pile * np.sin(theta_p)
+    H_cos_tp = H_pile * np.cos(theta_p)
 
-    # Numerator: resisting forces (shear resistance only, Equation 13)
-    numerator = np.sum(c * dl + N_eff * tan_phi)
+    # External horizontal driving forces (independent of F): seismic (driving),
+    # distributed-load horizontal component (driving), tension-crack water
+    # (driving), reinforcement and pile horizontal components (resisting).
+    horiz_ext = (np.sum(kw) + np.sum(D * sin_beta) + np.sum(T)
+                 - np.sum(P) - np.sum(H_cos_tp))
 
-    # Denominator: driving forces minus known resisting forces (Equation 13)
-    # P and pile tangential component are known resisting forces, subtracted from driving forces.
-    denominator = np.sum(W * sin_alpha + kw * cos_alpha - D * sin_beta_alpha + T * cos_alpha) - np.sum(P) - np.sum(H_pile * np.cos(alpha - theta_p))
+    # Iterate F: the base normal depends on F through m_alpha, exactly as Bishop.
+    F = 1.0
+    N_eff = None
+    converged = False
+    for _ in range(max_iter):
+        m_alpha = cos_alpha + sin_alpha * tan_phi / F
+        # Effective base normal from VERTICAL slice equilibrium (Bishop's N').
+        num_N = (W + D * cos_beta - P * sin_alpha - H_sin_tp
+                 - u * dl * cos_alpha - (c * dl * sin_alpha) / F)
+        N_eff = num_N / m_alpha
+        N_total = N_eff + u * dl
+        # Horizontal force equilibrium: resisting shear (projected horizontally)
+        # over driving (base-normal horizontal component + external horizontal).
+        resisting = np.sum((c * dl + N_eff * tan_phi) * cos_alpha)
+        driving = np.sum(N_total * sin_alpha) + horiz_ext
+        if driving <= 0:
+            return False, "Net horizontal driving force is non-positive (resisting forces exceed driving forces)."
+        F_new = resisting / driving
+        if abs(F_new - F) < tol:
+            F = F_new
+            converged = True
+            break
+        F = F_new
 
-    # Base factor of safety (Equation 13)
-    if denominator <= 0:
-        return False, "Net driving force is non-positive (resisting forces exceed driving forces)."
+    if not converged:
+        return False, "Janbu method did not converge within the maximum number of iterations."
 
-    FS_base = numerator / denominator
+    FS_base = F
 
     # === Compute Janbu correction factor ===
 
@@ -479,8 +519,18 @@ def janbu(slice_df, debug=False):
     else:  # c-φ soil
         b1 = 0.50
 
-    # Correction factor
-    fo = 1 + b1 * (dL_ratio - 1.4 * dL_ratio ** 2)
+    # Correction factor. The polynomial 1 + b1·(d/L − 1.4·(d/L)²) is a fit to
+    # Janbu's correction-factor charts and is only valid up to the chart domain;
+    # it peaks at d/L = 1/2.8 ≈ 0.357 and turns over (eventually < 1) beyond
+    # that, which is unphysical. d/L is geometrically unbounded, so clamp it to
+    # the peak: f0 saturates at its maximum rather than decreasing for very deep
+    # surfaces. Typical slip surfaces have d/L well below 0.357 (the repo
+    # benchmarks are ~0.13–0.20), so this only guards pathological geometries.
+    DL_PEAK = 1.0 / 2.8
+    dL_eff = min(dL_ratio, DL_PEAK)
+    if debug and dL_ratio > DL_PEAK:
+        print(f"Janbu f0: d/L = {dL_ratio:.3f} exceeds chart peak {DL_PEAK:.3f}; clamped.")
+    fo = 1 + b1 * (dL_eff - 1.4 * dL_eff ** 2)
 
     # Final corrected factor of safety
     FS = FS_base * fo
@@ -489,21 +539,20 @@ def janbu(slice_df, debug=False):
     slice_df['n_eff'] = N_eff
 
     if debug:
-        print(f"FS_base = {FS_base:.6f}")
+        print(f"FS_base (uncorrected) = {FS_base:.6f}")
         print(f"d/L ratio = {dL_ratio:.4f}")
         print(f"b1 factor = {b1:.2f}")
         print(f"fo correction = {fo:.4f}")
         print(f"FS_corrected = {FS:.6f}")
-        print(f"Numerator = {numerator:.6f}")
-        print(f"Denominator = {denominator:.6f}")
         if np.any(H_pile > 0):
-            print(f"sum_pile_tangential = {np.sum(H_pile * np.cos(alpha - theta_p)):.6f}")
+            print(f"sum_pile_horizontal = {np.sum(H_cos_tp):.6f}")
         print("N_eff =", np.array2string(N_eff, precision=4, separator=', '))
 
     return True, {
         'method': 'janbu',
         'FS': FS,
-        'fo': fo
+        'fo': fo,
+        'FS_base': FS_base,
     }
 
 

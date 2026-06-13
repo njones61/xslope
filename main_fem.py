@@ -5,7 +5,7 @@ from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
-input_file = "test/xslope_johnson_res.xlsx"
+input_file = "docs/seep/files/xslope_johnson_res.xlsx"
 slope_data = load_slope_data(input_file)
 
 plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
@@ -42,13 +42,13 @@ fem_data = build_fem_data(slope_data, mesh)
 plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True,
               label_elements=False, label_nodes=False, save_png=True)
 
-analysis_type = "single" # @param ["single","ssrm"]
+analysis_type = "ssrm" # @param ["single","ssrm"]
 failure_criterion = "non_convergence" # @param ["non_convergence","displacement_limit","displacement_increase"]
 deform_percent = 15 # @param {"type":"number"} for plotting deformation results - percentage of slope height
 
-F = 1.40     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
-F_min=1.40  # Minimum FS for SSRM search (adjust as needed)
-F_max=1.44   # Maximum FS for SSRM search (adjust as needed)
+F = 1.2     # Initial guess for Factor of Safety (used for single analysis) - adjust as needed
+F_min=1.15  # Minimum FS for SSRM search (adjust as needed)
+F_max=1.35   # Maximum FS for SSRM search (adjust as needed)
 
 if analysis_type == "single":
     solution = solve_fem(fem_data, F=F, debug_level=2)

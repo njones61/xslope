@@ -110,6 +110,28 @@ the method on 3-4 canonical problems and compares to hand calculations on a
 2-3-slice toy problem small enough to verify by hand. The shared
 `force_equilibrium` engine gets its own auditor (it serves two methods).
 
+> **Seed finding — Janbu base formulation does not match the standard Janbu
+> Simplified (validity-critical; found June 2026 while preparing a SLOPE/W
+> comparison for the paper).** `janbu()` in `solve.py` computes its base
+> (pre-correction) factor of safety with the **Ordinary/Fellenius normal force**
+> `N_eff = W·cosα − u·dl` and a moment-style `Σ(W·sinα)` denominator. The result
+> is numerically **identical to OMS** for circular surfaces — verified on the
+> benchmark critical surfaces: ACADS Simple OMS = Janbu-base = 0.9437; Arai &
+> Tagyo OMS = Janbu-base = 1.3451 (exact match in both). The standard Janbu
+> Simplified (and SLOPE/W's `F_f` at λ=0) instead uses the **iterative
+> vertical-equilibrium normal** with `m_α = cosα + sinα·tanφ/F` and horizontal
+> force equilibrium; a from-scratch implementation of that form gives 0.9376 and
+> 1.3181 on the same surfaces. So xslope's "Simplified Janbu" is effectively
+> **OMS × f₀**, not Janbu's method, which is why xslope's *uncorrected* base does
+> not match SLOPE/W's *uncorrected* Janbu. Note SLOPE/W reports the uncorrected
+> base (no f₀ applied; see the GeoStudio *Limit Equilibrium Formulation*), so the
+> mismatch is purely in the base formulation, not the correction factor.
+> Audit task: re-derive Janbu (1968/1973) base equation, decide whether to adopt
+> the iterative `m_α` normal + horizontal-force denominator (changes published
+> Janbu numbers — escalate to Norm), and either way reconcile the `janbu()` ≡
+> `oms()` coincidence. Captured at `solve.py:janbu()` (the `N_eff` / numerator /
+> denominator block) and `docs/lem/janbu.md`.
+
 **1b. Cross-method consistency battery (one harness agent):**
 - All methods on a frictionless (φ=0) circular problem → OMS, Bishop, Spencer
   must agree exactly (analytical property).

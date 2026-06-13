@@ -684,10 +684,21 @@ def corps_engineers(slice_df, variant=2, debug=False):
       variant=1: a single constant θ = inclination of the line from the bottom to
                  the top of the failure surface (the crest-to-toe chord).
       variant=2 (default): θ at each slice boundary parallel to the GROUND SURFACE
-                 (slice top). Robust under an unconstrained non-circular search;
-                 variant 1 uses one fixed θ everywhere and can return a spuriously
-                 low FS on surfaces with steep segments (the search exploits this),
-                 so variant 2 is the default for self-searching use.
+                 (slice top).
+
+    Variant 2 is the default because it is robust under an unconstrained
+    search (variant 1 uses one fixed θ everywhere and can return a spuriously
+    low FS on surfaces with steep segments, which a self-search exploits).
+    Note that variant 2 is NOT the conservative choice: the ground-parallel
+    convention systematically gives the HIGHEST (least conservative) factor of
+    safety among XSLOPE's methods — typically a few percent to ~15% above
+    Spencer — and the USACE manual itself notes the "average embankment slope"
+    assumption can be unconservative. Report a rigorous method (Spencer) for
+    design; use Corps for comparison.
+
+    Both Corps conventions and Lowe & Karafiath set the inter-slice inclination
+    from the signed ground/base slope and negate it on right-facing slopes, so
+    the force-equilibrium factor of safety is mirror-symmetric.
 
     Parameters:
         slice_df (pd.DataFrame): Must include ['x_l','y_lt','x_r','y_rt'] plus all
@@ -708,7 +719,7 @@ def corps_engineers(slice_df, variant=2, debug=False):
         if abs(dx) < 1e-12:
             theta_deg = 90.0
         else:
-            theta_deg = abs(np.degrees(np.arctan2(dy, dx)))
+            theta_deg = np.degrees(np.arctan2(dy, dx))  # signed crest-to-toe chord
         theta_list = np.full(n+1, theta_deg)
         theta_out = theta_deg
     else:
@@ -728,6 +739,19 @@ def corps_engineers(slice_df, variant=2, debug=False):
                 s = 0.5*(slope_top[j-1] + slope_top[j])
             theta_list[j] = np.degrees(np.arctan(s))
         theta_out = float(np.mean(theta_list))
+
+    # The force-equilibrium engine marches slices left→right with a hard-coded
+    # sliding sense (Z[0]=0 at the left). On a right-facing slope the signed
+    # ground/chord slope carries the wrong sign for that march, so the
+    # inter-slice inclinations are negated — the same convention lowe_karafiath
+    # uses. This is a no-op for left-facing slopes (the common case and every
+    # shipped benchmark). Without it, force-equilibrium FS is asymmetric under
+    # mirroring and can violate the expected method ordering on right-facing
+    # geometries.
+    right_facing = slice_df['y_lt'].iat[0] > slice_df['y_rt'].iat[-1]
+    if right_facing:
+        theta_list = -theta_list
+        theta_out = -theta_out
 
     slice_df['theta'] = theta_list[:-1]  # store theta in slice_df. Adjust length to n slices.
 

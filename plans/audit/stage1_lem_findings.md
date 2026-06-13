@@ -130,3 +130,37 @@ Relevant source: `/Users/njones/python_projects/xslope/xslope/solve.py`, `/Users
 **Bishop:** xslope 0.98738961 vs independent 0.9873895 — agree: True
 
 **Spencer:** xslope 0.9862236382 vs independent 0.9862236382 — agree: True
+
+---
+
+## Resolution log (applied fixes)
+
+**F1 + F2 + F8 (Janbu) — FIXED** (commit: Janbu reimplementation). `janbu()` now
+solves the true Janbu Simplified: vertical-equilibrium normal with m_α (iterative
+on F) + horizontal force equilibrium `F = Σ[(c·dl + N'·tanφ)cosα]/Σ(N·sinα + ext)`.
+f0 polynomial clamped at its chart peak (d/L = 1/2.8). Returns FS_base.
+Published Janbu numbers updated: acads_simple 0.992→0.987, arai 1.441→1.412,
+acads_weak 1.278→1.297. docs/lem/janbu.md rewritten.
+
+**F3 + F4 + F7 (Corps) — FIXED**; **F5 (Lowe-Karafiath) — NO CHANGE (audit
+premise was wrong).** A focused mirror investigation showed the F4/F5
+"contradiction" was illusory: it compared buggy Corps-v2 (signed, NO flip)
+against correct LK (signed, WITH flip). The correct rule for BOTH is signed
+slope + flip-if-right-facing (restores "θ positive = uphill along the engine's
+hard-coded increasing-x march", per USACE EM 1110-2-1902). Applied: Corps v1
+drops abs() → signed chord; Corps v1 and v2 negate θ when right-facing (mirroring
+LK). LK is unchanged. force_equilibrium engine unchanged (a residual deep-circle
+facing-robustness edge case remains, triggered by no benchmark — noted for future
+hardening). LK exceeding Spencer is documented method behavior (USACE: force
+methods within ±10% of rigorous, sometimes unconservative), occurs symmetrically
+on left-facing too — NOT a bug. F3: docstring/force_eq.md corrected — variant 2
+is the default for robustness, not safety (it is the LEAST conservative method).
+**Zero published-number impact** — every shipped benchmark is left-facing, where
+the flip is a no-op; only right-facing correctness (previously asymmetric/wrong)
+is fixed.
+
+**Still open (Tier 2/3, no published-number impact):** F6 (force_equilibrium
+single-guess secant fragility — bracketed solver), F11 (force-method spurious
+high root on phi=0 + dominant vertical load — warn/document), F9 (theta_p radians
+doc), F10 (OMS right-facing distributed-load moment-arm sign), F12/F14/F15/F16
+(doc/tolerance cosmetics).

@@ -239,5 +239,16 @@ Both conventions are available in xslope through the `variant` argument of `corp
 
 xslope defaults to **variant 2**. Because xslope can drive its own non-circular search, a single fixed inclination
 (variant 1) can return a spuriously low factor of safety on surfaces with steep segments — the search will seek out
-exactly those surfaces. The per-slice ground-parallel inclination (variant 2) is robust to this and is the safer
-default; variant 1 remains available to reproduce the "#1" results reported by other codes on a fixed surface.
+exactly those surfaces. The per-slice ground-parallel inclination (variant 2) is robust to this, which is why it is
+the default; variant 1 remains available to reproduce the "#1" results reported by other codes on a fixed surface.
+
+Variant 2 is the default for robustness, **not** because it is conservative. The ground-parallel ("Corps #2")
+convention systematically produces the **highest (least conservative)** factor of safety among xslope's methods —
+typically a few percent to ~15% above Spencer — and the USACE manual itself notes that the average-embankment-slope
+assumption can be unconservative. Use a rigorous method (Spencer) for design and report Corps for comparison.
+
+**Inter-slice inclination sign convention.** The force-equilibrium engine assembles slices from left to right with
+a fixed sliding sense. Both Corps conventions and Lowe & Karafiath therefore take the inter-slice inclination from
+the *signed* ground (or base) slope and negate it on right-facing slopes, so the computed factor of safety is the
+same for a slope and its mirror image. (Lowe & Karafiath exceeding Spencer on some geometries is expected behavior
+for a force-equilibrium method, not an error — see the USACE manual.)

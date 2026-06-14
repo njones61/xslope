@@ -2,7 +2,9 @@
 
 Spencer's Method is a complete equilibrium slope stability method that satisfies both force and moment equilibrium 
 and can be used on circular and non-circular slip surfaces. The primary assumption for Spencer's method is that all 
-side forces are parallel, i.e., the interslice forces have a constant inclination angle $\theta$.
+side forces are parallel, i.e., the interslice forces have a constant inclination angle $\theta$. Because it 
+satisfies all conditions of equilibrium, Spencer's method is the most rigorous procedure in xslope and is the 
+recommended choice for design; the other methods are best treated as comparative checks against it.
 
 The following derivation is adapted from the US Army Corps of Engineers (USACE) UTEXAS Version 2.0 user manual, which is based on the original work by Spencer (1967). The UTEXAS manual can accessed via this [link](https://apps.dtic.mil/sti/tr/pdf/ADA207044.pdf){target='blank'}. The equations come from Appendix A which was authored by Stephen G. Wright at the University of Texas at Austin, and the primary author of the UTEXAS slope stability software. 
 

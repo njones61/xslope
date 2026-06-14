@@ -1,6 +1,6 @@
 # Bishop's Simplified Method
 
-Bishop's Simplified Method is a widely used limit equilibrium technique for analyzing slope stability, especially suitable for **circular slip surfaces**. It improves on the Ordinary Method of Slices by including interslice normal forces and satisfies both **moment** and **vertical force** equilibrium. The key assumptions are:
+Bishop's Simplified Method is a widely used limit equilibrium technique for analyzing slope stability, especially suitable for **circular slip surfaces**. It improves on the Ordinary Method of Slices by including interslice normal forces and satisfies both **moment** and **vertical force** equilibrium. On circular surfaces its factor of safety is typically very close to the rigorous Spencer value, which makes it a dependable choice for routine design and a convenient check on Spencer; its main restriction is that it applies only to circular slip surfaces. The key assumptions are:
 
 - Circular slip surface  
 - Interslice side forces are **horizontal** and the moments they create are negligible

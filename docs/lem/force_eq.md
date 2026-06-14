@@ -6,7 +6,7 @@ moment equilibrium equations. There are several variations of the force equilibr
 assumptions used for the side force inclination. In **xslope**, two variations of the force equilibrium method are 
 supported: the **Lowe and 
 Karafiath** method and the **US Army Corps of Engineers** method. Both methods use the same equations, but they differ in 
-the side force assumptions.
+the side force assumptions. Because they satisfy force but not moment equilibrium, the computed factor of safety depends on the assumed side-force inclination and can be inaccurate — too high or too low — so these methods are best used for comparison, with a complete-equilibrium method such as Spencer preferred for design (see [Conventions and Limitations](#conventions-and-limitations) below).
 
 ## Forces Acting on the Slice
 

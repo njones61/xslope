@@ -1,6 +1,6 @@
 # Ordinary Method of Slices (OMS)
 
-The Ordinary Method of Slices (also known as the Swedish Method) is one of the simplest limit equilibrium techniques used for slope stability analysis. The factor of safety to be calculated directly without iteration. The key assumption for the OMS method is that the side forces can be neglected, meaning interslice shear and normal forces cancel out and are excluded from equilibrium considerations. Thus, the forces on the slice are as follows:
+The Ordinary Method of Slices (also known as the Swedish Method) is one of the simplest limit equilibrium techniques used for slope stability analysis. The factor of safety to be calculated directly without iteration. The key assumption for the OMS method is that the side forces can be neglected, meaning interslice shear and normal forces cancel out and are excluded from equilibrium considerations. Because it ignores interslice forces entirely and satisfies only overall moment equilibrium, OMS is the least accurate of the procedures in xslope — it can be markedly conservative on effective-stress surfaces with high pore pressures — and is included primarily as a historical and teaching baseline rather than for design. The forces on the slice are as follows:
 
 >![oms_slice.png](images/oms_slice.png){ width=200px }
 

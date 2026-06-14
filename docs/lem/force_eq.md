@@ -3,9 +3,9 @@
 The force equilibrium method is a common method used to analyze the stability of slopes. It works for both circular 
 and non-circular surfaces. It satisfies the force equilibrium equations for each slice, but it does not satisfy the 
 moment equilibrium equations. There are several variations of the force equilibrium method, depending on the 
-assumptions used for the side force inclination. In ******xslope******, two variations of the force equilibrium method are 
+assumptions used for the side force inclination. In **xslope**, two variations of the force equilibrium method are 
 supported: the **Lowe and 
-Karafaith** method and the **US Army Corps of Engineers** method. Both methods use the same equations, but they differ in 
+Karafiath** method and the **US Army Corps of Engineers** method. Both methods use the same equations, but they differ in 
 the side force assumptions.
 
 ## Forces Acting on the Slice
@@ -217,9 +217,9 @@ Once again, care must be taken to ensure that the tension crack water force ($T$
 The side force inclination is a critical parameter in the force equilibrium method. Two solution methods are 
 supported in **xslope**:
 
-### Lowe and Karafaith
+### Lowe and Karafiath
 
-The Lowe and Karafaith method assumes that the side force inclinations are equal to the average slope of ground 
+The Lowe and Karafiath method assumes that the side force inclinations are equal to the average slope of ground 
 surface and slip surface as defined by the top and bottom of the slice. 
 
 !!! warning "Lowe-Karafiath on non-circular surfaces"
@@ -229,18 +229,21 @@ surface and slip surface as defined by the top and bottom of the slice.
 
 ### US Army Corps of Engineers
 
-The US Army Corps of Engineers method assumes that the side force inclinations are parallel to the slope angle, 
-using one of the following methods:
+The US Army Corps of Engineers method assumes the side-force inclinations are parallel to the slope. The figure
+below (from EM 1110-2-1902) illustrates three such conventions; xslope implements the top and bottom ones:
 
 ![uscoe_theta.png](images/uscoe_theta.png){width=500px }
 
-Both conventions are available in xslope through the `variant` argument of `corps_engineers`:
+The convention is selected through the `variant` argument of `corps_engineers`:
 
-- **variant 1** — a single constant inclination parallel to a line connecting the bottom of the failure surface to
-  the top of the failure surface (the crest-to-toe chord). This matches the "Corps of Engineers #1" option in
-  commercial packages.
-- **variant 2 (default)** — the inclination at each slice boundary is parallel to the ground surface at the top of
-  that slice (the "Corps of Engineers #2" option).
+- **variant 1** (top panel) — a single constant inclination parallel to a line connecting the bottom of the failure
+  surface to the top of the failure surface (the crest-to-toe chord). This matches the "Corps of Engineers #1"
+  option in commercial packages.
+- **variant 2 (default)** (bottom panel) — the inclination at each slice boundary is parallel to the ground surface
+  at the top of that slice (the "Corps of Engineers #2" option).
+
+The **middle panel** of the figure — all side forces parallel to a single fixed line distinct from the crest-to-toe
+chord — is a third Corps convention that xslope does not currently support.
 
 xslope defaults to **variant 2**. Because xslope can drive its own non-circular search, a single fixed inclination
 (variant 1) can return a spuriously low factor of safety on surfaces with steep segments — the search will seek out
@@ -249,8 +252,10 @@ the default; variant 1 remains available to reproduce the "#1" results reported 
 
 Variant 2 is the default for robustness, **not** because it is conservative. The ground-parallel ("Corps #2")
 convention systematically produces the **highest (least conservative)** factor of safety among xslope's methods —
-typically a few percent to ~15% above Spencer — and the USACE manual itself notes that the average-embankment-slope
-assumption can be unconservative. Use a rigorous method (Spencer) for design and report Corps for comparison.
+typically a few percent to ~15% above Spencer. EM 1110-2-1902 cautions that methods which do not satisfy all
+conditions of equilibrium "may involve significant inaccuracies and should be used only under the restricted
+conditions described herein"; use a rigorous, complete-equilibrium method (Spencer) for design and report Corps for
+comparison.
 
 ## Conventions and Limitations
 
@@ -259,8 +264,9 @@ The following apply to **both** the Lowe & Karafiath and Corps of Engineers meth
 **Inter-slice inclination sign convention.** The force-equilibrium engine assembles slices from left to right with
 a fixed sliding sense. Both Corps conventions and Lowe & Karafiath therefore take the inter-slice inclination from
 the *signed* ground (or base) slope and negate it on right-facing slopes, so the computed factor of safety is the
-same for a slope and its mirror image. (Lowe & Karafiath exceeding Spencer on some geometries is expected behavior
-for a force-equilibrium method, not an error — see the USACE manual.)
+same for a slope and its mirror image. (A force-equilibrium factor of safety differing from Spencer's — in either
+direction — is expected given the side-force assumption, not a numerical error; EM 1110-2-1902 notes that methods
+which do not satisfy all conditions of equilibrium can be significantly inaccurate.)
 
 **Limitation — undrained ($\phi = 0$) surfaces with a dominant vertical load.** Because the force-equilibrium
 methods satisfy only horizontal force equilibrium, they are unreliable on $\phi = 0$ surfaces carrying a large
@@ -271,3 +277,9 @@ caught by convergence checks. On a submerged $\phi = 0$ test slope the Corps and
 exceed the moment-method value (Ordinary = Bishop = Spencer) by a factor of three to five. Use a moment-satisfying
 method (Bishop, Spencer, Morgenstern-Price) for undrained or heavily surcharged slopes; the force-equilibrium
 methods are appropriate for drained, frictional materials.
+
+## References
+
+- Lowe, J., and Karafiath, L. (1960). "Stability of earth dams upon drawdown." *Proceedings of the First Pan-American Conference on Soil Mechanics and Foundation Engineering*, Mexico City, Vol. 2, pp. 537–552.
+- U.S. Army Corps of Engineers (2003). *Slope Stability*. Engineer Manual [EM 1110-2-1902](https://www.publications.usace.army.mil/Portals/76/Publications/EngineerManuals/EM_1110-2-1902.pdf), Department of the Army, Washington, DC.
+- Duncan, J. M., Wright, S. G., and Brandon, T. L. (2014). *Soil Strength and Slope Stability*, 2nd ed. John Wiley & Sons, Hoboken, NJ.

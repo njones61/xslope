@@ -64,11 +64,11 @@ completeness only; they are legacy/educational, not recommended for design.)
   | Method | xslope FOS | Reference FOS | Diff (%) |
   |---|---|---|---|
   | Ordinary (OMS) | 0.942 | 1.00 | -5.8 |
-  | Bishop's Simplified | 0.987 | 1.00 | -1.3 |
-  | Simplified Janbu | 0.987 | 1.00 | -1.3 |
-  | Corps of Engineers | 0.991 | 1.00 | -0.9 |
+  | Bishop's Simplified | 0.985 | 1.00 | -1.5 |
+  | Simplified Janbu | 0.986 | 1.00 | -1.4 |
+  | Corps of Engineers | 0.990 | 1.00 | -1.0 |
   | Lowe & Karafiath | 0.987 | 1.00 | -1.3 |
-  | Spencer | 0.986 | 1.00 | -1.4 |
+  | Spencer | 0.984 | 1.00 | -1.6 |
 
   *xslope FOS = automated critical-circle search, 50 slices, each method searched
   independently. Corps of Engineers uses variant 2 (per-slice ground-parallel
@@ -122,10 +122,10 @@ completeness only; they are legacy/educational, not recommended for design.)
   |---|---|---|---|
   | Ordinary (OMS) | 1.344 | 1.451 | -7.4 |
   | Bishop's Simplified | 1.404 | 1.451 | -3.2 |
-  | Simplified Janbu | 1.412 | 1.451 | -2.7 |
-  | Corps of Engineers | 1.477 | 1.451 | +1.8 |
-  | Lowe & Karafiath | 1.439 | 1.451 | -0.8 |
-  | Spencer | 1.402 | 1.451 | -3.4 |
+  | Simplified Janbu | 1.411 | 1.451 | -2.8 |
+  | Corps of Engineers | 1.476 | 1.451 | +1.7 |
+  | Lowe & Karafiath | 1.438 | 1.451 | -0.9 |
+  | Spencer | 1.401 | 1.451 | -3.4 |
 
 ### LEM-3 (optional) — Fredlund & Krahn (1977) method ordering
 - **Source:** Fredlund & Krahn (1977), Can. Geotech. J. 14(3):429-439.

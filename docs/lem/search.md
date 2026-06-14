@@ -24,7 +24,7 @@ Again, the new points on this grid are evaluated for minimum FS. If the best poi
 
 ![alt text](images/autosearch_grid4.png)
 
-Each of the new points on this grid are then evaluated. This iterative process of grid evaluation and refinement continues until the grid size falls below the convergence tolerance (default 1% of the vertical distance between the ground surface maximum elevation and maximum depth). The algorithm tracks its progression through the search space, recording each jump to a new best location along with the corresponding factor of safety. Diagnostic output provides detailed information about each iteration, including the current center coordinates, factor of safety, and grid size, allowing users to monitor the convergence behavior. The search typically converges within 10-20 iterations, depending on the complexity of the slope geometry and the quality of the initial starting guess.
+Each of the new points on this grid are then evaluated. This iterative process of grid evaluation and refinement continues until the **factor of safety stops changing**, rather than until the grid reaches some fixed spacing. Specifically, the search converges once two successive refinement levels each lower the best factor of safety by less than `fs_tol` (default `5e-4`, so the reported FS is stable to three decimal places), provided the center grid has already refined below a small fraction of the slope height (`min_grid_frac`, default 1%). That second condition prevents a coarse grid from stopping early on a plateau before it has resolved the true minimum. A geometric grid floor (`tol`) and an iteration cap (`max_iter`) remain only as backstops. Keying convergence on the factor of safety rather than an absolute grid length makes the stopping point **scale-invariant** — a fixed length threshold such as "grid < 0.01" would mean something entirely different on a 20 ft slope than on a 500 ft slope. The algorithm tracks its progression through the search space, recording each jump to a new best location along with the corresponding factor of safety. Diagnostic output reports the center coordinates, factor of safety, and grid size at each iteration. The search typically converges within 10-20 iterations, depending on the complexity of the slope geometry and the quality of the initial starting guess.
 
 Throughout the search process, the algorithm maintains a comprehensive cache (`fs_cache`) that stores every evaluated circle configuration along with its computed factor of safety and associated solution details. This cache serves multiple purposes: it prevents redundant calculations, enables post-analysis visualization of the entire search space, and provides a ranked list of all evaluated failure surfaces. The cache is implemented as a dictionary keyed by (x, y) coordinates, with each entry storing the circle center coordinates, depth, factor of safety, slice dataframe, failure surface geometry, and the detailed solver results.
 
@@ -90,13 +90,16 @@ slope_data = load_slope_data("inputs/slope/input_template_reliability6.xlsx")
 
 # Perform circular search using Spencer's method
 # The 'circles' in slope_data provide the starting guess(es)
-fs_cache, converged, search_path = circular_search(
+fs_cache, converged, search_path, circle_cache = circular_search(
     slope_data,
     method_name='spencer',
-    diagnostic=False,  # Set True to see detailed iteration output
-    tol=0.01,         # Convergence tolerance in length units
-    max_iter=50,      # Maximum iterations
-    shrink_factor=0.5 # Grid reduction factor
+    diagnostic=False,    # Set True to see detailed iteration output
+    num_slices=40,       # Slices per trial surface (default 40)
+    fs_tol=5e-4,         # FS convergence tolerance (stable to ~3 decimals)
+    min_grid_frac=0.01,  # Min center-grid resolution (fraction of slope height)
+    max_iter=50,         # Maximum iterations (backstop)
+    shrink_factor=0.5,   # Grid reduction factor
+    tol=0.01,            # Geometric grid floor (backstop only)
 )
 
 # Check if search converged

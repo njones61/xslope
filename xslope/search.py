@@ -252,16 +252,18 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path, circle_cache
 
-def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30):
+def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0):
     """
     Non-circular search using the specified solver.
 
-    NOTE: convergence here is intentionally left as-is (absolute movement_distance
-    and move_tol). Scaling/refining it is unsafe until the search can reject
-    over-steep toe surfaces: with Spencer, a near-vertical base segment running up
-    to the toe is a spurious local minimum, and a finer or differently-scaled
-    search slides the points into it (see the SEARCH-2 admissibility item in
-    plans/plan_comprehensive_audit.md). Revisit together with that work.
+    A geometric admissibility guard (`max_base_angle`) rejects trial surfaces with
+    an over-steep base segment. Without it the coordinate-descent search drives the
+    points into a near-vertical base running up to the toe, which the rigorous
+    methods (Spencer especially) score as a spurious low minimum. Capping the base
+    inclination keeps the search on physically realistic surfaces. (The convergence
+    criterion itself is kept absolute — see the SEARCH-2 item in
+    plans/plan_comprehensive_audit.md — but the guard removes the degeneracy that
+    blocked refining it.)
 
     Parameters:
     -----------
@@ -281,6 +283,11 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         Maximum number of iterations
     move_tol : float
         Minimum movement distance for convergence (AND logic with fs_tol)
+    max_base_angle : float
+        Maximum allowed base inclination (degrees) for any slice. Trial surfaces
+        with a steeper base are rejected as inadmissible. Default 65 deg, the
+        active-wedge angle (45 + phi/2) for phi ~ 40 deg, near the steep end of
+        realistic soils; steeper bases are geometrically unrealistic slip surfaces.
 
     Returns:
     --------
@@ -350,6 +357,14 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
             return float('inf'), None, None, None, fs_cache
             
         df_slices, failure_surface = result
+
+        # Admissibility guard: reject surfaces with an over-steep base segment. A
+        # near-vertical base (typically running up to the toe) is geometrically
+        # unrealistic and is the spurious low-FS minimum the coordinate-descent
+        # search would otherwise slide into (worst for Spencer/Lowe).
+        if np.abs(df_slices['alpha'].values).max() > max_base_angle:
+            return float('inf'), None, None, None, fs_cache
+
         if rapid:
             solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
         else:

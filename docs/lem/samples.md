@@ -295,10 +295,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| — | — | 1.657 | 1.794 | 1.138 | 1.739 |
+| — | — | 1.657 | 1.794 | 1.369 | 1.739 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.657, fs_corps=1.794, fs_lowe=1.138, fs_spencer=1.739 -->
+<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.657, fs_corps=1.794, fs_lowe=1.369, fs_spencer=1.739 -->
 
 ### 8. Earth Dam 
 

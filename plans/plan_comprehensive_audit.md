@@ -203,6 +203,17 @@ Everything upstream of the solvers — where an error poisons every method equal
   > this neighborhood" policy so the search does not dead-end. Consider geometric
   > contortion limits (per-slice α-change caps) as a complementary, cheaper guard.
   >
+  > **PARTIALLY DONE (June 2026):** the cheap geometric guard is implemented for the
+  > non-circular search — `noncircular_search(max_base_angle=65°)` rejects trial
+  > surfaces with an over-steep base (the near-vertical toe that gives Spencer/Lowe a
+  > spurious low minimum). Fixed the noncircular-sample Lowe degeneracy (1.138@88.7° →
+  > 1.369@64.6°); all benchmark/rigorous values unchanged. NOTE the boundary-rider
+  > behavior is real: Lowe's FS decreases monotonically as the toe steepens, so it
+  > pins to the cap and its value is cap-sensitive (documented as a method outlier).
+  > STILL OPEN: extent-based tension/negative-normal filter (per Norm's no-naive-reject
+  > constraint), the same guard for the *circular* search, and the bracketed root
+  > finder (F6) — these still land together.
+  >
   > **Absorbs audit finding F6** (`force_equilibrium` single-guess secant root
   > finder). Replacing it with a bracketed solver (brentq) was TRIED and REVERTED:
   > it fixes the legitimate low-FS case (a phi=0 surface returning FS≈0.72 instead

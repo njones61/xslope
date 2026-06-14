@@ -241,6 +241,14 @@ Everything upstream of the solvers — where an error poisons every method equal
   > Evidence: `plans/audit/stage2_pipeline_findings.md` §5.
 - Reliability (`advanced.py`): distribution handling, COV math.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
+  > **TENSION-CRACK FACING CHECK (TODO).** Verify the tension-crack logic — both the
+  > dry crack and the water-filled crack (T force) — is sign-correct for **left- AND
+  > right-facing slopes across all methods**. This is the same facing-symmetry class
+  > as F10 (dload moment arm) and the pile fix: the crack water thrust T and its
+  > moment arm `a_t = Yo - y_t` are built in real coordinates and may not flip with
+  > facing. Use the mirror-symmetry harness (reflect geometry about a vertical axis,
+  > re-solve) — a model with a tension crack (with and without water) must give the
+  > same FS as its mirror image for oms/bishop/janbu/corps/lowe/spencer.
 - Each: one auditor + verifier; cross-check LEM vs FEM where both support the
   feature (e.g. reinforced slope LEM vs `reinforce_fem`).
 

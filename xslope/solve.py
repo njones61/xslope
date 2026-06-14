@@ -583,7 +583,7 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     }
 
 
-def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False):
+def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False, right_facing=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
 
@@ -686,21 +686,44 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
         r0 = residual(fs_guess)
         print(f"FS_guess={fs_guess:.6f} → residual={r0:.4g}")
 
-    # use Newton‐secant (no derivative) with single initial guess.
-    # NOTE: a single-guess secant from fs_guess=1.5 diverges when the true FS is
-    # well below the guess (a flat residual tail), so genuinely low-FS surfaces
-    # fail loudly rather than returning a value. A bracketed solver (brentq)
-    # fixes that legitimate case BUT also makes the solver return an FS on the
-    # numerically degenerate surfaces a free search can construct (negative base
-    # normals / pervasive interslice tension), turning a loud failure into a
-    # silent spurious minimum. The robust root finder must therefore land
-    # together with the search-admissibility filter — see the Stage-2 seed item
-    # in plans/plan_comprehensive_audit.md. Left as-is for now (fails loudly,
-    # no silent wrong answer; benchmarks converge).
+    # Root-find FS such that the right-end interslice force Z[n] = 0, by Newton-
+    # secant from fs_guess. (A bracketed brentq solver was tried to also catch the
+    # genuinely-low-FS surfaces where the single-guess secant diverges, but it
+    # resurrects non-physical over-strength roots near FS->0 on surfaces where the
+    # secant correctly fails, which the admissibility check below does not reliably
+    # separate from legitimate low-FS solutions. Deferred — see SEARCH/F6 item in
+    # plans/plan_comprehensive_audit.md.)
     try:
         FS_opt = newton(residual, fs_guess, tol=tol, maxiter=max_iter)
     except Exception as e:
         return False, f"force_equilibrium failed to converge: {e}"
+
+    # A non-positive factor of safety is unphysical: the secant has converged onto a
+    # spurious root (it happens on some steep right-facing surfaces). Reject it.
+    if not np.isfinite(FS_opt) or FS_opt <= 0:
+        return False, f"force_equilibrium: non-physical factor of safety ({FS_opt})"
+
+    # Re-evaluate at the root so N and Z reflect FS_opt (newton's last call may differ).
+    residual(FS_opt)
+
+    # Admissibility guard. A free search can drive the force-equilibrium solver onto
+    # grossly non-physical surfaces (a large fraction of slices in base tension, or
+    # pervasive interslice tension) and report a spurious low FS. Reject those by
+    # EXTENT only — a few negative base normals or a non-monotonic thrust line occur
+    # in valid solutions and are NOT rejected (valid benchmark criticals run ~0-4%
+    # negative normals, <=20% interslice tension). See the SEARCH/F6 item in
+    # plans/plan_comprehensive_audit.md.
+    frac_N_neg = float(np.mean(N < 0)) if n else 0.0
+    # Interslice "tension" sign is convention-dependent: on right-facing slopes the
+    # caller negates theta_list, which flips the sign of Z, so there tension is Z>0.
+    Z_int = Z[1:n]
+    z_tension = (Z_int > 0) if right_facing else (Z_int < 0)
+    frac_Z_tension = float(np.mean(z_tension)) if n > 1 else 0.0
+    if frac_N_neg > 0.5 or frac_Z_tension > 0.5:
+        return False, (
+            "force_equilibrium: inadmissible solution "
+            f"({100*frac_N_neg:.0f}% of base normals in tension, "
+            f"{100*frac_Z_tension:.0f}% interslice tension)")
 
     slice_df['n_eff'] = N  # store effective normal forces in slice_df
     slice_df['z'] = Z[:-1]  # store interslice forces in slice_df, adjust length to n slices
@@ -794,7 +817,7 @@ def corps_engineers(slice_df, variant=2, debug=False):
     slice_df['theta'] = theta_list[:-1]  # store theta in slice_df. Adjust length to n slices.
 
     # delegate to your force_equilibrium solver
-    success, results = force_equilibrium(slice_df, theta_list, debug=debug)
+    success, results = force_equilibrium(slice_df, theta_list, debug=debug, right_facing=right_facing)
     if not success:
         return success, results
     else:
@@ -857,7 +880,7 @@ def lowe_karafiath(slice_df, debug=False):
     slice_df['theta'] = theta_list[:-1]  # store theta in slice_df. Adjust length to n slices.
 
     # call your force_equilibrium solver
-    success, results = force_equilibrium(slice_df, theta_list, debug=debug)
+    success, results = force_equilibrium(slice_df, theta_list, debug=debug, right_facing=right_facing)
     if not success:
         return success, results
     else:

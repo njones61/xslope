@@ -210,19 +210,40 @@ Everything upstream of the solvers — where an error poisons every method equal
   > 1.369@64.6°); all benchmark/rigorous values unchanged. NOTE the boundary-rider
   > behavior is real: Lowe's FS decreases monotonically as the toe steepens, so it
   > pins to the cap and its value is cap-sensitive (documented as a method outlier).
-  > STILL OPEN: extent-based tension/negative-normal filter (per Norm's no-naive-reject
-  > constraint), the same guard for the *circular* search, and the bracketed root
-  > finder (F6) — these still land together.
+  > **ADMISSIBILITY GUARD DONE (June 2026):** `force_equilibrium` now rejects grossly
+  > non-physical solutions by EXTENT — (a) a non-positive factor of safety (the secant
+  > converges onto a spurious negative root on some steep right-facing surfaces), and
+  > (b) >50% interslice tension, measured facing-aware (the caller negates theta_list
+  > on right-facing slopes, flipping the sign of Z, so tension is Z>0 there). Per
+  > Norm's constraint, a few negative base normals / a non-monotonic thrust line are
+  > NOT rejected — valid benchmark criticals run 0-4% negative normals, <=20% tension,
+  > vs the documented degenerate Corps-v1 surface at 71% tension. This FIXED a real,
+  > shipped bug: the table was carrying **negative** Corps FS (a negative root won the
+  > search minimum) — eight_layers -1.463 -> 1.240, reinforce -1.476 -> 1.377, piles
+  > -0.233 -> 1.369. right_facing passed from corps_engineers/lowe_karafiath. Caveat:
+  > method_slices_problem2 (steep right-facing) Corps goes -2.209 -> 0.480 — positive
+  > now, but still a degenerate-boundary value (below its own OMS); Corps genuinely
+  > rides the admissibility boundary on that geometry, as the audit predicted.
   >
-  > **Absorbs audit finding F6** (`force_equilibrium` single-guess secant root
-  > finder). Replacing it with a bracketed solver (brentq) was TRIED and REVERTED:
-  > it fixes the legitimate low-FS case (a phi=0 surface returning FS≈0.72 instead
-  > of failing) but makes the solver return a value on the degenerate search
-  > surfaces above, turning a loud failure into a silent spurious minimum
-  > (acads_simple Corps search collapsed to the bracket floor 0.05). The current
-  > secant failure inadvertently acts as a crude admissibility filter. The robust
-  > root finder and the admissibility filter must therefore land TOGETHER. Left
-  > as-is for now (fails loudly, no silent wrong answer; benchmarks converge).
+  > **STILL OPEN — OMS/Janbu near-zero degeneracy (a *geometric* SEARCH-1 issue, not
+  > force-equilibrium).** The same negative-root-wins-the-search bug also affects OMS
+  > and Janbu: earth_dam_up (full-reservoir dam, high pore pressure) carries
+  > OMS=-1838935 and Janbu=-0.000 in the table. A search-level FS guard was tried but
+  > it only relocates the problem — the search rides whatever floor is set (OMS=0.1001
+  > at floor 0.1), because earth_dam_up has a *family* of degenerate deep circles giving
+  > arbitrarily low FS (OMS is intrinsically unreliable with pore pressure). The real
+  > fix is geometric admissibility (reject degenerate circle geometry / per-slice
+  > contortion limits), not an FS threshold. Left for a dedicated SEARCH-1 effort.
+  >
+  > **BRACKETED ROOT FINDER (F6) — DEFERRED.** brentq was retried with newton as the
+  > fast primary and a high->low bracket scan as fallback. It still resurrects the
+  > non-physical over-strength roots near FS->0 (c/FS, tanφ/FS blow up) on the very
+  > surfaces where the secant correctly fails, and the admissibility filter does NOT
+  > reliably separate those from legitimate low-FS solutions (reinforce collapsed to
+  > FS=0.0025, piles to 0.62). So the legitimate-low-FS case (newton diverging from
+  > fs_guess=1.5) is still unsolved. Kept the plain secant (fails loudly, no silent
+  > wrong answer). A correct fix needs a per-circle residual-shape analysis to bracket
+  > only the physical root — its own focused effort.
 - `fileio.py`: every sheet parser vs the template; defaults when cells are blank;
   the validation rules (the pilot found seep-only models exempted but FEM-only
   models not — look for more inconsistencies).

@@ -215,10 +215,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.628 | 0.762 | 0.734 | -2.209 | 0.788 | 0.770 |
+| 0.628 | 0.762 | 0.734 | 0.480 | 0.788 | 0.770 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=-2.209, fs_lowe=0.788, fs_spencer=0.770 -->
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=0.480, fs_lowe=0.788, fs_spencer=0.770 -->
 
 ### 6. Slope with Eight Layers
 
@@ -252,10 +252,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.805 | 1.154 | 1.160 | -1.463 | 1.060 | 1.189 |
+| 0.805 | 1.154 | 1.160 | 1.240 | 1.060 | 1.189 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=40, fs_oms=0.805, fs_bishop=1.154, fs_janbu=1.160, fs_corps=-1.463, fs_lowe=1.060, fs_spencer=1.189 -->
+<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=40, fs_oms=0.805, fs_bishop=1.154, fs_janbu=1.160, fs_corps=1.240, fs_lowe=1.060, fs_spencer=1.189 -->
 
 ### 7. Non-Circular Failure Surface
 
@@ -403,10 +403,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.480 | 1.593 | 1.590 | -1.476 | 1.597 | 1.587 |
+| 1.480 | 1.593 | 1.590 | 1.377 | 1.597 | 1.587 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.590, fs_corps=-1.476, fs_lowe=1.597, fs_spencer=1.587 -->
+<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.590, fs_corps=1.377, fs_lowe=1.597, fs_spencer=1.587 -->
 
 !!! note
     The solution for this problem found by XSLOPE is not the same as the solution found by UTEXASED. The difference
@@ -506,10 +506,10 @@ produces. The FEM result is generally considered more realistic for pile-stabili
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.622 | 1.854 | 1.649 | -0.233 | 1.857 | 1.842 |
+| 1.622 | 1.854 | 1.649 | 1.369 | 1.857 | 1.842 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.854, fs_janbu=1.649, fs_corps=-0.233, fs_lowe=1.857, fs_spencer=1.842 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.854, fs_janbu=1.649, fs_corps=1.369, fs_lowe=1.857, fs_spencer=1.842 -->
 
 ### 11. Polygon Input with a Sloping Bottom
 

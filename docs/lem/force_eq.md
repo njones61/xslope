@@ -222,6 +222,11 @@ supported in **xslope**:
 The Lowe and Karafaith method assumes that the side force inclinations are equal to the average slope of ground 
 surface and slip surface as defined by the top and bottom of the slice. 
 
+!!! warning "Lowe-Karafiath on non-circular surfaces"
+    Because the side-force inclination is tied to the **base slope**, the Lowe and Karafiath method is sensitive to the *shape* of a non-circular surface. Where the base steepens — typically the segment rising to the toe — the assumed interslice angle steepens with it, and the force balance can return an artificially **low** factor of safety. During an automated non-circular search this creates a spurious local minimum: the surface is drawn toward a near-vertical toe segment because that geometry keeps lowering the Lowe-Karafiath factor of safety (the more the toe steepens, the lower the FS), even though the surface is not physically realistic. The rigorous Spencer method, which solves for a single constant interslice angle from full force *and* moment equilibrium, does not chase this artifact.
+
+    xslope's non-circular search guards against the worst of it with a base-angle cap (`max_base_angle`, default 65°, the active-wedge angle for φ ≈ 40°), which keeps the search off the near-vertical surfaces. But because Lowe-Karafiath still tends to ride that cap on irregular geometries, treat its result there as a rough check rather than the governing value, and prefer Spencer when the methods disagree. The cap does not affect circular surfaces, where the base slope varies smoothly and the assumption is well-behaved.
+
 ### US Army Corps of Engineers
 
 The US Army Corps of Engineers method assumes that the side force inclinations are parallel to the slope angle, 

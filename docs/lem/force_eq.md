@@ -244,8 +244,10 @@ The convention is selected through the `variant` argument of `corps_engineers`:
 - **variant 2 (default)** (bottom panel) — the inclination at each slice boundary is parallel to the ground surface
   at the top of that slice (the "Corps of Engineers #2" option).
 
-The **middle panel** of the figure — all side forces parallel to a single fixed line distinct from the crest-to-toe
-chord — is a third Corps convention that xslope does not currently support.
+The **middle panel** of the figure — all side forces parallel to the average embankment slope (a single straight
+line from the crest to the toe of the slope) — is a third Corps convention that xslope does not currently support.
+EM 1110-2-1902 (§C-4) notes that this average-embankment-slope assumption can yield unconservative (too-high)
+factors of safety relative to complete-equilibrium methods such as Spencer.
 
 xslope defaults to **variant 2**. Because xslope can drive its own non-circular search, a single fixed inclination
 (variant 1) can return a spuriously low factor of safety on surfaces with steep segments — the search will seek out

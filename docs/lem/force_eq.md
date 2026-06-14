@@ -227,6 +227,8 @@ surface and slip surface as defined by the top and bottom of the slice.
 
     xslope's non-circular search guards against the worst of it with a base-angle cap (`max_base_angle`, default 65°, the active-wedge angle for φ ≈ 40°), which keeps the search off the near-vertical surfaces. But because Lowe-Karafiath still tends to ride that cap on irregular geometries, treat its result there as a rough check rather than the governing value, and prefer Spencer when the methods disagree. The cap does not affect circular surfaces, where the base slope varies smoothly and the assumption is well-behaved.
 
+    For ordinary surfaces the Lowe-Karafiath assumption is well regarded: EM 1110-2-1902 (§C-4) — which describes it as the per-slice average of the ground-surface and shear-surface inclinations — judges it "better than" the single-line side-force assumptions and notes it is normally within about 10 percent of complete-equilibrium methods (Duncan & Wright 1980). The behavior above is the exception that arises only when an automated search is free to drive the base toward vertical, a case that typical-use guidance does not contemplate.
+
 ### US Army Corps of Engineers
 
 The US Army Corps of Engineers method assumes the side-force inclinations are parallel to the slope. The figure

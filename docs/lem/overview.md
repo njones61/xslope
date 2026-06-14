@@ -189,14 +189,14 @@ generally considered the best and most accurate of the methods supported in XSLO
 
 The primary features of the limit equilibrium methods supported in XSLOPE are summarized in the table below:
 
-| Method | Equilibrium Conditions                       | Failure Surface | Iterative Solution | Interslice Forces | Accuracy |
-|--------|----------------------------------------------|-----------------|--------------------|-------------------|----------|
-| Ordinary Method of Slices | Overall Moment                               | Circular | No | None | Low |
-| Simplified Janbu | $\Sigma F_x=0$                               | Circular/Non-Circular | No | None | Low |
-| Bishop's Simplified Procedure | Overall Moment, $\Sigma F_y=0$               | Circular | Yes | None | Moderate |
-| Corps Engineers | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Horizontal | High |
-| Lowe-Karafiath | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Average of Slope and Surface Angles | High |
-| Spencer's Method | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Explicit | Very High |
+| Method | Equilibrium Conditions                       | Failure Surface | Iterative Solution | Interslice Forces |
+|--------|----------------------------------------------|-----------------|--------------------|-------------------|
+| Ordinary Method of Slices | Overall Moment                               | Circular | No | None |
+| Simplified Janbu | $\Sigma F_x=0$                               | Circular/Non-Circular | No | None |
+| Bishop's Simplified Procedure | Overall Moment, $\Sigma F_y=0$               | Circular | Yes | None |
+| Corps Engineers | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Horizontal |
+| Lowe-Karafiath | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Average of Slope and Surface Angles |
+| Spencer's Method | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Explicit |
 
 ### Choosing a method
 

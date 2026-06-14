@@ -6,10 +6,7 @@ The forces on the slice considered by the Janbu method are as follows:
 
 >>![oms_slice.png](images/oms_slice.png){width=200px}
 
-For the Janbu method, the inter-slice **shear** forces are assumed to be zero (the inter-slice normal forces are retained). The method satisfies overall **horizontal force equilibrium** of the sliding mass but does not satisfy moment equilibrium. It can be used on both circular and non-circular failure surfaces.
-
-!!! note "Janbu's method is not the Ordinary Method of Slices"
-    Because the inter-slice shear is neglected, the base normal force must be obtained from **vertical equilibrium of each slice**, which makes the factor of safety iterative — exactly as in Bishop's method. Using the simpler Ordinary (Fellenius) normal force $N = W\cos\alpha$ together with a $\sum W\sin\alpha$ denominator does **not** give Janbu's method; it gives the Ordinary Method of Slices. XSLOPE solves the iterative vertical-equilibrium normal below.
+For the Janbu method, the inter-slice **shear** forces are assumed to be zero (the inter-slice normal forces are retained). The method satisfies overall **horizontal force equilibrium** of the sliding mass but does not satisfy moment equilibrium. It can be used on both circular and non-circular failure surfaces. Because the inter-slice shear is neglected, the base normal force is found from vertical equilibrium of each slice — the same iterative relation used by Bishop's method.
 
 **Base normal force (vertical equilibrium).** Summing forces vertically on a slice, neglecting the inter-slice shear, with the mobilized base shear $S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$:
 

@@ -164,6 +164,31 @@ Everything upstream of the solvers — where an error poisons every method equal
 - Search: `circular_search` grid/refinement logic (does it terminate at a local
   minimum? does the starting-circle dependence matter?), `noncircular_search`
   move/shrink logic — characterize, at minimum, sensitivity to defaults.
+
+  > **Seed item — solution admissibility filtering in the search (force methods).**
+  > A free non-circular search can drive a force-equilibrium method onto a
+  > *numerically degenerate* surface and report a spurious minimum. Demonstrated:
+  > Corps **variant 1** (single crest-toe chord θ) on the ACADS weak layer searches
+  > down to FS = 1.048 — 18% below Spencer (1.279) and below variant 1's value on
+  > the genuine critical surface (1.360). The 1.048 surface is non-physical: 3/52
+  > negative effective base normals, 37/52 tensile interslice forces (min −212),
+  > steep base reversals (α down to −63.8°), and Spencer scores the SAME surface at
+  > 1.52 — confirming it is a variant-1 artifact, not a mechanism. (This is the
+  > reason variant 2 / per-slice ground-parallel is the search default; variant 1
+  > and the abs() v1 are kept for fixed-surface "Corps #1" reproduction.)
+  > Candidate fix: reject trial surfaces whose force-equilibrium solution is grossly
+  > inadmissible during the search. **CRITICAL design constraint (Norm, from years
+  > of UTEXAS use): do NOT reject any single occurrence of base tension or a
+  > non-monotonic line of thrust — those are normal in valid solutions (small crest
+  > slices routinely show base tension; the thrust line legitimately rises and
+  > falls).** The filter must key on EXTENT/DEGREE of non-physicality (a large
+  > fraction of slices in tension, multiple negative normals, gross thrust-line
+  > excursion beyond the mass), not presence. Note this would HARDEN the search for
+  > all force methods but would NOT make variant 1 a good default (the single-θ
+  > assumption is weak on irregular surfaces; an admissibility-filtered search just
+  > converges to the admissibility boundary). Also needs a "no admissible surface in
+  > this neighborhood" policy so the search does not dead-end. Consider geometric
+  > contortion limits (per-slice α-change caps) as a complementary, cheaper guard.
 - `fileio.py`: every sheet parser vs the template; defaults when cells are blank;
   the validation rules (the pilot found seep-only models exempted but FEM-only
   models not — look for more inconsistencies).

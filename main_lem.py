@@ -12,7 +12,7 @@ slope_data = load_slope_data("docs/lem/files/xslope_sloping_bottom.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
-num_slices = 20 # @param {"type":"integer"}
+num_slices = 40 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]
 rapid_drawdown = False # @param {"type":"boolean"}

@@ -21,10 +21,21 @@ from . import solve
 from .advanced import rapid_drawdown, validate_rapid_drawdown
 from .slice import generate_slices, get_y_from_intersection
 
-def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50, shrink_factor=0.5,
-                    fs_fail=9999, depth_tol_frac=0.03, diagnostic=False, num_slices=30):
+def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
+                    shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.01, depth_tol_frac=0.03,
+                    diagnostic=False, num_slices=40):
     """
     Global 9-point circular search with adaptive grid refinement.
+
+    Convergence is driven by the factor of safety, not the grid spacing: the
+    center grid keeps refining until the best FS stops improving — specifically
+    until two successive refinement levels each gain less than ``fs_tol`` (so the
+    reported FS is stable to ~3 decimal places). FS convergence is only accepted
+    once the center grid has refined below ``min_grid_frac`` of the slope height,
+    so a coarse-grid FS plateau cannot be mistaken for the true minimum. ``tol``
+    is a geometric backstop on the grid spacing and ``max_iter`` caps the count.
+    Keying the stop on FS (not an absolute length like ``grid < 0.01``, which
+    means different things on a 20 ft vs a 500 ft slope) makes it scale-invariant.
 
     Returns:
         list of dict: sorted fs_cache by FS
@@ -55,7 +66,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
     depth_floor = slope_data['domain_polygon'].bounds[1]
     y_min = depth_floor
     delta_y = y_max - y_min
-    tol = delta_y * depth_tol_frac
+    min_grid = delta_y * min_grid_frac   # required center-grid resolution before FS convergence
 
     circles = slope_data['circles']
 
@@ -197,24 +208,42 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
     if diagnostic:
         print(f"\n[✅ launch grid] Starting refinement from FS={best_fs:.4f} at ({x0:.2f}, {y0:.2f})")
 
+    fs_level_start = best_fs   # best FS at the start of the current grid resolution
+    small_levels = 0           # consecutive refinements that barely improved FS
+
     for iteration in range(max_iter):
         print(f"[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
         fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
 
         if best_point['FS'] < best_fs:
+            # Found a better center at this resolution — move there and keep exploring.
             best_fs = best_point['FS']
             x0 = best_point['Xo']
             y0 = best_point['Yo']
             depth_guess = best_point['Depth']
             search_path.append({"x": x0, "y": y0, "FS": best_fs})
+            continue
+
+        # No improvement at this resolution. Refine the grid, and converge once the
+        # FS gain over a refinement level has been negligible twice in a row (so the
+        # third decimal of FS is stable). The grid floor `tol` is only a backstop.
+        level_gain = fs_level_start - best_fs
+        if level_gain < fs_tol and grid_size < min_grid:
+            small_levels += 1
+            if small_levels >= 2:
+                converged = True
+                elapsed = time.time() - start_time
+                print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} (ΔFS<{fs_tol}) at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
+                break
         else:
-            grid_size *= shrink_factor
+            small_levels = 0
+        fs_level_start = best_fs
+        grid_size *= shrink_factor
 
         if grid_size < tol:
             converged = True
-            end_time = time.time()
-            elapsed = end_time - start_time
-            print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
+            elapsed = time.time() - start_time
+            print(f"[✅ converged: grid floor] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
             break
 
     if not converged and diagnostic:
@@ -226,7 +255,14 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, max_iter=50,
 def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30):
     """
     Non-circular search using the specified solver.
-    
+
+    NOTE: convergence here is intentionally left as-is (absolute movement_distance
+    and move_tol). Scaling/refining it is unsafe until the search can reject
+    over-steep toe surfaces: with Spencer, a near-vertical base segment running up
+    to the toe is a spurious local minimum, and a finer or differently-scaled
+    search slides the points into it (see the SEARCH-2 admissibility item in
+    plans/plan_comprehensive_audit.md). Revisit together with that work.
+
     Parameters:
     -----------
     data : dict
@@ -245,7 +281,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         Maximum number of iterations
     move_tol : float
         Minimum movement distance for convergence (AND logic with fs_tol)
-        
+
     Returns:
     --------
     tuple : (fs_cache, converged, search_path)

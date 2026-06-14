@@ -158,7 +158,9 @@ def main():
             if content[last:last + 1] == "\n":
                 last += 1
             continue
-        print(f"  {params.get('file')}  ({params.get('type', 'circular_search')})")
+        # num_slices policy: 50 for verification benchmarks, 40 for ordinary samples.
+        params['num_slices'] = 50 if 'benchmark' in params else 40
+        print(f"  {params.get('file')}  ({params.get('type', 'circular_search')}, ns={params['num_slices']})")
         fs = compute_fs(params)
         seen[key] = fs
         cells = "  ".join(f"{s}={fs[s]:.3f}" if fs[s] is not None else f"{s}=—"

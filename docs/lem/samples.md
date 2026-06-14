@@ -36,10 +36,10 @@ represents the line of thrust computed using Spencer's method.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.215 | 1.215 | 1.336 | 1.319 | 1.263 | 1.281 |
+| 1.215 | 1.215 | 1.335 | 1.319 | 1.263 | 1.276 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.336, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.281 -->
+<!-- test: file=files/xslope_simple_embankment.xlsx, type=circular_search, num_slices=40, fs_oms=1.215, fs_bishop=1.215, fs_janbu=1.335, fs_corps=1.319, fs_lowe=1.263, fs_spencer=1.276 -->
 
 Here is copy of the input file with the following variations/changes:
 
@@ -63,10 +63,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.986 | 0.986 | 0.808 | 1.053 | 1.042 | 0.986 |
+| 0.985 | 0.985 | 0.807 | 1.050 | 1.039 | 0.986 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=30, fs_oms=0.986, fs_bishop=0.986, fs_janbu=0.808, fs_corps=1.053, fs_lowe=1.042, fs_spencer=0.986 -->
+<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.807, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986 -->
 
 ### 2. Simple Slope with Foundation
 
@@ -89,10 +89,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.962 | 0.962 | 1.026 | 1.118 | 1.040 | 0.962 |
+| 0.964 | 0.964 | 1.029 | 1.120 | 1.041 | 0.964 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_foundation.xlsx, type=circular_search, num_slices=30, fs_oms=0.962, fs_bishop=0.962, fs_janbu=1.026, fs_corps=1.118, fs_lowe=1.040, fs_spencer=0.962 -->
+<!-- test: file=files/xslope_simple_foundation.xlsx, type=circular_search, num_slices=40, fs_oms=0.964, fs_bishop=0.964, fs_janbu=1.029, fs_corps=1.120, fs_lowe=1.041, fs_spencer=0.964 -->
 
 ### 3. Simple Slope with Multiple Layers
 
@@ -126,7 +126,7 @@ Solution (critical surface and factor of safety):
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=30, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244 -->
+<!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244 -->
 
 ### 4. Submerged Slope
 
@@ -152,10 +152,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.150 | 1.150 | 0.193 | 2.013 | 1.860 | 1.150 |
+| 1.154 | 1.154 | 0.175 | 2.011 | 1.861 | 1.154 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=30, fs_oms=1.150, fs_bishop=1.150, fs_janbu=0.193, fs_corps=2.013, fs_lowe=1.860, fs_spencer=1.150 -->
+<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=0.175, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154 -->
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
@@ -188,10 +188,10 @@ Here is the solution for just the starting circle (to match the problem descript
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.302 | 1.576 | 1.532 | 1.768 | 1.642 | 1.579 |
+| 1.303 | 1.576 | 1.533 | 1.766 | 1.641 | 1.579 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=30, fs_oms=1.302, fs_bishop=1.576, fs_janbu=1.532, fs_corps=1.768, fs_lowe=1.642, fs_spencer=1.579 -->
+<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.303, fs_bishop=1.576, fs_janbu=1.533, fs_corps=1.766, fs_lowe=1.641, fs_spencer=1.579 -->
 
 Here is the Excel input file with multiple starting circles for a global search for the critical surface:
 
@@ -215,10 +215,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.626 | 0.763 | 0.734 | -0.818 | 0.789 | 0.770 |
+| 0.628 | 0.762 | 0.734 | -2.209 | 0.788 | 0.770 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=30, fs_oms=0.626, fs_bishop=0.763, fs_janbu=0.734, fs_corps=-0.818, fs_lowe=0.789, fs_spencer=0.770 -->
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=-2.209, fs_lowe=0.788, fs_spencer=0.770 -->
 
 ### 6. Slope with Eight Layers
 
@@ -252,10 +252,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.814 | 1.154 | 1.159 | 1.240 | 1.073 | 1.189 |
+| 0.805 | 1.154 | 1.160 | -1.463 | 1.060 | 1.189 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=30, fs_oms=0.814, fs_bishop=1.154, fs_janbu=1.159, fs_corps=1.240, fs_lowe=1.073, fs_spencer=1.189 -->
+<!-- test: file=files/xslope_eight_layers.xlsx, type=circular_search, num_slices=40, fs_oms=0.805, fs_bishop=1.154, fs_janbu=1.160, fs_corps=-1.463, fs_lowe=1.060, fs_spencer=1.189 -->
 
 ### 7. Non-Circular Failure Surface
 
@@ -295,10 +295,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| — | — | 1.656 | 1.794 | 1.138 | 1.739 |
+| — | — | 1.657 | 1.794 | 1.138 | 1.739 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=30, fs_janbu=1.656, fs_corps=1.794, fs_lowe=1.138, fs_spencer=1.739 -->
+<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.657, fs_corps=1.794, fs_lowe=1.138, fs_spencer=1.739 -->
 
 ### 8. Earth Dam 
 
@@ -341,10 +341,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| -7886.762 | 1.815 | -0.000 | 2.071 | 2.018 | 1.800 |
+| -1838935.489 | 1.815 | -0.000 | 2.072 | 2.018 | 1.800 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=30, fs_oms=-7886.762, fs_bishop=1.815, fs_janbu=-0.000, fs_corps=2.071, fs_lowe=2.018, fs_spencer=1.800 -->
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_oms=-1838935.489, fs_bishop=1.815, fs_janbu=-0.000, fs_corps=2.072, fs_lowe=2.018, fs_spencer=1.800 -->
 
 **Downstream side of the dam**
 
@@ -370,10 +370,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.389 | 1.561 | 1.468 | 1.597 | 1.568 | 1.558 |
+| 1.386 | 1.561 | 1.470 | 1.595 | 1.568 | 1.558 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=30, fs_oms=1.389, fs_bishop=1.561, fs_janbu=1.468, fs_corps=1.597, fs_lowe=1.568, fs_spencer=1.558 -->
+<!-- test: file=files/xslope_earth_dam_down.xlsx, type=circular_search, num_slices=40, fs_oms=1.386, fs_bishop=1.561, fs_janbu=1.470, fs_corps=1.595, fs_lowe=1.568, fs_spencer=1.558 -->
 
 ### 9. Reinforced Slope
 
@@ -403,10 +403,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.480 | 1.594 | 1.583 | -3459.771 | 1.599 | 1.589 |
+| 1.480 | 1.593 | 1.590 | -1.476 | 1.597 | 1.587 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=30, fs_oms=1.480, fs_bishop=1.594, fs_janbu=1.583, fs_corps=-3459.771, fs_lowe=1.599, fs_spencer=1.589 -->
+<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.590, fs_corps=-1.476, fs_lowe=1.597, fs_spencer=1.587 -->
 
 !!! note
     The solution for this problem found by XSLOPE is not the same as the solution found by UTEXASED. The difference
@@ -506,10 +506,10 @@ produces. The FEM result is generally considered more realistic for pile-stabili
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.622 | 1.857 | 1.660 | -0.079 | 1.859 | 1.847 |
+| 1.622 | 1.854 | 1.649 | -0.233 | 1.857 | 1.842 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.857, fs_janbu=1.660, fs_corps=-0.079, fs_lowe=1.859, fs_spencer=1.847 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.854, fs_janbu=1.649, fs_corps=-0.233, fs_lowe=1.857, fs_spencer=1.842 -->
 
 ### 11. Polygon Input with a Sloping Bottom
 
@@ -548,7 +548,7 @@ Solution (critical surface and factor of safety):
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=30, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244 -->
+<!-- test: file=files/xslope_sloping_bottom.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244 -->
 
 ---
 
@@ -607,10 +607,10 @@ ACADS suite.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.942 | 0.987 | 0.987 | 0.991 | 0.987 | 0.986 |
+| 0.942 | 0.985 | 0.986 | 0.990 | 0.987 | 0.984 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_acads_simple.xlsx, type=circular_search, num_slices=50, fs_oms=0.942, fs_bishop=0.987, fs_janbu=0.987, fs_corps=0.991, fs_lowe=0.987, fs_spencer=0.986, benchmark=LEM-1 -->
+<!-- test: file=files/xslope_acads_simple.xlsx, type=circular_search, num_slices=50, fs_oms=0.942, fs_bishop=0.985, fs_janbu=0.986, fs_corps=0.990, fs_lowe=0.987, fs_spencer=0.984, benchmark=LEM-1 -->
 
 ### 13. Verification: ACADS Weak-Layer Slope (Non-Circular) {#verification-acads-weak-layer}
 
@@ -707,7 +707,7 @@ also SLOPE/W Verification Manual sec. 2.11.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 1.344 | 1.404 | 1.412 | 1.477 | 1.439 | 1.402 |
+| 1.344 | 1.404 | 1.411 | 1.476 | 1.438 | 1.401 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_arai_tagyo.xlsx, type=circular_search, num_slices=50, fs_oms=1.344, fs_bishop=1.404, fs_janbu=1.412, fs_corps=1.477, fs_lowe=1.439, fs_spencer=1.402, benchmark=LEM-2b -->
+<!-- test: file=files/xslope_arai_tagyo.xlsx, type=circular_search, num_slices=50, fs_oms=1.344, fs_bishop=1.404, fs_janbu=1.411, fs_corps=1.476, fs_lowe=1.438, fs_spencer=1.401, benchmark=LEM-2b -->

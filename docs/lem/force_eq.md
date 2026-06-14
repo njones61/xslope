@@ -252,6 +252,10 @@ convention systematically produces the **highest (least conservative)** factor o
 typically a few percent to ~15% above Spencer — and the USACE manual itself notes that the average-embankment-slope
 assumption can be unconservative. Use a rigorous method (Spencer) for design and report Corps for comparison.
 
+## Conventions and Limitations
+
+The following apply to **both** the Lowe & Karafiath and Corps of Engineers methods, since they share xslope's force-equilibrium engine.
+
 **Inter-slice inclination sign convention.** The force-equilibrium engine assembles slices from left to right with
 a fixed sliding sense. Both Corps conventions and Lowe & Karafiath therefore take the inter-slice inclination from
 the *signed* ground (or base) slope and negate it on right-facing slopes, so the computed factor of safety is the

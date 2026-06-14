@@ -189,6 +189,16 @@ Everything upstream of the solvers — where an error poisons every method equal
   > converges to the admissibility boundary). Also needs a "no admissible surface in
   > this neighborhood" policy so the search does not dead-end. Consider geometric
   > contortion limits (per-slice α-change caps) as a complementary, cheaper guard.
+  >
+  > **Absorbs audit finding F6** (`force_equilibrium` single-guess secant root
+  > finder). Replacing it with a bracketed solver (brentq) was TRIED and REVERTED:
+  > it fixes the legitimate low-FS case (a phi=0 surface returning FS≈0.72 instead
+  > of failing) but makes the solver return a value on the degenerate search
+  > surfaces above, turning a loud failure into a silent spurious minimum
+  > (acads_simple Corps search collapsed to the bracket floor 0.05). The current
+  > secant failure inadvertently acts as a crude admissibility filter. The robust
+  > root finder and the admissibility filter must therefore land TOGETHER. Left
+  > as-is for now (fails loudly, no silent wrong answer; benchmarks converge).
 - `fileio.py`: every sheet parser vs the template; defaults when cells are blank;
   the validation rules (the pilot found seep-only models exempted but FEM-only
   models not — look for more inconsistencies).

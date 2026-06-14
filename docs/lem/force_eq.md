@@ -252,3 +252,13 @@ a fixed sliding sense. Both Corps conventions and Lowe & Karafiath therefore tak
 the *signed* ground (or base) slope and negate it on right-facing slopes, so the computed factor of safety is the
 same for a slope and its mirror image. (Lowe & Karafiath exceeding Spencer on some geometries is expected behavior
 for a force-equilibrium method, not an error — see the USACE manual.)
+
+**Limitation — undrained ($\phi = 0$) surfaces with a dominant vertical load.** Because the force-equilibrium
+methods satisfy only horizontal force equilibrium, they are unreliable on $\phi = 0$ surfaces carrying a large
+vertical load (for example a submerged slope with ponded water modeled as a distributed load). In that
+configuration the horizontal force balance can be satisfied at a factor of safety several times larger than the
+true value — the method returns a genuine but grossly non-conservative root, not a numerical failure, so it is not
+caught by convergence checks. On a submerged $\phi = 0$ test slope the Corps and Lowe & Karafiath factors of safety
+exceed the moment-method value (Ordinary = Bishop = Spencer) by a factor of three to five. Use a moment-satisfying
+method (Bishop, Spencer, Morgenstern-Price) for undrained or heavily surcharged slopes; the force-equilibrium
+methods are appropriate for drained, frictional materials.

@@ -164,3 +164,23 @@ single-guess secant fragility — bracketed solver), F11 (force-method spurious
 high root on phi=0 + dominant vertical load — warn/document), F9 (theta_p radians
 doc), F10 (OMS right-facing distributed-load moment-arm sign), F12/F14/F15/F16
 (doc/tolerance cosmetics).
+
+**Tier-2/3 follow-up (applied):**
+- **F9, F16 — FIXED:** documented theta_p is RADIANS (not degrees like other angles)
+  and pile columns; corrected the stale `'d'`→`'dload'` distributed-load column in
+  the oms/force_equilibrium/spencer docstrings.
+- **F12 — FIXED:** Janbu b1 soil-type branch uses a 1e-9 tolerance instead of exact
+  float equality.
+- **F11 — DOCUMENTED:** force-method limitation on phi=0 + dominant vertical load
+  (spurious high root, 3-5x non-conservative) noted in force_eq.md; recommend a
+  moment method for undrained/surcharged slopes.
+- **F6 — REVERTED, folded into the Stage-2 search-admissibility item** (bracketed
+  root finder turns a loud failure into a silent spurious search minimum unless it
+  lands with the admissibility filter; see plan Stage 2).
+- **F10 — DEFERRED to Stage 2** (OMS right-facing distributed-load moment-arm sign).
+  It is latent (no shipped right-facing benchmark has a distributed load) and
+  touches a verified-correct method on a path with no benchmark, so it needs the
+  same mirror-symmetry verification harness as the Corps/LK sign work — done with
+  the Stage-2 geometry/right-facing pipeline audit, not bolted on now.
+- **F14, F15 — NO CHANGE** (Spencer design2 non-convergence and the unnormalized
+  residual tolerance are correct/defensible per the audit; documenting optional).

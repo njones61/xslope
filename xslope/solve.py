@@ -133,14 +133,17 @@ def oms(slice_df, debug=False):
           'w'             = slice weight Wᵢ
           'u'             = pore pressure force/unit‐length on base, uᵢ
           'dl'            = base length Δℓᵢ
-          'd'             = resultant distributed load Dᵢ
+          'dload'         = resultant distributed load Dᵢ
           'd_x','d_y'     = centroid (x,y) at which Dᵢ acts
-          'beta'   (deg)   = top slope βᵢ
+          'beta'   (deg)   = distributed-load inclination βᵢ
           'kw'            = seismic horizontal kWᵢ
           't'             = tension‐crack horizontal Tᵢ  (zero except one slice)
           'y_t'           = y‐loc of Tᵢ's line of action (zero except that one slice)
           'p'             = reinforcement uplift pᵢ (zero if none)
           'x_c','y_cg'    = slice‐centroid (x,y) for seismic moment arm
+          'h_pile'        = pile/pier force on base (zero if none)
+          'theta_p' (RAD)  = pile force inclination from horizontal — stored and
+                            consumed in RADIANS, unlike every other angle here
           'r'             = radius of circular failure surface
           'xo','yo'       = x,y coordinates of circle center
 
@@ -508,15 +511,18 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
 
     dL_ratio = d / L
 
-    # Determine b1 factor based on soil type
+    # Determine b1 factor by overall soil type (Janbu's three correction-factor
+    # curves). The classification is global by design — Janbu's chart is read
+    # once for the whole surface — using a small tolerance rather than exact
+    # float equality so that, e.g., a φ stored as 1e-12 still reads as φ=0.
     phi_sum = slice_df['phi'].sum()
     c_sum = slice_df['c'].sum()
 
-    if phi_sum == 0:  # c-only soil (undrained, φ = 0)
+    if phi_sum < 1e-9:    # c-only soil (undrained, φ = 0)
         b1 = 0.67
-    elif c_sum == 0:  # φ-only soil (no cohesion)
+    elif c_sum < 1e-9:    # φ-only soil (no cohesion)
         b1 = 0.31
-    else:  # c-φ soil
+    else:                 # c-φ soil
         b1 = 0.50
 
     # Correction factor. The polynomial 1 + b1·(d/L − 1.4·(d/L)²) is a fit to
@@ -568,11 +574,12 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
             'dl'    (slice base length),
             'w'     (slice weight),
             'u'     (pore force per unit length),
-            'd'     (distributed load),
+            'dload' (distributed load),
             'beta'  (distributed load inclination, degrees),
             'kw'    (seismic force),
             't'     (tension crack water force),
-            'p'     (reinforcement force)
+            'p'     (reinforcement force),
+            'h_pile' (pile force, optional), 'theta_p' (pile inclination, RADIANS, optional)
         theta_list (array-like): slice‐boundary force inclinations (degrees),
                                  length must be n+1 if there are n slices
         fs_guess (float): initial guess for factor of safety
@@ -658,7 +665,17 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
         r0 = residual(fs_guess)
         print(f"FS_guess={fs_guess:.6f} → residual={r0:.4g}")
 
-    # use Newton‐secant (no derivative) with single initial guess
+    # use Newton‐secant (no derivative) with single initial guess.
+    # NOTE: a single-guess secant from fs_guess=1.5 diverges when the true FS is
+    # well below the guess (a flat residual tail), so genuinely low-FS surfaces
+    # fail loudly rather than returning a value. A bracketed solver (brentq)
+    # fixes that legitimate case BUT also makes the solver return an FS on the
+    # numerically degenerate surfaces a free search can construct (negative base
+    # normals / pervasive interslice tension), turning a loud failure into a
+    # silent spurious minimum. The robust root finder must therefore land
+    # together with the search-admissibility filter — see the Stage-2 seed item
+    # in plans/plan_comprehensive_audit.md. Left as-is for now (fails loudly,
+    # no silent wrong answer; benchmarks converge).
     try:
         FS_opt = newton(residual, fs_guess, tol=tol, maxiter=max_iter)
     except Exception as e:
@@ -839,11 +856,12 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             'dl'    (slice base length),
             'w'     (slice weight),
             'u'     (pore force per unit length),
-            'd'     (distributed load),
+            'dload' (distributed load),
             'beta'  (distributed load inclination, degrees),
             'kw'    (seismic force),
             't'     (tension crack water force),
-            'p'     (reinforcement force)
+            'p'     (reinforcement force),
+            'h_pile' (pile force, optional), 'theta_p' (pile inclination, RADIANS, optional)
 
     Returns:
         float: FS where FS_force = FS_moment

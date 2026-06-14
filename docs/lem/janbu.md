@@ -8,7 +8,11 @@ The forces on the slice considered by the Janbu method are as follows:
 
 For the Janbu method, the inter-slice **shear** forces are assumed to be zero (the inter-slice normal forces are retained). The method satisfies overall **horizontal force equilibrium** of the sliding mass but does not satisfy moment equilibrium. It can be used on both circular and non-circular failure surfaces. Because the inter-slice shear is neglected, the base normal force is found from vertical equilibrium of each slice — the same iterative relation used by Bishop's method.
 
-**Base normal force (vertical equilibrium).** Summing forces vertically on a slice, neglecting the inter-slice shear, with the mobilized base shear $S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$:
+**Base normal force (vertical equilibrium)** 
+
+Summing forces vertically on a slice, neglecting the inter-slice shear, with the mobilized base shear:
+
+>>$S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$
 
 >>$N\cos\alpha + S\sin\alpha = W$
 
@@ -20,7 +24,9 @@ The mobilized base shear capacity (resisting force along the base) uses the effe
 
 >>$S\,F = c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi   \qquad (2)$
 
-**Factor of safety (horizontal force equilibrium).** Summing horizontal forces over the whole sliding mass, the inter-slice normal forces cancel and the horizontal components of the base normal ($N\sin\alpha$) and base shear ($S\cos\alpha$) must balance, $\sum S\cos\alpha = \sum N\sin\alpha$. With $S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$ this gives:
+**Factor of safety (horizontal force equilibrium)**
+
+Summing horizontal forces over the whole sliding mass, the inter-slice normal forces cancel and the horizontal components of the base normal ($N\sin\alpha$) and base shear ($S\cos\alpha$) must balance, $\sum S\cos\alpha = \sum N\sin\alpha$. With $S = \tfrac{1}{F}\left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]$ this gives:
 
 >>$F = \dfrac{\sum \left[c\,\Delta\ell + (N - u\,\Delta\ell)\tan\phi\right]\cos\alpha}{\sum N\sin\alpha}     \qquad (3)$
 

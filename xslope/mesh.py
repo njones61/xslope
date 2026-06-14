@@ -2601,25 +2601,28 @@ def _build_spatial_grid(nodes, elements, element_types):
     return grid
 
 
-def interpolate_at_point(nodes, elements, element_types, values, point):
+def interpolate_at_point(nodes, elements, element_types, values, point, return_found=False):
     """
     Interpolate values at a given point using the mesh.
-    
+
     Parameters:
         nodes: np.ndarray of node coordinates (n_nodes, 2)
         elements: np.ndarray of element vertex indices (n_elements, 8)
         element_types: np.ndarray indicating element type (3, 4, 6, or 8 nodes)
         values: np.ndarray of values at nodes (n_nodes,)
         point: tuple (x, y) coordinates of the point to interpolate at
-        
+        return_found: if True, return (value, found) so callers can distinguish a
+            genuine interpolated zero from a point that fell outside the mesh
+
     Returns:
         float: Interpolated value at the point, or 0.0 if point not found
+        (or (value, found) when return_found=True)
     """
     # Find the element containing the point
     element_idx = find_element_containing_point(nodes, elements, element_types, point)
-    
+
     if element_idx == -1:
-        return 0.0  # Point not found in any element
+        return (0.0, False) if return_found else 0.0  # Point not found in any element
     
     element = elements[element_idx]
     elem_type = element_types[element_idx]
@@ -2935,10 +2938,11 @@ def interpolate_at_point(nodes, elements, element_types, values, point):
             interpolated_value += N[i] * values[element[i]]
     
     else:
-        return 0.0  # Unknown element type
-    
+        return (0.0, False) if return_found else 0.0  # Unknown element type
+
     # Return zero if interpolated value is negative (pore pressure cannot be negative)
-    return max(0.0, interpolated_value)
+    result = max(0.0, interpolated_value)
+    return (result, True) if return_found else result
 
 
 def test_1d_element_alignment(mesh, reinforcement_lines, tolerance=1e-6, debug=True):

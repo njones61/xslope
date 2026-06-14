@@ -52,6 +52,16 @@ where $(x_e, y_e)$ is the pile-failure surface intersection point. When $\theta_
 
 The pile force is a **known applied force** and is **not** divided by the factor of safety $F$. This is because $H$ represents the structural resistance of the pile, not a soil strength parameter. It appears in the denominator of the factor of safety equation (reducing driving forces) rather than in the numerator (which contains soil shear strength divided by $F$).
 
+### Setting the Force Angle $\theta_p$
+
+A stabilizing pile always **resists** the sliding mass, so adding a pile can only increase the factor of safety. The angle $\theta_p$ sets the tilt of the pile force away from horizontal:
+
+- $\theta_p = 0$ — a horizontal force pushing back against the moving soil. This is the default and most common case.
+- $\theta_p > 0$ — the force is tilted **upward** (for example, a raking pile that also lifts the mass).
+- $\theta_p < 0$ — the force is tilted **downward**.
+
+You enter the same $\theta_p$ regardless of which way the slope faces. XSLOPE always directs the horizontal component *against* the soil movement, so $\theta_p = 0$ resists the slide whether the slope descends to the left or to the right — there is no need to flip the angle for a mirror-image slope. The sign of $\theta_p$ only controls the up/down tilt, where positive is upward.
+
 ### Per-Unit-Width Convention
 
 All forces in 2D limit equilibrium analysis are expressed per unit width of slope (perpendicular to the cross-section). If a row of piles has individual capacity $H_{\text{single}}$ at center-to-center spacing $S$, the equivalent force per unit width is:

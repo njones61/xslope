@@ -309,7 +309,8 @@ def load_slope_data(filepath):
             if pd.isna(mat_id_val):
                 mat_id = None
             else:
-                # Convert to integer and subtract 1 to make it 0-based
+                # Convert to integer and subtract 1 to make it 0-based.
+                # Range validation happens later, once materials are parsed.
                 mat_id = int(float(mat_id_val)) - 1
                 if mat_id < 0:
                     mat_id = None  # Invalid mat_id
@@ -1069,15 +1070,42 @@ def load_slope_data(filepath):
     has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or 
                      len(seepage_bc.get("exit_face", [])) > 0)
     is_seepage_only = has_seepage_bc and not circular and len(non_circ) == 0
-    
-    # Only require circular/non-circular data if this is NOT a seep-only analysis
-    if not is_seepage_only and not circular and len(non_circ) == 0:
+    # A mesh-based run with no LEM surfaces is a seepage or FEM (SSRM) analysis;
+    # neither needs circular/non-circular failure surfaces.
+    is_mesh_analysis = mesh is not None and not circular and len(non_circ) == 0
+
+    # Only require circular/non-circular data for a pure LEM run (no seep BCs, no mesh)
+    if not is_seepage_only and not is_mesh_analysis and not circular and len(non_circ) == 0:
         raise ValueError("Input must include either circular or non-circular surface data.")
     if not polygons:
         raise ValueError("Geometry is missing: provide either the 'profile' sheet or the 'polygon' sheet.")
     if not materials:
         raise ValueError("Materials sheet is empty.")
-        
+
+    # Every polygon must reference a material that exists in the 'mat' sheet. The
+    # polygon-sheet path validates this at parse time; profile-derived polygons are
+    # validated here (materials are not yet parsed when profile lines are read).
+    for poly in polygons:
+        mid = poly.get('mat_id')
+        if mid is not None and (mid < 0 or mid >= len(materials)):
+            raise ValueError(
+                f"A geometry zone references an invalid Mat ID ({mid + 1}); it must "
+                f"reference a material in the 'mat' sheet (1..{len(materials)}).")
+
+    # For slope-stability (non seep-only) runs, every material referenced by the
+    # geometry must have a positive unit weight. A gamma of 0 silently produces
+    # zero slice weights and meaningless factors of safety; seep-only runs do not
+    # use unit weight, so they are exempt.
+    if not is_seepage_only:
+        for poly in polygons:
+            mid = poly.get('mat_id')
+            if mid is not None and 0 <= mid < len(materials):
+                if materials[mid].get('gamma', 0) <= 0:
+                    raise ValueError(
+                        f"Material '{materials[mid]['name']}' (Mat ID {mid + 1}) has a "
+                        f"non-positive unit weight (gamma = {materials[mid]['gamma']}). "
+                        f"A positive unit weight is required for slope-stability analysis.")
+
 
     # Add everything to globals_data
     globals_data["template_version"] = template_version

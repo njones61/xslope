@@ -147,6 +147,19 @@ agent that has *not seen* `solve.py`, run on the ACADS benchmark; agreement to
 
 ### Stage 2 — Geometry & Slice Pipeline Audit (~2 sessions)
 
+> **STATUS: audit complete; fix batch #1–#7 applied & verified** (June 2026).
+> Findings in `plans/audit/stage2_pipeline_findings.md` §2; resolutions in §5.
+> All seven landed as no-ops on the shipped benchmarks (run_lem.py unchanged).
+> F10 resolved to **negate `a_dx` only** (not `a_dy`) — settled by a sloping-face
+> mirror test; the `a_dy` term is already β-flip-corrected in generate_slices.
+> Deferred: SEARCH-1/2 (→ admissibility-filter seed item below); cosmetics
+> SLICE-2/FS-1/fileio-04. **PILE-FACING — RESOLVED:** a real battered-pile (θ_p≠0)
+> right-facing bug (the vertical force-component's moment sign) was found and fixed in
+> oms/bishop (x_pile−Xo arm flip) and spencer (flip only the horizontal component, not the
+> whole H_pile); Janbu/Corps/Lowe were already correct. Two earlier "asymmetries" were my
+> harness errors (θ_p→180−θ_p mirror; descending ground_surface breaking np.interp). All
+> ≤0.0006% now, no-op on benchmarks. See stage2_pipeline_findings.md §5.
+
 Everything upstream of the solvers — where an error poisons every method equally
 (the pilot's CW-winding bug was exactly this class).
 
@@ -210,6 +223,11 @@ Everything upstream of the solvers — where an error poisons every method equal
 - Rapid drawdown (3-stage logic vs Duncan-Wright-Brandon procedure).
 - Reinforcement (tension distribution along lines, p resolution into slices).
 - Piles (force + moment handling per `plans/plan_piles.md` vs implementation).
+  > **PILE-FACING — already fixed in Stage 2** (oms/bishop/spencer battered-pile
+  > right-facing moment sign; Janbu/Corps/Lowe were already correct; defensive
+  > ascending-sort added before the Ito-Matsui-path `np.interp` ground lookups).
+  > Only leftover: add a permanent pile mirror-symmetry property test to the harness.
+  > Evidence: `plans/audit/stage2_pipeline_findings.md` §5.
 - Reliability (`advanced.py`): distribution handling, COV math.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
 - Each: one auditor + verifier; cross-check LEM vs FEM where both support the

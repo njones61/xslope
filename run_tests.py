@@ -37,8 +37,21 @@ import matplotlib
 matplotlib.use('Agg')  # non-interactive backend — no plot windows
 
 
+# Short method names used in compact fs_<method> test tags -> solver names.
+FS_METHOD_NAMES = {
+    'oms': 'oms', 'bishop': 'bishop', 'janbu': 'janbu',
+    'corps': 'corps_engineers', 'lowe': 'lowe_karafiath', 'spencer': 'spencer',
+}
+
+
 def parse_test_tags(md_path):
-    """Parse <!-- test: ... --> tags from a markdown file."""
+    """Parse <!-- test: ... --> tags from a markdown file.
+
+    A tag may name a single method the classic way (method=spencer,
+    expected_fs=1.23) or carry per-method values (fs_oms=0.94, fs_bishop=0.99,
+    ...). The latter form is expanded into one test per method, so every method
+    becomes an independently-checked regression.
+    """
     tests = []
     md_dir = Path(md_path).parent
 
@@ -65,7 +78,20 @@ def parse_test_tags(md_path):
             params['num_slices'] = int(params['num_slices'])
 
         params['source'] = str(md_path)
-        tests.append(params)
+
+        # Expand a compact multi-method tag (fs_oms=..., fs_bishop=..., ...) into
+        # one test per method; otherwise keep the single tag as-is.
+        fs_keys = [k for k in params if k.startswith('fs_')]
+        if fs_keys:
+            shared = {k: v for k, v in params.items() if not k.startswith('fs_')}
+            for k in fs_keys:
+                method = FS_METHOD_NAMES.get(k[3:], k[3:])
+                t = dict(shared)
+                t['method'] = method
+                t['expected_fs'] = float(params[k])
+                tests.append(t)
+        else:
+            tests.append(params)
 
     return tests
 
@@ -214,6 +240,10 @@ def main():
                         help='Skip verification benchmark tests (annotations '
                              'carrying a benchmark=<ID> tag), e.g. the slow '
                              'SSRM dam cases')
+    parser.add_argument('--quick', action='store_true',
+                        help='For LEM problems that list several methods, check '
+                             'only one method per problem (prefers Spencer) so '
+                             'routine runs stay fast')
     args = parser.parse_args()
 
     # If no specific flags, run all
@@ -258,6 +288,17 @@ def main():
         n_skipped = n_before - len(tests)
         if n_skipped:
             print(f"Skipping {n_skipped} benchmark tests (--skip-benchmarks)")
+
+    if args.quick:
+        # Collapse each problem's per-method expansion to a single check
+        # (prefer Spencer). Singleton tests (FEM, seep, single-method LEM) pass through.
+        from collections import OrderedDict
+        groups = OrderedDict()
+        for t in tests:
+            groups.setdefault((t.get('source'), t.get('file'), t.get('type')), []).append(t)
+        tests = [next((t for t in grp if t.get('method') == 'spencer'), grp[0])
+                 for grp in groups.values()]
+        print(f"--quick: checking one method per problem ({len(tests)} tests)")
 
     if not tests:
         print("No test tags found in documentation files.")

@@ -14,6 +14,8 @@
 
 from math import sin, cos, tan, radians, atan, atan2, degrees, sqrt
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
@@ -852,20 +854,24 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     piezo_y_all = get_piezometric_y_coordinates(slice_centers, piezo_line)
     piezo_y2_all = get_piezometric_y_coordinates(slice_centers, piezo_line2)
 
-    # Interpolation functions for distributed loads
+    # Interpolation functions for distributed loads. np.interp requires the
+    # sample points to be in ascending-X order; sort each load line so a load
+    # entered right-to-left is not silently interpolated to zero everywhere.
     dload_interp_funcs = []
     if dloads:
         for line in dloads:
-            xs = [pt['X'] for pt in line]
-            normals = [pt['Normal'] for pt in line]
+            pts = sorted(line, key=lambda pt: pt['X'])
+            xs = [pt['X'] for pt in pts]
+            normals = [pt['Normal'] for pt in pts]
             dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
 
     # Interpolation functions for second set of distributed loads
     dload2_interp_funcs = []
     if dloads2:
         for line in dloads2:
-            xs = [pt['X'] for pt in line]
-            normals = [pt['Normal'] for pt in line]
+            pts = sorted(line, key=lambda pt: pt['X'])
+            xs = [pt['X'] for pt in pts]
+            normals = [pt['Normal'] for pt in pts]
             dload2_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
 
     # Generate slices
@@ -902,6 +908,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         heights = []
         soil_weight = 0
         base_material_idx = None
+        base_overlap_bot = float('inf')  # elevation of the deepest present layer's base
         sum_gam_h_y = 0  # for calculating center of gravity of slice
         sum_gam_h = 0    # ditto
 
@@ -930,16 +937,21 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 sum_gam_h_y += h * gamma * (overlap_top + overlap_bot) / 2
                 sum_gam_h += h * gamma
                 soil_weight += h * gamma * dx
-                # Deepest layer present determines the base material (polygons are
-                # ordered top-to-bottom, so the last h>0 layer wins).
-                base_material_idx = mat_index
+                # Base material = the DEEPEST present layer (smallest base
+                # elevation), independent of polygon iteration order. The
+                # previous "last h>0 layer wins" relied on polygons being
+                # stored top-to-bottom; an out-of-order block silently bound
+                # the wrong base strength.
+                if overlap_bot < base_overlap_bot:
+                    base_overlap_bot = overlap_bot
+                    base_material_idx = mat_index
 
         # Center of gravity
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
 
         # Distributed load
         qC = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at center
-        if qC > 0: # We need to check qC to distinguish between a linear ramp up (down) and the case where the load starts or ends on one of the sides
+        if qC != 0: # nonzero center: distinguish a real load from the case where the load starts/ends on a side (allows negative uplift/suction loads)
             qL = sum(func(x_l) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at left‐top corner
             qR = sum(func(x_r) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at right‐top corner
         else:
@@ -949,7 +961,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         # Second distributed load
         qC2 = sum(func(x_c) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at center
-        if qC2 > 0: # We need to check qC2 to distinguish between a linear ramp up (down) and the case where the load starts or ends on one of the sides
+        if qC2 != 0: # nonzero center: distinguish a real load from a side-edge ramp (allows negative loads)
             qL2 = sum(func(x_l) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at left‐top corner
             qR2 = sum(func(x_r) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at right‐top corner
         else:
@@ -1048,6 +1060,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                             f'Specify H directly for battered piles.')
                     from .ito_matsui import intersect_pile_with_materials, compute_ito_matsui_force
                     gs_coords = np.array(ground_surface.coords)
+                    gs_coords = gs_coords[np.argsort(gs_coords[:, 0])]  # np.interp needs ascending x
                     y_ground_at_pile = np.interp(intersec.x, gs_coords[:, 0], gs_coords[:, 1])
                     ito_segments = intersect_pile_with_materials(
                         intersec.x, y_ground_at_pile, intersec.y,
@@ -1086,6 +1099,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                                 pl["D_pile"], S_pile, ito_segments)
                         else:
                             gs_coords = np.array(ground_surface.coords)
+                            gs_coords = gs_coords[np.argsort(gs_coords[:, 0])]  # np.interp needs ascending x
                             y_gnd = np.interp(intersec.x, gs_coords[:, 0], gs_coords[:, 1])
                             depth = y_gnd - intersec.y
                             L_m = depth / 3.0 if depth > 0 else 0.0
@@ -1128,13 +1142,21 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
                 # Interpolate pore pressure at the slice center base point
                 point = (x_c, y_cb)
-                u = max(0.0, interpolate_at_point(
+                u_val, found = interpolate_at_point(
                     mesh['nodes'],
                     mesh['elements'],
                     mesh['element_types'],
                     seep_u,
-                    point
-                ))
+                    point,
+                    return_found=True
+                )
+                if not found:
+                    warnings.warn(
+                        "Seepage pore pressure: a slice base point fell outside the "
+                        "seepage mesh and was assigned u = 0. Check that the mesh "
+                        "spans the full depth of the failure surface (a value of 0 "
+                        "below the phreatic surface over-predicts the factor of safety).")
+                u = max(0.0, u_val)
             else:
                 u = 0
 
@@ -1145,13 +1167,19 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
                 # Interpolate pore pressure at the slice center base point
                 point = (x_c, y_cb)
-                u2 = max(0.0, interpolate_at_point(
+                u2_val, found2 = interpolate_at_point(
                     mesh['nodes'],
                     mesh['elements'],
                     mesh['element_types'],
                     seep_u2,
-                    point
-                ))
+                    point,
+                    return_found=True
+                )
+                if not found2:
+                    warnings.warn(
+                        "Seepage pore pressure (second solution): a slice base point "
+                        "fell outside the seepage mesh and was assigned u = 0.")
+                u2 = max(0.0, u2_val)
             else:
                 u2 = 0
         else:

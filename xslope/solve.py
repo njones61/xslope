@@ -229,7 +229,15 @@ def oms(slice_df, debug=False):
     sum_W = np.sum(W * sin_alpha)
 
     #  (B) = Σ  Dᵢ·cosβᵢ·(Xo - d_{x,i})
+    # The vertical D-component (D·cosβ) acts at horizontal arm (d_x - Xo). That arm
+    # flips sign when the slope faces right, and cosβ (unlike sinβ) is NOT corrected
+    # by the β sign-flip applied in generate_slices, so flip it here. The horizontal
+    # D-component term (a_dy / sum_Dy) is already sign-correct via that β-flip and is
+    # left untouched; likewise the seismic (a_s) and tension-crack (a_t) arms.
+    right_facing = slice_df['y_lt'].iat[0] > slice_df['y_rt'].iat[-1]
     a_dx = d_x - Xo
+    if right_facing:
+        a_dx = -a_dx
     sum_Dx = np.sum(D * np.cos(beta) * a_dx)
 
     #  (C) = Σ [ kWᵢ * (Yo - y_{cg,i}) ]
@@ -242,9 +250,14 @@ def oms(slice_df, debug=False):
 
     # Pile resisting moment about circle center:
     # M_pile = Σ [ H·cos(θₚ)·(Yo - y_pile) + H·sin(θₚ)·(x_pile - Xo) ]
+    # The vertical-component arm (x_pile - Xo) is in real coordinates while alpha runs in
+    # the orientation-normalized frame, so it must flip on right-facing slopes (same
+    # correction as the distributed-load a_dx arm). Only matters for battered piles
+    # (theta_p != 0); for theta_p = 0 this term is zero.
+    pile_x_arm = -(x_pile - Xo) if right_facing else (x_pile - Xo)
     sum_pile_moment = np.sum(
         H_pile * np.cos(theta_p) * (Yo - y_pile)
-      + H_pile * np.sin(theta_p) * (x_pile - Xo)
+      + H_pile * np.sin(theta_p) * pile_x_arm
     )
 
     # Put them together with their 1/R factors:
@@ -329,16 +342,24 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     sin_beta  = np.sin(beta)
     cos_beta  = np.cos(beta)
 
-    # Moment arms
+    # Moment arms. The vertical-D-component arm (a_dx) flips sign on right-facing
+    # slopes and is not corrected by the β sign-flip in generate_slices (cosβ is
+    # even in β), so flip it here. a_dy (horizontal-D-component) is already correct
+    # via that β-flip; a_s/a_t track the sliding-direction convention. See oms().
+    right_facing = slice_df['y_lt'].iat[0] > slice_df['y_rt'].iat[-1]
     a_dx = d_x - Xo
+    if right_facing:
+        a_dx = -a_dx
     a_dy = Yo - d_y
     a_s  = Yo - y_cg
     a_t  = Yo - y_t
 
-    # Pile resisting moment about circle center (same term as OMS)
+    # Pile resisting moment about circle center (same term as OMS) — flip the
+    # vertical-component arm (x_pile - Xo) on right-facing slopes, as for a_dx above.
+    pile_x_arm = -(x_pile - Xo) if right_facing else (x_pile - Xo)
     sum_pile_moment = np.sum(
         H_pile * np.cos(theta_p) * (Yo - y_pile)
-      + H_pile * np.sin(theta_p) * (x_pile - Xo)
+      + H_pile * np.sin(theta_p) * pile_x_arm
     )
 
     # Denominator (moment equilibrium) — pile moment is a known resisting force, not factored by FS
@@ -924,7 +945,6 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         c = -c
         kw = -kw
         tan_p = -tan_p
-        H_pile = -H_pile
 
     # pre-compute the trigonometric functions
     cos_a = np.cos(alpha)  # cos(alpha)
@@ -935,9 +955,15 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     sin_psi = np.sin(psi)  # sin(psi)
     cos_psi = np.cos(psi)  # cos(psi)
 
-    # Pile force components
+    # Pile force components. On right-facing slopes only the HORIZONTAL component
+    # flips with the facing (it reverses with the sliding direction); the vertical
+    # (upward) component is facing-independent — up is up. Flipping the whole H_pile
+    # (as the other reflected quantities above) would wrongly negate the vertical
+    # component and break battered (theta_p != 0) piles.
     H_cos_tp = H_pile * np.cos(theta_pile)  # horizontal component
     H_sin_tp = H_pile * np.sin(theta_pile)  # vertical component (upward)
+    if right_facing:
+        H_cos_tp = -H_cos_tp
 
     Fh = - kw - V + P * sin_b + R * cos_psi + H_cos_tp       # Equation (1) + pile horizontal
     Fv = - W - P * cos_b + R * sin_psi + H_sin_tp        # Equation (2) + pile vertical (upward)

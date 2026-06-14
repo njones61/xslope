@@ -116,3 +116,74 @@ The geometry and slice pipeline is **fundamentally sound but carries three valid
 | 9 | **SLICE-2, FS-1, fileio-04** — cosmetic robustness/message/validation polish; batch opportunistically | cosmetic | trivial | None |
 
 **No fix in this queue changes a published benchmark number** — every confirmed defect is latent on the shipped inputs (left-facing, ascending-X, top-to-bottom-ordered polygons, non-negative loads, in-range mat_ids, surface-bearing FEM files). Recommended gate for publication: land #1 and #2 (validity-critical, both low-effort no-ops on benchmarks) plus #3 before release; #4–#7 are low-risk hardening that should ship alongside; #8 stays on the existing planned work unit.
+---
+
+## 5. Batch Resolution (applied)
+
+Stage-2 fix batch #1–#7 applied and verified; benchmarks (run_lem.py) unchanged
+across all three LEM cases — every fix confirmed a no-op on the shipped path.
+
+| # | Finding | Resolution | Verification |
+|---|---------|-----------|--------------|
+| 1 | **F10** | `oms()`+`bishop()`: negate **`a_dx` only** when `right_facing` | Search-based mirror, see note below |
+| 2 | **DLOAD-ORDER-DROP** | sort each dload line by ascending X before `np.interp` (slice.py) | descending input now = ascending (FS 1.1543) |
+| 3 | **SLICE-1** | base material by deepest overlap (`base_overlap_bot`, init +inf) | reordered polygons = original FS 1.2786 |
+| 4a | **fileio-02** | mat_id range check moved to validation block (materials parsed there) | benchmarks load clean |
+| 4b | **fileio-03** | require positive gamma for materials referenced by geometry (LEM only; seep-only exempt) | benchmarks load clean |
+| 5 | **PP-1** | `interpolate_at_point(..., return_found=True)`; warn on off-mesh seep base point instead of silent u=0 | rapid-drawdown seep LEM: u 0–5628, Bishop 2.23, 0 false warnings |
+| 6 | **DLOAD-1** | `qC != 0` / `qC2 != 0` gate (was `> 0`) | negative loads now retained |
+| 7 | **fileio-01** | `is_mesh_analysis` exemption (mesh + no LEM surface = seep/FEM run) | FEM/seep templates no longer rejected |
+
+**F10 — resolved to `a_dx` ONLY, not `a_dy`.** §3's focused check suggested "negate
+`a_dx/a_dy`", but it only exercised a *flat-crest* surcharge (β≈0, so the `a_dy`/sin β
+term is ~0 and cannot distinguish the two fixes). A search-based mirror harness with a
+**sloping-face** surcharge (β≠0, exercises both arms) settles it: negating `a_dx` only
+restores symmetry to <0.01% on *both* the flat-crest and sloping-face cases, whereas
+negating `a_dy` too would break the sloping-face case. Physical reason: `generate_slices`
+already sign-flips β for right-facing (slice.py:896), and `sum_Dy = Σ D·sinβ·(Yo−d_y)`
+inherits that correction; `sum_Dx = Σ D·cosβ·(d_x−Xo)` does not (cosβ is even in β), so
+only its geometric arm needs flipping. `a_s`/`a_t` left untouched as specified.
+
+Mirror results (acads_simple, crest & sloping-face surcharge), left vs right-facing:
+flat-crest OMS 0.36743/0.36741, Bishop 0.48968/0.48966; sloping-face OMS 0.73533/0.73527,
+Bishop 0.76841/0.76841 — all <0.01%. No-surcharge baseline symmetric to 0.001%.
+
+**PILE-FACING — RESOLVED. Real battered-pile right-facing bug, now fixed in all methods.**
+The F10 investigation flagged the pile moment term `H·sin(θ_p)·(x_pile − Xo)` as a latent
+right-facing analog. Settling "real vs. discretization" required peeling apart **three**
+layered effects (this is why early numbers looked contradictory):
+
+1. **An apparent ~16% asymmetry was MY harness error** — I mirrored with θ_p→180−θ_p,
+   treating θ_p as a global bearing. The convention is **θ_p relative to the resisting
+   direction** (horizontal component always opposes the slide; θ_p only tilts up/down), so
+   the same θ_p is kept on both facings.
+2. **A ~1.5% asymmetry at θ_p=0 was ALSO a harness artifact** — my geometry mirror left
+   `ground_surface` in *descending*-x order, and the Ito & Matsui auto-H path uses
+   `np.interp(x, gs_x, gs_y)` (slice.py:1063, 1100), which silently returns garbage for
+   non-ascending `xp`. That perturbed z_f → H → the M_cap/L_m cap. With `ground_surface`
+   re-sorted ascending (as `load_slope_data` always produces — verified) the θ_p=0
+   asymmetry vanishes (**0.0004%**). Not a production bug; production ground_surface is
+   ascending. (Optional hardening: sort before those `np.interp` calls.)
+3. **The remaining battered-pile (θ_p≠0) asymmetry is REAL** — ~2.9% (OMS/Bishop) and ~4.8%
+   (Spencer) under the clean (sorted-gs) harness. Root cause: the vertical pile force's
+   moment uses `x_pile − Xo` in real coordinates while α runs in the orientation-normalized
+   frame (OMS/Bishop), and Spencer's "reflect everything" block negated the *entire* H_pile,
+   wrongly flipping the facing-independent **vertical** (upward) component. Janbu/Corps/Lowe
+   are force-only (no pile moment) and were already symmetric (0.001%).
+
+**Fixes applied & verified (clean harness → all ≤0.0006%; no-op on shipped benchmarks):**
+- `oms()`/`bishop()`: flip the `(x_pile − Xo)` moment arm when `right_facing` (same family
+  as the F10 a_dx fix).
+- `spencer()`: drop H_pile from the reflect-everything negation; instead flip **only** the
+  horizontal component (`H_cos_tp`) for right_facing, leaving the vertical component alone.
+- Janbu/Corps/Lowe: no change needed (verified symmetric).
+- Published-benchmark impact: **None** (all shipped slopes left-facing; shipped xslope_piles
+  FS unchanged to 6 digits). Convention documented in `docs/lem/piles.md` §"Setting the
+  Force Angle".
+- Stage-3 leftover (optional, low priority): defensive ascending-sort before the pile-path
+  `np.interp` ground lookups; permanent pile mirror-symmetry property test in the harness.
+
+### Still deferred (unchanged)
+- **SEARCH-1 / SEARCH-2 (#8)** — stay with the admissibility-filter + bracketed-root-finder
+  work unit (Stage-2 seed item in plan_comprehensive_audit.md). No standalone filter.
+- **SLICE-2 / FS-1 / fileio-04 (#9)** — cosmetic; not addressed in this batch.

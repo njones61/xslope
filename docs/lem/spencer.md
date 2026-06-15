@@ -12,7 +12,7 @@ The following derivation is adapted from the US Army Corps of Engineers (USACE) 
 
 The geometry and the forces associated with a representative slice on a left-facing slope are as follows:
 
-![spencer2_forces.png](images/spencer3_forces.png)
+![spencer3_forces.png](images/spencer3_forces.png)
 
 where:
 
@@ -38,6 +38,8 @@ where:
 > $\Delta x$ = width of the slice<br>
 
 **Note**: In the current implementation of Spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. The reinforcement force $R$ is assumed flexible and therefore parallel to the base of the slice, acting at the base center $(x_b, y_b)$. All of the other forces are included.
+
+This page follows the UTEXAS symbol convention, in which $P$ is the distributed-load resultant on the top of the slice and $R$ is the reinforcement force. On the [OMS](oms.md), Bishop, Janbu, and [force-equilibrium](force_eq.md) pages these same two forces are written $D$ (distributed load) and $P$ (reinforcement), respectively.
 
 ## General Equations
 

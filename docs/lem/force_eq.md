@@ -26,9 +26,9 @@ The shear force ($S$) acting on the bottom of the slice is the mobilized shear s
 
 where $\tau_m$ is the mobilized shear strength of the soil and $\Delta \ell$ is the length of the slice. The mobilized shear strength is equal to:
 
->>$\tau_m = \dfrac{c + (\sigma-u)tan\phi}{F}$
+>>$\tau_m = \dfrac{c + (\sigma-u)\tan\phi}{F}$
  
->>$\tau_m = c_m + \sigma' tan\phi_m$
+>>$\tau_m = c_m + \sigma' \tan\phi_m$
 
 where:
 
@@ -38,14 +38,14 @@ where:
 - $\sigma'$ = the effective normal stress acting on the slice = $\sigma - u$
 - $u$ = the pore water pressure acting on the slice
 - $\phi$ = the angle of internal friction of the soil
-- tan$\phi_m$ = the mobilized friction of the soil = tan$\phi/F$
+- $\tan\phi_m$ = the mobilized friction of the soil = $\tan\phi/F$
 - $F$ = the factor of safety
 
 Inserting $\tau_m$ into the equation for $S$ gives:
 
->>$S = \left[c_m + (\sigma')  tan\phi_m\right]  \Delta \ell$
+>>$S = \left[c_m + (\sigma')  \tan\phi_m\right]  \Delta \ell$
 
->>$S = c_m  \Delta \ell + N'  tan\phi_m$
+>>$S = c_m  \Delta \ell + N'  \tan\phi_m$
 
 where:
 
@@ -55,7 +55,7 @@ where:
 
 ## Solving for Unknown Forces
 
-To satisfy force equilibrium, we need to solve for the unknown forces acting on each slice. The ultimate goal is to solve for the factor of safety, F. However, the mobilized shear strength ($c_m$ and $tan \phi_m$) is a function of the factor of safety. Therefore, we first assume a value for the factor of safety and then solve the equilibrium equations for all slices. If the forces balance, we are done. If not, we adjust the factor of safety and repeat until balance is achieved. Also, the side force inclination ($\theta$) is required for all slice boundaries. There are a number of methods for 
+To satisfy force equilibrium, we need to solve for the unknown forces acting on each slice. The ultimate goal is to solve for the factor of safety, F. However, the mobilized shear strength ($c_m$ and $\tan \phi_m$) is a function of the factor of safety. Therefore, we first assume a value for the factor of safety and then solve the equilibrium equations for all slices. If the forces balance, we are done. If not, we adjust the factor of safety and repeat until balance is achieved. Also, the side force inclination ($\theta$) is required for all slice boundaries. There are a number of methods for 
 establishing the side force inclination. These methods will be reviewed below. For now, we will assume we have a value for the side force inclinations.
 
 So our next step is to use the force equilibrium equations to solve for the unknown forces acting on each slice. We do this by starting on the bottom slice (slice 1) and working our way up to the top slice (slice n). For the first slice, we have:
@@ -83,38 +83,38 @@ equilibrium equations are balanced (no residual forces), then the factor of safe
 
 As shown in the previous section, we need to solve for two unknowns at each slice. For the general case, we can set up equations to solve for the unknowns as follows. First, we sum forces in the x-direction:
 
->>$\sum F_x = 0 \Rightarrow \left[c_m \Delta \ell + N'  tan(\phi_m)\right]  cos(\alpha) - (N' + u \Delta \ell)  sin(\alpha) + Z_{i}
->   cos(\theta_i) - Z_{i+1}  cos(\theta_{i+1}) = 0$
+>>$\sum F_x = 0 \Rightarrow \left[c_m \Delta \ell + N'  \tan(\phi_m)\right]  \cos(\alpha) - (N' + u \Delta \ell)  \sin(\alpha) + Z_{i}
+>   \cos(\theta_i) - Z_{i+1}  \cos(\theta_{i+1}) = 0$
 
->>$c_m \Delta \ell   cos(\alpha) + N'  tan(\phi_m)  cos(\alpha) - N'  sin(\alpha) - u \Delta \ell  sin(\alpha) - + Z_{i}  cos
+>>$c_m \Delta \ell   \cos(\alpha) + N'  \tan(\phi_m)  \cos(\alpha) - N'  \sin(\alpha) - u \Delta \ell  \sin(\alpha) - + Z_{i}  cos
 > (\theta_{i}) - Z_
-> {i+1}  cos(\theta_{i+1}) = 0$
+> {i+1}  \cos(\theta_{i+1}) = 0$
 
->>$c_m \Delta \ell   cos(\alpha) + N' \left[tan(\phi_m) cos(\alpha) - sin(\alpha)\right] - u \Delta \ell sin(\alpha) + Z_{i}
->  cos
-> (\theta_{i}) - Z_{i+1} cos(\theta_{i+1}) = 0$
+>>$c_m \Delta \ell   \cos(\alpha) + N' \left[\tan(\phi_m) \cos(\alpha) - \sin(\alpha)\right] - u \Delta \ell \sin(\alpha) + Z_{i}
+>  \cos
+> (\theta_{i}) - Z_{i+1} \cos(\theta_{i+1}) = 0$
 
 Rearranging in terms of our two unknowns ($N'$ and $Z_{i+1}$) gives:
 
->>$N' \left[tan(\phi_m) cos(\alpha) - sin(\alpha)\right] - Z_{i+1} cos(\theta_{i+1}) = - c_m \Delta \ell  cos(\alpha) + u 
-> \Delta \ell sin(\alpha) - Z_{i} cos(\theta_i)   \qquad (1)$
+>>$N' \left[\tan(\phi_m) \cos(\alpha) - \sin(\alpha)\right] - Z_{i+1} \cos(\theta_{i+1}) = - c_m \Delta \ell  \cos(\alpha) + u 
+> \Delta \ell \sin(\alpha) - Z_{i} \cos(\theta_i)   \qquad (1)$
 
 Likewise, we can sum forces in the y-direction:
 
->>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' tan(\phi_m)\right] sin(\alpha) + (N' + u \Delta \ell) cos(\alpha) - 
-> W + Z_{i} sin(\theta_{i}) - Z_{i+1} sin(\theta_{i+1}) = 0$
+>>$\sum F_y = 0 \Rightarrow \left[c_m \Delta \ell + N' \tan(\phi_m)\right] \sin(\alpha) + (N' + u \Delta \ell) \cos(\alpha) - 
+> W + Z_{i} \sin(\theta_{i}) - Z_{i+1} \sin(\theta_{i+1}) = 0$
 
->>$c_m \Delta \ell  sin(\alpha) + N' tan(\phi_m) sin(\alpha) + N' cos(\alpha) + u \Delta \ell cos(\alpha) - W + Z_{i} sin
+>>$c_m \Delta \ell  \sin(\alpha) + N' \tan(\phi_m) \sin(\alpha) + N' \cos(\alpha) + u \Delta \ell \cos(\alpha) - W + Z_{i} sin
 > (\theta_{i}) - 
-> Z_{i+1} sin(\theta_{i+1}) = 0$
+> Z_{i+1} \sin(\theta_{i+1}) = 0$
 
->>$c_m \Delta \ell  sin(\alpha) + N' \left[tan(\phi_m) sin(\alpha) +  cos(\alpha)\right] + u \Delta \ell cos(\alpha) - W + 
-> Z_{i} sin
-> (\theta_{i}) - Z_{i+1} sin(\theta_{i+1}) = 0$
+>>$c_m \Delta \ell  \sin(\alpha) + N' \left[\tan(\phi_m) \sin(\alpha) +  \cos(\alpha)\right] + u \Delta \ell \cos(\alpha) - W + 
+> Z_{i} \sin
+> (\theta_{i}) - Z_{i+1} \sin(\theta_{i+1}) = 0$
 
 Rearranging in terms of our two unknowns ($N$ and $Z_{i+1}$) gives:
 
->>$N' \left[tan(\phi_m) sin(\alpha) + cos(\alpha)\right] - Z_{i+1} sin(\theta_{i+1}) = -c_m \Delta \ell  sin(\alpha) - u\Delta \ell cos(\alpha) + W - Z_{i} sin(\theta_{i})   \qquad (2)$ 
+>>$N' \left[\tan(\phi_m) \sin(\alpha) + \cos(\alpha)\right] - Z_{i+1} \sin(\theta_{i+1}) = -c_m \Delta \ell  \sin(\alpha) - u\Delta \ell \cos(\alpha) + W - Z_{i} \sin(\theta_{i})   \qquad (2)$ 
 
 Now we can take equations (1) and (2) and rearrange them into a matrix form. We can write the two equations as:
 
@@ -128,7 +128,7 @@ where:
 
 The matrix $A$ is given by:
 
->>$A = \begin{bmatrix}tan(\phi_m) cos(\alpha) - sin(\alpha) & -cos(\theta_{i+1})\\tan(\phi_m) sin(\alpha) + cos(\alpha) & -sin(\theta_{i+1})\end{bmatrix}    \qquad (3)$
+>>$A = \begin{bmatrix}\tan(\phi_m) \cos(\alpha) - \sin(\alpha) & -\cos(\theta_{i+1})\\tan(\phi_m) \sin(\alpha) + \cos(\alpha) & -\sin(\theta_{i+1})\end{bmatrix}    \qquad (3)$
 
 The vector $x$ is given by:
 
@@ -136,7 +136,7 @@ The vector $x$ is given by:
 
 The vector $b$ is given by:
 
->>$b = \begin{bmatrix}- c_m \Delta \ell  cos(\alpha) + u \Delta \ell sin(\alpha) - Z_{i} cos(\theta_{i})\\-c_m \Delta \ell  sin(\alpha) - u\Delta \ell cos(\alpha) + W - Z_{i} sin(\theta_{i})\end{bmatrix}   \qquad (5)$
+>>$b = \begin{bmatrix}- c_m \Delta \ell  \cos(\alpha) + u \Delta \ell \sin(\alpha) - Z_{i} \cos(\theta_{i})\\-c_m \Delta \ell  \sin(\alpha) - u\Delta \ell \cos(\alpha) + W - Z_{i} \sin(\theta_{i})\end{bmatrix}   \qquad (5)$
 
 The matrix equation can then be solved for the two unknowns
 ($N$ and $Z_{i+1}$) using the numpy linalg method. The solution is given by:
@@ -269,8 +269,7 @@ The following apply to **both** the Lowe & Karafiath and Corps of Engineers meth
 a fixed sliding sense. Both Corps conventions and Lowe & Karafiath therefore take the inter-slice inclination from
 the *signed* ground (or base) slope and negate it on right-facing slopes, so the computed factor of safety is the
 same for a slope and its mirror image. (A force-equilibrium factor of safety differing from Spencer's — in either
-direction — is expected given the side-force assumption, not a numerical error; EM 1110-2-1902 notes that methods
-which do not satisfy all conditions of equilibrium can be significantly inaccurate.)
+direction — is expected given the side-force assumption, not a numerical error.)
 
 **Limitation — undrained ($\phi = 0$) surfaces with a dominant vertical load.** Because the force-equilibrium
 methods satisfy only horizontal force equilibrium, they are unreliable on $\phi = 0$ surfaces carrying a large

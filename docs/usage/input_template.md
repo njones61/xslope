@@ -110,18 +110,20 @@ The **mat** worksheet defines material properties for the soil layer defined by 
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
   with depth below a reference elevation.
 - **c** (cohesion) and **φ** (friction angle): Mohr-Coulomb shear strength parameters (option = `mc`).
-- **c**, **cp**, and **r-elev** (option = `cp`): undrained strength that increases linearly below the reference
-  elevation. The undrained shear strength at elevation $y$ is:
-
->>$S_u = c + c_p \cdot \max(0,\; r_{elev} - y)   \qquad (1)$
-
-  where **c** is the strength at the reference elevation **r-elev**, and **cp** is the *rate* of strength increase
-  per unit elevation below **r-elev** (e.g. psf/ft). At or above **r-elev** the strength equals **c**. This behaves
-  like a $S_u/\sigma'_v$ (c/p) ratio but is referenced to elevation rather than depth, which gives more precise
-  control for slope-stability problems.
+- **c**, **cp**, and **r-elev** (option = `cp`): undrained strength that increases linearly below a reference
+  elevation — see the formula below.
 - **d**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **u**: pore pressure option for effective stress analysis
+
+For the **cp** strength option, the undrained shear strength at elevation $y$ is:
+
+>>$S_u = c + c_p \cdot \max(0,\; r_{elev} - y)   \qquad (1)$
+
+where **c** is the strength at the reference elevation **r-elev** and **cp** is the *rate* of strength increase per
+unit elevation below it (e.g. psf/ft). At or above **r-elev** the strength equals **c**. This behaves like a
+$S_u/\sigma'_v$ (c/p) ratio but is referenced to elevation rather than depth, giving more precise control for
+slope-stability problems.
 
 **Pore Pressure Options** (column K):
 

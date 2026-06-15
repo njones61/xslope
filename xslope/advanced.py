@@ -372,9 +372,23 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         for p in param_info:
             print(f"  Material {p['material_id']}: {p['param']} = {p['mlv']:.3f} ± σ={p['std']:.3f}")
     
+    # Validate up front: a strength/weight parameter cannot be reduced below zero.
+    # If MLV - sigma < 0 for any parameter, the "minus sigma" perturbation is
+    # non-physical, the search finds no admissible surface (returns the fs_fail
+    # sentinel), and the reliability index comes out as garbage. Abort with a clear
+    # message before running the expensive perturbation searches.
+    invalid = [p for p in param_info if (p['mlv'] - p['std']) < 0]
+    if invalid:
+        details = "; ".join(
+            f"material {p['material_id']} {p['param']} (mean={p['mlv']:.3g}, sigma={p['std']:.3g})"
+            for p in invalid)
+        return False, ("Reliability: the standard deviation exceeds the mean (COV > 100%) for "
+                       f"{details}. mean - sigma is negative, which is non-physical. Reduce the "
+                       "standard deviation(s) so mean - sigma >= 0.")
+
     # Step 3: Calculate F+ and F- for each parameter using TSPM
     delta_F_values = []
-    
+
     for i, param in enumerate(param_info):
         if debug_level >= 1:
             print(f"\nProcessing parameter {i+1}/{len(param_info)}: Material {param['material_id']}, {param['param']}")

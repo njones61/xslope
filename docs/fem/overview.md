@@ -214,7 +214,7 @@ The distributed loads in the XSLOPE input template can be used either for limit 
 analysis. For limit equilibrium analysis, each distributed load is converted to a resultant force applied at the top of each 
 slice. The total load on each slice is calculated by integrating the distributed load over the slice width. 
 
-For finite element analysis, the same distributed loads are converted to equivalent nodal forces. Since distributed loads in XSLOPE always vary linearly along the ground surface (creating simple trapezoidal load distributions), the conversion to nodal forces can be simplified using trapezoidal integration rather than general finite element shape functions. For a linear load distribution between two adjacent nodes with load intensities $q_1$ and $q_2$ separated by distance $L$, the equivalent nodal forces perpendicular to the ground surface are:
+For finite element analysis, the same distributed loads are converted to equivalent nodal forces using consistent edge integration of the element shape functions, $f_i = \int N_i\, p\, d\Gamma$ (not tributary-length lumping; on a quadratic edge this gives the 1/6–2/3–1/6 corner–midside–corner split). For a linear load distribution between two adjacent nodes with load intensities $q_1$ and $q_2$ separated by distance $L$, this integration gives the equivalent nodal forces perpendicular to the ground surface:
 
 >>$F_1 = \frac{L}{6}(2q_1 + q_2)$
 
@@ -284,7 +284,7 @@ XSLOPE automatically assigns displacement boundary conditions in the `build_fem_
 
 4. **Force boundary conditions from distributed loads.** If distributed loads are defined in the input template, the boundary element edges along each load line are identified and assigned **consistent** equivalent nodal forces, $f_i = \int N_i\, p\, d\Gamma$ integrated edge-by-edge with Gauss quadrature (for a uniform pressure on a quadratic edge this is the 1/6–2/3–1/6 corner–midside–corner split). Simple tributary-length lumping is not used: on quadratic edges it misallocates corner and midside forces, leaving a chain of self-equilibrated nodal couples of order $pL/6$ along the boundary that appears as spurious near-surface stress oscillation — strong enough to falsely yield the skin elements when the applied pressure is large compared to the soil strength (e.g., reservoir loading). If a force node coincides with a roller or fixed boundary, both the displacement constraint and the applied force are preserved.
 
-The figure below shows the resulting boundary conditions for the reinforced slope example from the [FEM Samples](samples.md) page (Problem 2). Fixed supports (triangles) line the base of the mesh. X-roller supports (circles) line the left and right vertical boundaries, allowing vertical movement but preventing horizontal displacement. The ground surface and slope face are free. Force boundary conditions from a 240 psf surcharge are shown as arrows along the slope crest. Reinforcement elements are shown as red lines within the slope body.
+The figure below shows the resulting boundary conditions for the reinforced slope example from the [FEM Samples](samples.md) page (Problem 1). Fixed supports (triangles) line the base of the mesh. X-roller supports (circles) line the left and right vertical boundaries, allowing vertical movement but preventing horizontal displacement. The ground surface and slope face are free. Force boundary conditions from a 240 psf surcharge are shown as arrows along the slope crest. Reinforcement elements are shown as red lines within the slope body.
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
@@ -499,7 +499,7 @@ The key parameters of `solve_ssrm()` are:
 >- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed).<br>
 >- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>
 >- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 1000): Passed through to `solve_fem()` for each trial.
+>- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 3000): Passed through to `solve_fem()` for each trial.
 
 The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. The `last_solution` can be passed directly to `plot_fem_results()` for visualization of the failure mechanism at the critical state.
 
@@ -588,7 +588,7 @@ XSLOPE supports two types of one-dimensional structural elements embedded within
 
 - **[Soil Reinforcement](reinforcement.md)**: Flexible reinforcement (geotextiles, soil nails, ground anchors) modeled as tension-only truss elements with axial stiffness $EA/L$. Includes failure modes (pullout, peak-residual, complete failure), wished-in-place analysis considerations, and typical material properties.
 
-- **[Piles and Concrete Piers](piles.md)**: Rigid structural elements modeled as beam elements with both axial stiffness ($EA/L$) and lateral bending stiffness ($3EI/L^3$). Unlike reinforcement, piles carry both tension and compression. Rotational DOFs are eliminated through static condensation to maintain compatibility with the 2-DOF-per-node soil mesh.
+- **[Piles and Concrete Piers](piles.md)**: Rigid structural elements modeled as beam elements with both axial stiffness ($EA/L$) and lateral bending stiffness ($12EI/L^3$). Unlike reinforcement, piles carry both tension and compression. Rotational DOFs are eliminated through static condensation to maintain compatibility with the 2-DOF-per-node soil mesh.
 
 In both cases, the structural element properties are **not reduced** during SSRM strength reduction — only soil $c$ and $\tan\varphi$ are reduced. The resulting factor of safety represents the margin of safety in the soil strength, given the structural elements as-designed.
 
@@ -645,7 +645,7 @@ The `plot_fem_results()` function provides a flexible interface for visualizing 
 | `strain` | Von Mises equivalent strain contours computed from total strains. |
 | `yield` | Mohr-Coulomb yield function contours. Positive values indicate yielding/failure, negative values indicate an elastic state. |
 
-The default combination is `['deformation', 'shear_strain', 'displace_vector']`, which provides a comprehensive view of the failure mechanism. The following example shows the SSRM results for the non-circular failure surface problem from the [FEM Samples](samples.md) page (Problem 4), which features a thin weak clay layer controlling the failure mechanism:
+The default combination is `['deformation', 'shear_strain', 'displace_vector']`, which provides a comprehensive view of the failure mechanism. The following example shows the SSRM results for the non-circular failure surface problem from the [FEM Samples](samples.md) page (Problem 3), which features a thin weak clay layer controlling the failure mechanism:
 
 ![noncircular.png](../lem/sample_images/noncircular.png){width=900}
 

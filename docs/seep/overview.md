@@ -54,7 +54,7 @@ where:<br>
 $k_2$ = the minor principal permeability (typically vertical for layered soils)<br>
 $\alpha$ = the angle in degrees from the positive x-axis to the major permeability direction
 
-If $/alpha=0$, the K tensor reduces to:
+If $\alpha=0$, the K tensor reduces to:
 
 >>$[K] = \begin{bmatrix} k_1 & 0 \\ 0 & k_2 \end{bmatrix}$
 
@@ -224,7 +224,7 @@ XSLOPE automatically determines whether to use saturated (confined) or unsaturat
 When **no exit face boundary conditions** are specified (i.e., no nodes with `bc_type = 2`), XSLOPE performs saturated analysis using the `solve_confined` function. This approach features:
 
 - **Linear System:** Solves a single linear system $[K]\{h\} = \{Q\}$ where the conductivity matrix is constant
-- **Direct Solution:** Uses sparse matrix factorization (typically < 10,000 nodes) or iterative methods for larger problems
+- **Direct Solution:** Uses sparse matrix factorization (`scipy.sparse.linalg.spsolve`)
 - **Computational Efficiency:** Single solution step with guaranteed convergence
 - **Applicable When:** The phreatic surface lies above or very close to the entire analysis domain
 

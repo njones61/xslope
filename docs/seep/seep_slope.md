@@ -248,13 +248,13 @@ For limit equilibrium slope stability analysis, the mesh and seepage solution de
 
 ### Interpolation to Slice Locations
 
-The integration of seepage analysis results with limit equilibrium slope stability calculations requires interpolation of pore pressures from the seepage mesh nodes to the slice centroids used in limit equilibrium analysis. XSLOPE implements a robust interpolation scheme that preserves the accuracy of the computed pore pressure field while ensuring computational efficiency.
+The integration of seepage analysis results with limit equilibrium slope stability calculations requires interpolation of pore pressures from the seepage mesh nodes to the base center of each slice used in limit equilibrium analysis. XSLOPE implements a robust interpolation scheme that preserves the accuracy of the computed pore pressure field while ensuring computational efficiency.
 
 The interpolation process follows these key steps:
 
-**Spatial Search:** For each slice centroid, the system identifies the seepage analysis element containing that point using efficient spatial search algorithms.
+**Spatial Search:** For each slice base center, the system identifies the seepage analysis element containing that point using efficient spatial search algorithms.
 
-**Shape Function Evaluation:** The pore pressure at the slice centroid is computed using the finite element shape functions and the nodal pore pressure values of the containing element:
+**Shape Function Evaluation:** The pore pressure at the slice base center is computed using the finite element shape functions and the nodal pore pressure values of the containing element:
 
 >>$u(x,y) = \sum_{i=1}^{n} N_i(x,y) \cdot u_i$
 

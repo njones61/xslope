@@ -18,7 +18,7 @@ pip install xslope[fem]
     default. Run this once before installing:
 
     ```bash
-    apt-get update && apt-get install -y libgl1-mesa-glx libglu1-mesa
+    apt-get update && apt-get install -y libgl1 libglu1-mesa
     ```
 
     macOS and Windows need no extra step — gmsh ships its own libraries.

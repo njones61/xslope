@@ -272,6 +272,15 @@ Everything upstream of the solvers — where an error poisons every method equal
 
 - Rapid drawdown (3-stage logic vs Duncan-Wright-Brandon procedure).
 - Reinforcement (tension distribution along lines, p resolution into slices).
+  > **REINFORCEMENT FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check on the
+  > reinforce sample: all six methods symmetric to <0.004% and reinforcement correctly
+  > RAISES FS. Per-slice p is exactly mirror-symmetric (sum 4800 both facings) and the
+  > p resolution / parallel-to-base assumption flip correctly. This also re-confirms the
+  > dload (F10) fix: the base model (no reinforcement, dload only) is symmetric too.
+  > NOTE a harness lesson — the mirror MUST reflect every feature (ground, polygons,
+  > circles, reinforce_lines, dloads/dloads2, profile/pile lines) AND re-sort each
+  > point-line ascending in x; an unmirrored dload or descending xs (np.interp) produced
+  > a spurious 5-28% asymmetry that vanished once the mirror was complete.
 - Piles (force + moment handling per `plans/plan_piles.md` vs implementation).
   > **PILE-FACING — already fixed in Stage 2** (oms/bishop/spencer battered-pile
   > right-facing moment sign; Janbu/Corps/Lowe were already correct; defensive
@@ -280,6 +289,11 @@ Everything upstream of the solvers — where an error poisons every method equal
   > Evidence: `plans/audit/stage2_pipeline_findings.md` §5.
 - Reliability (`advanced.py`): distribution handling, COV math.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
+  > **SEISMIC (kw) FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check with
+  > k=0.15: all six methods are symmetric to <1e-3% and seismic correctly LOWERS FS
+  > (e.g. acads_simple Spencer 1.446 -> 1.006). kw is stored as a positive magnitude in
+  > slice.py and negated in Spencer's right-facing swap — the consistent pattern the
+  > tension-crack force was made to follow (below). No bug.
   > **TENSION-CRACK FACING — CONFIRMED BUG, FIXED (June 2026).** Ran the mirror-symmetry
   > harness on a tension-crack model (acads_simple, crack depth 4). The **dry** crack
   > (geometry truncation only) was already symmetric for all six methods, but the

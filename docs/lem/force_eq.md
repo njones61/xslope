@@ -55,7 +55,7 @@ where:
 
 ## Solving for Unknown Forces
 
-To satisfy force equilibrium, we need to solve for the unknown forces acting on each slice. The ultimate goal is to solve for the factor of safety, F. However, the mobilized shear strength ($c_m$ and $tan \phi_m$) is a function of the factor of safety. Therefore, we first assume a value for the factor of safety and the solve the equilbrium equations for all slices. If the forces balance, we are done. If not, we adjust the factor of safety and repeat until balance is achieved. Also, the side force inclination ($\theta$) is required for all slice boundaries. There are a number of methods for 
+To satisfy force equilibrium, we need to solve for the unknown forces acting on each slice. The ultimate goal is to solve for the factor of safety, F. However, the mobilized shear strength ($c_m$ and $tan \phi_m$) is a function of the factor of safety. Therefore, we first assume a value for the factor of safety and then solve the equilibrium equations for all slices. If the forces balance, we are done. If not, we adjust the factor of safety and repeat until balance is achieved. Also, the side force inclination ($\theta$) is required for all slice boundaries. There are a number of methods for 
 establishing the side force inclination. These methods will be reviewed below. For now, we will assume we have a value for the side force inclinations.
 
 So our next step is to use the force equilibrium equations to solve for the unknown forces acting on each slice. We do this by starting on the bottom slice (slice 1) and working our way up to the top slice (slice n). For the first slice, we have:
@@ -65,7 +65,7 @@ So our next step is to use the force equilibrium equations to solve for the unkn
 
 The unknowns in this case are the normal force ($N'$) and magnitude of the side force ($Z_{i+1}$). We do know the side 
 force inclination ($\theta_{i+1}$). So we have two equations: $\sum F_x = 0$ and $\sum F_y = 0$ and two unknowns. After 
-solving for the unknows, we proceed to the next slice:
+solving for the unknowns, we proceed to the next slice:
 
 ![sclice_fe_next.png](images/sclice_fe_next.png){width=700px }
 
@@ -94,7 +94,7 @@ As shown in the previous section, we need to solve for two unknowns at each slic
 >  cos
 > (\theta_{i}) - Z_{i+1} cos(\theta_{i+1}) = 0$
 
-Rearranging in terms of our two unknows ($N'$ and $Z_{i+1}$) gives:
+Rearranging in terms of our two unknowns ($N'$ and $Z_{i+1}$) gives:
 
 >>$N' \left[tan(\phi_m) cos(\alpha) - sin(\alpha)\right] - Z_{i+1} cos(\theta_{i+1}) = - c_m \Delta \ell  cos(\alpha) + u 
 > \Delta \ell sin(\alpha) - Z_{i} cos(\theta_i)   \qquad (1)$
@@ -112,7 +112,7 @@ Likewise, we can sum forces in the y-direction:
 > Z_{i} sin
 > (\theta_{i}) - Z_{i+1} sin(\theta_{i+1}) = 0$
 
-Rearranging in terms of our two unknows ($N$ and $Z_{i+1}$) gives:
+Rearranging in terms of our two unknowns ($N$ and $Z_{i+1}$) gives:
 
 >>$N' \left[tan(\phi_m) sin(\alpha) + cos(\alpha)\right] - Z_{i+1} sin(\theta_{i+1}) = -c_m \Delta \ell  sin(\alpha) - u\Delta \ell cos(\alpha) + W - Z_{i} sin(\theta_{i})   \qquad (2)$ 
 

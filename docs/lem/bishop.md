@@ -65,13 +65,13 @@ Finally, we can solve for $N'$:
 
 Next we use the general equation for the factor of safety based on moment equilibrium (resisting moments divided by driving moments):
 
->$F = \dfrac{\sum (c + \sigma' tan \phi') \Delta \ell}{\sum W sin \alpha}$
+>$F = \dfrac{\sum (c + \sigma' \tan \phi') \Delta \ell}{\sum W \sin \alpha}$
 
 >$N' = \sigma' \Delta \ell$
 
 thus:
 
->$F = \dfrac{\sum (c \Delta \ell + N' tan \phi')}{\sum W sin \alpha}   \qquad (4)$
+>$F = \dfrac{\sum (c \Delta \ell + N' \tan \phi')}{\sum W \sin \alpha}   \qquad (4)$
 
 Next, we substitute (3) into (4):
 
@@ -116,7 +116,7 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 ### Vertical Force Equilibrium
 
-First we first need to consider how these forces affect the vertical force equilibrium. The vertical force equilibrium equation becomes:
+First we need to consider how these forces affect the vertical force equilibrium. The vertical force equilibrium equation becomes:
 
 >$N \cos \alpha + S \sin \alpha + P \sin \alpha + H \sin \theta_p - W - D \cos \beta = 0$
 >

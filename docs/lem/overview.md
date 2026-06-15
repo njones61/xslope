@@ -34,7 +34,7 @@ The pore pressures can also be derived from a 2D finite element seepage analysis
 
 ## Developed Shear Strength
 
-When applying the limit equilibrium method, we often utilize what is called the "developed shear stregth". The main equation:
+When applying the limit equilibrium method, we often utilize what is called the "developed shear strength". The main equation:
 
 > $F = \dfrac{s}{\tau}$
 
@@ -80,8 +80,8 @@ where:
 >$W$ = weight of the slice<br>
 $N$ = normal force acting on the base of the slice<br>
 $S$ = shear force acting on the base of the slice<br>
-$E_i$ = interslice force acting on the left side of the slice<br>
-$X_i$ = interslice force acting on the right side of the slice<br>
+$E_i$ = horizontal interslice force on the left side of the slice (boundary $i$); $E_{i+1}$ acts on the right side<br>
+$X_i$ = vertical (shear) interslice force on the left side of the slice (boundary $i$); $X_{i+1}$ acts on the right side<br>
 $\Delta x$ = width of the slice<br>
 $\Delta \ell$ = length of the slice base, calculated as $\Delta x \sec \alpha$<br>
 $\alpha$ = inclination angle of the slice base<br>
@@ -111,7 +111,7 @@ In addition to the basic forces acting on each slice, modern slope stability ana
 **Distributed Loads**: Surface loads such as traffic, construction equipment, or other surcharges can be represented 
 as distributed forces acting on the top of slices. These loads contribute to both the driving forces and the normal 
 forces on the slice base. Distributed loads correspond to water for submerged or partially submerged slopes or 
-surchage loads from buildings, roads, or other structures above the slope. 
+surcharge loads from buildings, roads, or other structures above the slope. 
 
 ![distributed_loads.png](images/distributed_loads.png){width="800px"}
 
@@ -127,14 +127,14 @@ forces. These forces are typically represented as horizontal accelerations actin
 
 ![seismic.png](images/seismic.png)
 
-The seismic force is assumped to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. 
+The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. 
 
 **Reinforcement:** Reinforcement forces are used to represent the effects of geosynthetics, soil nails, or other 
 structural elements that provide additional stability to slopes. These forces can be modeled as tensile forces acting along the base of the slices, providing resistance to sliding and contributing to the overall stability of the slope.
 
 ![reinf_layers.png](images/reinf_layers.png)
 
-For the limit equilibrium methods in XSLOPE, the reinforcement is assumed to be flexible and therefore acts in a direction parallel to the base of the slice in a direciton that resists shear. More comprehensize treatment of reinforcement is included in the [finite element method](../fem/overview.md).
+For the limit equilibrium methods in XSLOPE, the reinforcement is assumed to be flexible and therefore acts in a direction parallel to the base of the slice in a direction that resists shear. More comprehensive treatment of reinforcement is included in the [finite element method](../fem/overview.md).
 
 **Tension Cracks:** In the upper part of the slope, the cohesion of a soil can be greater than the driving forces. 
 Since soils can generally not withstand tension, this is unconservative. To address this problem, a tension crack can be added to a user-specified depth and the tension crack forms the upper boundary of the slices and not cohesive forces are allowed on the slice (crack) boundary. It is also possible to assume that the crack fills with water, providing a small force driving failure as an extra measure of conservative analysis.
@@ -159,7 +159,7 @@ The following limit equilibrium methods are supported in XSLOPE. Each method has
 **Ordinary Method of Slices (OMS):** The [Ordinary Method of Slices](oms.md) provides the simplest approach to slope 
 stability 
 analysis. Since it requires no iteration, results can be obtained rapidly. However, these advantages come with 
-significant limitations: the method only satisfies moment equilibrium, can produce unconservative or overly consrvative 
+significant limitations: the method only satisfies moment equilibrium, can produce unconservative or overly conservative 
 results, and completely neglects interslice forces. This makes OMS most suitable for preliminary analysis and simple geometries where quick results are more important than high accuracy. 
 
 **Simplified Janbu Method:** The [Janbu Method](janbu.md) offers a different approach by satisfying force equilibrium rather than 
@@ -184,7 +184,7 @@ the slope angle at the top of the slice $\beta$ and the failure surface angle at
 satisfying 
 both force and moment equilibrium simultaneously. This comprehensive approach provides the highest accuracy and can 
 handle both circular and non-circular failure surfaces. However, this accuracy comes at a cost: the method is the 
-most complex to implement, requires and iterative solution, and is computationally intensive. Spencer's method is 
+most complex to implement, requires an iterative solution, and is computationally intensive. Spencer's method is 
 generally considered the best and most accurate of the methods supported in XSLOPE. 
 
 The primary features of the limit equilibrium methods supported in XSLOPE are summarized in the table below:
@@ -208,7 +208,7 @@ For each of the solution methods, the factor of safety can be computed either fo
 
 ## Rapid Drawdown Analysis
 
-Rapid drawdown analysis represents a specialized application that can use any of the other methods as its foundation. This approach is specifically designed for dam and levee analysis where water level changes create unique stability challenges. The method accounts for undrained conditions and provides multi-stage analysis that captures the complex behavior of soils during rapid water level changes. However, this specialization limits its applicability to specific scenarios, and the multi-stage approach increases computational complexity. In XSLOPE, rapid drawdown analysis can be peformed with any of the supported limit equilibrium methods. [Documentation](rapid.md)
+Rapid drawdown analysis represents a specialized application that can use any of the other methods as its foundation. This approach is specifically designed for dam and levee analysis where water level changes create unique stability challenges. The method accounts for undrained conditions and provides multi-stage analysis that captures the complex behavior of soils during rapid water level changes. However, this specialization limits its applicability to specific scenarios, and the multi-stage approach increases computational complexity. In XSLOPE, rapid drawdown analysis can be performed with any of the supported limit equilibrium methods. [Documentation](rapid.md)
 
 ## Reliability Analysis
 
@@ -216,7 +216,7 @@ XSLOPE includes an option to perform a reliability analysis with any of the supp
 
 ## Code Examples and Usage
 
-To perform a limit equilibrium analsysi in XSLOPE, the user must first define the slope geometry, material properties, distributed loads, etc using the Excel Input Template as described in the [Input Template](../usage/input_template.md) page. The input template can then be loaded into Python using the 'load_slope_data' function. This function loads the input file and returns a dictionary containing the data from each sheet. The data can then be accessed using the sheet name as the key. For example:
+To perform a limit equilibrium analysis in XSLOPE, the user must first define the slope geometry, material properties, distributed loads, etc using the Excel Input Template as described in the [Input Template](../usage/input_template.md) page. The input template can then be loaded into Python using the 'load_slope_data' function. This function loads the input file and returns a dictionary containing the data from each sheet. The data can then be accessed using the sheet name as the key. For example:
 
 !!! note "Defining geometry: profile lines or polygons"
     Slope geometry can be defined two ways. The traditional approach uses **profile

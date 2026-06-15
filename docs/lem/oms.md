@@ -176,3 +176,11 @@ Note that:
 - **No iteration** is required.
 - **Less accurate** than more complete methods (e.g., Bishop's or Spencer's).
 - Provides the same solution as the Swedish method when $\phi = 0$.
+
+!!! warning "Not for fully-submerged slopes under a large water load"
+    Because OMS ignores interslice forces, it cannot balance the large water load on a
+    **fully-submerged slope** — for example the upstream face of a dam under a full
+    reservoir. The reservoir load enters the driving terms while the base normal is
+    reduced by buoyancy, so the computed factor of safety is unreliable (the
+    `earth_dam_up` sample is reported as *n/a* for this reason). Use a
+    complete-equilibrium method such as Bishop or Spencer for such cases.

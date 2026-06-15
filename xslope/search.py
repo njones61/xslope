@@ -21,6 +21,43 @@ from . import solve
 from .advanced import rapid_drawdown, validate_rapid_drawdown
 from .slice import generate_slices, get_y_from_intersection
 
+# A valid limit-equilibrium failure surface must have a meaningful net gravitational
+# driving force. A surface under flat ground (e.g. a circle in a reservoir bottom)
+# has |sum W sin(alpha)| ~ 0 — no failure mechanism — yet with high pore pressure the
+# factor of safety can blow up to a huge negative/near-zero value and win the search
+# minimum. Reject surfaces whose |sum W sin(alpha)| is below this fraction of the
+# total weight. Valid criticals run 0.2-0.6; degenerate flat circles run ~5e-5.
+MIN_DRIVING_FRAC = 0.01
+
+# A surface with more than this fraction of slices in base tension (negative
+# effective normal) is rejected as a non-failure surface. Valid criticals run
+# 0-10%; the degenerate high-pore-pressure circles run 40-80%.
+MAX_BASE_TENSION_FRAC = 0.25
+
+
+def _net_driving_too_small(df_slices):
+    """True if the surface has negligible net gravitational driving force (a flat,
+    non-failure surface) and should be rejected as a search candidate."""
+    W = df_slices['w'].values
+    total = float(np.abs(W).sum())
+    if total <= 0:
+        return True
+    driving = abs(float((W * np.sin(np.radians(df_slices['alpha'].values))).sum()))
+    return driving < MIN_DRIVING_FRAC * total
+
+
+def _base_tension_too_extensive(df_slices):
+    """True if a large fraction of slices carry a negative effective base normal
+    (base in tension) — a non-physical surface, e.g. a circle through a
+    high-pore-pressure zone where the moment methods then return a negative/near-zero
+    factor of safety. Valid criticals run ~0%; the degenerate cases run 60-80%. A
+    few negative base normals are normal and are NOT rejected (extent only)."""
+    if 'n_eff' not in df_slices.columns:
+        return False
+    N = df_slices['n_eff'].values
+    return len(N) > 0 and float((N < 0).mean()) > MAX_BASE_TENSION_FRAC
+
+
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.01, depth_tol_frac=0.03,
                     diagnostic=False, num_slices=40):
@@ -95,11 +132,19 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                     solver_result = None
                 else:
                     df_slices, failure_surface = result
-                    if rapid:
-                        solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
+                    if _net_driving_too_small(df_slices):
+                        FS = fs_fail  # degenerate surface (near-zero net driving)
+                        solver_result = None
                     else:
-                        solver_success, solver_result = solver(df_slices)
-                    FS = solver_result['FS'] if solver_success else fs_fail
+                        if rapid:
+                            solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
+                        else:
+                            solver_success, solver_result = solver(df_slices)
+                        FS = solver_result['FS'] if solver_success else fs_fail
+                        if solver_success and _base_tension_too_extensive(df_slices):
+                            FS = fs_fail  # degenerate surface (base mostly in tension)
+                        if not (FS > 0):  # reject non-positive / NaN factor of safety
+                            FS = fs_fail
                 fs_results.append((FS, d, df_slices, failure_surface, solver_result))
 
                 # Add to circle_cache for plotting all tested circles
@@ -365,11 +410,19 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         if np.abs(df_slices['alpha'].values).max() > max_base_angle:
             return float('inf'), None, None, None, fs_cache
 
+        # Reject surfaces with negligible net driving force (flat / non-failure).
+        if _net_driving_too_small(df_slices):
+            return float('inf'), None, None, None, fs_cache
+
         if rapid:
             solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
         else:
             solver_success, solver_result = solver(df_slices)
         FS = solver_result['FS'] if solver_success else float('inf')
+        if solver_success and _base_tension_too_extensive(df_slices):
+            FS = float('inf')  # degenerate surface (base mostly in tension)
+        if not (FS > 0):  # reject non-positive / NaN factor of safety
+            FS = float('inf')
         
         # Cache result
         key = tuple(map(tuple, points))

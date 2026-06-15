@@ -225,15 +225,33 @@ Everything upstream of the solvers — where an error poisons every method equal
   > now, but still a degenerate-boundary value (below its own OMS); Corps genuinely
   > rides the admissibility boundary on that geometry, as the audit predicted.
   >
-  > **STILL OPEN — OMS/Janbu near-zero degeneracy (a *geometric* SEARCH-1 issue, not
-  > force-equilibrium).** The same negative-root-wins-the-search bug also affects OMS
-  > and Janbu: earth_dam_up (full-reservoir dam, high pore pressure) carries
-  > OMS=-1838935 and Janbu=-0.000 in the table. A search-level FS guard was tried but
-  > it only relocates the problem — the search rides whatever floor is set (OMS=0.1001
-  > at floor 0.1), because earth_dam_up has a *family* of degenerate deep circles giving
-  > arbitrarily low FS (OMS is intrinsically unreliable with pore pressure). The real
-  > fix is geometric admissibility (reject degenerate circle geometry / per-slice
-  > contortion limits), not an FS threshold. Left for a dedicated SEARCH-1 effort.
+  > **SEARCH-LEVEL GUARDS DONE (June 2026).** Added three extent-based admissibility
+  > guards to the circular and non-circular searches (xslope/search.py): a candidate is
+  > rejected when (a) the net gravitational driving |Σ W sinα| is < 1% of ΣW (a flat,
+  > no-mechanism circle), (b) > 25% of slices carry a negative effective base normal
+  > (a circle threaded through a high-pore-pressure zone), or (c) the solved FS is
+  > non-positive. These fixed real shipped degeneracies: earth_dam_up OMS went from
+  > -1,838,935 (a flat reservoir-bottom circle) to a finite value, and
+  > method_slices_problem2 Corps from a degenerate 0.480 to 0.710 (in line with
+  > Spencer/Lowe). A fourth "minimum surface span" (extent) guard was prototyped and
+  > **reverted** — it was chasing a tiny-circle theory that proved wrong (see below).
+  >
+  > **RESOLVED — earth_dam_up OMS/Janbu is a METHOD LIMITATION, not a search/code bug.**
+  > Investigated the persistent near-zero earth_dam_up OMS/Janbu. On the *same* upstream
+  > circle, every other method gives a sensible FS (OMS 1.11, Bishop 2.03, Spencer 2.03,
+  > Corps 3.84, Lowe 3.82) and **only Janbu collapses to 0.000** — so the slices, water
+  > inputs, and geometry are all correct. The cause is the simplified equations on a
+  > *fully-submerged* face: the reservoir dload's horizontal component (D sinβ ≈ 20,000)
+  > enters Janbu's horizontal driving sum directly, while the resisting term is tiny
+  > (buoyant thin sliver, N_eff ≈ 368), so FS → 0. OMS (no interslice forces) is softer
+  > but similarly unreliable. The inclined-interslice methods (Spencer/Corps/Lowe) and
+  > moment methods (Bishop) balance the load and are reliable. This is the same class as
+  > the documented force_eq.md large-water-load caveat — inherent to the approximation,
+  > not fixable in code. **Resolution:** earth_dam_up OMS and Janbu are reported as
+  > *n/a* in samples.md (with a footnote) and excluded from the test suite via
+  > benchmarks/gen_fs_tables.py (EXCLUDED set); the limitation is documented in oms.md
+  > and janbu.md. No geometric/extent guard is warranted — the surface is valid; the
+  > method is what's limited.
   >
   > **BRACKETED ROOT FINDER (F6) — DEFERRED.** brentq was retried with newton as the
   > fast primary and a high->low bracket scan as fallback. It still resurrects the

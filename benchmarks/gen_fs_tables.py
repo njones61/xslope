@@ -45,6 +45,25 @@ METHODS = [
 # Methods that require a circular surface (skipped for non-circular searches).
 CIRCULAR_ONLY = {"oms", "bishop"}
 
+# (file, short-method) combinations that are method limitations rather than valid
+# results: reported as "n/a" in the table (with a footnote) and omitted from the
+# test tag. OMS and Janbu break on the fully-submerged upstream face of
+# earth_dam_up — their simplified equations cannot balance the large reservoir
+# water load, so the search is drawn to a spurious near-zero factor of safety
+# (see the OMS and Janbu method notes).
+NA = "n/a"
+EXCLUDED = {
+    ("files/xslope_earth_dam_up.xlsx", "oms"),
+    ("files/xslope_earth_dam_up.xlsx", "janbu"),
+}
+EXCLUDED_NOTE = (
+    "\\* OMS and Janbu are not reported for this problem. On a fully-submerged "
+    "slope their simplified equations cannot balance the large reservoir water "
+    "load, so they return a spurious near-zero factor of safety; the rigorous "
+    "methods (Bishop, Spencer, Corps, Lowe) remain reliable. See the OMS and "
+    "Janbu method notes."
+)
+
 TEST_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 TABLE_RE = re.compile(r'[ \t]*<!--\s*fs-table\s*-->.*?<!--\s*/fs-table\s*-->\n?', re.DOTALL)
 
@@ -74,6 +93,9 @@ def compute_fs(params):
     slope_data = load_slope_data(path)
     results = {}
     for short, solver, _ in METHODS:
+        if (file_rel, short) in EXCLUDED:
+            results[short] = NA
+            continue
         if not applicable(short, test_type):
             results[short] = None
             continue
@@ -104,6 +126,8 @@ def build_table(fs):
     headers = [hdr for _, _, hdr in METHODS]
     def cell(short):
         v = fs.get(short)
+        if v == NA:
+            return "n/a\\*"
         return f"{v:.3f}" if v is not None else "—"
     row = [cell(short) for short, _, _ in METHODS]
     lines = [
@@ -113,8 +137,10 @@ def build_table(fs):
         "| " + " | ".join(headers) + " |",
         "|" + "---:|" * len(headers),
         "| " + " | ".join(row) + " |",
-        "<!-- /fs-table -->",
     ]
+    if any(fs.get(s) == NA for s, _, _ in METHODS):
+        lines += ["", EXCLUDED_NOTE]
+    lines.append("<!-- /fs-table -->")
     return "\n".join(lines)
 
 
@@ -124,8 +150,9 @@ def build_tag(params, fs):
     if "num_slices" in params:
         parts.append(f"num_slices={params['num_slices']}")
     for short, _, _ in METHODS:
-        if fs.get(short) is not None:
-            parts.append(f"fs_{short}={fs[short]:.3f}")
+        v = fs.get(short)
+        if v is not None and v != NA:
+            parts.append(f"fs_{short}={v:.3f}")
     if "benchmark" in params:
         parts.append(f"benchmark={params['benchmark']}")
     return "<!-- test: " + ", ".join(parts) + " -->"
@@ -163,7 +190,8 @@ def main():
         print(f"  {params.get('file')}  ({params.get('type', 'circular_search')}, ns={params['num_slices']})")
         fs = compute_fs(params)
         seen[key] = fs
-        cells = "  ".join(f"{s}={fs[s]:.3f}" if fs[s] is not None else f"{s}=—"
+        cells = "  ".join(f"{s}={fs[s]:.3f}" if isinstance(fs[s], float)
+                          else f"{s}={fs[s] if fs[s] is not None else '—'}"
                           for s, _, _ in METHODS)
         print(f"      {cells}")
         out.append(build_table(fs) + "\n\n" + build_tag(params, fs))

@@ -111,3 +111,14 @@ Limitations:
 - Not suitable for highly irregular slopes or layered soils with complex interactions
 - Not a complete equilibrium method (no moment or interslice force balance)
 
+!!! warning "Not for fully-submerged slopes under a large water load"
+    Janbu's horizontal-force balance places the water load's horizontal component
+    ($D\sin\beta$) directly in the **driving** terms of equation (7), while the
+    resisting term is reduced by buoyancy through the effective base normal. On a
+    **fully-submerged slope** — for example the upstream face of a dam under a full
+    reservoir — the reservoir load overwhelms the resistance and the factor of safety
+    collapses to a spurious near-zero value (the `earth_dam_up` sample is reported as
+    *n/a* for this reason). The inclined-interslice-force methods (Spencer, Corps of
+    Engineers, Lowe & Karafiath) balance this load correctly; use one of them for such
+    cases.
+

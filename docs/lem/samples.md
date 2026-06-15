@@ -215,10 +215,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| 0.628 | 0.762 | 0.734 | 0.480 | 0.788 | 0.770 |
+| 0.628 | 0.762 | 0.734 | 0.710 | 0.788 | 0.770 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=0.480, fs_lowe=0.788, fs_spencer=0.770 -->
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=0.710, fs_lowe=0.788, fs_spencer=0.770 -->
 
 ### 6. Slope with Eight Layers
 
@@ -341,10 +341,12 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| -1838935.489 | 1.815 | -0.000 | 2.072 | 2.018 | 1.800 |
+| n/a\* | 1.815 | n/a\* | 2.072 | 2.018 | 1.800 |
+
+\* OMS and Janbu are not reported for this problem. On a fully-submerged slope their simplified equations cannot balance the large reservoir water load, so they return a spurious near-zero factor of safety; the rigorous methods (Bishop, Spencer, Corps, Lowe) remain reliable. See the OMS and Janbu method notes.
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_oms=-1838935.489, fs_bishop=1.815, fs_janbu=-0.000, fs_corps=2.072, fs_lowe=2.018, fs_spencer=1.800 -->
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.815, fs_corps=2.072, fs_lowe=2.018, fs_spencer=1.800 -->
 
 **Downstream side of the dam**
 

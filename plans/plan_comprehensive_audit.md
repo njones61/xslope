@@ -493,8 +493,15 @@ characterized, criterion validated on G&L Ex.1); remaining holes:
   >     εx=0.01, εy=0.02, γxy=0.
   >   - *1D truss (reinforcement):* reinforce_fem FS 1.076 (off) → 1.662 (on) — correctly raises FS.
   >   - *pile beam:* piles_fem FS 1.213 (off) → 1.369 (on) — correctly raises FS.
-- The ductile-reinforced-slope question: what should SSRM report when there is
-  no displacement catastrophe (reinforce_fem grows smoothly to F=2.6)?
+- ~~The ductile-reinforced-slope question: what should SSRM report when there is
+  no displacement catastrophe?~~
+  > **RESOLVED (June 2026, a15812c).** When the slope still reaches equilibrium at F_max
+  > (FS exceeds the search ceiling — the ductile reinforced case), or fails to converge even at
+  > F_min, solve_ssrm already returns converged=False/FS=None — but the explanatory message was
+  > gated on debug_level>=1, so at the default debug_level=0 the caller got a silent FS=None. Now
+  > the message prints unconditionally with an actionable note ("FS > F_max … increase F_max …
+  > expected for a heavily reinforced slope that deforms ductilely without a displacement
+  > catastrophe"). Stage 4b fully closed.
 
 ### Stage 5 — Documentation Audit (~2 sessions, highly parallel)
 

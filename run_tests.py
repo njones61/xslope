@@ -150,7 +150,7 @@ def run_fem_test(test):
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
-    target_size = test.get('target_size', 2.0)
+    target_size = test.get('target_size')  # default computed from domain extent below
     ssrm_tolerance = test.get('tolerance', 0.05)
 
     slope_data = load_slope_data(file_path)
@@ -163,6 +163,11 @@ def run_fem_test(test):
     if uses_seep and slope_data.get('mesh') is not None:
         mesh = slope_data['mesh']
     else:
+        # Default mesh size scales with the domain (like the seepage path) rather
+        # than a fixed value, so a wide domain does not blow up to a huge mesh.
+        if target_size is None:
+            x_coords = [x for x, _ in slope_data['ground_surface'].coords]
+            target_size = (max(x_coords) - min(x_coords)) / 100
         # constraint lines include BOTH reinforcement and pile axes — pile
         # beam elements require their axis lines in the mesh (a
         # reinforcement-only extraction silently drops the piles)

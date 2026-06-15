@@ -329,8 +329,12 @@ Everything upstream of the solvers — where an error poisons every method equal
   >     Verified: a derived cp fixture (xslope_clay_slope_reliability_cp, c=100/cp=14/r_elev=20)
   >     solves FS=1.81, reliability now perturbs γ+c+cp (β 1.457→1.467; previously cp's ΔF=0.99
   >     was dropped — materially unconservative); the 3 mc fixtures unchanged. `reliability` test
-  >     type added to run_tests.py; 4 reliability fixtures pinned. Minor open: perturbed φ/c not
-  >     clamped ≥0.
+  >     type added to run_tests.py; 4 reliability fixtures pinned.
+  >   - **RELIABILITY-NEGSIGMA (FIXED, a938e20):** when σ > mean (COV > 100%) the MLV−σ search
+  >     found no admissible surface and returned the fs_fail sentinel (9999), which the TSPM used
+  >     as a real FS → garbage β (went negative on a stable slope). Now validated up front (before
+  >     the perturbation searches) and aborts with a clear message. Clamping the parameter to 0 was
+  >     rejected — it makes the ±σ difference asymmetric and biases β unconservatively.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
   > **SEISMIC (kw) FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check with
   > k=0.15: all six methods are symmetric to <1e-3% and seismic correctly LOWERS FS

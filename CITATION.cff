@@ -11,12 +11,11 @@ authors:
     given-names: Norman L.
     affiliation: Brigham Young University
 version: 0.1.51
-date-released: 2026-06-15  # set to the actual v0.1.51 release date
+date-released: 2026-06-16
 license: Apache-2.0
 repository-code: "https://github.com/njones61/xslope"
 url: "https://xslope.org"
-# Add the Zenodo concept DOI here after the first release is archived:
-# doi: 10.5281/zenodo.XXXXXXX
+doi: 10.5281/zenodo.20709270
 keywords:
   - slope stability
   - seepage

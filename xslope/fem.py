@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import time
+import warnings
 from math import degrees, sin, cos, sqrt, asin, tan
 
 
@@ -334,7 +335,12 @@ def build_fem_data(slope_data, mesh=None):
             if isinstance(seep_u, np.ndarray) and len(seep_u) == n_nodes:
                 u = np.maximum(0.0, seep_u)
             else:
-                print("Warning: Seepage solution dimensions don't match mesh nodes")
+                n_seep = len(seep_u) if hasattr(seep_u, "__len__") else "?"
+                warnings.warn(
+                    f"Seepage pore pressures NOT applied: the stored seep solution has {n_seep} "
+                    f"values but the FEM mesh has {n_nodes} nodes. Pore pressures default to 0, "
+                    "which over-predicts the factor of safety — run the FEM on the same mesh as "
+                    "the seepage solution.")
     
     # Process 1D reinforcement elements
     elements_1d = np.array([]).reshape(0, 3) if 'elements_1d' not in mesh else mesh['elements_1d']

@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: xslope
+abstract: >-
+  Open-source Python package for integrated seepage and slope stability
+  analysis, combining limit equilibrium methods, finite element seepage, and
+  finite element slope stability (shear strength reduction).
+type: software
+authors:
+  - family-names: Jones
+    given-names: Norman L.
+    affiliation: Brigham Young University
+version: 0.1.51
+date-released: 2026-06-15  # set to the actual v0.1.51 release date
+license: Apache-2.0
+repository-code: "https://github.com/njones61/xslope"
+url: "https://xslope.org"
+# Add the Zenodo concept DOI here after the first release is archived:
+# doi: 10.5281/zenodo.XXXXXXX
+keywords:
+  - slope stability
+  - seepage
+  - limit equilibrium
+  - finite element
+  - shear strength reduction
+  - geotechnical engineering

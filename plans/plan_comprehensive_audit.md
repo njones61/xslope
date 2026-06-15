@@ -276,19 +276,17 @@ Everything upstream of the solvers — where an error poisons every method equal
   > Duncan-Wright-Wong method is faithfully implemented: eqs 2,3,4,5,6,7,8,9,10 are
   > algebraically correct, the d-ψ (Kc=1) and c'-φ' (Kc=Kf) envelopes are NOT swapped,
   > Stage-1 uses drained+full-pool / Stage-2 uses drawdown conditions (u2/dload2 swapped
-  > in correctly), and final FS = min(S2,S3). Open items (none change published numbers):
-  >   - **RD-F3 (edge):** the Kf-denominator guard `continue`s (advanced.py:155) at the
-  >     knife-edge |σ'_fc - c'cosφ'|<1e-12, skipping the strength assignment so the slice
-  >     keeps DRAINED strength in Stage 2 instead of the doc's lower-of-two fallback. The
-  >     genuinely negative-denominator case (σ'_fc < c'cosφ') is still caught by the
-  >     line-178 σ3<0 fallback, so impact is the narrow knife-edge only. Fix: route to the
-  >     fallback, don't `continue`.
-  >   - **RD-F2 (robustness):** τ_ff is assigned to df['c'] (advanced.py:194) with no
-  >     `max(0, ·)` clamp; a base-tension slice (σ'_fc<0) or odd interpolation can yield
-  >     negative undrained cohesion. Add a clamp.
-  >   - **RD-F8 (latent):** rapid_drawdown mutates the caller's slice_df in place
-  >     (u/dload/c/phi). Safe in search (fresh df per candidate) but destructive via
-  >     `solve_selected(slice_df, rapid=True)`. Add a defensive `df.copy()`.
+  > in correctly), and final FS = min(S2,S3). 3 low-impact robustness gaps FIXED (54f28e1),
+  > all behavior-preserving (earth_dam_rapid FS unchanged at 1.2683), none change published
+  > numbers:
+  >   - **RD-F3 (FIXED):** the degenerate K1/Kf denominator guards (cos(φ)~0, Kf denom ~0)
+  >     used to `continue`, silently leaving the slice with DRAINED strength in the undrained
+  >     Stage-2 solve. Now route to the lower-of-two-curves fallback (the doc's negative-stress
+  >     rule), restructured so the two envelope strengths are computed before the interpolation.
+  >   - **RD-F2 (FIXED):** clamp τ_ff = max(0, ·) before assigning to df['c'] (was unclamped —
+  >     a base-tension slice or odd interpolation could yield negative undrained cohesion).
+  >   - **RD-F8 (FIXED):** rapid_drawdown now operates on `df.copy()`, so it no longer mutates
+  >     the caller's slice_df (was destructive via `solve_selected(slice_df, rapid=True)`).
 - Reinforcement (tension distribution along lines, p resolution into slices).
   > **REINFORCEMENT FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check on the
   > reinforce sample: all six methods symmetric to <0.004% and reinforcement correctly

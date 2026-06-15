@@ -360,14 +360,18 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
     
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
-        
-        # Check each parameter for standard deviation
-        param_mappings = {
-            'gamma': 'sigma_gamma',
-            'c': 'sigma_c', 
-            'phi': 'sigma_phi'
-        }
-        
+
+        # Perturb only the strength parameters the material's strength model actually
+        # uses: 'mc' (Mohr-Coulomb) uses c and phi; 'cp' (undrained strength
+        # Su = c + cp*max(0, r_elev - y)) uses both the base c and the rate cp. gamma
+        # applies to both models. Perturbing a field the model does not use (e.g. phi on
+        # a cp material) would do nothing and silently drop that material's strength
+        # uncertainty from COV_F.
+        if material.get('option') == 'cp':
+            param_mappings = {'gamma': 'sigma_gamma', 'c': 'sigma_c', 'cp': 'sigma_cp'}
+        else:
+            param_mappings = {'gamma': 'sigma_gamma', 'c': 'sigma_c', 'phi': 'sigma_phi'}
+
         for param, std_key in param_mappings.items():
             if std_key in material and material[std_key] > 0:
                 param_info.append({

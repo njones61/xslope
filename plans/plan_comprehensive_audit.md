@@ -471,8 +471,20 @@ characterized, criterion validated on G&L Ex.1); remaining holes:
   on non-convex boundaries).
 - 1D truss integration and the pile beam elements (newest, least-tested code);
   `compute_strains`.
-- Known open item: the systematic ~6-11% FEM-above-LEM gap on wet dams
-  (Ex.6 +10%, Johnson +11%) — root-cause or characterize for the manuscript.
+- ~~Known open item: the systematic ~6-11% FEM-above-LEM gap on wet dams~~
+  > **INVESTIGATED — NOT A SYSTEMATIC ENGINE GAP (June 2026).** On the clean Griffiths Ex.6
+  > dam (same dam, dry/full/seep), FEM vs LEM(Spencer) agree within ±4% and the sign is NOT
+  > consistent: dry +2.5% (FEM 2.510 / LEM 2.448), full reservoir +0.6% (1.926 / 1.915),
+  > seepage −3.8% (1.685 / 1.751). No systematic FEM-above-LEM bias, and no growth with water —
+  > well inside normal FEM-vs-LEM scatter (±5-15% in the literature). The larger historical gaps
+  > trace to (a) the pathological earth-dam case with a high-k foundation seam (strong up/down
+  > seepage gradients → abnormal LEM, per Norm — discount it), and (b) the LEM's own
+  > submerged-slope limitations already documented (Janbu/OMS collapse on submerged faces; search
+  > degeneracy). The FEM engine itself is accurate (G&L Ex.1 FS 1.377, Ex.6 dry 2.51 vs sample
+  > 2.45). Not a FEM bug — the gap is LEM behavior on hard wet cases plus method differences.
+  remaining FEM holes still TODO:
+- `build_fem_data` BC auto-assignment edges, dload-to-nodal-force convention.
+- 1D truss + pile beam elements; `compute_strains`.
 - The ductile-reinforced-slope question: what should SSRM report when there is
   no displacement catastrophe (reinforce_fem grows smoothly to F=2.6)?
 

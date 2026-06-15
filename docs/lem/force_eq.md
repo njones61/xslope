@@ -124,7 +124,7 @@ where:
 
 - $A$ is a 2x2 matrix of coefficients
 - $x$ is a 2x1 vector of unknowns
-- $c$ is a 2x1 vector of constants
+- $b$ is a 2x1 vector of constants
 
 The matrix $A$ is given by:
 

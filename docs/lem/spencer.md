@@ -63,7 +63,7 @@ The shear force on the base of the slice is:
 
 >>$S = \tau \Delta \ell  \qquad (4)$
 
-where $\tau$ is the shear stress on the base of the slice. Recall that from limit equilibrium, the factor of safety $F_s$ is defined as the ratio of the resisting shear strength $s$ to the driving: stress $t$:
+where $\tau$ is the shear stress on the base of the slice. Recall that from limit equilibrium, the factor of safety $F_s$ is defined as the ratio of the resisting shear strength $s$ to the driving stress $\tau$:
 
 >>$F_s = \dfrac{s}{t}  \qquad (5)$
 
@@ -302,7 +302,7 @@ This iterative solution continues until the residuals $R_1$ and $R_2$ converge t
 
 ## Effective Normal Forces and Interslice Forces
 
-After solving for the factor of safety $F$ and the inclination angle $\theta$, we can calculate the effective normal force $N$ on the base of each slice. The normal force is calculated using equation (18). The effective normal force $N'$ can be calculated as:
+After solving for the factor of safety $F$ and the inclination angle $\theta$, we can calculate the normal force $N$ on the base of each slice. The normal force is calculated using equation (18). The effective normal force $N'$ can be calculated as:
 
 >>$N' = N - u \Delta \ell  \qquad (65)$
 
@@ -338,7 +338,7 @@ $y_{t,i}$ is known, we can solve for $y_{t,i+1}$ as follows:
 > Z_i \cos \theta (y_{t,i} - y_b)}{Z_{i+1} \cos \theta} \right]  \qquad (69)$
 
 For the first slice, we can set $y_{t,1} = y_{lb}$ where $y_{lb}$ is the lower left corner of the slice. For each 
-subsequent slice,  $y_{t,i}$ is equal to $y_{t,i+1}$ from the previous slice. We can use that in equation (30) to 
+subsequent slice,  $y_{t,i}$ is equal to $y_{t,i+1}$ from the previous slice. We can use that in equation (69) to 
 calculate $y_{t,i+1}$. We repeat this process for all slices until we reach the right side of the slope.
 
 

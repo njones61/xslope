@@ -30,8 +30,8 @@ The resulting mesh contains all necessary data structures for finite element ana
 ### Typical Code Pattern
 
 ```python
-from mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
-from fileio import load_slope_data
+from xslope.mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
+from xslope.fileio import load_slope_data
 
 # Load slope geometry and properties
 slope_data = load_slope_data('inputs/slope/input_template_reinf5.xlsx')
@@ -156,13 +156,13 @@ Special attention is given to maintaining element quality throughout the mesh ge
 
 ## Geometric Preprocessing with build_polygons
 
-The geometric preprocessing stage transforms the input slope geometry into a set of closed polygons suitable for finite element mesh generation. The `build_polygons()` function located in mesh.py:1160 serves as the primary interface for this transformation, taking slope_data containing profile line definitions and producing material zone polygons.
+The geometric preprocessing stage transforms the input slope geometry into a set of closed polygons suitable for finite element mesh generation. The `build_polygons()` function located in mesh.py serves as the primary interface for this transformation, taking slope_data containing profile line definitions and producing material zone polygons.
 
 ### Basic Usage Example
 
 ```python
-from mesh import build_polygons
-from fileio import load_slope_data
+from xslope.mesh import build_polygons
+from xslope.fileio import load_slope_data
 
 # Load slope geometry from Excel input file
 slope_data = load_slope_data('inputs/slope/input_template_lface4.xlsx')
@@ -200,13 +200,13 @@ The polygon construction process includes automatic cleaning algorithms that rem
 
 ## Mesh Generation with build_mesh_from_polygons
 
-The core mesh generation functionality is implemented in the `build_mesh_from_polygons()` function at mesh.py:8, which serves as the primary interface between the geometric preprocessing and the Gmsh finite element mesh generator. This function accepts material zone polygons and produces high-quality finite element meshes suitable for slope stability analysis.
+The core mesh generation functionality is implemented in the `build_mesh_from_polygons()` function at mesh.py, which serves as the primary interface between the geometric preprocessing and the Gmsh finite element mesh generator. This function accepts material zone polygons and produces high-quality finite element meshes suitable for slope stability analysis.
 
 ### Basic Mesh Generation
 
 ```python
-from mesh import build_mesh_from_polygons, build_polygons
-from fileio import load_slope_data
+from xslope.mesh import build_mesh_from_polygons, build_polygons
+from xslope.fileio import load_slope_data
 
 # Load slope data and generate polygons
 slope_data = load_slope_data('inputs/slope/input_template_lface4.xlsx')
@@ -283,7 +283,7 @@ The creation of quadratic finite elements represents one of the most sophisticat
 
 ### Linear-to-Quadratic Conversion Process
 
-The conversion process implemented in `convert_linear_to_quadratic_mesh()` at mesh.py:813 operates on fully generated linear meshes, adding the necessary nodes and updating element connectivity to create quadratic elements. This approach ensures maximum compatibility with embedded one-dimensional elements while maintaining precise control over node placement and element quality.
+The conversion process implemented in `convert_linear_to_quadratic_mesh()` at mesh.py operates on fully generated linear meshes, adding the necessary nodes and updating element connectivity to create quadratic elements. This approach ensures maximum compatibility with embedded one-dimensional elements while maintaining precise control over node placement and element quality.
 
 The conversion algorithm begins by analyzing the existing linear mesh to identify all unique edges that will require midside nodes. A comprehensive edge map is constructed that tracks all edges in both two-dimensional and one-dimensional elements, ensuring that midside nodes are shared appropriately between adjacent elements. This sharing is crucial for maintaining mesh conformity and ensuring proper finite element assembly.
 
@@ -404,8 +404,8 @@ One-dimensional elements are defined through the lines parameter in `build_mesh_
 #### Extracting Reinforcement Lines from Slope Data
 
 ```python
-from mesh import extract_reinforcement_line_geometry, build_polygons, build_mesh_from_polygons
-from fileio import load_slope_data
+from xslope.mesh import extract_reinforcement_line_geometry, build_polygons, build_mesh_from_polygons
+from xslope.fileio import load_slope_data
 
 # Load slope data containing reinforcement definitions
 slope_data = load_slope_data('inputs/slope/input_template_reinf5.xlsx')
@@ -482,9 +482,9 @@ Quality assurance for integrated one-dimensional and two-dimensional meshes incl
 ### Complete Workflow Example
 
 ```python
-from mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
-from fileio import load_slope_data
-from seep import setup_seepage_boundary_conditions, solve_confined
+from xslope.mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
+from xslope.fileio import load_slope_data
+from xslope.seep import setup_seepage_boundary_conditions, solve_confined
 import numpy as np
 
 def create_slope_mesh_workflow():
@@ -564,7 +564,7 @@ if __name__ == "__main__":
 ### Integration with Visualization
 
 ```python
-from plot import plot_mesh, plot_seepage_results
+from xslope.plot import plot_mesh, plot_seepage_results
 
 def visualize_mesh_and_results(mesh, heads):
     """Visualize mesh and seep results."""

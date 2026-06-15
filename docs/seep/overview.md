@@ -6,9 +6,9 @@ Seepage analysis in XSLOPE provides comprehensive groundwater flow modeling capa
 
 ![sample.png](images/sample.png){width=1200px}
 
-The seepage analysis framework in XSLOPE addresses the fundamental challenge that pore water pressures are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions. The finite element approach implemented in XSLOPE solves the complete groundwater flow equation throughout the slope domain, producing spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions. Furthermore, the seepage analysis tooks share the same input structure (Excel input template) used by the limit equilibrium and finite element methods, ensuring that the seepage analysis uses the same soil profile and site geometry and ensuring simple and seemless integration of the calculated pore pressures with the slope stability analysis.
+The seepage analysis framework in XSLOPE addresses the fundamental challenge that pore water pressures are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions. The finite element approach implemented in XSLOPE solves the complete groundwater flow equation throughout the slope domain, producing spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions. Furthermore, the seepage analysis tools share the same input structure (Excel input template) used by the limit equilibrium and finite element methods, ensuring that the seepage analysis uses the same soil profile and site geometry and ensuring simple and seamless integration of the calculated pore pressures with the slope stability analysis.
 
-Beyond the slope stability integration, the seepage tools in XSLOPE can be used as a stand-alone 2D seepage analysis tool, as long as the problem geometry and inputs are obtained from the Excel input template. Both saturated and unsaturated problems can be simulated. Furthermore, the system can directly import input files associated with the SEEP2D code. SEEP2D is a 2D finite element seepage program written in FORTRAN and originally producted by the US Army Corps of Engineers.
+Beyond the slope stability integration, the seepage tools in XSLOPE can be used as a stand-alone 2D seepage analysis tool, as long as the problem geometry and inputs are obtained from the Excel input template. Both saturated and unsaturated problems can be simulated. Furthermore, the system can directly import input files associated with the SEEP2D code. SEEP2D is a 2D finite element seepage program written in FORTRAN and originally produced by the US Army Corps of Engineers.
 
 ## Governing Equations
 
@@ -62,7 +62,7 @@ For isotropic materials ($k_1 = k_2 = k$), the tensor reduces to $[K] = k[I]$ re
 
 >>$[K] = \begin{bmatrix} k & 0 \\ 0 & k \end{bmatrix}$
 
-The continuity equation for incompressible flow in incompressible porous media requires that:
+The continuity equation for incompressible flow in porous media requires that:
 
 >>$\nabla \cdot \vec{v} = 0$
 
@@ -213,7 +213,7 @@ The conductivity matrix for each element is computed using numerical integration
 where $[B]$ is the strain-displacement matrix relating nodal heads to hydraulic gradients within the element.
 
 !!! Note
-    In most cases, linear triangles (tri3) are sufficiently accurate for seepage anlysis. 
+    In most cases, linear triangles (tri3) are sufficiently accurate for seepage analysis. 
 
 ### Saturated vs Unsaturated Solution Algorithms
 
@@ -337,10 +337,10 @@ where the velocity components are computed from the hydraulic head gradients usi
 The following example demonstrates the complete workflow for performing seepage analysis using XSLOPE's integrated mesh generation and solution capabilities:
 
 ```python
-from fileio import load_slope_data
-from mesh import build_polygons, build_mesh_from_polygons
-from seep import build_seep_data, run_seepage_analysis
-from plot_seep import plot_seep_data, plot_seep_solution
+from xslope.fileio import load_slope_data
+from xslope.mesh import build_polygons, build_mesh_from_polygons
+from xslope.seep import build_seep_data, run_seepage_analysis
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
 import numpy as np
 
 # Load slope geometry and material properties
@@ -367,7 +367,6 @@ plot_seep_data(
     seep_data, 
     show_nodes=True, 
     show_bc=True, 
-    material_table=True,
     alpha=0.4
 )
 
@@ -387,7 +386,7 @@ plot_seep_solution(
     base_mat=1,             # Material for flow line scaling
     fill_contours=True,     # Color-filled contours
     phreatic=True,          # Show phreatic surface
-    show_mesh=True          # Overlay element edges
+    mesh=True          # Overlay element edges
 )
 ```
 
@@ -396,8 +395,8 @@ plot_seep_solution(
 For users with existing SEEP2D input files, XSLOPE provides direct import capabilities:
 
 ```python
-from seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics
-from plot_seep import plot_seep_data, plot_seep_solution
+from xslope.seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
 
 # Import SEEP2D format input file
 seep_data = import_seep2d("inputs/seep/lface.s2d")
@@ -410,7 +409,6 @@ plot_seep_data(
     seep_data,
     show_nodes=False,
     show_bc=True,
-    material_table=True,
     label_elements=False,
     label_nodes=False
 )
@@ -426,7 +424,7 @@ plot_seep_solution(
     base_mat=2,
     fill_contours=False,    # Line contours only
     phreatic=True,
-    show_mesh=False,        # Clean visualization
+    mesh=False,        # Clean visualization
     alpha=0.6
 )
 ```
@@ -491,8 +489,8 @@ parametric_results = parametric_seepage_study()
 ### Export and Visualization of Results
 
 ```python
-from seep import export_seep_solution, save_seep_data_to_json
-from mesh import export_mesh_to_json
+from xslope.seep import export_seep_solution, save_seep_data_to_json
+from xslope.mesh import export_mesh_to_json
 
 def export_seepage_results():
     """Complete workflow with result export capabilities."""
@@ -517,11 +515,11 @@ def export_seepage_results():
     print("Exported complete seep data to outputs/seep_data.json")
     
     # Plot 1: Mesh with boundary conditions
-    plot_seep_data(seep_data, show_bc=True, material_table=True)
+    plot_seep_data(seep_data, show_bc=True)
     
     # Plot 2: Solution with flow net
     plot_seep_solution(seep_data, solution, levels=25, phreatic=True, 
-                      fill_contours=True, show_mesh=True)
+                      fill_contours=True, mesh=True)
     
 # Export complete analysis
 export_seepage_results()

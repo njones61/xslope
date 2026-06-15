@@ -4,7 +4,7 @@ The following examples illustrate how to use XSLOPE to perform seepage analysis.
 
 <a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_seep.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-These problems feature standalone seepage analyses. For instructions on to run an integrated seepage analysis with slope stability analysis, see the [Integrated Seeapage and Slope Stability Analysis](seep_slope.md) page.
+These problems feature standalone seepage analyses. For instructions on how to run an integrated seepage analysis with slope stability analysis, see the [Integrated Seepage and Slope Stability Analysis](seep_slope.md) page.
 
 ### 1. Sheetpile with Clay Blanket
 
@@ -59,7 +59,7 @@ of the dam down to the tailwater. To build the input file, the following list of
 
 ![earth_dam1_pts.png](images/earth_dam1_pts.png)
 
-In this case, the solution is partially saturated, so the kr0 and h0 parameters must be specfied for each material. 
+In this case, the solution is partially saturated, so the kr0 and h0 parameters must be specified for each material. 
 The following Excel file contains a complete set of inputs for this problem:
 
 [xslope_earth_dam1.xlsx](files/xslope_earth_dam1.xlsx)

@@ -81,7 +81,7 @@ This model is appropriate for ductile materials (geotextiles, some geosynthetics
 
 **Pullout Failure Model:**
 
-For each reinforcement line, it is assume that the tension force in the reinforcement is zero at the two ends and increases linearly with distance along the line as frictional resistance between the reinforcement and the surrounding soil developed. Full tension force develops over a pullout distance, $L_p$.
+For each reinforcement line, it is assumed that the tension force in the reinforcement is zero at the two ends and increases linearly with distance along the line as frictional resistance between the reinforcement and the surrounding soil develops. Full tension force develops over a pullout distance, $L_p$.
 
 - Pullout failure may occur in elements where the embedment length is less than the pullout length $L_p$<br>
 - The available strength is limited by pullout resistance rather than material strength<br>

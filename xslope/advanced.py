@@ -74,6 +74,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
     from . import solve
     method_func = getattr(solve, method_name)
 
+    # Work on a copy: the analysis overwrites strength and load columns (Stage 2
+    # swaps in the drawdown pore pressures / loads and undrained strengths), so do
+    # not mutate the caller's slice DataFrame.
+    df = df.copy()
+
     # Validate that d and psi parameters are present for at least some slices
     if (df['d'] == 0).all() and (df['psi'] == 0).all():
         return False, "Rapid drawdown requires d and psi parameters for low-K materials. All values are zero — check your input template."
@@ -135,67 +140,47 @@ def rapid_drawdown(df, method_name, debug_level=1):
             phi_deg = df.iloc[i]['phi1']  # Use original phi for calculations
             c_val = df.iloc[i]['c1']      # Use original c for calculations
             
-            # Calculate K1 using equation (4)
             phi_rad = np.radians(phi_deg)
-            if abs(np.cos(phi_rad)) < 1e-12:
-                if debug_level >= 2:
-                    print(f"  Warning: cos(phi) near zero for slice {i+1}, skipping K1 calculation")
-                continue
-            
-            K1 = (sigma_fc_i + tau_fc_i * (np.sin(phi_rad) + 1) / np.cos(phi_rad)) / \
-                 (sigma_fc_i + tau_fc_i * (np.sin(phi_rad) - 1) / np.cos(phi_rad))
-            
-            if debug_level >= 2:
-                print(f"  K1 = {K1:.4f}")
-            
-            # Calculate Kf using equation (6)
-            if abs(sigma_fc_i - c_val * np.cos(phi_rad)) < 1e-12:
-                if debug_level >= 2:
-                    print(f"  Warning: denominator near zero for Kf calculation in slice {i+1}")
-                continue
-            
-            Kf = ((sigma_fc_i + c_val * np.cos(phi_rad)) * (1 + np.sin(phi_rad))) / \
-                 ((sigma_fc_i - c_val * np.cos(phi_rad)) * (1 - np.sin(phi_rad)))
-            
-            if debug_level >= 2:
-                print(f"  Kf = {Kf:.4f}")
-            
-            # Check for negative stresses using equations (7) and (8)
-            sigma3_k1 = sigma_fc_i + tau_fc_i * (np.sin(phi_rad) - 1) / np.cos(phi_rad)  # Equation (7)
-            sigma3_kf = (sigma_fc_i - c_val * np.cos(phi_rad)) * (1 - np.sin(phi_rad)) / (np.cos(phi_rad)**2)  # Equation (8)
-            
-            if debug_level >= 2:
-                print(f"  sigma3_k1 = {sigma3_k1:.4f}, sigma3_kf = {sigma3_kf:.4f}")
-            
-            # Calculate tau_ff values for both curves
-            tau_ff_k1 = d_val + sigma_fc_i * np.tan(np.radians(psi_val))  # d-psi curve
-            tau_ff_kf = c_val + sigma_fc_i * np.tan(phi_rad)  # c-phi curve
-            
-            if debug_level >= 2:
-                print(f"  tau_ff_k1 = {tau_ff_k1:.4f}, tau_ff_kf = {tau_ff_kf:.4f}")
-            
-            # Determine which tau_ff to use
-            if sigma3_k1 < 0 or sigma3_kf < 0:
-                # Use the lower of the two curves
+            cos_phi = np.cos(phi_rad)
+            sin_phi = np.sin(phi_rad)
+
+            # tau_ff for the two envelopes: d-psi (Kc=1) and c'-phi' (Kc=Kf).
+            tau_ff_k1 = d_val + sigma_fc_i * np.tan(np.radians(psi_val))  # d-psi curve (Kc=1)
+            tau_ff_kf = c_val + sigma_fc_i * np.tan(phi_rad)             # c-phi curve (Kc=Kf)
+
+            # Fall back to the lower of the two curves (the doc's negative-stress rule)
+            # whenever the K1/Kf interpolation is ill-conditioned: cos(phi) ~ 0, the Kf
+            # denominator factor ~ 0, or a negative minor principal stress sigma'_3c on
+            # either envelope (eqs 7, 8). Previously these cases hit `continue` and the
+            # slice silently kept its drained strength in the undrained Stage-2 solve.
+            kf_first = sigma_fc_i - c_val * cos_phi   # Kf denominator factor (eq 6)
+            use_fallback = abs(cos_phi) < 1e-12 or abs(kf_first) < 1e-12
+            if not use_fallback:
+                sigma3_k1 = sigma_fc_i + tau_fc_i * (sin_phi - 1) / cos_phi          # eq (7)
+                sigma3_kf = kf_first * (1 - sin_phi) / (cos_phi ** 2)                # eq (8)
+                use_fallback = sigma3_k1 < 0 or sigma3_kf < 0
+
+            if use_fallback:
                 tau_ff = min(tau_ff_k1, tau_ff_kf)
-                if debug_level >= 2:
-                    print(f"  Negative stress detected, using lower curve: tau_ff = {tau_ff:.4f}")
             else:
-                # Interpolate using equation (5)
+                K1 = (sigma_fc_i + tau_fc_i * (sin_phi + 1) / cos_phi) / \
+                     (sigma_fc_i + tau_fc_i * (sin_phi - 1) / cos_phi)               # eq (4)
+                Kf = ((sigma_fc_i + c_val * cos_phi) * (1 + sin_phi)) / \
+                     (kf_first * (1 - sin_phi))                                       # eq (6)
                 if abs(Kf - 1) < 1e-12:
                     tau_ff = tau_ff_k1
                 else:
-                    tau_ff = ((Kf - K1) * tau_ff_k1 + (K1 - 1) * tau_ff_kf) / (Kf - 1)
-                
-                if debug_level >= 2:
-                    print(f"  Interpolated tau_ff = {tau_ff:.4f}")
-            
+                    tau_ff = ((Kf - K1) * tau_ff_k1 + (K1 - 1) * tau_ff_kf) / (Kf - 1)  # eq (5)
+
+            tau_ff = max(0.0, tau_ff)   # undrained shear strength cannot be negative
+
+            if debug_level >= 2:
+                print(f"  Slice {i+1}: tau_ff_k1={tau_ff_k1:.3f}, tau_ff_kf={tau_ff_kf:.3f}, "
+                      f"fallback={use_fallback} -> tau_ff={tau_ff:.3f}")
+
             # Set undrained strength parameters
             df.iloc[i, df.columns.get_loc('c')] = float(tau_ff)
             df.iloc[i, df.columns.get_loc('phi')] = 0.0
-            
-            if debug_level >= 2:
-                print(f"  Set c = {tau_ff:.4f}, phi = 0.0 for slice {i+1}")
         else:
             # High-K material - keep original c and phi
             if debug_level >= 2:

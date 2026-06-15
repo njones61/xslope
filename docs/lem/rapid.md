@@ -40,7 +40,7 @@ Approximate values of $c_v$ are as follows:
 
 _(Taken from Duncan et al, 1992)_
 
-For example, consider the following levee. The maximum drainage distance for pore pressures do dissipate is 35 ft, and the coefficient of consolidation for the compacted clay is 2 ft²/day. If the pool is lowered over 50 days, we can calculate T as follows:
+For example, consider the following levee. The maximum drainage distance for pore pressures to dissipate is 35 ft, and the coefficient of consolidation for the compacted clay is 2 ft²/day. If the pool is lowered over 50 days, we can calculate T as follows:
 
 ![example1.png](rapid_images/example1.png)
 
@@ -88,7 +88,7 @@ Likewise, the shear stress on the failure plane at the end of the consolidation 
 
 >>$\tau_{fc} = \dfrac{1}{F}(c' + \sigma'_{fc} \tan \phi')   \qquad (3)$
 
-Note that this is the mobilized shear strength and $F$ is the factory of safety returned by the solver in the Stage 1 solution.
+Note that this is the mobilized shear strength and $F$ is the factor of safety returned by the solver in the Stage 1 solution.
 
 ## Stage 2 - Compute FS for Post-Drawdown Conditions
 
@@ -114,7 +114,7 @@ For the stresses on the base of each slice, the actual $K$ ratio should vary som
 
 ![k_interp.png](rapid_images/k_interp.png){width=720px}
 
-If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpoloate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
+If we define $K_1$ as the stress ratio on the failure plane at the end of stage 1, we interpolate the two curves and extract the appropriate $\tau_{ff}$ value to use in the Stage 2 calculations. First of all, we compute $K_1$ as follows:
 
 >>$K_1 = \dfrac{\sigma'_{fc} + \tau_{fc}[(\sin \phi' + 1) / \cos \phi']}{\sigma'_{fc} + \tau_{fc}[(\sin \phi' - 1) / \cos \phi']}   \qquad (4)$
 
@@ -170,7 +170,7 @@ In summary, the calculations are done in the following process:
 
 **Stage 1**
 
-1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factory of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice.<br>
+1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factor of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice.<br>
 
 2.  Calculate $\sigma'_{fc}$ and $\tau_{fc}$ using equations (2) and (3).<br>
 

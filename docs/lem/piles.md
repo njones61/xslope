@@ -78,7 +78,7 @@ The pile force $H$ at angle $\theta_p$ is incorporated into each limit equilibri
 
 - [**OMS**](oms.md): $H\sin(\alpha-\theta_p)$ added to $N'$; pile moment terms added to the denominator
 - [**Bishop**](bishop.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; pile moment terms added to the denominator
-- [**Janbu**](janbu.md): $H\sin(\alpha-\theta_p)$ added to $N'$; $H\cos(\alpha-\theta_p)$ subtracted from the denominator
+- [**Janbu**](janbu.md): $-H\sin\theta_p$ enters vertical equilibrium for $N'$; $-H\cos\theta_p$ enters the horizontal force balance
 - [**Force Equilibrium** (Corps of Engineers, Lowe-Karafiath)](force_eq.md): $-H\cos\theta_p$ added to horizontal equilibrium ($b_0$); $-H\sin\theta_p$ added to vertical equilibrium ($b_1$)
 - [**Spencer**](spencer.md): $H\cos\theta_p$ added to $F_h$; $H\sin\theta_p$ added to $F_v$; moment terms added to $M_o$
 

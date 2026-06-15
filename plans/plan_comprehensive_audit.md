@@ -383,8 +383,22 @@ Everything upstream of the solvers — where an error poisons every method equal
 >     node-index order). Diagnostic printout only — not used in the solution.
 >   - **SEEP-ZEROINFLOW (open, low):** the flow-closure ratio returns 0 (passes vacuously) when
 >     positive inflow is ~0 — only matters for a degenerate no-inflow problem.
-> STILL TODO below: element stiffness per type, anisotropy rotated-coordinate cross-check, the
-> tri6 flow-net defect ([[project_tri6_flownet]]), import_seep2d fidelity, u-transfer path.
+>
+> **CROSS-CHECKS — ALL PASS (June 2026).**
+>   - *Anisotropy:* isotropic k (k1=k2) is EXACTLY rotation-invariant (coffer_dam 46.23390 at
+>     α=0/30/90); anisotropic k1=10,k2=1 flows ~2× more when the high-k axis aligns with the
+>     flow (α=0 vs 90). K-tensor assembly correct.
+>   - *Element family:* tri3/tri6/quad4/quad8/quad9 agree on flowrate within discretization error
+>     (coffer_dam 45.6–46.2 ~1.5%; lost_lake 21.4–21.5k ~0.5%). No single-family bug.
+>   - *tri6 FLOW NET — the old "tri6 broken" claim is WRONG (corrected [[project_tri6_flownet]]).*
+>     Measured phi_range/flowrate (=1.0 for a consistent net): tri6 is the BEST element — 1.000 with
+>     no sharp singularity (levee, lost_lake), and closer to 1.0 than tri3 at sheet-pile tips
+>     (coffer_dam tri6 0.94 vs tri3 0.84; double_sheetpile 0.88 vs 0.75). The under-shoot is a
+>     velocity-singularity-resolution issue at sheet-pile tips (ratio → 1 under mesh refinement,
+>     tri6 always ahead), NOT an element bug. Users should PREFER tri6 for flow nets.
+> STILL TODO below: per-element-type stiffness line-audit, import_seep2d fidelity, the
+> seepage→LEM/FEM u-transfer interpolation (partly covered by the passing johnson_res seep-coupled
+> tests).
 
 The June 2026 campaign anchored the *outputs* (exact confined-radial and
 sheetpile benchmarks, Kozeny free-surface bracketing) but did not line-audit the

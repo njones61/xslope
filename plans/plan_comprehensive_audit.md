@@ -364,6 +364,28 @@ Everything upstream of the solvers — where an error poisons every method equal
 
 ### Stage 4a — Seepage Engine Audit (~1-2 sessions)
 
+> **CORE SOLVE PATH VERIFIED CORRECT; 1 robustness fix + doc/diagnostic items (June 2026).**
+> Audited the steady-state engine (`seep.py` solve path) against `docs/seep/overview.md`.
+> Verified faithful: the K-tensor anisotropy rotation (k1·c²+k2·s², (k1−k2)cs; `_element_kmats`
+> seep.py:726), the linear-front kr (`kr_frontal` seep.py:685), confined/unconfined selection
+> by `bc_type==2`, per-Gauss-point kr for ALL element types (tri3 7-point, tri6 3-point, quads
+> 3×3/4×4 — NOT centroid), the edge-by-edge higher-order seepage-face active set, the 3-part
+> AND convergence (head change + unrelaxed flow-closure probe + exit-face stability), and the
+> inflow/outflow balance. Findings:
+>   - **SEEP-CONV (FIXED, bf1f487):** `solve_unsaturated` exhausted max_iter, printed a warning,
+>     then returned a flowrate with NO programmatic failure signal — a silent-wrong-number risk.
+>     Now returns `converged`/`closure_error` in the solution dict, warns loudly, and the seep
+>     test fails on non-convergence (was pinning a possibly-unreliable flowrate).
+>   - **SEEP-DOC (FIXED, 6e55e55):** overview.md said tri3 kr is sampled "at the centroid"; the
+>     code uses a 7-point rule (per-GP for all element types). Doc corrected.
+>   - **SEEP-DIAG (open, low):** `diagnose_exit_face` (seep.py:986) interpolates the exit
+>     elevation assuming exit nodes are in geometric order along the face (np.where gives
+>     node-index order). Diagnostic printout only — not used in the solution.
+>   - **SEEP-ZEROINFLOW (open, low):** the flow-closure ratio returns 0 (passes vacuously) when
+>     positive inflow is ~0 — only matters for a degenerate no-inflow problem.
+> STILL TODO below: element stiffness per type, anisotropy rotated-coordinate cross-check, the
+> tri6 flow-net defect ([[project_tri6_flownet]]), import_seep2d fidelity, u-transfer path.
+
 The June 2026 campaign anchored the *outputs* (exact confined-radial and
 sheetpile benchmarks, Kozeny free-surface bracketing) but did not line-audit the
 solver internals. Full audit of `seep.py`, same techniques as Stage 1:

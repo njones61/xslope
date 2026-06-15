@@ -1234,7 +1234,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 d = materials[base_material_idx]['d']
                 psi = materials[base_material_idx]['psi']
             else:
-                c = (materials[base_material_idx]['r_elev'] - y_cb) * materials[base_material_idx]['cp']
+                # 'cp' option: undrained strength c at the reference elevation r_elev,
+                # increasing by the rate cp per unit elevation below it (clamped to c
+                # at/above r_elev): Su = c + cp * max(0, r_elev - y).
+                mat = materials[base_material_idx]
+                c = mat['c'] + max(0.0, mat['r_elev'] - y_cb) * mat['cp']
                 phi = 0
                 c1 = 0      # not used in rapid drawdown, but must be defined
                 phi1 = 0    # not used in rapid drawdown, but must be defined

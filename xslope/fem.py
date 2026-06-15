@@ -226,20 +226,18 @@ def build_fem_data(slope_data, mesh=None):
     pp_option = list(unique_pp_options)[0] if unique_pp_options else "none"
     
     for i, material in enumerate(materials):
-        strength_option = material.get("strength_option", "mc")
+        strength_option = material.get("option", "mc")
         
         if strength_option == "mc":
             # Mohr-Coulomb: use c and phi directly
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
         elif strength_option == "cp":
-            # c/p ratio: compute undrained strength based on depth
-            cp_ratio = material.get("cp_ratio", 0.0)
-            r_elev = material.get("r_elev", 0.0)
-            
-            # For c/p option, we need to assign strength per element based on element centroid
-            # This will be handled when processing elements
-            c_by_mat[i] = cp_ratio  # Store cp_ratio temporarily
+            # 'cp' option: undrained strength c at the reference elevation, increasing
+            # by the rate cp per unit elevation below it. Assigned per element (by
+            # centroid elevation) in the loop below; store the cp rate temporarily.
+            cp_rate = material.get("cp", 0.0)
+            c_by_mat[i] = cp_rate  # Store cp rate temporarily (used per-element below)
             phi_by_mat[i] = 0.0     # Undrained analysis
         else:
             c_by_mat[i] = material.get("c", 0.0)
@@ -273,22 +271,24 @@ def build_fem_data(slope_data, mesh=None):
     for elem_idx in range(n_elements):
         mat_id = element_materials[elem_idx] - 1  # Convert to 0-based
         material = materials[mat_id]
-        strength_option = material.get("strength_option", "mc")
+        strength_option = material.get("option", "mc")
         
         if strength_option == "cp":
-            cp_ratio = c_by_mat[mat_id]  # This is actually cp_ratio
+            cp_rate = c_by_mat[mat_id]  # cp rate stored above
+            c_base = material.get("c", 0.0)
             r_elev = material.get("r_elev", 0.0)
-            
+
             # Compute element centroid
             elem_nodes = elements[elem_idx]
             elem_type = element_types[elem_idx]
             active_nodes = elem_nodes[:elem_type]  # Only use active nodes
             elem_coords = nodes[active_nodes]
             centroid_y = np.mean(elem_coords[:, 1])
-            
-            # Depth below reference elevation
+
+            # Su = c + cp * max(0, r_elev - y): base strength c at r_elev, increasing
+            # by the rate cp per unit elevation below it (clamped to c at/above r_elev).
             depth = max(0.0, r_elev - centroid_y)
-            c_by_elem[elem_idx] = cp_ratio * depth
+            c_by_elem[elem_idx] = c_base + cp_rate * depth
             phi_by_elem[elem_idx] = 0.0
         else:
             c_by_elem[elem_idx] = c_by_mat[mat_id]

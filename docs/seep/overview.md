@@ -131,7 +131,7 @@ This linear front approach provides several advantages:
 - **Physical Reasonableness:** Captures the essential reduction in conductivity above the phreatic surface
 - **Parameter Simplicity:** Only two parameters ($kr_0$ and $h_0$) needed per material
 
-The iterative solution process adjusts the relative conductivity at each element based on the computed pressure head at the element centroid, creating a spatially varying conductivity field that reflects the degree of saturation throughout the domain.
+The iterative solution process adjusts the relative conductivity within each element based on the computed pressure head sampled at the element's Gauss integration points (a quadrature-weighted average of $k_r(\psi)$ over the element), creating a spatially varying conductivity field that reflects the degree of saturation throughout the domain.
 
 ## Boundary Conditions
 
@@ -235,8 +235,8 @@ When **exit face boundary conditions are present** (i.e., any nodes with `bc_typ
 - **Nonlinear System:** Requires iterative solution because conductivity varies with pressure head
 - **Iterative Process:** <br>
   1. Initialize hydraulic head distribution (usually from saturated solution)<br>
-  2. Compute pressure head at each element centroid: $\psi = h - z$<br>
-  3. Evaluate relative conductivity using linear front method: $k_r = kr_{frontal}(\psi, kr_0, h_0)$<br>
+  2. Compute pressure head $\psi = h - z$ at each element's Gauss integration points<br>
+  3. Evaluate relative conductivity using the linear front method at each point and take the quadrature-weighted element average: $k_r = kr_{frontal}(\psi, kr_0, h_0)$<br>
   4. Assemble modified conductivity matrix: $[K_{modified}] = k_r [K]$<br>
   5. Solve linear system with current conductivity matrix<br>
   6. Check convergence (see below)<br>

@@ -2666,9 +2666,13 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                              tension_cutoff=tension_cutoff,
                              early_exit=(max_disp_factor is None))
     if not solution_min["converged"]:
+        msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_min:.2f} — it is "
+               f"unstable at or below this strength-reduction factor (FS < {F_min:.2f}). "
+               "Lower F_min to bracket the factor of safety.")
+        print(f"\n{msg}")
         return {
             "converged": False,
-            "error": f"F_min = {F_min} does not converge - slope unstable at F={F_min}",
+            "error": msg,
             "FS": None
         }
     if debug_level >= 1:
@@ -2683,13 +2687,17 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                              tension_cutoff=tension_cutoff,
                              early_exit=(max_disp_factor is None))
     if solution_max["converged"]:
-        if debug_level >= 1:
-            print(f"\nSSRM failed: F_max = {F_max} still converges — FS > {F_max}. Increase F_max.")
+        msg = (f"SSRM: the slope still reaches equilibrium at F = {F_max:.2f}, so the factor "
+               f"of safety exceeds the search ceiling (FS > {F_max:.2f}). No failure was found "
+               f"in [{F_min:.2f}, {F_max:.2f}] — increase F_max to bracket it. This is expected "
+               "for a heavily reinforced or very stable slope that deforms ductilely without a "
+               "displacement catastrophe.")
+        print(f"\n{msg}")
         return {
             "converged": False,
             "FS": None,
             "last_solution": solution_max,
-            "error": f"F_max = {F_max} still converges — FS > {F_max}. Increase F_max."
+            "error": msg
         }
     if debug_level >= 1:
         print(f"    -> Did NOT converge ({solution_max['iterations']} iters)")

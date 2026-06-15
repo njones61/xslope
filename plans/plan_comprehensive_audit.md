@@ -396,9 +396,22 @@ Everything upstream of the solvers — where an error poisons every method equal
 >     (coffer_dam tri6 0.94 vs tri3 0.84; double_sheetpile 0.88 vs 0.75). The under-shoot is a
 >     velocity-singularity-resolution issue at sheet-pile tips (ratio → 1 under mesh refinement,
 >     tri6 always ahead), NOT an element bug. Users should PREFER tri6 for flow nets.
-> STILL TODO below: per-element-type stiffness line-audit, import_seep2d fidelity, the
-> seepage→LEM/FEM u-transfer interpolation (partly covered by the passing johnson_res seep-coupled
-> tests).
+>
+> **INTERFACES — CLOSED (June 2026).**
+>   - *u-transfer (LEM):* `interpolate_at_point` (mesh.py:2604) uses correct shape functions
+>     (tri3 barycentric, tri6 quadratic); slice.py WARNS on an out-of-mesh slice base (with the
+>     over-predicts-FS caveat) and clamps negative u to 0. Verified correct.
+>   - *u-transfer (FEM):* applies nodal seep_u on a matching mesh (johnson_res_fem: 4141/4494
+>     nodes, max u 9971). FIXED (48db8e4): build_fem_data used `warnings.warn` twice but never
+>     imported warnings (latent NameError); added the import and upgraded the seep/FEM mesh-mismatch
+>     case from a bare print to a proper warning with the LEM-consistent FS caveat.
+>   - *import_seep2d:* faithful — triangle repeat-last-node (n3==n4) convention, 0-based conversion,
+>     CCW normalize-then-re-pad, BC mapping (1=head, 2=exit→elevation), unit weight, per-material
+>     k1/k2/α/kr0/h0. Validated end-to-end on all 4 SEEP2D reference files (s2con/s2unc/quad
+>     variants — tri3, quad4, mixed all import, solve, and converge; the three triangle cases agree
+>     at ~39.5).
+> Per-element-type stiffness matrices are validated indirectly by the element-family cross-check
+> (all 5 types agree within discretization error). **Stage 4a complete.**
 
 The June 2026 campaign anchored the *outputs* (exact confined-radial and
 sheetpile benchmarks, Kozeny free-surface bracketing) but did not line-audit the

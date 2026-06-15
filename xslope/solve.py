@@ -967,6 +967,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         R = -R
         c = -c
         kw = -kw
+        V = -V   # tension-crack water thrust: flips with the sliding direction, like kw
         tan_p = -tan_p
 
     # pre-compute the trigonometric functions

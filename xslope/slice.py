@@ -989,8 +989,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if right_facing:
                 # Right‐facing slope → water pushes on left side of the first slice (i == 0)
                 if i == 0:
-                    # line of action is d_tc/3 above the bottom left corner y_lb
-                    t_force = - t_force  # negative because it acts to the right on free body diagram
+                    # line of action is d_tc/3 above the bottom left corner y_lb.
+                    # t_force is stored as a positive magnitude (like the seismic kw);
+                    # each method resolves its own sliding-direction sign. The orientation-
+                    # normalized methods (oms/bishop/janbu/corps/lowe) treat it as driving;
+                    # spencer, which works in real coordinates, flips it for right-facing.
                     y_t_loc = y_lb + (tcrack_water / 3.0)
                 else:
                     # other slices = no tension‐crack force

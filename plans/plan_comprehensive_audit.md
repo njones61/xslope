@@ -280,14 +280,24 @@ Everything upstream of the solvers — where an error poisons every method equal
   > Evidence: `plans/audit/stage2_pipeline_findings.md` §5.
 - Reliability (`advanced.py`): distribution handling, COV math.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
-  > **TENSION-CRACK FACING CHECK (TODO).** Verify the tension-crack logic — both the
-  > dry crack and the water-filled crack (T force) — is sign-correct for **left- AND
-  > right-facing slopes across all methods**. This is the same facing-symmetry class
-  > as F10 (dload moment arm) and the pile fix: the crack water thrust T and its
-  > moment arm `a_t = Yo - y_t` are built in real coordinates and may not flip with
-  > facing. Use the mirror-symmetry harness (reflect geometry about a vertical axis,
-  > re-solve) — a model with a tension crack (with and without water) must give the
-  > same FS as its mirror image for oms/bishop/janbu/corps/lowe/spencer.
+  > **TENSION-CRACK FACING — CONFIRMED BUG, FIXED (June 2026).** Ran the mirror-symmetry
+  > harness on a tension-crack model (acads_simple, crack depth 4). The **dry** crack
+  > (geometry truncation only) was already symmetric for all six methods, but the
+  > **water-filled** crack (the T thrust) was asymmetric by **5-8% for oms/bishop/janbu/
+  > corps/lowe — only Spencer was correct**. Direction confirmed the left-facing side was
+  > right (water LOWERS FS, as it must) and the right-facing side was wrong (water raised
+  > FS). Root cause: slice.py pre-negated the crack water force on right-facing slopes
+  > ("acts to the right on the free body diagram") for Spencer's real-coordinate force
+  > balance, but the five orientation-normalized methods consume it as a driving-positive
+  > magnitude (the same way they consume the seismic kw) and did NOT want that negation —
+  > meanwhile Spencer's own right-facing swap block negates kw/c/R/etc. but was MISSING V.
+  > So T was doing the opposite of kw in both places. **Fix:** store the crack water force
+  > as a positive magnitude in slice.py (drop the negation, matching kw), and add `V = -V`
+  > to Spencer's right-facing swap. All six methods now symmetric for dry and water cracks,
+  > and water lowers FS everywhere. No shipped numbers change — every shipped model is
+  > left-facing or crack-free (the one water-crack sample, simple_embankment_mods, is
+  > left-facing). Regression test: `test/tension_crack_symmetry_check.py` (symmetry +
+  > physical-sign). Same facing-symmetry class as F10 and the pile fix.
 - Each: one auditor + verifier; cross-check LEM vs FEM where both support the
   feature (e.g. reinforced slope LEM vs `reinforce_fem`).
 

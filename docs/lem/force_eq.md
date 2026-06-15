@@ -51,7 +51,7 @@ where:
 
 >>$N'$ = the effective normal force acting on the slice = $\sigma'  \Delta \ell$
 
->>$N$ = the total normal force acting on the slice = $N + u \Delta \ell$
+>>$N$ = the total normal force acting on the slice = $N' + u \Delta \ell$
 
 ## Solving for Unknown Forces
 

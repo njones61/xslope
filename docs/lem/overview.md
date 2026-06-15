@@ -64,7 +64,7 @@ For equilibrium to be satisfied for a candidate failure surface, the following t
 
 >$\Sigma F_x = 0$
 
->$\Sigma F_x = 0$
+>$\Sigma F_y = 0$
 
 >$\Sigma M = 0$
 
@@ -257,7 +257,7 @@ follows:
 ```python
 import xslope as xslope
 from xslope.fileio import load_slope_data
-from xslope.plot import lot_inputs,
+from xslope.plot import plot_inputs
 
 slope_data = load_slope_data(file_name)
 plot_inputs(slope_data)
@@ -282,7 +282,7 @@ from xslope.plot import plot_solution
 from xslope.solve import solve_selected
 
 circle = slope_data['circles'][0] if slope_data['circular'] else None
-on_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
+non_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
 success, result = generate_slices(slope_data, circle=circle, non_circ=non_circ, num_slices=num_slices)
 if success:
   slice_df, failure_surface = result
@@ -350,7 +350,7 @@ from xslope.advanced import reliability
 from xslope.plot import plot_reliability_results
 
 circular = (surface_type == "circular")
-  success, result = reliability_analysis(slope_data, method, rapid=rapid_drawdown, circular=circular, debug_level=1)
+success, result = reliability(slope_data, method, rapid=rapid_drawdown, circular=circular, debug_level=1)
 if success:
   plot_reliability_results(slope_data, result, save_png=save_png)
 else:

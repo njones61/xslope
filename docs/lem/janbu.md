@@ -1,4 +1,4 @@
-#Janbu Simplified Method
+# Janbu Simplified Method
 
 Janbu's Simplified Method is one of the earliest and most commonly used slope stability analysis techniques based on limit equilibrium principles. It provides an approximate factor of safety (FS) for a mass of soil sliding along a specified failure surface by assuming partial force equilibrium . The method was developed by Norwegian engineer **Nils Janbu** in the 1950s to simplify slope stability analysis for circular and non-circular failure surfaces. The factor of safety computed by Janbu's simplified method typically **underestimates** the true FS and is therefore considered conservative. A correction factor was later introduced to compensate for the oversimplifications inherent in the method. Because it satisfies only force equilibrium and leans on this empirical correction, Janbu's method is best suited to quick or preliminary estimates — particularly on non-circular surfaces — with the result confirmed against a complete-equilibrium method such as Spencer before it is relied on for design. 
 

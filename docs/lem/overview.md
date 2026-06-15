@@ -259,9 +259,19 @@ import xslope as xslope
 from xslope.fileio import load_slope_data
 from xslope.plot import plot_inputs
 
+# Analysis inputs — edit these for your problem
+file_name = "input_template.xlsx"   # path to your completed Excel input file
+method = "spencer"                  # oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
+num_slices = 40
+rapid_drawdown = False              # True for a rapid-drawdown analysis
+surface_type = "circular"           # "circular" or "non-circular"
+save_png = False
+
 slope_data = load_slope_data(file_name)
 plot_inputs(slope_data)
 ```
+
+The subsequent examples reuse these variables (`slope_data`, `method`, `num_slices`, `rapid_drawdown`, `surface_type`, `save_png`), so run the blocks below in sequence.
 This loads the slope data into a dictionary and displays the inputs as follows:
 
 ![xslope_inputs.png](images/xslope_inputs.png)
@@ -313,8 +323,8 @@ from xslope.solve import solve_all
 from xslope.search import circular_search, noncircular_search
 
 if surface_type == "circular":
-  fs_cache, converged, search_path = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
-  plot_circular_search_results(slope_data, fs_cache, search_path, save_png=save_png)
+  fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
+  plot_circular_search_results(slope_data, fs_cache, search_path, circle_cache=circle_cache, save_png=save_png)
 else:
   fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid_drawdown, diagnostic=False)
   plot_noncircular_search_results(slope_data, fs_cache, search_path, save_png=save_png)

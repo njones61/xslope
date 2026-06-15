@@ -10,10 +10,10 @@ If you intend to perform either seepage analysis or slope stability using the fi
 install xslope as follows:
 
 ```bash
-apt-get update && apt-get install -y libgl1-mesa-glx libglu1-mesa # required by gmsh
+apt-get update && apt-get install -y libgl1-mesa-glx libglu1-mesa # Linux only: gmsh OpenGL libs
 pip install xslope[fem]
 ```
-The `[fem]` extra also installs the **gmsh** package, which is used for mesh generation in xslope.
+The `[fem]` extra also installs the **gmsh** package, which is used for mesh generation in xslope. The `apt-get` line is only needed on Debian/Ubuntu Linux (e.g. Google Colab); on macOS and Windows, gmsh ships its own libraries and you can skip it.
 
 After installing xslope, you can access the functions as follows:
 

@@ -28,6 +28,7 @@ Usage:
 """
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -281,6 +282,32 @@ def main():
                     tests.append(t)
             elif run_lem:
                 tests.append(t)
+
+    # Private test problems (CE 544 homework/exam keys) live in a separate
+    # repo kept out of the public xslope tree. Look for it as a sibling
+    # directory or at $XSLOPE_PRIVATE_TESTS; scan every markdown file there for
+    # test tags and route by type. Silently skipped when the repo is absent
+    # (public CI, other clones), so the public suite is unaffected.
+    private_dir = os.environ.get('XSLOPE_PRIVATE_TESTS') or str(
+        Path(__file__).resolve().parent.parent / 'xslope_private_tests')
+    private_path = Path(private_dir)
+    if private_path.is_dir():
+        n_priv = 0
+        for md in sorted(private_path.glob('*.md')):
+            if md.name.lower() == 'readme.md':
+                continue
+            for t in parse_test_tags(md):
+                ttype = t.get('type', '')
+                if ttype == 'fem_ssrm':
+                    if run_fem:
+                        tests.append(t); n_priv += 1
+                elif ttype == 'seep':
+                    if run_seep:
+                        tests.append(t); n_priv += 1
+                elif run_lem:
+                    tests.append(t); n_priv += 1
+        if n_priv:
+            print(f"Including {n_priv} private tests from {private_path.name}/")
 
     if args.skip_benchmarks:
         n_before = len(tests)

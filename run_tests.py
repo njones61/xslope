@@ -72,7 +72,7 @@ def parse_test_tags(md_path):
             params['file'] = str(md_dir / params['file'])
 
         # Convert numeric fields
-        for key in ['expected_fs', 'expected_flowrate', 'tolerance', 'target_size', 'f_min', 'f_max']:
+        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max']:
             if key in params:
                 params[key] = float(params[key])
         if 'num_slices' in params:
@@ -222,6 +222,22 @@ def run_seep_test(test):
     return solution['flowrate'], None
 
 
+def run_reliability_test(test):
+    """Run a single reliability analysis, returning the lognormal reliability index beta."""
+    from xslope.fileio import load_slope_data
+    from xslope.advanced import reliability as reliability_analysis
+
+    file_path = test['file']
+    method = test.get('method', 'spencer')
+    circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
+
+    slope_data = load_slope_data(file_path)
+    success, result = reliability_analysis(slope_data, method, circular=circular, debug_level=0)
+    if not success:
+        return None, f"reliability failed: {result}"
+    return result['beta_ln'], None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
@@ -229,6 +245,8 @@ def run_test(test):
         return run_fem_test(test)
     elif test_type == 'seep':
         return run_seep_test(test)
+    elif test_type == 'reliability':
+        return run_reliability_test(test)
     else:
         return run_lem_test(test)
 
@@ -356,6 +374,10 @@ def main():
             expected = test.get('expected_flowrate')
             tol = test.get('tolerance', 0.05) * abs(expected) if expected else 0
             label = 'flowrate'
+        elif test_type == 'reliability':
+            expected = test.get('expected_beta')
+            tol = test.get('tolerance', 0.02)
+            label = 'beta'
         else:
             expected = test.get('expected_fs')
             tol = test.get('tolerance', args.tolerance)

@@ -351,7 +351,7 @@ Each iteration builds a corrected load vector and solves the full system:
 
 >- **Time step** $\Delta t$: A numerical parameter (not physical time) that controls stability. Following Smith & Griffiths (their Program 6.1 form): $\Delta t = \dfrac{4(1+\nu)}{3E}$. The Mohr-Coulomb stability bound $\Delta t = \dfrac{4(1+\nu)(1-2\nu)}{E(1-2\nu+\sin^2\phi)}$ is ~2.6× larger and was found to drive a sustained limit cycle at Gauss points in mild effective tension beneath reservoir loading (the per-iteration redistribution overshoots and never settles); the smaller value is in the stable regime. Note that the per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and failure criterion are calibrated jointly with it.<br>
 >- **Flow rule** $\dfrac{\partial Q}{\partial \sigma}$: non-associated flow with dilation angle $\psi = 0$ (no plastic volume change), evaluated from the full invariant form with Lode-angle corner treatment as described above. The gradient implementation is verified against finite differences of $Q$ to machine precision.<br>
->- **Maximum iterations**: 1000 (Griffiths & Lane's ceiling; hundreds of iterations may be needed near the critical factor of safety)<br>
+>- **Maximum iterations**: 3000 (true equilibria near the critical factor settle slowly; Griffiths & Lane used a ceiling near 1000, but hundreds to a few thousand iterations may be needed just below failure)<br>
 >- **Tension cutoff** (optional, default off): a second viscoplastic mechanism that relaxes effective mean tension volumetrically. The $\psi = 0$ flow is purely deviatoric and cannot return a stress state near or beyond the Mohr-Coulomb apex. With the effective-stress pore-pressure formulation such states rarely arise below failure; the option remains for genuine tension zones (e.g., steep crests at low confinement). Griffiths & Lane (1999) include no tension treatment.
 
 **Key Points:**<br>
@@ -409,7 +409,7 @@ else:
 The key parameters of `solve_fem()` are:
 
 >- **`F`** (default 1.0): Strength reduction factor applied as $c_r = c/F$ and $\tan\phi_r = \tan\phi / F$. When called directly, $F = 1.0$ gives the unreduced solution; values of $F > 1.0$ can be used to test stability at specific reduction levels.<br>
->- **`max_iterations`** (default 500): Maximum viscoplastic iterations before declaring non-convergence.<br>
+>- **`max_iterations`** (default 3000): Maximum viscoplastic iterations before declaring non-convergence.<br>
 >- **`tolerance`** (default $10^{-3}$): Convergence tolerance for the elastic-relative displacement criterion described above.<br>
 >- **`max_disp_factor`** (default 0.1): If the maximum viscoplastic displacement exceeds this fraction of the mesh height, the solve is terminated early and declared non-converged. Set to `None` to disable this check.<br>
 >- **`debug_level`** (default 0): Controls output verbosity — 0 for silent, 1 for a summary, 2 for per-iteration details.

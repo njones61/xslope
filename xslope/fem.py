@@ -993,7 +993,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         fem_data (dict): FEM data dictionary from build_fem_data
         F (float): Shear strength reduction factor (c/F, tan(phi)/F)
         debug_level (int): 0=silent, 1=summary, 2=per-iteration
-        max_iterations (int): Maximum viscoplastic iterations (default 500)
+        max_iterations (int): Maximum viscoplastic iterations (default 3000)
         tolerance (float): Convergence tolerance ||du|| / ||u|| (default 1e-3).
             Normalized by the current displacement (Smith & Griffiths CHECON-style),
             so steady benign viscoplastic creep is accepted as converged; false

@@ -482,9 +482,17 @@ characterized, criterion validated on G&L Ex.1); remaining holes:
   > submerged-slope limitations already documented (Janbu/OMS collapse on submerged faces; search
   > degeneracy). The FEM engine itself is accurate (G&L Ex.1 FS 1.377, Ex.6 dry 2.51 vs sample
   > 2.45). Not a FEM bug — the gap is LEM behavior on hard wet cases plus method differences.
-  remaining FEM holes still TODO:
-- `build_fem_data` BC auto-assignment edges, dload-to-nodal-force convention.
-- 1D truss + pile beam elements; `compute_strains`.
+  >
+  > **SPOT-CHECKS — ALL PASS (June 2026). Stage 4b complete.**
+  >   - *dload→nodal-force:* consistent edge integration (2-pt Gauss of the edge shape functions;
+  >     tri6 quadratic `(2t−1)(t−1),4t(1−t),t(2t−1)` → the 1/6-2/3-1/6 split), applied along the
+  >     inward normal, edges oriented by projection (fem.py:734-808). Total force matches expected
+  >     within mesh tolerance (griffiths6_full: 10180 vs 10001, ~1.8% from boundary approximation).
+  >     NOT tributary lumping, as the doc requires.
+  >   - *compute_strains:* exact for tri3 and tri6 — a linear field u=(0.01x,0.02y) returns
+  >     εx=0.01, εy=0.02, γxy=0.
+  >   - *1D truss (reinforcement):* reinforce_fem FS 1.076 (off) → 1.662 (on) — correctly raises FS.
+  >   - *pile beam:* piles_fem FS 1.213 (off) → 1.369 (on) — correctly raises FS.
 - The ductile-reinforced-slope question: what should SSRM report when there is
   no displacement catastrophe (reinforce_fem grows smoothly to F=2.6)?
 

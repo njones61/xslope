@@ -219,6 +219,8 @@ def run_seep_test(test):
     seep_data = build_seep_data(mesh, slope_data)
     solution = run_seepage_analysis(seep_data, tol=1e-4)
 
+    if not solution.get('converged', True):
+        return None, "seepage solution did not converge (flowrate unreliable)"
     return solution['flowrate'], None
 
 

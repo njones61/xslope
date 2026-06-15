@@ -493,6 +493,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     # Track convergence history
     residuals = []
+    converged = False
     relax = 1.0  # Initial relaxation factor
     prev_residual = float('inf')
 
@@ -605,6 +606,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             print(f"Converged in {iteration} iterations "
                   f"(residual = {residual:.3e}, closure = {rel_closure:.3e}, "
                   f"exit face stable)")
+            converged = True
             break
 
         # Update for next iteration
@@ -640,7 +642,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     closure_error = abs(net_inflow - net_outflow)
     print(f"Flow closure check: inflow = {net_inflow:.6e}, outflow = {net_outflow:.6e}, error = {closure_error:.6e}")
 
-    return h_new, A, q_final, total_inflow, exit_face_active
+    return h_new, A, q_final, total_inflow, exit_face_active, converged, closure_error
 
 def compute_tri6_centroid_pressure(p_nodes, element_nodes):
     """
@@ -2850,7 +2852,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
         kr0_per_element = kr0_by_mat[mat_ids]
         h0_per_element = h0_by_mat[mat_ids]
 
-        head, A, q, total_flow, exit_face_active = solve_unsaturated(
+        head, A, q, total_flow, exit_face_active, converged, closure_error = solve_unsaturated(
             nodes=nodes,
             elements=elements,
             bc_type=bc_type,
@@ -2873,6 +2875,8 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
         print(f"phi min: {np.min(phi):.3f}, max: {np.max(phi):.3f}")
         velocity = compute_velocity(nodes, elements, head, k1, k2, angle, kr0_per_element, h0_per_element, element_types)
     else:
+        # Confined analysis is a single direct linear solve — always "converged".
+        converged, closure_error = True, 0.0
         head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
@@ -2900,8 +2904,14 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
         "i_mag": i_mag,
         "q": q,
         "phi": phi,
-        "flowrate": total_flow
+        "flowrate": total_flow,
+        "converged": converged,
+        "closure_error": closure_error,
     }
+
+    if not converged:
+        print("WARNING: seepage solution did not converge — flowrate is unreliable "
+              "(solution['converged'] is False).")
 
     elapsed = time.time() - start_time
     print(f"Seepage analysis completed in {elapsed:.2f} seconds.")

@@ -443,6 +443,27 @@ solver internals. Full audit of `seep.py`, same techniques as Stage 1:
 
 ### Stage 4b — FEM Spot-Audit (~1 session)
 
+> **VISCOPLASTIC SSRM ENGINE VERIFIED CORRECT (June 2026).** Audited `solve_fem`/`solve_ssrm`
+> (fem.py) against docs/fem/overview.md. All headline correctness points faithful:
+>   - **Elastic-strain yield check** (the one that silently inflates FS if regressed): the loop
+>     computes ε^el = ε − ε^vp before the stress/yield evaluation (fem.py:1449-1453: `eps4[:,:3] =
+>     eps − evpg[:,:3]`, `eps4[:,3] = −evpg[:,3]`, `sig4 = D4·eps4`), and repeats it in the final
+>     stress recovery (1793-1801). Correct.
+>   - MOCOUF yield function (1469-1471) and MOCOUQ ψ=0 flow with the Lode-corner freeze at
+>     |sinθ|>0.49 (1481-1495); Δt = 4(1+ν)/(3E) exactly (1211); two-part AND convergence (CHECON
+>     displacement + plastic-flow dUFR<1% of peak, 1752) plus the displacement limit; SSRM c/F and
+>     atan(tanφ/F) with correct converged→failed bisection (1082-1084, 2700-2722); effective-stress
+>     pore-pressure load term ∫B^T m u dV with m=[1,1,0,1] (1414-1420); [K] factored once with splu
+>     and reused. All confirmed.
+>   - **Benchmark:** Griffiths & Lane Example 1 SSRM FS = 1.377 (tri6, width/40 mesh) — matches G&L
+>     ~1.4 and the sample benchmark 1.36 (difference is mesh resolution).
+>   - Only items were doc drift (FIXED 88622b8): the solve_fem docstring and two overview.md spots
+>     said max_iterations default 500/1000; actual is 3000. Reference helpers compute_flow_vector_tp
+>     / mc_flow_vector_4 are unused (the loop inlines an equivalent vectorized flow — verified
+>     consistent); a no-progress early-exit exists but is disabled in the default FS path.
+> Remaining holes below (BC auto-assignment / dload-to-nodal-force, 1D truss + pile beams, the
+> FEM-above-LEM wet-dam gap) are still TODO.
+
 Largely exercised by the June 2026 campaign (flow rule FD-verified, dt regime
 characterized, criterion validated on G&L Ex.1); remaining holes:
 - `build_fem_data` material/element mapping, BC auto-assignment edges,

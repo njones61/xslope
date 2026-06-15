@@ -6,7 +6,7 @@ XSLOPE exchanges geometry with CAD software through the **DXF** format, using th
 - **Export a model to DXF** — write a complete model out to a layered DXF for documentation, sharing, or editing in CAD
   (`export_dxf`).
 - **Import polygons from a DXF** — read material-zone polygons from a DXF and write
-  them to the `polygons` sheet of an input template (`import_dxf`).
+  them to the `polygon` sheet of an input template (`import_dxf`).
 - **Save a plot to DXF** — save any XSLOPE plot (inputs, solution, search,
   seepage, FEM) directly to a layered DXF, the analog of saving a PNG
   (`save_dxf=True`).
@@ -74,7 +74,7 @@ Exported DXF file opened in CAD:
 ## Importing polygons from a DXF
 
 Import reads geometry **in the other direction**: a DXF drawing of a cross-section
-becomes the `polygons` sheet of an input template.
+becomes the `polygon` sheet of an input template.
 
 !!! note "Import is polygons-only"
     Import reads **material zones** and nothing else — material zones are the one
@@ -121,7 +121,7 @@ Unique material layers (2): EMBANKMENT, FOUNDATION
 ### Step 3 — Import into a template
 
 `import_dxf` copies an input template, writes the extracted polygons to the
-`polygons` sheet, and seeds the `mat` sheet with the layer names as material
+`polygon` sheet, and seeds the `mat` sheet with the layer names as material
 names:
 
 ```python

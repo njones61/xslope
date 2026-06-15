@@ -68,8 +68,8 @@ The **main** worksheet provides global parameters that apply to all analyses and
 These global parameters are accessed throughout the analysis. For example, the unit weight of water is used in 
 computing pore pressures from piezometric lines, and the seismic coefficient is used to add horizontal inertial 
 forces to each slice in limit equilibrium calculations. The tension crack parameters allow the simulation of a tension
-crack at the top of the slope for cohesive soils to reduce the liklihood that negative normal forces develop along the 
-fact, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 
+crack at the top of the slope for cohesive soils to reduce the likelihood that negative normal forces develop along the 
+face, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 
 conservatism as this applies a driving force to the failure surface.
 
 ---
@@ -274,7 +274,7 @@ should be ordered from left to right.
 The **circles** worksheet defines circular failure surfaces for limit equilibrium analysis. Circular surfaces are 
 the most common assumption in slope stability analysis and are required for methods like Bishop's Simplified Method 
 and Spencer's Method. XSLOPE supports up to 10 circular failure surfaces, each of which can be analyzed 
-individually or used as starting points when searching for a critical failure surface with a mininum factor of 
+individually or used as starting points when searching for a critical failure surface with a minimum factor of 
 safety using an automated search algorithm.
 
 ![circles.png](images/circles.png){width=1000px}
@@ -338,7 +338,7 @@ supported in XSLOPE, the following table defines which methods support non-circu
 For the movement option, the following values are supported:
 
 - **Free**: No movement constraint
-- **Horizonal**: Point moves in the horizontal direction only
+- **Horiz**: Point moves in the horizontal direction only
 - **Fixed**: Fixed movement constraint at each point
 
 For the **Free** option, if the point is the first or last point in the list, the movement constraint is applied 
@@ -382,7 +382,7 @@ defined by two points with a normal force for each.
 
 The **reinforce** worksheet defines soil reinforcement elements such as soil nails, rock anchors, geosynthetic 
 reinforcement, or tiebacks. These elements provide additional resistance to sliding by mobilizing tensile forces 
-along the failure surface. Each reinforcmeent object is represented as a straight line defined by the XY coordinates of 
+along the failure surface. Each reinforcement object is represented as a straight line defined by the XY coordinates of 
 the endpoints. Each line also has a set of properties that define the strength of the reinforcement and the pullout 
 length along the line. The Lp1 and Lp2 parameters control the pullout length along the line. The tensile force is 
 assumed to be zero at the end and linearly increasing to Tmax (or Tres for post-peak behavior) at distance of Lp1 
@@ -477,7 +477,7 @@ See the [LEM Piles](../lem/piles.md) section for detailed equation derivations a
 The **seep bc** and **seep bc (2)** worksheets define boundary conditions for finite element seepage analysis. 
 Boundary conditions 
 specify where water enters or exits the domain and the magnitude of hydraulic head on the boundary. There are two 
-types of boundary conditions: speficied head and exit face. **Specified head** boundaries correspond to free water on 
+types of boundary conditions: specified head and exit face. **Specified head** boundaries correspond to free water on 
 the face of the slope and the magnitude of the head is the height of water above the datum defined for the problem. 
 **Exit face** boundaries conditions are used for unconfined problems are applied to the "downstream" side of the slope 
 where water exits the slope. In the unconfined seepage solution, the phreatic surface intersects the exit face at 
@@ -486,7 +486,7 @@ the exit point, a head = elevation (zero pressure) condition is applied. For poi
 point, the head is determined by the pore pressure equation. 
 
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
-exit face. For confied problems, there is typically one upstream and one downstream specified head boundary 
+exit face. For confined problems, there is typically one upstream and one downstream specified head boundary 
 condition. Additional specified head boundary conditions can be defined to represent the water level in an 
 excavation, etc. The sheet is formatted for one exit face and up to 5 specified head boundaries. Additional 
 specified head boundary 

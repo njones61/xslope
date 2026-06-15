@@ -6,15 +6,14 @@ XSLOPE is available on PyPI. If you intend to only run limit equilibrium problem
 pip install xslope
 ```
 
-If you intend to peform either seepage analysis or slope stability using the finite element method, you will need to 
+If you intend to perform either seepage analysis or slope stability using the finite element method, you will need to 
 install xslope as follows:
 
 ```bash
 apt-get update && apt-get install -y libgl1-mesa-glx libglu1-mesa # required by gmsh
-pip install xslope[fem]==0.1.12
-pip install gmsh
+pip install xslope[fem]
 ```
-This installs the **gmsh** package as well, which is used for mesh generation in xslope.
+The `[fem]` extra also installs the **gmsh** package, which is used for mesh generation in xslope.
 
 After installing xslope, you can access the functions as follows:
 

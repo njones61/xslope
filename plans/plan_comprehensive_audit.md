@@ -312,16 +312,27 @@ Everything upstream of the solvers — where an error poisons every method equal
   > σ_F=√Σ(ΔF/2)², COV_F=σ_F/F_MLV, β_LN=ln(F_MLV/√(1+COV²))/√(ln(1+COV²)). A `reliability`
   > test type was added to run_tests.py and 3 CE 544 fixtures pinned (β = 1.670 / 2.483 /
   > 0.344, verified reproducible). Defect:
-  >   - **RELIABILITY-CP (confirmed):** the perturbation loop's param_mappings only covers
-  >     gamma/c/phi (advanced.py:365-369), but a non-`mc` material draws its strength from
-  >     `cp` (depth-varying undrained: c=(r_elev-y_cb)·cp, φ=0; slice.py:1237). So `sigma_cp`
-  >     is validated by the has_std gate (advanced.py:309-310) but NEVER perturbed, and
-  >     `sigma_c` on such a material IS perturbed but has no effect (its c is unused).
-  >     Cohesion uncertainty for cp-gradient materials is silently dropped → COV_F too small
-  >     → β overestimated → P_f underestimated (UNCONSERVATIVE); if sigma_cp is the only
-  >     uncertainty it errors "COV_F is zero." Fix: add cp→sigma_cp to the mappings (or
-  >     select params by material option). No current fixture exercises cp+reliability, so a
-  >     test case is needed to verify the fix. Minor: perturbed phi/c not clamped ≥0.
+  >   - **RELIABILITY-CP → uncovered the cp option was BROKEN END-TO-END (June 2026, FIXED).**
+  >     Investigating why reliability ignored `sigma_cp` exposed a chain of latent bugs in the
+  >     `cp` strength option (undrained strength increasing with depth). Intended model (author-
+  >     confirmed): Su = c + cp·max(0, r_elev − y) — strength c at the reference elevation,
+  >     increasing by the rate cp per unit elevation below it. Bugs, all fixed; no shipped
+  >     sample uses cp, so no published numbers change:
+  >       1. **fileio (5af90e8):** read `row.get('cp')`/`'s(cp)'`/`'s(ψ)'` but the mat headers
+  >          are `'c/p'`/`'s(c/p)'`/`'s(psi)'` → cp, σ_cp, σ_psi were ALWAYS 0; cp was unreadable
+  >          from any template.
+  >       2. **slice.py LEM (4045204):** Su = (r_elev−y)·cp — omitted base c, no clamp (negative
+  >          strength above r_elev).
+  >       3. **fem.py FEM (4045204):** the cp branch was DEAD — read `material['strength_option']`
+  >          /`['cp_ratio']` (fileio stores `'option'`/`'cp'`), so every material fell through to
+  >          Mohr-Coulomb → a cp material got constant base c (or 0). Plus the missing base c.
+  >       4. **advanced.py reliability (1067f66):** TSPM perturbed only gamma/c/phi; now selects
+  >          by option (mc → {γ,c,φ}; cp → {γ,c,cp}), so cp-material uncertainty enters COV_F.
+  >     Verified: a derived cp fixture (xslope_clay_slope_reliability_cp, c=100/cp=14/r_elev=20)
+  >     solves FS=1.81, reliability now perturbs γ+c+cp (β 1.457→1.467; previously cp's ΔF=0.99
+  >     was dropped — materially unconservative); the 3 mc fixtures unchanged. `reliability` test
+  >     type added to run_tests.py; 4 reliability fixtures pinned. Minor open: perturbed φ/c not
+  >     clamped ≥0.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
   > **SEISMIC (kw) FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check with
   > k=0.15: all six methods are symmetric to <1e-3% and seismic correctly LOWERS FS

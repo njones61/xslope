@@ -271,6 +271,24 @@ Everything upstream of the solvers — where an error poisons every method equal
 ### Stage 3 — Advanced Features Audit (~1-2 sessions)
 
 - Rapid drawdown (3-stage logic vs Duncan-Wright-Brandon procedure).
+  > **RAPID DRAWDOWN — CORE VERIFIED CORRECT; 3 low-impact robustness gaps (June 2026).**
+  > Audited `rapid_drawdown` (advanced.py ~50-282) against rapid.md. The 3-stage
+  > Duncan-Wright-Wong method is faithfully implemented: eqs 2,3,4,5,6,7,8,9,10 are
+  > algebraically correct, the d-ψ (Kc=1) and c'-φ' (Kc=Kf) envelopes are NOT swapped,
+  > Stage-1 uses drained+full-pool / Stage-2 uses drawdown conditions (u2/dload2 swapped
+  > in correctly), and final FS = min(S2,S3). Open items (none change published numbers):
+  >   - **RD-F3 (edge):** the Kf-denominator guard `continue`s (advanced.py:155) at the
+  >     knife-edge |σ'_fc - c'cosφ'|<1e-12, skipping the strength assignment so the slice
+  >     keeps DRAINED strength in Stage 2 instead of the doc's lower-of-two fallback. The
+  >     genuinely negative-denominator case (σ'_fc < c'cosφ') is still caught by the
+  >     line-178 σ3<0 fallback, so impact is the narrow knife-edge only. Fix: route to the
+  >     fallback, don't `continue`.
+  >   - **RD-F2 (robustness):** τ_ff is assigned to df['c'] (advanced.py:194) with no
+  >     `max(0, ·)` clamp; a base-tension slice (σ'_fc<0) or odd interpolation can yield
+  >     negative undrained cohesion. Add a clamp.
+  >   - **RD-F8 (latent):** rapid_drawdown mutates the caller's slice_df in place
+  >     (u/dload/c/phi). Safe in search (fresh df per candidate) but destructive via
+  >     `solve_selected(slice_df, rapid=True)`. Add a defensive `df.copy()`.
 - Reinforcement (tension distribution along lines, p resolution into slices).
   > **REINFORCEMENT FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check on the
   > reinforce sample: all six methods symmetric to <0.004% and reinforcement correctly
@@ -288,6 +306,22 @@ Everything upstream of the solvers — where an error poisons every method equal
   > Only leftover: add a permanent pile mirror-symmetry property test to the harness.
   > Evidence: `plans/audit/stage2_pipeline_findings.md` §5.
 - Reliability (`advanced.py`): distribution handling, COV math.
+  > **RELIABILITY — TSPM CORRECT; 1 confirmed defect (June 2026).** Audited `reliability`
+  > (advanced.py 285-504) against reliability.md. The Taylor-Series core is correct:
+  > F_MLV from search, per-parameter F⁺(MLV+σ)/F⁻(MLV-σ) re-search, ΔF=|F⁺-F⁻|,
+  > σ_F=√Σ(ΔF/2)², COV_F=σ_F/F_MLV, β_LN=ln(F_MLV/√(1+COV²))/√(ln(1+COV²)). A `reliability`
+  > test type was added to run_tests.py and 3 CE 544 fixtures pinned (β = 1.670 / 2.483 /
+  > 0.344, verified reproducible). Defect:
+  >   - **RELIABILITY-CP (confirmed):** the perturbation loop's param_mappings only covers
+  >     gamma/c/phi (advanced.py:365-369), but a non-`mc` material draws its strength from
+  >     `cp` (depth-varying undrained: c=(r_elev-y_cb)·cp, φ=0; slice.py:1237). So `sigma_cp`
+  >     is validated by the has_std gate (advanced.py:309-310) but NEVER perturbed, and
+  >     `sigma_c` on such a material IS perturbed but has no effect (its c is unused).
+  >     Cohesion uncertainty for cp-gradient materials is silently dropped → COV_F too small
+  >     → β overestimated → P_f underestimated (UNCONSERVATIVE); if sigma_cp is the only
+  >     uncertainty it errors "COV_F is zero." Fix: add cp→sigma_cp to the mappings (or
+  >     select params by material option). No current fixture exercises cp+reliability, so a
+  >     test case is needed to verify the fix. Minor: perturbed phi/c not clamped ≥0.
 - Seismic (kw) and tension crack (t, zw) terms end-to-end.
   > **SEISMIC (kw) FACING — VERIFIED CLEAN (June 2026).** Mirror-symmetry check with
   > k=0.15: all six methods are symmetric to <1e-3% and seismic correctly LOWERS FS

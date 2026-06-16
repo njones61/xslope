@@ -64,11 +64,15 @@ def build_acads_weak_layer():
     prof.update(profile_line_cells(3, 1, [(20, 26.5), (84, 26.5)]))   # base of weak layer
     u['profile'] = prof
     u['piezo'] = piezo_cells([(20, 26.5), (84, 26.5)])  # at base of weak layer
-    # Non-circular block: exit at toe bench, slide along weak layer (y~26.75), back scarp to crest
+    # Non-circular block: exit at toe bench, slide along weak layer (y~26.55), back scarp to crest.
+    # The 'Horiz' points are seeded just above the base of the weak layer (base y=26.5,
+    # top y=27.0): the search only moves them horizontally, so this seed elevation is the
+    # sliding plane. Placing the slip near the base of a weak layer is standard practice and
+    # matches the ACADS/SLOPE/W reference (FOS ~1.26); the layer-center seed reads ~1.5% high.
     u['non-circ'] = noncirc_cells([
         (38, 27.75, "Free"),    # exit on bench near toe
-        (44, 26.75, "Horiz"),   # toe-side, in weak layer
-        (66, 26.75, "Horiz"),   # crest-side, in weak layer
+        (44, 26.55, "Horiz"),   # toe-side, near base of weak layer
+        (66, 26.55, "Horiz"),   # crest-side, near base of weak layer
         (75, 40.0, "Free"),     # entry on crest
     ])
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})

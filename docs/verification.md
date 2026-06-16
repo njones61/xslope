@@ -51,11 +51,14 @@ critical surface runs along the weak layer. ACADS accepted band ≈ 1.26.
 
 | Method | XSLOPE FOS | Reference | Diff |
 |---|---|---|---|
-| Spencer | 1.279 | ~1.26 | +1.5% |
-| Corps of Engineers | 1.355 | ~1.26 | +7.6% |
-| Lowe & Karafiath | 1.268 | ~1.26 | +0.6% |
-| Simplified Janbu | 1.297 | ~1.26 | +2.9% |
+| Spencer | 1.258 | ~1.26 | −0.2% |
+| Corps of Engineers | 1.336 | ~1.26 | +6.0% |
+| Lowe & Karafiath | 1.249 | ~1.26 | −0.9% |
+| Simplified Janbu | 1.278 | ~1.26 | +1.4% |
 
+The non-circular slip is seeded just above the base of the weak layer (the
+standard placement for a weak interlayer — see the sample-problem write-up);
+Spencer then lands within 0.3% of SLOPE/W's Morgenstern-Price value (1.261).
 Corps of Engineers reads modestly high here, consistent with ground-parallel
 side-force inclinations on this geometry (XSLOPE uses the standard "Corps #2"
 convention — see [Force Equilibrium Methods](lem/force_eq.md)).

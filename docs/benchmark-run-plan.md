@@ -91,10 +91,10 @@ completeness only; they are legacy/educational, not recommended for design.)
 
   | Method | xslope FOS | Reference FOS | Diff (%) |
   |---|---|---|---|
-  | Spencer | 1.279 | ~1.26 | +1.5 |
-  | Corps of Engineers | 1.355 | ~1.26 | +7.6 |
-  | Lowe & Karafiath | 1.268 | ~1.26 | +0.6 |
-  | Simplified Janbu | 1.297 | ~1.26 | +2.9 |
+  | Spencer | 1.258 | ~1.26 | −0.2 |
+  | Corps of Engineers | 1.336 | ~1.26 | +6.0 |
+  | Lowe & Karafiath | 1.249 | ~1.26 | −0.9 |
+  | Simplified Janbu | 1.278 | ~1.26 | +1.4 |
 
   *Corps of Engineers uses **variant 2** (side forces parallel to the ground
   surface at each slice top — the standard "Corps of Engineers #2" convention;
@@ -103,7 +103,7 @@ completeness only; they are legacy/educational, not recommended for design.)
   search dive to a surface with a near-vertical toe segment where the fixed
   inclination collapses the force balance (Corps FS → 1.05 while Spencer rates
   that same surface 1.53). Variant 2 is xslope's default for this reason. Corps
-  reads slightly high here (+7.6%), consistent with ground-parallel side forces
+  reads slightly high here (+6.0%), consistent with ground-parallel side forces
   on this geometry.*
 
 ### LEM-2b — Arai & Tagyo (1985) homogeneous slope (circular)

@@ -642,14 +642,20 @@ Results for the methods applicable to non-circular surfaces:
 
 | Method | XSLOPE FOS | Reference | Diff |
 |---|---|---|---|
-| Spencer | 1.279 | ~1.26 | +1.5% |
-| Corps of Engineers | 1.355 | ~1.26 | +7.6% |
-| Lowe & Karafiath | 1.268 | ~1.26 | +0.6% |
-| Simplified Janbu | 1.297 | ~1.26 | +2.9% |
+| Spencer | 1.258 | ~1.26 | −0.2% |
+| Corps of Engineers | 1.336 | ~1.26 | +6.0% |
+| Lowe & Karafiath | 1.249 | ~1.26 | −0.9% |
+| Simplified Janbu | 1.278 | ~1.26 | +1.4% |
 
-Corps of Engineers reads modestly high here, consistent with ground-parallel
-side-force inclinations on a surface with a steep back scarp (XSLOPE uses the
-standard "Corps #2" convention — see
+The two interior surface points are seeded just above the base of the weak
+layer (base $y=26.5$, top $y=27.0$). Because the non-circular search moves
+``Horiz`` points horizontally only, that seed elevation *is* the sliding plane:
+placing it near the base of a weak interlayer is standard practice and matches
+the reference, whereas seeding it at the layer center biases the factor of
+safety roughly 1.5% high. With the base placement, Spencer lands within 0.3% of
+SLOPE/W's Morgenstern-Price value (1.261). Corps of Engineers reads modestly
+high here, consistent with ground-parallel side-force inclinations on a surface
+with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
 [Force Equilibrium Methods](force_eq.md)). This benchmark also appears on the
 [Verification](../verification.md#limit-equilibrium) page.
 
@@ -661,10 +667,10 @@ sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer |
 |---:|---:|---:|---:|---:|---:|
-| — | — | 1.297 | 1.355 | 1.268 | 1.279 |
+| — | — | 1.278 | 1.336 | 1.249 | 1.258 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_acads_weak_layer.xlsx, type=noncircular_search, num_slices=50, fs_janbu=1.297, fs_corps=1.355, fs_lowe=1.268, fs_spencer=1.279, benchmark=LEM-2 -->
+<!-- test: file=files/xslope_acads_weak_layer.xlsx, type=noncircular_search, num_slices=50, fs_janbu=1.278, fs_corps=1.336, fs_lowe=1.249, fs_spencer=1.258, benchmark=LEM-2 -->
 
 ### 14. Verification: Arai & Tagyo Homogeneous Slope {#verification-arai-tagyo}
 

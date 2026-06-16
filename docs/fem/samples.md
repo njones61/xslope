@@ -303,9 +303,9 @@ Results:
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
 | Full reservoir (free surface) | 1.91 | ~1.9 | +1% |
-| Before filling (no free surface) | 2.45 | ~2.4 | +2% |
+| Before filling (no free surface) | 2.44 | ~2.4 | +2% |
 
-Solution for the before-filling (dry) case at the computed factor of safety (F = 2.45). The
+Solution for the before-filling (dry) case at the computed factor of safety (F = 2.44). The
 shear strain concentration and displacement vectors show the critical mechanism passing
 beneath the crest and exiting on the downstream face:
 

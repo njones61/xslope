@@ -1,5 +1,5 @@
 {% set name = "xslope" %}
-{% set version = "0.1.51" %}
+{% set version = "0.1.52" %}
 
 package:
   name: {{ name|lower }}
@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: 20eac4ab97b1dbbae6bf034bcacf1916927cf6687675a66a45b8297f669e52b0
+  sha256: bf4730661b8d26f72c3f60cdddba7f6dcb4131387a09390d74058df07d38be22
 
 build:
   noarch: python

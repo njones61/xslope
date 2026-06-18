@@ -10,6 +10,7 @@ name = "xslope"
 dynamic = ["version"]
 description = "Slope stability analysis (limit equilibrium and FEM) in Python."
 readme = { file = "README.md", content-type = "text/markdown" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
 authors = [
   { name = "Norman L. Jones" }

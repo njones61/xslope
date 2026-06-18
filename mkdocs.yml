@@ -73,6 +73,5 @@ nav:
       - Slice: api/slice.md
       - Solve: api/solve.md
   - Coding:
-      - Conda: coding/conda_guide.md
       - Contributing: coding/contributing.md
 

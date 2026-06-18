@@ -1,3 +1,4 @@
+mkdocs
 python-markdown-math
 pymdown-extensions
 mkdocstrings[python]

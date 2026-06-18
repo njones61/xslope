@@ -18,7 +18,7 @@ Set up a dev environment:
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -e .[fem]  # [fem] adds gmsh, needed for mesh/seepage code
-pip install mkdocs mkdocstrings mkdocstrings-python pymdown-extensions  # for docs
+pip install -r docs/requirements.txt  # for building the docs
 ```
 
 ## Making Changes

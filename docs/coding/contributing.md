@@ -17,8 +17,8 @@ Set up a dev environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -e .
-pip install mkdocs mkdocstrings mkdocstrings-python  # for docs
+pip install -e .[fem]  # [fem] adds gmsh, needed for mesh/seepage code
+pip install mkdocs mkdocstrings mkdocstrings-python pymdown-extensions  # for docs
 ```
 
 ## Making Changes
@@ -42,7 +42,17 @@ Branch prefixes: `feature/`, `fix/`, `docs/`, `refactor/`.
 
 ## Testing
 
-Before submitting, at minimum run `python main.py` and any `test_*.py` or `main_*.py` scripts relevant to your change. Verify existing examples still work.
+xslope has a regression test suite in `run_tests.py`. It auto-discovers test cases tagged in the docs sample pages (`docs/{lem,fem,seep}/samples.md` and `docs/seep/seep_slope.md`) and compares computed factors of safety and flowrates against expected values. Before submitting, run it and make sure it passes:
+
+```bash
+python run_tests.py                  # all tests
+python run_tests.py --lem            # only LEM tests
+python run_tests.py --fem            # only FEM tests
+python run_tests.py --seep           # only seepage tests
+python run_tests.py --skip-benchmarks  # skip slow verification benchmarks
+```
+
+If your change adds a new sample, add a `<!-- test: ... -->` tag to the sample so it becomes part of the suite automatically.
 
 ## Documentation
 

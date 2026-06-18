@@ -5,6 +5,26 @@ Release, and the Zenodo archive. Keep them identical. Three things consume that
 version independently, so a release is not done until all the relevant steps are
 finished.
 
+## When to do each step
+
+PyPI and the GitHub Release/DOI serve different audiences, and they do **not**
+have to move together:
+
+- **PyPI is for users.** Any change you want `pip install xslope` to pick up
+  needs a PyPI upload (step 2), which needs a fresh version number (step 1).
+  This includes packaging, docs, and metadata fixes.
+- **The GitHub Release + Zenodo DOI is for citation.** Mint a DOI only for
+  versions someone might cite in a paper to reproduce results — i.e. releases
+  that **change computed results or add real capability** (a new analysis
+  method, a fix that changes factors of safety, a meaningful feature). Skip the
+  GitHub Release (step 3) for packaging, docs, typos, and metadata-only fixes.
+
+Rule of thumb: minor/major bumps usually get a DOI; patch bumps usually do not —
+but decide by *what changed*, not the version number. The concept DOI in
+`CITATION.cff` always resolves to the newest release, so anyone who just wants
+to "cite xslope" has a working link even for versions where no per-version DOI
+was minted.
+
 ## Steps
 
 1. **Bump the version.** Edit `xslope/_version.py` (`__version__`), e.g.

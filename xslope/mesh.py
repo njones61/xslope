@@ -2468,60 +2468,67 @@ def find_element_containing_point(nodes, elements, element_types, point):
     grid_x = int((x - spatial_grid['x_min']) / spatial_grid['cell_size'])
     grid_y = int((y - spatial_grid['y_min']) / spatial_grid['cell_size'])
     
-    # Get candidate elements from this cell and neighboring cells
-    candidate_elements = set()
-    for dx in [-1, 0, 1]:
-        for dy in [-1, 0, 1]:
-            cell_key = (grid_x + dx, grid_y + dy)
-            if cell_key in spatial_grid['cells']:
-                candidate_elements.update(spatial_grid['cells'][cell_key])
-    
-    # Check only the candidate elements
-    for elem_idx in candidate_elements:
+    def _point_in_element(elem_idx):
         element = elements[elem_idx]
         elem_type = element_types[elem_idx]
-        
+
         if elem_type in [3, 6]:  # Triangle (linear or quadratic)
             # For point-in-element testing, use only corner nodes
             x1, y1 = nodes[element[0]]
             x2, y2 = nodes[element[1]]
             x3, y3 = nodes[element[2]]
-            
+
             # Calculate barycentric coordinates
             det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
             if abs(det) < 1e-12:  # Degenerate triangle
-                continue
-                
+                return False
+
             lambda1 = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / det
             lambda2 = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / det
             lambda3 = 1.0 - lambda1 - lambda2
-            
+
             # Check if point is inside triangle (all barycentric coordinates >= 0)
-            if lambda1 >= -1e-12 and lambda2 >= -1e-12 and lambda3 >= -1e-12:
-                return elem_idx
-                
+            return lambda1 >= -1e-12 and lambda2 >= -1e-12 and lambda3 >= -1e-12
+
         elif elem_type in [4, 8, 9]:  # Quadrilateral (linear or quadratic)
             # For point-in-element testing, use only corner nodes
             x1, y1 = nodes[element[0]]
             x2, y2 = nodes[element[1]]
             x3, y3 = nodes[element[2]]
             x4, y4 = nodes[element[3]]
-            
+
             # Use point-in-polygon test for quadrilaterals
             # Check if point is inside by counting crossings
             vertices = [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
             inside = False
-            
             for j in range(len(vertices)):
                 xi, yi = vertices[j]
                 xj, yj = vertices[(j + 1) % len(vertices)]
-                
                 if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
                     inside = not inside
-            
-            if inside:
-                return elem_idx
-    
+            return inside
+
+        return False
+
+    cells = spatial_grid['cells']
+    # Elements are registered into every cell their bounding box overlaps, so the
+    # point's own cell already holds the containing element in the common case.
+    # Check it first and return immediately — this avoids the wide neighbor sweep.
+    for elem_idx in cells.get((grid_x, grid_y), ()):
+        if _point_in_element(elem_idx):
+            return elem_idx
+
+    # Fallback: scan the surrounding ring. Rarely needed (e.g. a point landing
+    # exactly on a cell boundary with floating-point round-off), but keeps the
+    # result identical to a full search.
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            for elem_idx in cells.get((grid_x + dx, grid_y + dy), ()):
+                if _point_in_element(elem_idx):
+                    return elem_idx
+
     return -1  # Point not found in any element
 
 
@@ -2560,8 +2567,11 @@ def _build_spatial_grid(nodes, elements, element_types):
         total_area += area
     
     avg_element_area = total_area / len(elements)
-    # Cell size should be roughly 2-3 times the square root of average element area
-    cell_size = max(0.1, 2.5 * np.sqrt(avg_element_area))
+    # Cell size on the order of the element size keeps each cell sparse (a handful
+    # of elements). Combined with the single-cell query in
+    # find_element_containing_point, this makes point location ~an order of
+    # magnitude faster than a coarse grid that forces a wide neighbor sweep.
+    cell_size = max(0.1, 0.75 * np.sqrt(avg_element_area))
     
     # Build grid
     grid = {

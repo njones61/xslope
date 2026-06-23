@@ -21,15 +21,15 @@ plot_inputs(slope_data, mode='lem', save_png=True)
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 30 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
-surface_type = "non_circular" # @param ["circular","non_circular"]
+surface_type = "circular" # @param ["circular","non_circular"]
 save_png = True # @param {"type":"boolean"}
 diagnostic = False # @param {"type":"boolean"}
 
-beta1 = 18  # desired slope angle in degrees
-beta2 = 24  # desired slope angle in degrees
+beta1 = 25  # desired slope angle in degrees
+beta2 = 35  # desired slope angle in degrees
 design_fs = 1.5  # target factor of safety for design
-toe_index = 0  # index of the toe point in the first profile line (zero-based index)
-slope_index = 1  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
+toe_index = 1  # index of the toe point in the first profile line (zero-based index)
+slope_index = 2  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
 
 def rebuild_geometry(slope_data):
     """Rebuild the polygon-based geometry after editing profile_lines.
@@ -133,6 +133,6 @@ ax.legend()
 ax.grid()
 plt.tight_layout()
 if save_png:
-    plt.savefig('fs_vs_slope_angle.png')
+    plt.savefig('fs_vs_slope_angle.png', dpi=600)
 plt.show()
 

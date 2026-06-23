@@ -5,7 +5,10 @@ One of the powerful benefits of using XSLOPE as a Python package is the ability 
 - a target **factor of safety** (deterministic design, e.g. FS = 1.2), or
 - a target **reliability** $R = P(FS > 1)$ (probabilistic design, e.g. R = 0.75).
 
-The same driver script (`main_design.py`) performs both studies; you select between them with the `design_mode` parameter (`"fs"` or `"reliability"`).
+The same driver script performs both studies; you select between them with the `design_mode` parameter (`"fs"` or `"reliability"`). The script is included in the repository as [`main_design.py`](https://github.com/njones61/xslope/blob/main/main_design.py) in the project root, and the Colab notebook below mirrors it cell by cell. Run it locally with `python main_design.py` (edit the parameters near the top of the file), or step through the notebook in Colab.
+
+!!! note "This is an illustration of the capability, not a turnkey design tool"
+    The script shown here solves one specific, deliberately simple problem: varying a **single** slope-angle point on a simple profile. Real design problems differ — different geometry, multiple design variables, berms, loads, staged construction, custom constraints — and you will almost always need to write or adapt driver code for your own situation. That is the whole point of using XSLOPE as a Python package: the limit-equilibrium, reliability, seepage, and FEM engines are callable building blocks, and you assemble them to fit your problem. With modern **agentic programming** (e.g. Claude Code), this is fast and approachable — describe your design problem in plain language and let the agent wire up the XSLOPE calls, which is exactly how this example was built. Treat `main_design.py` as a starting template to copy and modify, not a finished product.
 
 The following Colab notebook has been prepared to implement the design process:
 

@@ -42,10 +42,11 @@ num_angles = 10  # number of slope angles to evaluate across [beta1, beta2]
 toe_index = 1  # index of the toe point in the first profile line (zero-based index)
 slope_index = 2  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
 
-design_fs = 1.5            # target factor of safety   (design_mode="fs")
+design_fs = 1.2            # target factor of safety   (design_mode="fs")
 design_reliability = 0.75  # target reliability R = P(FS > 1)  (design_mode="reliability")
-                           # (typical real-world targets are 0.95-0.99; this sample's high COV
-                           #  in c keeps R near 0.85, so 0.85 is used here to bracket the sweep)
+                           # The target must fall within the swept range. For the shipped
+                           # sample (a weak c-phi soil), FS spans ~0.88-1.27 and R spans
+                           # ~0.5-0.92 over beta=20-30°, so 1.2 and 0.75 bracket the sweep.
 
 
 def rebuild_geometry(slope_data):

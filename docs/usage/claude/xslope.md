@@ -59,6 +59,8 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
 3. **Derive coordinates.** If the diagram shows dimensions/angles but not explicit XY coordinates, compute them. Place the origin sensibly (e.g., toe of slope at (0,0) or left edge of foundation). Profile lines are listed top-to-bottom (shallowest first) with points left-to-right.
 
+   **Choose a geometry method:** use the **profile** sheet for flat-lying, stacked, full-width layers (the common case); use the **polygon** sheet for irregular/dipping bedrock, lens-shaped inclusions, zoned dams, or CAD-style closed regions. Use one or the other, never both. With profile lines, watch for layers that pinch out (an upper layer that ends partway across, like embankment fill at the toe) — its line must end at the pinch-out point, not run along the top of the layer below. When a layer pinches out mid-section and the profile approach gets fiddly, polygons are usually cleaner.
+
 4. **Choose starting circles** for LEM. Good strategy:
    - **Center X**: Place Xo halfway between the toe and crest of the slope.
    - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
@@ -489,6 +491,101 @@ write_profile_line(1, 1, [(0, 84), (150, 84), (174.7, 64)])
 write_profile_line(2, 2, [(0, 64), (174.7, 64), (204.3, 40)])
 write_profile_line(3, 3, [(0, 40), (320, 40)])
 ```
+
+**CRITICAL — a profile line must only span where its material actually exists.**
+Each profile line is the *top* of its material. Where an upper layer pinches out (e.g.
+the embankment fill ends at the toe and bare foundation continues beyond), the line must
+**start/end exactly at the pinch-out point** — it must NOT continue horizontally along the
+top of the layer below it. A segment of one profile line lying on top of (coincident with)
+a lower profile line creates a **zero-thickness sliver**, which `build_polygons()` turns
+into a geometrically **invalid** (self-touching) polygon. That breaks meshing, point-in-
+polygon material lookups, and the domain/ground-surface union — even though slice weights
+may look plausible.
+
+Concrete example — a 3 m embankment (1V:3H) on a flat 3-layer foundation, toe at (0, 4.9),
+crest at (9, 7.9), foundation top at y=4.9, layers below at 3.4 and 2.8, domain x ∈ [-15, 20]:
+
+```python
+# WRONG — embankment line runs from x=-15 along y=4.9 (on top of the foundation line),
+# producing an invalid embankment polygon from x=-15 to 0:
+#   write_profile_line(1, 1, [(-15, 4.9), (0, 4.9), (9, 7.9), (20, 7.9)])
+
+# RIGHT — embankment line starts at the TOE; foundation lines carry the full width.
+# The ground surface left of the toe comes from the foundation line (mat 2), not the fill.
+write_profile_line(1, 1, [(0, 4.9), (9, 7.9), (20, 7.9)])   # embankment fill (pinches out at toe)
+write_profile_line(2, 2, [(-15, 4.9), (20, 4.9)])           # found. sand 1 (full width)
+write_profile_line(3, 3, [(-15, 3.4), (20, 3.4)])           # weak clay   (full width)
+write_profile_line(4, 4, [(-15, 2.8), (20, 2.8)])           # found. sand 2 (full width)
+```
+
+Upper and lower lines may **touch at a single point** (the toe, where the fill meets the
+foundation) — that is fine. What is not allowed is them sharing a whole horizontal *segment*.
+After building, validate every polygon: `all(Polygon(p['coords']).is_valid for p in build_polygons(slope_data))`.
+
+### Sheet: polygon (alternative to profile)
+
+The **polygon** sheet is an alternative to the **profile** sheet for defining geometry. Each
+material zone is a **closed polygon** instead of a top-of-layer line. Fill in **either**
+`profile` **or** `polygon` — never both in the same file (`load_slope_data` raises if both
+are populated). Both feed the same internal polygon representation, so all analyses (LEM,
+seep, FEM) work identically afterward.
+
+**When to prefer polygons over profile lines:**
+- Irregular / dipping / non-monotonic bedrock surfaces
+- Lens-shaped inclusions (a sand lens fully inside a clay deposit) — nesting is detected
+  automatically; the inner polygon overrides the outer in the overlap
+- Zoned dam cross-sections, CAD-style closed regions, or any geometry that is awkward to
+  express as stacked left-to-right lines (which the pinch-out rule above can make fiddly)
+
+**When profile lines are simpler:** flat-lying, stacked, full-width layers.
+
+**Layout** (mirrors the profile sheet; no Max Depth):
+- Polygons arranged horizontally in 3-column groups: Polygon 1 = cols A-B, Polygon 2 = D-E,
+  Polygon N at offset (N-1)*3 from A.
+- Row 4: "Polygon #N" header
+- Row 5: "Mat ID:" label + mat id value (in the y-column, e.g. B5, E5, ...)
+- Row 6: material name (XLOOKUP FORMULA — do NOT overwrite)
+- Row 7: "x"/"y" headers
+- Row 8+: polygon vertices, one per row
+
+**Rules:** winding order does not matter (CW or CCW); the polygon closes automatically (do
+NOT repeat the first vertex as the last); each polygon needs ≥3 vertices; together the
+polygons should tile the cross-section with no gaps or overlaps (except intentional nesting).
+The ground surface and bottom/side boundaries are derived from the **union of all polygons**,
+so there is no Max Depth and an irregular bedrock surface is represented directly.
+
+```python
+updates['polygon'] = {}
+
+def write_polygon(poly_num, mat_id, vertices):
+    """Add a material-zone polygon to updates dict.
+    poly_num: 1-based polygon number
+    mat_id: material ID (1-based, references mat sheet)
+    vertices: list of (x, y) tuples; CW or CCW, do NOT repeat the first point.
+    """
+    col_offset = (poly_num - 1) * 3   # 0, 3, 6, ...
+    x_col = 1 + col_offset            # A=1, D=4, G=7, ...
+    y_col = 2 + col_offset            # B=2, E=5, H=8, ...
+    updates['polygon'][cell_ref(5, y_col)] = mat_id   # Mat ID value (row 6 formula auto-fills)
+    for i, (x, y) in enumerate(vertices):
+        updates['polygon'][cell_ref(8 + i, x_col)] = x
+        updates['polygon'][cell_ref(8 + i, y_col)] = y
+
+# Same embankment-on-foundation problem as the profile example, expressed as polygons.
+# Each zone is a self-contained closed region — the embankment naturally pinches out at
+# the toe with no sliver, and the foundation layers tile the full width.
+write_polygon(1, 1, [(0, 4.9), (9, 7.9), (20, 7.9), (20, 4.9)])     # embankment fill
+write_polygon(2, 2, [(-15, 4.9), (20, 4.9), (20, 3.4), (-15, 3.4)]) # found. sand 1
+write_polygon(3, 3, [(-15, 3.4), (20, 3.4), (20, 2.8), (-15, 2.8)]) # weak clay
+write_polygon(4, 4, [(-15, 2.8), (20, 2.8), (20, 0.0), (-15, 0.0)]) # found. sand 2
+
+# Example: sand lens embedded in clay (nesting auto-detected, lens overrides clay)
+# write_polygon(1, 1, [(0, 0), (100, 0), (100, 50), (0, 50)])        # clay block
+# write_polygon(2, 2, [(40, 20), (60, 20), (60, 30), (40, 30)])      # sand lens inside
+```
+
+After writing, validate the same way as for profiles — plot inputs and confirm every zone
+is a valid polygon that tiles the section without gaps/overlaps.
 
 ### Sheet: piezo
 
@@ -940,7 +1037,7 @@ else:
 
 1. **Units must be consistent.** English: ft, pcf, psf. Metric: m, kN/m3, kPa. Do not mix.
 
-2. **Profile lines go top-to-bottom.** The first profile line is the ground surface or the shallowest layer. Each subsequent line defines a deeper layer boundary. Points within each line go left-to-right.
+2. **Profile lines go top-to-bottom.** The first profile line is the ground surface or the shallowest layer. Each subsequent line defines a deeper layer boundary. Points within each line go left-to-right. **A profile line must only span where its material exists** — where an upper layer pinches out (e.g. embankment fill ending at the toe), end the line there; never run it horizontally coincident with the line below, or you create an invalid zero-thickness polygon (see the Sheet: profile pinch-out rule). For geometries where this is awkward (irregular bedrock, lenses, zoned dams), use the **polygon** sheet instead — see "Sheet: polygon". Fill in profile OR polygon, never both.
 
 3. **Material numbering is 1-based** in the Excel file. Mat ID 1 in the profile sheet references row 9 (first data row) of the mat sheet.
 

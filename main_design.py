@@ -1,29 +1,67 @@
+# NOTE: This design driver only works with PROFILE-LINE based input templates.
+# The slope-angle sweep edits profile_lines and regenerates the material polygons
+# from them (see rebuild_geometry). Polygon-sheet inputs have no profile lines to
+# reshape, so the slope angle cannot be varied — use a profile-based template.
 import numpy as np
 import math
 from xslope.global_config import non_circ
 
-from xslope.fileio import load_slope_data, build_ground_surface
+from shapely.geometry import Polygon
+from xslope.fileio import load_slope_data, build_ground_surface_from_polygons
+from xslope.mesh import build_polygons
 from xslope.plot import plot_circular_search_results, plot_noncircular_search_results, plot_solution, plot_reliability_results, plot_inputs
 from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
 
-slope_data = load_slope_data("docs/lem/files/xslope_design2.xlsx")
+slope_data = load_slope_data("inputs/xslope_design.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
 num_slices = 30 # @param {"type":"integer"}
-analysis_type = "single_surface" # @param ["single_surface","all_methods", "auto_search","reliability"]
-surface_type = "circular" # @param ["circular","non_circular"]
+analysis_type = "auto_search" # @param ["single_surface","all_methods", "auto_search","reliability"]
+surface_type = "non_circular" # @param ["circular","non_circular"]
 save_png = True # @param {"type":"boolean"}
 diagnostic = False # @param {"type":"boolean"}
 
-beta1 = 25  # desired slope angle in degrees
-beta2 = 35  # desired slope angle in degrees
-design_fs = 1.4  # target factor of safety for design
-toe_index = 1  # index of the toe point in the first profile line (zero-based index)
-slope_index = 2  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
+beta1 = 18  # desired slope angle in degrees
+beta2 = 24  # desired slope angle in degrees
+design_fs = 1.5  # target factor of safety for design
+toe_index = 0  # index of the toe point in the first profile line (zero-based index)
+slope_index = 1  # index of the slope top point (toe_index+1 for right-facing, toe_index-1 for left-facing)
+
+def rebuild_geometry(slope_data):
+    """Rebuild the polygon-based geometry after editing profile_lines.
+
+    Slice weights, layer heights, and base materials are all computed from
+    slope_data['polygons'] (see generate_slices), NOT from 'ground_surface'.
+    After moving a profile point we must regenerate the material polygons and
+    re-derive the ground surface / domain polygon from them — exactly as
+    load_slope_data does — or the weights stay pinned to the original geometry.
+    """
+    polys = [
+        {'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+        for p in build_polygons(slope_data={'profile_lines': slope_data['profile_lines'],
+                                             'max_depth': slope_data.get('max_depth')})
+    ]
+    slope_data['polygons'] = polys
+    ground_surface, domain_polygon = build_ground_surface_from_polygons(polys)
+    slope_data['ground_surface'] = ground_surface
+    slope_data['domain_polygon'] = domain_polygon
+
+
+def run_search(slope_data):
+    """Run the appropriate search for the selected surface_type and return the
+    sorted fs_cache (lowest FS first), convergence flag, and search path."""
+    if surface_type == "circular":
+        fs_cache, converged, search_path, _circle_cache = circular_search(
+            slope_data, method, num_slices=num_slices, diagnostic=diagnostic)
+    else:
+        fs_cache, converged, search_path = noncircular_search(
+            slope_data, method, num_slices=num_slices, diagnostic=diagnostic)
+    return fs_cache, converged, search_path
+
 
 betas = np.linspace(beta1, beta2, num=10)  # generate slope angles between beta1 and beta2
 fs_results = np.zeros_like(betas)
@@ -36,11 +74,11 @@ for i, beta in enumerate(betas):
   # Calculate new x_top from beta: tan(beta) = (y_top - y_toe) / (x_top - x_toe)
   x_top_new = x_toe + (y_top - y_toe) / math.tan(math.radians(beta))
   slope_data['profile_lines'][0]['coords'][slope_index] = (x_top_new, y_top)
-  slope_data['ground_surface'] = build_ground_surface(slope_data['profile_lines'])
+  rebuild_geometry(slope_data)
 
   print(f"Slope angle: {beta:.1f}°, toe: ({x_toe}, {y_toe}), slope point: ({x_top_new:.2f}, {y_top})")
 
-  fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, num_slices=num_slices, diagnostic=diagnostic)
+  fs_cache, converged, search_path = run_search(slope_data)
   fs_results[i] = fs_cache[0]['FS']
 
 print("Beta sweep finished. Results:")
@@ -63,8 +101,8 @@ x_toe, y_toe = profile[toe_index]
 x_top, y_top = profile[slope_index]
 x_top_new = x_toe + (y_top - y_toe) / math.tan(math.radians(critical_slope_angle))
 slope_data['profile_lines'][0]['coords'][slope_index] = (x_top_new, y_top)
-slope_data['ground_surface'] = build_ground_surface(slope_data['profile_lines'])
-fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, num_slices=num_slices, diagnostic=diagnostic)
+rebuild_geometry(slope_data)
+fs_cache, converged, search_path = run_search(slope_data)
 fs_at_critical = fs_cache[0]['FS']
 print(f"FS at critical slope angle ({critical_slope_angle:.2f}°): {fs_at_critical:.3f}")  
 critical_surface = fs_cache[0]

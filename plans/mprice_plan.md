@@ -1,19 +1,49 @@
 # Morgenstern–Price Method — Implementation Plan / Discussion
 
-Status: **DISCUSSION DRAFT** — nothing implemented yet. This document is the
-working space for deciding *how* to add Morgenstern–Price (M-P) to xslope before
-any code is written.
+Status: **BUILD SPEC — design decisions locked (2026-06-24), nothing implemented
+yet.** All blocking decisions are resolved; see the Decisions block below, the
+resolved list (§9), and the build order (§10). Remaining items (§8) are
+non-blocking. Ready to implement.
 
-### Decisions so far (2026-06-23)
+### Decisions (locked 2026-06-24) — this section is now a build spec
 
-- **`f(x)` library at v1:** constant (`=1`, Spencer regression), half-sine, and
-  clipped/trapezoidal sine. No user-defined table for v1.
+- **`f(x)` library at v1:** constant (`=1`, Spencer regression) and half-sine
+  *only*. Clipped/trapezoidal sine and a user-defined table are both deferred to
+  "later/optional" (§5a) — FS is insensitive to `f(x)`, so they buy ~no accuracy
+  and only add parameters/tests; trivial to add once `_mp_march` exists.
 - **`f(x)` selection:** function argument only (e.g. `f_type='half_sine'`); no
   Excel-template cell for now.
-- **Solver structure:** flesh out *both* the two-curve intersection and the direct
-  2-D Newton (see §3) before committing — they share a building block, so we build
-  that first and can switch outer solvers.
-- **`F_m` (moment) formulation:** open — work it out together (see §4).
+- **`F_m` (moment) formulation:** **locked** — overall moment about the **origin**
+  (§4a, fully derived and sign-reconciled). Thrust line is a post-process
+  diagnostic (option b). The `f(x)=1 ≡ Spencer` test is the validation backstop.
+- **Shared building block:** **refactor `force_equilibrium`** to expose a fixed-`F`
+  per-slice march returning `(force_res, moment_res)` (no inner `F` root-find);
+  Corps/L-K/M-P all call it. Guard Corps/L-K FS bit-stability with the existing
+  regression across the refactor.
+- **Solver structure:** **Approach A (two-curve crossing) is the reference oracle,
+  the `F`-vs-`λ` docs figure, and the stability fallback — not the shipped path.**
+  **Approach B (2-D Newton on `(F, λ)`) is the production solver** (Bishop seed,
+  `λ=0` start, line search, tension guard — mirroring `spencer()`); on divergence
+  it falls back to A's bracketed crossing. Start B with a **numeric** Jacobian:
+  unlike Spencer's closed-form lumped-`Q`, M-P's residuals come from the march, so
+  the analytic Jacobian means differentiating the recurrence — defer it unless the
+  numeric Newton proves slow/unstable on the benchmarks (the Spencer history says
+  it might, which is exactly why A exists as the robust fallback).
+- **v1 load scope:** all single-stage terms in the §4a moment table
+  (`W, dload, kW, V, R, H`). **Rapid drawdown needs no solver work** — it is an
+  outer 3-stage wrapper (`advanced.rapid_drawdown`) that swaps each stage's loads /
+  pore pressures into the standard `dload`/`u` columns and re-calls the solver, so
+  M-P inherits it for free once it solves a standard `slice_df`. (There is **no**
+  `dload2` term in the M-P moment sum — the solver never sees the `2` columns.)
+- **Result contract:** mirror `spencer()`'s output keys exactly, plus `lambda` and
+  `f_type`, so `plot.py`, the summary, and the search reuse Spencer's rendering
+  unchanged: `(success, {method, FS, lambda, f_type, theta_i (per boundary),
+  line-of-thrust `y_t`, `n_eff`, `z`, ...})`.
+- **No-solution / robustness policy:** mirror Spencer — Bishop `F` seed, `λ=0`
+  start, reuse `force_equilibrium`'s tension-admissibility guard on `N_i`, and on
+  non-convergence or no `F_f`/`F_m` crossing return `(False, reason)` so the
+  automated search just skips the surface. Approach-A `λ` search bracket:
+  `λ ∈ [−1.5, 1.5]` with a sign-change bracket on `g(λ)=F_f−F_m`.
 
 ## 1. What M-P is, and how it relates to what we already have
 
@@ -46,8 +76,12 @@ Common choices for `f(x)`:
 - **Constant** `f(x) = 1` → Spencer (sanity/regression case).
 - **Half-sine** `f(x) = sin(π · (x − x_L)/(x_R − x_L))` → the textbook default; forces
   the interslice shear to zero at both ends of the surface, which is physically
-  reasonable and is GeoStudio's default.
-- **Clipped/trapezoidal sine**, **user-defined table**, etc. (later, optional).
+  reasonable and is GeoStudio's/SLOPE-W's default.
+
+These two are the v1 library. **Clipped/trapezoidal sine** and a **user-defined
+table** are deferred (§5a): because FS is insensitive to `f(x)`, they add solver
+parameters and test surface without moving any benchmark, and they are easy to
+bolt on later once the engine exists.
 
 In practice the computed FS is famously *insensitive* to the choice of `f(x)`
 (typically <1% spread), which is the classic argument for M-P being "rigorous yet
@@ -159,13 +193,22 @@ warranted), mirroring how `spencer()` solves its `(F, θ)` system.
   carries ~150 lines of line-search / fallback / tension-rejection machinery for
   exactly this reason); harder to debug a 2-D divergence than a 1-D curve crossing.
 
-### Recommendation
+### Recommendation (locked)
 
-Build `_mp_march` first, then **Approach A** for the reference implementation and
-validation (it gives the `F`-vs-`λ` curve, which we need anyway to prove
-correctness and to make the docs figure). Keep **Approach B** as a fast path that
-must agree with A on every benchmark. Seed both from Bishop FS (like Spencer) and
-`λ = 0` (pure force-equilibrium starting point).
+Build `_mp_march` first (the `force_equilibrium` refactor). Then:
+
+- **Approach A is the reference oracle, the docs `F`-vs-`λ` figure, and the
+  stability fallback** — bracketed and robust-but-slow. Build it first so it can
+  validate everything else and back up B on divergence.
+- **Approach B (2-D Newton on `(F, λ)`) is the shipped solver.** It must agree with
+  A on every benchmark; on divergence it falls back to A's bracketed crossing.
+  Start with a numeric Jacobian (analytic march-Jacobian deferred — see the
+  Decisions block). Seed both from Bishop FS and `λ = 0`.
+
+Lesson carried over from Spencer: a numeric/curve-crossing solver on these LEM
+residuals was slow and unstable until an analytic-Jacobian Newton replaced it.
+Here, A is deliberately retained as the robust fallback so B can be the fast path
+without first paying for the (harder, march-based) analytic Jacobian.
 
 ## 4. Moment equilibrium `F_m` — working it out
 
@@ -300,8 +343,11 @@ the numerical march we solve the residual directly rather than as a closed form.
   already use (negate the inclinations / flip the relevant signs) so `M_origin`
   stays mirror-consistent. Validate with the `f(x)=1 ≡ Spencer` test run on a
   right-facing geometry specifically.
-- A second surface load (`dload2`/`d_x2`/`d_y2`) exists for rapid drawdown;
-  include it by analogy with row 4 if/when M-P supports rapid drawdown.
+- **No `dload2` term.** Rapid drawdown is handled entirely by the outer wrapper
+  `advanced.rapid_drawdown`, which swaps each stage's `dload2`/`u2`/… into the
+  standard `dload`/`u` columns and re-calls the solver. The M-P solver only ever
+  sees one set of loads, so the moment sum needs the single `dload` term (row 4)
+  and nothing more — M-P inherits rapid drawdown for free.
 
 ### Option (b) — per-slice line-of-thrust recurrence (original M-P 1965)
 
@@ -340,7 +386,7 @@ a peak of 1 is pure convention. This is also why FS is famously insensitive to t
 choice of `f` (only the *relative variation* of the interslice angle along the
 surface moves the answer, and that effect is small).
 
-**v1 library** (selected by `f_type`):
+**v1 library** (selected by `f_type`) — **two functions**:
 
 1. **`constant`** — `f(s) = 1`.
    Recovers Spencer (`tan θ = λ`, constant). This is the regression case (§7.1).
@@ -348,33 +394,11 @@ surface moves the answer, and that effect is small).
 2. **`half_sine`** — `f(s) = sin(π s)`.
    Single arch, peak 1 at mid-surface, `f = 0` at both ends so the interslice
    *shear* vanishes where the slip surface daylights — physically reasonable and
-   the textbook / GeoStudio default. This is the workhorse for design.
+   the textbook / GeoStudio / SLOPE-W default. This is the workhorse for design.
 
-3. **`clipped_sine`** — quarter-sine tapers with a flat unit top, taper fraction
-   `t ∈ (0, 0.5]` (default `t = 0.25`):
-
-   ```
-   f(s) = sin( π s / (2t) )          0 ≤ s < t        (rise 0 → 1)
-        = 1                          t ≤ s ≤ 1 − t    (flat)
-        = sin( π (1 − s) / (2t) )    1 − t < s ≤ 1    (fall 1 → 0)
-   ```
-   `C¹`-continuous at the joins (slope 0 there). `t → 0` approaches `constant`;
-   `t = 0.5` is the half-sine. A flat-topped function that still tapers to zero at
-   the ends.
-
-   `trapezoidal` is the same shape with **linear** ramps instead of sine tapers
-   (corner fractions `a`, `b`; default `a = b = 0.25`):
-   ```
-   f(s) = s / a            0 ≤ s < a
-        = 1                a ≤ s ≤ 1 − b
-        = (1 − s) / b      1 − b < s ≤ 1
-   ```
-   Offered as a sub-variant of `clipped_sine` (or its own `f_type` — minor).
-
-All four taper to zero at the ends except `constant`. Since FS is insensitive to
-`f` and the design recommendation is `half_sine`, `clipped_sine`/`trapezoidal`
-are provided mainly for completeness and inter-code comparison; their exact corner
-parameters are **not** tuned to match any one external code (see §8).
+`half_sine` tapers to zero at the ends; `constant` does not. These two span the
+practical range (Spencer + canonical M-P), which is exactly why FS-vs-`f(x)`
+insensitivity makes a larger library unnecessary for v1.
 
 **Right-facing slopes.** `force_equilibrium` already negates `theta_list` and
   flips the tension-sign convention for right-facing surfaces; M-P's λ-driven
@@ -384,6 +408,36 @@ parameters are **not** tuned to match any one external code (see §8).
 - **Initial guesses & robustness.** Seed `F` from Bishop (as Spencer does) and
   `λ = 0` (pure force-equilibrium starting point), ramp `λ` up; reuse Spencer's
   tension-admissibility rejection idea on the resulting `N_i`.
+
+### 5a. Deferred `f(x)` options (not v1)
+
+Kept here so the work isn't lost, but **out of the v1 library** — FS is insensitive
+to `f(x)`, so these move no benchmark; they exist only for completeness /
+inter-code comparison and are a few lines to add once `_mp_march` and the `f_type`
+dispatch exist. Their corner parameters are deliberately **not** tuned to match any
+one external code.
+
+- **`clipped_sine`** — quarter-sine tapers with a flat unit top, taper fraction
+  `t ∈ (0, 0.5]` (default `t = 0.25`):
+
+  ```
+  f(s) = sin( π s / (2t) )          0 ≤ s < t        (rise 0 → 1)
+       = 1                          t ≤ s ≤ 1 − t    (flat)
+       = sin( π (1 − s) / (2t) )    1 − t < s ≤ 1    (fall 1 → 0)
+  ```
+  `C¹`-continuous at the joins (slope 0 there). `t → 0` approaches `constant`;
+  `t = 0.5` is the half-sine.
+
+- **`trapezoidal`** — same flat-topped shape with **linear** ramps instead of sine
+  tapers (corner fractions `a`, `b`; default `a = b = 0.25`):
+  ```
+  f(s) = s / a            0 ≤ s < a
+       = 1                a ≤ s ≤ 1 − b
+       = (1 − s) / b      1 − b < s ≤ 1
+  ```
+
+- **user-defined table** — a `(s, f)` lookup interpolated to the boundaries. The
+  most flexible and the most input-plumbing; deferred indefinitely.
 
 ## 6. Integration checklist (after the math is settled)
 
@@ -396,8 +450,9 @@ parameters are **not** tuned to match any one external code (see §8).
   arg only for v1; no input-template cell).
 - `plot.py`: show λ / interslice function and line of thrust (mirror Spencer).
 - `search.py`: confirm the circular/non-circular search can call it like Spencer.
-- Docs: new `docs/lem/morgenstern_price.md` (derivation in the Spencer style),
-  link from `docs/lem/overview.md`, update `verification.md`.
+- Docs: new `docs/lem/mprice.md` (derivation in the Spencer style); **add it to the
+  `mkdocs.yml` nav** under the LEM section, right after "Spencer's Method"; link
+  from `docs/lem/overview.md`; update `verification.md`.
 - Per the repo's "docs track solver" rule, this is one work unit:
   code + docstrings + docs page + verification + sample.
 
@@ -408,8 +463,9 @@ parameters are **not** tuned to match any one external code (see §8).
 1. **`f(x)=1` must equal Spencer** on every existing LEM benchmark (FS and the
    implied constant `θ` — i.e. `arctan(λ)` should match Spencer's `θ`). Tight
    tolerance. This is the make-or-break test and confirms the whole formulation.
-2. **`f(x)` insensitivity** — FS should vary <~1% across constant / half-sine /
-   clipped on a normal slope; flag if it doesn't (a classic M-P property).
+2. **`f(x)` insensitivity** — FS from `constant` vs `half_sine` should differ
+   <~1% on a normal slope; flag if it doesn't (a classic M-P property). (Extends
+   to the deferred `f(x)` shapes if/when they're added.)
 3. **Force-only tie-out** — `F_f(λ)` from `_mp_march` must reproduce the existing
    `force_equilibrium` FS for the same `theta_list`, as a check on the refactor.
 
@@ -432,34 +488,135 @@ exactly where M-P earns its keep, and SLOPE/W reports the named M-P value (not
 just Spencer). xslope Spencer already sits at 1.258 here, so M-P with half-sine
 should land within ~1% of 1.261.
 
-Acceptance: half-sine M-P within ~1% of each reference FS; FS spread across
-`f(x)` choices <~1%; `f(x)=1` reproduces our own Spencer to tolerance.
+Acceptance: half-sine M-P within ~1% of each reference FS; `constant` vs
+`half_sine` FS spread <~1%; `f(x)=1` reproduces our own Spencer to tolerance.
 
 **To source if possible (improves the benchmark):** a published case that also
 reports **λ** for a stated `f(x)` (the SLOPE/W manual and Fredlund–Krahn 1977
 both plot/tabulate λ). Matching λ — not just FS — would validate the interslice
 distribution, not only the scalar result. Open item — see §8.
 
-## 8. Still to settle before coding
+## 8. Open items
 
-1. **`F_m` formulation (§4):** confirm the proposed split — option (a)
-   overall-moment-**about-the-origin** *defines* `F_m` (same reference point as
-   Spencer, works for circular and non-circular alike), option (b) thrust-line
-   recurrence is a post-process diagnostic. This is the main open item.
-2. **Clipped/trapezoidal default parameters** (taper/corner fractions `t`, `a`,
-   `b`) — defined in §5 with sensible defaults; only needs a final value choice,
-   and they're deliberately *not* matched to a specific external code.
-3. **A published case reporting λ** (not just FS) for a stated `f(x)`, to validate
+All design decisions are locked (see the Decisions block at the top and §9). The
+only remaining items are non-blocking and can be pursued during/after coding:
+
+1. **A published case reporting λ** (not just FS) for a stated `f(x)`, to validate
    the interslice distribution — the SLOPE/W manual and Fredlund–Krahn (1977) are
    the likely sources (§7.2). Nice-to-have, not a blocker.
+2. **Analytic march-Jacobian for Approach B** — only if the numeric Jacobian proves
+   slow/unstable on the benchmarks (the A fallback covers stability in the
+   meantime). Deferred, not blocking.
 
-## 9. Resolved (from discussion 2026-06-23)
+## 9. Resolved decisions (locked 2026-06-24)
 
-- f(x) library = constant + half-sine + clipped/trapezoidal sine; no user table v1.
-- f(x) selected via `f_type` function argument; no Excel cell v1.
-- Build the shared `_mp_march` evaluator, then implement **both** Approach A
-  (two-curve intersection, reference impl) and Approach B (2-D Newton, fast path
-  that must agree with A).
-- `F_m` sums moments about the **origin** (not the circle center), matching
-  Spencer's eq (16) so the same formulation covers circular and non-circular
-  surfaces.
+- **f(x) library v1** = constant + half-sine only; clipped/trapezoidal sine and the
+  user-defined table deferred (§5a) — FS is insensitive to f(x).
+- **f(x) selection** via `f_type` function argument; no Excel cell v1.
+- **Shared building block:** refactor `force_equilibrium` into a fixed-`F` march
+  returning `(force_res, moment_res)`; Corps/L-K/M-P all call it (guard their FS
+  stability with the existing regression).
+- **`F_m`** sums moments about the **origin** (§4a, derived + sign-reconciled),
+  covering circular and non-circular alike; thrust line is a post-process
+  diagnostic. **No `dload2` term** — rapid drawdown is an outer wrapper.
+- **Approach A** = reference oracle + `F`-vs-`λ` docs figure + stability fallback.
+  **Approach B (2-D Newton on `(F, λ)`)** = shipped solver, numeric Jacobian to
+  start, falls back to A on divergence. Both seeded from Bishop FS and `λ=0`.
+- **v1 load scope** = single-stage `W, dload, kW, V, R, H`; rapid drawdown inherited
+  for free via the outer wrapper (no solver work).
+- **Result contract** mirrors `spencer()`'s keys + `lambda` + `f_type`.
+- **No-solution policy** mirrors Spencer: tension guard, return `(False, reason)`
+  on non-convergence; Approach-A `λ` bracket `[−1.5, 1.5]`.
+
+## 10. Build order (ready to implement)
+
+The **core** is a strictly sequential chain on `solve.py` (S0→S5). Each stage lists
+its **deliverable**, **depends-on**, and **exit criterion** (the gate that must pass
+before the next stage starts). Stages marked ⛔ are **hard stops** — do not proceed
+past them on a failure; a defect there poisons everything downstream. Independent
+work that can run in parallel with the core is in §11.
+
+**S0 — Recon (no code).**
+- *Deliverable:* confirmed map of `force_equilibrium`'s return signature + its
+  Corps/L-K callers, and a verified checklist that every `slice_df` column the §4a
+  moment table names exists with the assumed sign (`n_eff`, `y_cb`, `d_x/d_y`, `t`,
+  `p`, `h_pile`, `theta_p`, …).
+- *Depends-on:* nothing. *Exit:* checklist complete; any column/sign surprise
+  reconciled against §4a before S1. (Good fit for an `Explore` subagent — §11.)
+
+**S1 — Refactor `force_equilibrium` into the shared fixed-`F` march.**
+- *Deliverable:* `_mp_march(slice_df, lam, f_vals, F) -> (N[], Z[], force_res,
+  moment_res=None)`; Corps/L-K re-pointed through it.
+- *Depends-on:* S0. *Exit ⛔:* every Corps/L-K LEM benchmark FS **bit-stable**
+  (identical pre/post refactor). Do not start S2 until green.
+
+**S2 — Moment accumulator.**
+- *Deliverable:* `moment_res` populated in the march from the §4a table.
+- *Depends-on:* S1. *Exit:* each of the 8 terms unit-checked in isolation (sign +
+  arm) against §4a; assembled `moment_res` finite on a sample surface.
+
+**S3 — Approach A + the Spencer gate.**
+- *Deliverable:* `F_f(λ)`, `F_m(λ)` root-finds and the `λ` crossing; the `F`-vs-`λ`
+  curve as a diagnostic.
+- *Depends-on:* S2. *Exit ⛔ (make-or-break):* with `f(x)=1`, M-P reproduces
+  `spencer()` **FS and `arctan(λ)` vs Spencer θ** to tight tolerance on every LEM
+  benchmark, **and** the force-only tie-out (`F_f` vs `force_equilibrium`) matches.
+  Nothing downstream is trustworthy until this passes.
+
+**S4 — `half_sine` + published benchmarks.**
+- *Deliverable:* `half_sine` `f_type`; the §7.2 benchmark runs.
+- *Depends-on:* S3 (gate passed). *Exit:* half-sine M-P within ~1% of each
+  reference (primary LEM-2, SLOPE/W M-P = 1.261); `constant`-vs-`half_sine` FS
+  spread <~1%.
+
+**S5 — Approach B (shipped solver).**
+- *Deliverable:* 2-D Newton on `(F, λ)` (numeric Jacobian, Bishop+`λ=0` seed, line
+  search, tension guard), falling back to A on divergence.
+- *Depends-on:* S4. *Exit:* B matches A on **every** benchmark; no-solution path
+  returns `(False, reason)`; search runs M-P over many surfaces without hangs.
+
+**S6 — Integration (code).**
+- *Deliverable:* register `morgenstern_price` in `solve_selected`/`solve_all`
+  (+ a print line: FS, λ, `f_type`); `plot.py` shows λ / the interslice function and
+  the line of thrust (mirror Spencer); confirm the circular/non-circular search
+  calls it exactly like Spencer.
+- *Depends-on:* S5. *Exit:* `solve_all` and an automated search run M-P end-to-end
+  and plot correctly.
+
+**S7 — Documentation.**
+- *Deliverable:*
+  - new **`docs/lem/mprice.md`** — derivation in the Spencer style, reusing the §4a
+    moment table and the `F`-vs-`λ` figure (P2 drafts the prose during S1–S5; final
+    numbers/figure dropped in here);
+  - **`mkdocs.yml` nav entry** under the LEM section, immediately **after "Spencer's
+    Method"**: `- Morgenstern–Price Method: lem/mprice.md`;
+  - link the page from `docs/lem/overview.md`;
+  - add the M-P row(s) to `docs/verification.md` (P3 scaffolds);
+  - add a sample + a `run_tests.py` regression tag.
+- *Depends-on:* S5 (numbers/figure), and P2/P3 drafts (§11). *Exit:* `mkdocs build`
+  clean **and the page is reachable from the nav**; the new regression tag passes in
+  `run_tests.py`; the verification table matches the benchmark run. Per the "docs
+  track solver" rule, S6 + S7 land together as one work unit.
+
+## 11. Parallelization & subagents
+
+The core (S1–S5) is a single-threaded chain on `solve.py` and must **not** be
+fanned out — the stages depend on each other and edit the same code. But four
+streams are genuinely independent and can run in parallel with, or ahead of, the
+core, plus the per-gate verification can be delegated.
+
+**Independent streams (spawn up front, run alongside the core):**
+
+| # | Subagent task | Type | Depends only on | Runs during |
+|---|---|---|---|---|
+| P1 | **Recon** (S0): map `force_equilibrium` contract + callers; verify §4a columns/signs | `Explore` (read-only) | current code | before S1 |
+| P2 | **Docs draft** `docs/lem/mprice.md` from this plan + `spencer.md` as style template (derivation, moment-table prose, Spencer/M-P comparison) | general/docs | the plan | all of S1–S5; figures/numbers + nav entry land at S7 |
+| P3 | **Benchmark + verification scaffolding**: regression tags + `verification.md` M-P table/acceptance from the §7.2 spec | general | the **fixed result contract** (locked) | S2 onward |
+| P4 | **λ-source research**: find a published case reporting λ for a stated `f(x)` (Fredlund–Krahn 1977 / SLOPE-W manual; §8.1) | research (web) | nothing | anytime |
+
+**Delegatable verification gates (sequential, but offloaded so the main thread keeps moving):**
+
+- **After S1:** a `verify` agent runs the LEM benchmark suite pre/post refactor and reports Corps/L-K bit-stability (the S1 exit gate).
+- **After S3 and S5:** a `verify` agent runs the `f=1 ≡ Spencer` comparison (S3 gate) and the A↔B agreement across all benchmarks (S5 exit).
+
+**Orchestration shape:** fan out P1–P4 as independent agents; build S1→S5 sequentially in the main thread; drop a verify agent at the S1, S3, and S5 gates. P2/P3's drafts land into S6 with only figures/final numbers to fill once the solver is green. This parallelizes essentially all non-core work while keeping the engine a clean sequential chain.

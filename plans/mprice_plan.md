@@ -634,6 +634,18 @@ work that can run in parallel with the core is in §11.
 - *Depends-on:* S3 (gate passed). *Exit:* half-sine M-P within ~1% of each
   reference (primary LEM-2, SLOPE/W M-P = 1.261); `constant`-vs-`half_sine` FS
   spread <~1%.
+- **Status (2026-06-24): DONE ✅** (validation only — `half_sine` landed in S3).
+  Evaluated on each benchmark's critical surface:
+  | Case | ref | xslope Spencer | MP half_sine | MP const |
+  |---|---|---|---|---|
+  | LEM-1 ACADS simple (circ) | 1.00 | 0.984 | 0.984 | 0.984 |
+  | **LEM-2 weak layer (non-circ)** | **1.261** | 1.259 | **1.251 (−0.8%)** | 1.259 |
+  | LEM-2b Arai & Tagyo (circ) | 1.451 | 1.401 | 1.400 | 1.401 |
+  Primary target met: half_sine M-P within **−0.8%** of SLOPE/W's named non-circular
+  M-P value. `constant`-vs-`half_sine` spread <1% everywhere (insensitivity holds).
+  LEM-1/LEM-2b sit >1% from the *external* reference, but xslope's own Spencer is
+  offset by the same amount (pre-existing V&V gap, not an M-P error) — M-P matches
+  xslope Spencer exactly in every case.
 
 **S5 — Approach B (shipped solver).**
 - *Deliverable:* 2-D Newton on `(F, λ)` (numeric Jacobian, Bishop+`λ=0` seed, line

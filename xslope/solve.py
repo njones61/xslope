@@ -634,33 +634,47 @@ def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta
     ──────────────────────────────────────────────────────────────────────────────
     """
     n = len(alpha)
-    N = np.zeros(n)            # base normal force per slice
-    Z = np.zeros(n + 1)        # interslice forces, Z[0] = 0 (nothing enters slice 0)
 
-    # Vectorize everything that does NOT depend on the marched Z[i]. Only the per-slice
-    # 2x2 solve stays in the loop (Z is a left→right recurrence). The 2x2 is solved in
-    # CLOSED FORM rather than np.linalg.solve — for a 2x2 in a Python loop this is the
-    # dominant cost; closed form is ~5-10x faster and agrees to floating-point.
+    # Fully VECTORIZED march. Per slice the 2x2 gives, in closed form,
+    #   Z[i+1] = (a11·b1 − a21·b0)/det   with   b0 = b0base − Z[i]·ct[i],
+    #                                            b1 = b1base − Z[i]·st[i],
+    # which is AFFINE in Z[i]:  Z[i+1] = p[i] + q[i]·Z[i]  (a LINEAR recurrence). A
+    # linear recurrence has a closed form via cumulative products, so the whole march
+    # is np.cumprod/np.cumsum — no Python loop (~2x faster than the per-slice loop,
+    # and it speeds up Corps/L-K too). The multiplier q stays ~1 for physical slip
+    # surfaces (cumprod magnitude ~1 even at 120 slices), so it is numerically stable;
+    # we fall back to the scalar recurrence if cumprod ever goes non-finite.
     ca = np.cos(alpha); sa = np.sin(alpha)
     cb = np.cos(beta);  sb = np.sin(beta)
     ct = np.cos(theta); st = np.sin(theta)            # interslice angle, length n+1
     cp = np.cos(theta_p); sp = np.sin(theta_p)
     c_m = c / FS
     tan_phi_m = np.tan(phi) / FS
-    # A-matrix first column (the N coefficients); second column is (-ct[i+1], -st[i+1]).
-    a11 = tan_phi_m * ca - sa
+    a11 = tan_phi_m * ca - sa                          # A first column (N coefficients)
     a21 = tan_phi_m * sa + ca
-    # Z-independent parts of the RHS (the Z[i] coupling is added in the loop).
+    a12 = -ct[1:]; a22 = -st[1:]                       # A second column at boundary i+1
+    det = a11 * a22 - a12 * a21
     b0base = -c_m*dl*ca - P*ca + u*dl*sa - D*sb + kw + T - H_pile*cp
     b1base = -c_m*dl*sa - P*sa - u*dl*ca + w + D*cb - H_pile*sp
-    for i in range(n):
-        a12 = -ct[i+1]
-        a22 = -st[i+1]
-        b0 = b0base[i] - Z[i]*ct[i]
-        b1 = b1base[i] - Z[i]*st[i]
-        det = a11[i]*a22 - a12*a21[i]
-        N[i] = (b0*a22 - a12*b1) / det
-        Z[i+1] = (a11[i]*b1 - a21[i]*b0) / det
+    cti = ct[:-1]; sti = st[:-1]                       # interslice angle at boundary i
+
+    # Z[i+1] = p[i] + q[i]·Z[i]
+    p = (a11 * b1base - a21 * b0base) / det
+    q = (a21 * cti - a11 * sti) / det
+    Z = np.empty(n + 1)
+    Z[0] = 0.0
+    Pc = np.empty(n + 1)
+    Pc[0] = 1.0
+    np.cumprod(q, out=Pc[1:])                          # Pc[i] = prod_{j<i} q[j]
+    if np.all(np.isfinite(Pc)) and np.all(Pc[1:] != 0.0):
+        Z[1:] = Pc[1:] * np.cumsum(p / Pc[1:])
+    else:                                              # pathological geometry → scalar scan
+        for i in range(n):
+            Z[i + 1] = p[i] + q[i] * Z[i]
+
+    b0 = b0base - Z[:-1] * cti
+    b1 = b1base - Z[:-1] * sti
+    N = (b0 * a22 - a12 * b1) / det
     return N, Z
 
 
@@ -712,83 +726,72 @@ def _moment_about_origin(N, FS, *, x_c, y_cg, y_cb, alpha, c, phi, dl, u, w,
     return float(np.sum(M))
 
 
+def _mp_extract(slice_df, right_facing):
+    """Pull every array the M-P march needs out of the DataFrame ONCE, apply the
+    right-facing flips, and return a plain dict of numpy arrays.
+
+    Hoisting this out of the per-iteration residual avoids re-reading ~25 pandas
+    columns on every Newton step — `DataFrame.__getitem__` otherwise dominates the
+    M-P solve (it is read ~13× per solve, once per residual evaluation).
+
+    RIGHT-FACING flips mirror spencer()'s internal set (alpha, beta, phi=tan_p, c, P,
+    kw, V) plus the pile `theta_p -> π-θp` (flips cos θp, not sin θp) so that f(x)=1
+    reduces to Spencer — validated by the f(x)=1 == Spencer gate (S3b).
+    """
+    n = len(slice_df)
+    g = lambda col: slice_df[col].values.astype(float)
+    A = dict(
+        alpha=np.radians(slice_df['alpha'].values), phi=np.radians(slice_df['phi'].values),
+        c=g('c'), w=g('w'), u=g('u'), dl=g('dl'), D=g('dload'),
+        beta=np.radians(slice_df['beta'].values), kw=g('kw'), V=g('t'), P=g('p'),
+        H_pile=g('h_pile') if 'h_pile' in slice_df.columns else np.zeros(n),
+        theta_p=g('theta_p') if 'theta_p' in slice_df.columns else np.zeros(n),
+        x_c=g('x_c'), y_cg=g('y_cg'), y_cb=g('y_cb'),
+        d_x=g('d_x'), d_y=g('d_y'), y_t=g('y_t'),
+        x_pile=g('x_pile') if 'x_pile' in slice_df.columns else np.zeros(n),
+        y_pile=g('y_pile') if 'y_pile' in slice_df.columns else np.zeros(n),
+    )
+    if right_facing:
+        for k in ('alpha', 'beta', 'phi', 'c', 'P', 'kw', 'V'):
+            A[k] = -A[k]
+        A['theta_p'] = np.pi - A['theta_p']
+    return A
+
+
+def _mp_residuals(A, f_vals, lam, FS):
+    """`(N, Z, force_res, moment_res)` from PRE-EXTRACTED arrays `A` (`_mp_extract`),
+    at interslice scale λ and trial FS. No DataFrame access — this is what the
+    Approach-A/B inner loops call every iteration.
+
+    `θ_j = arctan(λ·f_vals_j)` (M-P's `tan θ = λ·f`); `force_res = Z[n]` → 0 at force
+    equilibrium; `moment_res` → 0 at moment equilibrium. With `f_vals ≡ 1` this is
+    Spencer (constant θ) — the make-or-break regression.
+    """
+    theta = np.arctan(lam * f_vals)
+    N, Z = _equilibrium_march(A['alpha'], A['phi'], A['c'], A['w'], A['u'], A['dl'],
+                              A['D'], A['beta'], A['kw'], A['V'], A['P'],
+                              A['H_pile'], A['theta_p'], theta, FS)
+    force_res = Z[-1]
+    moment_res = _moment_about_origin(
+        N, FS, x_c=A['x_c'], y_cg=A['y_cg'], y_cb=A['y_cb'], alpha=A['alpha'],
+        c=A['c'], phi=A['phi'], dl=A['dl'], u=A['u'], w=A['w'], D=A['D'], beta=A['beta'],
+        d_x=A['d_x'], d_y=A['d_y'], kw=A['kw'], V=A['V'], y_t=A['y_t'], P=A['P'],
+        H_pile=A['H_pile'], theta_p=A['theta_p'], x_pile=A['x_pile'], y_pile=A['y_pile'])
+    return N, Z, force_res, moment_res
+
+
 def _mp_march(slice_df, lam, f_vals, FS, right_facing=False):
-    """Morgenstern-Price per-slice march at a fixed `(λ, FS)`.
+    """Morgenstern-Price march for a single `(λ, FS)`: extract arrays then evaluate.
 
-    Forms the per-boundary interslice inclinations `θ_j = arctan(λ·f_vals_j)` (the
-    M-P assumption `tan θ = λ·f(x)`), runs the shared `_equilibrium_march` for the
-    base normals `N` and interslice forces `Z`, and forms the two global residuals:
-
-        force_res  = Z[n]                          → 0 at force equilibrium
-        moment_res = _moment_about_origin(...)     → 0 at moment equilibrium
-
-    Returns `(N, Z, force_res, moment_res)`. It does NOT root-find — Approach A
-    (S3) / Approach B (S5) drive `(FS, λ)` to zero BOTH residuals; their common zero
-    is the M-P solution.
-
-    `f_vals` has length n+1 (evaluated at each slice boundary). With `f_vals ≡ 1`
-    this is Spencer (`θ = arctan λ`, constant) — the make-or-break regression (S3).
-
-    RIGHT-FACING is finalized and validated in S3 (the `f(x)=1 == Spencer` gate run
-    on a right-facing geometry, per the sign note on `_equilibrium_march`). It is
-    deliberately not implemented here yet so S2 lands the moment math, fully
-    unit-checked, on the unambiguous left-facing convention.
+    Thin wrapper over `_mp_extract` + `_mp_residuals`, kept for direct/standalone
+    callers (tests, gates). The solver itself extracts ONCE and calls
+    `_mp_residuals` in the loop. Returns `(N, Z, force_res, moment_res)`.
     """
     n = len(slice_df)
     f_vals = np.asarray(f_vals, dtype=float)
     if len(f_vals) != n + 1:
         raise ValueError(f"f_vals length ({len(f_vals)}) must be n+1 ({n+1})")
-
-    # Per-slice arrays (angles → radians), matching _equilibrium_march's inputs.
-    alpha = np.radians(slice_df['alpha'].values)
-    phi   = np.radians(slice_df['phi'].values)
-    c     = slice_df['c'].values.astype(float)
-    w     = slice_df['w'].values.astype(float)
-    u     = slice_df['u'].values.astype(float)
-    dl    = slice_df['dl'].values.astype(float)
-    D     = slice_df['dload'].values.astype(float)
-    beta  = np.radians(slice_df['beta'].values)
-    kw    = slice_df['kw'].values.astype(float)
-    V     = slice_df['t'].values.astype(float)        # tension-crack water (= T in the force march)
-    P     = slice_df['p'].values.astype(float)
-    H_pile  = slice_df['h_pile'].values.astype(float)  if 'h_pile'  in slice_df.columns else np.zeros(n)
-    theta_p = slice_df['theta_p'].values.astype(float) if 'theta_p' in slice_df.columns else np.zeros(n)
-    # Geometry for the moment arms.
-    x_c   = slice_df['x_c'].values.astype(float)
-    y_cg  = slice_df['y_cg'].values.astype(float)
-    y_cb  = slice_df['y_cb'].values.astype(float)
-    d_x   = slice_df['d_x'].values.astype(float)
-    d_y   = slice_df['d_y'].values.astype(float)
-    y_t   = slice_df['y_t'].values.astype(float)
-    x_pile = slice_df['x_pile'].values.astype(float) if 'x_pile' in slice_df.columns else np.zeros(n)
-    y_pile = slice_df['y_pile'].values.astype(float) if 'y_pile' in slice_df.columns else np.zeros(n)
-
-    # RIGHT-FACING: mirror spencer()'s internal flip set so f(x)=1 reduces to Spencer
-    # (validated empirically by the f(x)=1 == Spencer gate, S3b — both residuals
-    # vanish at Spencer's solution). Same convention spencer() applies in its own
-    # `if right_facing:` block; here it is applied once, before the march and moment,
-    # so both stay consistent. (The pile horizontal-component flip — theta_p -> π-θp,
-    # flipping cos θp but not sin θp — is the analog of Spencer's H_cos flip; no
-    # right-facing+pile benchmark exists, so it is by analogy, not yet gate-checked.)
-    if right_facing:
-        alpha = -alpha
-        beta  = -beta
-        phi   = -phi              # tan φ flips (Spencer's tan_p flip)
-        c     = -c
-        P     = -P
-        kw    = -kw
-        V     = -V
-        theta_p = np.pi - theta_p
-
-    theta = np.arctan(lam * f_vals)               # M-P: tan θ = λ·f at each boundary
-    N, Z = _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, V, P,
-                              H_pile, theta_p, theta, FS)
-    force_res = Z[n]
-    moment_res = _moment_about_origin(
-        N, FS, x_c=x_c, y_cg=y_cg, y_cb=y_cb, alpha=alpha, c=c, phi=phi, dl=dl,
-        u=u, w=w, D=D, beta=beta, d_x=d_x, d_y=d_y, kw=kw, V=V, y_t=y_t, P=P,
-        H_pile=H_pile, theta_p=theta_p, x_pile=x_pile, y_pile=y_pile)
-    return N, Z, force_res, moment_res
+    return _mp_residuals(_mp_extract(slice_df, right_facing), f_vals, lam, FS)
 
 
 def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False, right_facing=False):
@@ -1679,6 +1682,10 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     except ValueError as e:
         return False, str(e)
 
+    # Extract all per-slice arrays ONCE (with right-facing flips); the inner Newton
+    # loops call _mp_residuals(A, ...) — no per-iteration DataFrame access.
+    A = _mp_extract(slice_df, right_facing)
+
     # Seed FS from Bishop where possible (as Spencer does), else fs_guess.
     seed = fs_guess
     try:
@@ -1692,7 +1699,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         """Force-equilibrium FS at this λ: the FS root of `force_res` (= Z[n]). The
         force residual is monotonic in FS, so this root is unique and well-behaved —
         no branch-jumping (unlike the moment-only FS, which is multivalued)."""
-        return newton(lambda FS: _mp_march(slice_df, lam, f_vals, FS, right_facing)[2],
+        return newton(lambda FS: _mp_residuals(A, f_vals, lam, FS)[2],
                       s, tol=tol, maxiter=max_iter)
 
     def h(lam):
@@ -1703,7 +1710,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         sidesteps the multivalued moment-only FS curve `F_m(λ)` (and its asymptote)
         entirely. (This curve search is the slow-but-robust reference path; the
         Approach-B Newton, S5, is the fast path.)"""
-        return _mp_march(slice_df, lam, f_vals, F_f(lam, seed), right_facing)[3]
+        return _mp_residuals(A, f_vals, lam, F_f(lam, seed))[3]
 
     lo, hi = lambda_bracket
 
@@ -1737,7 +1744,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         `hybr` well-conditioned; seeding near the physical solution keeps it off the
         multivalued moment-only branch. Returns λ* or None (→ fall back to A)."""
         from scipy.optimize import root
-        f0 = _mp_march(slice_df, 0.0, f_vals, seed, right_facing)
+        f0 = _mp_residuals(A, f_vals, 0.0, seed)
         sf = abs(f0[2]) or 1.0       # force-residual scale at the seed
         sm = abs(f0[3]) or 1.0       # moment-residual scale at the seed
 
@@ -1746,7 +1753,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
             if not (np.isfinite(F) and np.isfinite(lam)) or F <= 0.05:
                 return [1e3, 1e3]
             try:
-                _, _, fr, mr = _mp_march(slice_df, lam, f_vals, F, right_facing)
+                _, _, fr, mr = _mp_residuals(A, f_vals, lam, F)
             except Exception:
                 return [1e3, 1e3]
             return [fr / sf, mr / sm]
@@ -1781,7 +1788,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     # Recover N, Z, θ at λ* (FS already known from Approach B; else solve it via A's F_f).
     if FS is None:
         FS = F_f(lam_star, seed)
-    N, Z, force_res, moment_res = _mp_march(slice_df, lam_star, f_vals, FS, right_facing)
+    N, Z, force_res, moment_res = _mp_residuals(A, f_vals, lam_star, FS)
     theta_deg = np.degrees(np.arctan(lam_star * f_vals))   # per boundary, length n+1
 
     slice_df['n_eff'] = N

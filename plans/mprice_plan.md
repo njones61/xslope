@@ -661,17 +661,29 @@ work that can run in parallel with the core is in §11.
   (default) runs B then falls back to the robust Approach-A grid scan; `'A'`/`'B'`
   force one. **Validation: A vs B agree to max |ΔFS|=1.5e-9, |Δλ|=7e-10 over 41
   cases, 0 fallbacks.** (An earlier 1-D `h(λ)` secant also worked but was ~3× slower.)
-- **Speed reality + optimization (2026-06-24).** M-P is *inherently* slower than
-  Spencer: Spencer uses a vectorized lumped-`Q` solve with an analytic Jacobian
-  (~1.2 ms/solve), while M-P does ~20-30 `_equilibrium_march` calls per solve. An
-  early "≈ Spencer speed" claim was wrong — it came from one input (acads_simple)
-  that happened to show parity. On the main_lem problem (sloping_bottom, 40 slices)
-  an M-P circular_search was **14 s vs Spencer 3.3 s (~4×)**. Two optimizations cut
-  this: (1) **closed-form 2×2 + vectorized precompute** in `_equilibrium_march`
-  (replacing per-slice `np.linalg.solve`; Corps/L-K unchanged to 3.8e-14), and
-  (2) Approach B **returns its FS**, skipping a redundant final `F_f` re-solve.
-  Result: M-P search **4.9 s vs Spencer 3.4 s (~1.4×)**, all gates still pass. M-P
-  stays somewhat slower than Spencer by nature; ~1.4× is realistic, not parity.
+- **Speed optimization (2026-06-24).** An early "≈ Spencer speed" claim was wrong —
+  it came from one input (acads_simple) that happened to show parity. The real
+  baseline on the main_lem problem (sloping_bottom, 40 slices) was an M-P
+  circular_search at **14 s vs Spencer 3.3 s (~4×)**. Profiling drove four fixes:
+  1. **Closed-form 2×2** in `_equilibrium_march` (replace per-slice `np.linalg.solve`).
+  2. Approach B **returns its FS**, skipping a redundant final `F_f` re-solve.
+  3. **Vectorized march**: the interslice recurrence `Z[i+1]=p[i]+q[i]·Z[i]` is
+     LINEAR, so the whole march is `cumprod`/`cumsum` — no Python loop. Stable (the
+     multiplier `q`≈1, cumprod ~1 even at 120 slices; scalar-scan fallback if
+     non-finite). Speeds up Corps/L-K too (unchanged to 3.1e-14).
+  4. **Extract-once** (the big one): split `_mp_march` into `_mp_extract` (pull ~25
+     DataFrame columns once, with flips) + `_mp_residuals` (pure-numpy, per
+     iteration). Profiling showed `DataFrame.__getitem__` (re-read every Newton
+     step, ~13×/solve) was ~75% of the solve.
+  **Result: M-P circular_search 3.7 s vs Spencer 3.3 s (~1.12×) — essentially
+  parity**, all gates still pass.
+- **Analytic Jacobian — tried, reverted (no benefit).** Implemented a gradient-checked
+  (to 1e-8) tangent-linear Jacobian + hand-coded 2-D Newton. Correct and gates pass,
+  but **no speedup**: the bottleneck was never the iteration count — it was the
+  per-call work (DataFrame extraction, then the march), so a tangent march that does
+  MORE per-slice arithmetic just trades fewer iterations for costlier ones. Reverted
+  to keep the simpler scipy `hybr` Approach B. (The extract-once + vectorized-march
+  wins above are what actually mattered.)
 
 **S6 — Integration (code).**
 - *Deliverable:* register `morgenstern_price` in `solve_selected`/`solve_all`

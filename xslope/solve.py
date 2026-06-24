@@ -1575,7 +1575,8 @@ def _mp_f_vals(slice_df, f_type):
 
 
 def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
-                      max_iter=50, lambda_bracket=(-1.5, 1.5), debug_level=0):
+                      max_iter=50, lambda_bracket=(-1.5, 1.5), solver='auto',
+                      debug_level=0):
     """Morgenstern-Price complete-equilibrium method (Approach A: F_f / F_m crossing).
 
     M-P satisfies BOTH force and moment equilibrium with a VARIABLE interslice-force
@@ -1642,27 +1643,64 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         return _mp_march(slice_df, lam, f_vals, F_f(lam, seed), right_facing)[3]
 
     lo, hi = lambda_bracket
-    grid = np.linspace(lo, hi, 61)
-    hv = []
-    for lam in grid:
-        try:
-            hv.append(h(lam))
-        except Exception:
-            hv.append(np.nan)
-    hv = np.array(hv)
 
-    crossings = []
-    for i in range(len(grid) - 1):
-        a, b = hv[i], hv[i + 1]
-        if np.isfinite(a) and np.isfinite(b) and a * b <= 0 and not (a == 0 and b == 0):
+    def approach_A():
+        """Robust reference (slow): scan h(λ) on a grid, brentq each sign change,
+        and take the crossing nearest λ=0 (the physical one). ~61 h-evals."""
+        grid = np.linspace(lo, hi, 61)
+        hv = []
+        for lam in grid:
             try:
-                crossings.append(brentq(h, grid[i], grid[i + 1], xtol=1e-9, maxiter=100))
+                hv.append(h(lam))
             except Exception:
-                pass
-    if not crossings:
+                hv.append(np.nan)
+        hv = np.array(hv)
+        crossings = []
+        for i in range(len(grid) - 1):
+            a, b = hv[i], hv[i + 1]
+            if np.isfinite(a) and np.isfinite(b) and a * b <= 0 and not (a == 0 and b == 0):
+                try:
+                    crossings.append(brentq(h, grid[i], grid[i + 1], xtol=1e-9, maxiter=100))
+                except Exception:
+                    pass
+        return min(crossings, key=abs) if crossings else None
+
+    def approach_B():
+        """Fast path (Approach B): secant on the smooth scalar h(λ) seeded at λ=0 —
+        a handful of h-evals instead of A's full grid scan. The S3 `h(λ)` reduction
+        makes the problem 1-D in λ (F_f is well-behaved), so a 1-D secant is both
+        faster AND more stable than a raw 2-D (F, λ) Newton, which would re-hit the
+        multivalued moment-only FS curve. Returns None (→ fall back to A) if it
+        leaves the bracket or stalls."""
+        l0, l1 = 0.0, 0.05
+        try:
+            h0, h1 = h(l0), h(l1)
+        except Exception:
+            return None
+        for _ in range(60):
+            if not (np.isfinite(h0) and np.isfinite(h1)) or h1 == h0:
+                return None
+            l2 = l1 - h1 * (l1 - l0) / (h1 - h0)
+            if not (lo - 0.5 <= l2 <= hi + 0.5):     # diverging out of range → bail to A
+                return None
+            if abs(l2 - l1) < 1e-9:
+                return l2
+            try:
+                h2 = h(l2)
+            except Exception:
+                return None
+            l0, h0, l1, h1 = l1, h1, l2, h2
+        return None
+
+    if solver == 'A':
+        lam_star = approach_A()
+    else:                       # 'auto' (default) / 'B': fast secant, fall back to A
+        lam_star = approach_B()
+        if lam_star is None and solver == 'auto':
+            lam_star = approach_A()
+    if lam_star is None:
         return False, ("Morgenstern-Price: no F_f/F_m crossing found in "
                        f"λ ∈ [{lo}, {hi}].")
-    lam_star = min(crossings, key=abs)   # physical crossing is the one nearest λ=0
 
     # Final solution at λ*: FS = F_f(λ*); recover N, Z, θ for output.
     FS = F_f(lam_star, seed)

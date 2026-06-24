@@ -652,6 +652,16 @@ work that can run in parallel with the core is in §11.
   search, tension guard), falling back to A on divergence.
 - *Depends-on:* S4. *Exit:* B matches A on **every** benchmark; no-solution path
   returns `(False, reason)`; search runs M-P over many surfaces without hangs.
+- **Status (2026-06-24): DONE ✅.** Design refinement vs the deliverable: the S3
+  `h(λ)` reduction makes the problem **1-D in λ** (`F_f` is well-behaved), so the
+  fast path is a **1-D secant on `h(λ)` seeded at λ=0**, not a 2-D `(F, λ)` Newton —
+  it is both faster AND more stable (a raw 2-D Newton would re-hit the multivalued
+  moment-only FS curve). `morgenstern_price(..., solver=)`: `'auto'` (default) runs
+  B then falls back to A; `'A'`/`'B'` force one. **Validation: A vs B agree to
+  max |ΔFS|=5e-10, |Δλ|=2e-10 over 41 (file × f_type) cases, B never fell back
+  (0/41), and B is ~25× faster (0.7s vs 17.3s).** Confirmed M-P drives
+  `circular_search` end-to-end (acads_simple critical FS=0.9839 = Spencer 0.984),
+  no hangs.
 
 **S6 — Integration (code).**
 - *Deliverable:* register `morgenstern_price` in `solve_selected`/`solve_all`

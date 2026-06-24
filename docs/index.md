@@ -12,14 +12,15 @@ The limit equilibrium method (LEM) represents the fundamental approach to slope 
 
 xslope employs the method of slices, a numerical technique that divides the potential failure mass into a series of vertical slices. Rather than analyzing the entire mass as a single unit, each slice is examined individually, with the overall stability determined by summing the forces and moments acting on all slices. This approach allows for the analysis of complex geometries, varying soil conditions, and multiple loading scenarios including distributed surface loads, seismic forces, reinforcement, and tension cracks.
 
-The package implements six distinct limit equilibrium methods, each with different assumptions about inter-slice forces and equilibrium conditions:
+The package implements seven distinct limit equilibrium methods, each with different assumptions about inter-slice forces and equilibrium conditions:
 
 - **Ordinary Method of Slices (OMS)** - The simplest approach, satisfying only moment equilibrium with no iteration required. Best for preliminary analysis where speed is prioritized over accuracy.
 - **Simplified Janbu Method** - Satisfies horizontal force equilibrium with an empirical correction factor. Suitable for both circular and non-circular failure surfaces.
 - **Bishop's Simplified Method** - The most widely used method, satisfying moment and vertical force equilibrium. Provides good accuracy for circular failure surfaces with reasonable computational efficiency.
 - **Corps of Engineers Method** - A force equilibrium approach assuming horizontal inter-slice forces. Applicable to any failure surface geometry.
 - **Lowe & Karafiath Method** - Similar to Corps Engineers but with inter-slice forces oriented at the average of the slope and failure surface angles. Particularly effective for seismic loading analysis.
-- **Spencer's Method** - The most rigorous approach, satisfying complete force and moment equilibrium simultaneously. Generally considered the most accurate method available in xslope.
+- **Spencer's Method** - A rigorous approach satisfying complete force and moment equilibrium simultaneously with a constant inter-slice force inclination. Generally considered one of the most accurate methods available in xslope.
+- **Morgenstern–Price Method** - The most general complete-equilibrium method and a generalization of Spencer's: it satisfies full force and moment equilibrium while letting the inter-slice force inclination vary along the surface according to a chosen function, $\tan\theta(x) = \lambda f(x)$ (constant, which reproduces Spencer, or a half-sine default). Applicable to both circular and non-circular surfaces.
 
 Beyond single surface analysis, xslope includes automated search algorithms that systematically evaluate thousands of candidate failure surfaces to identify the critical surface with the minimum factor of safety. These search capabilities use adaptive grid refinement to efficiently locate critical surfaces for both circular and non-circular geometries. The package also supports rapid drawdown analysis for dams and levees, as well as reliability analysis using Monte Carlo methods to compute probability of failure based on input parameter uncertainties.
 

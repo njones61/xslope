@@ -543,6 +543,27 @@ work that can run in parallel with the core is in §11.
   `p`, `h_pile`, `theta_p`, …).
 - *Depends-on:* nothing. *Exit:* checklist complete; any column/sign surprise
   reconciled against §4a before S1. (Good fit for an `Explore` subagent — §11.)
+- **Status (2026-06-24): DONE — gate met, no column/sign mismatches vs §4a.**
+  Findings to carry into S1/S2:
+  - **Extractable march** = the `force_equilibrium` inner loop **`solve.py:648–682`**
+    — the per-slice 2×2 solve (`A·[N_i, Z_{i+1}] = b`) run at a fixed `F`, *before*
+    the `scipy.optimize.newton` root-find of `F` on residual `Z[n]`. It writes
+    `n_eff` (effective normal) and `z` back to `slice_df`. Refactor target is clean.
+  - **`spencer()` success dict is minimal:** `{'method','FS','theta'}`. Line of
+    thrust (`yt_l`,`yt_r`), `n_eff`, `z`, `theta` are stored in `slice_df`, not
+    returned. → M-P result dict = those keys **+ `lambda` + `f_type`** (§contract).
+  - ⚠️ **Right-facing conventions differ between the two engines** (highest-risk
+    reconciliation): `force_equilibrium` expects the *caller* to negate `theta_list`
+    and uses the `right_facing` flag only for the tension-sign guard — it does **not**
+    flip external-load signs internally; `spencer()` instead flips
+    `alpha,beta,psi,R,c,kw,V,tan_p,H_cos` *internally* (solve.py:963–991). The M-P
+    march is `force_equilibrium`-based, so the moment accumulator (S2) must hold **one**
+    consistent convention; run the S3 `f(x)=1 ≡ Spencer` gate on a **right-facing**
+    geometry specifically to catch a sign slip here.
+  - **Gotcha:** `theta_p` (pile) is stored in **radians**; all other `slice_df`
+    angles (`alpha,phi,beta,theta`) are **degrees**.
+  - Total-normal moment term uses **`n_eff + u·dl`** (the engine's `n_eff` is the
+    effective normal).
 
 **S1 — Refactor `force_equilibrium` into the shared fixed-`F` march.**
 - *Deliverable:* `_mp_march(slice_df, lam, f_vals, F) -> (N[], Z[], force_res,

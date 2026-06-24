@@ -181,6 +181,12 @@ def main():
         params = parse_raw(m.group(1))
         key = (params.get("file"), params.get("type"))
         out.append(content[last:m.start()])
+        # Only FS-by-method tags get a generated table; pass everything else
+        # through untouched (e.g. type=reliability carries expected_beta, not fs_*).
+        if params.get("type") not in ("single_circle", "circular_search", "noncircular_search"):
+            out.append(m.group(0))
+            last = m.end()
+            continue
         if key in seen:
             print(f"  (collapsed duplicate tag for {key[0]})")
             last = m.end()

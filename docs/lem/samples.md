@@ -858,3 +858,38 @@ Solution (critical surface with the tension crack, Spencer's method):
 <!-- /fs-table -->
 
 <!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.453, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->
+
+### 18. Reliability Analysis (Submerged Slope)
+
+XSLOPE can run a **reliability analysis** with any of the limit equilibrium methods
+(see [Reliability Analysis](reliability.md)). Instead of a single factor of safety,
+each uncertain input is given a most-likely value (MLV) and a standard deviation
+($\sigma$) on the **mat** sheet. XSLOPE perturbs each variable to estimate the
+standard deviation of the factor of safety ($\sigma_F$) and its coefficient of
+variation ($COV_F = \sigma_F / F_{MLV}$), then forms the **lognormal reliability
+index**
+
+$$\beta_{LN} = \frac{\ln\!\left(F_{MLV} / \sqrt{1 + COV_F^2}\right)}{\sqrt{\ln\!\left(1 + COV_F^2\right)}},$$
+
+from which the reliability $R$ and probability of failure $P_f = 1 - R$ follow.
+
+This sample is a submerged slope in undrained clay; the unit weight and the
+undrained strength are the uncertain inputs, and the water standing above the slope
+is modeled as a distributed load.
+
+Excel input file: [xslope_prob_submerged_KEY.xlsx](files/xslope_prob_submerged_KEY.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![prob_submerged_inputs1.png](sample_images/prob_submerged_inputs1.png){width=900}
+
+Reliability result — the $F_{MLV}$ critical surface (Spencer's method) with the
+analysis summary:
+
+![prob_submerged_reliability.png](sample_images/prob_submerged_reliability.png){width=900}
+
+| $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ |
+|---:|---:|---:|---:|---:|---:|
+| 1.354 | 0.389 | 28.7% | 0.935 | 82.5% | 17.5% |
+
+<!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.935, tolerance=0.03 -->

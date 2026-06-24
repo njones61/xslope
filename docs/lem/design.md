@@ -83,6 +83,8 @@ With `design_mode = "fs"`, the script reports the critical factor of safety at e
 | 28.9° | 0.91 |
 | 30.0° | 0.88 |
 
+<!-- test: file=files/xslope_acads_simple.xlsx, type=design_search, method=bishop, beta=30, toe_index=1, slope_index=2, num_slices=30, expected_fs=0.880, tolerance=0.01 -->
+
 For this weak soil the factor of safety ranges from about 0.88 to 1.27 across the swept angles, so the target `design_fs` must fall **within that range**. With `design_fs = 1.2`, interpolation gives a critical slope angle of about **21.4°**:
 
 ![design_fs_chart.png](images/design_fs_chart.png){width=1000}

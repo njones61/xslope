@@ -72,7 +72,7 @@ def parse_test_tags(md_path):
             params['file'] = str(md_dir / params['file'])
 
         # Convert numeric fields
-        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max']:
+        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta']:
             if key in params:
                 params[key] = float(params[key])
         if 'num_slices' in params:
@@ -140,6 +140,60 @@ def run_lem_test(test):
 
     else:
         return None, f"Unknown LEM test type: {test_type}"
+
+
+def run_design_test(test):
+    """Run a design-sweep regression: edit a profile point to set the slope-face
+    angle, rebuild the polygon geometry, then run a circular search and return FS.
+
+    This guards the bug found in the design driver (main_design.py), where editing
+    profile_lines and rebuilding only the ground surface left the slice weights —
+    and therefore the factor of safety — pinned to the ORIGINAL geometry. Slice
+    weights are computed from slope_data['polygons'], so the polygons must be
+    regenerated from the edited profile. The expected FS reflects the NEW slope
+    angle; if the polygon resync regresses, the search returns the stale
+    base-geometry FS and this test fails.
+    """
+    import math
+    from shapely.geometry import Polygon
+    from xslope.fileio import load_slope_data, build_ground_surface_from_polygons
+    from xslope.mesh import build_polygons
+    from xslope.search import circular_search
+
+    file_path = test['file']
+    method = test.get('method', 'bishop')
+    beta = float(test['beta'])
+    toe_index = int(test.get('toe_index', 1))
+    slope_index = int(test.get('slope_index', 2))
+    num_slices = test.get('num_slices', 30)
+
+    slope_data = load_slope_data(file_path)
+
+    # Move the slope-top point so the slope face makes angle `beta`:
+    #   tan(beta) = (y_top - y_toe) / (x_top - x_toe)
+    profile = slope_data['profile_lines'][0]['coords']
+    x_toe, y_toe = profile[toe_index]
+    _x_top, y_top = profile[slope_index]
+    x_top_new = x_toe + (y_top - y_toe) / math.tan(math.radians(beta))
+    slope_data['profile_lines'][0]['coords'][slope_index] = (x_top_new, y_top)
+
+    # Rebuild material polygons from the edited profile, then re-derive the ground
+    # surface / domain polygon from them — the resync that the original bug omitted.
+    polys = [
+        {'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+        for p in build_polygons(slope_data={'profile_lines': slope_data['profile_lines'],
+                                             'max_depth': slope_data.get('max_depth')})
+    ]
+    slope_data['polygons'] = polys
+    ground_surface, domain_polygon = build_ground_surface_from_polygons(polys)
+    slope_data['ground_surface'] = ground_surface
+    slope_data['domain_polygon'] = domain_polygon
+
+    fs_cache, converged, search_path, circle_cache = circular_search(
+        slope_data, method, num_slices=num_slices)
+    if not fs_cache or fs_cache[0]['FS'] >= 9999:
+        return None, "design_search found no valid surface"
+    return fs_cache[0]['FS'], None
 
 
 def run_fem_test(test):
@@ -249,6 +303,8 @@ def run_test(test):
         return run_seep_test(test)
     elif test_type == 'reliability':
         return run_reliability_test(test)
+    elif test_type == 'design_search':
+        return run_design_test(test)
     else:
         return run_lem_test(test)
 
@@ -284,6 +340,11 @@ def main():
         lem_samples = Path('docs/lem/samples.md')
         if lem_samples.exists():
             tests.extend(parse_test_tags(lem_samples))
+        # The design example carries a design_search regression (guards the
+        # profile-edit / polygon-rebuild bug found in main_design.py).
+        lem_design = Path('docs/lem/design.md')
+        if lem_design.exists():
+            tests.extend(parse_test_tags(lem_design))
     if run_fem:
         fem_samples = Path('docs/fem/samples.md')
         if fem_samples.exists():

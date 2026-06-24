@@ -1932,7 +1932,10 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
 
     alpha = 0.3
-    if results['method'] == 'spencer':
+    if results['method'] in ('spencer', 'morgenstern_price'):
+        # M-P draws the thrust line too once it is computed; plot_thrust_line_from_df
+        # skips gracefully while 'yt_l'/'yt_r' are absent (M-P thrust line is a
+        # deferred post-process diagnostic — see plans/mprice_plan.md §4 option b).
         plot_thrust_line_from_df(ax, slice_df)
 
     plot_base_stresses(ax, slice_df, alpha=alpha)
@@ -1981,6 +1984,9 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         title = f'Corps Engineers: FS = {fs:.3f}, θ = {theta:.2f}°'
     elif method == 'lowe_karafiath':
         title = f'Lowe & Karafiath: FS = {fs:.3f}'
+    elif method == 'morgenstern_price':
+        title = (f"Morgenstern-Price ({results.get('f_type', '')}): "
+                 f"FS = {fs:.3f}, λ = {results['lambda']:.3f}")
     else:
         title = f'{method}: FS = {fs:.3f}'
     ax.set_title(title)

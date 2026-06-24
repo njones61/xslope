@@ -670,6 +670,17 @@ work that can run in parallel with the core is in §11.
   calls it exactly like Spencer.
 - *Depends-on:* S5. *Exit:* `solve_all` and an automated search run M-P end-to-end
   and plot correctly.
+- **Status (2026-06-24): DONE ✅.** Registered in `solve_selected` (prints
+  `Morgenstern-Price (f_type): FS=..., lambda=...`) and appended to `solve_all`.
+  `plot_solution` gains an M-P title (`FS`, `λ`); base-stress bars already work
+  from the stored `n_eff`. Search needs no change — `circular_search` /
+  `noncircular_search` call it via `getattr(solve, method)` exactly like Spencer
+  (confirmed: acads_simple circular_search critical FS=0.984). Verified `solve_all`,
+  `solve_selected`, and `plot_solution` end-to-end on circular + non-circular.
+  **One deferred diagnostic:** the M-P **line of thrust** (`yt_l`/`yt_r`, option-b
+  recurrence) is not computed yet; `plot_solution` is already wired to draw it and
+  skips gracefully until it exists — a post-process nicety, not blocking M-P as a
+  first-class method.
 
 **S7 — Documentation.**
 - *Deliverable:*

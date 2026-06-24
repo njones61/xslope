@@ -30,7 +30,8 @@ def solve_selected(method_name, slice_df, rapid=False):
     ----------
     method_name : str
         Name of the solution method function to call. Must be one of:
-        'oms', 'bishop', 'janbu', 'spencer', 'corps_engineers', 'lowe_karafiath'
+        'oms', 'bishop', 'janbu', 'spencer', 'corps_engineers', 'lowe_karafiath',
+        'morgenstern_price'
     slice_df : pandas.DataFrame
         Slice dataframe containing all required columns for the specified method
         (see individual method documentation for column requirements)
@@ -75,6 +76,9 @@ def solve_selected(method_name, slice_df, rapid=False):
         print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
     elif func == lowe_karafiath:
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
+    elif func == morgenstern_price:
+        print(f'Morgenstern-Price ({result["f_type"]}): FS={result["FS"]:.3f}, '
+              f'lambda={result["lambda"]:.3f}')
 
     return result
 
@@ -108,6 +112,7 @@ def solve_all(slice_df, rapid=False):
     4. Corps of Engineers Method
     5. Lowe & Karafiath Method
     6. Spencer's Method
+    7. Morgenstern-Price Method
 
     If any method fails, an error message is displayed but execution continues
     with the remaining methods.
@@ -118,6 +123,7 @@ def solve_all(slice_df, rapid=False):
     solve_selected('corps_engineers', slice_df, rapid=rapid)
     solve_selected('lowe_karafiath', slice_df, rapid=rapid)
     solve_selected('spencer', slice_df, rapid=rapid)
+    solve_selected('morgenstern_price', slice_df, rapid=rapid)
 
 def oms(slice_df, debug=False):
     """

@@ -652,16 +652,17 @@ work that can run in parallel with the core is in §11.
   search, tension guard), falling back to A on divergence.
 - *Depends-on:* S4. *Exit:* B matches A on **every** benchmark; no-solution path
   returns `(False, reason)`; search runs M-P over many surfaces without hangs.
-- **Status (2026-06-24): DONE ✅.** Design refinement vs the deliverable: the S3
-  `h(λ)` reduction makes the problem **1-D in λ** (`F_f` is well-behaved), so the
-  fast path is a **1-D secant on `h(λ)` seeded at λ=0**, not a 2-D `(F, λ)` Newton —
-  it is both faster AND more stable (a raw 2-D Newton would re-hit the multivalued
-  moment-only FS curve). `morgenstern_price(..., solver=)`: `'auto'` (default) runs
-  B then falls back to A; `'A'`/`'B'` force one. **Validation: A vs B agree to
-  max |ΔFS|=5e-10, |Δλ|=2e-10 over 41 (file × f_type) cases, B never fell back
-  (0/41), and B is ~25× faster (0.7s vs 17.3s).** Confirmed M-P drives
-  `circular_search` end-to-end (acads_simple critical FS=0.9839 = Spencer 0.984),
-  no hangs.
+- **Status (2026-06-24): DONE ✅.** Approach B is the plan's **2-D Newton** (scipy
+  `hybr`) on the **scaled** `(force_res, moment_res)` residuals over `(FS, λ)`,
+  seeded at `(Bishop-FS, 0)`. Both residuals come from ONE `_mp_march` per eval.
+  Scaling the two residuals to O(1) (they differ ~1e3×) makes `hybr`
+  well-conditioned, and seeding near the physical solution keeps it off the
+  multivalued moment-only branch. `morgenstern_price(..., solver=)`: `'auto'`
+  (default) runs B then falls back to the robust Approach-A grid scan; `'A'`/`'B'`
+  force one. **Validation: A vs B agree to max |ΔFS|=1.5e-9, |Δλ|=7e-10 over 41
+  cases, 0 fallbacks.** (An earlier 1-D `h(λ)` secant also worked but was ~3× slower
+  in a search; the residual-scaled 2-D Newton makes an M-P automated search ≈
+  Spencer speed — circular_search acads_simple 13.0s vs Spencer 12.4s.)
 
 **S6 — Integration (code).**
 - *Deliverable:* register `morgenstern_price` in `solve_selected`/`solve_all`

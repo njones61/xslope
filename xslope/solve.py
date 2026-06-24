@@ -1672,30 +1672,38 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         return min(crossings, key=abs) if crossings else None
 
     def approach_B():
-        """Fast path (Approach B): secant on the smooth scalar h(λ) seeded at λ=0 —
-        a handful of h-evals instead of A's full grid scan. The S3 `h(λ)` reduction
-        makes the problem 1-D in λ (F_f is well-behaved), so a 1-D secant is both
-        faster AND more stable than a raw 2-D (F, λ) Newton, which would re-hit the
-        multivalued moment-only FS curve. Returns None (→ fall back to A) if it
-        leaves the bracket or stalls."""
-        l0, l1 = 0.0, 0.05
+        """Fast path (Approach B): 2-D Newton (scipy `hybr`) on the SCALED
+        `(force_res, moment_res)` residuals over `(FS, λ)`, seeded at `(Bishop-FS,
+        0)`. Both residuals come from ONE `_mp_march` per evaluation, so this is ~3×
+        faster than the h(λ) secant (which nests a full `F_f` root-find inside every
+        step). Scaling the two residuals to O(1) (they differ by ~1e3×) is what makes
+        `hybr` well-conditioned; seeding near the physical solution keeps it off the
+        multivalued moment-only branch. Returns λ* or None (→ fall back to A)."""
+        from scipy.optimize import root
+        f0 = _mp_march(slice_df, 0.0, f_vals, seed, right_facing)
+        sf = abs(f0[2]) or 1.0       # force-residual scale at the seed
+        sm = abs(f0[3]) or 1.0       # moment-residual scale at the seed
+
+        def R(x):
+            F, lam = x
+            if not (np.isfinite(F) and np.isfinite(lam)) or F <= 0.05:
+                return [1e3, 1e3]
+            try:
+                _, _, fr, mr = _mp_march(slice_df, lam, f_vals, F, right_facing)
+            except Exception:
+                return [1e3, 1e3]
+            return [fr / sf, mr / sm]
+
         try:
-            h0, h1 = h(l0), h(l1)
+            sol = root(R, [seed, 0.0], method='hybr')
         except Exception:
             return None
-        for _ in range(60):
-            if not (np.isfinite(h0) and np.isfinite(h1)) or h1 == h0:
-                return None
-            l2 = l1 - h1 * (l1 - l0) / (h1 - h0)
-            if not (lo - 0.5 <= l2 <= hi + 0.5):     # diverging out of range → bail to A
-                return None
-            if abs(l2 - l1) < 1e-9:
-                return l2
-            try:
-                h2 = h(l2)
-            except Exception:
-                return None
-            l0, h0, l1, h1 = l1, h1, l2, h2
+        F_b, lam_b = sol.x
+        if not (sol.success and F_b > 0.05 and (lo - 0.5) <= lam_b <= (hi + 0.5)):
+            return None
+        rb = R(sol.x)                # confirm it's a true root, not a merit-fn stall
+        if abs(rb[0]) < 1e-4 and abs(rb[1]) < 1e-4:
+            return float(lam_b)
         return None
 
     if solver == 'A':

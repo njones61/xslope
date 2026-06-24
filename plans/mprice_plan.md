@@ -45,6 +45,38 @@ non-blocking. Ready to implement.
   automated search just skips the surface. Approach-A `λ` search bracket:
   `λ ∈ [−1.5, 1.5]` with a sign-change bracket on `g(λ)=F_f−F_m`.
 
+### Post-build verification & corrections (2026-06-24)
+
+A re-scan of this plan after the initial S0–S6 build found that several stages had
+been marked **DONE with exit-gate checks that were never actually run**. Re-running
+each:
+
+- **Tension-admissibility guard (robustness policy) — WAS MISSING, now added.**
+  `mprice` had no admissibility guard, so its λ-optimised search could latch onto a
+  surface that balances only with partly-tensile interslice forces (which Spencer's
+  solver simply fails to converge on). On `simple_embankment` this gave a spurious
+  1.226 (−3.9% vs Spencer). Guard added: reject >50% base-normal tension **or** >30%
+  interslice tension (tight cap — physical M-P criticals run ≤18% interslice
+  tension). `simple_embankment` → 1.260 (in band); no physical surface wrongly
+  rejected; the f(x)=1≡Spencer gate is unaffected.
+- **Line of thrust (§6) — WAS MISSING, now added** (`_mp_line_of_thrust`; reproduces
+  Spencer for f(x)=1 to ~1e-6).
+- **Force-only tie-out (§7.1.3, part of the S3 ⛔ gate) — never run; NOW RUN: PASSES.**
+  `F_f(λ)` matches `force_equilibrium` for the same θ to ~1e-10 / bit-exact.
+- **Rapid drawdown (load scope) — never verified; NOW RUN: WORKS.**
+  `solve_selected('mprice', …, rapid=True)` → earth_dam_rapid FS=1.265, johnson
+  FS=1.649. **Caveat:** there is *no rapid-drawdown regression test for any method*
+  (a pre-existing suite gap) — so mprice-rapid is verified manually only, pending a
+  rapid regression test.
+- **f(x) insensitivity (§7.1.2) — measured & FLAGGED.** const-vs-half_sine on the
+  *same* surface: circular/homogeneous ≤0.03%, but **non-circular weak-layer 1.2–1.4%**
+  (noncircular 1.25%, acads_weak_layer 1.39%) — above the <1% rule of thumb. Expected
+  (f(x) matters more on the kinked weak-layer surface), not a defect; document it in
+  `mprice.md` (S7).
+
+**Meta-lesson:** a stage is not "done" until its named exit-gate checks have actually
+been executed — not asserted.
+
 ## 1. What M-P is, and how it relates to what we already have
 
 Morgenstern–Price (1965) is a complete-equilibrium method: it satisfies force
@@ -711,16 +743,22 @@ work that can run in parallel with the core is in §11.
 - *Deliverable:*
   - new **`docs/lem/mprice.md`** — derivation in the Spencer style, reusing the §4a
     moment table and the `F`-vs-`λ` figure (P2 drafts the prose during S1–S5; final
-    numbers/figure dropped in here);
+    numbers/figure dropped in here). **Include the f(x)-insensitivity note** from the
+    post-build findings (weak-layer non-circular ~1.4%).
   - **`mkdocs.yml` nav entry** under the LEM section, immediately **after "Spencer's
     Method"**: `- Morgenstern–Price Method: lem/mprice.md`;
-  - link the page from `docs/lem/overview.md`;
-  - add the M-P row(s) to `docs/verification.md` (P3 scaffolds);
-  - add a sample + a `run_tests.py` regression tag.
+  - **`docs/lem/overview.md` — fold M-P into the whole page, not just a link:**
+    the method-comparison table (it lists Spencer but not M-P), the design-guidance
+    prose (Spencer is currently "the recommended choice" — add M-P as the other
+    complete-equilibrium option), and the method-list code examples
+    (`# oms, bishop, janbu, corps, lowe, spencer` → add `mprice`).
+  - `docs/verification.md` M-P rows — **DONE** (added in the table-update pass).
+  - sample FS-table column + `fs_mprice` regression tags — **DONE** (gen_fs_tables
+    regenerated `samples.md`; full LEM regression 203/203).
 - *Depends-on:* S5 (numbers/figure), and P2/P3 drafts (§11). *Exit:* `mkdocs build`
-  clean **and the page is reachable from the nav**; the new regression tag passes in
-  `run_tests.py`; the verification table matches the benchmark run. Per the "docs
-  track solver" rule, S6 + S7 land together as one work unit.
+  clean **and the page is reachable from the nav**; `overview.md` shows M-P in the
+  table + guidance + code lists; the regression passes. Per the "docs track solver"
+  rule, S6 + S7 land together as one work unit.
 
 ## 11. Parallelization & subagents
 

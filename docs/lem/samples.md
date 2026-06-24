@@ -724,3 +724,38 @@ also SLOPE/W Verification Manual sec. 2.11.
 <!-- /fs-table -->
 
 <!-- test: file=files/xslope_arai_tagyo.xlsx, type=circular_search, num_slices=50, fs_oms=1.344, fs_bishop=1.404, fs_janbu=1.411, fs_corps=1.476, fs_lowe=1.438, fs_spencer=1.401, fs_mprice=1.400, benchmark=LEM-2b -->
+
+### 15. Rapid Drawdown (Johnson Reservoir Dam)
+
+This sample exercises XSLOPE's **rapid drawdown** capability — the three-stage
+procedure (Duncan, Wright & Brandon) for the *upstream* slope of an earth dam
+after the reservoir is lowered faster than the low-permeability zones can drain.
+The Johnson Reservoir dam is analyzed on its upstream design circle:
+
+- **Stage 1** — pre-drawdown stability with drained strengths and full-pool
+  (El. 160 ft) pore pressures.
+- **Stage 2** — post-drawdown stability with the interpolated undrained
+  strengths (the bilinear $d$, $\psi$ envelope on the core and foundation; the
+  shell is free-draining).
+- **Stage 3** — post-drawdown check with drained strengths and the lowered-pool
+  (El. 110 ft) pore pressures.
+
+The governing factor of safety is the **minimum of Stage 2 and Stage 3**. Pore
+pressures for both pool levels come from finite-element seepage solutions
+(`u = seep`), and the two reservoir levels are carried as the two distributed-load
+and seepage-boundary-condition sets that the rapid-drawdown wrapper swaps in per
+stage. See [Rapid Drawdown Analysis](rapid.md) for the methodology.
+
+The table reports the governing rapid-drawdown FS on the upstream circle by
+method. The complete-equilibrium methods agree closely (Spencer 1.646,
+Morgenstern-Price 1.649, and Bishop 1.649).
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.355 | 1.649 | 1.686 | 2.119 | 1.804 | 1.646 | 1.649 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.355, fs_bishop=1.649, fs_janbu=1.686, fs_corps=2.119, fs_lowe=1.804, fs_spencer=1.646, fs_mprice=1.649 -->

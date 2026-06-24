@@ -89,6 +89,8 @@ def compute_fs(params):
     file_rel = params["file"]
     test_type = params.get("type", "circular_search")
     num_slices = int(params.get("num_slices", 30))
+    # rapid=true -> 3-stage rapid-drawdown analysis (works with any test type).
+    rapid = str(params.get("rapid", "false")).strip().lower() in ("true", "1", "yes")
     path = os.path.join(os.path.dirname(SAMPLES_MD), file_rel)
 
     slope_data = load_slope_data(path)
@@ -109,13 +111,13 @@ def compute_fs(params):
                         results[short] = None
                         continue
                     slice_df, _ = res
-                    r = solve_selected(solver, slice_df)
+                    r = solve_selected(solver, slice_df, rapid=rapid)
                     results[short] = r["FS"] if isinstance(r, dict) else None
                 elif test_type == "noncircular_search":
-                    fs_cache, _, _ = noncircular_search(slope_data, solver, num_slices=num_slices)
+                    fs_cache, _, _ = noncircular_search(slope_data, solver, num_slices=num_slices, rapid=rapid)
                     results[short] = fs_cache[0]["FS"] if fs_cache and fs_cache[0]["FS"] < 9999 else None
                 else:  # circular_search
-                    fs_cache, _, _, _ = circular_search(slope_data, solver, num_slices=num_slices)
+                    fs_cache, _, _, _ = circular_search(slope_data, solver, num_slices=num_slices, rapid=rapid)
                     results[short] = fs_cache[0]["FS"] if fs_cache and fs_cache[0]["FS"] < 9999 else None
         except Exception as e:
             print(f"    ! {solver} failed on {file_rel}: {e}", file=sys.stderr)

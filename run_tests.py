@@ -101,6 +101,9 @@ def run_lem_test(test):
     test_type = test['type']
     method = test['method']
     num_slices = test.get('num_slices', 30)
+    # `rapid=true` runs the 3-stage rapid-drawdown analysis (needs the seep solution
+    # + dloads/seep-bc stage-2 data in the input). Works with any test type.
+    rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
 
     slope_data = load_slope_data(file_path)
 
@@ -110,14 +113,14 @@ def run_lem_test(test):
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
-        solver_result = solve_selected(method, slice_df)
+        solver_result = solve_selected(method, slice_df, rapid=rapid)
         if isinstance(solver_result, str):
             return None, f"solve failed: {solver_result}"
         return solver_result['FS'], None
 
     elif test_type == 'circular_search':
         fs_cache, converged, search_path, circle_cache = circular_search(
-            slope_data, method, num_slices=num_slices
+            slope_data, method, num_slices=num_slices, rapid=rapid
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "circular_search found no valid surface"
@@ -125,7 +128,7 @@ def run_lem_test(test):
 
     elif test_type == 'noncircular_search':
         fs_cache, converged, search_path = noncircular_search(
-            slope_data, method, num_slices=num_slices
+            slope_data, method, num_slices=num_slices, rapid=rapid
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "noncircular_search found no valid surface"

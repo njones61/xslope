@@ -17,7 +17,7 @@ from shapely.geometry import Polygon
 from xslope.fileio import load_slope_data, build_ground_surface_from_polygons
 from xslope.mesh import build_polygons
 from xslope.plot import plot_circular_search_results, plot_noncircular_search_results, plot_solution, plot_reliability_results, plot_inputs
-from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, solve_selected, solve_all
+from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, morgenstern_price, solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.advanced import reliability as reliability_analysis
@@ -25,7 +25,7 @@ from xslope.advanced import reliability as reliability_analysis
 slope_data = load_slope_data("docs/lem/files/xslope_acads_simple.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
-method = "bishop" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
+method = "bishop" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer","morgenstern_price"]
 # Bishop is used for the sweep: for simple circular surfaces it gives the same FS as
 # Spencer but stays fast at steep angles. Spencer cascades into an expensive scipy
 # fallback on steep/marginal circles, making each search 4-8x slower near beta2.

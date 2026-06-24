@@ -2,7 +2,7 @@ from xslope.global_config import non_circ
 
 from xslope.fileio import load_slope_data
 from xslope.plot import plot_circular_search_results, plot_noncircular_search_results
-from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
+from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, morgenstern_price
 from xslope.search import circular_search, noncircular_search
 
 
@@ -12,7 +12,8 @@ slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx
 # fs_cache, converged, search_path = noncircular_search(slope_data, 'corps_engineers', diagnostic=False)
 # plot_noncircular_search_results(slope_data, fs_cache, search_path)
 
-# For circular search:
+# For circular search (method can be any of: 'oms', 'bishop', 'janbu',
+# 'corps_engineers', 'lowe_karafiath', 'spencer', 'morgenstern_price'):
 fs_cache, converged, search_path = circular_search(slope_data, 'spencer', diagnostic=False)
 plot_circular_search_results(slope_data, fs_cache, search_path)
 

@@ -2,7 +2,7 @@ from xslope.global_config import non_circ
 
 from xslope.fileio import load_slope_data
 from xslope.plot import plot_circular_search_results, plot_noncircular_search_results, plot_solution, plot_reliability_results, plot_inputs
-from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, solve_selected, solve_all
+from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath, morgenstern_price, solve_selected, solve_all
 from xslope.search import circular_search, noncircular_search
 from xslope.slice import generate_slices
 from xslope.summary import print_ito_matsui_summary, print_rapid_drawdown_summary, print_no_solution_warning
@@ -11,7 +11,7 @@ from xslope.advanced import reliability as reliability_analysis
 slope_data = load_slope_data("docs/lem/files/xslope_sloping_bottom.xlsx")
 plot_inputs(slope_data, mode='lem', save_png=True)
 
-method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"]
+method = "spencer" # @param ["oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer","morgenstern_price"]
 num_slices = 40 # @param {"type":"integer"}
 analysis_type = "auto_search" # @param ["single_surface", "auto_search","reliability"]
 surface_type = "circular" # @param ["circular","non_circular"]

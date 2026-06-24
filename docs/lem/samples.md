@@ -751,15 +751,21 @@ Excel input file: [xslope_johnson_rapid_KEY.xlsx](files/xslope_johnson_rapid_KEY
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![johnson_rapid_inputs1.png](sample_images/johnson_rapid_inputs1.png)
+![johnson_rapid_inputs1.png](sample_images/johnson_rapid_inputs1.png){width=900}
 
 Solution (governing rapid-drawdown surface and factor of safety, Spencer's method):
 
-![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=700}
+![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=900}
 
 The table reports the governing rapid-drawdown FS on the upstream circle by
-method. The complete-equilibrium methods agree closely (Spencer 1.646,
-Morgenstern-Price 1.649, and Bishop 1.649).
+method. The two complete-equilibrium methods agree (Spencer 1.646,
+Morgenstern-Price 1.649), with Bishop — which satisfies moment but not full force
+equilibrium — close behind at 1.649. The Corps of Engineers (2.119) and
+Lowe-Karafiath (1.804) force-equilibrium methods read **substantially higher**
+here: as noted in the introduction, they are sensitive to the assumed
+interslice-force inclination, and the large pore pressures carried through the
+post-drawdown stages amplify that sensitivity, pushing the factor of safety well
+above the rigorous Spencer value.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
@@ -774,34 +780,51 @@ Morgenstern-Price 1.649, and Bishop 1.649).
 ### 16. Multiple Local Minima
 
 A two-layer slope — a **cohesionless embankment** ($c' = 0$, $\phi' = 30°$) over a
-**stiff clay foundation** ($c = 450$ psf, $\phi = 0$) — that illustrates how the
-critical circle depends on where the search is seeded. The factor of safety below
-is for the embankment circle specified in the input (tangent to the top of the
-foundation). A circle seeded deep in the foundation converges to a *different*
-local minimum, and because the embankment is cohesionless a free automated search
-is drawn toward the shallow infinite-slope limit ($F = \tan\phi'/\tan\beta \approx
-1.3$, a near-planar sliver). The lesson: seed the search from several depths and
-compare, rather than trusting a single starting circle.
+**soft clay foundation** ($c = 450$ psf, $\phi = 0$) — with two competing failure
+mechanisms that a single automated search can easily confuse.
+
+Because the embankment is cohesionless, a free search collapses onto the
+**degenerate infinite-slope limit**: a vanishingly shallow, near-planar sliver high
+on the slope face with $F = \tan\phi'/\tan\beta \approx 1.30$. The search figure
+below shows it — every tested circle shrinks toward the face and the "critical"
+surface (red) is a tiny sliver carrying essentially no sliding mass. It is a
+mathematical artifact, not a design-relevant failure.
+
+The engineering-critical mechanism is the **deep foundation failure**. Seeding a
+circle **tangent to the limiting depth** (the base of the soft foundation,
+$y = -20$) finds it: a deep circle through the clay with $FS \approx 1.43$. This is
+the global minimum among physical surfaces — and it is *lower* than any shallow
+embankment circle, so a search that stops at the sliver is both non-physical and
+unconservative for the foundation. The lesson: on a cohesionless-over-soft-foundation
+profile, never trust a single free search — seed circles tangent to each candidate
+failure depth and compare.
 
 Excel input file: [xslope_mult_min_KEY.xlsx](files/xslope_mult_min_KEY.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![mult_min_inputs1.png](sample_images/mult_min_inputs1.png)
+![mult_min_inputs1.png](sample_images/mult_min_inputs1.png){width=900}
 
-Solution (specified embankment circle, Spencer's method):
+Degenerate infinite-slope search — a free search collapses to a near-planar sliver
+near the crest (critical circle in red, $FS \approx 1.30$):
 
-![mult_min_results1.png](sample_images/mult_min_results1.png){width=700}
+![mult_min_degenerate.png](sample_images/mult_min_degenerate.png){width=900}
+
+Global minimum — the deep foundation failure found from a circle tangent to the
+limiting depth (Spencer's method). All methods are evaluated on this same deep
+circle:
+
+![mult_min_results1.png](sample_images/mult_min_results1.png){width=900}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.666 | 1.784 | 1.727 | 1.813 | 1.795 | 1.784 | 1.784 |
+| 1.354 | 1.434 | 1.417 | 1.719 | 1.524 | 1.426 | 1.431 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.666, fs_bishop=1.784, fs_janbu=1.727, fs_corps=1.813, fs_lowe=1.795, fs_spencer=1.784, fs_mprice=1.784 -->
+<!-- test: file=files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.354, fs_bishop=1.434, fs_janbu=1.417, fs_corps=1.719, fs_lowe=1.524, fs_spencer=1.426, fs_mprice=1.431 -->
 
 ### 17. Tension Crack
 
@@ -820,11 +843,11 @@ Excel input file: [xslope_tension_KEY.xlsx](files/xslope_tension_KEY.xlsx)
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![tension_inputs1.png](sample_images/tension_inputs1.png)
+![tension_inputs1.png](sample_images/tension_inputs1.png){width=900}
 
 Solution (critical surface with the tension crack, Spencer's method):
 
-![tension_results1.png](sample_images/tension_results1.png){width=700}
+![tension_results1.png](sample_images/tension_results1.png){width=900}
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):

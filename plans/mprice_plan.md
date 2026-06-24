@@ -678,10 +678,13 @@ work that can run in parallel with the core is in §11.
   `noncircular_search` call it via `getattr(solve, method)` exactly like Spencer
   (confirmed: acads_simple circular_search critical FS=0.984). Verified `solve_all`,
   `solve_selected`, and `plot_solution` end-to-end on circular + non-circular.
-  **One deferred diagnostic:** the M-P **line of thrust** (`yt_l`/`yt_r`, option-b
-  recurrence) is not computed yet; `plot_solution` is already wired to draw it and
-  skips gracefully until it exists — a post-process nicety, not blocking M-P as a
-  first-class method.
+- **Line of thrust DONE (2026-06-24).** `_mp_line_of_thrust` generalizes Spencer's
+  per-slice moment recurrence (eqs 68-69) to a per-boundary θ, using the march's
+  `Z` and the same external-load `Mo` + right-facing reflection Spencer uses; for a
+  constant θ it reduces exactly to Spencer's. Stored as `yt_l`/`yt_r` and drawn by
+  `plot_solution`. Validated: for `f(x)=1` it reproduces Spencer's thrust line to
+  ~1e-6–1e-11 across left/right-facing, piles, reinforcement, submerged, and
+  non-circular.
 
 **S7 — Documentation.**
 - *Deliverable:*

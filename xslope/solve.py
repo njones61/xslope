@@ -1536,7 +1536,142 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     return True, results
 
 
+def _mp_f_vals(slice_df, f_type):
+    """Interslice-force shape function f evaluated at each slice BOUNDARY.
+
+    The boundaries are x_b = [x_l[0], x_r[0], ..., x_r[n-1]] (length n+1), and the
+    normalized position is s_j = (x_b[j] - x_L) / (x_R - x_L) in [0, 1]. Only the
+    SHAPE of f matters (tan θ = λ·f, so scaling f just rescales λ), so each is
+    normalized to a unit peak by convention.
+
+    v1 library:
+        'constant'  -> f = 1            (recovers Spencer; the regression case)
+        'half_sine' -> f = sin(π s)     (textbook / GeoStudio default; f=0 at ends)
+    """
+    x_l = slice_df['x_l'].values.astype(float)
+    x_r = slice_df['x_r'].values.astype(float)
+    x_b = np.concatenate([[x_l[0]], x_r])           # boundary x-coords, length n+1
+    span = x_b[-1] - x_b[0]
+    s = (x_b - x_b[0]) / span if span != 0 else np.zeros_like(x_b)
+    if f_type == 'constant':
+        return np.ones_like(s)
+    elif f_type == 'half_sine':
+        return np.sin(np.pi * s)
+    else:
+        raise ValueError(f"unknown f_type {f_type!r} (use 'constant' or 'half_sine')")
 
 
+def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
+                      max_iter=50, lambda_bracket=(-1.5, 1.5), debug_level=0):
+    """Morgenstern-Price complete-equilibrium method (Approach A: F_f / F_m crossing).
+
+    M-P satisfies BOTH force and moment equilibrium with a VARIABLE interslice-force
+    inclination: ``tan(θ_j) = λ · f(x_j)``, where ``f`` is a prescribed shape
+    function (see `_mp_f_vals`) and ``λ`` a scalar. Spencer is the special case
+    ``f ≡ 1`` (then ``θ = arctan λ`` is constant).
+
+    Approach A (Fredlund-Krahn / GLE style): for each ``λ`` find
+        ``F_f(λ)`` = the FS root of the force residual  (Z[n] = 0), and
+        ``F_m(λ)`` = the FS root of the moment residual (moment about origin = 0),
+    then find ``λ*`` where ``F_f = F_m``. The crossing FS is the M-P factor of
+    safety; ``λ*`` fixes the interslice-force distribution. Both residuals come from
+    `_mp_march`.
+
+    Parameters:
+        f_type: 'constant' (== Spencer regression) or 'half_sine' (design default).
+        lambda_bracket: search interval for ``λ`` (sign change of ``F_f − F_m``).
+    Returns:
+        (True, {'method','FS','lambda','f_type','theta'(deg, per boundary, n+1)})
+        or (False, message).
+
+    NOTE: right-facing slopes are not yet handled (S3b); they return a clear
+    message rather than a wrong number.
+    """
+    from scipy.optimize import brentq
+
+    n = len(slice_df)
+    if n < 2:
+        return False, "Morgenstern-Price needs at least 2 slices."
+
+    # Facing detection mirrors spencer(); right-facing convention is finalized in S3b.
+    y_ct = slice_df['y_ct'].values
+    if y_ct[0] > y_ct[-1]:
+        return False, ("Morgenstern-Price: right-facing surfaces are not yet "
+                       "supported (pending S3b); see plans/mprice_plan.md.")
+
+    try:
+        f_vals = _mp_f_vals(slice_df, f_type)
+    except ValueError as e:
+        return False, str(e)
+
+    # Seed FS from Bishop where possible (as Spencer does), else fs_guess.
+    seed = fs_guess
+    try:
+        ok_b, res_b = bishop(slice_df)
+        if ok_b:
+            seed = res_b['FS']
+    except Exception:
+        pass
+
+    def F_f(lam, s):
+        """Force-equilibrium FS at this λ: the FS root of `force_res` (= Z[n]). The
+        force residual is monotonic in FS, so this root is unique and well-behaved —
+        no branch-jumping (unlike the moment-only FS, which is multivalued)."""
+        return newton(lambda FS: _mp_march(slice_df, lam, f_vals, FS)[2],
+                      s, tol=tol, maxiter=max_iter)
+
+    def h(lam):
+        """Moment residual evaluated AT the force-equilibrium FS for this λ:
+        ``h(λ) = moment_res(F_f(λ), λ)``. This is the key to a robust Approach A.
+        `F_f(λ)` is smooth and single-valued, so `h` is a SMOOTH scalar function of λ
+        alone whose root is the M-P solution (where force AND moment both close) — it
+        sidesteps the multivalued moment-only FS curve `F_m(λ)` (and its asymptote)
+        entirely. (This curve search is the slow-but-robust reference path; the
+        Approach-B Newton, S5, is the fast path.)"""
+        return _mp_march(slice_df, lam, f_vals, F_f(lam, seed))[3]
+
+    lo, hi = lambda_bracket
+    grid = np.linspace(lo, hi, 61)
+    hv = []
+    for lam in grid:
+        try:
+            hv.append(h(lam))
+        except Exception:
+            hv.append(np.nan)
+    hv = np.array(hv)
+
+    crossings = []
+    for i in range(len(grid) - 1):
+        a, b = hv[i], hv[i + 1]
+        if np.isfinite(a) and np.isfinite(b) and a * b <= 0 and not (a == 0 and b == 0):
+            try:
+                crossings.append(brentq(h, grid[i], grid[i + 1], xtol=1e-9, maxiter=100))
+            except Exception:
+                pass
+    if not crossings:
+        return False, ("Morgenstern-Price: no F_f/F_m crossing found in "
+                       f"λ ∈ [{lo}, {hi}].")
+    lam_star = min(crossings, key=abs)   # physical crossing is the one nearest λ=0
+
+    # Final solution at λ*: FS = F_f(λ*); recover N, Z, θ for output.
+    FS = F_f(lam_star, seed)
+    N, Z, force_res, moment_res = _mp_march(slice_df, lam_star, f_vals, FS)
+    theta_deg = np.degrees(np.arctan(lam_star * f_vals))   # per boundary, length n+1
+
+    slice_df['n_eff'] = N
+    slice_df['z'] = Z[:-1]
+    slice_df['theta'] = theta_deg[1:]   # right-boundary interslice angle per slice
+
+    if debug_level >= 1:
+        print(f"Morgenstern-Price ({f_type}): FS = {FS:.5f}, λ = {lam_star:.5f}, "
+              f"force_res = {force_res:.2e}, moment_res = {moment_res:.2e}")
+
+    return True, {
+        'method': 'morgenstern_price',
+        'FS': FS,
+        'lambda': lam_star,
+        'f_type': f_type,
+        'theta': theta_deg,
+    }
 
 

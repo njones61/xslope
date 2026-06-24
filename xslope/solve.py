@@ -670,6 +670,120 @@ def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta
     return N, Z
 
 
+def _moment_about_origin(N, FS, *, x_c, y_cg, y_cb, alpha, c, phi, dl, u, w,
+                         D, beta, d_x, d_y, kw, V, y_t, P, H_pile, theta_p,
+                         x_pile, y_pile):
+    """Moment of the WHOLE sliding mass about the origin (0,0), CCW positive.
+
+    This is the Morgenstern-Price moment residual (plan §4a). Its root in `FS` at a
+    fixed interslice-force distribution is `F_m`. The moment of a force with global
+    components `(F_x, F_y)` acting at `(x, y)` is `M = x·F_y − y·F_x`.
+
+    The interslice forces are INTERNAL: on the whole mass they cancel exactly (equal
+    and opposite on each shared boundary), regardless of `λ` or the thrust line, so
+    they do not appear here — that is what lets us sum about the origin without
+    knowing the line of thrust.
+
+    All angle arrays are in RADIANS. `N` is the EFFECTIVE base normal from the
+    march; the total base reaction for its moment arm is `N + u·dl` (effective +
+    pore uplift, plan §4a rows 2/2b), and the mobilized base shear is
+    `S = (c·dl + N·tanφ)/FS`.
+
+    Per-slice terms (summed), each straight from the §4a table:
+        weight W        →  −W·x_c
+        normal N′+U     →  (N + u·dl)·(x_c·cosα + y_cb·sinα)
+        base shear S    →  S·(x_c·sinα − y_cb·cosα)
+        surface load D  →  −D·(d_x·cosβ + d_y·sinβ)
+        seismic kW      →  kW·y_cg
+        tension water V →  V·y_t
+        reinforcement R →  R·(x_c·sinα − y_cb·cosα)
+        pile H          →  H·(x_pile·sinθ_p − y_pile·cosθ_p)
+
+    SIGN/RIGHT-FACING: convention-agnostic — it uses whatever arrays it is given.
+    Facing is handled by the caller (see `_mp_march`); this keeps the math one place.
+    """
+    sa, ca = np.sin(alpha), np.cos(alpha)
+    sb, cb = np.sin(beta), np.cos(beta)
+    S = (c * dl + N * np.tan(phi)) / FS          # mobilized base shear (N is effective)
+    M = (
+        -w * x_c                                  # weight (0,−W) at (x_c, y_cg)
+        + (N + u * dl) * (x_c * ca + y_cb * sa)   # total normal N′+U at (x_c, y_cb)
+        + S * (x_c * sa - y_cb * ca)              # base shear at (x_c, y_cb)
+        - D * (d_x * cb + d_y * sb)               # surface load at (d_x, d_y)
+        + kw * y_cg                               # seismic (horizontal) at y_cg
+        + V * y_t                                 # tension-crack water (horiz) at y_t
+        + P * (x_c * sa - y_cb * ca)              # reinforcement (∥ base) at (x_c, y_cb)
+        + H_pile * (x_pile * np.sin(theta_p) - y_pile * np.cos(theta_p))  # pile
+    )
+    return float(np.sum(M))
+
+
+def _mp_march(slice_df, lam, f_vals, FS, right_facing=False):
+    """Morgenstern-Price per-slice march at a fixed `(λ, FS)`.
+
+    Forms the per-boundary interslice inclinations `θ_j = arctan(λ·f_vals_j)` (the
+    M-P assumption `tan θ = λ·f(x)`), runs the shared `_equilibrium_march` for the
+    base normals `N` and interslice forces `Z`, and forms the two global residuals:
+
+        force_res  = Z[n]                          → 0 at force equilibrium
+        moment_res = _moment_about_origin(...)     → 0 at moment equilibrium
+
+    Returns `(N, Z, force_res, moment_res)`. It does NOT root-find — Approach A
+    (S3) / Approach B (S5) drive `(FS, λ)` to zero BOTH residuals; their common zero
+    is the M-P solution.
+
+    `f_vals` has length n+1 (evaluated at each slice boundary). With `f_vals ≡ 1`
+    this is Spencer (`θ = arctan λ`, constant) — the make-or-break regression (S3).
+
+    RIGHT-FACING is finalized and validated in S3 (the `f(x)=1 == Spencer` gate run
+    on a right-facing geometry, per the sign note on `_equilibrium_march`). It is
+    deliberately not implemented here yet so S2 lands the moment math, fully
+    unit-checked, on the unambiguous left-facing convention.
+    """
+    n = len(slice_df)
+    f_vals = np.asarray(f_vals, dtype=float)
+    if len(f_vals) != n + 1:
+        raise ValueError(f"f_vals length ({len(f_vals)}) must be n+1 ({n+1})")
+    if right_facing:
+        raise NotImplementedError(
+            "right-facing Morgenstern-Price is finalized in S3 (the f(x)=1 == "
+            "Spencer gate on a right-facing geometry); see plans/mprice_plan.md.")
+
+    # Per-slice arrays (angles → radians), matching _equilibrium_march's inputs.
+    alpha = np.radians(slice_df['alpha'].values)
+    phi   = np.radians(slice_df['phi'].values)
+    c     = slice_df['c'].values.astype(float)
+    w     = slice_df['w'].values.astype(float)
+    u     = slice_df['u'].values.astype(float)
+    dl    = slice_df['dl'].values.astype(float)
+    D     = slice_df['dload'].values.astype(float)
+    beta  = np.radians(slice_df['beta'].values)
+    kw    = slice_df['kw'].values.astype(float)
+    V     = slice_df['t'].values.astype(float)        # tension-crack water (= T in the force march)
+    P     = slice_df['p'].values.astype(float)
+    H_pile  = slice_df['h_pile'].values.astype(float)  if 'h_pile'  in slice_df.columns else np.zeros(n)
+    theta_p = slice_df['theta_p'].values.astype(float) if 'theta_p' in slice_df.columns else np.zeros(n)
+    # Geometry for the moment arms.
+    x_c   = slice_df['x_c'].values.astype(float)
+    y_cg  = slice_df['y_cg'].values.astype(float)
+    y_cb  = slice_df['y_cb'].values.astype(float)
+    d_x   = slice_df['d_x'].values.astype(float)
+    d_y   = slice_df['d_y'].values.astype(float)
+    y_t   = slice_df['y_t'].values.astype(float)
+    x_pile = slice_df['x_pile'].values.astype(float) if 'x_pile' in slice_df.columns else np.zeros(n)
+    y_pile = slice_df['y_pile'].values.astype(float) if 'y_pile' in slice_df.columns else np.zeros(n)
+
+    theta = np.arctan(lam * f_vals)               # M-P: tan θ = λ·f at each boundary
+    N, Z = _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, V, P,
+                              H_pile, theta_p, theta, FS)
+    force_res = Z[n]
+    moment_res = _moment_about_origin(
+        N, FS, x_c=x_c, y_cg=y_cg, y_cb=y_cb, alpha=alpha, c=c, phi=phi, dl=dl,
+        u=u, w=w, D=D, beta=beta, d_x=d_x, d_y=d_y, kw=kw, V=V, y_t=y_t, P=P,
+        H_pile=H_pile, theta_p=theta_p, x_pile=x_pile, y_pile=y_pile)
+    return N, Z, force_res, moment_res
+
+
 def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False, right_facing=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.

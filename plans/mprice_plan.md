@@ -589,6 +589,18 @@ work that can run in parallel with the core is in §11.
 - *Deliverable:* `moment_res` populated in the march from the §4a table.
 - *Depends-on:* S1. *Exit:* each of the 8 terms unit-checked in isolation (sign +
   arm) against §4a; assembled `moment_res` finite on a sample surface.
+- **Status (2026-06-24): DONE.** Added `_moment_about_origin(...)` (the §4a sum,
+  convention-agnostic — uses whatever arrays it's given) and
+  `_mp_march(slice_df, lam, f_vals, FS) -> (N, Z, force_res, moment_res)`
+  (left-facing; builds `θ=arctan(λ·f)`, runs `_equilibrium_march`, then the moment
+  sum). `right_facing=True` raises `NotImplementedError` (finalized in S3). All 8
+  moment terms unit-checked to 1e-9 in isolation (sign + arm). **Bonus result that
+  de-risks S3:** at Spencer's solution on a left-facing benchmark (acads_simple,
+  FS=1.4462, θ=15.35°) with `f≡1`, `λ=tan θ`, BOTH residuals vanish to numerical
+  precision (`force_res≈2e-8`, `moment_res≈-6e-7` vs a moment scale ~1.8e5, i.e.
+  ~3e-12 relative). So the `f(x)=1 ≡ Spencer` *formulation* is already confirmed for
+  left-facing — S3's left-facing gate should pass immediately; only the right-facing
+  convention remains to work out and validate.
 
 **S3 — Approach A + the Spencer gate.**
 - *Deliverable:* `F_f(λ)`, `F_m(λ)` root-finds and the `λ` crossing; the `F`-vs-`λ`

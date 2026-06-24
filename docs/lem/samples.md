@@ -746,6 +746,17 @@ pressures for both pool levels come from finite-element seepage solutions
 and seepage-boundary-condition sets that the rapid-drawdown wrapper swaps in per
 stage. See [Rapid Drawdown Analysis](rapid.md) for the methodology.
 
+Excel input file: [xslope_johnson_rapid_KEY.xlsx](files/xslope_johnson_rapid_KEY.xlsx)
+(the seepage mesh and the two seep solutions are bundled alongside it).
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![johnson_rapid_inputs1.png](sample_images/johnson_rapid_inputs1.png)
+
+Solution (governing rapid-drawdown surface and factor of safety, Spencer's method):
+
+![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=700}
+
 The table reports the governing rapid-drawdown FS on the upstream circle by
 method. The complete-equilibrium methods agree closely (Spencer 1.646,
 Morgenstern-Price 1.649, and Bishop 1.649).
@@ -759,3 +770,68 @@ Morgenstern-Price 1.649, and Bishop 1.649).
 <!-- /fs-table -->
 
 <!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.355, fs_bishop=1.649, fs_janbu=1.686, fs_corps=2.119, fs_lowe=1.804, fs_spencer=1.646, fs_mprice=1.649 -->
+
+### 16. Multiple Local Minima
+
+A two-layer slope — a **cohesionless embankment** ($c' = 0$, $\phi' = 30°$) over a
+**stiff clay foundation** ($c = 450$ psf, $\phi = 0$) — that illustrates how the
+critical circle depends on where the search is seeded. The factor of safety below
+is for the embankment circle specified in the input (tangent to the top of the
+foundation). A circle seeded deep in the foundation converges to a *different*
+local minimum, and because the embankment is cohesionless a free automated search
+is drawn toward the shallow infinite-slope limit ($F = \tan\phi'/\tan\beta \approx
+1.3$, a near-planar sliver). The lesson: seed the search from several depths and
+compare, rather than trusting a single starting circle.
+
+Excel input file: [xslope_mult_min_KEY.xlsx](files/xslope_mult_min_KEY.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![mult_min_inputs1.png](sample_images/mult_min_inputs1.png)
+
+Solution (specified embankment circle, Spencer's method):
+
+![mult_min_results1.png](sample_images/mult_min_results1.png){width=700}
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.666 | 1.784 | 1.727 | 1.813 | 1.795 | 1.784 | 1.784 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.666, fs_bishop=1.784, fs_janbu=1.727, fs_corps=1.813, fs_lowe=1.795, fs_spencer=1.784, fs_mprice=1.784 -->
+
+### 17. Tension Crack
+
+A slope whose upper layer has cohesion, so an unmodified analysis produces
+non-physical **tension at the crest** (and an inverted line of thrust) that
+unconservatively raises the factor of safety. The remedy is a **tension crack** at
+the top of the slope, whose depth follows
+$d_{crack} = \dfrac{2 c_d}{\gamma}\tan\!\left(45 + \dfrac{\phi_d}{2}\right)$ with the
+mobilized strengths $c_d = c/F$, $\tan\phi_d = \tan\phi / F$. Because the crack
+depth depends on $F$, it is iterated to convergence; this model carries the
+converged depth (`tcrack_depth` = 4.5 ft on the **main** sheet), at which the crest
+tension just vanishes. The complete-equilibrium methods agree (Spencer and
+Morgenstern-Price both 1.414, matching Bishop).
+
+Excel input file: [xslope_tension_KEY.xlsx](files/xslope_tension_KEY.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![tension_inputs1.png](sample_images/tension_inputs1.png)
+
+Solution (critical surface with the tension crack, Spencer's method):
+
+![tension_results1.png](sample_images/tension_results1.png){width=700}
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.413 | 1.414 | 1.453 | 1.673 | 1.544 | 1.414 | 1.414 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.453, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->

@@ -56,20 +56,20 @@ def capture(path, fn, *args, **kwargs):
     print("wrote", path)
 
 
-def search(sd, ttype, num_slices):
+def search(sd, ttype, num_slices, rapid=False):
     """Return (crit, fs_cache, search_path, circle_cache) for the problem."""
     with contextlib.redirect_stdout(io.StringIO()):
         if ttype == "single_circle":
             ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=num_slices)
             slice_df, surface = res
-            result = solve_selected(METHOD, slice_df)
+            result = solve_selected(METHOD, slice_df, rapid=rapid)
             crit = {"slices": slice_df, "failure_surface": surface, "solver_result": result}
             return crit, None, None, None
         elif ttype == "noncircular_search":
-            fs_cache, _, path = noncircular_search(sd, METHOD, num_slices=num_slices, diagnostic=False)
+            fs_cache, _, path = noncircular_search(sd, METHOD, num_slices=num_slices, diagnostic=False, rapid=rapid)
             return fs_cache[0], fs_cache, path, None
         else:
-            fs_cache, _, path, circ = circular_search(sd, METHOD, num_slices=num_slices, diagnostic=False)
+            fs_cache, _, path, circ = circular_search(sd, METHOD, num_slices=num_slices, diagnostic=False, rapid=rapid)
             return fs_cache[0], fs_cache, path, circ
 
 
@@ -87,13 +87,14 @@ def main():
         xlsx = os.path.join(IMG_DIR, params["file"])
         ttype = params.get("type", "circular_search")
         num_slices = int(params.get("num_slices", 40))
+        rapid = str(params.get("rapid", "false")).strip().lower() in ("true", "1", "yes")
         # RESULT_RE also matches *_search_results* (they contain "_results"); drop those.
         results = [r for r in RESULT_RE.findall(segment) if "search_results" not in r]
         searches = SEARCH_RE.findall(segment)
         if not results and not searches:
             continue
         sd = load_slope_data(xlsx)
-        crit, fs_cache, path, circ = search(sd, ttype, num_slices)
+        crit, fs_cache, path, circ = search(sd, ttype, num_slices, rapid)
         for name in searches:
             out = f"{IMG_DIR}/sample_images/{name}.png"
             if ttype == "noncircular_search":

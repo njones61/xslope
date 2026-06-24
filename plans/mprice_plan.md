@@ -759,6 +759,14 @@ work that can run in parallel with the core is in §11.
   clean **and the page is reachable from the nav**; `overview.md` shows M-P in the
   table + guidance + code lists; the regression passes. Per the "docs track solver"
   rule, S6 + S7 land together as one work unit.
+- **Status (2026-06-24): DONE ✅.** Created `docs/lem/mprice.md` (Spencer-style
+  derivation: interslice function `λ f(x)`, the per-slice force march, moment about
+  the origin with the term-by-term table, the `F_f`/`F_m` two-curve solution + the
+  generated `F`-vs-`λ` figure, the admissibility guard, the f(x)-insensitivity note,
+  and the line of thrust). Added the `mkdocs.yml` nav entry after Spencer; folded M-P
+  into `overview.md` (description, comparison-table row, design guidance, both method
+  lists). verification.md rows and the `fs_mprice` sample tags were already in.
+  `mkdocs build` clean; the page is reachable from the nav. **All S0–S7 complete.**
 
 ## 11. Parallelization & subagents
 

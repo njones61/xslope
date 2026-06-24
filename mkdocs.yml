@@ -41,6 +41,7 @@ nav:
     - Janbu Method: lem/janbu.md
     - Force Equilibrium Methods: lem/force_eq.md
     - Spencer's Method: lem/spencer.md
+    - Morgenstern–Price Method: lem/mprice.md
     - Piles and Concrete Piers: lem/piles.md
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md

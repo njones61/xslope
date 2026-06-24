@@ -187,6 +187,17 @@ handle both circular and non-circular failure surfaces. However, this accuracy c
 most complex to implement, requires an iterative solution, and is computationally intensive. Spencer's method is 
 generally considered the best and most accurate of the methods supported in XSLOPE. 
 
+**Morgenstern–Price Method:** [Morgenstern–Price](mprice.md) is the most general 
+complete-equilibrium method and the parent of Spencer's method. It also satisfies 
+force and moment equilibrium on both circular and non-circular surfaces, but instead 
+of a single constant interslice inclination it lets the inclination vary along the 
+surface as $\tan\theta(x) = \lambda\,f(x)$, where $f(x)$ is a prescribed interslice 
+force function (XSLOPE offers a constant function — which reproduces Spencer exactly — 
+and a half-sine, the textbook default). The computed factor of safety is famously 
+insensitive to the choice of $f(x)$, so in practice Morgenstern–Price and Spencer 
+agree very closely; Morgenstern–Price is the method to use when you want to match a 
+named $f(x)$ convention (for example, GeoStudio SLOPE/W's half-sine default). 
+
 The primary features of the limit equilibrium methods supported in XSLOPE are summarized in the table below:
 
 | Method | Equilibrium Conditions                       | Failure Surface | Iterative Solution | Interslice Forces |
@@ -196,11 +207,12 @@ The primary features of the limit equilibrium methods supported in XSLOPE are su
 | Bishop's Simplified Procedure | Overall Moment, $\Sigma F_y=0$               | Circular | Yes | None |
 | Corps Engineers | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Horizontal |
 | Lowe-Karafiath | $\Sigma F_x=0$, $\Sigma F_y=0$               | Circular/Non-Circular | Yes | Average of Slope and Surface Angles |
-| Spencer's Method | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Explicit |
+| Spencer's Method | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Constant inclination |
+| Morgenstern–Price | $\Sigma F_x=0$, $\Sigma F_y=0$, $\Sigma M=0$ | Circular/Non-Circular | Yes | Variable inclination $\lambda f(x)$ |
 
 ### Choosing a method
 
-For design, use a method that satisfies all conditions of equilibrium: **Spencer's method** is the recommended choice in XSLOPE and applies to both circular and non-circular surfaces. **Bishop's Simplified Method** is a dependable alternative on circular surfaces — it usually agrees closely with Spencer — and a convenient check on it. The remaining methods are best treated as comparisons rather than the basis for design: the **Ordinary Method of Slices** is a conservative, largely educational baseline; **Simplified Janbu** and the **force-equilibrium methods** (Corps of Engineers, Lowe-Karafiath) are approximate and, because they do not satisfy moment equilibrium, can be inaccurate — the force-equilibrium result is especially sensitive to the assumed side-force inclination. This mirrors the guidance in the USACE *Slope Stability* manual (EM 1110-2-1902), which cautions that methods not satisfying all conditions of equilibrium "may involve significant inaccuracies and should be used only under the restricted conditions described herein."
+For design, use a method that satisfies all conditions of equilibrium: **Spencer's method** is the recommended choice in XSLOPE and applies to both circular and non-circular surfaces. The **Morgenstern–Price method** is its more general form and is equally suitable — the two agree very closely, and Morgenstern–Price is preferred when you need to match a particular interslice force function (such as SLOPE/W's half-sine). **Bishop's Simplified Method** is a dependable alternative on circular surfaces — it usually agrees closely with Spencer — and a convenient check on it. The remaining methods are best treated as comparisons rather than the basis for design: the **Ordinary Method of Slices** is a conservative, largely educational baseline; **Simplified Janbu** and the **force-equilibrium methods** (Corps of Engineers, Lowe-Karafiath) are approximate and, because they do not satisfy moment equilibrium, can be inaccurate — the force-equilibrium result is especially sensitive to the assumed side-force inclination. This mirrors the guidance in the USACE *Slope Stability* manual (EM 1110-2-1902), which cautions that methods not satisfying all conditions of equilibrium "may involve significant inaccuracies and should be used only under the restricted conditions described herein."
 
 ## Automated Search for the Critical Factor of Safety 
 
@@ -261,7 +273,7 @@ from xslope.plot import plot_inputs
 
 # Analysis inputs — edit these for your problem
 file_name = "input_template.xlsx"   # path to your completed Excel input file
-method = "spencer"                  # oms, bishop, janbu, corps, lowe, spencer
+method = "spencer"                  # oms, bishop, janbu, corps, lowe, spencer, mprice
 num_slices = 40
 rapid_drawdown = False              # True for a rapid-drawdown analysis
 surface_type = "circular"           # "circular" or "non-circular"
@@ -281,7 +293,7 @@ selected failure surface or perform an exhaustive search to find the surface wit
 safety. If you are performing a single analysis, your first build a set of slices using the 'generate_slices' function. 
 This function takes the slope data and the failure surface you want to analyze as inputs and returns a set of 
 slices in a pandas DataFrame. These slices are then passed to the 'solve_selected' function along with a string 
-defining the method to be used ("oms","bishop","janbu","corps","lowe","spencer"). This function 
+defining the method to be used ("oms","bishop","janbu","corps","lowe","spencer","mprice"). This function 
 returns a dictionary containing the results of the analysis which can then be plotted using the 'plot_solution' 
 function. For example:
 

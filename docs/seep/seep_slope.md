@@ -328,3 +328,44 @@ Finally, the same Excel file and the corresponding mesh and seepage solution fil
 <!-- test: file=files/xslope_johnson_res.xlsx, type=fem_ssrm, expected_fs=1.29, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=4000 -->
 
 The deformed mesh and displacement vectors show a deep-seated mechanism through the embankment and into the foundation, consistent with the critical circle found by the LEM search. The FEM factor of safety of 1.29 agrees with the Spencer's method result of 1.25 to within about 3% — typical of the agreement between SSRM and a well-converged limit equilibrium solution when both use the same strength and pore pressure inputs. Since neither method depends on the other (the LEM prescribes a circular surface, while the FEM develops the failure mechanism from the stress field alone), this agreement provides a strong mutual check on the combined seepage and slope stability workflow.
+
+## Piezometric Line vs. Seepage-Derived Pore Pressures
+
+The pore pressures that drive a slope stability analysis can be supplied two ways: from a **piezometric line** (a hand-drawn phreatic surface, $u = \gamma_w h_p$) or **interpolated from a finite-element seepage solution**. The two are not equivalent — a piezometric line is a simplified estimate of the phreatic surface, while the seepage solution honors the actual flow field and the material permeabilities. The right-facing slope below (a three-layer silt / sand / clay profile from the method-of-slices exercises) is solved both ways on the **same single circle** ($X_0 = 175$, $Y_0 = 100$, tangent to the foundation), so the only thing that changes between the two runs is the pore-pressure model.
+
+### Part a — Piezometric line
+
+All three materials use the `piezo` pore-pressure option, with the phreatic surface entered on the **piezo** sheet.
+
+Excel input file: [xslope_rface_PIEZO_KEY.xlsx](files/xslope_rface_PIEZO_KEY.xlsx)
+
+![rface_piezo_inputs.png](images/rface_piezo_inputs.png){width=900}
+
+![rface_piezo_results.png](images/rface_piezo_results.png){width=900}
+
+Spencer's method gives **FS = 1.94**.
+
+<!-- test: file=files/xslope_rface_PIEZO_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.298, fs_bishop=1.928, fs_janbu=1.716, fs_corps=2.649, fs_lowe=2.105, fs_spencer=1.943, fs_mprice=1.943 -->
+
+### Part b — Seepage-derived pore pressures
+
+The same model is re-run with all three materials switched to the `seep` option. A finite-element seepage analysis (specified head $H = 80$ ft upstream, exit face downstream) is run first; its mesh and nodal pore pressures are bundled with the Excel file, imported automatically, and interpolated to each slice base.
+
+Excel input file (mesh and seepage solution bundled alongside): [xslope_rface_SEEP_KEY.xlsx](files/xslope_rface_SEEP_KEY.xlsx)
+
+![rface_seep_inputs.png](images/rface_seep_inputs.png){width=900}
+
+![rface_seep_results.png](images/rface_seep_results.png){width=900}
+
+Spencer's method gives **FS = 2.08**.
+
+<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.473, fs_bishop=2.068, fs_janbu=1.863, fs_corps=2.798, fs_lowe=2.258, fs_spencer=2.080, fs_mprice=2.081 -->
+
+### Comparison
+
+| Pore-pressure model | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|:--|--:|--:|--:|--:|--:|--:|--:|
+| Piezometric line | 1.298 | 1.928 | 1.716 | 2.649 | 2.105 | 1.943 | 1.943 |
+| Seepage | 1.473 | 2.068 | 1.863 | 2.798 | 2.258 | 2.080 | 2.081 |
+
+For this slope the piezometric line implies somewhat higher pore pressures than the seepage solution over the body of the slope, so it returns a modestly **lower (more conservative)** factor of safety — the two agree within about 7%, consistently across all methods. The difference is not always this small, nor always in this direction: where seepage is routed through the more permeable layers and exits along the downstream face, the computed pore pressures near the toe can be far higher than any reasonable piezometric line, dropping the factor of safety dramatically (a near-toe uplift failure). That is exactly why a seepage analysis is preferred whenever seepage is actually occurring.

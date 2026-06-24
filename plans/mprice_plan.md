@@ -660,9 +660,18 @@ work that can run in parallel with the core is in §11.
   multivalued moment-only branch. `morgenstern_price(..., solver=)`: `'auto'`
   (default) runs B then falls back to the robust Approach-A grid scan; `'A'`/`'B'`
   force one. **Validation: A vs B agree to max |ΔFS|=1.5e-9, |Δλ|=7e-10 over 41
-  cases, 0 fallbacks.** (An earlier 1-D `h(λ)` secant also worked but was ~3× slower
-  in a search; the residual-scaled 2-D Newton makes an M-P automated search ≈
-  Spencer speed — circular_search acads_simple 13.0s vs Spencer 12.4s.)
+  cases, 0 fallbacks.** (An earlier 1-D `h(λ)` secant also worked but was ~3× slower.)
+- **Speed reality + optimization (2026-06-24).** M-P is *inherently* slower than
+  Spencer: Spencer uses a vectorized lumped-`Q` solve with an analytic Jacobian
+  (~1.2 ms/solve), while M-P does ~20-30 `_equilibrium_march` calls per solve. An
+  early "≈ Spencer speed" claim was wrong — it came from one input (acads_simple)
+  that happened to show parity. On the main_lem problem (sloping_bottom, 40 slices)
+  an M-P circular_search was **14 s vs Spencer 3.3 s (~4×)**. Two optimizations cut
+  this: (1) **closed-form 2×2 + vectorized precompute** in `_equilibrium_march`
+  (replacing per-slice `np.linalg.solve`; Corps/L-K unchanged to 3.8e-14), and
+  (2) Approach B **returns its FS**, skipping a redundant final `F_f` re-solve.
+  Result: M-P search **4.9 s vs Spencer 3.4 s (~1.4×)**, all gates still pass. M-P
+  stays somewhat slower than Spencer by nature; ~1.4× is realistic, not parity.
 
 **S6 — Integration (code).**
 - *Deliverable:* register `morgenstern_price` in `solve_selected`/`solve_all`

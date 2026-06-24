@@ -636,43 +636,31 @@ def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta
     n = len(alpha)
     N = np.zeros(n)            # base normal force per slice
     Z = np.zeros(n + 1)        # interslice forces, Z[0] = 0 (nothing enters slice 0)
+
+    # Vectorize everything that does NOT depend on the marched Z[i]. Only the per-slice
+    # 2x2 solve stays in the loop (Z is a left→right recurrence). The 2x2 is solved in
+    # CLOSED FORM rather than np.linalg.solve — for a 2x2 in a Python loop this is the
+    # dominant cost; closed form is ~5-10x faster and agrees to floating-point.
+    ca = np.cos(alpha); sa = np.sin(alpha)
+    cb = np.cos(beta);  sb = np.sin(beta)
+    ct = np.cos(theta); st = np.sin(theta)            # interslice angle, length n+1
+    cp = np.cos(theta_p); sp = np.sin(theta_p)
     c_m = c / FS
     tan_phi_m = np.tan(phi) / FS
+    # A-matrix first column (the N coefficients); second column is (-ct[i+1], -st[i+1]).
+    a11 = tan_phi_m * ca - sa
+    a21 = tan_phi_m * sa + ca
+    # Z-independent parts of the RHS (the Z[i] coupling is added in the loop).
+    b0base = -c_m*dl*ca - P*ca + u*dl*sa - D*sb + kw + T - H_pile*cp
+    b1base = -c_m*dl*sa - P*sa - u*dl*ca + w + D*cb - H_pile*sp
     for i in range(n):
-        ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
-        cb, sb = np.cos(beta[i]), np.sin(beta[i])
-
-        # 2x2 system for (N_i, Z_{i+1}) from horizontal & vertical force balance,
-        # eqs (6)-(7). theta is used as-is (caller has already negated it for
-        # right-facing slopes — see the convention note above).
-        A = np.array([
-            [tan_phi_m[i]*ca - sa,   -np.cos(theta[i+1])],
-            [tan_phi_m[i]*sa + ca,   -np.sin(theta[i+1])]
-        ])
-        # Pile: subtract H·cos(θp) from b0 (horizontal), H·sin(θp) from b1 (vertical)
-        b0 = (
-            -c_m[i]*dl[i]*ca
-            - P[i]*ca
-            + u[i]*dl[i]*sa
-            - Z[i]*np.cos(theta[i])
-            - D[i]*sb
-            + kw[i]
-            + T[i]
-            - H_pile[i]*np.cos(theta_p[i])
-        )
-        b1 = (
-            -c_m[i]*dl[i]*sa
-            - P[i]*sa
-            - u[i]*dl[i]*ca
-            + w[i]
-            - Z[i]*np.sin(theta[i])
-            + D[i]*cb
-            - H_pile[i]*np.sin(theta_p[i])
-        )
-
-        N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
-        Z[i+1] = Z_ip1
-        N[i] = N_i
+        a12 = -ct[i+1]
+        a22 = -st[i+1]
+        b0 = b0base[i] - Z[i]*ct[i]
+        b1 = b1base[i] - Z[i]*st[i]
+        det = a11[i]*a22 - a12*a21[i]
+        N[i] = (b0*a22 - a12*b1) / det
+        Z[i+1] = (a11[i]*b1 - a21[i]*b0) / det
     return N, Z
 
 
@@ -1772,21 +1760,27 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
             return None
         rb = R(sol.x)                # confirm it's a true root, not a merit-fn stall
         if abs(rb[0]) < 1e-4 and abs(rb[1]) < 1e-4:
-            return float(lam_b)
+            return float(lam_b), float(F_b)   # λ* and its FS (skips a redundant re-solve)
         return None
 
+    FS = None
     if solver == 'A':
         lam_star = approach_A()
-    else:                       # 'auto' (default) / 'B': fast secant, fall back to A
-        lam_star = approach_B()
-        if lam_star is None and solver == 'auto':
+    else:                       # 'auto' (default) / 'B': fast 2-D Newton, fall back to A
+        b = approach_B()
+        if b is not None:
+            lam_star, FS = b           # B gives FS directly — no redundant F_f re-solve
+        elif solver == 'auto':
             lam_star = approach_A()
+        else:
+            lam_star = None
     if lam_star is None:
         return False, ("Morgenstern-Price: no F_f/F_m crossing found in "
                        f"λ ∈ [{lo}, {hi}].")
 
-    # Final solution at λ*: FS = F_f(λ*); recover N, Z, θ for output.
-    FS = F_f(lam_star, seed)
+    # Recover N, Z, θ at λ* (FS already known from Approach B; else solve it via A's F_f).
+    if FS is None:
+        FS = F_f(lam_star, seed)
     N, Z, force_res, moment_res = _mp_march(slice_df, lam_star, f_vals, FS, right_facing)
     theta_deg = np.degrees(np.arctan(lam_star * f_vals))   # per boundary, length n+1
 

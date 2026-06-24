@@ -11,8 +11,8 @@ from xslope.fileio import load_slope_data
 from xslope.search import circular_search, noncircular_search
 
 # Methods that apply to circular vs non-circular surfaces.
-CIRC_METHODS = ["oms", "bishop", "janbu", "corps_engineers", "lowe_karafiath", "spencer"]
-NONCIRC_METHODS = ["janbu", "corps_engineers", "lowe_karafiath", "spencer"]
+CIRC_METHODS = ["oms", "bishop", "janbu", "corps", "lowe", "spencer"]
+NONCIRC_METHODS = ["janbu", "corps", "lowe", "spencer"]
 
 CASES = [
     {"id": "LEM-1", "name": "ACADS Simple Slope",

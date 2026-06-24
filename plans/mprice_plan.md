@@ -441,7 +441,7 @@ one external code.
 
 ## 6. Integration checklist (after the math is settled)
 
-- `solve.py`: new `morgenstern_price(slice_df, f_type='half_sine', ...)` returning
+- `solve.py`: new `mprice(slice_df, f_type='half_sine', ...)` returning
   `(success, {'method','FS','lambda', 'f_type', ...})`, following the
   `(success, result)` contract.
 - `solve_selected()` / `solve_all()`: register the method + a print line
@@ -610,7 +610,7 @@ work that can run in parallel with the core is in §11.
   benchmark, **and** the force-only tie-out (`F_f` vs `force_equilibrium`) matches.
   Nothing downstream is trustworthy until this passes.
 - **Status (2026-06-24): DONE ✅ — gate passed, S3a + S3b.** Added public
-  `morgenstern_price(slice_df, f_type='half_sine', ...)` + `_mp_f_vals`
+  `mprice(slice_df, f_type='half_sine', ...)` + `_mp_f_vals`
   (constant / half_sine).
   - **S3a robustness finding:** the moment-only FS curve `F_m(λ)` is *multivalued*
     (an asymptote where its branch flips), so a naive `F_f`−`F_m` crossing jumps
@@ -657,7 +657,7 @@ work that can run in parallel with the core is in §11.
   seeded at `(Bishop-FS, 0)`. Both residuals come from ONE `_mp_march` per eval.
   Scaling the two residuals to O(1) (they differ ~1e3×) makes `hybr`
   well-conditioned, and seeding near the physical solution keeps it off the
-  multivalued moment-only branch. `morgenstern_price(..., solver=)`: `'auto'`
+  multivalued moment-only branch. `mprice(..., solver=)`: `'auto'`
   (default) runs B then falls back to the robust Approach-A grid scan; `'A'`/`'B'`
   force one. **Validation: A vs B agree to max |ΔFS|=1.5e-9, |Δλ|=7e-10 over 41
   cases, 0 fallbacks.** (An earlier 1-D `h(λ)` secant also worked but was ~3× slower.)
@@ -686,7 +686,7 @@ work that can run in parallel with the core is in §11.
   wins above are what actually mattered.)
 
 **S6 — Integration (code).**
-- *Deliverable:* register `morgenstern_price` in `solve_selected`/`solve_all`
+- *Deliverable:* register `mprice` in `solve_selected`/`solve_all`
   (+ a print line: FS, λ, `f_type`); `plot.py` shows λ / the interslice function and
   the line of thrust (mirror Spencer); confirm the circular/non-circular search
   calls it exactly like Spencer.

@@ -261,7 +261,7 @@ from xslope.plot import plot_inputs
 
 # Analysis inputs — edit these for your problem
 file_name = "input_template.xlsx"   # path to your completed Excel input file
-method = "spencer"                  # oms, bishop, janbu, corps_engineers, lowe_karafiath, spencer
+method = "spencer"                  # oms, bishop, janbu, corps, lowe, spencer
 num_slices = 40
 rapid_drawdown = False              # True for a rapid-drawdown analysis
 surface_type = "circular"           # "circular" or "non-circular"
@@ -281,7 +281,7 @@ selected failure surface or perform an exhaustive search to find the surface wit
 safety. If you are performing a single analysis, your first build a set of slices using the 'generate_slices' function. 
 This function takes the slope data and the failure surface you want to analyze as inputs and returns a set of 
 slices in a pandas DataFrame. These slices are then passed to the 'solve_selected' function along with a string 
-defining the method to be used ("oms","bishop","janbu","corps_engineers","lowe_karafiath","spencer"). This function 
+defining the method to be used ("oms","bishop","janbu","corps","lowe","spencer"). This function 
 returns a dictionary containing the results of the analysis which can then be plotted using the 'plot_solution' 
 function. For example:
 

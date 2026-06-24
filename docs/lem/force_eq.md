@@ -236,7 +236,7 @@ below (from EM 1110-2-1902) illustrates three such conventions; xslope implement
 
 ![uscoe_theta.png](images/uscoe_theta.png){width=500px }
 
-The convention is selected through the `variant` argument of `corps_engineers`:
+The convention is selected through the `variant` argument of `corps`:
 
 - **variant 1** (top panel) — a single constant inclination parallel to a line connecting the bottom of the failure
   surface to the top of the failure surface (the crest-to-toe chord). This matches the "Corps of Engineers #1"

@@ -1932,7 +1932,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
 
     alpha = 0.3
-    if results['method'] in ('spencer', 'morgenstern_price'):
+    if results['method'] in ('spencer', 'mprice'):
         # M-P draws the thrust line too once it is computed; plot_thrust_line_from_df
         # skips gracefully while 'yt_l'/'yt_r' are absent (M-P thrust line is a
         # deferred post-process diagnostic — see plans/mprice_plan.md §4 option b).
@@ -1979,12 +1979,12 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     elif method == 'janbu':
         fo = results['fo']
         title = f'Janbu-Corrected: FS = {fs:.3f}, fo = {fo:.2f}'
-    elif method == 'corps_engineers':
+    elif method == 'corps':
         theta = results['theta']
         title = f'Corps Engineers: FS = {fs:.3f}, θ = {theta:.2f}°'
-    elif method == 'lowe_karafiath':
+    elif method == 'lowe':
         title = f'Lowe & Karafiath: FS = {fs:.3f}'
-    elif method == 'morgenstern_price':
+    elif method == 'mprice':
         title = (f"Morgenstern-Price ({results.get('f_type', '')}): "
                  f"FS = {fs:.3f}, λ = {results['lambda']:.3f}")
     else:

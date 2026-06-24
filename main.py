@@ -37,7 +37,7 @@ else:
     print(result)
     exit()
 
-methods = ['oms', 'bishop', 'janbu', 'corps_engineers', 'lowe_karafiath', 'spencer']
+methods = ['oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer']
 results = solve_selected(methods[5], slice_df, rapid=False)  # spencer = methods[5]
 plot_solution(slope_data, slice_df, failure_surface, results)
 

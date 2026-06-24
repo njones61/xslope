@@ -841,7 +841,7 @@ slope_data = load_slope_data(input_file)
 plot_inputs(slope_data, mode='lem', save_png=True)
 
 # --- Configuration ---
-method = "spencer"        # "oms", "bishop", "janbu", "corps_engineers", "lowe_karafiath", "spencer"
+method = "spencer"        # "oms", "bishop", "janbu", "corps", "lowe", "spencer"
 num_slices = 30
 analysis_type = "auto_search"   # "single_surface", "auto_search", or "reliability"
 surface_type = "circular"       # "circular" or "non_circular"
@@ -904,8 +904,8 @@ elif analysis_type == "reliability":
 | Ordinary Method of Slices | `oms` | No |
 | Bishop's Simplified | `bishop` | No |
 | Janbu | `janbu` | Yes |
-| Corps of Engineers | `corps_engineers` | Yes |
-| Lowe & Karafiath | `lowe_karafiath` | Yes |
+| Corps of Engineers | `corps` | Yes |
+| Lowe & Karafiath | `lowe` | Yes |
 | Spencer | `spencer` | Yes |
 
 ---

@@ -31,13 +31,13 @@ from shapely.geometry import LineString
 
 from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
-from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
+from xslope.solve import oms, bishop, spencer, janbu, corps, lowe
 
 MODEL = "docs/lem/files/xslope_acads_simple.xlsx"
 TCRACK_DEPTH = 4.0
 TCRACK_WATER = 3.0
 METHODS = [("oms", oms), ("bishop", bishop), ("janbu", janbu),
-           ("corps", corps_engineers), ("lowe", lowe_karafiath), ("spencer", spencer)]
+           ("corps", corps), ("lowe", lowe), ("spencer", spencer)]
 TOL_PCT = 0.05  # mirror asymmetry must be below this (well under arc-discretization noise)
 
 

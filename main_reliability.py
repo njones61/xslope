@@ -6,7 +6,7 @@ from xslope.advanced import reliability
 slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx")
 
 # Run reliability analysis. `method` can be any LEM method: 'oms', 'bishop',
-# 'janbu', 'corps_engineers', 'lowe_karafiath', 'spencer', or 'morgenstern_price'.
+# 'janbu', 'corps', 'lowe', 'spencer', or 'mprice'.
 print("Running reliability analysis with Spencer method...")
 success, result = reliability(slope_data, method='spencer', rapid=False, circular=True, debug_level=1)
 

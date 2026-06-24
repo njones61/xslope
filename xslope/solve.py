@@ -30,8 +30,8 @@ def solve_selected(method_name, slice_df, rapid=False):
     ----------
     method_name : str
         Name of the solution method function to call. Must be one of:
-        'oms', 'bishop', 'janbu', 'spencer', 'corps_engineers', 'lowe_karafiath',
-        'morgenstern_price'
+        'oms', 'bishop', 'janbu', 'spencer', 'corps', 'lowe',
+        'mprice'
     slice_df : pandas.DataFrame
         Slice dataframe containing all required columns for the specified method
         (see individual method documentation for column requirements)
@@ -72,11 +72,11 @@ def solve_selected(method_name, slice_df, rapid=False):
         print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
     elif func == janbu:
         print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
-    elif func == corps_engineers:
+    elif func == corps:
         print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
-    elif func == lowe_karafiath:
+    elif func == lowe:
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
-    elif func == morgenstern_price:
+    elif func == mprice:
         print(f'Morgenstern-Price ({result["f_type"]}): FS={result["FS"]:.3f}, '
               f'lambda={result["lambda"]:.3f}')
 
@@ -120,10 +120,10 @@ def solve_all(slice_df, rapid=False):
     solve_selected('oms', slice_df, rapid=rapid)
     solve_selected('bishop', slice_df, rapid=rapid)
     solve_selected('janbu', slice_df, rapid=rapid)
-    solve_selected('corps_engineers', slice_df, rapid=rapid)
-    solve_selected('lowe_karafiath', slice_df, rapid=rapid)
+    solve_selected('corps', slice_df, rapid=rapid)
+    solve_selected('lowe', slice_df, rapid=rapid)
     solve_selected('spencer', slice_df, rapid=rapid)
-    solve_selected('morgenstern_price', slice_df, rapid=rapid)
+    solve_selected('mprice', slice_df, rapid=rapid)
 
 def oms(slice_df, debug=False):
     """
@@ -621,7 +621,7 @@ def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta
     This march uses every per-slice quantity (alpha, beta, kw, T, P, ...) EXACTLY
     as passed; it performs NO internal sign flips for slope facing. Right-facing
     slopes are handled by the CALLER negating the whole `theta_list` before the
-    call (see `corps_engineers` / `lowe_karafiath`). Negating theta flips the sign
+    call (see `corps` / `lowe`). Negating theta flips the sign
     of Z, which is why the tension guard back in `force_equilibrium` keys its
     Z<0 / Z>0 test on the `right_facing` flag.
 
@@ -917,7 +917,7 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
 
     return True, {'FS': FS_opt}
 
-def corps_engineers(slice_df, variant=2, debug=False):
+def corps(slice_df, variant=2, debug=False):
     """
     Corps of Engineers (Modified Swedish) force-equilibrium solver.
 
@@ -987,7 +987,7 @@ def corps_engineers(slice_df, variant=2, debug=False):
     # The force-equilibrium engine marches slices left→right with a hard-coded
     # sliding sense (Z[0]=0 at the left). On a right-facing slope the signed
     # ground/chord slope carries the wrong sign for that march, so the
-    # inter-slice inclinations are negated — the same convention lowe_karafiath
+    # inter-slice inclinations are negated — the same convention lowe
     # uses. This is a no-op for left-facing slopes (the common case and every
     # shipped benchmark). Without it, force-equilibrium FS is asymmetric under
     # mirroring and can violate the expected method ordering on right-facing
@@ -1004,11 +1004,11 @@ def corps_engineers(slice_df, variant=2, debug=False):
     if not success:
         return success, results
     else:
-        results['method'] = 'corps_engineers'  # append method
+        results['method'] = 'corps'  # append method
         results['theta'] = theta_out           # append theta (mean for variant 2)
         return success, results
 
-def lowe_karafiath(slice_df, debug=False):
+def lowe(slice_df, debug=False):
     """
     Lowe-Karafiath limit equilibrium: variable interslice inclinations equal to
     the average of the top‐and bottom‐surface slopes of the two adjacent slices
@@ -1067,7 +1067,7 @@ def lowe_karafiath(slice_df, debug=False):
     if not success:
         return success, results
     else:
-        results['method'] = 'lowe_karafiath'  # append method
+        results['method'] = 'lowe'  # append method
         return success, results
 
 def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
@@ -1640,7 +1640,7 @@ def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing):
     slice_df['yt_r'] = yt_r
 
 
-def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
+def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
                       max_iter=50, lambda_bracket=(-1.5, 1.5), solver='auto',
                       debug_level=0):
     """Morgenstern-Price complete-equilibrium method (Approach A: F_f / F_m crossing).
@@ -1801,7 +1801,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
               f"force_res = {force_res:.2e}, moment_res = {moment_res:.2e}")
 
     return True, {
-        'method': 'morgenstern_price',
+        'method': 'mprice',
         'FS': FS,
         'lambda': lam_star,
         'f_type': f_type,

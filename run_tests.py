@@ -38,12 +38,6 @@ import matplotlib
 matplotlib.use('Agg')  # non-interactive backend — no plot windows
 
 
-# Short method names used in compact fs_<method> test tags -> solver names.
-FS_METHOD_NAMES = {
-    'oms': 'oms', 'bishop': 'bishop', 'janbu': 'janbu',
-    'corps': 'corps_engineers', 'lowe': 'lowe_karafiath', 'spencer': 'spencer',
-}
-
 
 def parse_test_tags(md_path):
     """Parse <!-- test: ... --> tags from a markdown file.
@@ -86,9 +80,8 @@ def parse_test_tags(md_path):
         if fs_keys:
             shared = {k: v for k, v in params.items() if not k.startswith('fs_')}
             for k in fs_keys:
-                method = FS_METHOD_NAMES.get(k[3:], k[3:])
                 t = dict(shared)
-                t['method'] = method
+                t['method'] = k[3:]      # fs_<method> tag -> solver function name
                 t['expected_fs'] = float(params[k])
                 tests.append(t)
         else:

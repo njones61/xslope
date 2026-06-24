@@ -144,7 +144,7 @@ slope_data = load_slope_data("inputs/slope/input_template_noncircular.xlsx")
 # Perform non-circular search using Lowe-Karafiath method
 fs_cache, converged, search_path = noncircular_search(
     slope_data,
-    method_name='lowe_karafiath',
+    method_name='lowe',
     diagnostic=True,           # Print iteration details
     movement_distance=4.0,     # Initial step size
     shrink_factor=0.8,         # Step reduction factor

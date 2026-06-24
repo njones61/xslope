@@ -38,8 +38,8 @@ METHODS = [
     ("oms", "oms", "OMS"),
     ("bishop", "bishop", "Bishop"),
     ("janbu", "janbu", "Janbu"),
-    ("corps", "corps_engineers", "Corps"),
-    ("lowe", "lowe_karafiath", "Lowe"),
+    ("corps", "corps", "Corps"),
+    ("lowe", "lowe", "Lowe"),
     ("spencer", "spencer", "Spencer"),
 ]
 # Methods that require a circular surface (skipped for non-circular searches).

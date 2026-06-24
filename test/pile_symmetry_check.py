@@ -24,11 +24,11 @@ from shapely.geometry import LineString
 
 from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
-from xslope.solve import oms, bishop, spencer, janbu, corps_engineers, lowe_karafiath
+from xslope.solve import oms, bishop, spencer, janbu, corps, lowe
 
 PILE_MODEL = "docs/lem/files/xslope_piles.xlsx"
 METHODS = [("oms", oms), ("bishop", bishop), ("spencer", spencer),
-           ("janbu", janbu), ("corps", corps_engineers), ("lowe", lowe_karafiath)]
+           ("janbu", janbu), ("corps", corps), ("lowe", lowe)]
 TOL_PCT = 0.05  # mirror asymmetry must be below this (well under arc-discretization noise)
 
 

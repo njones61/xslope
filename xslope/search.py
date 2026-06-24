@@ -315,7 +315,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     data : dict
         Input data dictionary containing all necessary parameters
     method_name : str
-        The method name to use (e.g., 'lowe_karafiath', 'spencer')
+        The method name to use (e.g., 'lowe', 'spencer')
     diagnostic : bool
         If True, print diagnostic information during search
     movement_distance : float

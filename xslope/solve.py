@@ -583,6 +583,93 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     }
 
 
+def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta_p, theta, FS):
+    """Shared fixed-FS force-equilibrium march (left -> right over slices).
+
+    The per-slice engine extracted from `force_equilibrium` so it can be reused:
+    the force-equilibrium methods (Corps of Engineers, Lowe-Karafiath — via
+    `force_equilibrium`) and, in future, Morgenstern-Price all march on it. It does
+    NOT root-find FS — it evaluates ONE trial `FS` and returns the resulting base
+    normals and interslice forces. Callers form their own residuals from the
+    output: force closure is `Z[n]`; M-P additionally accumulates a moment residual
+    from the returned `N`.
+
+    Parameters (per-slice numpy arrays of length n; angles already in RADIANS):
+        alpha, phi, c, w, u, dl  base inclination, friction, cohesion, weight,
+                                 pore pressure/length, base length
+        D, beta                  distributed surface load magnitude and inclination
+        kw                       horizontal seismic force
+        T                        tension-crack water force (nonzero only on the
+                                 cracked slice)
+        P                        reinforcement force (parallel to base)
+        H_pile, theta_p          pile force magnitude and inclination (theta_p in
+                                 RADIANS, like everything else here)
+        theta                    interslice-force inclination at each BOUNDARY,
+                                 length n+1 (radians)
+        FS                       trial factor of safety
+    Returns:
+        (N, Z): N = base normal force per slice (length n, effective normal);
+                Z = interslice resultant at each boundary (length n+1, Z[0] = 0).
+
+    SIGN / RIGHT-FACING CONVENTION  ── do not forget ─────────────────────────────
+    This march uses every per-slice quantity (alpha, beta, kw, T, P, ...) EXACTLY
+    as passed; it performs NO internal sign flips for slope facing. Right-facing
+    slopes are handled by the CALLER negating the whole `theta_list` before the
+    call (see `corps_engineers` / `lowe_karafiath`). Negating theta flips the sign
+    of Z, which is why the tension guard back in `force_equilibrium` keys its
+    Z<0 / Z>0 test on the `right_facing` flag.
+
+    This DIFFERS from `spencer()`, which instead flips alpha, beta, psi, R, c, kw,
+    V, tan_p and the pile horizontal component INTERNALLY (its `if right_facing:`
+    block). Morgenstern-Price is built on THIS march, so its moment accumulator
+    must follow the caller-negates-theta convention used here, NOT Spencer's
+    internal-flip convention. The `f(x)=1 == Spencer` validation must therefore be
+    run on a right-facing geometry specifically, to confirm the two reconcile.
+    ──────────────────────────────────────────────────────────────────────────────
+    """
+    n = len(alpha)
+    N = np.zeros(n)            # base normal force per slice
+    Z = np.zeros(n + 1)        # interslice forces, Z[0] = 0 (nothing enters slice 0)
+    c_m = c / FS
+    tan_phi_m = np.tan(phi) / FS
+    for i in range(n):
+        ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
+        cb, sb = np.cos(beta[i]), np.sin(beta[i])
+
+        # 2x2 system for (N_i, Z_{i+1}) from horizontal & vertical force balance,
+        # eqs (6)-(7). theta is used as-is (caller has already negated it for
+        # right-facing slopes — see the convention note above).
+        A = np.array([
+            [tan_phi_m[i]*ca - sa,   -np.cos(theta[i+1])],
+            [tan_phi_m[i]*sa + ca,   -np.sin(theta[i+1])]
+        ])
+        # Pile: subtract H·cos(θp) from b0 (horizontal), H·sin(θp) from b1 (vertical)
+        b0 = (
+            -c_m[i]*dl[i]*ca
+            - P[i]*ca
+            + u[i]*dl[i]*sa
+            - Z[i]*np.cos(theta[i])
+            - D[i]*sb
+            + kw[i]
+            + T[i]
+            - H_pile[i]*np.cos(theta_p[i])
+        )
+        b1 = (
+            -c_m[i]*dl[i]*sa
+            - P[i]*sa
+            - u[i]*dl[i]*ca
+            + w[i]
+            - Z[i]*np.sin(theta[i])
+            + D[i]*cb
+            - H_pile[i]*np.sin(theta_p[i])
+        )
+
+        N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
+        Z[i+1] = Z_ip1
+        N[i] = N_i
+    return N, Z
+
+
 def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False, right_facing=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
@@ -637,49 +724,21 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     H_pile  = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n)
     theta_p = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
 
-    N = np.zeros(n)  # normal forces on slice bases
+    N = np.zeros(n)  # normal forces on slice bases (filled by each march)
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
 
     def residual(FS):
-        """Return the right‐side interslice force Z[n] for a given FS."""
-        c_m       = c / FS
-        tan_phi_m = np.tan(phi) / FS
-        Z[:] = 0.0  # reset Z for each call
-        for i in range(n):
-            ca, sa = np.cos(alpha[i]), np.sin(alpha[i])
-            cb, sb = np.cos(beta[i]), np.sin(beta[i])
+        """Right-side interslice force Z[n] for a given FS (force-closure residual).
 
-            # Matrix A coefficients from equations (6) and (7)
-            A = np.array([
-                [tan_phi_m[i]*ca - sa,   -np.cos(theta[i+1])],
-                [tan_phi_m[i]*sa + ca,   -np.sin(theta[i+1])]
-            ])
-
-            # Vector b from equations (6) and (7)
-            # Pile: subtract H·cos(θp) from b0 (horizontal), subtract H·sin(θp) from b1 (vertical)
-            b0 = (
-                -c_m[i]*dl[i]*ca
-                - P[i]*ca
-                + u[i]*dl[i]*sa
-                - Z[i]*np.cos(theta[i])
-                - D[i]*sb
-                + kw[i]
-                + T[i]
-                - H_pile[i]*np.cos(theta_p[i])
-            )
-            b1 = (
-                -c_m[i]*dl[i]*sa
-                - P[i]*sa
-                - u[i]*dl[i]*ca
-                + w[i]
-                - Z[i]*np.sin(theta[i])
-                + D[i]*cb
-                - H_pile[i]*np.sin(theta_p[i])
-            )
-            
-            N_i, Z_ip1 = np.linalg.solve(A, np.array([b0, b1]))
-            Z[i+1] = Z_ip1
-            N[i] = N_i  # store normal force on slice base
+        Delegates the per-slice march to the shared `_equilibrium_march`, then
+        copies its output into the persistent N/Z arrays (via slice assignment) so
+        the admissibility check and the slice_df writes after the root-find see the
+        values at the converged FS. Pure extraction — arithmetic is unchanged.
+        """
+        N_march, Z_march = _equilibrium_march(
+            alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta_p, theta, FS)
+        N[:] = N_march
+        Z[:] = Z_march
         return Z[n]
 
     if debug:

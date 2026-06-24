@@ -570,6 +570,20 @@ work that can run in parallel with the core is in §11.
   moment_res=None)`; Corps/L-K re-pointed through it.
 - *Depends-on:* S0. *Exit ⛔:* every Corps/L-K LEM benchmark FS **bit-stable**
   (identical pre/post refactor). Do not start S2 until green.
+- **Status (2026-06-24): DONE — gate met, bit-identical.** Design refinement vs the
+  deliverable above: the shared low-level march was extracted as
+  **`_equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile,
+  theta_p, theta, FS) -> (N, Z)`** (solve.py, just above `force_equilibrium`). It
+  takes the *per-boundary `theta`* array (general — Corps/L-K build it from
+  geometry; M-P will pass `arctan(λ·f)`), not `(lam, f_vals)`, and returns just
+  `(N, Z)`. `force_res = Z[n]` and the `moment_res` accumulator belong to the M-P
+  wrapper built in **S2/S3** on top of this march — keeping the low-level march
+  free of any residual/`λ` concepts. `force_equilibrium.residual()` now delegates
+  to it; **Corps/L-K were not touched** (they call `force_equilibrium`, so they are
+  re-pointed transitively). The march carries a prominent SIGN/RIGHT-FACING comment
+  block (caller-negates-theta convention, contrasted with `spencer()`'s internal
+  flips). Verified bit-identical FS to full float precision over 16 Corps/L-K
+  evaluations (piles, reinforcement, submerged, non-circular, multi-layer).
 
 **S2 — Moment accumulator.**
 - *Deliverable:* `moment_res` populated in the march from the §4a table.

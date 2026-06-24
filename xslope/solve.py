@@ -1791,6 +1791,25 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     N, Z, force_res, moment_res = _mp_residuals(A, f_vals, lam_star, FS)
     theta_deg = np.degrees(np.arctan(lam_star * f_vals))   # per boundary, length n+1
 
+    # Admissibility guard. M-P's λ-optimisation actively seeks the lowest FS, so —
+    # unlike the fixed-θ methods — it can exploit surfaces that balance only with
+    # partly TENSILE interslice forces (non-physical: soil cannot pull slices apart),
+    # giving a spuriously low FS on a surface Spencer's solver simply fails to
+    # converge on. We reject those. force_equilibrium's own note is that valid
+    # criticals run ≤20% interslice tension; our physical M-P criticals are ≤18%,
+    # while spurious ones (e.g. simple_embankment) hit ~33%, so a 30% INTERSLICE cap
+    # cleanly separates them. Base-normal tension keeps the looser 50% extent
+    # backstop (it is not what the λ-optimisation exploits). Interslice tension is
+    # Z<0 here: M-P keeps the un-negated θ convention for BOTH facings (unlike
+    # force_equilibrium, which negates theta_list for right-facing and flips Z).
+    frac_N_neg = float(np.mean(N < 0))
+    Z_int = Z[1:-1]
+    frac_Z_tension = float(np.mean(Z_int < 0)) if len(Z_int) else 0.0
+    if frac_N_neg > 0.5 or frac_Z_tension > 0.30:
+        return False, ("Morgenstern-Price: inadmissible solution "
+                       f"({100*frac_N_neg:.0f}% of base normals in tension, "
+                       f"{100*frac_Z_tension:.0f}% interslice tension)")
+
     slice_df['n_eff'] = N
     slice_df['z'] = Z[:-1]
     slice_df['theta'] = theta_deg[1:]   # right-boundary interslice angle per slice

@@ -36,6 +36,7 @@ slices per method. The ACADS consensus answer is FOS ≈ 1.00.
 | Corps of Engineers | 0.990 | 1.00 | −1.0% |
 | Lowe & Karafiath | 0.987 | 1.00 | −1.3% |
 | Spencer | 0.984 | 1.00 | −1.6% |
+| Morgenstern-Price | 0.984 | 1.00 | −1.6% |
 
 All rigorous methods fall within the ACADS accepted band; OMS reads low, as
 expected for a legacy method (its known conservative bias on effective-stress
@@ -52,13 +53,17 @@ critical surface runs along the weak layer. ACADS accepted band ≈ 1.26.
 | Method | XSLOPE FOS | Reference | Diff |
 |---|---|---|---|
 | Spencer | 1.258 | ~1.26 | −0.2% |
+| Morgenstern-Price | 1.248 | ~1.26 | −1.0% |
 | Corps of Engineers | 1.336 | ~1.26 | +6.0% |
 | Lowe & Karafiath | 1.249 | ~1.26 | −0.9% |
 | Simplified Janbu | 1.278 | ~1.26 | +1.4% |
 
 The non-circular slip is seeded just above the base of the weak layer (the
-standard placement for a weak interlayer — see the sample-problem write-up);
-Spencer then lands within 0.3% of SLOPE/W's Morgenstern-Price value (1.261).
+standard placement for a weak interlayer — see the sample-problem write-up).
+This is exactly where complete equilibrium earns its keep: XSLOPE's Spencer and
+Morgenstern-Price (half-sine) both land within ~1% of SLOPE/W's named
+Morgenstern-Price value (1.261) — Spencer at 1.258 (−0.2%) and M-P at 1.248
+(−1.0%).
 Corps of Engineers reads modestly high here, consistent with ground-parallel
 side-force inclinations on this geometry (XSLOPE uses the standard "Corps #2"
 convention — see [Force Equilibrium Methods](lem/force_eq.md)).
@@ -79,6 +84,7 @@ et al. (2002). Full details:
 | Corps of Engineers | 1.476 | 1.451 | +1.7% |
 | Lowe & Karafiath | 1.438 | 1.451 | −0.9% |
 | Spencer | 1.401 | 1.451 | −3.4% |
+| Morgenstern-Price | 1.400 | 1.451 | −3.5% |
 
 ---
 

@@ -41,6 +41,7 @@ METHODS = [
     ("corps", "corps", "Corps"),
     ("lowe", "lowe", "Lowe"),
     ("spencer", "spencer", "Spencer"),
+    ("mprice", "mprice", "M-P"),
 ]
 # Methods that require a circular surface (skipped for non-circular searches).
 CIRCULAR_ONLY = {"oms", "bishop"}

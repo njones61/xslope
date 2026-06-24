@@ -744,10 +744,6 @@ def _mp_march(slice_df, lam, f_vals, FS, right_facing=False):
     f_vals = np.asarray(f_vals, dtype=float)
     if len(f_vals) != n + 1:
         raise ValueError(f"f_vals length ({len(f_vals)}) must be n+1 ({n+1})")
-    if right_facing:
-        raise NotImplementedError(
-            "right-facing Morgenstern-Price is finalized in S3 (the f(x)=1 == "
-            "Spencer gate on a right-facing geometry); see plans/mprice_plan.md.")
 
     # Per-slice arrays (angles → radians), matching _equilibrium_march's inputs.
     alpha = np.radians(slice_df['alpha'].values)
@@ -772,6 +768,23 @@ def _mp_march(slice_df, lam, f_vals, FS, right_facing=False):
     y_t   = slice_df['y_t'].values.astype(float)
     x_pile = slice_df['x_pile'].values.astype(float) if 'x_pile' in slice_df.columns else np.zeros(n)
     y_pile = slice_df['y_pile'].values.astype(float) if 'y_pile' in slice_df.columns else np.zeros(n)
+
+    # RIGHT-FACING: mirror spencer()'s internal flip set so f(x)=1 reduces to Spencer
+    # (validated empirically by the f(x)=1 == Spencer gate, S3b — both residuals
+    # vanish at Spencer's solution). Same convention spencer() applies in its own
+    # `if right_facing:` block; here it is applied once, before the march and moment,
+    # so both stay consistent. (The pile horizontal-component flip — theta_p -> π-θp,
+    # flipping cos θp but not sin θp — is the analog of Spencer's H_cos flip; no
+    # right-facing+pile benchmark exists, so it is by analogy, not yet gate-checked.)
+    if right_facing:
+        alpha = -alpha
+        beta  = -beta
+        phi   = -phi              # tan φ flips (Spencer's tan_p flip)
+        c     = -c
+        P     = -P
+        kw    = -kw
+        V     = -V
+        theta_p = np.pi - theta_p
 
     theta = np.arctan(lam * f_vals)               # M-P: tan θ = λ·f at each boundary
     N, Z = _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, V, P,
@@ -1593,11 +1606,9 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     if n < 2:
         return False, "Morgenstern-Price needs at least 2 slices."
 
-    # Facing detection mirrors spencer(); right-facing convention is finalized in S3b.
+    # Facing detection mirrors spencer(); _mp_march applies the right-facing flip set.
     y_ct = slice_df['y_ct'].values
-    if y_ct[0] > y_ct[-1]:
-        return False, ("Morgenstern-Price: right-facing surfaces are not yet "
-                       "supported (pending S3b); see plans/mprice_plan.md.")
+    right_facing = bool(y_ct[0] > y_ct[-1])
 
     try:
         f_vals = _mp_f_vals(slice_df, f_type)
@@ -1617,7 +1628,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         """Force-equilibrium FS at this λ: the FS root of `force_res` (= Z[n]). The
         force residual is monotonic in FS, so this root is unique and well-behaved —
         no branch-jumping (unlike the moment-only FS, which is multivalued)."""
-        return newton(lambda FS: _mp_march(slice_df, lam, f_vals, FS)[2],
+        return newton(lambda FS: _mp_march(slice_df, lam, f_vals, FS, right_facing)[2],
                       s, tol=tol, maxiter=max_iter)
 
     def h(lam):
@@ -1628,7 +1639,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         sidesteps the multivalued moment-only FS curve `F_m(λ)` (and its asymptote)
         entirely. (This curve search is the slow-but-robust reference path; the
         Approach-B Newton, S5, is the fast path.)"""
-        return _mp_march(slice_df, lam, f_vals, F_f(lam, seed))[3]
+        return _mp_march(slice_df, lam, f_vals, F_f(lam, seed), right_facing)[3]
 
     lo, hi = lambda_bracket
     grid = np.linspace(lo, hi, 61)
@@ -1655,7 +1666,7 @@ def morgenstern_price(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
 
     # Final solution at λ*: FS = F_f(λ*); recover N, Z, θ for output.
     FS = F_f(lam_star, seed)
-    N, Z, force_res, moment_res = _mp_march(slice_df, lam_star, f_vals, FS)
+    N, Z, force_res, moment_res = _mp_march(slice_df, lam_star, f_vals, FS, right_facing)
     theta_deg = np.degrees(np.arctan(lam_star * f_vals))   # per boundary, length n+1
 
     slice_df['n_eff'] = N

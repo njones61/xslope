@@ -609,19 +609,25 @@ work that can run in parallel with the core is in §11.
   `spencer()` **FS and `arctan(λ)` vs Spencer θ** to tight tolerance on every LEM
   benchmark, **and** the force-only tie-out (`F_f` vs `force_equilibrium`) matches.
   Nothing downstream is trustworthy until this passes.
-- **Status (2026-06-24): S3a DONE (left-facing); S3b (right-facing) remaining.**
-  Added public `morgenstern_price(slice_df, f_type='half_sine', ...)` +
-  `_mp_f_vals` (constant / half_sine). **Key robustness finding:** the moment-only
-  FS curve `F_m(λ)` is *multivalued* (it has an asymptote where its branch flips),
-  so naive `F_f`−`F_m` crossing jumps branches and fakes/misses crossings. The fix
-  is to root-find on **`h(λ) = moment_res(F_f(λ), λ)`** — the moment residual
-  evaluated AT the force-equilibrium FS. Since `force_res` is monotonic in FS,
-  `F_f(λ)` is smooth/single-valued, so `h(λ)` is a smooth scalar in λ alone whose
-  root is the M-P solution — it sidesteps `F_m`'s multivaluedness entirely.
-  **Result: 17/17 left-facing benchmarks reproduce Spencer EXACTLY** (FS to ±1e-6,
-  `arctan(λ)` = Spencer θ), and half_sine FS sits <~1.4% from constant (the §7.1
-  insensitivity property). Right-facing returns a clear "pending S3b" message;
-  3 right-facing benchmark files remain (earth_dam_down, method_slices_problem(2)).
+- **Status (2026-06-24): DONE ✅ — gate passed, S3a + S3b.** Added public
+  `morgenstern_price(slice_df, f_type='half_sine', ...)` + `_mp_f_vals`
+  (constant / half_sine).
+  - **S3a robustness finding:** the moment-only FS curve `F_m(λ)` is *multivalued*
+    (an asymptote where its branch flips), so a naive `F_f`−`F_m` crossing jumps
+    branches and fakes/misses crossings. Fix: root-find on
+    **`h(λ) = moment_res(F_f(λ), λ)`** — the moment residual evaluated AT the
+    force-equilibrium FS. `force_res` is monotonic in FS so `F_f(λ)` is smooth and
+    single-valued, making `h(λ)` a smooth scalar in λ alone whose root is the M-P
+    solution; it sidesteps `F_m`'s multivaluedness entirely.
+  - **S3b right-facing:** determined empirically (both residuals vanish at Spencer's
+    solution) that the right-facing convention is exactly Spencer's internal flip
+    set — `_mp_march` flips `{alpha, beta, phi, c, P, kw, V}` (+ pile `θp→π−θp` by
+    analogy, no right-facing+pile benchmark exists) when `right_facing`, applied
+    once before both march and moment so they stay consistent.
+  - **Result: 20/20 benchmarks (all left + right facing) reproduce Spencer EXACTLY**
+    (FS to ±1e-6, `arctan(λ)` = Spencer θ); half_sine FS sits <~1.4% from constant
+    (the §7.1 insensitivity property). The force march is unchanged from S1, so
+    Corps/L-K remain bit-stable (force-only tie-out holds).
 
 **S4 — `half_sine` + published benchmarks.**
 - *Deliverable:* `half_sine` `f_type`; the §7.2 benchmark runs.

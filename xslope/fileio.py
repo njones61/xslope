@@ -1145,6 +1145,252 @@ def load_slope_data(filepath):
 
     return globals_data
 
+
+def save_slope_data_to_xlsx(slope_data, filepath, template=None):
+    """
+    Write an in-memory ``slope_data`` dict back to an XSLOPE Excel input file.
+
+    This is the inverse of :func:`load_slope_data`: it maps every editable input
+    category (global parameters, materials, geometry, piezometric lines, failure
+    surfaces, distributed loads, reinforcement, piles, and seepage boundary
+    conditions) back into the template's sheet/cell layout. It builds on
+    :func:`write_cells_to_xlsx`, which edits the workbook at the XML level and so
+    preserves all formatting, formulas, charts, and drawings.
+
+    Round-trip guarantee: for every input category,
+    ``load_slope_data(<file written by this function>)`` reproduces the source
+    ``slope_data``. Derived geometry (``ground_surface``, ``domain_polygon``,
+    ``tcrack_surface``, and — for profile input — ``polygons``) is recomputed by
+    the loader and therefore not written here.
+
+    Parameters
+    ----------
+    slope_data : dict
+        A dict in the form returned by :func:`load_slope_data`.
+    filepath : str
+        Destination ``.xlsx`` path.
+    template : str, optional
+        Path to a blank XSLOPE template. If given, it is copied to ``filepath``
+        first — use this for "New" or "Save As" from the standard template. If
+        ``None``, ``filepath`` must already exist and is edited in place ("Save").
+
+    Returns
+    -------
+    str
+        ``filepath``.
+
+    Notes
+    -----
+    Geometry is written to either the ``profile`` sheet (when ``profile_lines`` is
+    present) or the ``polygon`` sheet (otherwise) — never both, matching the
+    loader's mutual-exclusivity rule. Formula cells (e.g. the profile/polygon
+    row-6 material-name XLOOKUP) are never written; the material IDs that feed
+    them are, and :func:`write_cells_to_xlsx` flags the workbook for a full
+    recalculation on open so the dependent formulas refresh.
+
+    Circle surfaces are always written with ``Option = "Depth"`` (the loader
+    collapses every circle to ``Xo/Yo/Depth/R`` with ``R = Yo - Depth``, so this
+    reproduces the radius regardless of how the original was specified). The pile
+    ``theta`` (``qp``) column is left blank because the loader auto-derives it
+    from the pile endpoints.
+    """
+    if template is not None:
+        shutil.copy(template, filepath)
+    elif not os.path.exists(filepath):
+        raise ValueError(
+            "save_slope_data_to_xlsx: 'filepath' does not exist and no 'template' "
+            "was provided. Pass template=<blank template path> to create a new file.")
+
+    def _f(v):
+        return float(v)
+
+    updates = {}
+
+    # === main ===
+    updates['main'] = {
+        'D8': _f(slope_data['gamma_water']),
+        'D9': _f(slope_data['tcrack_depth']),
+        'D10': _f(slope_data['tcrack_water']),
+        'D11': _f(slope_data['k_seismic']),
+    }
+
+    # === mat ===  (header row 8, data rows 9+; column order matches load_slope_data)
+    mat_num_cols = [
+        ('gamma', 3), ('c', 5), ('phi', 6), ('cp', 7), ('r_elev', 8),
+        ('d', 9), ('psi', 10),
+        ('sigma_gamma', 12), ('sigma_c', 13), ('sigma_phi', 14),
+        ('sigma_cp', 15), ('sigma_d', 16), ('sigma_psi', 17),
+        ('k1', 18), ('k2', 19), ('alpha', 20), ('kr0', 21), ('h0', 22),
+        ('E', 23), ('nu', 24),
+    ]
+    mat = {}
+    for idx, material in enumerate(slope_data.get('materials', [])):
+        row = 9 + idx
+        mat[cell_ref(row, 1)] = idx + 1                       # 1-based mat number
+        mat[cell_ref(row, 2)] = str(material.get('name', ''))
+        # option / u are strings; leave the cell blank when unset (the loader reads
+        # an empty cell back as 'nan', so writing the literal text would be noise).
+        for key, col in [('option', 4), ('u', 11)]:
+            val = material.get(key)
+            if val is not None and str(val).strip().lower() not in ('', 'nan'):
+                mat[cell_ref(row, col)] = str(val)
+        for key, col in mat_num_cols:
+            mat[cell_ref(row, col)] = _f(material.get(key, 0) or 0)
+    if mat:
+        updates['mat'] = mat
+
+    # === geometry: profile OR polygon (mutually exclusive, matching the loader) ===
+    profile_lines = slope_data.get('profile_lines') or []
+    if profile_lines:
+        prof = {}
+        md = slope_data.get('max_depth')
+        prof['B2'] = _f(md) if md is not None else 0.0
+        for n, line in enumerate(profile_lines):              # n is 0-based
+            x_col = 1 + n * 3                                  # A, D, G, ...
+            y_col = x_col + 1
+            # Write the row-4 block header. load_slope_data() detects how many
+            # profile lines exist by scanning for a non-empty header here, so this
+            # makes the file self-describing rather than relying on the template's
+            # pre-labeled blocks.
+            prof[cell_ref(4, x_col)] = f"Profile Line #{n + 1}"
+            mat_id = line.get('mat_id')
+            if mat_id is not None:
+                prof[cell_ref(5, y_col)] = int(mat_id) + 1    # 0-based -> 1-based
+            for i, (x, y) in enumerate(line['coords']):
+                prof[cell_ref(8 + i, x_col)] = _f(x)
+                prof[cell_ref(8 + i, y_col)] = _f(y)
+        updates['profile'] = prof
+    else:
+        polygons = slope_data.get('polygons') or []
+        if polygons:
+            poly_u = {}
+            for n, pdict in enumerate(polygons):
+                x_col = 1 + n * 3
+                y_col = x_col + 1
+                poly_u[cell_ref(4, x_col)] = f"Polygon #{n + 1}"   # block header (see profile)
+                mat_id = pdict.get('mat_id')
+                if mat_id is not None:
+                    poly_u[cell_ref(5, y_col)] = int(mat_id) + 1
+                coords = list(pdict['polygon'].exterior.coords)
+                if len(coords) >= 2 and coords[0] == coords[-1]:
+                    coords = coords[:-1]                       # loader closes implicitly
+                for i, (x, y) in enumerate(coords):
+                    poly_u[cell_ref(8 + i, x_col)] = _f(x)
+                    poly_u[cell_ref(8 + i, y_col)] = _f(y)
+            updates['polygon'] = poly_u
+
+    # === piezo ===  (line 1 in cols A:B, line 2 in cols D:E, data from row 4)
+    piezo = {}
+    for i, (x, y) in enumerate(slope_data.get('piezo_line') or []):
+        piezo[cell_ref(4 + i, 1)] = _f(x)
+        piezo[cell_ref(4 + i, 2)] = _f(y)
+    for i, (x, y) in enumerate(slope_data.get('piezo_line2') or []):
+        piezo[cell_ref(4 + i, 4)] = _f(x)
+        piezo[cell_ref(4 + i, 5)] = _f(y)
+    if piezo:
+        updates['piezo'] = piezo
+
+    # === circles ===  (header row 2, data rows 3+; always written as Option="Depth")
+    circ = {}
+    for n, c in enumerate(slope_data.get('circles') or []):
+        row = 3 + n
+        circ[cell_ref(row, 1)] = n + 1
+        circ[cell_ref(row, 2)] = _f(c['Xo'])
+        circ[cell_ref(row, 3)] = _f(c['Yo'])
+        circ[cell_ref(row, 4)] = 'Depth'
+        circ[cell_ref(row, 5)] = _f(c['Depth'])
+    if circ:
+        updates['circles'] = circ
+
+    # === non-circ ===  (data rows 3+; cols A=X, B=Y, C=Movement)
+    nonc = {}
+    for i, p in enumerate(slope_data.get('non_circ') or []):
+        row = 3 + i
+        nonc[cell_ref(row, 1)] = _f(p['X'])
+        nonc[cell_ref(row, 2)] = _f(p['Y'])
+        mv = p.get('Movement')
+        if mv is not None and not (isinstance(mv, float) and pd.isna(mv)):
+            nonc[cell_ref(row, 3)] = str(mv)
+    if nonc:
+        updates['non-circ'] = nonc
+
+    # === dloads / dloads (2) ===  (3-col blocks from col B, +1 gap; data from row 4)
+    def _dload_updates(blocks):
+        u = {}
+        for n, block in enumerate(blocks):
+            x_col = 2 + n * 4                                  # B, F, J, ...
+            for i, pt in enumerate(block):
+                u[cell_ref(4 + i, x_col)] = _f(pt['X'])
+                u[cell_ref(4 + i, x_col + 1)] = _f(pt['Y'])
+                u[cell_ref(4 + i, x_col + 2)] = _f(pt['Normal'])
+        return u
+    d1 = _dload_updates(slope_data.get('dloads') or [])
+    if d1:
+        updates['dloads'] = d1
+    d2 = _dload_updates(slope_data.get('dloads2') or [])
+    if d2:
+        updates['dloads (2)'] = d2
+
+    # === reinforce ===  (raw endpoint form in 'reinforcement_lines' round-trips)
+    reinf = {}
+    for n, r in enumerate(slope_data.get('reinforcement_lines') or []):
+        row = 3 + n
+        reinf.update({
+            cell_ref(row, 1): n + 1,
+            cell_ref(row, 2): _f(r['x1']), cell_ref(row, 3): _f(r['y1']),
+            cell_ref(row, 4): _f(r['x2']), cell_ref(row, 5): _f(r['y2']),
+            cell_ref(row, 6): _f(r['t_max']), cell_ref(row, 7): _f(r['t_res']),
+            cell_ref(row, 8): _f(r['lp1']), cell_ref(row, 9): _f(r['lp2']),
+            cell_ref(row, 10): _f(r['E']), cell_ref(row, 11): _f(r['area']),
+        })
+    if reinf:
+        updates['reinforce'] = reinf
+
+    # === piles ===  (header row 2, data rows 3+; qp/theta left blank — auto-derived)
+    piles_u = {}
+    for n, p in enumerate(slope_data.get('pile_lines') or []):
+        row = 3 + n
+        piles_u[cell_ref(row, 1)] = n + 1
+        piles_u[cell_ref(row, 2)] = str(p.get('label', f"Pile {n + 1}"))
+        piles_u[cell_ref(row, 3)] = _f(p['x1'])
+        piles_u[cell_ref(row, 4)] = _f(p['y1'])
+        piles_u[cell_ref(row, 5)] = _f(p['x2'])
+        piles_u[cell_ref(row, 6)] = _f(p['y2'])
+        for key, col in [('H', 7), ('D_pile', 9), ('S', 10), ('E', 11),
+                         ('I', 12), ('area', 13), ('V_cap', 14), ('M_cap', 15)]:
+            val = p.get(key)
+            if val is not None:
+                piles_u[cell_ref(row, col)] = _f(val)
+        piles_u[cell_ref(row, 16)] = str(p.get('fixity', 'free'))
+    if piles_u:
+        updates['piles'] = piles_u
+
+    # === seep bc / seep bc (2) ===
+    def _seep_updates(bc):
+        u = {}
+        for i, (x, y) in enumerate(bc.get('exit_face') or []):
+            u[cell_ref(5 + i, 2)] = _f(x)                     # B
+            u[cell_ref(5 + i, 3)] = _f(y)                     # C
+        for k, head in enumerate(bc.get('specified_heads') or []):
+            x_col = 5 + k * 3                                 # E, H, K, ...
+            y_col = x_col + 1
+            u[cell_ref(3, y_col)] = _f(head['head'])         # head value in row 3
+            for i, (x, y) in enumerate(head['coords']):
+                u[cell_ref(5 + i, x_col)] = _f(x)
+                u[cell_ref(5 + i, y_col)] = _f(y)
+        return u
+    s1 = _seep_updates(slope_data.get('seepage_bc') or {})
+    if s1:
+        updates['seep bc'] = s1
+    s2 = _seep_updates(slope_data.get('seepage_bc2') or {})
+    if s2:
+        updates['seep bc (2)'] = s2
+
+    updates = {k: v for k, v in updates.items() if v}
+    write_cells_to_xlsx(filepath, updates)
+    return filepath
+
+
 def save_data_to_pickle(data, filepath):
     """
     Save a data object to a pickle file.

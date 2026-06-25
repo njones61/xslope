@@ -38,6 +38,73 @@ import matplotlib
 matplotlib.use('Agg')  # non-interactive backend — no plot windows
 
 
+# === Excel round-trip regression (save_slope_data_to_xlsx) ===
+# load -> save into a blank template -> reload must reproduce every input
+# category. The file set spans circular & non-circular surfaces, profile &
+# polygon geometry, reinforcement, piles, distributed loads (both sets), a
+# second piezo line, reliability sigmas, and seepage BCs (both sets).
+ROUNDTRIP_TEMPLATE = 'docs/inputs/input_template.xlsx'
+ROUNDTRIP_FILES = [
+    'docs/inputs/slope/xslope_simple1.xlsx',
+    'docs/inputs/slope/xslope_dam.xlsx',
+    'docs/inputs/slope/xslope_rapid.xlsx',
+    'docs/inputs/slope/xslope_reliability.xlsx',
+    'docs/inputs/slope/xslope_rface.xlsx',
+    'docs/fem/files/xslope_reinforce_fem.xlsx',
+    'docs/fem/files/xslope_piles_fem.xlsx',
+    'docs/fem/files/xslope_noncircular_fem.xlsx',
+    'docs/fem/files/xslope_griffiths1_load.xlsx',
+    'docs/seep/files/xslope_earth_dam1.xlsx',
+    'docs/inputs/seep/xslope_earth_dam_bc2.xlsx',
+    'docs/seep/files/xslope_levee_poly.xlsx',
+    'docs/inputs/seep/xslope_lost_lake.xlsx',
+]
+# Source (non-derived) keys that must survive a round-trip. Derived geometry
+# (ground_surface, domain_polygon, and polygons-from-profile) is recomputed by
+# the loader and so is compared separately (polygon geometry only).
+ROUNDTRIP_KEYS = [
+    'gamma_water', 'tcrack_depth', 'tcrack_water', 'k_seismic', 'max_depth',
+    'profile_lines', 'materials', 'piezo_line', 'piezo_line2', 'circles',
+    'non_circ', 'dloads', 'dloads2', 'reinforcement_lines', 'pile_lines',
+    'seepage_bc', 'seepage_bc2',
+]
+
+
+def _roundtrip_eq(a, b):
+    """Scalar equality with float tolerance; strings compared verbatim (so the
+    loader's empty-cell 'nan' sentinel matches itself)."""
+    import math
+    if str(a) == str(b):
+        return True
+    try:
+        return math.isclose(float(a), float(b), rel_tol=1e-6, abs_tol=1e-6)
+    except (TypeError, ValueError):
+        return False
+
+
+def _roundtrip_diff(a, b, path=''):
+    """Recursively compare two slope_data values; return a list of mismatch paths."""
+    out = []
+    if isinstance(a, dict):
+        if not isinstance(b, dict):
+            return [f"{path}: dict vs {type(b).__name__}"]
+        for k in a:
+            if k not in b:
+                out.append(f"{path}.{k}: missing")
+            else:
+                out += _roundtrip_diff(a[k], b[k], f"{path}.{k}")
+        return out
+    if isinstance(a, (list, tuple)):
+        if not isinstance(b, (list, tuple)) or len(a) != len(b):
+            blen = len(b) if hasattr(b, '__len__') else '?'
+            return [f"{path}: len {len(a)} vs {blen}"]
+        for i, (x, y) in enumerate(zip(a, b)):
+            out += _roundtrip_diff(x, y, f"{path}[{i}]")
+        return out
+    if not _roundtrip_eq(a, b):
+        out.append(f"{path}: {a!r} != {b!r}")
+    return out
+
 
 def parse_test_tags(md_path):
     """Parse <!-- test: ... --> tags from a markdown file.
@@ -290,9 +357,52 @@ def run_reliability_test(test):
     return result['beta_ln'], None
 
 
+def run_roundtrip_test(test):
+    """Verify save_slope_data_to_xlsx round-trips a file: load -> save into a
+    blank template -> reload must reproduce every input category.
+
+    Returns (0.0, None) on success, or (None, message) listing the mismatches.
+    """
+    import tempfile
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    d1 = load_slope_data(test['file'])
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(d1, tmp, template=test['template'])
+        d2 = load_slope_data(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+    mismatches = []
+    for k in ROUNDTRIP_KEYS:
+        mismatches += _roundtrip_diff(d1.get(k), d2.get(k), k)
+
+    # Polygon-sourced geometry has no profile_lines to compare, so check the
+    # reconstructed polygon zones directly (geometry + material assignment).
+    if not d1.get('profile_lines'):
+        p1 = d1.get('polygons') or []
+        p2 = d2.get('polygons') or []
+        if len(p1) != len(p2):
+            mismatches.append(f"polygons: len {len(p1)} vs {len(p2)}")
+        else:
+            for i, (a, b) in enumerate(zip(p1, p2)):
+                if a.get('mat_id') != b.get('mat_id'):
+                    mismatches.append(f"polygons[{i}].mat_id")
+                if not a['polygon'].equals(b['polygon']):
+                    mismatches.append(f"polygons[{i}].geom")
+
+    if mismatches:
+        return None, "round-trip mismatch: " + "; ".join(mismatches[:5])
+    return 0.0, None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
+    if test_type == 'roundtrip':
+        return run_roundtrip_test(test)
     if test_type == 'fem_ssrm':
         return run_fem_test(test)
     elif test_type == 'seep':
@@ -310,6 +420,8 @@ def main():
     parser.add_argument('--lem', action='store_true', help='Run only LEM tests')
     parser.add_argument('--fem', action='store_true', help='Run only FEM tests')
     parser.add_argument('--seep', action='store_true', help='Run only seepage tests')
+    parser.add_argument('--roundtrip', action='store_true',
+                        help='Run only the Excel save/load round-trip tests')
     parser.add_argument('--tolerance', type=float, default=0.01,
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
@@ -325,10 +437,11 @@ def main():
     args = parser.parse_args()
 
     # If no specific flags, run all
-    run_all = not args.lem and not args.fem and not args.seep
+    run_all = not (args.lem or args.fem or args.seep or args.roundtrip)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
+    run_roundtrip = args.roundtrip or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -391,6 +504,22 @@ def main():
         if n_priv:
             print(f"Including {n_priv} private tests from {private_path.name}/")
 
+    # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
+    # list rather than markdown tags, since they check load/save fidelity, not FS.
+    if run_roundtrip:
+        if Path(ROUNDTRIP_TEMPLATE).exists():
+            n_rt = 0
+            for fp in ROUNDTRIP_FILES:
+                if Path(fp).exists():
+                    tests.append({'type': 'roundtrip', 'file': fp,
+                                  'template': ROUNDTRIP_TEMPLATE, 'method': '-',
+                                  'source': 'roundtrip'})
+                    n_rt += 1
+            if n_rt and not run_all:
+                print(f"Including {n_rt} Excel round-trip tests")
+        else:
+            print(f"Skipping round-trip tests (template not found: {ROUNDTRIP_TEMPLATE})")
+
     if args.skip_benchmarks:
         n_before = len(tests)
         tests = [t for t in tests if 'benchmark' not in t]
@@ -437,6 +566,10 @@ def main():
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'
+        elif test_type == 'roundtrip':
+            expected = 0.0          # run_roundtrip_test returns 0.0 on success
+            tol = 0.0
+            label = 'mismatch'
         else:
             expected = test.get('expected_fs')
             tol = test.get('tolerance', args.tolerance)

@@ -29,75 +29,18 @@ and view results — without writing code or running a notebook.
 
 ---
 
-## 2. Technology Stack — Trade Study
+## 2. Technology Stack (decided)
 
-Two families are on the table: a **native-Python desktop** stack (PySide6 + embedded
-Matplotlib) and a **web front-end** stack (Electron/Tauri/PyWebView + the Python engine
-behind an API). Both can satisfy "cross-platform desktop." They differ sharply in how
-they handle this codebase's two defining facts: (a) all visualization is Matplotlib, and
-(b) `slope_data`/results are full of **Shapely geometry, NumPy arrays, and pandas
-DataFrames**.
+**PySide6 (Qt for Python) + embedded Matplotlib**, single Python process, calling `xslope` directly. Reasons tied to this codebase:
 
-### 2a. The web / Electron path, evaluated fairly
+- **Reuse all plotting for free** — every low-level `plot_*` helper already takes an `ax`, so we embed a Matplotlib `FigureCanvasQTAgg` and call the existing plotting code unchanged. The single biggest lever.
+- **No language/process boundary** — the GUI imports `xslope` and calls functions directly; `slope_data`/results (Shapely geometry, NumPy arrays, pandas DataFrames) pass by reference, so there is no serialization layer to build or maintain.
+- **Zoom/pan + pick built in** — `NavigationToolbar2QT` gives zoom/pan/home; Matplotlib events (`button_press_event`, `pick_event`) give double-click-to-edit.
+- **Rich forms/tables** — Qt's `QTableView`/`QFormLayout`/`QDockWidget` suit the materials/vertex tables and run-options dialogs.
+- **Background work** — `QThread` workers run long solves (searches, SSRM) with progress/cancel.
+- **Licensing & packaging** — PySide6 is LGPL (compatible with Apache-2.0; PyQt is GPL — avoid); PyInstaller/Briefcase produce native installers.
 
-Concrete architectures if we go web:
-
-- **Electron** (Chromium + Node) shell + Python engine as a **sidecar process**, talking over local HTTP/WebSocket (FastAPI) or JSON-RPC over stdio.
-- **Tauri** (Rust shell, system webview) + Python sidecar — much smaller binary than Electron, same sidecar/IPC model.
-- **PyWebView** — a lightweight system-webview window with Python in the *main* process and a JS↔Python bridge (no Node, no second runtime). The most Python-friendly web option.
-
-Within any of these, visualization has only two honest options, and both have a real cost:
-
-1. **Render Matplotlib server-side to PNG/SVG and ship the image to the web view.** Reuses *all* existing plotting code — good. But the canvas becomes an **image**: smooth zoom/pan/pick at the vector level is lost. You bolt on image pan/zoom, re-render on zoom via a **round-trip to Python** (laggy), and implement "double-click to edit" by mapping click pixels back through the exported axes transform. Workable, but the interactive feel is second-rate and the plumbing is non-trivial.
-2. **Rewrite the plotting in JS (Plotly/D3/canvas).** Great client-side interactivity — but you re-implement *and then forever maintain a parallel rendering layer* for slices, base stresses, thrust lines, mesh, head contours, flowlines, FEM deformation/shear-strain/vectors, and the material tables (~370 KB of Matplotlib code across `plot.py`/`plot_seep.py`/`plot_fem.py`). Two plotting code paths that must stay in sync as the engine evolves. Highest cost in the whole project.
-
-**The serialization tax (applies to Electron/Tauri sidecar, less so PyWebView):**
-`slope_data` contains `LineString`/`Polygon` (Shapely), the mesh holds NumPy arrays, and
-results hold pandas `DataFrame`s. None of these are JSON-serializable as-is. A process
-boundary forces a **custom encode/decode layer for every category**, maintained in
-lockstep with the engine. In-process Python passes them by reference — that layer simply
-does not exist.
-
-**Where the web path genuinely wins** (worth being honest about):
-
-- If you later want the **same app to run in a browser or as a hosted/multi-user cloud service**, a web UI is already most of the way there. *(The stated goal is a local desktop app to replace Colab — not a web service.)*
-- **Richer UI styling/theming** via HTML/CSS, and easier custom/modern look.
-- If the team were **JS/web-skilled** rather than Python-scientific (not the case here).
-
-**Net:** the web path's costs (image-based interactivity *or* a duplicated plotting
-layer, plus a serialization boundary) are paid up front and forever, against benefits
-(browser/cloud reach, CSS theming) that the current goal doesn't ask for.
-
-### 2b. Future-proofing note
-
-Choosing native **does not burn the web bridge.** The engine API is clean and
-function-oriented; if a hosted/browser version is ever wanted, the *same* functions can
-be wrapped in a FastAPI service later without touching the desktop app. So we can take
-the low-cost native path now and keep the web option open as an additive future project,
-rather than pay the web tax today.
-
-### Recommendation: **PySide6 (Qt for Python) + embedded Matplotlib**
-
-For concrete reasons tied to this codebase:
-
-| Requirement | Why PySide6 + Matplotlib wins |
-| --- | --- |
-| Same language as engine | The GUI runs in the same Python process and calls `xslope` functions directly — **no IPC, no serialization boundary, no second language to maintain.** |
-| Reuse existing plots | Every `plot_*` low-level helper already takes an `ax`. We embed a Matplotlib `FigureCanvasQTAgg` and call the **existing plotting code unchanged.** This is the single biggest lever — we get most of the visualization "for free." |
-| Zoom / pan | Matplotlib's `NavigationToolbar2QT` gives zoom/pan/home out of the box; custom pick (double-click-to-edit) via Matplotlib event callbacks (`button_press_event`, `pick_event`). |
-| Rich forms & tables | Qt has first-class `QTableView`, `QFormLayout`, `QDockWidget` (dockable side panels), validators, file dialogs, etc. — ideal for the materials table, vertex tables, and run-options dialogs. |
-| Packaging | Mature: PyInstaller (one-folder) or Briefcase (native `.dmg` / `.msi` installers). |
-| Licensing | PySide6 is **LGPL**, compatible with the project's Apache-2.0 license (PyQt is GPL/commercial — avoid). |
-| Background work | `QThread` workers for long solves (searches, SSRM), with progress + cancel, while keeping the UI responsive. |
-
-### Alternatives considered (and why not)
-
-- **Electron / Tauri + web front-end + Python backend.** The user is open to a different wrapper language, but this path forces us to **rewrite the entire plotting layer** (Matplotlib doesn't render in a browser; we'd move to Plotly/D3) and adds a cross-process bridge (HTTP/WebSocket) plus a packaging headache (bundling a Python sidecar). All cost, little benefit here.
-- **Tkinter + Matplotlib.** Built-in and embeds Matplotlib, but dated widgets and weak table/validation support make the forms-heavy parts painful.
-- **Streamlit / Dash / Panel (web app in a webview).** Fast to prototype, but the reactive-rerun model fights interactive canvas editing (pan/pick/double-click), and it isn't really a "desktop app."
-- **Toga / BeeWare, Dear PyGui, Kivy.** Either immature for this use or require rewriting all visualization.
-
-**Decision:** PySide6 + embedded Matplotlib, single-process, engine called directly. (Open to confirming — see §12.)
+*Ruled out:* web/Electron/Tauri/PyWebView (forces rewriting the Matplotlib plotting layer in JS, or accepting image-based round-tripped interactivity, plus a process/serialization bridge — all cost, no benefit for a desktop-only goal); Tkinter (weak tables/forms); Streamlit/Dash (reactive model fights canvas editing). A hosted web version stays possible later by wrapping the same engine functions in FastAPI, without affecting the desktop app.
 
 ---
 
@@ -175,13 +118,9 @@ The Explore of the codebase confirms a clean, callable API. Mapping of GUI actio
 
 ### Gaps to build **in the `xslope` package** (so notebooks/scripts benefit too)
 
-1. **Full `save_slope_data_to_xlsx(slope_data, path, template=…)`** — ✅ **DONE** (in `xslope/fileio.py`). The inverse of `load_slope_data`: writes the **source input tables** (main params, materials, profile/polygon geometry, piezo, circles, non-circ, dloads, reinforce, piles, seep BC) back into the template's sheet/cell layout, building on the package's existing formatting-preserving `write_cells_to_xlsx`. Contract: pass `template=<blank template>` to create a file ("New"/"Save As"); pass `template=None` to edit an existing file in place ("Save").
-
-   Key correctness details handled: writes geometry to **either** the `profile` sheet (when `profile_lines` present) **or** the `polygon` sheet (mutually exclusive, matching the loader); skips **derived** geometry (`ground_surface`, `domain_polygon`, `polygons` when profile-sourced); never writes **formula** cells (the row-6 material-name XLOOKUP) but does write the Mat IDs that feed them; collapses every circle to `Option="Depth"` (loader recomputes `R = Yo - Depth` identically); leaves the pile `qp/theta` column blank (auto-derived on load); reconstructs reinforcement from the raw `reinforcement_lines` (the round-trippable form); leaves empty `option`/`u` cells blank.
-
-   **Verified** with a round-trip test (load → save → load is identity) across 13 representative files spanning all categories — circular & non-circular surfaces, profile & polygon geometry, reinforcement, piles, distributed loads (both sets), second piezo line, reliability sigmas, and seepage BCs (both sets). All pass.
-2. **Optional: a thin restyle hook on the renderer.** Existing `plot_*` functions hardcode colors/styles. To support the Display-Options dialog without forking the plotting code, add optional style kwargs (color/linestyle/linewidth/visibility) to the low-level `ax` helpers, *or* introduce a GUI-side renderer that composes the low-level helpers and applies a `StyleConfig`. Start by reusing plots as-is; add styling incrementally.
-3. **Progress/cancel callbacks (nice-to-have).** Long searches and SSRM currently print to stdout. We can capture stdout for the log pane initially; later, thread an optional `progress_callback` through `circular_search` / `solve_ssrm` for a real progress bar and cancellation.
+1. **`save_slope_data_to_xlsx(slope_data, path, template=…)`** — ✅ **DONE** (`xslope/fileio.py`). Inverse of `load_slope_data`: writes the source input tables back into the template via the formatting-preserving `write_cells_to_xlsx`. `template=<blank>` creates a new file (New / Save As); `template=None` edits in place (Save). Verified by a load→save→load round-trip across 13 files spanning all input categories, wired into `run_tests.py` (`--roundtrip`).
+2. **A restyle hook on the renderer.** Existing `plot_*` functions hardcode colors/styles. To drive the Display-Options dialog (§8a) without forking the plotting code, add optional style kwargs to the low-level `ax` helpers *or* introduce a GUI-side renderer that composes them and applies a `StyleConfig`. Start by reusing plots as-is; add styling incrementally.
+3. **Progress/cancel callbacks (nice-to-have).** Searches and SSRM print to stdout today — capture that for the log pane initially; later thread an optional `progress_callback` through `circular_search` / `solve_ssrm` for a real progress bar and cancellation.
 
 ---
 
@@ -243,18 +182,55 @@ This cleanly resolves the "two LEM display types" question: they're just two tab
 
 - **Zoom/pan:** Matplotlib `NavigationToolbar2QT` (built in). Add fit-to-extent ("Home") and scroll-wheel zoom.
 - **Select / edit:** enable `picker` on rendered artists, tag each with its `slope_data` reference; double-click → open editor (§6).
-- **Display Options dialog:** a `StyleConfig` of per-layer `{visible, color, linestyle, linewidth/size}`; the renderer reads it. Toggling re-renders. (Drives the §5.2 styling work.)
+- **Display Options dialog:** a `StyleConfig` of per-layer `{visible, color, linestyle, linewidth/size, alpha, ...}` plus figure-level settings (background, font size, DPI); the renderer reads it. Editing re-renders live. (Drives the §5.2 styling work, and is persisted per §8a.)
 - **DXF export:** "Export current view to DXF" calls the active `plot_*` with `save_dxf=True` (already supported across plot functions), or `cad.export_dxf(slope_data, path)` for a clean geometry export.
 - **DXF import:** wizard → `cad.read_dxf_polygons` to list layers → map layers to materials → `cad.import_dxf(...)` writes into a template copy → `load_slope_data` opens it.
+
+### 8a. Style persistence (per-project + global default)
+
+Styling (colors, line styles, widths, visibility, fills, figure background/fonts) is
+**not** stored in the Excel file — the input template format stays untouched. Instead it
+is kept in JSON sidecars, resolved in three deep-merged tiers:
+
+1. **Factory defaults** — shipped with the app (`studio/resources/style_factory.json`). Always present, so "Reset to factory" can never fail.
+2. **User global default** — written by a **"Set as default"** action. Lives in the OS app-config dir via Qt's `QStandardPaths.AppConfigLocation` (macOS `~/Library/Application Support/XSlope Studio/style_default.json`, Windows `%APPDATA%\XSlope Studio\…`) — not a home-dir dotfile.
+3. **Per-project sidecar** — `{stem}_style.json`, written **next to the `.xlsx`**, matching the existing `{stem}_mesh.json` / `{stem}_seep.csv` sidecar convention. So styling travels with the project when the xlsx + sidecar are shared, without altering the xlsx.
+
+**Effective style = factory ⊕ global ⊕ project** (deep-merge). Each file stores only
+**sparse overrides relative to factory** (not a full snapshot) plus a `version` field —
+so files stay tiny, remain portable (a colleague sees your exact styling regardless of
+*their* global default), and unset keys automatically pick up new factory values when the
+app updates. The `StyleConfig` the renderer reads is the merged result; the plot path
+never needs to know which tier a value came from.
+
+Example `{stem}_style.json`:
+
+```json
+{
+  "version": 1,
+  "layers": {
+    "failure_surface": { "color": "#cc0000", "linewidth": 2.0 },
+    "slices":          { "facecolor": "#e8f0ff", "alpha": 0.3 },
+    "piezo_line":      { "color": "#1f77b4", "linestyle": "--", "visible": true }
+  },
+  "figure": { "dpi": 300, "font_size": 9 }
+}
+```
+
+**Lifecycle hooks:** Open → load `{stem}_style.json` if present, else global, else factory.
+Display Options edits → live `StyleConfig` re-render. Save / Save As → also write
+`{stem}_style.json` beside the xlsx (only if it differs from default, so unstyled projects
+don't litter sidecars). "Set as default" → write current overrides to the global file.
+"Reset to factory" / "Revert to default" → clear the relevant override tier.
 
 ---
 
 ## 9. File / Project Lifecycle
 
 - **New** → copy standard template (`docs/inputs/input_template.xlsx`) into a working doc; user fills via forms; `save_slope_data_to_xlsx` writes it.
-- **Open** → `load_slope_data`; render Inputs view. Auto-load `{stem}_mesh.json` / `{stem}_seep.csv` if present (already handled by `load_slope_data`).
-- **Save / Save As** → `save_slope_data_to_xlsx` (new function, §5.1). Preserve the existing format.
-- **Recent files**, dirty-state prompt on close, and a per-project sidecar for mesh/seep/fem outputs following the existing `{stem}_*.json/.csv` convention.
+- **Open** → `load_slope_data`; render Inputs view. Auto-load `{stem}_mesh.json` / `{stem}_seep.csv` if present (already handled by `load_slope_data`), and `{stem}_style.json` if present (§8a).
+- **Save / Save As** → `save_slope_data_to_xlsx` (§5.1), preserving the existing format; also writes the `{stem}_style.json` style sidecar when the style differs from default (§8a).
+- **Recent files**, dirty-state prompt on close, and per-project sidecars (`{stem}_mesh.json`, `{stem}_seep.csv`, `{stem}_style.json`) all following the existing `{stem}_*` convention.
 
 ---
 
@@ -274,7 +250,8 @@ studio/                # XSlope Studio desktop app
   editors/            # one module per input category (forms/tables)
   runners/            # lem, seep, fem, mesh run-controllers (QThread workers)
   dialogs/            # run-options, display-options, dxf import/export wizards
-  resources/          # icons, bundled blank template
+  style.py            # StyleConfig + 3-tier resolve/merge + sidecar I/O (§8a)
+  resources/          # icons, bundled blank template, style_factory.json
 ```
 
 - The app imports the engine as `import xslope` — no copy of the engine, single source of truth.
@@ -286,7 +263,7 @@ studio/                # XSlope Studio desktop app
 ## 11. Phased Roadmap
 
 **Phase 0 — Engine prerequisite** ✅ **DONE**
-- `save_slope_data_to_xlsx(slope_data, path, template=…)` implemented in `xslope/fileio.py` and verified by a round-trip test across 13 representative files (all input categories). See §5.1. *(Recommended follow-up: fold the round-trip check into the repo's `run_tests.py` so it stays green.)*
+- `save_slope_data_to_xlsx(slope_data, path, template=…)` implemented in `xslope/fileio.py` and verified by a round-trip test across 13 representative files (all input categories). See §5.1. The round-trip check is wired into `run_tests.py` as a `roundtrip` test type (runs in the default suite; standalone via `python run_tests.py --roundtrip`).
 
 **Phase 1 — Skeleton + read-only viewer**
 - PySide6 app shell, menus, dockable panels, embedded Matplotlib canvas with zoom/pan.
@@ -303,8 +280,9 @@ studio/                # XSlope Studio desktop app
 **Phase 4 — Meshing + Seepage + FEM**
 - Meshing dialog; Seepage run + result view; FEM single/SSRM + result views; progress/cancel.
 
-**Phase 5 — Canvas selection + Display Options**
+**Phase 5 — Canvas selection + Display Options + style persistence**
 - Pick/double-click-to-edit; `StyleConfig` + Display Options dialog (visibility/colors/styles).
+- Style persistence (§8a): factory/global/project 3-tier resolve+merge, `{stem}_style.json` sidecar I/O, "Set as default" / "Reset to factory" actions.
 
 **Phase 6 — DXF + Smart editing + polish**
 - DXF import wizard and export-current-view; optional coincident smart-editing; undo/redo.
@@ -314,25 +292,21 @@ studio/                # XSlope Studio desktop app
 
 ---
 
-## 12. Decisions
+## 12. Decisions (all settled)
 
-**Settled**
+- **GUI stack:** PySide6 + embedded Matplotlib, single-process, calling `xslope` directly (§2).
+- **Application name:** XSlope Studio.
+- **Code location:** a `studio/` subfolder inside the existing repo (§10).
+- **v1 scope:** LEM first — open / edit / save + LEM analysis and results; Seepage and FEM follow (Phase 4).
+- **Distribution:** both — native `.dmg`/`.msi` installers *and* `pip install xslope[gui]`.
 
-- **GUI stack:** **PySide6 (Qt for Python) + embedded Matplotlib**, single-process, calling `xslope` directly. Chosen for plotting reuse and engine symmetry (see §2 trade study). The web/Electron path was evaluated and set aside — its costs (image-based interactivity *or* a duplicated JS plotting layer, plus a serialization bridge) aren't justified by the desktop-only goal, and a FastAPI-wrapped web version remains possible later (§2b).
-- **Application name:** **XSlope Studio**.
-- **Code location:** a **`studio/`** subfolder inside the existing repo (see §10).
-- **v1 scope:** **LEM first** — open / edit / save + LEM analysis and results in the first usable release; Seepage and FEM follow (Phase 4). The roadmap is already ordered this way.
-- **Distribution:** **both** — native `.dmg`/`.msi` installers *and* `pip install xslope[gui]`.
-
-**Still open**
-
-1. Nothing blocking. Remaining choices (icon/branding, exact menu layout, undo/redo granularity) are detail-level and can be settled during implementation.
+Nothing blocking remains; detail-level choices (icon/branding, menu layout, undo/redo granularity) settle during implementation.
 
 ---
 
 ## 13. Key Risks / Watch-items
 
-- **Save fidelity** — the Excel save must perfectly round-trip every category; this is the foundation and the main net-new engine code.
+- **Save fidelity** — done and covered by the `--roundtrip` test; keep that test green as input categories evolve.
 - **Long solves blocking the UI** — must run on worker threads from the start; FEM/SSRM also need cancellation.
 - **Restyling existing plots** — the hardcoded styles in `plot_*` mean Display Options needs either added style kwargs or a GUI-side renderer; scope carefully.
 - **Packaging heavy deps** — gmsh (FEM) and the scientific stack inflate installer size and complicate signing.

@@ -22,6 +22,7 @@ Usage:
     python run_tests.py --lem        # run only LEM tests
     python run_tests.py --fem        # run only FEM tests
     python run_tests.py --seep       # run only seepage tests
+    python run_tests.py --roundtrip  # run only the Excel save/load round-trip tests
     python run_tests.py --tolerance 0.02  # custom FS tolerance (default 0.01)
     python run_tests.py --skip-benchmarks # exclude verification benchmarks (faster)
     python run_tests.py --verbose    # print details for passing tests too

@@ -41,6 +41,10 @@ dependencies = [
 
 [project.optional-dependencies]
 fem = ["gmsh"]
+gui = ["PySide6"]
+
+[project.scripts]
+xslope-studio = "studio.app:main"
 
 [project.urls]
 Homepage = "https://github.com/njones61/xslope"
@@ -49,7 +53,7 @@ Source = "https://github.com/njones61/xslope"
 Issues = "https://github.com/njones61/xslope/issues"
 
 [tool.setuptools]
-packages = ["xslope"]
+packages = ["xslope", "studio"]
 
 [tool.setuptools.dynamic]
 version = { attr = "xslope._version.__version__" }

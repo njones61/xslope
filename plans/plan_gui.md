@@ -265,9 +265,9 @@ studio/                # XSlope Studio desktop app
 **Phase 0 — Engine prerequisite** ✅ **DONE**
 - `save_slope_data_to_xlsx(slope_data, path, template=…)` implemented in `xslope/fileio.py` and verified by a round-trip test across 13 representative files (all input categories). See §5.1. The round-trip check is wired into `run_tests.py` as a `roundtrip` test type (runs in the default suite; standalone via `python run_tests.py --roundtrip`).
 
-**Phase 1 — Skeleton + read-only viewer**
-- PySide6 app shell, menus, dockable panels, embedded Matplotlib canvas with zoom/pan.
-- Open Excel → render Inputs view via `plot_inputs`. Recent files, log pane.
+**Phase 1 — Skeleton + read-only viewer** ✅ **DONE**
+- `studio/` PySide6 app: shell, menus, dockable Inputs summary panel + Log pane, embedded Matplotlib canvas with zoom/pan + scroll-zoom, LEM/Seep/FEM mode selector, recent files.
+- File → Open renders the Inputs view via `plot_inputs(fig=…)` (the `fig=` param added to `plot.py`). `ProjectDocument` holds `slope_data` with snapshot undo/redo. Packaged as the `xslope-studio` entry point (`gui` extra). Verified headlessly (offscreen).
 
 **Phase 2 — Editing**
 - Editors for all input categories; mutate `slope_data` → auto re-render.

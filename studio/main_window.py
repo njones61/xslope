@@ -12,9 +12,10 @@ from __future__ import annotations
 import os
 import sys
 import traceback
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
     QPlainTextEdit, QToolBar, QTreeWidget, QTreeWidgetItem, QWidget,
@@ -22,11 +23,15 @@ from PySide6.QtWidgets import (
 
 from .canvas import MplCanvas
 from .document import ProjectDocument
+from .editors import CATEGORY_EDITORS
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
 MAX_RECENT = 8
 MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
+# Blank template bundled with the app; used to create files on Save As.
+TEMPLATE = Path(__file__).resolve().parent / "resources" / "input_template.xlsx"
+CATEGORY_ROLE = Qt.UserRole + 1
 
 
 class _LogStream:
@@ -87,6 +92,7 @@ class MainWindow(QMainWindow):
         self.inputs_tree = QTreeWidget()
         self.inputs_tree.setHeaderLabels(["Input", "Count / Value"])
         self.inputs_tree.setColumnWidth(0, 180)
+        self.inputs_tree.itemDoubleClicked.connect(self._on_tree_double_click)
         dock = QDockWidget("Inputs", self)
         dock.setObjectName("inputs_dock")
         dock.setWidget(self.inputs_tree)
@@ -118,9 +124,9 @@ class MainWindow(QMainWindow):
         self.act_redo = QAction("&Redo", self, shortcut=QKeySequence.Redo,
                                 triggered=self.doc.redo, enabled=False)
         self.act_about = QAction("&About", self, triggered=self._about)
-        # Save actions exist but are disabled until Phase 2 wires editing.
-        self.act_save = QAction("&Save", self, shortcut=QKeySequence.Save, enabled=False)
-        self.act_save_as = QAction("Save &As…", self, enabled=False)
+        self.act_save = QAction("&Save", self, shortcut=QKeySequence.Save,
+                                enabled=False, triggered=self.save)
+        self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -196,12 +202,15 @@ class MainWindow(QMainWindow):
     # --- document signal handlers ---------------------------------------
     def _on_loaded(self):
         self.mode_combo.setCurrentIndex([m for _, m in MODES].index(self._mode))
+        self.act_save.setEnabled(True)
+        self.act_save_as.setEnabled(True)
         self._render()
         self._populate_inputs_tree()
         self._update_title()
         n = len(self.doc.slope_data.get("materials", []))
         self.statusBar().showMessage(
-            f"Loaded {os.path.basename(self.doc.path)} — {n} material(s)")
+            f"Loaded {os.path.basename(self.doc.path)} — {n} material(s). "
+            f"Double-click an underlined input to edit it.")
 
     def _render(self):
         if not self.doc.is_open:
@@ -223,19 +232,26 @@ class MainWindow(QMainWindow):
     def _populate_inputs_tree(self):
         d = self.doc.slope_data
         self.inputs_tree.clear()
+        font_editable = None
 
-        def add(name, value):
-            QTreeWidgetItem(self.inputs_tree, [name, str(value)])
+        def add(name, value, category=None):
+            item = QTreeWidgetItem(self.inputs_tree, [name, str(value)])
+            if category is not None:
+                item.setData(0, CATEGORY_ROLE, category)
+                f = item.font(0)
+                f.setUnderline(True)
+                item.setFont(0, f)
+                item.setToolTip(0, "Double-click to edit")
+            return item
 
-        add("Unit weight of water", d.get("gamma_water"))
-        add("Tension crack depth", d.get("tcrack_depth"))
-        add("Seismic coefficient k", d.get("k_seismic"))
-        add("Materials", len(d.get("materials", [])))
+        add("Global parameters", f"γw={d.get('gamma_water')}, k={d.get('k_seismic')}",
+            category="global")
+        add("Materials", len(d.get("materials", [])), category="materials")
         add("Profile lines", len(d.get("profile_lines") or []))
         add("Polygons", len(d.get("polygons") or []))
-        add("Circles", len(d.get("circles") or []))
-        add("Non-circular pts", len(d.get("non_circ") or []))
-        add("Piezo line pts", len(d.get("piezo_line") or []))
+        add("Circles", len(d.get("circles") or []), category="circles")
+        add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")
+        add("Piezometric line", len(d.get("piezo_line") or []), category="piezo")
         add("Distributed loads", len(d.get("dloads") or []))
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []))
         add("Piles", len(d.get("pile_lines") or []))
@@ -243,6 +259,56 @@ class MainWindow(QMainWindow):
         add("Seepage heads", len(sbc.get("specified_heads", [])))
         add("Mesh", "yes" if d.get("mesh") is not None else "no")
         self.inputs_tree.expandAll()
+
+    # --- editing ---------------------------------------------------------
+    def _on_tree_double_click(self, item, _column):
+        category = item.data(0, CATEGORY_ROLE)
+        if category:
+            self.edit_category(category)
+
+    def edit_category(self, category):
+        editor = CATEGORY_EDITORS.get(category)
+        if editor is None or not self.doc.is_open:
+            return
+        dlg = editor.build(self.doc.slope_data, self)
+        if dlg.exec():
+            self.doc.begin_edit()
+            try:
+                editor.apply(self.doc.slope_data, dlg)
+            except Exception:
+                traceback.print_exc()
+            self.doc.commit_edit()        # -> re-render + mark dirty
+            self._populate_inputs_tree()
+
+    # --- save ------------------------------------------------------------
+    def save(self):
+        if not self.doc.path:
+            return self.save_as()
+        try:
+            self.doc.save(template=None)   # edit in place, preserve formatting
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Save failed", str(exc))
+            return
+        self.statusBar().showMessage(f"Saved {os.path.basename(self.doc.path)}")
+
+    def save_as(self):
+        start = self.doc.path or (self._recent[0] if self._recent else "")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save As", start, "Excel files (*.xlsx)")
+        if not path:
+            return
+        if not path.lower().endswith(".xlsx"):
+            path += ".xlsx"
+        try:
+            self.doc.save(path=path, template=str(TEMPLATE))  # fresh file from template
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Save failed", str(exc))
+            return
+        self._add_recent(path)
+        self._update_title()
+        self.statusBar().showMessage(f"Saved {os.path.basename(path)}")
 
     # --- misc ------------------------------------------------------------
     def _update_title(self):
@@ -260,6 +326,18 @@ class MainWindow(QMainWindow):
             f"engine.<br><br>Open an Excel input file to view its geometry and inputs.")
 
     def closeEvent(self, event):
+        if self.doc.is_open and self.doc.dirty:
+            res = QMessageBox.question(
+                self, "Unsaved changes", "Save changes before closing?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+            if res == QMessageBox.Cancel:
+                event.ignore()
+                return
+            if res == QMessageBox.Save:
+                self.save()
+                if self.doc.dirty:        # save failed or was cancelled
+                    event.ignore()
+                    return
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
         super().closeEvent(event)

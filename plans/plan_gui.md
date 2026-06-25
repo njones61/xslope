@@ -269,9 +269,12 @@ studio/                # XSlope Studio desktop app
 - `studio/` PySide6 app: shell, menus, dockable Inputs summary panel + Log pane, embedded Matplotlib canvas with zoom/pan + scroll-zoom, LEM/Seep/FEM mode selector, recent files.
 - File → Open renders the Inputs view via `plot_inputs(fig=…)` (the `fig=` param added to `plot.py`). `ProjectDocument` holds `slope_data` with snapshot undo/redo. Packaged as the `xslope-studio` entry point (`gui` extra). Verified headlessly (offscreen).
 
-**Phase 2 — Editing**
-- Editors for all input categories; mutate `slope_data` → auto re-render.
-- Save / Save As / New (from template). Document dirty-state handling.
+**Phase 2 — Editing** 🚧 **IN PROGRESS**
+- ✅ Modal editor framework (`studio/editors.py`): generic `TableEditorDialog` / `FormEditorDialog`, launched by double-clicking an Inputs-tree category; edits go through `ProjectDocument.begin_edit/commit_edit` → re-render + dirty. Editors preserve unshown record keys.
+- ✅ Editors for: global params, materials, circles, non-circular surface, piezometric line.
+- ✅ Save (in place) / Save As (fresh file from bundled blank template); unsaved-changes prompt on close.
+- ⬜ Remaining editors: profile lines / polygons (geometry), distributed loads, reinforcement, piles, seepage BC (the nested/block-structured categories).
+- ⬜ New (from template) — pairs with the geometry editor (a blank template won't `load`, so New needs a minimal in-memory skeleton + geometry entry).
 
 **Phase 3 — LEM analysis**
 - Run-options dialog; worker-thread execution; Search + Solution + Reliability result tabs.

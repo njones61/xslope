@@ -1561,6 +1561,7 @@ def plot_inputs(
     legend_ncol="auto",
     legend_max_cols=6,
     legend_max_rows=4,
+    fig=None,
 ):
     """
     Creates a plot showing the slope geometry and input parameters.
@@ -1596,11 +1597,19 @@ def plot_inputs(
         legend_max_cols: When legend_ncol="auto", cap the number of columns (default: 6).
         legend_max_rows: When legend_ncol="auto", try to keep legend rows <= this value
             by increasing columns (default: 4).
+        fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
+            GUI canvas). When None (default) a new pyplot figure is created and shown;
+            when provided, the figure is cleared and reused and plt.show() is skipped.
 
     Returns:
-        None
+        The Matplotlib Figure that was drawn into.
     """
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
 
     # Plot mesh in background if available
     mesh = slope_data.get('mesh')
@@ -1829,17 +1838,19 @@ def plot_inputs(
 
     ax.set_title(title)
 
-    plt.subplots_adjust(bottom=bottom_margin)
-    plt.tight_layout()
+    fig.subplots_adjust(bottom=bottom_margin)
+    fig.tight_layout()
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:
-        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, base_name + '.dxf')
 
-    plt.show()
+    if own_fig:
+        plt.show()
+    return fig
 
 # ========== Main Plotting Function =========
 

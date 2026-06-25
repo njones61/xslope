@@ -85,7 +85,7 @@ Single Python process, document-view (MVC-ish) structure:
 
 ### Key components
 
-- **`ProjectDocument`** — owns `slope_data`, the source file path, a dirty flag, and cached results. Provides typed accessors/mutators per input category and emits change signals. Owns undo/redo (command stack) eventually.
+- **`ProjectDocument`** — owns `slope_data`, the source file path, a dirty flag, and cached results. Provides typed accessors/mutators per input category and emits change signals. Owns **snapshot-based undo/redo** (deep-copies `slope_data` onto an undo stack on each edit).
 - **`CanvasWidget`** — embeds a Matplotlib figure; renders the current view by calling existing `xslope.plot` helpers with the document's `slope_data` and a `StyleConfig`. Handles pan/zoom (toolbar) and pick events (double-click → open editor).
 - **Editor panels/dialogs** — one per input category (see §6). Tables for tabular data, forms for scalars.
 - **Run controllers** — assemble kwargs from run-options dialogs, launch engine calls on a worker thread, stream progress/log, store results on the document.
@@ -119,7 +119,7 @@ The Explore of the codebase confirms a clean, callable API. Mapping of GUI actio
 ### Gaps to build **in the `xslope` package** (so notebooks/scripts benefit too)
 
 1. **`save_slope_data_to_xlsx(slope_data, path, template=…)`** — ✅ **DONE** (`xslope/fileio.py`). Inverse of `load_slope_data`: writes the source input tables back into the template via the formatting-preserving `write_cells_to_xlsx`. `template=<blank>` creates a new file (New / Save As); `template=None` edits in place (Save). Verified by a load→save→load round-trip across 13 files spanning all input categories, wired into `run_tests.py` (`--roundtrip`).
-2. **A restyle hook on the renderer.** Existing `plot_*` functions hardcode colors/styles. To drive the Display-Options dialog (§8a) without forking the plotting code, add optional style kwargs to the low-level `ax` helpers *or* introduce a GUI-side renderer that composes them and applies a `StyleConfig`. Start by reusing plots as-is; add styling incrementally.
+2. **Embeddable, styleable plotting.** Add optional `ax=`/`fig=` and `style=` (`StyleConfig`) params to the high-level `plot_*` functions (`plot_inputs`, `plot_solution`, the search/seep/fem plots) so the GUI passes its embedded Matplotlib figure and applies per-layer styling, instead of each function creating its own figure with hardcoded styles. Keeps a single layout path — no GUI-side re-implementation. Start by reusing plots as-is (figure embedding first), then thread `style=` through incrementally.
 3. **Progress/cancel callbacks (nice-to-have).** Searches and SSRM print to stdout today — capture that for the log pane initially; later thread an optional `progress_callback` through `circular_search` / `solve_ssrm` for a real progress bar and cancellation.
 
 ---
@@ -299,8 +299,15 @@ studio/                # XSlope Studio desktop app
 - **Code location:** a `studio/` subfolder inside the existing repo (§10).
 - **v1 scope:** LEM first — open / edit / save + LEM analysis and results; Seepage and FEM follow (Phase 4).
 - **Distribution:** both — native `.dmg`/`.msi` installers *and* `pip install xslope[gui]`.
+- **Undo/redo:** snapshot-based — deep-copy `slope_data` onto an undo stack per edit (the dicts are tiny, so this gives full undo/redo cheaply) (§4).
+- **Canvas editing (v1):** forms/tables + double-click-to-edit only; the canvas is view + selection. Interactive drag of geometry is deferred to a later phase (§6, §8).
+- **Plot embedding:** add optional `ax=`/`fig=` (and `style=`) params to the high-level `plot_*` functions so the GUI passes its embedded figure and applies styling — one layout path, no GUI-side re-implementation (§5).
+- **Document model:** single project per window (no MDI) in v1.
+- **Recompute:** explicit **Run** to (re)solve; only inputs re-render live on edit.
+- **Units:** the engine is unit-agnostic; the `gamma_water` field implicitly sets the system (≈62.4 → English pcf/psf/ft, ≈9.81 → metric kN/m³/kPa/m). The GUI may *infer* that from `gamma_water` to show convenient unit labels, but performs **no enforcement or conversion** — the user is responsible for confirming units are consistent.
+- **Packaging detail:** `studio/` ships inside the `xslope` distribution (added to `pyproject` packages + the `xslope-studio` entry point), enabled via the `gui` extra.
 
-Nothing blocking remains; detail-level choices (icon/branding, menu layout, undo/redo granularity) settle during implementation.
+Nothing blocking remains; detail-level choices (icon/branding, menu layout) settle during implementation.
 
 ---
 

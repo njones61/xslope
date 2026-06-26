@@ -12,9 +12,7 @@ from __future__ import annotations
 import html
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import (
-    QImage, QKeySequence, QShortcut, QTextCursor, QTextDocument,
-)
+from PySide6.QtGui import QImage, QKeySequence, QShortcut, QTextDocument
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
@@ -99,24 +97,25 @@ class ChatDock(QWidget):
         self._add_block("Assistant", text, "#2e7d32")
 
     def _on_tool_ran(self, code, output, figures):
-        self._append_html(
-            f'<div style="margin:6px 0;"><b>Ran code</b>'
-            f'<pre style="background:#f4f4f4;padding:6px;border-radius:4px;'
-            f'white-space:pre-wrap;">{html.escape(code)}</pre>')
+        pre = ("background:#f4f4f4;padding:6px;border-radius:4px;"
+               "white-space:pre-wrap;word-wrap:break-word;")
+        frag = (f'<div style="margin-top:8px;"><b>Ran code</b>'
+                f'<pre style="{pre}">{html.escape(code)}</pre>')
         if output and output != "(no output)":
-            self._append_html(
-                f'<pre style="background:#eef3ee;padding:6px;border-radius:4px;'
-                f'white-space:pre-wrap;">{html.escape(output)}</pre>')
+            frag += (f'<pre style="{pre.replace("#f4f4f4", "#eef3ee")}">'
+                     f'{html.escape(output)}</pre>')
+        frag += "</div>"
+        self.transcript.append(frag)            # one complete block -> own paragraph
         for path in figures or []:
             self._append_image(path)
-        self._append_html("</div>")
 
     def _on_tool_declined(self, code):
-        self._append_html('<div style="color:#9a6700;">Declined to run the code.</div>')
+        self.transcript.append('<div style="color:#9a6700;margin-top:8px;">'
+                               'Declined to run the code.</div>')
 
     def _on_failed(self, message):
-        self._append_html(f'<div style="color:#b00020;"><b>Error:</b> '
-                          f'{html.escape(message)}</div>')
+        self.transcript.append(f'<div style="color:#b00020;margin-top:8px;">'
+                               f'<b>Error:</b> {html.escape(message)}</div>')
         self._idle()
 
     def _on_finished(self):
@@ -129,9 +128,11 @@ class ChatDock(QWidget):
         self.status_label.clear()
 
     def _add_block(self, who, text, color):
-        self._append_html(
-            f'<div style="margin:6px 0;"><b style="color:{color};">{who}:</b> '
-            f'{html.escape(text).replace(chr(10), "<br>")}</div>')
+        body = html.escape(text).replace("\n", "<br>")
+        # word-wrap so a long unbroken token (URL/JSON) still wraps in the box.
+        self.transcript.append(
+            f'<div style="margin-top:8px;word-wrap:break-word;">'
+            f'<b style="color:{color};">{who}:</b> {body}</div>')
 
     def _append_image(self, path):
         img = QImage(path)
@@ -143,9 +144,4 @@ class ChatDock(QWidget):
         self._img_seq += 1
         url = QUrl(f"xslope-fig://{self._img_seq}")
         self.transcript.document().addResource(QTextDocument.ImageResource, url, img)
-        self._append_html(f'<img src="{url.toString()}"><br>')
-
-    def _append_html(self, fragment):
-        self.transcript.moveCursor(QTextCursor.End)
-        self.transcript.insertHtml(fragment)
-        self.transcript.moveCursor(QTextCursor.End)
+        self.transcript.append(f'<img src="{url.toString()}">')

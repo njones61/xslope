@@ -674,6 +674,7 @@ class MainWindow(QMainWindow):
         self._fem_runner.succeeded.connect(self._on_fem_succeeded)
         self._fem_runner.failed.connect(self._on_fem_failed)
         self._fem_runner.cancelled.connect(self._on_fem_cancelled)
+        self._fem_runner.progress.connect(self._on_run_progress)
         self._fem_runner.finished.connect(self._on_fem_finished)
         if is_ssrm:                     # only SSRM supports cooperative cancel
             self.cancel_btn.setEnabled(True)
@@ -778,7 +779,7 @@ class MainWindow(QMainWindow):
         self._runner.succeeded.connect(self._on_lem_succeeded)
         self._runner.failed.connect(self._on_lem_failed)
         self._runner.cancelled.connect(self._on_lem_cancelled)
-        self._runner.progress.connect(self._on_lem_progress)
+        self._runner.progress.connect(self._on_run_progress)
         self._runner.finished.connect(self._on_lem_finished)
         self._runner.start()
 
@@ -791,12 +792,12 @@ class MainWindow(QMainWindow):
             self.progress_bar.setRange(0, 0)   # back to busy while it winds down
             self.statusBar().showMessage("Cancelling…")
 
-    def _on_lem_progress(self, done, total, label):
+    def _on_run_progress(self, done, total, label):
         if total <= 0:                       # indeterminate
             self.progress_bar.setRange(0, 0)
         else:
             self.progress_bar.setRange(0, total)
-            self.progress_bar.setValue(done)
+            self.progress_bar.setValue(min(done, total))
         if label:
             self.statusBar().showMessage(f"{label}  ({done}/{total})" if total > 0 else label)
 

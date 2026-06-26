@@ -2535,11 +2535,28 @@ def compute_flow_vector_tp(stress_tp, psi=0.0):
     return np.array([flow_x_tp, flow_y_tp, flow_xy_tp])
 
 
+def _ssrm_progress(callback, done, total, label):
+    """Report SSRM progress; never let a misbehaving callback break the solve."""
+    if callback is not None:
+        try:
+            callback(int(done), int(total), str(label))
+        except Exception:
+            pass
+
+
+def _ssrm_bisect_steps(width, tolerance):
+    """Number of halvings needed to narrow ``width`` below ``tolerance``."""
+    if width <= tolerance:
+        return 0
+    return max(1, int(np.ceil(np.log2(width / tolerance))))
+
+
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
-               pp_formulation='effective', dt_scale=1.0, cancel_check=None):
+               pp_formulation='effective', dt_scale=1.0, cancel_check=None,
+               progress_callback=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2610,21 +2627,21 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check)
+            cancel_check=cancel_check, progress_callback=progress_callback)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check)
+            cancel_check=cancel_check, progress_callback=progress_callback)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check)
+            cancel_check=cancel_check, progress_callback=progress_callback)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -2647,7 +2664,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
-                 dt_scale=1.0, cancel_check=None):
+                 dt_scale=1.0, cancel_check=None, progress_callback=None):
     """SSRM using fixed VP displacement limit as failure criterion."""
 
     if debug_level >= 1:
@@ -2657,10 +2674,15 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         if max_disp_factor is not None:
             print(f"  Displacement limit: {max_disp_factor:.0%} of mesh height")
 
+    # Progress reported as: 2 bound checks + the (deterministic) bisection steps.
+    n_steps = _ssrm_bisect_steps(F_max - F_min, tolerance)
+    total = 2 + n_steps
+
     F_left = F_min
     F_right = F_max
 
     # Verify lower bound converges
+    _ssrm_progress(progress_callback, 0, total, f"Checking lower bound F={F_min:.3f}")
     if debug_level >= 1:
         print(f"  Verifying lower bound F={F_min:.2f} converges...")
     solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
@@ -2682,6 +2704,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         print(f"    -> Converged in {solution_min['iterations']} iters")
 
     # Verify upper bound does not converge
+    _ssrm_progress(progress_callback, 1, total, f"Checking upper bound F={F_max:.3f}")
     if debug_level >= 1:
         print(f"  Verifying upper bound F={F_max:.2f} does not converge...")
     solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
@@ -2713,6 +2736,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
 
+        _ssrm_progress(progress_callback, min(2 + iteration, total - 1), total,
+                       f"F={F_mid:.3f} in [{F_left:.3f}, {F_right:.3f}]")
         if debug_level >= 1:
             print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
 
@@ -2738,6 +2763,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # the full bracket is returned in 'final_interval'.
     critical_FS = 0.5 * (F_left + F_right)
 
+    _ssrm_progress(progress_callback, total, total, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
         print(f"\n  SSRM result: FS = {critical_FS:.4f}")
         print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
@@ -2758,7 +2784,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
                  pp_formulation='effective',
-                 dt_scale=1.0, cancel_check=None):
+                 dt_scale=1.0, cancel_check=None, progress_callback=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -2829,6 +2855,11 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         # the catastrophic growth in plastic displacement at failure.
         return _measure(sol), sol
 
+    # Progress reported as: the coarse sweep + the refining bisection (estimated
+    # from one sweep interval's width).
+    n_refine = _ssrm_bisect_steps((F_max - F_min) / max(1, n_sweep - 1), tolerance)
+    total = n_sweep + n_refine
+
     # Phase 1: Coarse sweep
     F_values = np.linspace(F_min, F_max, n_sweep)
     displacements = []
@@ -2840,6 +2871,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     for i, F_val in enumerate(F_values):
         from .search import _check_cancel
         _check_cancel(cancel_check)
+        _ssrm_progress(progress_callback, i, total,
+                       f"Sweep F={F_val:.3f} ({i + 1}/{n_sweep})")
         max_vp, sol = _get_max_vp_disp(F_val)
         displacements.append(max_vp)
         solutions.append(sol)
@@ -2902,6 +2935,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         from .search import _check_cancel
         _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
+        _ssrm_progress(progress_callback, min(n_sweep + iteration, total - 1), total,
+                       f"Refine F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]")
         d_mid, sol_mid = _get_max_vp_disp(F_mid)
 
         # Compute ratios for each half
@@ -2927,6 +2962,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
     critical_FS = (F_left + F_right) / 2.0
 
+    _ssrm_progress(progress_callback, total, total, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
         print(f"\n  SSRM result: FS = {critical_FS:.4f}")
         print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")

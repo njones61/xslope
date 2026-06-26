@@ -103,6 +103,7 @@ class FemRunner(QThread):
     succeeded = Signal(object)
     failed = Signal(str)
     cancelled = Signal()
+    progress = Signal(int, int, str)   # done, total (-1 = indeterminate), label
 
     def __init__(self, slope_data, options, parent=None):
         super().__init__(parent)
@@ -136,11 +137,14 @@ class FemRunner(QThread):
             else:
                 print(f"Running SSRM (F in [{opts.get('F_min', 1.0):g}, "
                       f"{opts.get('F_max', 2.0):g}], {opts.get('failure_criterion')})…")
+                def cb(done, total, label):
+                    self.progress.emit(int(done), int(total) if total else -1, str(label))
+
                 result = solve_ssrm(
                     fem_data, F_min=opts.get("F_min", 1.0), F_max=opts.get("F_max", 2.0),
                     tolerance=opts.get("tolerance", 0.01), debug_level=1,
                     failure_criterion=opts.get("failure_criterion", "non_convergence"),
-                    cancel_check=self._cancel.is_set)
+                    cancel_check=self._cancel.is_set, progress_callback=cb)
                 if not result.get("converged", False):
                     self.failed.emit(f"SSRM did not converge: "
                                      f"{result.get('error', 'unknown error')}")

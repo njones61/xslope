@@ -119,8 +119,10 @@ SCHEMA_BRIEF = """\
 
 Authoritative `slope_data` record schemas — these key names are the ground truth.
 Do NOT load or read .xlsx files (or call `load_slope_data`) to discover the schema;
-the records below ARE the schema. For an empty project every list is `[]` — build
-the lists directly. To start an empty project: `doc.new()`.
+the records below ARE the schema. A project is ALWAYS open and `slope_data` is a
+live dict (every list is `[]` for a fresh one) — just build the lists directly.
+Do NOT call `doc.new()` or reassign `doc.slope_data`; your edits are detected and
+the canvas re-renders automatically.
 
 - materials[i]: name, gamma, option ('mc' Mohr-Coulomb | 'cp'), c, phi, cp, r_elev,
   d, psi, u ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if
@@ -476,6 +478,11 @@ class Assistant(QObject):
 
     def _run_python(self, code):
         doc = self._mw.doc
+        if doc.slope_data is None:
+            # The assistant builds into a live document; if nothing is open, start
+            # an empty project so `slope_data` is a real dict from the first snippet
+            # (otherwise the model wastes turns on doc.new() + re-fetch).
+            doc.new()
         before = _input_signature(doc.slope_data)
         mesh_before = self._mw.mesh_signature(doc.slope_data)
         doc.begin_edit()                    # snapshot for undo / rollback

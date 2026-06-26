@@ -49,12 +49,15 @@ class ChatDock(QWidget):
         self.send_btn = QPushButton("Send")
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setEnabled(False)
+        self.clear_btn = QPushButton("Clear")
+        self.clear_btn.setToolTip("Start a fresh conversation (clears history).")
         self.settings_btn = QPushButton("Settings…")
 
         self.model_label = QLabel()
         self.model_label.setWordWrap(True)        # wraps so the dock can be narrow
         top = QHBoxLayout()
         top.addWidget(self.model_label, 1)
+        top.addWidget(self.clear_btn, 0, Qt.AlignTop)
         top.addWidget(self.settings_btn, 0, Qt.AlignTop)
 
         self.status_label = QLabel()
@@ -75,6 +78,7 @@ class ChatDock(QWidget):
         self.input.submit.connect(self._send)         # Enter sends
         self.send_btn.clicked.connect(self._send)
         self.stop_btn.clicked.connect(self._assistant.cancel)
+        self.clear_btn.clicked.connect(self._clear)
         self.settings_btn.clicked.connect(self._open_settings)
 
         self._assistant.assistant_text.connect(self._on_assistant_text)
@@ -92,6 +96,15 @@ class ChatDock(QWidget):
         from .ai.settings_dialog import AssistantSettingsDialog
         if AssistantSettingsDialog(self._assistant.config, self).exec():
             self._refresh_model_label()
+
+    def _clear(self):
+        """Start a fresh conversation: wipe the transcript and the model's message
+        history. The Python kernel (variables/state) is left intact."""
+        if self._assistant.is_busy():
+            return
+        self._assistant.reset()
+        self.transcript.clear()
+        self._img_seq = 0
 
     def _send(self):
         text = self.input.toPlainText().strip()

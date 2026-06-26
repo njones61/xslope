@@ -42,12 +42,17 @@ class LemRunner(QThread):
                 self.failed.emit(
                     "A circular failure surface is required (no circles defined).")
                 return
+            rapid = " (rapid drawdown)" if self._rapid else ""
+            print(f"Running {self._method.upper()} — single circular surface "
+                  f"(Xo={circle.get('Xo')}, Yo={circle.get('Yo')}, R={circle.get('R'):.3g}), "
+                  f"{self._num_slices} slices{rapid}…")
             ok, result = generate_slices(sd, circle=circle, non_circ=None,
                                          num_slices=self._num_slices)
             if not ok:
                 self.failed.emit(str(result))
                 return
             slice_df, failure_surface = result
+            print(f"Generated {len(slice_df)} slices; solving…")
             results = solve_selected(self._method, slice_df, rapid=self._rapid)
             if not isinstance(results, dict):
                 self.failed.emit(f"No solution: {results}")

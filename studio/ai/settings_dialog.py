@@ -19,9 +19,15 @@ class AssistantSettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Assistant settings")
         self._config = config
+        self.setMinimumWidth(460)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
+        # Let the field column grow to the dialog width (so the URL isn't clipped)
+        # and give the rows breathing room.
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(10)
 
         self.provider = QComboBox()
         for key, spec in PROVIDERS.items():

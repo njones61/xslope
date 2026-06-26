@@ -180,7 +180,7 @@ This cleanly resolves the "two LEM display types" question: they're just two tab
 
 ## 8. Canvas: Zoom / Pan / Select / DXF
 
-- **Zoom/pan:** Matplotlib `NavigationToolbar2QT` (built in). Add fit-to-extent ("Home") and scroll-wheel zoom.
+- **Zoom/pan:** the figure is rendered to a pixmap shown in a `QGraphicsView`, so the **whole figure** (axes, title, labels, margins) zooms/pans uniformly like an image viewer — wheel-zoom anchored at the cursor, drag-to-pan, Fit / 100% / +/− (not Matplotlib's axes-only data zoom).
 - **Select / edit:** enable `picker` on rendered artists, tag each with its `slope_data` reference; double-click → open editor (§6).
 - **Display Options dialog:** a `StyleConfig` of per-layer `{visible, color, linestyle, linewidth/size, alpha, ...}` plus figure-level settings (background, font size, DPI); the renderer reads it. Editing re-renders live. (Drives the §5.2 styling work, and is persisted per §8a.)
 - **DXF export:** "Export current view to DXF" calls the active `plot_*` with `save_dxf=True` (already supported across plot functions), or `cad.export_dxf(slope_data, path)` for a clean geometry export.

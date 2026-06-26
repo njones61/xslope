@@ -37,9 +37,12 @@ class MplCanvas(QWidget):
 
         self.canvas.mpl_connect("scroll_event", self._on_scroll)
 
-    def render_inputs(self, slope_data, mode="lem"):
-        """Draw the Inputs view for slope_data into the embedded figure."""
-        plot_inputs(slope_data, fig=self.figure, mode=mode, mat_table=True)
+    def render_inputs(self, slope_data, mode="lem", mat_table=False):
+        """Draw the Inputs view for slope_data into the embedded figure.
+
+        The on-canvas material table is off by default (material properties are
+        viewed/edited via the Materials editor); a display option can turn it on."""
+        plot_inputs(slope_data, fig=self.figure, mode=mode, mat_table=mat_table)
         self.canvas.draw_idle()
 
     def clear(self):

@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
     # --- docks -----------------------------------------------------------
     def _make_inputs_dock(self):
         self.inputs_tree = QTreeWidget()
-        self.inputs_tree.setHeaderLabels(["Input", "Count / Value"])
+        self.inputs_tree.setHeaderLabels(["Input", "Count"])
         self.inputs_tree.setColumnWidth(0, 180)
         self.inputs_tree.itemClicked.connect(self._on_tree_click)
         dock = QDockWidget("Inputs", self)
@@ -244,33 +244,21 @@ class MainWindow(QMainWindow):
                 item.setToolTip(0, "Click to edit")
             return item
 
+        sbc = d.get("seepage_bc") or {}
+        profile_lines = d.get("profile_lines") or []
         add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
-        profile_lines = d.get("profile_lines") or []
         add("Profile lines", len(profile_lines),
             category="profile" if profile_lines else None)
         add("Polygons", len(d.get("polygons") or []))
         add("Circles", len(d.get("circles") or []), category="circles")
         add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")
-        n_pz2 = len(d.get("piezo_line2") or [])
-        add("Piezometric lines",
-            f"{len(d.get('piezo_line') or [])}" + (f" / {n_pz2}" if n_pz2 else ""),
-            category="piezo")
-        n_dl2 = len(d.get("dloads2") or [])
-        add("Distributed loads",
-            f"{len(d.get('dloads') or [])}" + (f" / {n_dl2}" if n_dl2 else ""),
-            category="dloads")
+        add("Piezometric lines", len(d.get("piezo_line") or []), category="piezo")
+        add("Distributed loads", len(d.get("dloads") or []), category="dloads")
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []),
             category="reinforce")
         add("Piles", len(d.get("pile_lines") or []), category="piles")
-        sbc = d.get("seepage_bc") or {}
-        n_heads = len(sbc.get("specified_heads", []))
-        parts = [f"{n_heads} head(s)"] if n_heads else []
-        if sbc.get("exit_face"):
-            parts.append("exit face")
-        if d.get("has_seepage_bc2"):
-            parts.append("+ set 2")
-        add("Seep BC", ", ".join(parts) if parts else 0, category="seep_bc")
+        add("Seep BC", len(sbc.get("specified_heads", [])), category="seep_bc")
         self.inputs_tree.expandAll()
 
     # --- editing ---------------------------------------------------------

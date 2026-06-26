@@ -523,15 +523,18 @@ class DloadsEditor(CategoryEditor):
 XY_FIELDS = [Field("x", "x"), Field("y", "y")]
 
 
-class _SeepHeadsWidget(QWidget):
-    """Master/detail list of specified-head boundaries: the list (left) + the
-    selected boundary's head value and point table (right)."""
+class _SeepBcSetWidget(QWidget):
+    """One seepage BC set as a single master/detail: the left list holds each
+    specified-head boundary AND the exit face; the right side shows one
+    full-height point table (plus a head-value field, hidden for the exit face)."""
 
-    def __init__(self, heads, parent=None):
+    def __init__(self, bc, parent=None):
         super().__init__(parent)
+        bc = bc or {}
         self._heads = [{"head": h.get("head", 0.0),
                         "coords": [tuple(c) for c in h.get("coords", [])]}
-                       for h in (heads or [])]
+                       for h in (bc.get("specified_heads") or [])]
+        self._exit = [tuple(c) for c in (bc.get("exit_face") or [])]
         self._cur = -1
         self.table = None
 
@@ -544,9 +547,9 @@ class _SeepHeadsWidget(QWidget):
         left.addWidget(self.list)
         lb = QHBoxLayout()
         b_add = QPushButton("Add head")
-        b_add.clicked.connect(self._add)
-        b_rem = QPushButton("Remove")
-        b_rem.clicked.connect(self._remove)
+        b_add.clicked.connect(self._add_head)
+        b_rem = QPushButton("Remove head")
+        b_rem.clicked.connect(self._remove_head)
         lb.addWidget(b_add)
         lb.addWidget(b_rem)
         left.addLayout(lb)
@@ -554,7 +557,8 @@ class _SeepHeadsWidget(QWidget):
         right = QVBoxLayout()
         body.addLayout(right, 1)
         hrow = QHBoxLayout()
-        hrow.addWidget(QLabel("Head value:"))
+        self.head_label = QLabel("Head value:")
+        hrow.addWidget(self.head_label)
         self.head_edit = QLineEdit()
         hrow.addWidget(self.head_edit, 1)
         right.addLayout(hrow)
@@ -562,40 +566,46 @@ class _SeepHeadsWidget(QWidget):
         right.addLayout(self._holder, 1)
 
         self._refresh()
-        if self._heads:
-            self.list.setCurrentRow(0)
-        else:
-            self.head_edit.setEnabled(False)
+        self.list.setCurrentRow(0)
+
+    def _is_exit(self, idx):
+        return idx == len(self._heads)
 
     def _refresh(self):
         self.list.blockSignals(True)
         self.list.clear()
         for i, h in enumerate(self._heads):
-            self.list.addItem(f"Head {i + 1}  (h={h['head']})")
+            self.list.addItem(f"Head {i + 1}  (h = {h['head']})")
+        self.list.addItem("Exit face")
         self.list.blockSignals(False)
 
     def _commit(self):
-        if 0 <= self._cur < len(self._heads):
+        if self._cur < 0:
+            return
+        coords = [(r["x"], r["y"]) for r in self.table.result_rows()] if self.table else []
+        if self._is_exit(self._cur):
+            self._exit = coords
+        elif self._cur < len(self._heads):
             try:
                 self._heads[self._cur]["head"] = float(self.head_edit.text() or 0)
             except ValueError:
                 self._heads[self._cur]["head"] = 0.0
-            if self.table is not None:
-                self._heads[self._cur]["coords"] = [(r["x"], r["y"])
-                                                    for r in self.table.result_rows()]
+            self._heads[self._cur]["coords"] = coords
 
     def _load(self, idx):
         if self.table is not None:
             self.table.setParent(None)
             self.table = None
-        if not (0 <= idx < len(self._heads)):
-            self.head_edit.setText("")
-            self.head_edit.setEnabled(False)
+        if idx < 0:
             return
-        self.head_edit.setEnabled(True)
-        h = self._heads[idx]
-        self.head_edit.setText(str(h["head"]))
-        rows = [{"x": x, "y": y} for (x, y) in h["coords"]]
+        is_exit = self._is_exit(idx)
+        self.head_label.setVisible(not is_exit)
+        self.head_edit.setVisible(not is_exit)
+        if is_exit:
+            rows = [{"x": x, "y": y} for (x, y) in self._exit]
+        else:
+            self.head_edit.setText(str(self._heads[idx]["head"]))
+            rows = [{"x": x, "y": y} for (x, y) in self._heads[idx]["coords"]]
         self.table = _EditableTable(XY_FIELDS, rows, _new_pt)
         self._holder.addWidget(self.table)
 
@@ -604,47 +614,26 @@ class _SeepHeadsWidget(QWidget):
         self._cur = idx
         self._load(idx)
 
-    def _add(self):
+    def _add_head(self):
         self._commit()
         self._heads.append({"head": 0.0, "coords": []})
         self._refresh()
         self.list.setCurrentRow(len(self._heads) - 1)
 
-    def _remove(self):
+    def _remove_head(self):
         idx = self.list.currentRow()
-        if idx < 0:
+        if idx < 0 or self._is_exit(idx):  # the exit face is permanent
             return
         self._heads.pop(idx)
         self._cur = -1
         self._refresh()
-        if self._heads:
-            self.list.setCurrentRow(min(idx, len(self._heads) - 1))
-        else:
-            self._load(-1)
-
-    def result_heads(self):
-        self._commit()
-        return [{"head": h["head"], "coords": list(h["coords"])} for h in self._heads]
-
-
-class _SeepBcSetWidget(QWidget):
-    """One seepage BC set: specified-head boundaries (master/detail) + exit face."""
-
-    def __init__(self, bc, parent=None):
-        super().__init__(parent)
-        bc = bc or {}
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Specified-head boundaries"))
-        self.heads = _SeepHeadsWidget(bc.get("specified_heads"))
-        layout.addWidget(self.heads, 1)
-        layout.addWidget(QLabel("Exit face"))
-        exit_rows = [{"x": x, "y": y} for (x, y) in (bc.get("exit_face") or [])]
-        self.exit = _EditableTable(XY_FIELDS, exit_rows, _new_pt)
-        layout.addWidget(self.exit)
+        self.list.setCurrentRow(min(idx, len(self._heads)))
 
     def result(self):
-        return {"specified_heads": self.heads.result_heads(),
-                "exit_face": [(r["x"], r["y"]) for r in self.exit.result_rows()]}
+        self._commit()
+        return {"specified_heads": [{"head": h["head"], "coords": list(h["coords"])}
+                                    for h in self._heads],
+                "exit_face": list(self._exit)}
 
 
 class SeepBcEditor(CategoryEditor):
@@ -653,7 +642,7 @@ class SeepBcEditor(CategoryEditor):
     def build(self, slope_data, parent):
         dlg = QDialog(parent)
         dlg.setWindowTitle("Seep BC")
-        dlg.resize(640, 660)
+        dlg.resize(640, 520)
         layout = QVBoxLayout(dlg)
         layout.addWidget(_help_label(
             "Seepage boundary conditions: a list of specified-head boundaries (each a head "

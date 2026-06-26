@@ -368,7 +368,7 @@ class Assistant(QObject):
                 return STUDIO_SYSTEM + _SKILL_HEADER + skill
         return STUDIO_SYSTEM + SCHEMA_BRIEF
 
-    def send(self, user_text):
+    def send(self, user_text, images=None):
         if self.is_busy():
             return
         if not self.config.is_ready():
@@ -376,7 +376,14 @@ class Assistant(QObject):
                              f"{self.config.display_name()}. Open the assistant "
                              "Settings to add one (or switch to a local Ollama model).")
             return
-        self._messages.append({"role": "user", "content": user_text})
+        if images:
+            # Multimodal user turn (OpenAI/LiteLLM format; translated to the
+            # Anthropic image format for Claude). ``images`` are data: URLs.
+            content = [{"type": "text", "text": user_text or "(see image)"}]
+            content += [{"type": "image_url", "image_url": {"url": u}} for u in images]
+            self._messages.append({"role": "user", "content": content})
+        else:
+            self._messages.append({"role": "user", "content": user_text})
         self._worker = _AgentWorker(self.config.completion_kwargs(), self._system(),
                                     self._messages, [RUN_PYTHON_TOOL],
                                     cache_system=self.config.supports_prompt_cache(),

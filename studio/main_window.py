@@ -101,6 +101,7 @@ class MainWindow(QMainWindow):
         self._mode = "lem"
         self._runner = None
         self._mesh_busy = False
+        self._run_implemented = {"lem"}   # modes whose Run is wired up so far
         self._last_lem_opts = {}
         self._last_mesh_opts = {}
 
@@ -134,6 +135,7 @@ class MainWindow(QMainWindow):
         self.cancel_btn.setVisible(False)
         self.cancel_btn.clicked.connect(self._cancel_run)
         self.statusBar().addPermanentWidget(self.cancel_btn)
+        self._update_run_actions()    # initial labels / visibility (no file yet)
         self.statusBar().showMessage("Open an Excel input file to begin.")
 
     # --- docks -----------------------------------------------------------
@@ -178,7 +180,7 @@ class MainWindow(QMainWindow):
         self.act_save = QAction("&Save", self, shortcut=QKeySequence.Save,
                                 enabled=False, triggered=self.save)
         self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
-        self.act_run_lem = QAction("Run &LEM…", self, enabled=False, triggered=self.run_lem)
+        self.act_run = QAction("Run &LEM…", self, enabled=False, triggered=self.run_current)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
 
@@ -202,7 +204,7 @@ class MainWindow(QMainWindow):
         m_run = mb.addMenu("&Run")
         m_run.addAction(self.act_build_mesh)
         m_run.addSeparator()
-        m_run.addAction(self.act_run_lem)
+        m_run.addAction(self.act_run)
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
@@ -227,7 +229,7 @@ class MainWindow(QMainWindow):
         tb.addWidget(self.mode_combo)
         tb.addSeparator()
         tb.addAction(self.act_build_mesh)
-        tb.addAction(self.act_run_lem)
+        tb.addAction(self.act_run)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
@@ -299,8 +301,7 @@ class MainWindow(QMainWindow):
         self.mode_combo.setCurrentIndex([m for _, m in MODES].index(self._mode))
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
-        self.act_run_lem.setEnabled(True)
-        self.act_build_mesh.setEnabled(True)
+        self._update_run_actions()
         self._clear_result_tabs()
         self.canvas.reset_fit()       # fit the fresh file to the window
         self._render()
@@ -325,9 +326,40 @@ class MainWindow(QMainWindow):
 
     def _on_mode_changed(self, index):
         self._mode = MODES[index][1]
+        self._update_run_actions()
         if self.doc.is_open:
             self._render()
             self._populate_inputs_tree()
+
+    def _update_run_actions(self):
+        """Keep the single Run action's label and the Build Mesh action in sync
+        with the current mode: Run text follows LEM/Seep/FEM; Build Mesh shows only
+        in Seep/FEM (LEM needs no mesh); Seep/FEM Run is gated on a built mesh."""
+        mode = self._mode
+        self.act_run.setText({"lem": "Run &LEM…", "seep": "Run &Seep…",
+                              "fem": "Run &FEM…"}.get(mode, "Run…"))
+        open_ = self.doc.is_open
+        busy = self._runner is not None or self._mesh_busy
+        if mode == "lem":
+            self.act_run.setEnabled(open_ and not busy)
+            self.act_run.setToolTip("")
+        else:
+            has_mesh = open_ and self.doc.slope_data.get("mesh") is not None
+            implemented = mode in self._run_implemented
+            self.act_run.setEnabled(open_ and has_mesh and implemented and not busy)
+            self.act_run.setToolTip(
+                "Coming soon." if not implemented
+                else "Build a mesh first (Build Mesh…)." if not has_mesh else "")
+        # Meshing only applies to the FE workflows.
+        self.act_build_mesh.setVisible(mode in ("seep", "fem"))
+        self.act_build_mesh.setEnabled(open_ and mode in ("seep", "fem") and not busy)
+
+    def run_current(self):
+        """Dispatch the Run action by the current mode."""
+        if self._mode == "lem":
+            self.run_lem()
+        # seep / fem runs arrive in the next Phase 4 increments (action stays
+        # disabled in those modes until then).
 
     def _populate_inputs_tree(self):
         d = self.doc.slope_data
@@ -395,7 +427,7 @@ class MainWindow(QMainWindow):
         opts = dlg.options()
         self._last_mesh_opts = opts
         self._mesh_busy = True
-        self.act_build_mesh.setEnabled(False)
+        self._update_run_actions()    # disable Run/Build while meshing
         self.statusBar().showMessage("Building mesh …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -428,9 +460,9 @@ class MainWindow(QMainWindow):
 
     def _mesh_done(self):
         self._mesh_busy = False
-        self.act_build_mesh.setEnabled(self.doc.is_open)
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
+        self._update_run_actions()
 
     def _show_mesh(self, mesh):
         if self.mesh_canvas is None:
@@ -452,7 +484,7 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_lem_opts = opts
-        self.act_run_lem.setEnabled(False)
+        self.act_run.setEnabled(False)
         verb = {"auto_search": "Searching", "reliability": "Running reliability"}.get(
             opts["analysis"], "Running")
         self.statusBar().showMessage(f"{verb} {opts['method']} …")
@@ -518,13 +550,13 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Run cancelled.")
 
     def _on_lem_finished(self):
-        self.act_run_lem.setEnabled(self.doc.is_open)
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
         self.cancel_btn.setVisible(False)
         if self._runner is not None:
             self._runner.deleteLater()
             self._runner = None
+        self._update_run_actions()
 
     def _show_search(self, search):
         if self.search_canvas is None:

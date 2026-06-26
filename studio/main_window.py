@@ -135,6 +135,7 @@ class MainWindow(QMainWindow):
         self._make_inputs_dock()
         self._make_display_dock()
         self._make_log_dock()
+        self._make_chat_dock()
         # Let the left dock column own the bottom-left corner so it runs the full
         # window height; the Log dock then starts at the central canvas's left edge
         # instead of spanning under the Inputs/Display docks.
@@ -231,6 +232,27 @@ class MainWindow(QMainWindow):
         self.resizeDocks([self.inputs_dock, self.display_dock], [300, 430],
                          Qt.Vertical)
 
+    def _make_chat_dock(self):
+        # AI assistant (Phase A spike) — a chat that drives the app/engine via an
+        # in-process run_python tool. The anthropic dep is optional and imported
+        # lazily, so the dock loads even without it (sending then reports it).
+        from .ai.assistant import Assistant
+        from .chat_dock import ChatDock
+        self.assistant = Assistant(self)
+        chat = ChatDock(self.assistant, self)
+        dock = QDockWidget("Assistant", self)
+        dock.setObjectName("chat_dock")
+        dock.setWidget(chat)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+        self.chat_dock = dock
+
+    def refresh_inputs_view(self):
+        """Re-render the Inputs canvas and the inputs tree after an external edit
+        (e.g. the assistant mutated slope_data via run_python)."""
+        if self.doc.is_open:
+            self._render()
+            self._populate_inputs_tree()
+
     def _install_log_capture(self):
         sys.stdout = _LogStream(self.log, sys.__stdout__)
         sys.stderr = _LogStream(self.log, sys.__stderr__)
@@ -281,6 +303,7 @@ class MainWindow(QMainWindow):
         m_view.addAction(self.inputs_dock.toggleViewAction())
         m_view.addAction(self.display_dock.toggleViewAction())
         m_view.addAction(self.log_dock.toggleViewAction())
+        m_view.addAction(self.chat_dock.toggleViewAction())
 
         m_help = mb.addMenu("&Help")
         m_help.addAction(self.act_about)
@@ -372,6 +395,7 @@ class MainWindow(QMainWindow):
     def _on_loaded(self):
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
+        self.assistant.reset()        # new project -> fresh conversation
         self._clear_result_tabs()
         # Restore saved solutions first so the default mode can see whether an FEM
         # solution exists, then pick the mode that fits this file.

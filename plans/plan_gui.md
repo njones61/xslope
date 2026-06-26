@@ -477,11 +477,18 @@ set up for the template.
 
 ### 14.9 Phased approach
 
-- **A — Spike:** Claude-only, in-process `run_python` with the **live document**
-  (`slope_data`/`results`) and engine in scope + read/write file tools, the skill
-  prompt as system context, plain transcript, confirm-before-run. Validates the
-  "drive Studio by chat, building into the in-memory project" UX end-to-end with
-  the least scaffolding.
+- **A — Spike** ✅ **BUILT** — Claude-only (`anthropic` SDK, `claude-opus-4-8`,
+  adaptive thinking) in `studio/ai/` (`kernel.py` persistent in-process namespace
+  with `xslope` + the live `doc`/`slope_data`/`results`; `assistant.py` manual
+  tool-use loop on a `QThread` with the single `run_python` tool, marshalling each
+  call back to the GUI thread for a confirm dialog + document mutation + re-render)
+  and `studio/chat_dock.py` (right-side dock: transcript with inline figures and
+  "ran code" blocks, autonomy toggle confirm/auto, Stop). Skill prompt is the
+  system context (`docs/usage/claude/xslope.md`, repo-bound for now). Optional
+  `xslope[ai]` extra; the dock loads without `anthropic` and reports if absent.
+  Verified end-to-end with a mocked client (text → tool_use → run_python on the
+  live doc → result → final text). **Remaining for Phase A polish:** package the
+  skill prompt (§14.5), streaming responses, API-key UX.
 - **B — Multi-provider:** LiteLLM layer + Settings (provider/model/keys/Ollama URL);
   capability-aware UI.
 - **C — Native tools + live document:** structured input edit / run / results tools

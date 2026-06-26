@@ -23,10 +23,10 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import MplCanvas
-from .dialogs import RunLemDialog
+from .dialogs import BuildMeshDialog, RunLemDialog
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
-from .runners import LemRunner
+from .runners import LemRunner, MeshRunner
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
         # Central area: a tab strip of result views (plan §7). The Inputs view is
         # always present; the LEM Solution view is added after the first solve.
         self.canvas = MplCanvas(self)
+        self.mesh_canvas = None
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
@@ -96,7 +97,9 @@ class MainWindow(QMainWindow):
 
         self._mode = "lem"
         self._runner = None
+        self._mesh_runner = None
         self._last_lem_opts = {}
+        self._last_mesh_opts = {}
         self._recent = [p for p in (self.settings.value("recent_files") or []) if p]
 
         self._make_inputs_dock()
@@ -162,6 +165,8 @@ class MainWindow(QMainWindow):
                                 enabled=False, triggered=self.save)
         self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
         self.act_run_lem = QAction("Run &LEM…", self, enabled=False, triggered=self.run_lem)
+        self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
+                                      triggered=self.build_mesh)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -181,6 +186,8 @@ class MainWindow(QMainWindow):
         m_edit.addAction(self.act_redo)
 
         m_run = mb.addMenu("&Run")
+        m_run.addAction(self.act_build_mesh)
+        m_run.addSeparator()
         m_run.addAction(self.act_run_lem)
 
         m_view = mb.addMenu("&View")
@@ -205,6 +212,7 @@ class MainWindow(QMainWindow):
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         tb.addWidget(self.mode_combo)
         tb.addSeparator()
+        tb.addAction(self.act_build_mesh)
         tb.addAction(self.act_run_lem)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
@@ -278,6 +286,7 @@ class MainWindow(QMainWindow):
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
         self.act_run_lem.setEnabled(True)
+        self.act_build_mesh.setEnabled(True)
         self._clear_result_tabs()
         self.canvas.reset_fit()       # fit the fresh file to the window
         self._render()
@@ -361,6 +370,65 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()
+
+    # --- meshing ---------------------------------------------------------
+    def build_mesh(self):
+        if not self.doc.is_open or self._mesh_runner is not None:
+            return
+        dlg = BuildMeshDialog(self, defaults=self._last_mesh_opts)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self._last_mesh_opts = opts
+        self.act_build_mesh.setEnabled(False)
+        self.statusBar().showMessage("Building mesh …")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self._mesh_runner = MeshRunner(self.doc.slope_data, opts, parent=self)
+        self._mesh_runner.succeeded.connect(self._on_mesh_succeeded)
+        self._mesh_runner.failed.connect(self._on_mesh_failed)
+        self._mesh_runner.finished.connect(self._on_mesh_finished)
+        self._mesh_runner.start()
+
+    def _on_mesh_succeeded(self, mesh):
+        self.doc.slope_data["mesh"] = mesh   # used by Inputs render, Seep and FEM
+        self.doc.results["mesh"] = mesh
+        # Persist alongside the .xlsx using the {stem}_mesh.json convention.
+        if self.doc.path:
+            try:
+                from xslope.mesh import export_mesh_to_json
+                stem = os.path.splitext(self.doc.path)[0]
+                export_mesh_to_json(mesh, f"{stem}_mesh.json")
+            except Exception:
+                traceback.print_exc()
+        self._show_mesh(mesh)
+        self._render()                       # mesh now appears in the Inputs view
+        n1d = len(mesh.get("elements_1d", []) or [])
+        self.statusBar().showMessage(
+            f"Mesh built — {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements"
+            + (f", {n1d} 1D elements." if n1d else "."))
+
+    def _on_mesh_failed(self, message):
+        QMessageBox.warning(self, "Build mesh failed", message)
+        self.statusBar().showMessage("Build mesh failed.")
+
+    def _on_mesh_finished(self):
+        self.act_build_mesh.setEnabled(self.doc.is_open)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
+        if self._mesh_runner is not None:
+            self._mesh_runner.deleteLater()
+            self._mesh_runner = None
+
+    def _show_mesh(self, mesh):
+        if self.mesh_canvas is None:
+            self.mesh_canvas = MplCanvas(self)
+            self.view_tabs.insertTab(1, self.mesh_canvas, "Mesh")
+        try:
+            self.mesh_canvas.render_mesh(mesh, self.doc.slope_data.get("materials"))
+        except Exception:
+            traceback.print_exc()
+        self.view_tabs.setCurrentWidget(self.mesh_canvas)
 
     # --- LEM analysis ----------------------------------------------------
     def run_lem(self):
@@ -479,7 +547,7 @@ class MainWindow(QMainWindow):
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
-        for attr in ("search_canvas", "solution_canvas", "reliability_canvas"):
+        for attr in ("mesh_canvas", "search_canvas", "solution_canvas", "reliability_canvas"):
             canvas = getattr(self, attr)
             if canvas is not None:
                 idx = self.view_tabs.indexOf(canvas)
@@ -542,6 +610,8 @@ class MainWindow(QMainWindow):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()     # ask an in-flight run to stop, then wait briefly
             self._runner.wait(5000)
+        if self._mesh_runner is not None and self._mesh_runner.isRunning():
+            self._mesh_runner.wait(10000)   # meshing has no cancel hook; let it finish
         if self.doc.is_open and self.doc.dirty:
             res = QMessageBox.question(
                 self, "Unsaved changes", "Save changes before closing?",

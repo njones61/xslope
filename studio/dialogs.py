@@ -9,8 +9,8 @@ remaining analysis type (next increment).
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel,
-    QSpinBox, QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout,
+    QLabel, QSpinBox, QVBoxLayout,
 )
 
 LEM_METHODS = [
@@ -26,6 +26,82 @@ LEM_METHODS = [
 ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search"),
                   ("reliability", "Reliability")]
 SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
+
+MESH_ELEMENT_TYPES = [
+    ("tri3", "Linear triangles (tri3)"),
+    ("tri6", "Quadratic triangles (tri6)"),
+    ("quad4", "Linear quads (quad4)"),
+    ("quad8", "Quadratic quads (quad8)"),
+    ("quad9", "Quadratic quads (quad9)"),
+]
+
+
+class BuildMeshDialog(QDialog):
+    """Options for building a finite-element mesh from the geometry.
+
+    Target element size is either entered directly or auto-sized as
+    ``(x_max - x_min) / size_divisions`` over the ground surface (see the
+    main_seep / main_fem drivers)."""
+
+    def __init__(self, parent=None, defaults=None):
+        super().__init__(parent)
+        self.setWindowTitle("Build mesh")
+        defaults = defaults or {}
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.element_type = QComboBox()
+        for key, label in MESH_ELEMENT_TYPES:
+            self.element_type.addItem(label, key)
+        idx = self.element_type.findData(defaults.get("element_type", "tri6"))
+        if idx >= 0:
+            self.element_type.setCurrentIndex(idx)
+        form.addRow("Element type", self.element_type)
+
+        self.auto_size = QCheckBox("Auto-size from geometry")
+        self.auto_size.setChecked(bool(defaults.get("auto_size", True)))
+        form.addRow("", self.auto_size)
+
+        self.size_divisions = QSpinBox()
+        self.size_divisions.setRange(5, 1000)
+        self.size_divisions.setValue(int(defaults.get("size_divisions", 50)))
+        self.size_divisions.setToolTip("Number of elements across the slope width.")
+        form.addRow("Size divisions", self.size_divisions)
+
+        self.target_size = QDoubleSpinBox()
+        self.target_size.setRange(0.001, 1e6)
+        self.target_size.setDecimals(3)
+        self.target_size.setValue(float(defaults.get("target_size", 1.0)))
+        form.addRow("Target element size", self.target_size)
+
+        layout.addLayout(form)
+        note = QLabel("Auto-size sets the target element size to the slope width "
+                      "divided by the number of divisions.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.button(QDialogButtonBox.Ok).setText("Build")
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+        self.auto_size.toggled.connect(self._sync_enabled)
+        self._sync_enabled()
+
+    def _sync_enabled(self):
+        auto = self.auto_size.isChecked()
+        self.size_divisions.setEnabled(auto)
+        self.target_size.setEnabled(not auto)
+
+    def options(self):
+        return {
+            "element_type": self.element_type.currentData(),
+            "auto_size": self.auto_size.isChecked(),
+            "size_divisions": self.size_divisions.value(),
+            "target_size": self.target_size.value(),
+        }
 
 
 class RunLemDialog(QDialog):

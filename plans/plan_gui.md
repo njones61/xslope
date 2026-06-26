@@ -285,8 +285,11 @@ studio/                # XSlope Studio desktop app
 - ✅ **Cooperative cancel** — a `cancel_check` callable is threaded through `circular_search` / `noncircular_search` / `reliability` (engine-side; checked at iteration boundaries, raises `AnalysisCancelled`). The worker exposes `cancel()` (sets a `threading.Event`) and a Cancel button by the progress bar; cancelling aborts cleanly without killing the thread, emits `cancelled`, and leaves no result tab. Close also cancels an in-flight run.
 - ⬜ Remaining solver tolerances in the dialog (`fs_tol`, `tol`, `max_iter`).
 
-**Phase 4 — Meshing + Seepage + FEM**
-- Meshing dialog; Seepage run + result view; FEM single/SSRM + result views; progress/cancel.
+**Phase 4 — Meshing + Seepage + FEM** 🚧 **IN PROGRESS**
+- ✅ **Build Mesh** — `BuildMeshDialog` (element type; target size, entered or auto-sized as slope-width / divisions per the drivers) → `MeshRunner` (`QThread`) builds via `get_material_polygons` + `build_mesh_from_polygons`, including reinforcement/pile constraint lines so the mesh also serves FEM. Result shows in a **Mesh** tab (`plot_mesh`, given `fig=`) and the mesh is stored on `slope_data['mesh']` (so it appears in the Inputs view) and written to the `{stem}_mesh.json` sidecar. Build progress shows a busy bar.
+- ⬜ **Run Seep** — `RunSeepDialog` + worker (`build_seep_data` → `run_seepage_analysis`; `plot_seep_data` / `plot_seep_solution`, need `fig=`); BC set 1/2. Introduces the mode-driven Run button (text follows the LEM/Seep/FEM mode) — Seep enabled only when a mesh exists.
+- ⬜ **Run FEM** — `RunFemDialog` + worker (`build_fem_data` → `solve_fem` / `solve_ssrm`; `plot_fem_data` / `plot_fem_results`, need `fig=`); single vs SSRM, reuse the progress bar + cancel. FEM enabled only when a mesh exists.
+- Decisions: Run is **mode-driven** with dynamic text ("Run LEM/Seep/FEM"); a mesh is **explicit** (Build Mesh first — Seep/FEM stay disabled until `slope_data['mesh']` is present), not auto-built.
 
 **Phase 5 — Canvas selection + Display Options + style persistence**
 - Pick/double-click-to-edit; `StyleConfig` + Display Options dialog (visibility/colors/styles).

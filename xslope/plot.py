@@ -2356,10 +2356,10 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         plt.show()
     return fig
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plot the finite element mesh with material regions.
-    
+
     Parameters:
         mesh: Mesh dictionary with 'nodes', 'elements', 'element_types', and 'element_materials' keys
         materials: Optional list of material dictionaries for legend labels
@@ -2368,18 +2368,26 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         show_nodes: If True, plot points at node locations
         label_elements: If True, label each element with its number at its centroid
         label_nodes: If True, label each node with its number
+        fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
+            GUI canvas). When None (default) a new pyplot figure is created and shown;
+            when provided, the figure is cleared and reused and plt.show() is skipped.
     """
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
     from matplotlib.collections import PolyCollection
     import numpy as np
-    
+
     nodes = mesh["nodes"]
     elements = mesh["elements"]
     element_types = mesh["element_types"]
     mat_ids = mesh["element_materials"]
-    
-    fig, ax = plt.subplots(figsize=figsize)
+
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
     
     # Group elements by material ID
     material_elements = {}
@@ -2542,15 +2550,17 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     # Add extra cushion for legend space
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
-    plt.tight_layout()
-    
+    fig.tight_layout()
+
     if save_png:
-        plt.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, 'plot_mesh.dxf')
-    
-    plt.show()
+
+    if own_fig:
+        plt.show()
+    return fig
 
 
 def plot_polygons(

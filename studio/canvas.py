@@ -27,8 +27,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
 from xslope.plot import (
-    plot_circular_search_results, plot_inputs, plot_noncircular_search_results,
-    plot_reliability_results, plot_solution,
+    plot_circular_search_results, plot_inputs, plot_mesh,
+    plot_noncircular_search_results, plot_reliability_results, plot_solution,
 )
 
 ZOOM_STEP = 1.25
@@ -103,6 +103,9 @@ class MplCanvas(QWidget):
     def render_reliability(self, slope_data, reliability_data):
         self._draw(lambda fig: plot_reliability_results(
             slope_data, reliability_data, fig=fig))
+
+    def render_mesh(self, mesh, materials=None):
+        self._draw(lambda fig: plot_mesh(mesh, materials=materials, fig=fig))
 
     def _draw(self, draw_fn):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.

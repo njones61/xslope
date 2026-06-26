@@ -376,16 +376,19 @@ Two ways the agent can touch the project, likely both:
    "anything a notebook can do" and is the main reuse of the skill's existing code
    patterns. Figures it produces are shown inline in the chat (and/or a result tab).
 
-**Build = populate the in-memory project, not write a file (decided).** The
-`/xslope` skill ends by *saving an `.xlsx`*; inside Studio the agent instead
-**populates the live `slope_data` dict of a fresh (or current) project** — which
-renders immediately on the canvas for review — and the user persists it with
-**Save As** when satisfied. So the skill's surgical-xlsx-writer machinery is no
-longer needed for the build case; what we reuse is its **schema knowledge** (the
-sheet/category layout, geometry rules, examples) mapped onto `slope_data` keys and
-the §6 editor `apply` functions. File write/reload stays available as a secondary
-path (e.g. operating on an existing on-disk file), but the document is the primary
-target.
+**Build = populate the in-memory project, not write a file (decided, Studio path
+only).** The standalone `/xslope` skill ends by *saving an `.xlsx`* and **remains a
+first-class feature unchanged** — the CLI/IDE, file-based workflow (surgical xlsx
+writer and all) keeps working for people who want it. Inside Studio, the chat takes
+a *different* build path: the agent **populates the live `slope_data` dict of a
+fresh (or current) project** — which renders immediately on the canvas for review —
+and the user persists it with **Save As**. So *for the Studio path* the surgical
+xlsx writer isn't needed (the document is built directly); what Studio reuses from
+the skill is its **schema knowledge** (the sheet/category layout, geometry rules,
+examples) mapped onto `slope_data` keys and the §6 editor `apply` functions. File
+write/reload stays available as a secondary path. Net: two coexisting front ends to
+the same engine — the file-first standalone skill *and* the document-first Studio
+assistant — not a replacement of one by the other.
 
 ### 14.3 Provider abstraction (bring-your-own-model)
 
@@ -425,9 +428,11 @@ selected model has no vision).
 
 ### 14.5 Reusing the existing skill
 
-`docs/usage/claude/xslope.md` (the `/xslope` skill body — template cell layout,
-the surgical xlsx writer, per-sheet helpers, run snippets) becomes **domain
-knowledge injected into the system prompt**, not the limit of behavior. Caveat:
+The standalone `/xslope` skill stays as-is (see §14.2) — this section is about how
+*Studio* draws on it. `docs/usage/claude/xslope.md` (the skill body — template cell
+layout, the surgical xlsx writer, per-sheet helpers, run snippets) becomes **domain
+knowledge injected into the Studio system prompt**, not the limit of behavior, and
+Studio leans on the schema parts rather than the file-writer (§14.2). Caveat:
 it's written for a file-first agent and currently lives in `docs/` and is
 repo-bound (the `SKILL.md` `!`cat …`` include only resolves inside the repo). To
 use it from an installed Studio we must **package the prompt** (ship it under

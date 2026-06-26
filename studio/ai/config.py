@@ -39,10 +39,17 @@ PROVIDERS = {
     "zai": {
         "label": "Z.ai (GLM)", "prefix": "openai/", "needs_key": True,
         # OpenAI-compatible endpoint (editable: GLM coding-plan keys use a
-        # different base — .../api/coding/paas/v4). Text-only; gets the full skill.
+        # different base — .../api/coding/paas/v4). Gets the full skill.
         "base": "https://api.z.ai/api/paas/v4",
-        "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"],
-        "tools": True, "vision": False, "skill": True,
+        # Suggestions only — model is editable so you can type any current GLM id
+        # (the lineup changes fast). Text models first, then the V (vision) models.
+        "editable_model": True,
+        "models": ["glm-4.6", "glm-4.7", "glm-5.2", "glm-5", "glm-4.5",
+                   "glm-4.5-air", "glm-4.6v", "glm-4.5v", "glm-4.6v-flash"],
+        # vision depends on the chosen model — GLM vision models carry a "V" right
+        # after the version (glm-4.6v, glm-5v-turbo). tools across all.
+        "tools": True, "vision": None, "skill": True,
+        "vision_match": r"\dv",
     },
     "ollama": {
         "label": "Ollama (local, free)", "prefix": "ollama_chat/", "needs_key": False,
@@ -155,10 +162,17 @@ class AssistantConfig:
         return f"{PROVIDERS[self.provider()]['label']} · {self.model()}"
 
     def capabilities(self):
-        """Capability hints for the current provider: ``{tools, vision}`` each
-        True / False / None (None = depends on the chosen local model)."""
+        """Capability hints for the current provider/model: ``{tools, vision}`` each
+        True / False / None (None = depends on the chosen local model). When the
+        provider lists ``vision_models`` (e.g. Z.ai's GLM-V models), vision is
+        resolved from the selected model rather than the provider default."""
         spec = PROVIDERS[self.provider()]
-        return {"tools": spec.get("tools"), "vision": spec.get("vision")}
+        vision = spec.get("vision")
+        pat = spec.get("vision_match")
+        if pat is not None:
+            import re
+            vision = bool(re.search(pat, (self.model() or "").lower()))
+        return {"tools": spec.get("tools"), "vision": vision}
 
     def supports_prompt_cache(self):
         """Whether to mark the system prompt cacheable with cache_control blocks

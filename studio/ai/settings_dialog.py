@@ -77,6 +77,7 @@ class AssistantSettingsDialog(QDialog):
         layout.addWidget(bb)
 
         self.provider.currentIndexChanged.connect(self._sync)
+        self.model.currentTextChanged.connect(self._refresh_caps_note)  # vision is per-model
         self._sync()
 
     def _spec(self):
@@ -104,6 +105,14 @@ class AssistantSettingsDialog(QDialog):
         has_base = spec.get("base") is not None
         self.base_edit.setEnabled(has_base)
         self.base_edit.setText(self._config.base_url(prov) or "")
+        self._refresh_caps_note()
+
+    def _refresh_caps_note(self):
+        """Set the cost / tool / vision note for the current provider+model. Vision
+        can depend on the chosen model (e.g. Z.ai's GLM-V models), so this also runs
+        when the model changes, not just the provider."""
+        spec = self._spec()
+        needs_key = spec["needs_key"]
         cost = ("Local model — no key needed; runs on your machine, free."
                 if not needs_key else
                 "Hosted model — billed per token to your API account.")
@@ -111,8 +120,17 @@ class AssistantSettingsDialog(QDialog):
         tool_note = ("Tool use (run code): supported." if tools is True else
                      "Tool use (run code): not supported — chat only." if tools is False
                      else "Tool use (run code): depends on the local model you pick.")
+        # Vision can be per-model (GLM-V etc.). The selection isn't saved yet, so
+        # resolve it from the spec + the currently shown model name.
+        vis = spec.get("vision")
+        pat = spec.get("vision_match")
+        if pat is not None:
+            import re
+            vis = bool(re.search(pat, self.model.currentText().strip().lower()))
+        vision_note = ("  Vision (images): supported." if vis is True else
+                       "  Vision (images): not on this model." if vis is False else "")
         cache = " Prompt caching reduces repeat-turn cost." if spec.get("prompt_cache") else ""
-        self.note.setText(f"{cost}\n{tool_note}{cache}")
+        self.note.setText(f"{cost}\n{tool_note}{vision_note}{cache}")
 
         # The relocated capability warning (was a caption in the dock).
         if tools is False:

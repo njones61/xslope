@@ -17,9 +17,9 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
-    QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget, QTabWidget,
-    QToolBar, QTreeWidget, QTreeWidgetItem, QWidget,
+    QComboBox, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
+    QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem, QWidget,
 )
 
 from .canvas import MplCanvas
@@ -189,6 +189,21 @@ class MainWindow(QMainWindow):
         dock = QDockWidget("Log", self)
         dock.setObjectName("log_dock")
         dock.setWidget(self.log)
+        # Custom title bar: the "Log" label plus a right-aligned Clear button that
+        # empties the pane (like clearing a terminal). The custom widget is still
+        # the dock's drag handle; visibility is toggled from the View menu.
+        title = QWidget()
+        row = QHBoxLayout(title)
+        row.setContentsMargins(6, 2, 4, 2)
+        row.addWidget(QLabel("Log"))
+        row.addStretch(1)
+        clear_btn = QToolButton()
+        clear_btn.setText("Clear")
+        clear_btn.setAutoRaise(True)
+        clear_btn.setToolTip("Clear the log output")
+        clear_btn.clicked.connect(self.log.clear)
+        row.addWidget(clear_btn)
+        dock.setTitleBarWidget(title)
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
         self.log_dock = dock
 

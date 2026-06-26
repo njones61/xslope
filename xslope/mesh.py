@@ -203,7 +203,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     else:
         adjusted_target_size = target_size
 
-    gmsh.initialize()
+    # gmsh installs a SIGINT handler when interruptible; signal handlers can only be
+    # set from the main thread, so disable it when meshing off-thread (e.g. a GUI
+    # worker). On the main thread keep it so Ctrl+C still interrupts long meshes.
+    import threading
+    gmsh.initialize(interruptible=(threading.current_thread() is threading.main_thread()))
     gmsh.option.setNumber("General.Verbosity", 4)  # Reduce verbosity
     gmsh.model.add("multi_region_mesh")
     

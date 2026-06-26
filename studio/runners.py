@@ -94,6 +94,70 @@ class SeepRunner(QThread):
             self.failed.emit("Seepage run failed — see the Log pane for details.")
 
 
+class FemRunner(QThread):
+    """Runs an FEM analysis (single trial or SSRM) off the GUI thread. SSRM
+    supports cooperative cancellation via a cancel_check threaded into solve_ssrm.
+    Emits ``succeeded`` with ``{fem_data, solution, FS, analysis}``, ``failed``,
+    or ``cancelled``."""
+
+    succeeded = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+
+    def __init__(self, slope_data, options, parent=None):
+        super().__init__(parent)
+        self._sd = slope_data
+        self._options = options
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
+
+    def run(self):
+        from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+        from xslope.search import AnalysisCancelled
+        try:
+            sd = self._sd
+            mesh = sd.get("mesh")
+            if mesh is None:
+                self.failed.emit("No mesh available — build a mesh first.")
+                return
+            print("Building FEM data…")
+            fem_data = build_fem_data(sd, mesh)
+            opts = self._options
+            if opts.get("analysis", "ssrm") == "single":
+                F = opts.get("F", 1.0)
+                print(f"Solving FEM (single trial, F={F:g})…")
+                solution = solve_fem(fem_data, F=F, debug_level=1)
+                print(f"FEM solve: converged={solution.get('converged')}, "
+                      f"iterations={solution.get('iterations')}")
+                self.succeeded.emit({"fem_data": fem_data, "solution": solution,
+                                     "FS": None, "analysis": "single"})
+            else:
+                print(f"Running SSRM (F in [{opts.get('F_min', 1.0):g}, "
+                      f"{opts.get('F_max', 2.0):g}], {opts.get('failure_criterion')})…")
+                result = solve_ssrm(
+                    fem_data, F_min=opts.get("F_min", 1.0), F_max=opts.get("F_max", 2.0),
+                    tolerance=opts.get("tolerance", 0.01), debug_level=1,
+                    failure_criterion=opts.get("failure_criterion", "non_convergence"),
+                    cancel_check=self._cancel.is_set)
+                if not result.get("converged", False):
+                    self.failed.emit(f"SSRM did not converge: "
+                                     f"{result.get('error', 'unknown error')}")
+                    return
+                fs = result.get("FS")
+                print(f"SSRM factor of safety = {fs:.3f}")
+                self.succeeded.emit({"fem_data": fem_data,
+                                     "solution": result["last_solution"],
+                                     "FS": fs, "analysis": "ssrm"})
+        except AnalysisCancelled:
+            print("Run cancelled.")
+            self.cancelled.emit()
+        except Exception:
+            traceback.print_exc()
+            self.failed.emit("FEM run failed — see the Log pane for details.")
+
+
 class LemRunner(QThread):
     """Runs an LEM analysis off the GUI thread.
 

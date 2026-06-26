@@ -23,11 +23,11 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import MplCanvas
-from .dialogs import BuildMeshDialog, RunLemDialog, RunSeepDialog
-from .display_panels import SeepDisplayPanel
+from .dialogs import BuildMeshDialog, RunFemDialog, RunLemDialog, RunSeepDialog
+from .display_panels import FemResultsDisplayPanel, SeepDisplayPanel
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
-from .runners import LemRunner, MeshWorker, SeepRunner
+from .runners import FemRunner, LemRunner, MeshWorker, SeepRunner
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -96,6 +96,8 @@ class MainWindow(QMainWindow):
         self.reliability_canvas = None
         self.seep_data_canvas = None
         self.seep_solution_canvas = None
+        self.fem_data_canvas = None
+        self.fem_results_canvas = None
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
         self.view_tabs.currentChanged.connect(self._on_view_tab_changed)
@@ -104,11 +106,13 @@ class MainWindow(QMainWindow):
         self._mode = "lem"
         self._runner = None
         self._seep_runner = None
+        self._fem_runner = None
         self._mesh_busy = False
-        self._run_implemented = {"lem", "seep"}   # modes whose Run is wired up so far
+        self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
         self._last_mesh_opts = {}
         self._last_seep_opts = {}
+        self._last_fem_opts = {}
 
         # gmsh must run on one consistent thread (it segfaults if re-initialized on
         # a fresh thread each build), so a single persistent worker thread handles
@@ -364,7 +368,7 @@ class MainWindow(QMainWindow):
                               "fem": "Run &FEM…"}.get(mode, "Run…"))
         open_ = self.doc.is_open
         busy = (self._runner is not None or self._seep_runner is not None
-                or self._mesh_busy)
+                or self._fem_runner is not None or self._mesh_busy)
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
             self.act_run.setToolTip("")
@@ -385,7 +389,8 @@ class MainWindow(QMainWindow):
             self.run_lem()
         elif self._mode == "seep":
             self.run_seep()
-        # fem run arrives in the next Phase 4 increment.
+        elif self._mode == "fem":
+            self.run_fem()
 
     def _populate_inputs_tree(self):
         d = self.doc.slope_data
@@ -584,6 +589,97 @@ class MainWindow(QMainWindow):
             except Exception:
                 traceback.print_exc()
 
+    # --- FEM -------------------------------------------------------------
+    def run_fem(self):
+        if not self.doc.is_open or self._fem_runner is not None:
+            return
+        if self.doc.slope_data.get("mesh") is None:
+            QMessageBox.information(self, "Run FEM", "Build a mesh first (Build Mesh…).")
+            return
+        dlg = RunFemDialog(self, defaults=self._last_fem_opts)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self._last_fem_opts = opts
+        is_ssrm = opts["analysis"] == "ssrm"
+        self.statusBar().showMessage("Running FEM …")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self._fem_runner = FemRunner(self.doc.slope_data, opts, parent=self)
+        self._fem_runner.succeeded.connect(self._on_fem_succeeded)
+        self._fem_runner.failed.connect(self._on_fem_failed)
+        self._fem_runner.cancelled.connect(self._on_fem_cancelled)
+        self._fem_runner.finished.connect(self._on_fem_finished)
+        if is_ssrm:                     # only SSRM supports cooperative cancel
+            self.cancel_btn.setEnabled(True)
+            self.cancel_btn.setVisible(True)
+        self._update_run_actions()
+        self._fem_runner.start()
+
+    def _on_fem_succeeded(self, bundle):
+        self.doc.results["fem_solution"] = bundle
+        if self.doc.path:
+            try:
+                from xslope.fem import export_fem_solution
+                export_fem_solution(bundle["fem_data"], bundle["solution"],
+                                    os.path.splitext(self.doc.path)[0])
+            except Exception:
+                traceback.print_exc()
+        self._show_fem_data(bundle["fem_data"])
+        self._show_fem_results()
+        if self.fem_results_canvas is not None:
+            self.view_tabs.setCurrentWidget(self.fem_results_canvas)
+        if bundle.get("FS") is not None:
+            self.statusBar().showMessage(f"FEM done — SSRM FS = {bundle['FS']:.3f}")
+        else:
+            conv = bundle["solution"].get("converged")
+            self.statusBar().showMessage(f"FEM single solve done (converged={conv}).")
+
+    def _on_fem_failed(self, message):
+        QMessageBox.warning(self, "FEM run failed", message)
+        self.statusBar().showMessage("FEM run failed.")
+
+    def _on_fem_cancelled(self):
+        self.statusBar().showMessage("Run cancelled.")
+
+    def _on_fem_finished(self):
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.cancel_btn.setVisible(False)
+        if self._fem_runner is not None:
+            self._fem_runner.deleteLater()
+            self._fem_runner = None
+        self._update_run_actions()
+
+    def _show_fem_data(self, fem_data):
+        if self.fem_data_canvas is None:
+            self.fem_data_canvas = MplCanvas(self)
+            self.view_tabs.addTab(self.fem_data_canvas, "FEM · Data")
+        try:
+            self.fem_data_canvas.render_fem_data(fem_data)
+        except Exception:
+            traceback.print_exc()
+
+    def _show_fem_results(self):
+        if self.fem_results_canvas is None:
+            self.fem_results_canvas = MplCanvas(self)
+            self.view_tabs.addTab(self.fem_results_canvas, "FEM · Results")
+            panel = FemResultsDisplayPanel()
+            panel.changed.connect(self._rerender_fem_results)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.fem_results_canvas] = panel
+        self._rerender_fem_results()
+
+    def _rerender_fem_results(self):
+        bundle = self.doc.results.get("fem_solution")
+        panel = self._display_panels.get(self.fem_results_canvas)
+        if bundle and panel and self.fem_results_canvas is not None:
+            try:
+                self.fem_results_canvas.render_fem_results(
+                    bundle["fem_data"], bundle["solution"], panel.options())
+            except Exception:
+                traceback.print_exc()
+
     # --- LEM analysis ----------------------------------------------------
     def run_lem(self):
         if not self.doc.is_open or self._runner is not None:
@@ -612,8 +708,10 @@ class MainWindow(QMainWindow):
         self._runner.start()
 
     def _cancel_run(self):
-        if self._runner is not None and self._runner.isRunning():
-            self._runner.cancel()
+        runner = next((r for r in (self._runner, self._fem_runner)
+                       if r is not None and r.isRunning()), None)
+        if runner is not None:
+            runner.cancel()
             self.cancel_btn.setEnabled(False)
             self.progress_bar.setRange(0, 0)   # back to busy while it winds down
             self.statusBar().showMessage("Cancelling…")
@@ -702,7 +800,8 @@ class MainWindow(QMainWindow):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
         for attr in ("mesh_canvas", "search_canvas", "solution_canvas",
-                     "reliability_canvas", "seep_data_canvas", "seep_solution_canvas"):
+                     "reliability_canvas", "seep_data_canvas", "seep_solution_canvas",
+                     "fem_data_canvas", "fem_results_canvas"):
             canvas = getattr(self, attr)
             if canvas is not None:
                 idx = self.view_tabs.indexOf(canvas)
@@ -779,6 +878,9 @@ class MainWindow(QMainWindow):
             self._runner.wait(5000)
         if self._seep_runner is not None and self._seep_runner.isRunning():
             self._seep_runner.wait(10000)   # seepage has no cancel hook; let it finish
+        if self._fem_runner is not None and self._fem_runner.isRunning():
+            self._fem_runner.cancel()       # SSRM stops cooperatively
+            self._fem_runner.wait(15000)
         # Stop the persistent mesh thread (lets an in-flight build finish first).
         self._mesh_thread.quit()
         self._mesh_thread.wait(10000)

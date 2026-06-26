@@ -36,7 +36,7 @@ def _extract_uv(disp, fem_data):
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
-                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300):
+                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
 
@@ -60,7 +60,12 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     bc_type = fem_data["bc_type"]
     bc_values = fem_data["bc_values"]
 
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
     materials = np.unique(element_materials)
 
     # Import get_material_color to ensure consistent colors with plot_mesh
@@ -296,16 +301,18 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
     ax.set_title(title)
-    plt.tight_layout()
-    
+    fig.tight_layout()
+
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:
-        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, base_name + '.dxf')
 
-    plt.show()
+    if own_fig:
+        plt.show()
+    return fig
 
 
 def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size=0.03, saved_roller_x=None):
@@ -421,7 +428,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=False, save_png=False, save_dxf=False, dpi=300):
+                    scale_vectors=False, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -491,6 +498,16 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     x_margin = (x_max - x_min) * 0.05
     y_margin = (y_max - y_min) * 0.05
 
+    own_fig = fig is None
+    if not own_fig:
+        # Embedded: reuse the caller's figure (GUI canvas). Build the same panel
+        # layout on it via fig.subplots instead of creating a new pyplot figure.
+        fig.clear()
+        try:
+            fig.set_layout_engine("constrained")
+        except Exception:
+            pass
+
     if n_plots == 1:
         # With equal aspect, a wide/short slope only fills a thin band of a tall
         # figure, leaving the colorbar towering over the actual plot. Size the
@@ -504,7 +521,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             single_height = float(np.clip(single_height, 2.0, figsize[1]))
         else:
             single_height = figsize[1]
-        fig, ax = plt.subplots(figsize=(figsize[0], single_height), layout='constrained')
+        if own_fig:
+            fig, ax = plt.subplots(figsize=(figsize[0], single_height), layout='constrained')
+        else:
+            ax = fig.add_subplot(111)
         axes = [ax]
         legend_ax = None
     else:
@@ -513,17 +533,24 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if has_deform_legend:
             # Add a thin row after the first plot for the legend
             height_ratios = [1] + [0.08] + [1] * (n_plots - 1)
-            fig, all_axes = plt.subplots(n_plots + 1, 1,
-                                         figsize=(figsize[0], total_height),
-                                         layout='constrained',
-                                         gridspec_kw={'height_ratios': height_ratios})
+            if own_fig:
+                fig, all_axes = plt.subplots(n_plots + 1, 1,
+                                             figsize=(figsize[0], total_height),
+                                             layout='constrained',
+                                             gridspec_kw={'height_ratios': height_ratios})
+            else:
+                all_axes = fig.subplots(n_plots + 1, 1,
+                                        gridspec_kw={'height_ratios': height_ratios})
             axes = [all_axes[0]] + list(all_axes[2:])
             legend_ax = all_axes[1]
             legend_ax.set_axis_off()
         else:
-            fig, axes = plt.subplots(n_plots, 1,
-                                     figsize=(figsize[0], total_height),
-                                     layout='constrained')
+            if own_fig:
+                fig, axes = plt.subplots(n_plots, 1,
+                                         figsize=(figsize[0], total_height),
+                                         layout='constrained')
+            else:
+                axes = fig.subplots(n_plots, 1)
             legend_ax = None
         if not isinstance(axes, (list, np.ndarray)):
             axes = [axes]
@@ -583,15 +610,16 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              frameon=False)
 
     if save_png:
-        plt.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         # One DXF per panel (each plot type), since the figure is multi-panel.
         for i, pt in enumerate(plot_types):
             if i < len(axes):
                 axes_to_dxf(axes[i], f'fem_results_{pt}.dxf')
-    
-    plt.show()
+
+    if own_fig:
+        plt.show()
     
     # Return appropriate values
     if n_plots == 1:

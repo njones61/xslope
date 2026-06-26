@@ -36,6 +36,99 @@ MESH_ELEMENT_TYPES = [
 ]
 
 
+FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
+FEM_FAILURE_CRITERIA = [
+    ("non_convergence", "Non-convergence"),
+    ("displacement_limit", "Displacement limit"),
+    ("displacement_increase", "Displacement increase"),
+]
+
+
+class RunFemDialog(QDialog):
+    """Solve parameters for an FEM run (single trial or SSRM). Display options
+    (plot type, deformation scale) live on the FEM Results view."""
+
+    def __init__(self, parent=None, defaults=None):
+        super().__init__(parent)
+        self.setWindowTitle("Run FEM")
+        defaults = defaults or {}
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.analysis = QComboBox()
+        for key, label in FEM_ANALYSIS_TYPES:
+            self.analysis.addItem(label, key)
+        aidx = self.analysis.findData(defaults.get("analysis", "ssrm"))
+        if aidx >= 0:
+            self.analysis.setCurrentIndex(aidx)
+        form.addRow("Analysis", self.analysis)
+
+        self.F = QDoubleSpinBox()
+        self.F.setRange(0.1, 10.0)
+        self.F.setSingleStep(0.05)
+        self.F.setValue(float(defaults.get("F", 1.0)))
+        form.addRow("F (single)", self.F)
+
+        self.F_min = QDoubleSpinBox()
+        self.F_min.setRange(0.1, 10.0)
+        self.F_min.setSingleStep(0.05)
+        self.F_min.setValue(float(defaults.get("F_min", 1.0)))
+        form.addRow("F min (SSRM)", self.F_min)
+
+        self.F_max = QDoubleSpinBox()
+        self.F_max.setRange(0.1, 20.0)
+        self.F_max.setSingleStep(0.05)
+        self.F_max.setValue(float(defaults.get("F_max", 2.0)))
+        form.addRow("F max (SSRM)", self.F_max)
+
+        self.tolerance = QDoubleSpinBox()
+        self.tolerance.setDecimals(4)
+        self.tolerance.setRange(0.0001, 1.0)
+        self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
+        form.addRow("Tolerance (SSRM)", self.tolerance)
+
+        self.failure_criterion = QComboBox()
+        for key, label in FEM_FAILURE_CRITERIA:
+            self.failure_criterion.addItem(label, key)
+        cidx = self.failure_criterion.findData(defaults.get("failure_criterion",
+                                                            "non_convergence"))
+        if cidx >= 0:
+            self.failure_criterion.setCurrentIndex(cidx)
+        form.addRow("Failure criterion", self.failure_criterion)
+
+        layout.addLayout(form)
+        note = QLabel("Plot type and deformation scale are set on the FEM Results "
+                      "view after solving.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.button(QDialogButtonBox.Ok).setText("Run")
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+        self.analysis.currentIndexChanged.connect(self._sync_enabled)
+        self._sync_enabled()
+
+    def _sync_enabled(self):
+        single = self.analysis.currentData() == "single"
+        self.F.setEnabled(single)
+        for w in (self.F_min, self.F_max, self.tolerance, self.failure_criterion):
+            w.setEnabled(not single)
+
+    def options(self):
+        return {
+            "analysis": self.analysis.currentData(),
+            "F": self.F.value(),
+            "F_min": self.F_min.value(),
+            "F_max": self.F_max.value(),
+            "tolerance": self.tolerance.value(),
+            "failure_criterion": self.failure_criterion.currentData(),
+        }
+
+
 SEEP_VARIABLES = [
     ("head", "Total head"),
     ("u", "Pore pressure"),

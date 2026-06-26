@@ -2539,7 +2539,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
-               pp_formulation='effective', dt_scale=1.0):
+               pp_formulation='effective', dt_scale=1.0, cancel_check=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2609,19 +2609,22 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
-            tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale)
+            tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
+            cancel_check=cancel_check)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
-            staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale)
+            staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
+            cancel_check=cancel_check)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
-            tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale)
+            tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
+            cancel_check=cancel_check)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -2644,7 +2647,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
-                 dt_scale=1.0):
+                 dt_scale=1.0, cancel_check=None):
     """SSRM using fixed VP displacement limit as failure criterion."""
 
     if debug_level >= 1:
@@ -2706,6 +2709,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     iteration = 0
 
     while (F_right - F_left) > tolerance and iteration < 50:
+        from .search import _check_cancel
+        _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
 
         if debug_level >= 1:
@@ -2753,7 +2758,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
                  pp_formulation='effective',
-                 dt_scale=1.0):
+                 dt_scale=1.0, cancel_check=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -2833,6 +2838,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         print(f"\n  Phase 1: Coarse sweep ({n_sweep} points)")
 
     for i, F_val in enumerate(F_values):
+        from .search import _check_cancel
+        _check_cancel(cancel_check)
         max_vp, sol = _get_max_vp_disp(F_val)
         displacements.append(max_vp)
         solutions.append(sol)
@@ -2892,6 +2899,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # Phase 3: Refine within catastrophe interval by bisection
     iteration = 0
     while (F_right - F_left) > tolerance and iteration < 50:
+        from .search import _check_cancel
+        _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
         d_mid, sol_mid = _get_max_vp_disp(F_mid)
 

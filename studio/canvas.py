@@ -31,6 +31,7 @@ from xslope.plot import (
     plot_noncircular_search_results, plot_reliability_results, plot_solution,
 )
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
+from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
@@ -121,6 +122,15 @@ class MplCanvas(QWidget):
             vectors=opts.get("vectors", False),
             fill_contours=opts.get("fill_contours", False),
             phreatic=opts.get("phreatic", True), mesh=False, fig=fig))
+
+    def render_fem_data(self, fem_data):
+        self._draw(lambda fig: plot_fem_data(fem_data, show_bc=True, fig=fig))
+
+    def render_fem_results(self, fem_data, solution, opts):
+        opts = opts or {}
+        self._draw(lambda fig: plot_fem_results(
+            fem_data, solution, plot_type=[opts.get("plot_type", "shear_strain")],
+            deform_percent=opts.get("deform_percent", 15), fig=fig))
 
     def _draw(self, draw_fn):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.

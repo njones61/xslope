@@ -184,7 +184,8 @@ class MainWindow(QMainWindow):
         tb.addAction(self.act_new)
         tb.addAction(self.act_open)
         tb.addSeparator()
-        tb.addWidget(QLabel(" Mode: "))
+        self.mode_label = QLabel(" Mode: ")
+        tb.addWidget(self.mode_label)
         self.mode_combo = QComboBox()
         for label, _ in MODES:
             self.mode_combo.addItem(label)
@@ -192,13 +193,12 @@ class MainWindow(QMainWindow):
         tb.addWidget(self.mode_combo)
         tb.addSeparator()
         tb.addAction(self.act_run_lem)
-        # macOS renders text-only toolbar buttons larger than QLabel/QComboBox;
-        # force the action buttons to the default UI font so they match "Mode:".
-        ui_font = QLabel().font()
-        for act in (self.act_new, self.act_open, self.act_run_lem):
-            btn = tb.widgetForAction(act)
-            if btn is not None:
-                btn.setFont(ui_font)
+        # macOS's native style draws text-only toolbar buttons in the larger system
+        # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
+        # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
+        pt = self.mode_label.font().pointSizeF()
+        if pt > 0:
+            tb.setStyleSheet(f"QToolButton {{ font-size: {pt:g}pt; }}")
 
     # --- new / open / recent ---------------------------------------------
     def new_project(self):

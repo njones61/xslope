@@ -11,10 +11,15 @@ and triggering a re-render is safe.
 
 from __future__ import annotations
 
+import os
 import tempfile
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+
+# Figure formats a snippet might savefig itself — if it did, we don't also
+# auto-save its open figures (which would show the same plot twice).
+_FIG_EXTS = (".png", ".pdf", ".svg", ".jpg", ".jpeg")
 
 
 class PythonKernel:
@@ -22,6 +27,18 @@ class PythonKernel:
         self._doc = doc
         self._ns = {}
         self._seeded = False
+        self._outdir = None
+        self._fig_seq = 0
+
+    @property
+    def outdir(self):
+        """Folder the assistant's generated files (plots, CSVs, …) are written to,
+        so the user can open them. Snippets run with this as the working directory,
+        so a naive ``plt.savefig('x.png')`` lands here. Stable for the session."""
+        if self._outdir is None:
+            self._outdir = os.path.join(tempfile.gettempdir(), "xslope_studio_assistant")
+            os.makedirs(self._outdir, exist_ok=True)
+        return self._outdir
 
     def reset(self):
         """Drop all variables; the engine + helpers re-seed on the next run."""
@@ -35,7 +52,8 @@ class PythonKernel:
         import numpy as np
         import pandas as pd
         import xslope
-        self._ns.update({"np": np, "pd": pd, "plt": plt, "xslope": xslope})
+        self._ns.update({"np": np, "pd": pd, "plt": plt, "xslope": xslope,
+                         "OUTPUT_DIR": self.outdir})
         self._ns.update(self._helpers())
         self._seeded = True
 
@@ -117,8 +135,10 @@ class PythonKernel:
         return code
 
     def run(self, code):
-        """Execute ``code``; return ``(stdout_text, [figure_png_paths], error_text)``.
-        ``error_text`` is ``None`` on success."""
+        """Execute ``code``; return ``(stdout_text, [output_file_paths], error_text)``.
+        Output files are everything the snippet produced in ``outdir`` — pyplot
+        figures it left open (auto-saved) plus any files it wrote itself (plots,
+        CSVs, …). ``error_text`` is ``None`` on success."""
         if not self._seeded:
             self._seed()
         import matplotlib.pyplot as plt
@@ -128,30 +148,45 @@ class PythonKernel:
         self._ns["doc"] = self._doc
         self._ns["slope_data"] = self._doc.slope_data
         self._ns["results"] = self._doc.results
+        self._ns["OUTPUT_DIR"] = self.outdir
 
         code = self._normalize(code)
-        before = set(plt.get_fignums())
+        os.makedirs(self.outdir, exist_ok=True)     # may have been cleared by the OS
+        before_figs = set(plt.get_fignums())
+        existing = set(os.listdir(self.outdir))     # to detect files the snippet writes
+        prev_cwd = os.getcwd()
         buf = StringIO()
         error = None
         try:
+            os.chdir(self.outdir)        # relative saves (savefig('x.png')) land here
             with redirect_stdout(buf), redirect_stderr(buf):
                 exec(code, self._ns)
         except Exception:
             error = traceback.format_exc()
-
-        # Save any figures the snippet created (new since `before`).
-        figures = []
-        for num in plt.get_fignums():
-            if num in before:
-                continue
-            fig = plt.figure(num)
-            path = tempfile.NamedTemporaryFile(
-                prefix="xslope_ai_", suffix=".png", delete=False).name
+        finally:
             try:
-                fig.savefig(path, dpi=120, bbox_inches="tight")
-                figures.append(path)
+                os.chdir(prev_cwd)
             except Exception:
                 pass
+
+        # Auto-save figures the snippet left open — but only if it didn't already
+        # save a figure itself (e.g. savefig('plot.png') without closing), so a
+        # saved-and-left-open plot isn't shown twice.
+        wrote_figure = any(f.lower().endswith(_FIG_EXTS)
+                           for f in os.listdir(self.outdir) if f not in existing)
+        if not wrote_figure:
+            for num in plt.get_fignums():
+                if num in before_figs:
+                    continue
+                self._fig_seq += 1
+                path = os.path.join(self.outdir, f"assistant_plot_{self._fig_seq:03d}.png")
+                try:
+                    plt.figure(num).savefig(path, dpi=120, bbox_inches="tight")
+                except Exception:
+                    pass
         plt.close("all")
 
-        return buf.getvalue(), figures, error
+        # Everything newly present in outdir is this snippet's output.
+        created = sorted(f for f in os.listdir(self.outdir) if f not in existing)
+        outputs = [os.path.join(self.outdir, f) for f in created]
+        return buf.getvalue(), outputs, error

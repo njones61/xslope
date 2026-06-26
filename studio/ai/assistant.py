@@ -11,6 +11,7 @@ Conversation history (OpenAI message format) persists across turns. See §14.
 from __future__ import annotations
 
 import json
+import os
 import threading
 
 from PySide6.QtCore import QObject, QThread, Signal
@@ -58,7 +59,11 @@ Key facts about your environment:
 automatically and the user persists the result with Save As — do NOT write .xlsx \
 files for the build case.
 - Figures you make with `plt` are shown to the user; you won't see them back, so \
-print any numbers you need to reason about.
+print any numbers you need to reason about. Files you save (plots, CSVs, exported \
+.xlsx, …) go to the working directory — the assistant output folder (also \
+`OUTPUT_DIR`) — and the user can open them from the chat or the dock's Files \
+button, so save them with clear, descriptive filenames when the user asks for a \
+file or a saved plot.
 - Prefer one focused snippet per step. Keep code short and readable. Print a \
 brief result. Don't reformat or refactor the user's data beyond the request.
 - **Only do what was asked.** If asked to edit inputs, just edit `slope_data` — \
@@ -510,12 +515,13 @@ class Assistant(QObject):
             holder["event"].set()
             return
 
-        stdout, figures, error = self._run_python(code)
+        stdout, outputs, error = self._run_python(code)
         parts = []
         if stdout.strip():
             parts.append(stdout.rstrip())
-        if figures:
-            parts.append(f"[{len(figures)} figure(s) shown to the user]")
+        if outputs:
+            names = ", ".join(os.path.basename(p) for p in outputs)
+            parts.append(f"[saved {len(outputs)} file(s) the user can open: {names}]")
         if error:
             parts.append("ERROR:\n" + error)
         if not parts:
@@ -524,7 +530,7 @@ class Assistant(QObject):
 
         holder["content"] = result_text
         holder["event"].set()
-        self.tool_ran.emit(code, result_text, figures)
+        self.tool_ran.emit(code, result_text, outputs)
 
     def _run_python(self, code):
         doc = self._mw.doc
@@ -536,7 +542,7 @@ class Assistant(QObject):
         before = _input_signature(doc.slope_data)
         mesh_before = self._mw.mesh_signature(doc.slope_data)
         doc.begin_edit()                    # snapshot for undo / rollback
-        stdout, figures, error = self._kernel.run(code)
+        stdout, outputs, error = self._kernel.run(code)
         edited = geom_changed = False
         if error:
             # Transactional: a snippet that raised leaves no partial edit, so
@@ -558,7 +564,11 @@ class Assistant(QObject):
             self._mw.refresh_inputs_view()
         except Exception:
             pass
-        return stdout, figures, error
+        return stdout, outputs, error
+
+    def output_dir(self):
+        """Folder where the assistant writes generated files (plots, CSVs, …)."""
+        return self._kernel.outdir
 
     def _confirm_run(self, code):
         from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QLabel,

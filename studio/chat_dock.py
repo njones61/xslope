@@ -10,9 +10,12 @@ minimal (a wrapping model label + Settings) so the dock can be made narrow.
 from __future__ import annotations
 
 import html
+import os
+import subprocess
+import sys
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt, QUrl, Signal
-from PySide6.QtGui import QImage, QTextDocument
+from PySide6.QtGui import QDesktopServices, QImage, QTextDocument
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
@@ -84,9 +87,12 @@ class ChatDock(QWidget):
         self._assistant = assistant
         self._img_seq = 0
         self._pending = []        # list[QImage] attached to the next message
+        self._paths = {}          # link-id -> output file path (open / reveal)
 
         self.transcript = QTextBrowser()
         self.transcript.setOpenExternalLinks(False)
+        self.transcript.setOpenLinks(False)            # we handle clicks ourselves
+        self.transcript.anchorClicked.connect(self._on_anchor)
 
         self.attach_label = QLabel()
         self.attach_label.setStyleSheet("color:#555;")
@@ -112,12 +118,16 @@ class ChatDock(QWidget):
         self.clear_btn.setToolTip("Start a fresh conversation (clears history and "
                                   "the assistant's Python variables; your project "
                                   "is unaffected).")
+        self.files_btn = QPushButton("Files…")
+        self.files_btn.setToolTip("Open the folder where the assistant saves "
+                                  "generated plots and files.")
         self.settings_btn = QPushButton("Settings…")
 
         self.model_label = QLabel()
         self.model_label.setWordWrap(True)        # wraps so the dock can be narrow
         top = QHBoxLayout()
         top.addWidget(self.model_label, 1)
+        top.addWidget(self.files_btn, 0, Qt.AlignTop)
         top.addWidget(self.clear_btn, 0, Qt.AlignTop)
         top.addWidget(self.settings_btn, 0, Qt.AlignTop)
 
@@ -142,6 +152,7 @@ class ChatDock(QWidget):
         self.send_btn.clicked.connect(self._send)
         self.stop_btn.clicked.connect(self._assistant.cancel)
         self.clear_btn.clicked.connect(self._clear)
+        self.files_btn.clicked.connect(self._open_files_folder)
         self.settings_btn.clicked.connect(self._open_settings)
 
         self._assistant.assistant_text.connect(self._on_assistant_text)
@@ -168,7 +179,13 @@ class ChatDock(QWidget):
         self._assistant.reset()
         self.transcript.clear()
         self._img_seq = 0
+        self._paths.clear()
         self._clear_attachments()
+
+    def _open_files_folder(self):
+        d = self._assistant.output_dir()
+        os.makedirs(d, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(d))
 
     # --- image attachments ----------------------------------------------
     def _add_attachment(self, img):
@@ -215,7 +232,7 @@ class ChatDock(QWidget):
     def _on_assistant_text(self, text):
         self._add_block("Assistant", text, "#2e7d32")
 
-    def _on_tool_ran(self, code, output, figures):
+    def _on_tool_ran(self, code, output, outputs):
         pre = ("background:#f4f4f4;padding:6px;border-radius:4px;"
                "white-space:pre-wrap;word-wrap:break-word;")
         frag = (f'<div style="margin-top:8px;"><b>Ran code</b>'
@@ -225,8 +242,11 @@ class ChatDock(QWidget):
                      f'{html.escape(output)}</pre>')
         frag += "</div>"
         self.transcript.append(frag)            # one complete block -> own paragraph
-        for path in figures or []:
-            self._append_image(path)
+        for path in outputs or []:              # plots inline, other files as links
+            if path.lower().endswith(_IMAGE_EXTS):
+                self._append_image(path)
+            else:
+                self._append_file(path)
 
     def _on_tool_declined(self, code):
         self.transcript.append('<div style="color:#9a6700;margin-top:8px;">'
@@ -253,16 +273,76 @@ class ChatDock(QWidget):
             f'<div style="margin-top:8px;word-wrap:break-word;">'
             f'<b style="color:{color};">{who}:</b> {body}</div>')
 
+    # --- generated outputs (clickable to open / reveal) -----------------
+    def _register(self, path):
+        """Map a file path to a short link id used by the open/reveal anchors."""
+        ident = str(len(self._paths) + 1)
+        self._paths[ident] = path
+        return ident
+
     def _append_image(self, path):
-        self._append_qimage(QImage(path))
+        """An assistant-generated image: shown inline, clickable to open, with an
+        open / show-in-folder caption."""
+        img = QImage(path)
+        if img.isNull():
+            self._append_file(path)         # not loadable as image -> link it
+            return
+        ident = self._register(path)
+        url = self._image_resource(img)
+        name = html.escape(os.path.basename(path))
+        self.transcript.append(
+            f'<a href="xopen:{ident}"><img src="{url}"></a>'
+            f'<div style="font-size:11px;color:#666;">{name} — '
+            f'<a href="xopen:{ident}">open</a> &middot; '
+            f'<a href="xreveal:{ident}">show in folder</a></div>')
+
+    def _append_file(self, path):
+        """A non-image generated file (CSV, xlsx, …): shown as a link row."""
+        ident = self._register(path)
+        name = html.escape(os.path.basename(path))
+        self.transcript.append(
+            f'<div style="margin-top:6px;">📄 <a href="xopen:{ident}">{name}</a> '
+            f'<span style="font-size:11px;color:#666;">'
+            f'(<a href="xreveal:{ident}">show in folder</a>)</span></div>')
 
     def _append_qimage(self, img):
+        """Inline a QImage with no backing file (e.g. a pasted user attachment)."""
+        url = self._image_resource(img)
+        if url:
+            self.transcript.append(f'<img src="{url}">')
+
+    def _image_resource(self, img):
         if img.isNull():
-            return
+            return None
         cap = max(220, self.transcript.viewport().width() - 24)
         if img.width() > cap:
             img = img.scaledToWidth(cap, Qt.SmoothTransformation)
         self._img_seq += 1
         url = QUrl(f"xslope-fig://{self._img_seq}")
         self.transcript.document().addResource(QTextDocument.ImageResource, url, img)
-        self.transcript.append(f'<img src="{url.toString()}">')
+        return url.toString()
+
+    def _on_anchor(self, url):
+        """Open or reveal a generated file when its link is clicked."""
+        s = url.toString()
+        scheme, _, ident = s.partition(":")
+        path = self._paths.get(ident)
+        if not path or not os.path.exists(path):
+            return
+        if scheme == "xreveal":
+            self._reveal(path)
+        else:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    @staticmethod
+    def _reveal(path):
+        """Reveal a file in the OS file manager (select it where supported)."""
+        try:
+            if sys.platform == "darwin":
+                subprocess.run(["open", "-R", path], check=False)
+            elif sys.platform.startswith("win"):
+                subprocess.run(["explorer", f"/select,{path}"], check=False)
+            else:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(path)))
+        except Exception:
+            pass

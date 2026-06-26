@@ -25,15 +25,12 @@ TAB_LOCATIONS = [
     "lower right", "lower center", "center left", "center right", "center",
 ]
 
-# Valid plot_fem_results plot types (one shown at a time on the FEM Results view).
+# FEM Results plot types (one shown at a time). plot_fem_results also supports
+# displace_mag / stress / strain / yield, but those are diagnostic and omitted here.
 FEM_PLOT_TYPES = [
     ("shear_strain", "Shear strain"),
     ("deformation", "Deformation"),
-    ("displace_mag", "Displacement magnitude"),
     ("displace_vector", "Displacement vectors"),
-    ("stress", "Von Mises stress"),
-    ("strain", "Equivalent strain"),
-    ("yield", "Yield function"),
 ]
 
 

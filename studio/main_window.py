@@ -130,6 +130,11 @@ class MainWindow(QMainWindow):
         self._make_inputs_dock()
         self._make_display_dock()
         self._make_log_dock()
+        # Let the left dock column own the bottom-left corner so it runs the full
+        # window height; the Log dock then starts at the central canvas's left edge
+        # instead of spanning under the Inputs/Display docks.
+        self.setCorner(Qt.BottomLeftCorner, Qt.LeftDockWidgetArea)
+        self._arrange_docks()
         self._make_actions()
         self._make_menus()
         self._make_toolbar()
@@ -186,6 +191,13 @@ class MainWindow(QMainWindow):
         dock.setWidget(self.log)
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
         self.log_dock = dock
+
+    def _arrange_docks(self):
+        # The left column now spans the full height (it owns the bottom-left
+        # corner), so give the Display dock the larger share — the Inputs tree is
+        # short, and per-plot display options want the room.
+        self.resizeDocks([self.inputs_dock, self.display_dock], [240, 560],
+                         Qt.Vertical)
 
     def _install_log_capture(self):
         sys.stdout = _LogStream(self.log, sys.__stdout__)

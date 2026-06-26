@@ -21,7 +21,8 @@ os.environ.setdefault("QT_API", "pyside6")
 from PySide6.QtCore import QEvent, QRectF, Qt, QTimer
 from PySide6.QtGui import QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
-    QGraphicsScene, QGraphicsView, QHBoxLayout, QToolButton, QVBoxLayout, QWidget,
+    QFileDialog, QGraphicsScene, QGraphicsView, QHBoxLayout, QInputDialog,
+    QMessageBox, QToolButton, QVBoxLayout, QWidget,
 )
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
@@ -77,6 +78,13 @@ class MplCanvas(QWidget):
             btn.clicked.connect(slot)
             bar.addWidget(btn)
         bar.addStretch(1)
+        # Export the current figure to an image file (per-view, so it sits next to
+        # the image it saves and works for views without a Display panel).
+        save_btn = QToolButton()
+        save_btn.setText("Save…")
+        save_btn.setToolTip("Export this view to a PNG / PDF / SVG file")
+        save_btn.clicked.connect(self.save_image)
+        bar.addWidget(save_btn)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -131,6 +139,43 @@ class MplCanvas(QWidget):
         self._draw(lambda fig: plot_fem_results(
             fem_data, solution, plot_type=[opts.get("plot_type", "shear_strain")],
             deform_percent=opts.get("deform_percent", 15), fig=fig))
+
+    # --- export ----------------------------------------------------------
+    def save_image(self, _checked=False, suggested_name=""):
+        """Export the current figure to a file. PNG prompts for a DPI; PDF/SVG are
+        vector and need none. Saves at the figure's true size in inches, so output
+        resolution is independent of the on-screen zoom."""
+        path, sel = QFileDialog.getSaveFileName(
+            self, "Save image", suggested_name,
+            "PNG image (*.png);;PDF document (*.pdf);;SVG image (*.svg)")
+        if not path:
+            return
+        ext = os.path.splitext(path)[1].lower()
+        if not ext:                       # user typed no extension — infer from filter
+            ext = {"PDF document (*.pdf)": ".pdf",
+                   "SVG image (*.svg)": ".svg"}.get(sel, ".png")
+            path += ext
+        dpi = 300
+        if ext not in (".pdf", ".svg"):   # raster formats need a resolution
+            dpi, ok = QInputDialog.getInt(self, "Image resolution",
+                                          "DPI:", 300, 50, 1200, 50)
+            if not ok:
+                return
+        try:
+            # Restore the on-screen render DPI afterwards so the live pixmap is
+            # unaffected by the export DPI.
+            self.figure.savefig(path, dpi=dpi, bbox_inches="tight")
+            self.figure.set_dpi(self._render_dpi or BASE_DPI)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(self, "Save image failed",
+                                "Could not write the image — see the Log pane.")
+            return
+        # Visible confirmation via the window's status bar if available.
+        win = self.window()
+        if hasattr(win, "statusBar"):
+            win.statusBar().showMessage(f"Saved {os.path.basename(path)}")
 
     def _draw(self, draw_fn):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.

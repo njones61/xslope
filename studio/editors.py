@@ -14,8 +14,8 @@ import math
 
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QTabWidget, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QPushButton, QTableWidget,
+    QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
 
@@ -518,6 +518,169 @@ class PilesEditor(CategoryEditor):
         slope_data["pile_lines"] = rows
 
 
+# --- profile lines (geometry; master/detail) -------------------------------- #
+def _resync_geometry(slope_data):
+    """Rebuild the derived geometry (polygons, domain, ground surface, t-crack)
+    from edited profile_lines — the resync the loader/design driver also do."""
+    from shapely.geometry import LineString, Polygon
+    from xslope.mesh import build_polygons
+    from xslope.fileio import build_ground_surface_from_polygons
+
+    profile_lines = slope_data.get("profile_lines") or []
+    if not profile_lines:
+        return
+    polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"]}
+             for p in build_polygons(slope_data={"profile_lines": profile_lines,
+                                                  "max_depth": slope_data.get("max_depth")})]
+    slope_data["polygons"] = polys
+    gs, dom = build_ground_surface_from_polygons(polys)
+    slope_data["ground_surface"] = gs
+    slope_data["domain_polygon"] = dom
+    td = slope_data.get("tcrack_depth", 0)
+    if td and td > 0 and gs is not None and not gs.is_empty:
+        slope_data["tcrack_surface"] = LineString([(x, y - td) for x, y in gs.coords])
+    else:
+        slope_data["tcrack_surface"] = None
+
+
+class ProfileLinesDialog(QDialog):
+    """Master/detail editor: a list of profile lines (left) + the selected line's
+    material and vertex table (right)."""
+
+    XY = [Field("x", "x"), Field("y", "y")]
+
+    def __init__(self, profile_lines, materials, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Profile lines")
+        self.resize(680, 540)
+        self._materials = materials
+        self._lines = [{"mat_id": pl.get("mat_id"),
+                        "coords": [tuple(c) for c in pl.get("coords", [])]}
+                       for pl in (profile_lines or [])]
+        self._cur = -1
+        self.table = None
+
+        main = QVBoxLayout(self)
+        main.addWidget(_help_label(
+            "Each profile line is the top of a material layer, drawn left→right and ordered "
+            "shallowest first. Select a line to edit its material and vertices."))
+        body = QHBoxLayout()
+        main.addLayout(body, 1)
+
+        left = QVBoxLayout()
+        body.addLayout(left)
+        self.list = QListWidget()
+        self.list.currentRowChanged.connect(self._on_select)
+        left.addWidget(self.list)
+        lbtns = QHBoxLayout()
+        b_add = QPushButton("Add line")
+        b_add.clicked.connect(self._add_line)
+        b_rem = QPushButton("Remove line")
+        b_rem.clicked.connect(self._remove_line)
+        lbtns.addWidget(b_add)
+        lbtns.addWidget(b_rem)
+        left.addLayout(lbtns)
+
+        right = QVBoxLayout()
+        body.addLayout(right, 1)
+        matrow = QHBoxLayout()
+        matrow.addWidget(QLabel("Material:"))
+        self.mat_combo = QComboBox()
+        for i, m in enumerate(materials):
+            self.mat_combo.addItem(f"{i + 1}: {m.get('name', '')}")
+        self.mat_combo.currentIndexChanged.connect(self._on_mat_changed)
+        matrow.addWidget(self.mat_combo, 1)
+        right.addLayout(matrow)
+        self._holder = QVBoxLayout()
+        right.addLayout(self._holder, 1)
+
+        _ok_cancel(self, main)
+
+        self._refresh_list()
+        if self._lines:
+            self.list.setCurrentRow(0)
+
+    def _label(self, i):
+        mid = self._lines[i]["mat_id"]
+        if mid is not None and 0 <= mid < len(self._materials):
+            return f"Line {i + 1}  (mat {mid + 1}: {self._materials[mid].get('name', '')})"
+        return f"Line {i + 1}  (mat ?)"
+
+    def _refresh_list(self):
+        self.list.blockSignals(True)
+        self.list.clear()
+        for i in range(len(self._lines)):
+            self.list.addItem(self._label(i))
+        self.list.blockSignals(False)
+
+    def _commit_current(self):
+        if 0 <= self._cur < len(self._lines) and self.table is not None:
+            self._lines[self._cur]["coords"] = [(r["x"], r["y"]) for r in self.table.result_rows()]
+            if self.mat_combo.currentIndex() >= 0:
+                self._lines[self._cur]["mat_id"] = self.mat_combo.currentIndex()
+
+    def _load(self, idx):
+        if self.table is not None:
+            self.table.setParent(None)
+            self.table = None
+        if not (0 <= idx < len(self._lines)):
+            return
+        ln = self._lines[idx]
+        rows = [{"x": x, "y": y} for (x, y) in ln["coords"]]
+        self.table = _EditableTable(self.XY, rows, _new_pt)
+        self._holder.addWidget(self.table)
+        self.mat_combo.blockSignals(True)
+        mid = ln["mat_id"]
+        self.mat_combo.setCurrentIndex(mid if (mid is not None and 0 <= mid < self.mat_combo.count()) else 0)
+        self.mat_combo.blockSignals(False)
+
+    def _on_select(self, new_idx):
+        self._commit_current()
+        self._cur = new_idx
+        self._load(new_idx)
+
+    def _on_mat_changed(self, idx):
+        if 0 <= self._cur < len(self._lines) and idx >= 0:
+            self._lines[self._cur]["mat_id"] = idx
+            item = self.list.item(self._cur)
+            if item:
+                item.setText(self._label(self._cur))
+
+    def _add_line(self):
+        self._commit_current()
+        self._lines.append({"mat_id": 0, "coords": []})
+        self._refresh_list()
+        self.list.setCurrentRow(len(self._lines) - 1)
+
+    def _remove_line(self):
+        idx = self.list.currentRow()
+        if idx < 0:
+            return
+        self._lines.pop(idx)
+        self._cur = -1  # invalidate so the next select doesn't write to a stale index
+        self._refresh_list()
+        if self._lines:
+            self.list.setCurrentRow(min(idx, len(self._lines) - 1))
+        else:
+            self._load(-1)
+
+    def result_lines(self):
+        self._commit_current()
+        return [{"coords": list(ln["coords"]), "mat_id": ln["mat_id"]} for ln in self._lines]
+
+
+class ProfileEditor(CategoryEditor):
+    label = "Profile lines"
+
+    def build(self, slope_data, parent):
+        return ProfileLinesDialog(slope_data.get("profile_lines") or [],
+                                  slope_data.get("materials") or [], parent)
+
+    def apply(self, slope_data, dlg):
+        slope_data["profile_lines"] = dlg.result_lines()
+        _resync_geometry(slope_data)  # rebuild polygons / ground surface / t-crack
+
+
 # --- reinforcement ---------------------------------------------------------- #
 def _new_reinf():
     return {"x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "t_max": 0.0, "t_res": 0.0,
@@ -557,4 +720,5 @@ CATEGORY_EDITORS = {
     "seep_bc": HeadBcEditor(),
     "piles": PilesEditor(),
     "reinforce": ReinforcementEditor(),
+    "profile": ProfileEditor(),
 }

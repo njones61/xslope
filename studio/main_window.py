@@ -246,7 +246,9 @@ class MainWindow(QMainWindow):
 
         add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
-        add("Profile lines", len(d.get("profile_lines") or []))
+        profile_lines = d.get("profile_lines") or []
+        add("Profile lines", len(profile_lines),
+            category="profile" if profile_lines else None)
         add("Polygons", len(d.get("polygons") or []))
         add("Circles", len(d.get("circles") or []), category="circles")
         add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")

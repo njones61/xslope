@@ -19,8 +19,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .ai.assistant import MODEL
-
 
 class ChatDock(QWidget):
     def __init__(self, assistant, parent=None):
@@ -38,13 +36,16 @@ class ChatDock(QWidget):
         self.send_btn = QPushButton("Send")
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setEnabled(False)
+        self.settings_btn = QPushButton("Settings…")
         self.autonomy = QComboBox()
         self.autonomy.addItem("Confirm before running", True)
         self.autonomy.addItem("Auto-run", False)
 
+        self.model_label = QLabel()
         top = QHBoxLayout()
-        top.addWidget(QLabel(f"Model: {MODEL}"))
+        top.addWidget(self.model_label)
         top.addStretch(1)
+        top.addWidget(self.settings_btn)
         top.addWidget(self.autonomy)
 
         row = QHBoxLayout()
@@ -59,6 +60,7 @@ class ChatDock(QWidget):
 
         self.send_btn.clicked.connect(self._send)
         self.stop_btn.clicked.connect(self._assistant.cancel)
+        self.settings_btn.clicked.connect(self._open_settings)
         self.autonomy.currentIndexChanged.connect(self._sync_autonomy)
         for seq in ("Ctrl+Return", "Ctrl+Enter", "Meta+Return", "Meta+Enter"):
             QShortcut(QKeySequence(seq), self.input, activated=self._send)
@@ -69,10 +71,19 @@ class ChatDock(QWidget):
         self._assistant.failed.connect(self._on_failed)
         self._assistant.finished.connect(self._on_finished)
         self._sync_autonomy()
+        self._refresh_model_label()
 
     # --- actions ---------------------------------------------------------
     def _sync_autonomy(self):
         self._assistant.confirm = bool(self.autonomy.currentData())
+
+    def _refresh_model_label(self):
+        self.model_label.setText(self._assistant.config.display_name())
+
+    def _open_settings(self):
+        from .ai.settings_dialog import AssistantSettingsDialog
+        if AssistantSettingsDialog(self._assistant.config, self).exec():
+            self._refresh_model_label()
 
     def _send(self):
         text = self.input.toPlainText().strip()

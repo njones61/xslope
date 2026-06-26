@@ -1,47 +1,47 @@
-"""Assistant — the agent loop behind the chat dock (Phase A spike).
+"""Assistant — the agent loop behind the chat dock (Phase B: multi-provider).
 
-A manual Claude tool-use loop (so tool execution can be gated by a confirm
-dialog) running on a ``QThread``: the blocking ``messages.create`` calls happen
-off the GUI thread, while each ``run_python`` tool call is marshalled back to the
-GUI thread (modal confirm + document mutation + re-render) and the worker waits
-for the result. Conversation history persists across turns on the controller.
-
-Claude-only for now via the official ``anthropic`` SDK (model ``claude-opus-4-8``,
-adaptive thinking). The system prompt is the Studio framing plus the existing
-``/xslope`` skill knowledge. See plan_gui.md §14.
+A manual tool-use loop (so each tool call can be gated by a confirm dialog) over
+**LiteLLM**, so the same loop drives Claude, OpenAI, or a local Ollama model —
+chosen in Settings (:mod:`studio.ai.config`). The blocking completion calls run on
+a ``QThread``; each ``run_python`` call is marshalled to the GUI thread (modal
+confirm + document mutation + re-render) and the worker waits for the result.
+Conversation history (OpenAI message format) persists across turns. See §14.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import threading
 
 from PySide6.QtCore import QObject, QThread, Signal
 
-MODEL = "claude-opus-4-8"
-MAX_TOKENS = 16000
+from .config import AssistantConfig
 
+MAX_TOKENS = 8000
+
+# OpenAI/LiteLLM function-tool format (works across providers).
 RUN_PYTHON_TOOL = {
-    "name": "run_python",
-    "description": (
-        "Execute Python in the live XSlope Studio session and return its stdout. "
-        "A persistent namespace is preloaded with: `xslope` (the engine), `np`, "
-        "`pd`, `plt` (matplotlib.pyplot), and the open project — `doc` "
-        "(ProjectDocument), `slope_data` (the dict you edit), and `results`. "
-        "Variables persist across calls like a notebook. Build or edit the input "
-        "by mutating `slope_data` in place (it re-renders on the canvas; the user "
-        "saves via Save As) rather than writing an .xlsx. Any `plt` figures you "
-        "create are shown to the user automatically, so just create them — you "
-        "don't receive the images back. Print values you need to read."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "code": {"type": "string", "description": "Python source to execute."},
+    "type": "function",
+    "function": {
+        "name": "run_python",
+        "description": (
+            "Execute Python in the live XSlope Studio session and return its "
+            "stdout. A persistent namespace is preloaded with: `xslope` (the "
+            "engine), `np`, `pd`, `plt` (matplotlib.pyplot), and the open project "
+            "— `doc` (ProjectDocument), `slope_data` (the dict you edit), and "
+            "`results`. Variables persist across calls like a notebook. Build or "
+            "edit the input by mutating `slope_data` in place (it re-renders on "
+            "the canvas; the user saves via Save As) rather than writing an .xlsx. "
+            "Any `plt` figures you create are shown to the user automatically — "
+            "you don't receive the images back. Print values you need to read."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "Python source to execute."},
+            },
+            "required": ["code"],
         },
-        "required": ["code"],
-        "additionalProperties": False,
     },
 }
 
@@ -73,6 +73,7 @@ in-memory `slope_data` document over its .xlsx-writing patterns.
 def _load_skill_text():
     """The /xslope skill body (schema + API knowledge), best-effort. Repo-bound
     for now; packaging it travels with §14.5."""
+    import os
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     path = os.path.join(here, "docs", "usage", "claude", "xslope.md")
     try:
@@ -83,18 +84,18 @@ def _load_skill_text():
 
 
 class _AgentWorker(QThread):
-    """Runs the Claude tool-use loop off the GUI thread."""
+    """Runs the LiteLLM tool-use loop off the GUI thread."""
 
     text = Signal(str)              # an assistant text block
     tool_call = Signal(object)      # {id, name, input, holder} — handled on GUI thread
     failed = Signal(str)
     done = Signal()
 
-    def __init__(self, client, system, messages, tools, parent=None):
+    def __init__(self, kwargs, system, messages, tools, parent=None):
         super().__init__(parent)
-        self._client = client
+        self._kwargs = kwargs       # provider/model kwargs for litellm.completion
         self._system = system
-        self._messages = messages   # shared list, mutated in place across turns
+        self._messages = messages   # shared list (OpenAI format), mutated in place
         self._tools = tools
         self._cancel = threading.Event()
 
@@ -103,36 +104,53 @@ class _AgentWorker(QThread):
 
     def run(self):
         try:
+            import litellm
+            litellm.drop_params = True          # ignore params a provider doesn't support
+            litellm.suppress_debug_info = True
+        except Exception:
+            self.failed.emit("The 'litellm' package is not installed. "
+                             "Install it with: pip install \"xslope[ai]\"")
+            return
+        try:
             while not self._cancel.is_set():
-                resp = self._client.messages.create(
-                    model=MODEL, max_tokens=MAX_TOKENS,
-                    system=self._system, messages=self._messages,
-                    tools=self._tools, thinking={"type": "adaptive"})
-                # Append the full content (incl. thinking blocks) for correct replay.
-                self._messages.append({"role": "assistant", "content": resp.content})
-                for block in resp.content:
-                    if block.type == "text" and block.text.strip():
-                        self.text.emit(block.text)
+                resp = litellm.completion(
+                    messages=[{"role": "system", "content": self._system}] + self._messages,
+                    tools=self._tools, max_tokens=MAX_TOKENS, **self._kwargs)
+                msg = resp.choices[0].message
+                tool_calls = getattr(msg, "tool_calls", None) or []
 
-                if resp.stop_reason != "tool_use":
+                assistant_msg = {"role": "assistant", "content": msg.content or ""}
+                if tool_calls:
+                    assistant_msg["tool_calls"] = [
+                        {"id": tc.id, "type": "function",
+                         "function": {"name": tc.function.name,
+                                      "arguments": tc.function.arguments}}
+                        for tc in tool_calls]
+                self._messages.append(assistant_msg)
+
+                if msg.content and msg.content.strip():
+                    self.text.emit(msg.content)
+
+                if not tool_calls:
                     break
 
-                results = []
-                for block in resp.content:
-                    if block.type != "tool_use":
-                        continue
+                produced = False
+                for tc in tool_calls:
                     if self._cancel.is_set():
                         break
-                    holder = {"event": threading.Event(), "content": "", "is_error": False}
-                    self.tool_call.emit({"id": block.id, "name": block.name,
-                                         "input": block.input, "holder": holder})
+                    try:
+                        args = json.loads(tc.function.arguments or "{}")
+                    except Exception:
+                        args = {}
+                    holder = {"event": threading.Event(), "content": ""}
+                    self.tool_call.emit({"id": tc.id, "name": tc.function.name,
+                                         "input": args, "holder": holder})
                     holder["event"].wait()
-                    results.append({"type": "tool_result", "tool_use_id": block.id,
-                                    "content": holder["content"],
-                                    "is_error": holder["is_error"]})
-                if not results:
+                    self._messages.append({"role": "tool", "tool_call_id": tc.id,
+                                           "content": holder["content"]})
+                    produced = True
+                if not produced:
                     break
-                self._messages.append({"role": "user", "content": results})
             self.done.emit()
         except Exception as exc:
             self.failed.emit(f"{type(exc).__name__}: {exc}")
@@ -153,9 +171,9 @@ class Assistant(QObject):
         from .kernel import PythonKernel
         self._mw = main_window
         self._kernel = PythonKernel(main_window.doc)
+        self.config = AssistantConfig(getattr(main_window, "settings", None))
         self._messages = []
         self._worker = None
-        self._client = None
         self.confirm = True               # autonomy: confirm before running code
 
     # --- lifecycle -------------------------------------------------------
@@ -163,35 +181,23 @@ class Assistant(QObject):
         return self._worker is not None and self._worker.isRunning()
 
     def reset(self):
-        """Clear the conversation (e.g. on opening a different project)."""
         self._messages = []
-
-    def _ensure_client(self):
-        if self._client is None:
-            import anthropic              # imported lazily — optional dependency
-            self._client = anthropic.Anthropic()
-        return self._client
 
     def _system(self):
         skill = _load_skill_text()
-        text = STUDIO_SYSTEM + ("\n\n---\n\n" + skill if skill else "")
-        return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
+        return STUDIO_SYSTEM + ("\n\n---\n\n" + skill if skill else "")
 
     def send(self, user_text):
         if self.is_busy():
             return
-        try:
-            client = self._ensure_client()
-        except ImportError:
-            self.failed.emit("The 'anthropic' package is not installed. "
-                             "Install it with: pip install \"xslope[ai]\"")
-            return
-        except Exception as exc:
-            self.failed.emit(f"Could not start the assistant: {exc}")
+        if not self.config.is_ready():
+            self.failed.emit("No API key set for "
+                             f"{self.config.display_name()}. Open the assistant "
+                             "Settings to add one (or switch to a local Ollama model).")
             return
         self._messages.append({"role": "user", "content": user_text})
-        self._worker = _AgentWorker(client, self._system(), self._messages,
-                                    [RUN_PYTHON_TOOL], parent=self)
+        self._worker = _AgentWorker(self.config.completion_kwargs(), self._system(),
+                                    self._messages, [RUN_PYTHON_TOOL], parent=self)
         self._worker.text.connect(self.assistant_text)
         self._worker.tool_call.connect(self._on_tool_call)   # queued -> GUI thread
         self._worker.failed.connect(self._on_failed)
@@ -207,7 +213,6 @@ class Assistant(QObject):
         holder = req["holder"]
         if req["name"] != "run_python":
             holder["content"] = f"Unknown tool: {req['name']}"
-            holder["is_error"] = True
             holder["event"].set()
             return
         code = (req["input"] or {}).get("code", "")
@@ -215,7 +220,6 @@ class Assistant(QObject):
         if self.confirm and not self._confirm_run(code):
             self.tool_declined.emit(code)
             holder["content"] = "The user declined to run this code."
-            holder["is_error"] = True
             holder["event"].set()
             return
 
@@ -232,16 +236,14 @@ class Assistant(QObject):
         result_text = "\n".join(parts)
 
         holder["content"] = result_text
-        holder["is_error"] = bool(error)
         holder["event"].set()
         self.tool_ran.emit(code, result_text, figures)
 
     def _run_python(self, code):
         doc = self._mw.doc
-        # Snapshot for undo, then re-render + refresh the inputs tree after.
-        doc.begin_edit()
+        doc.begin_edit()                    # snapshot for undo
         stdout, figures, error = self._kernel.run(code)
-        doc.commit_edit()
+        doc.commit_edit()                   # re-render + mark dirty
         try:
             self._mw.refresh_inputs_view()
         except Exception:

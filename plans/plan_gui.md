@@ -489,8 +489,18 @@ set up for the template.
   Verified end-to-end with a mocked client (text → tool_use → run_python on the
   live doc → result → final text). **Remaining for Phase A polish:** package the
   skill prompt (§14.5), streaming responses, API-key UX.
-- **B — Multi-provider:** LiteLLM layer + Settings (provider/model/keys/Ollama URL);
-  capability-aware UI.
+- **B — Multi-provider** ✅ **BUILT** — the agent loop now runs over **LiteLLM**
+  (OpenAI message format), so the same loop drives Claude / OpenAI / local **Ollama**
+  (free, no key). `studio/ai/config.py` holds the provider/model selection
+  (`QSettings`) and API keys (OS keychain via `keyring`, QSettings fallback) and
+  produces the `litellm.completion` kwargs; `studio/ai/settings_dialog.py` is the
+  Settings dialog (provider, model, key, Ollama URL) opened from a **Settings…**
+  button in the dock; the dock shows the active provider·model. `litellm.drop_params`
+  smooths over per-provider param gaps. Verified end-to-end with a mocked
+  `litellm.completion` (tool_calls round-trip) plus config/keyring round-trip.
+  Refinements: prompt caching + adaptive-thinking are Claude-specific and not yet
+  re-threaded through LiteLLM; capability-aware UI (disable tools/vision for models
+  that lack them) still to do.
 - **C — Native tools + live document:** structured input edit / run / results tools
   wired to `ProjectDocument` and the runners, inline figures, confirm-to-run.
 - **D — Vision & polish:** sketch→inputs, parametric-sweep ergonomics, cost meter,

@@ -42,7 +42,7 @@ dependencies = [
 [project.optional-dependencies]
 fem = ["gmsh"]
 gui = ["PySide6"]
-ai = ["anthropic"]
+ai = ["litellm", "keyring"]
 
 [project.scripts]
 xslope-studio = "studio.app:main"

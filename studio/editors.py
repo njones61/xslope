@@ -10,6 +10,8 @@ sigmas), so a round-trip through an editor never drops data.
 
 from __future__ import annotations
 
+import math
+
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
@@ -21,9 +23,13 @@ from PySide6.QtWidgets import (
 # Field spec + dialogs
 # --------------------------------------------------------------------------- #
 class Field:
-    """One editable column/field. kind ∈ {'float','int','str','choice'}."""
+    """One editable column/field. kind ∈ {'float','optfloat','int','str','choice'}.
 
-    _BLANK = {"float": 0.0, "int": 0, "str": "", "choice": ""}
+    'optfloat' is an optional float: a blank cell reads back as None (not 0.0), so
+    optional fields like a pile's H or capacities stay unset instead of becoming
+    zero (which the loader would reject)."""
+
+    _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": ""}
 
     def __init__(self, key, header, kind="float", choices=None, default=None):
         self.key = key
@@ -41,6 +47,13 @@ class Field:
                 return float(text)
             except ValueError:
                 return 0.0
+        if self.kind == "optfloat":
+            if text == "" or text.lower() == "none":
+                return None
+            try:
+                return float(text)
+            except ValueError:
+                return None
         if self.kind == "int":
             try:
                 return int(float(text))
@@ -112,7 +125,7 @@ class _EditableTable(QWidget):
                     combo.setCurrentText(str(val))
                 self.table.setCellWidget(i, j, combo)
             else:
-                self.table.setItem(i, j, QTableWidgetItem(str(val)))
+                self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
 
     def _add_row(self):
         i = self.table.rowCount()
@@ -471,6 +484,40 @@ class HeadBcEditor(CategoryEditor):
         slope_data["has_seepage_bc2"] = bool(bc2.get("specified_heads") or bc2.get("exit_face"))
 
 
+# --- piles ------------------------------------------------------------------ #
+def _new_pile():
+    return {"label": "Pile", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "H": None,
+            "theta_p": 0.0, "D_pile": None, "S": None, "E": None, "I": None,
+            "area": None, "V_cap": None, "M_cap": None, "fixity": "free"}
+
+
+class PilesEditor(CategoryEditor):
+    label = "Piles"
+    FIELDS = [
+        Field("label", "Label", "str"),
+        Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
+        Field("H", "H", "optfloat"), Field("D_pile", "D", "optfloat"),
+        Field("S", "S", "optfloat"), Field("E", "E", "optfloat"),
+        Field("I", "I", "optfloat"), Field("area", "Area", "optfloat"),
+        Field("V_cap", "Vcap", "optfloat"), Field("M_cap", "Mcap", "optfloat"),
+        Field("fixity", "Fixity", "choice", choices=["free", "fixed"]),
+    ]
+
+    def build(self, slope_data, parent):
+        return TableEditorDialog(
+            "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile, parent,
+            help_text="Leave H blank for auto Ito & Matsui force. I / Area auto-compute "
+                      "from D when blank. θ is auto-derived from the pile axis. Vcap/Mcap "
+                      "require S (spacing).")
+
+    def apply(self, slope_data, dlg):
+        rows = dlg.result_rows()
+        for p in rows:  # θ is auto-derived from the axis (loader does the same)
+            dx, dy = p["x2"] - p["x1"], p["y2"] - p["y1"]
+            p["theta_p"] = math.degrees(math.atan2(dx, -dy))
+        slope_data["pile_lines"] = rows
+
+
 CATEGORY_EDITORS = {
     "global": GlobalEditor(),
     "materials": MaterialsEditor(),
@@ -479,4 +526,5 @@ CATEGORY_EDITORS = {
     "piezo": PiezoEditor(),
     "dloads": DloadsEditor(),
     "seep_bc": HeadBcEditor(),
+    "piles": PilesEditor(),
 }

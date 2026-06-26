@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
             f"{len(d.get('dloads') or [])}" + (f" / {n_dl2}" if n_dl2 else ""),
             category="dloads")
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []))
-        add("Piles", len(d.get("pile_lines") or []))
+        add("Piles", len(d.get("pile_lines") or []), category="piles")
         sbc = d.get("seepage_bc") or {}
         n_heads = len(sbc.get("specified_heads", []))
         parts = [f"{n_heads} head(s)"] if n_heads else []

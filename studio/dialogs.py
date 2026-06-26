@@ -30,10 +30,11 @@ SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
 class RunLemDialog(QDialog):
     """Options for an LEM solve (single surface or auto-search; circular or not)."""
 
-    def __init__(self, parent=None, defaults=None):
+    def __init__(self, parent=None, defaults=None, slope_data=None):
         super().__init__(parent)
         self.setWindowTitle("Run LEM")
         defaults = defaults or {}
+        slope_data = slope_data or {}
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -44,8 +45,18 @@ class RunLemDialog(QDialog):
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
         form.addRow("Analysis", self.analysis)
 
-        self.surface = self._combo(SURFACE_TYPES, defaults.get("surface", "circular"))
-        form.addRow("Surface", self.surface)
+        # Only offer a surface-type choice when the file has both; otherwise
+        # hardwire to whichever surface is present (shown as a fixed label).
+        has_circ = bool(slope_data.get("circular") and slope_data.get("circles"))
+        has_ncirc = bool(slope_data.get("non_circ"))
+        if has_circ != has_ncirc:                      # exactly one defined
+            self._fixed_surface = "circular" if has_circ else "noncircular"
+            self.surface = None
+            form.addRow("Surface", QLabel(dict(SURFACE_TYPES)[self._fixed_surface]))
+        else:                                          # both (a real choice) or neither
+            self._fixed_surface = None
+            self.surface = self._combo(SURFACE_TYPES, defaults.get("surface", "circular"))
+            form.addRow("Surface", self.surface)
 
         self.num_slices = QSpinBox()
         self.num_slices.setRange(5, 500)
@@ -87,7 +98,7 @@ class RunLemDialog(QDialog):
         return {
             "method": self.method.currentData(),
             "analysis": self.analysis.currentData(),
-            "surface": self.surface.currentData(),
+            "surface": self._fixed_surface or self.surface.currentData(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),

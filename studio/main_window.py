@@ -354,7 +354,8 @@ class MainWindow(QMainWindow):
     def run_lem(self):
         if not self.doc.is_open or self._runner is not None:
             return
-        dlg = RunLemDialog(self, defaults=self._last_lem_opts)
+        dlg = RunLemDialog(self, defaults=self._last_lem_opts,
+                           slope_data=self.doc.slope_data)
         if not dlg.exec():
             return
         opts = dlg.options()

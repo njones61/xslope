@@ -90,6 +90,13 @@ pressure" never means "no water load." Never skip the load.
 — a submerged slope). A plain dashed line with no ▽ is a material boundary or \
 reference line, not water. If the water-surface elevation or extent is unclear, \
 ASK rather than guess.
+- Extend the flat ground sections FAR ENOUGH on BOTH sides that every trial \
+failure surface daylights on the ground surface inside the model, never at a \
+vertical edge. The source diagram rarely shows the true extents — do not copy \
+its width. Rule of thumb: each flat should run at least ~2x the slope height \
+beyond the toe and beyond the crest, and MORE for deep circles tangent to the \
+hard base; if the critical or trial circles reach the left/right boundary, widen \
+the domain. The hard base (`max_depth`) spans the full profile width.
 """
 
 # Appended only for Anthropic, where prompt caching makes the large skill body

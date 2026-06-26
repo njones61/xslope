@@ -165,6 +165,11 @@ class MplCanvas(QWidget):
         self.view.scale(1 / ZOOM_STEP, 1 / ZOOM_STEP)
         self._schedule_refine()
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Re-fit the whole figure to the new window size (re-rasterize debounced).
+        self.fit()
+
     def eventFilter(self, obj, event):
         if obj is self.view.viewport() and event.type() == QEvent.Wheel:
             factor = ZOOM_STEP if event.angleDelta().y() > 0 else 1 / ZOOM_STEP

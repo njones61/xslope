@@ -491,12 +491,17 @@ class MainWindow(QMainWindow):
         if not self.doc.is_open:
             self.canvas.clear()
             return
-        try:
-            self.canvas.render_inputs(
-                self.doc.slope_data, mode=self._mode,
-                opts=self.inputs_panel.options())
-        except Exception:
-            traceback.print_exc()
+        sd = self.doc.slope_data
+        if not (sd.get("profile_lines") or sd.get("polygons")):
+            # Empty project (e.g. freshly created with New) — no geometry to draw
+            # yet. Leave the canvas blank until the user adds inputs.
+            self.canvas.clear()
+        else:
+            try:
+                self.canvas.render_inputs(sd, mode=self._mode,
+                                          opts=self.inputs_panel.options())
+            except Exception:
+                traceback.print_exc()
         self.act_undo.setEnabled(self.doc.can_undo())
         self.act_redo.setEnabled(self.doc.can_redo())
 
@@ -560,12 +565,16 @@ class MainWindow(QMainWindow):
         polygons = d.get("polygons") or []
         add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
+        # A project is profile-based unless it has polygons but no profile lines.
+        # An empty (new) project defaults to profile-based so the user can add the
+        # first profile line; polygons are then derived from it.
+        profile_based = bool(profile_lines) or not polygons
         add("Profile lines", len(profile_lines),
-            category="profile" if profile_lines else None)
+            category="profile" if profile_based else None)
         # Polygons are derived from profile lines for profile-based files (edit them
         # via the profile editor); only polygon-based files edit polygons directly.
         add("Polygons", len(polygons),
-            category="polygons" if (polygons and not profile_lines) else None)
+            category="polygons" if not profile_based else None)
         add("Circles", len(d.get("circles") or []), category="circles")
         add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")
         add("Piezometric lines", len(d.get("piezo_line") or []), category="piezo")

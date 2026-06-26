@@ -45,8 +45,9 @@ class AssistantSettingsDialog(QDialog):
         self.api_key.setPlaceholderText("sk-…")
         form.addRow("API key", self.api_key)
 
-        self.ollama_base = QLineEdit(config.ollama_base())
-        form.addRow("Ollama URL", self.ollama_base)
+        self.base_edit = QLineEdit()
+        self.base_edit.setPlaceholderText("API base URL")
+        form.addRow("Base URL", self.base_edit)
 
         self.confirm = QCheckBox("Confirm before running code")
         self.confirm.setChecked(config.confirm_before_run())
@@ -100,7 +101,9 @@ class AssistantSettingsDialog(QDialog):
         needs_key = spec["needs_key"]
         self.api_key.setEnabled(needs_key)
         self.api_key.setText(self._config.api_key(prov) if needs_key else "")
-        self.ollama_base.setEnabled(bool(spec.get("needs_base")))
+        has_base = spec.get("base") is not None
+        self.base_edit.setEnabled(has_base)
+        self.base_edit.setText(self._config.base_url(prov) or "")
         cost = ("Local model — no key needed; runs on your machine, free."
                 if not needs_key else
                 "Hosted model — billed per token to your API account.")
@@ -134,6 +137,7 @@ class AssistantSettingsDialog(QDialog):
                 return                     # keep the dialog open
             self._config.set_api_key(prov, key)
         model = self.model.currentText().strip()
-        self._config.set_selection(prov, model, self.ollama_base.text().strip())
+        base = self.base_edit.text().strip() if self._spec().get("base") else None
+        self._config.set_selection(prov, model, base)
         self._config.set_confirm_before_run(self.confirm.isChecked())
         self.accept()

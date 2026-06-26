@@ -36,9 +36,17 @@ PROVIDERS = {
         # it gets the full skill (`skill`) without Anthropic cache_control blocks.
         "tools": True, "vision": False, "skill": True,
     },
+    "zai": {
+        "label": "Z.ai (GLM)", "prefix": "openai/", "needs_key": True,
+        # OpenAI-compatible endpoint (editable: GLM coding-plan keys use a
+        # different base — .../api/coding/paas/v4). Text-only; gets the full skill.
+        "base": "https://api.z.ai/api/paas/v4",
+        "models": ["glm-4.6", "glm-4.5", "glm-4.5-air"],
+        "tools": True, "vision": False, "skill": True,
+    },
     "ollama": {
         "label": "Ollama (local, free)", "prefix": "ollama_chat/", "needs_key": False,
-        "needs_base": True, "editable_model": True,
+        "base": "http://localhost:11434", "editable_model": True,
         "models": ["llama3.1", "qwen2.5-coder", "mistral"],
         "tools": None, "vision": None,   # depends on the local model
     },
@@ -68,14 +76,29 @@ class AssistantConfig:
         prov = self.provider()
         return self._s.value(f"ai/model/{prov}", PROVIDERS[prov]["models"][0])
 
-    def ollama_base(self):
-        return self._s.value("ai/ollama_base", DEFAULT_OLLAMA_BASE)
+    def base_url(self, provider=None):
+        """The API base URL for an OpenAI-compatible / local provider (those with a
+        `base` in PROVIDERS), or None. Per-provider override falls back to the spec
+        default (and, for Ollama, to the legacy single-key setting)."""
+        prov = provider or self.provider()
+        default = PROVIDERS[prov].get("base")
+        if default is None:
+            return None
+        if prov == "ollama":
+            default = self._s.value("ai/ollama_base", default)   # migrate old key
+        return self._s.value(f"ai/base/{prov}", default)
 
-    def set_selection(self, provider, model, ollama_base=None):
+    def set_base_url(self, provider, url):
+        self._s.setValue(f"ai/base/{provider}", url)
+
+    def ollama_base(self):
+        return self.base_url("ollama")
+
+    def set_selection(self, provider, model, base=None):
         self._s.setValue("ai/provider", provider)
         self._s.setValue(f"ai/model/{provider}", model)
-        if ollama_base is not None:
-            self._s.setValue("ai/ollama_base", ollama_base)
+        if base is not None and PROVIDERS[provider].get("base") is not None:
+            self.set_base_url(provider, base)
 
     def confirm_before_run(self):
         v = self._s.value("ai/confirm", True)
@@ -157,6 +180,6 @@ class AssistantConfig:
         kw = {"model": spec["prefix"] + self.model()}
         if spec["needs_key"]:
             kw["api_key"] = self.api_key(prov)
-        if spec.get("needs_base"):
-            kw["api_base"] = self.ollama_base()
+        if spec.get("base"):
+            kw["api_base"] = self.base_url(prov)
         return kw

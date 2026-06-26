@@ -45,6 +45,9 @@ class ChatDock(QWidget):
         top.addWidget(self.model_label, 1)
         top.addWidget(self.settings_btn, 0, Qt.AlignTop)
 
+        self.status_label = QLabel()
+        self.status_label.setStyleSheet("color:#666; font-style:italic;")
+
         row = QHBoxLayout()
         row.addWidget(self.send_btn)
         row.addWidget(self.stop_btn)
@@ -52,6 +55,7 @@ class ChatDock(QWidget):
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.transcript, 1)
+        layout.addWidget(self.status_label)
         layout.addWidget(self.input)
         layout.addLayout(row)
         self.setMinimumWidth(220)
@@ -86,6 +90,8 @@ class ChatDock(QWidget):
         self._add_block("You", text, "#1a5fb4")
         self.send_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
+        self.status_label.setText(
+            "Working… (a local model may take a minute to load on first use)")
         self._assistant.send(text)
 
     # --- assistant signals ----------------------------------------------
@@ -120,6 +126,7 @@ class ChatDock(QWidget):
     def _idle(self):
         self.send_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.status_label.clear()
 
     def _add_block(self, who, text, color):
         self._append_html(

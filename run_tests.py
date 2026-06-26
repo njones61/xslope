@@ -44,7 +44,8 @@ matplotlib.use('Agg')  # non-interactive backend — no plot windows
 # category. The file set spans circular & non-circular surfaces, profile &
 # polygon geometry, reinforcement, piles, distributed loads (both sets), a
 # second piezo line, reliability sigmas, and seepage BCs (both sets).
-ROUNDTRIP_TEMPLATE = 'docs/inputs/input_template.xlsx'
+ROUNDTRIP_TEMPLATE = 'docs/inputs/input_template.xlsx'   # editable master (docs link)
+BUNDLED_TEMPLATE = 'xslope/resources/input_template.xlsx'  # copy shipped in the wheel
 ROUNDTRIP_FILES = [
     'docs/inputs/slope/xslope_simple1.xlsx',
     'docs/inputs/slope/xslope_dam.xlsx',
@@ -399,11 +400,31 @@ def run_roundtrip_test(test):
     return 0.0, None
 
 
+def run_template_sync_test(test):
+    """Verify the template copy shipped in the wheel (xslope/resources) is
+    byte-identical to the editable docs master, so the two can't silently drift
+    when the master is tweaked.
+
+    Returns (0.0, None) if identical, else (None, message).
+    """
+    import filecmp
+    if not os.path.exists(ROUNDTRIP_TEMPLATE):
+        return None, f"master template missing: {ROUNDTRIP_TEMPLATE}"
+    if not os.path.exists(BUNDLED_TEMPLATE):
+        return None, f"packaged template missing: {BUNDLED_TEMPLATE}"
+    if not filecmp.cmp(ROUNDTRIP_TEMPLATE, BUNDLED_TEMPLATE, shallow=False):
+        return None, (f"packaged template differs from master — run: "
+                      f"cp {ROUNDTRIP_TEMPLATE} {BUNDLED_TEMPLATE}")
+    return 0.0, None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
     if test_type == 'roundtrip':
         return run_roundtrip_test(test)
+    if test_type == 'template_sync':
+        return run_template_sync_test(test)
     if test_type == 'fem_ssrm':
         return run_fem_test(test)
     elif test_type == 'seep':
@@ -508,6 +529,10 @@ def main():
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.
     if run_roundtrip:
+        # Guard that the packaged template (shipped in the wheel) hasn't drifted
+        # from the editable docs master.
+        tests.append({'type': 'template_sync', 'file': BUNDLED_TEMPLATE,
+                      'method': '-', 'source': 'template'})
         if Path(ROUNDTRIP_TEMPLATE).exists():
             n_rt = 0
             for fp in ROUNDTRIP_FILES:
@@ -567,8 +592,8 @@ def main():
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'
-        elif test_type == 'roundtrip':
-            expected = 0.0          # run_roundtrip_test returns 0.0 on success
+        elif test_type in ('roundtrip', 'template_sync'):
+            expected = 0.0          # these return 0.0 on success
             tol = 0.0
             label = 'mismatch'
         else:

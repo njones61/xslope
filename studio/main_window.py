@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import sys
 import traceback
-from pathlib import Path
 
 from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
@@ -21,6 +20,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
     QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem, QWidget,
 )
+
+from xslope.fileio import default_template_path
 
 from .canvas import MplCanvas
 from .dialogs import BuildMeshDialog, RunFemDialog, RunLemDialog, RunSeepDialog
@@ -36,8 +37,9 @@ APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
 MAX_RECENT = 8
 MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
-# Blank template bundled with the app; used to create files on Save As.
-TEMPLATE = Path(__file__).resolve().parent / "resources" / "input_template.xlsx"
+# Blank template used to create files on Save As — the single copy bundled with
+# the engine package (xslope/resources), so the GUI and library share one source.
+TEMPLATE = default_template_path()
 CATEGORY_ROLE = Qt.UserRole + 1
 
 

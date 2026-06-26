@@ -1135,6 +1135,21 @@ def load_slope_data(filepath):
     return globals_data
 
 
+def default_template_path():
+    """Filesystem path to the blank XSLOPE input template bundled with the
+    package (``xslope/resources/input_template.xlsx``).
+
+    Pass it as the ``template=`` argument to :func:`save_slope_data_to_xlsx` to
+    create a new file from the standard template — useful for library-only
+    (no-GUI) users, since the template ships inside the installed package and so
+    is available regardless of where pip put it. The docs copy
+    (``docs/inputs/input_template.xlsx``) is the editable master; the two are kept
+    byte-identical by a check in ``run_tests.py``.
+    """
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "resources", "input_template.xlsx")
+
+
 def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     """
     Write an in-memory ``slope_data`` dict back to an XSLOPE Excel input file.

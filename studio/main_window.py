@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
         self.inputs_tree = QTreeWidget()
         self.inputs_tree.setHeaderLabels(["Input", "Count / Value"])
         self.inputs_tree.setColumnWidth(0, 180)
-        self.inputs_tree.itemDoubleClicked.connect(self._on_tree_double_click)
+        self.inputs_tree.itemClicked.connect(self._on_tree_click)
         dock = QDockWidget("Inputs", self)
         dock.setObjectName("inputs_dock")
         dock.setWidget(self.inputs_tree)
@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
         n = len(self.doc.slope_data.get("materials", []))
         self.statusBar().showMessage(
             f"Loaded {os.path.basename(self.doc.path)} — {n} material(s). "
-            f"Double-click an underlined input to edit it.")
+            f"Click an underlined input to edit it.")
 
     def _render(self):
         if not self.doc.is_open:
@@ -241,17 +241,19 @@ class MainWindow(QMainWindow):
                 f = item.font(0)
                 f.setUnderline(True)
                 item.setFont(0, f)
-                item.setToolTip(0, "Double-click to edit")
+                item.setToolTip(0, "Click to edit")
             return item
 
-        add("Global parameters", f"γw={d.get('gamma_water')}, k={d.get('k_seismic')}",
-            category="global")
+        add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
         add("Profile lines", len(d.get("profile_lines") or []))
         add("Polygons", len(d.get("polygons") or []))
         add("Circles", len(d.get("circles") or []), category="circles")
         add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")
-        add("Piezometric line", len(d.get("piezo_line") or []), category="piezo")
+        n_pz2 = len(d.get("piezo_line2") or [])
+        add("Piezometric lines",
+            f"{len(d.get('piezo_line') or [])}" + (f" / {n_pz2}" if n_pz2 else ""),
+            category="piezo")
         add("Distributed loads", len(d.get("dloads") or []))
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []))
         add("Piles", len(d.get("pile_lines") or []))
@@ -261,7 +263,7 @@ class MainWindow(QMainWindow):
         self.inputs_tree.expandAll()
 
     # --- editing ---------------------------------------------------------
-    def _on_tree_double_click(self, item, _column):
+    def _on_tree_click(self, item, _column):
         category = item.data(0, CATEGORY_ROLE)
         if category:
             self.edit_category(category)

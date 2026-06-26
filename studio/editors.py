@@ -13,7 +13,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QVBoxLayout,
+    QTabWidget, QVBoxLayout, QWidget,
 )
 
 
@@ -73,23 +73,18 @@ class FormEditorDialog(QDialog):
         return {f.key: f.from_text(self._edits[f.key].text()) for f in self._fields}
 
 
-class TableEditorDialog(QDialog):
-    """Editable table over a list of dict records. Unshown keys are preserved."""
+class _EditableTable(QWidget):
+    """A table over a list of dict records with Add/Remove rows. Unshown keys are
+    preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
-    def __init__(self, title, fields, rows, new_row, parent=None, help_text=None):
+    def __init__(self, fields, rows, new_row, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(title)
-        self.resize(min(1200, 160 + 110 * len(fields)), 460)
         self._fields = fields
         self._new_row = new_row
         self._bases = [dict(r) for r in rows]  # keep originals to preserve extra keys
 
         layout = QVBoxLayout(self)
-        if help_text:
-            lbl = QLabel(help_text)
-            lbl.setWordWrap(True)
-            layout.addWidget(lbl)
-
+        layout.setContentsMargins(0, 0, 0, 0)
         self.table = QTableWidget(len(rows), len(fields))
         self.table.setHorizontalHeaderLabels([f.header for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -106,11 +101,6 @@ class TableEditorDialog(QDialog):
         bar.addWidget(rem)
         bar.addStretch(1)
         layout.addLayout(bar)
-
-        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        bb.accepted.connect(self.accept)
-        bb.rejected.connect(self.reject)
-        layout.addWidget(bb)
 
     def _set_row(self, i, row):
         for j, f in enumerate(self._fields):
@@ -150,6 +140,62 @@ class TableEditorDialog(QDialog):
                     base[f.key] = f.from_text(item.text() if item else "")
             out.append(base)
         return out
+
+
+def _help_label(text):
+    lbl = QLabel(text)
+    lbl.setWordWrap(True)
+    return lbl
+
+
+def _ok_cancel(dialog, layout):
+    bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    bb.accepted.connect(dialog.accept)
+    bb.rejected.connect(dialog.reject)
+    layout.addWidget(bb)
+
+
+class TableEditorDialog(QDialog):
+    """Editable table over a list of dict records."""
+
+    def __init__(self, title, fields, rows, new_row, parent=None, help_text=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(min(1200, 160 + 110 * len(fields)), 460)
+        layout = QVBoxLayout(self)
+        if help_text:
+            layout.addWidget(_help_label(help_text))
+        self._editable = _EditableTable(fields, rows, new_row)
+        layout.addWidget(self._editable)
+        _ok_cancel(self, layout)
+
+    def result_rows(self):
+        return self._editable.result_rows()
+
+
+class TabbedTableEditorDialog(QDialog):
+    """A tabbed dialog, one editable table per tab (e.g. the two piezo lines)."""
+
+    def __init__(self, title, tabs, parent=None, help_text=None):
+        # tabs: list of (tab_title, fields, rows, new_row)
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        max_cols = max(len(fields) for _, fields, _, _ in tabs)
+        self.resize(min(1200, 200 + 110 * max_cols), 480)
+        layout = QVBoxLayout(self)
+        if help_text:
+            layout.addWidget(_help_label(help_text))
+        self._tabs = QTabWidget()
+        self._editables = []
+        for tab_title, fields, rows, new_row in tabs:
+            et = _EditableTable(fields, rows, new_row)
+            self._tabs.addTab(et, tab_title)
+            self._editables.append(et)
+        layout.addWidget(self._tabs)
+        _ok_cancel(self, layout)
+
+    def result_rows(self, index):
+        return self._editables[index].result_rows()
 
 
 # --------------------------------------------------------------------------- #
@@ -222,22 +268,39 @@ class MaterialsEditor(CategoryEditor):
 
 
 def _new_circle():
-    return {"Xo": 0.0, "Yo": 0.0, "Depth": 0.0, "R": 0.0}
+    return {"Xo": 0.0, "Yo": 0.0, "Option": "Depth", "Depth": 0.0,
+            "Xi": 0.0, "Yi": 0.0, "R": 0.0}
 
 
 class CirclesEditor(CategoryEditor):
     label = "Circles"
-    FIELDS = [Field("Xo", "Xo"), Field("Yo", "Yo"), Field("Depth", "Depth (elev)")]
+    # Mirror the 'circles' worksheet: Xo, Yo, Option, Depth, Xi, Yi, R.
+    FIELDS = [
+        Field("Xo", "Xo"), Field("Yo", "Yo"),
+        Field("Option", "Option", "choice", choices=["Depth", "Radius", "Intercept"]),
+        Field("Depth", "Depth"), Field("Xi", "Xi"), Field("Yi", "Yi"), Field("R", "R"),
+    ]
 
     def build(self, slope_data, parent):
         return TableEditorDialog(
             "Circles", self.FIELDS, slope_data.get("circles", []), _new_circle, parent,
-            help_text="Depth is the elevation of the circle bottom; R = Yo − Depth.")
+            help_text="Option sets how each circle's size is defined (only the matching "
+                      "field is used):\n"
+                      "  • Depth — elevation of the circle bottom at the center (R = Yo − Depth)\n"
+                      "  • Radius — the circle radius R directly (Depth = Yo − R)\n"
+                      "  • Intercept — a point (Xi, Yi) the circle passes through")
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
         for c in rows:
-            c["R"] = c["Yo"] - c["Depth"]
+            opt = str(c.get("Option", "Depth"))
+            if opt == "Radius":
+                c["Depth"] = c["Yo"] - c["R"]
+            elif opt == "Intercept":
+                c["R"] = ((c["Xi"] - c["Xo"]) ** 2 + (c["Yi"] - c["Yo"]) ** 2) ** 0.5
+                c["Depth"] = c["Yo"] - c["R"]
+            else:  # Depth
+                c["R"] = c["Yo"] - c["Depth"]
         slope_data["circles"] = rows
         slope_data["circular"] = len(rows) > 0
 
@@ -265,15 +328,24 @@ def _new_pt():
 
 
 class PiezoEditor(CategoryEditor):
-    label = "Piezometric line"
+    label = "Piezometric lines"
     FIELDS = [Field("x", "x"), Field("y", "y")]
 
+    def _rows(self, slope_data, key):
+        return [{"x": x, "y": y} for (x, y) in (slope_data.get(key) or [])]
+
     def build(self, slope_data, parent):
-        rows = [{"x": x, "y": y} for (x, y) in (slope_data.get("piezo_line") or [])]
-        return TableEditorDialog("Piezometric line 1", self.FIELDS, rows, _new_pt, parent)
+        return TabbedTableEditorDialog(
+            "Piezometric lines",
+            [("Line 1", self.FIELDS, self._rows(slope_data, "piezo_line"), _new_pt),
+             ("Line 2 (rapid drawdown)", self.FIELDS, self._rows(slope_data, "piezo_line2"), _new_pt)],
+            parent,
+            help_text="Points ordered left→right. Line 2 is only used for rapid-drawdown "
+                      "analysis (the drawdown / second water table).")
 
     def apply(self, slope_data, dlg):
-        slope_data["piezo_line"] = [(r["x"], r["y"]) for r in dlg.result_rows()]
+        slope_data["piezo_line"] = [(r["x"], r["y"]) for r in dlg.result_rows(0)]
+        slope_data["piezo_line2"] = [(r["x"], r["y"]) for r in dlg.result_rows(1)]
 
 
 CATEGORY_EDITORS = {

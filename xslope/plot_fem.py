@@ -428,7 +428,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=True, save_png=False, save_dxf=False, dpi=300, fig=None, fs=None):
+                    scale_vectors=True, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -608,10 +608,6 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if handles:
             legend_ax.legend(handles, labels, loc='center', ncol=4, fontsize=10,
                              frameon=False)
-
-    # Show the SSRM factor of safety above the panels when provided.
-    if fs is not None:
-        fig.suptitle(f"Factor of Safety = {fs:.3f}", fontsize=13, fontweight='bold')
 
     if save_png:
         fig.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')

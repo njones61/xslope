@@ -468,6 +468,13 @@ class MainWindow(QMainWindow):
             fem_data = build_fem_data(self.doc.slope_data, mesh)
             solution = import_fem_solution(fem_data, stem)
             meta = import_fem_meta(stem) or {}
+            # Restore the strength-reduction factor the result plots show in their
+            # subplot titles (solution["F"]); fall back to the SSRM FS.
+            F_saved = meta.get("F")
+            if F_saved is None:
+                F_saved = meta.get("FS")
+            if F_saved is not None:
+                solution["F"] = F_saved
         except Exception:
             traceback.print_exc()
             return
@@ -798,7 +805,10 @@ class MainWindow(QMainWindow):
                 export_fem_solution(bundle["fem_data"], bundle["solution"],
                                     os.path.splitext(self.doc.path)[0],
                                     meta={"FS": bundle.get("FS"),
-                                          "analysis": bundle.get("analysis")})
+                                          "analysis": bundle.get("analysis"),
+                                          # The strength-reduction factor shown in
+                                          # the subplot titles (solution["F"]).
+                                          "F": bundle["solution"].get("F")})
             except Exception:
                 traceback.print_exc()
         self._show_fem_data(bundle["fem_data"])
@@ -862,8 +872,7 @@ class MainWindow(QMainWindow):
         if bundle and panel and self.fem_results_canvas is not None:
             try:
                 self.fem_results_canvas.render_fem_results(
-                    bundle["fem_data"], bundle["solution"], panel.options(),
-                    fs=bundle.get("FS"))
+                    bundle["fem_data"], bundle["solution"], panel.options())
             except Exception:
                 traceback.print_exc()
 

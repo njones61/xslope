@@ -166,10 +166,10 @@ class MplCanvas(QWidget):
             alpha=opts.get("alpha", 0.4),
             bc_symbol_size=opts.get("bc_symbol_size", 0.03), fig=fig))
 
-    def render_fem_results(self, fem_data, solution, opts, fs=None):
+    def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}
         self._draw(lambda fig: plot_fem_results(
-            fem_data, solution, fs=fs,
+            fem_data, solution,
             plot_type=[opts.get("plot_type", "shear_strain")],
             deform_percent=opts.get("deform_percent", 15),
             show_mesh=opts.get("show_mesh", True),

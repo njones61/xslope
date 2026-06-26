@@ -36,6 +36,86 @@ MESH_ELEMENT_TYPES = [
 ]
 
 
+SEEP_VARIABLES = [
+    ("head", "Total head"),
+    ("u", "Pore pressure"),
+    ("v_mag", "Velocity magnitude"),
+    ("i_mag", "Gradient magnitude"),
+]
+
+
+class RunSeepDialog(QDialog):
+    """Options for a seepage solve + its solution plot."""
+
+    def __init__(self, parent=None, defaults=None, has_bc2=False):
+        super().__init__(parent)
+        self.setWindowTitle("Run Seepage")
+        defaults = defaults or {}
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.bc = QComboBox()
+        self.bc.addItem("Set 1", 1)
+        if has_bc2:
+            self.bc.addItem("Set 2 (rapid drawdown)", 2)
+        idx = self.bc.findData(defaults.get("bc", 1))
+        if idx >= 0:
+            self.bc.setCurrentIndex(idx)
+        form.addRow("BC set", self.bc)
+
+        self.tol = QDoubleSpinBox()
+        self.tol.setDecimals(8)
+        self.tol.setRange(1e-10, 1.0)
+        self.tol.setValue(float(defaults.get("tol", 1e-4)))
+        form.addRow("Convergence tol", self.tol)
+
+        self.variable = QComboBox()
+        for key, label in SEEP_VARIABLES:
+            self.variable.addItem(label, key)
+        vidx = self.variable.findData(defaults.get("variable", "head"))
+        if vidx >= 0:
+            self.variable.setCurrentIndex(vidx)
+        form.addRow("Plot variable", self.variable)
+
+        self.levels = QSpinBox()
+        self.levels.setRange(2, 100)
+        self.levels.setValue(int(defaults.get("levels", 20)))
+        form.addRow("Contour levels", self.levels)
+
+        self.flowlines = QCheckBox("Flow lines")
+        self.flowlines.setChecked(bool(defaults.get("flowlines", True)))
+        form.addRow("", self.flowlines)
+        self.vectors = QCheckBox("Velocity vectors")
+        self.vectors.setChecked(bool(defaults.get("vectors", False)))
+        form.addRow("", self.vectors)
+        self.fill_contours = QCheckBox("Filled contours")
+        self.fill_contours.setChecked(bool(defaults.get("fill_contours", False)))
+        form.addRow("", self.fill_contours)
+        self.phreatic = QCheckBox("Phreatic surface")
+        self.phreatic.setChecked(bool(defaults.get("phreatic", True)))
+        form.addRow("", self.phreatic)
+
+        layout.addLayout(form)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.button(QDialogButtonBox.Ok).setText("Run")
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+    def options(self):
+        return {
+            "bc": self.bc.currentData(),
+            "tol": self.tol.value(),
+            "variable": self.variable.currentData(),
+            "levels": self.levels.value(),
+            "flowlines": self.flowlines.isChecked(),
+            "vectors": self.vectors.isChecked(),
+            "fill_contours": self.fill_contours.isChecked(),
+            "phreatic": self.phreatic.isChecked(),
+        }
+
+
 class BuildMeshDialog(QDialog):
     """Options for building a finite-element mesh from the geometry.
 

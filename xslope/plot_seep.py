@@ -6,7 +6,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -17,6 +17,8 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         show_bc: If True, plot boundary condition nodes
         label_elements: If True, label each element with its number at its centroid
         label_nodes: If True, label each node with its number just above and to the right
+        fig: Optional existing Matplotlib Figure to draw into (embeds in a GUI canvas);
+            when provided the figure is cleared/reused and plt.show() is skipped.
     """
 
     # Extract data from seep_data
@@ -26,7 +28,12 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     element_types = seep_data.get("element_types", None)
     bc_type = seep_data["bc_type"]
 
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
     materials = np.unique(element_materials)
 
     # Import get_material_color to ensure consistent colors with plot_mesh
@@ -209,19 +216,21 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     
     ax.set_title(title)
     # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
-    plt.tight_layout()
-    
+    fig.tight_layout()
+
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:
-        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, base_name + '.dxf')
-    
-    plt.show()
+
+    if own_fig:
+        plt.show()
+    return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, save_dxf=False, dpi=300):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plot seep analysis results including head contours, flowlines, and phreatic surface.
     
@@ -317,7 +326,16 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
 
 
     # Use constrained_layout for best layout
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    else:
+        fig.clear()
+        try:
+            fig.set_layout_engine("constrained")
+        except Exception:
+            pass
+        ax = fig.add_subplot(111)
 
     # If element_types is not provided, assume all triangles (backward compatibility)
     if element_types is None:
@@ -571,12 +589,14 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('—', '').replace('(', '').replace(')', '')
     if save_png:
-        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, base_name + '.dxf')
-    
-    plt.show()
+
+    if own_fig:
+        plt.show()
+    return fig
 
 
     # plot_seep_material_table has been moved to xslope/plot.py

@@ -59,6 +59,41 @@ class MeshWorker(QObject):
             self.failed.emit("Mesh build failed — see the Log pane for details.")
 
 
+class SeepRunner(QThread):
+    """Runs a seepage solve off the GUI thread (no gmsh, so a plain per-run
+    QThread is fine). Emits ``succeeded`` with ``{seep_data, solution, options}``
+    or ``failed``."""
+
+    succeeded = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, slope_data, options, parent=None):
+        super().__init__(parent)
+        self._sd = slope_data
+        self._options = options
+
+    def run(self):
+        from xslope.seep import build_seep_data, run_seepage_analysis
+        try:
+            sd = self._sd
+            mesh = sd.get("mesh")
+            if mesh is None:
+                self.failed.emit("No mesh available — build a mesh first.")
+                return
+            bc = self._options.get("bc", 1)
+            tol = self._options.get("tol", 1e-4)
+            print(f"Building seepage data (BC set {bc})…")
+            seep_data = build_seep_data(mesh, sd, seep_bc=bc)
+            print(f"Running seepage analysis (tol={tol:g})…")
+            solution = run_seepage_analysis(seep_data, tol=tol)
+            print("Seepage analysis complete.")
+            self.succeeded.emit({"seep_data": seep_data, "solution": solution,
+                                 "options": self._options})
+        except Exception:
+            traceback.print_exc()
+            self.failed.emit("Seepage run failed — see the Log pane for details.")
+
+
 class LemRunner(QThread):
     """Runs an LEM analysis off the GUI thread.
 

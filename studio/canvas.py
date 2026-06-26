@@ -30,6 +30,7 @@ from xslope.plot import (
     plot_circular_search_results, plot_inputs, plot_mesh,
     plot_noncircular_search_results, plot_reliability_results, plot_solution,
 )
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
@@ -106,6 +107,19 @@ class MplCanvas(QWidget):
 
     def render_mesh(self, mesh, materials=None):
         self._draw(lambda fig: plot_mesh(mesh, materials=materials, fig=fig))
+
+    def render_seep_data(self, seep_data):
+        self._draw(lambda fig: plot_seep_data(seep_data, show_nodes=False,
+                                              show_bc=True, fig=fig))
+
+    def render_seep_solution(self, seep_data, solution, opts):
+        opts = opts or {}
+        self._draw(lambda fig: plot_seep_solution(
+            seep_data, solution, variable=opts.get("variable", "head"),
+            levels=opts.get("levels", 20), flowlines=opts.get("flowlines", True),
+            vectors=opts.get("vectors", False),
+            fill_contours=opts.get("fill_contours", False),
+            phreatic=opts.get("phreatic", True), mesh=False, fig=fig))
 
     def _draw(self, draw_fn):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.

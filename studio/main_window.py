@@ -23,10 +23,10 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import MplCanvas
-from .dialogs import BuildMeshDialog, RunLemDialog
+from .dialogs import BuildMeshDialog, RunLemDialog, RunSeepDialog
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
-from .runners import LemRunner, MeshWorker
+from .runners import LemRunner, MeshWorker, SeepRunner
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -93,6 +93,8 @@ class MainWindow(QMainWindow):
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
+        self.seep_data_canvas = None
+        self.seep_solution_canvas = None
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
         self.view_tabs.currentChanged.connect(self._on_view_tab_changed)
@@ -100,10 +102,12 @@ class MainWindow(QMainWindow):
 
         self._mode = "lem"
         self._runner = None
+        self._seep_runner = None
         self._mesh_busy = False
-        self._run_implemented = {"lem"}   # modes whose Run is wired up so far
+        self._run_implemented = {"lem", "seep"}   # modes whose Run is wired up so far
         self._last_lem_opts = {}
         self._last_mesh_opts = {}
+        self._last_seep_opts = {}
 
         # gmsh must run on one consistent thread (it segfaults if re-initialized on
         # a fresh thread each build), so a single persistent worker thread handles
@@ -339,7 +343,8 @@ class MainWindow(QMainWindow):
         self.act_run.setText({"lem": "Run &LEM…", "seep": "Run &Seep…",
                               "fem": "Run &FEM…"}.get(mode, "Run…"))
         open_ = self.doc.is_open
-        busy = self._runner is not None or self._mesh_busy
+        busy = (self._runner is not None or self._seep_runner is not None
+                or self._mesh_busy)
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
             self.act_run.setToolTip("")
@@ -358,8 +363,9 @@ class MainWindow(QMainWindow):
         """Dispatch the Run action by the current mode."""
         if self._mode == "lem":
             self.run_lem()
-        # seep / fem runs arrive in the next Phase 4 increments (action stays
-        # disabled in those modes until then).
+        elif self._mode == "seep":
+            self.run_seep()
+        # fem run arrives in the next Phase 4 increment.
 
     def _populate_inputs_tree(self):
         d = self.doc.slope_data
@@ -473,6 +479,79 @@ class MainWindow(QMainWindow):
         except Exception:
             traceback.print_exc()
         self.view_tabs.setCurrentWidget(self.mesh_canvas)
+
+    # --- seepage ---------------------------------------------------------
+    def run_seep(self):
+        if not self.doc.is_open or self._seep_runner is not None:
+            return
+        if self.doc.slope_data.get("mesh") is None:
+            QMessageBox.information(self, "Run Seepage",
+                                    "Build a mesh first (Build Mesh…).")
+            return
+        dlg = RunSeepDialog(self, defaults=self._last_seep_opts,
+                            has_bc2=bool(self.doc.slope_data.get("has_seepage_bc2")))
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self._last_seep_opts = opts
+        self.statusBar().showMessage("Running seepage …")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self._seep_runner = SeepRunner(self.doc.slope_data, opts, parent=self)
+        self._seep_runner.succeeded.connect(self._on_seep_succeeded)
+        self._seep_runner.failed.connect(self._on_seep_failed)
+        self._seep_runner.finished.connect(self._on_seep_finished)
+        self._update_run_actions()
+        self._seep_runner.start()
+
+    def _on_seep_succeeded(self, bundle):
+        self.doc.results["seep_solution"] = bundle
+        bc = bundle["options"].get("bc", 1)
+        # Persist the solution next to the .xlsx ({stem}_seep.csv / _seep2.csv).
+        if self.doc.path:
+            try:
+                from xslope.seep import export_seep_solution
+                stem = os.path.splitext(self.doc.path)[0]
+                suffix = "_seep.csv" if bc == 1 else f"_seep{bc}.csv"
+                export_seep_solution(bundle["seep_data"], bundle["solution"], stem + suffix)
+            except Exception:
+                traceback.print_exc()
+        self._show_seep_data(bundle["seep_data"])
+        self._show_seep_solution(bundle)
+        if self.seep_solution_canvas is not None:
+            self.view_tabs.setCurrentWidget(self.seep_solution_canvas)
+        self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
+
+    def _on_seep_failed(self, message):
+        QMessageBox.warning(self, "Seepage run failed", message)
+        self.statusBar().showMessage("Seepage run failed.")
+
+    def _on_seep_finished(self):
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
+        if self._seep_runner is not None:
+            self._seep_runner.deleteLater()
+            self._seep_runner = None
+        self._update_run_actions()
+
+    def _show_seep_data(self, seep_data):
+        if self.seep_data_canvas is None:
+            self.seep_data_canvas = MplCanvas(self)
+            self.view_tabs.addTab(self.seep_data_canvas, "Seep · Data")
+        try:
+            self.seep_data_canvas.render_seep_data(seep_data)
+        except Exception:
+            traceback.print_exc()
+
+    def _show_seep_solution(self, bundle):
+        if self.seep_solution_canvas is None:
+            self.seep_solution_canvas = MplCanvas(self)
+            self.view_tabs.addTab(self.seep_solution_canvas, "Seep · Solution")
+        try:
+            self.seep_solution_canvas.render_seep_solution(
+                bundle["seep_data"], bundle["solution"], bundle["options"])
+        except Exception:
+            traceback.print_exc()
 
     # --- LEM analysis ----------------------------------------------------
     def run_lem(self):
@@ -591,7 +670,8 @@ class MainWindow(QMainWindow):
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
-        for attr in ("mesh_canvas", "search_canvas", "solution_canvas", "reliability_canvas"):
+        for attr in ("mesh_canvas", "search_canvas", "solution_canvas",
+                     "reliability_canvas", "seep_data_canvas", "seep_solution_canvas"):
             canvas = getattr(self, attr)
             if canvas is not None:
                 idx = self.view_tabs.indexOf(canvas)
@@ -654,6 +734,8 @@ class MainWindow(QMainWindow):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()     # ask an in-flight run to stop, then wait briefly
             self._runner.wait(5000)
+        if self._seep_runner is not None and self._seep_runner.isRunning():
+            self._seep_runner.wait(10000)   # seepage has no cancel hook; let it finish
         # Stop the persistent mesh thread (lets an in-flight build finish first).
         self._mesh_thread.quit()
         self._mesh_thread.wait(10000)

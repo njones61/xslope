@@ -211,6 +211,90 @@ class TabbedTableEditorDialog(QDialog):
         return self._editables[index].result_rows()
 
 
+class _BlockListWidget(QWidget):
+    """Master/detail over a list of blocks, where each block is a list of dict
+    rows: a list of blocks (left) + the selected block's row table (right).
+    Used for distributed loads (and reusable for other block-structured inputs)."""
+
+    def __init__(self, blocks, fields, new_row, block_label="Load", parent=None):
+        super().__init__(parent)
+        self._fields = fields
+        self._new_row = new_row
+        self._block_label = block_label
+        self._blocks = [[dict(r) for r in blk] for blk in (blocks or [])]
+        self._cur = -1
+        self.table = None
+
+        body = QHBoxLayout(self)
+        body.setContentsMargins(0, 0, 0, 0)
+        left = QVBoxLayout()
+        body.addLayout(left)
+        self.list = QListWidget()
+        self.list.currentRowChanged.connect(self._on_select)
+        left.addWidget(self.list)
+        lb = QHBoxLayout()
+        b_add = QPushButton(f"Add {block_label.lower()}")
+        b_add.clicked.connect(self._add_block)
+        b_rem = QPushButton("Remove")
+        b_rem.clicked.connect(self._remove_block)
+        lb.addWidget(b_add)
+        lb.addWidget(b_rem)
+        left.addLayout(lb)
+        self._holder = QVBoxLayout()
+        body.addLayout(self._holder, 1)
+
+        self._refresh_list()
+        if self._blocks:
+            self.list.setCurrentRow(0)
+
+    def _refresh_list(self):
+        self.list.blockSignals(True)
+        self.list.clear()
+        for i in range(len(self._blocks)):
+            self.list.addItem(f"{self._block_label} {i + 1}")
+        self.list.blockSignals(False)
+
+    def _commit_current(self):
+        if 0 <= self._cur < len(self._blocks) and self.table is not None:
+            self._blocks[self._cur] = self.table.result_rows()
+
+    def _load(self, idx):
+        if self.table is not None:
+            self.table.setParent(None)
+            self.table = None
+        if not (0 <= idx < len(self._blocks)):
+            return
+        self.table = _EditableTable(self._fields, self._blocks[idx], self._new_row)
+        self._holder.addWidget(self.table)
+
+    def _on_select(self, idx):
+        self._commit_current()
+        self._cur = idx
+        self._load(idx)
+
+    def _add_block(self):
+        self._commit_current()
+        self._blocks.append([])
+        self._refresh_list()
+        self.list.setCurrentRow(len(self._blocks) - 1)
+
+    def _remove_block(self):
+        idx = self.list.currentRow()
+        if idx < 0:
+            return
+        self._blocks.pop(idx)
+        self._cur = -1
+        self._refresh_list()
+        if self._blocks:
+            self.list.setCurrentRow(min(idx, len(self._blocks) - 1))
+        else:
+            self._load(-1)
+
+    def result_blocks(self):
+        self._commit_current()
+        return [list(b) for b in self._blocks]
+
+
 # --------------------------------------------------------------------------- #
 # Per-category editors
 # --------------------------------------------------------------------------- #
@@ -366,54 +450,39 @@ class PiezoEditor(CategoryEditor):
         slope_data["piezo_line2"] = [(r["x"], r["y"]) for r in dlg.result_rows(1)]
 
 
-# --- distributed loads (two sets; each a set of point blocks) --------------- #
-DLOAD_FIELDS = [Field("Load", "Load #", "int", default=1),
-                Field("X", "X"), Field("Y", "Y"), Field("Normal", "Normal")]
+# --- distributed loads (two sets; each a list of point blocks) -------------- #
+DLOAD_FIELDS = [Field("X", "X"), Field("Y", "Y"), Field("Normal", "Normal")]
 
 
-def _new_dload_row():
-    return {"Load": 1, "X": 0.0, "Y": 0.0, "Normal": 0.0}
-
-
-def _flatten_loads(blocks):
-    """[[pt,...], ...] -> flat rows tagged with a 1-based Load # for the table."""
-    rows = []
-    for i, block in enumerate(blocks or [], start=1):
-        for pt in block:
-            rows.append({"Load": i, "X": pt.get("X", 0.0),
-                         "Y": pt.get("Y", 0.0), "Normal": pt.get("Normal", 0.0)})
-    return rows
-
-
-def _group_loads(rows):
-    """Flat rows -> [[{X,Y,Normal}, ...], ...] grouped by Load #, row order kept."""
-    groups, order = {}, []
-    for r in rows:
-        k = int(r.get("Load", 1) or 1)
-        if k not in groups:
-            groups[k] = []
-            order.append(k)
-        groups[k].append({"X": r["X"], "Y": r["Y"], "Normal": r["Normal"]})
-    return [groups[k] for k in sorted(order)]
+def _new_dload_pt():
+    return {"X": 0.0, "Y": 0.0, "Normal": 0.0}
 
 
 class DloadsEditor(CategoryEditor):
     label = "Distributed loads"
 
     def build(self, slope_data, parent):
-        return TabbedTableEditorDialog(
-            "Distributed loads",
-            [("Set 1", DLOAD_FIELDS, _flatten_loads(slope_data.get("dloads")), _new_dload_row),
-             ("Set 2 (rapid drawdown)", DLOAD_FIELDS,
-              _flatten_loads(slope_data.get("dloads2")), _new_dload_row)],
-            parent,
-            help_text="Each load is a left→right series of points (≥2 each). Use the Load # "
-                      "column to group points into separate loads. Set 2 is the second "
-                      "rapid-drawdown stage.")
+        dlg = QDialog(parent)
+        dlg.setWindowTitle("Distributed loads")
+        dlg.resize(640, 520)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(_help_label(
+            "Each load is a left→right series of points (≥2). Select a load to edit its "
+            "points. Set 2 is the second rapid-drawdown stage."))
+        tabs = QTabWidget()
+        w1 = _BlockListWidget(slope_data.get("dloads"), DLOAD_FIELDS, _new_dload_pt, "Load")
+        w2 = _BlockListWidget(slope_data.get("dloads2"), DLOAD_FIELDS, _new_dload_pt, "Load")
+        tabs.addTab(w1, "Set 1")
+        tabs.addTab(w2, "Set 2 (rapid drawdown)")
+        layout.addWidget(tabs)
+        _ok_cancel(dlg, layout)
+        dlg._sets = (w1, w2)
+        return dlg
 
     def apply(self, slope_data, dlg):
-        slope_data["dloads"] = _group_loads(dlg.result_rows(0))
-        slope_data["dloads2"] = _group_loads(dlg.result_rows(1))
+        w1, w2 = dlg._sets
+        slope_data["dloads"] = w1.result_blocks()
+        slope_data["dloads2"] = w2.result_blocks()
 
 
 # --- head BC (two sets; each: specified-head groups + an exit face) --------- #

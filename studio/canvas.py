@@ -301,6 +301,15 @@ class MplCanvas(QWidget):
         self.view.scale(1 / ZOOM_STEP, 1 / ZOOM_STEP)
         self._schedule_refine()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # A result canvas is usually drawn while its tab is hidden (no viewport
+        # size yet), so the initial fit is skipped. Re-attempt it the moment the
+        # view becomes visible — deferred one cycle so the page has been laid out.
+        # Guarded by _fitted, so revisiting a tab won't clobber the user's zoom.
+        if not self._fitted:
+            QTimer.singleShot(0, self.ensure_fitted)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # Re-fit the whole figure to the new window size (re-rasterize debounced).

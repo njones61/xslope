@@ -10,6 +10,7 @@ widget itself.
 
 from __future__ import annotations
 
+import threading
 import traceback
 
 from PySide6.QtCore import QThread, Signal
@@ -20,11 +21,13 @@ class LemRunner(QThread):
 
     Emits ``succeeded`` with a bundle ``{slice_df, failure_surface, results,
     search}`` (``search`` is ``None`` for single-surface, else a dict describing
-    the search for the Search view) or ``failed`` with an error message.
+    the search for the Search view), ``failed`` with an error message, or
+    ``cancelled`` if the run was aborted via :meth:`cancel`.
     """
 
     succeeded = Signal(object)
     failed = Signal(str)
+    cancelled = Signal()
     progress = Signal(int, int, str)   # done, total (-1 = indeterminate), label
 
     def __init__(self, slope_data, options, parent=None):
@@ -36,8 +39,15 @@ class LemRunner(QThread):
         self._num_slices = options.get("num_slices", 40)
         self._rapid = options.get("rapid", False)
         self._diagnostic = options.get("diagnostic", False)
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation; the search loops stop at the next
+        iteration boundary and the run emits ``cancelled``."""
+        self._cancel.set()
 
     def run(self):
+        from xslope.search import AnalysisCancelled
         try:
             if self._analysis == "reliability":
                 self._run_reliability()
@@ -45,6 +55,9 @@ class LemRunner(QThread):
                 self._run_search()
             else:
                 self._run_single()
+        except AnalysisCancelled:
+            print("Run cancelled.")
+            self.cancelled.emit()
         except Exception:
             traceback.print_exc()   # streams to the Log pane via the stdout/stderr tee
             self.failed.emit("Solve failed — see the Log pane for details.")
@@ -103,7 +116,7 @@ class LemRunner(QThread):
                   f"{self._method.upper()}{self._rapid_tag()}…")
             fs_cache, converged, search_path, circle_cache = circular_search(
                 sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
-                diagnostic=self._diagnostic)
+                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set)
             search = {"kind": "circular", "fs_cache": fs_cache,
                       "search_path": search_path, "circle_cache": circle_cache}
         else:
@@ -114,7 +127,7 @@ class LemRunner(QThread):
                   f"{self._method.upper()}{self._rapid_tag()}…")
             fs_cache, converged, search_path = noncircular_search(
                 sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
-                diagnostic=self._diagnostic)
+                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set)
             search = {"kind": "noncircular", "fs_cache": fs_cache,
                       "search_path": search_path, "circle_cache": None}
 
@@ -153,7 +166,7 @@ class LemRunner(QThread):
 
         ok, result = reliability(sd, self._method, rapid=self._rapid, circular=circular,
                                  debug_level=1 if self._diagnostic else 0,
-                                 progress_callback=cb)
+                                 progress_callback=cb, cancel_check=self._cancel.is_set)
         if not ok:
             self.failed.emit(str(result))
             return

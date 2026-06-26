@@ -268,7 +268,7 @@ def rapid_drawdown(df, method_name, debug_level=1):
 
 
 def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
-                progress_callback=None):
+                progress_callback=None, cancel_check=None):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -327,11 +327,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
     if circular:
         if debug_level >= 1:
             print("Performing circular search...")
-        fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid)
+        fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check)
     else:
         if debug_level >= 1:
             print("Performing noncircular search...")
-        fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid)
+        fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check)
     
     if not fs_cache:
         return False, "Search failed - no results found"
@@ -406,6 +406,8 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
     delta_F_values = []
 
     for i, param in enumerate(param_info):
+        from .search import _check_cancel
+        _check_cancel(cancel_check)
         if debug_level >= 1:
             print(f"\nProcessing parameter {i+1}/{len(param_info)}: Material {param['material_id']}, {param['param']}")
         
@@ -425,11 +427,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
         
         # Calculate F+ and F-
         if circular:
-            fs_cache_plus, _, _, _ = circular_search(slope_data_plus, method, rapid=rapid)
-            fs_cache_minus, _, _, _ = circular_search(slope_data_minus, method, rapid=rapid)
+            fs_cache_plus, _, _, _ = circular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check)
+            fs_cache_minus, _, _, _ = circular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check)
         else:
-            fs_cache_plus, _, _ = noncircular_search(slope_data_plus, method, rapid=rapid)
-            fs_cache_minus, _, _ = noncircular_search(slope_data_minus, method, rapid=rapid)
+            fs_cache_plus, _, _ = noncircular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check)
+            fs_cache_minus, _, _ = noncircular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check)
         
         if not fs_cache_plus or not fs_cache_minus:
             return False, f"Failed to calculate F+ or F- for parameter {param['param']}"

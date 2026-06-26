@@ -58,9 +58,22 @@ def _base_tension_too_extensive(df_slices):
     return len(N) > 0 and float((N < 0).mean()) > MAX_BASE_TENSION_FRAC
 
 
+class AnalysisCancelled(Exception):
+    """Raised by a search/reliability run when its ``cancel_check`` asks it to stop.
+
+    Cooperative cancellation: long loops call ``cancel_check()`` at iteration
+    boundaries and raise this if it returns True, so a caller (e.g. the GUI's
+    worker thread) can abort cleanly without killing the thread mid-computation."""
+
+
+def _check_cancel(cancel_check):
+    if cancel_check is not None and cancel_check():
+        raise AnalysisCancelled()
+
+
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.01, depth_tol_frac=0.03,
-                    diagnostic=False, num_slices=40):
+                    diagnostic=False, num_slices=40, cancel_check=None):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -225,6 +238,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     all_starts = []
     fs_cache = {}  # Shared cache for all starting circles
     for i, start_circle in enumerate(circles):
+        _check_cancel(cancel_check)
         x0 = start_circle['Xo']
         y0 = start_circle['Yo']
         r0 = y0 - start_circle['Depth']
@@ -257,6 +271,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     small_levels = 0           # consecutive refinements that barely improved FS
 
     for iteration in range(max_iter):
+        _check_cancel(cancel_check)
         print(f"[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
         fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
 
@@ -297,7 +312,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path, circle_cache
 
-def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0):
+def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, cancel_check=None):
     """
     Non-circular search using the specified solver.
 
@@ -473,6 +488,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     
     # Main search loop
     for iteration in range(max_iter):
+        _check_cancel(cancel_check)
         improved = False
         
         if diagnostic:

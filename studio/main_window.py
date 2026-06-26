@@ -18,7 +18,7 @@ from PySide6.QtCore import Qt, QObject, QSettings, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
-    QPlainTextEdit, QProgressBar, QTabWidget, QToolBar, QTreeWidget,
+    QPlainTextEdit, QProgressBar, QPushButton, QTabWidget, QToolBar, QTreeWidget,
     QTreeWidgetItem, QWidget,
 )
 
@@ -107,11 +107,16 @@ class MainWindow(QMainWindow):
         self._update_recent_menu()
         self._update_title()
         self._install_log_capture()
-        # A run progress bar lives at the right of the status bar (hidden when idle).
+        # A run progress bar + Cancel button live at the right of the status bar
+        # (hidden when idle).
         self.progress_bar = QProgressBar()
         self.progress_bar.setMaximumWidth(220)
         self.progress_bar.setVisible(False)
         self.statusBar().addPermanentWidget(self.progress_bar)
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setVisible(False)
+        self.cancel_btn.clicked.connect(self._cancel_run)
+        self.statusBar().addPermanentWidget(self.cancel_btn)
         self.statusBar().showMessage("Open an Excel input file to begin.")
 
     # --- docks -----------------------------------------------------------
@@ -374,12 +379,22 @@ class MainWindow(QMainWindow):
         # Show a busy bar immediately; reliability switches it to determinate.
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
         self._runner = LemRunner(self.doc.slope_data, opts, parent=self)
         self._runner.succeeded.connect(self._on_lem_succeeded)
         self._runner.failed.connect(self._on_lem_failed)
+        self._runner.cancelled.connect(self._on_lem_cancelled)
         self._runner.progress.connect(self._on_lem_progress)
         self._runner.finished.connect(self._on_lem_finished)
         self._runner.start()
+
+    def _cancel_run(self):
+        if self._runner is not None and self._runner.isRunning():
+            self._runner.cancel()
+            self.cancel_btn.setEnabled(False)
+            self.progress_bar.setRange(0, 0)   # back to busy while it winds down
+            self.statusBar().showMessage("Cancelling…")
 
     def _on_lem_progress(self, done, total, label):
         if total <= 0:                       # indeterminate
@@ -419,10 +434,14 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "LEM run failed", message)
         self.statusBar().showMessage("LEM run failed.")
 
+    def _on_lem_cancelled(self):
+        self.statusBar().showMessage("Run cancelled.")
+
     def _on_lem_finished(self):
         self.act_run_lem.setEnabled(self.doc.is_open)
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
+        self.cancel_btn.setVisible(False)
         if self._runner is not None:
             self._runner.deleteLater()
             self._runner = None
@@ -521,7 +540,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         if self._runner is not None and self._runner.isRunning():
-            self._runner.wait(5000)   # let an in-flight solve finish before teardown
+            self._runner.cancel()     # ask an in-flight run to stop, then wait briefly
+            self._runner.wait(5000)
         if self.doc.is_open and self.doc.dirty:
             res = QMessageBox.question(
                 self, "Unsaved changes", "Save changes before closing?",

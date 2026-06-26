@@ -282,7 +282,8 @@ studio/                # XSlope Studio desktop app
 - ✅ **Auto-search** — circular (`circular_search`) and non-circular (`noncircular_search`) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, both given `fig=`) showing all trial surfaces + critical + search path, plus the critical surface in the Solution tab. Search iteration progress streams to the log.
 - ✅ Rapid drawdown flag wired through single/search; `fig=` added to all LEM plot functions, mirroring `plot_inputs`.
 - ✅ **Reliability** (`advanced.reliability`) → **LEM · Reliability** tab (`plot_reliability_results`, given `fig=`) + Solution tab for the MLV surface. A determinate **progress bar** in the status bar tracks the `1 + 2N` searches via a `progress_callback` threaded through `reliability()` (engine-side, so notebooks benefit too); other runs show a busy bar. Surface-type choice is hidden unless the file has both circular and non-circular.
-- ⬜ Cooperative cancel for long runs (searches/SSRM); remaining tolerances in the dialog.
+- ✅ **Cooperative cancel** — a `cancel_check` callable is threaded through `circular_search` / `noncircular_search` / `reliability` (engine-side; checked at iteration boundaries, raises `AnalysisCancelled`). The worker exposes `cancel()` (sets a `threading.Event`) and a Cancel button by the progress bar; cancelling aborts cleanly without killing the thread, emits `cancelled`, and leaves no result tab. Close also cancels an in-flight run.
+- ⬜ Remaining solver tolerances in the dialog (`fs_tol`, `tol`, `max_iter`).
 
 **Phase 4 — Meshing + Seepage + FEM**
 - Meshing dialog; Seepage run + result view; FEM single/SSRM + result views; progress/cancel.

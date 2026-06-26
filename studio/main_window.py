@@ -657,6 +657,42 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()
+            self.invalidate_results()     # inputs changed -> solution is stale
+
+    def invalidate_results(self):
+        """Inputs changed (via an editor or the assistant), so any cached analysis
+        solution is stale — drop the solution result tabs and their cached results
+        (the Mesh tab is kept; it is rebuilt explicitly). Leaves the user on a
+        valid view (Inputs), which is why an edit visibly refreshes."""
+        if not self.doc.is_open:
+            return
+        single = ("search_canvas", "solution_canvas", "reliability_canvas",
+                  "fem_data_canvas", "fem_results_canvas")
+        canvases = [getattr(self, a) for a in single]
+        canvases += list(self.seep_data_canvas.values())
+        canvases += list(self.seep_solution_canvas.values())
+        removed = False
+        for canvas in canvases:
+            if canvas is not None:
+                idx = self.view_tabs.indexOf(canvas)
+                if idx >= 0:
+                    self.view_tabs.removeTab(idx)
+                    removed = True
+                panel = self._display_panels.pop(canvas, None)
+                if panel is not None:
+                    self.display_stack.removeWidget(panel)
+                    panel.deleteLater()
+                canvas.deleteLater()
+        for a in single:
+            setattr(self, a, None)
+        self.seep_data_canvas = {}
+        self.seep_solution_canvas = {}
+        for key in ("lem_solution", "seep_solutions", "fem_solution"):
+            self.doc.results.pop(key, None)
+        if removed:
+            self._show_display_for_tab(self.view_tabs.currentWidget())
+            self.statusBar().showMessage(
+                "Inputs changed — cleared the now-stale analysis result(s).")
 
     # --- meshing ---------------------------------------------------------
     def build_mesh(self):

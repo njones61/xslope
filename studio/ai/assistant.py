@@ -181,6 +181,41 @@ def _extract_code(content):
     return None, False
 
 
+_SOURCE_KEYS = (
+    "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
+    "materials", "profile_lines", "circles", "non_circ", "piezo_line",
+    "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "pile_lines",
+    "seepage_bc", "seepage_bc2",
+)
+
+
+def _input_signature(sd):
+    """A JSON signature of the editable source inputs, to tell whether a code run
+    actually changed the inputs (vs a read-only query). Returns None if it can't
+    be built (then the caller treats the run as a possible edit, to be safe)."""
+    def clean(o):
+        if hasattr(o, "wkt"):
+            return o.wkt
+        try:
+            import numpy as np
+            if isinstance(o, np.ndarray):
+                return o.tolist()
+            if isinstance(o, np.generic):
+                return o.item()
+        except Exception:
+            pass
+        if isinstance(o, dict):
+            return {k: clean(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [clean(x) for x in o]
+        return o
+    try:
+        return json.dumps({k: clean(sd.get(k)) for k in _SOURCE_KEYS},
+                          sort_keys=True, default=str)
+    except Exception:
+        return None
+
+
 def _load_skill_text():
     """The /xslope skill body (schema + API knowledge), best-effort. Repo-bound
     for now; packaging it travels with §14.5."""
@@ -389,15 +424,25 @@ class Assistant(QObject):
 
     def _run_python(self, code):
         doc = self._mw.doc
+        before = _input_signature(doc.slope_data)
         doc.begin_edit()                    # snapshot for undo / rollback
         stdout, figures, error = self._kernel.run(code)
+        edited = False
         if error:
             # Transactional: a snippet that raised leaves no partial edit, so
             # trial-and-error retries can't compound (e.g. a +5 applied 5 times).
             doc.rollback_edit()
         else:
-            doc.commit_edit()               # keep edit -> re-render + mark dirty
+            after = _input_signature(doc.slope_data)
+            if before is None or after is None or after != before:
+                doc.commit_edit()           # real edit -> re-render + mark dirty
+                edited = True
+            else:
+                doc.cancel_edit()           # read-only run -> no dirty, no undo step
         try:
+            if edited:
+                # Inputs changed: any cached solution is now stale.
+                self._mw.invalidate_results()
             self._mw.refresh_inputs_view()
         except Exception:
             pass

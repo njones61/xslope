@@ -110,6 +110,13 @@ class ProjectDocument(QObject):
             self.slope_data = self._undo.pop()
             self.changed.emit()
 
+    def cancel_edit(self):
+        """Drop the ``begin_edit`` snapshot without committing — for a code run that
+        turned out not to change anything (e.g. a read-only query), so it isn't
+        recorded as an edit or marked dirty."""
+        if self._undo:
+            self._undo.pop()
+
     def can_undo(self) -> bool:
         return bool(self._undo)
 

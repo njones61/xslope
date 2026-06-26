@@ -146,6 +146,41 @@ def _parse_text_tool_call(content, names):
     return None
 
 
+def _is_runnable(code):
+    """True if ``code`` compiles (trying the literal-escape repair too)."""
+    if not code:
+        return False
+    for variant in (code, code.replace("\\n", "\n").replace("\\t", "\t")):
+        try:
+            compile(variant, "<assistant>", "exec")
+            return True
+        except SyntaxError:
+            pass
+    return False
+
+
+def _extract_code(content):
+    """Recover ``run_python`` code from an assistant turn that made no structured
+    tool call — a JSON tool-call, a fenced ```python block, or whole-content
+    Python (weaker models often just *write* the code in chat). Returns
+    ``(code, pure)`` where ``pure`` means the message is only the code (so it is
+    suppressed from the transcript); ``(None, False)`` if nothing runnable."""
+    import re
+    if not content:
+        return None, False
+    s = content.strip()
+    call = _parse_text_tool_call(s, TOOL_NAMES)
+    if call:
+        return call[1].get("code", ""), True
+    fence = re.search(r"```(?:python|py)?\s*\n?(.*?)```", s, re.S)
+    if fence and _is_runnable(fence.group(1).strip()):
+        return fence.group(1).strip(), False        # keep any surrounding prose
+    if _is_runnable(s) and re.search(
+            r"\b(slope_data|doc|results|run_lem|xslope|plt|np|pd|print)\b", s):
+        return s, True
+    return None, False
+
+
 def _load_skill_text():
     """The /xslope skill body (schema + API knowledge), best-effort. Repo-bound
     for now; packaging it travels with §14.5."""
@@ -208,9 +243,10 @@ class _AgentWorker(QThread):
                 msg = resp.choices[0].message
                 tool_calls = getattr(msg, "tool_calls", None) or []
 
-                # Fallback for models that emit the call as plain-text JSON.
-                text_call = (_parse_text_tool_call(msg.content, TOOL_NAMES)
-                             if not tool_calls else None)
+                # Fallback for models that don't make a structured tool call but
+                # write the code (as JSON, a fenced block, or bare Python).
+                code_call, pure = ((None, False) if tool_calls
+                                   else _extract_code(msg.content))
 
                 assistant_msg = {"role": "assistant", "content": msg.content or ""}
                 if tool_calls:
@@ -221,8 +257,8 @@ class _AgentWorker(QThread):
                         for tc in tool_calls]
                 self._messages.append(assistant_msg)
 
-                # Show assistant text, but suppress a raw tool-call JSON.
-                if msg.content and msg.content.strip() and not text_call:
+                # Show assistant text, but suppress a message that is only code.
+                if msg.content and msg.content.strip() and not (code_call and pure):
                     self.text.emit(msg.content)
 
                 if tool_calls:
@@ -240,13 +276,12 @@ class _AgentWorker(QThread):
                         produced = True
                     if not produced:
                         break
-                elif text_call:
-                    name, args = text_call
-                    # No tool-call protocol here — feed the result back as a
-                    # plain user turn so any provider can continue.
-                    result = self._run(name, args)
+                elif code_call:
+                    # No tool-call protocol — feed the result back as a plain user
+                    # turn so any provider can continue.
+                    result = self._run("run_python", {"code": code_call})
                     self._messages.append({
-                        "role": "user", "content": f"[{name} output]\n{result}"})
+                        "role": "user", "content": f"[run_python output]\n{result}"})
                 else:
                     break
             self.done.emit()

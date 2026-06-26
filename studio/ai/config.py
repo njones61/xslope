@@ -78,14 +78,21 @@ class AssistantConfig:
     # --- credentials -----------------------------------------------------
     def api_key(self, provider):
         kr = _keyring()
+        raw = None
         if kr is not None:
             try:
-                key = kr.get_password(KEYRING_SERVICE, f"{provider}_api_key")
-                if key:
-                    return key
+                raw = kr.get_password(KEYRING_SERVICE, f"{provider}_api_key")
             except Exception:
                 pass
-        return self._s.value(f"ai/key_fallback/{provider}", "") or ""
+        if not raw:
+            raw = self._s.value(f"ai/key_fallback/{provider}", "") or ""
+        key = (raw or "").strip()
+        # A real API key has no internal whitespace/newlines; reject a corrupt
+        # value (e.g. text pasted by mistake) so it can't become an illegal HTTP
+        # header — treat it as unset instead.
+        if key and any(ch.isspace() for ch in key):
+            return ""
+        return key
 
     def set_api_key(self, provider, key):
         kr = _keyring()

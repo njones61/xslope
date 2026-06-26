@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel,
-    QLineEdit, QVBoxLayout,
+    QLineEdit, QMessageBox, QVBoxLayout,
 )
 
 from .config import PROVIDERS
@@ -124,9 +124,16 @@ class AssistantSettingsDialog(QDialog):
 
     def _save(self):
         prov = self.provider.currentData()
+        if self._spec()["needs_key"]:
+            key = self.api_key.text().strip()
+            if key and any(ch.isspace() for ch in key):
+                QMessageBox.warning(self, "Invalid API key",
+                                    "That doesn't look like an API key — it contains "
+                                    "spaces or line breaks. Paste only the key "
+                                    "(e.g. starts with 'sk-').")
+                return                     # keep the dialog open
+            self._config.set_api_key(prov, key)
         model = self.model.currentText().strip()
         self._config.set_selection(prov, model, self.ollama_base.text().strip())
-        if self._spec()["needs_key"]:
-            self._config.set_api_key(prov, self.api_key.text().strip())
         self._config.set_confirm_before_run(self.confirm.isChecked())
         self.accept()

@@ -390,7 +390,7 @@ class MainWindow(QMainWindow):
         try:
             self.canvas.render_inputs(
                 self.doc.slope_data, mode=self._mode,
-                mat_table=self.inputs_panel.options().get("mat_table", False))
+                opts=self.inputs_panel.options())
         except Exception:
             traceback.print_exc()
         self.act_undo.setEnabled(self.doc.can_undo())
@@ -720,7 +720,7 @@ class MainWindow(QMainWindow):
         if self.fem_data_canvas is None:
             self.fem_data_canvas = MplCanvas(self)
             self.view_tabs.addTab(self.fem_data_canvas, "FEM · Data")
-            panel = FeDataDisplayPanel()
+            panel = FeDataDisplayPanel(include_bc_symbol=True)
             panel.changed.connect(self._rerender_fem_data)
             self.display_stack.addWidget(panel)
             self._display_panels[self.fem_data_canvas] = panel

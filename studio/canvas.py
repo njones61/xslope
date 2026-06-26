@@ -92,9 +92,15 @@ class MplCanvas(QWidget):
         layout.addWidget(self.view)
 
     # --- rendering -------------------------------------------------------
-    def render_inputs(self, slope_data, mode="lem", mat_table=False):
-        self._draw(lambda fig: plot_inputs(slope_data, fig=fig, mode=mode,
-                                           mat_table=mat_table))
+    def render_inputs(self, slope_data, mode="lem", opts=None):
+        opts = opts or {}
+        self._draw(lambda fig: plot_inputs(
+            slope_data, fig=fig, mode=mode,
+            mat_table=opts.get("mat_table", False),
+            tab_loc=opts.get("tab_loc", "top"),
+            legend_ncol=opts.get("legend_ncol", "auto"),
+            legend_max_cols=opts.get("legend_max_cols", 6),
+            legend_max_rows=opts.get("legend_max_rows", 4)))
 
     def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None):
         opts = opts or {}
@@ -125,7 +131,8 @@ class MplCanvas(QWidget):
         self._draw(lambda fig: plot_mesh(
             mesh, materials=materials, show_nodes=opts.get("show_nodes", True),
             label_elements=opts.get("label_elements", False),
-            label_nodes=opts.get("label_nodes", False), fig=fig))
+            label_nodes=opts.get("label_nodes", False),
+            pad_frac=opts.get("pad_frac", 0.05), fig=fig))
 
     def render_seep_data(self, seep_data, opts=None):
         opts = opts or {}
@@ -133,13 +140,17 @@ class MplCanvas(QWidget):
             seep_data, show_nodes=opts.get("show_nodes", False),
             show_bc=opts.get("show_bc", True),
             label_elements=opts.get("label_elements", False),
-            label_nodes=opts.get("label_nodes", False), fig=fig))
+            label_nodes=opts.get("label_nodes", False),
+            alpha=opts.get("alpha", 0.4), fig=fig))
 
     def render_seep_solution(self, seep_data, solution, opts):
         opts = opts or {}
         self._draw(lambda fig: plot_seep_solution(
             seep_data, solution, variable=opts.get("variable", "head"),
             levels=opts.get("levels", 20), base_mat=opts.get("base_mat", 1),
+            alpha=opts.get("alpha", 0.4),
+            vector_scale=opts.get("vector_scale", 0.05),
+            pad_frac=opts.get("pad_frac", 0.05),
             flowlines=opts.get("flowlines", True),
             vectors=opts.get("vectors", False),
             fill_contours=opts.get("fill_contours", False),
@@ -151,13 +162,24 @@ class MplCanvas(QWidget):
             fem_data, show_nodes=opts.get("show_nodes", False),
             show_bc=opts.get("show_bc", True),
             label_elements=opts.get("label_elements", False),
-            label_nodes=opts.get("label_nodes", False), fig=fig))
+            label_nodes=opts.get("label_nodes", False),
+            alpha=opts.get("alpha", 0.4),
+            bc_symbol_size=opts.get("bc_symbol_size", 0.03), fig=fig))
 
     def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}
         self._draw(lambda fig: plot_fem_results(
             fem_data, solution, plot_type=[opts.get("plot_type", "shear_strain")],
-            deform_percent=opts.get("deform_percent", 15), fig=fig))
+            deform_percent=opts.get("deform_percent", 15),
+            show_mesh=opts.get("show_mesh", True),
+            show_reinforcement=opts.get("show_reinforcement", True),
+            label_elements=opts.get("label_elements", False),
+            plot_boundary=opts.get("plot_boundary", True),
+            plot_nodes=opts.get("plot_nodes", False),
+            plot_elements=opts.get("plot_elements", False),
+            scale_vectors=opts.get("scale_vectors", False),
+            displacement_tolerance=opts.get("displacement_tolerance", 0.5),
+            fig=fig))
 
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):

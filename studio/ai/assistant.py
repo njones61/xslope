@@ -423,8 +423,38 @@ class Assistant(QObject):
 
     # --- worker signals --------------------------------------------------
     def _on_failed(self, message):
-        self.failed.emit(message)
+        self.failed.emit(self._friendly(message))
         self._cleanup()
+
+    def _friendly(self, message):
+        """Turn a raw provider/litellm error into a short, actionable line."""
+        import re
+        m = message.lower()
+        prov = self.config.provider()
+        if "credit balance is too low" in m or "plans & billing" in m:
+            return ("Your Anthropic API account is out of credits. Add credits at "
+                    "console.anthropic.com → Plans & Billing, then try again.")
+        if ("invalid x-api-key" in m or "authentication" in m
+                or "invalid_api_key" in m or "no api key" in m or " 401" in m):
+            return "Invalid or missing API key — open Settings and check the key."
+        if ("connection error" in m or "connection refused" in m
+                or "max retries" in m or "failed to establish" in m
+                or "all connection attempts failed" in m or "timed out" in m):
+            if prov == "ollama":
+                return (f"Can't reach Ollama at {self.config.ollama_base()} — is it "
+                        "running? Start the Ollama app, or run 'ollama serve'.")
+            return "Network error reaching the model — check your connection."
+        if "not found" in m and prov == "ollama":
+            model = self.config.model()
+            return (f"Model '{model}' isn't available in Ollama. Pull it with "
+                    f"'ollama pull {model}', or fix the name in Settings.")
+        if "rate limit" in m or " 429" in m or "overloaded" in m:
+            return "Rate limited or overloaded — wait a moment and try again."
+        # Fallback: pull the human message out of the provider JSON, else trim.
+        inner = re.search(r'"message"\s*:\s*"([^"]+)"', message)
+        if inner:
+            return inner.group(1)
+        return message if len(message) < 200 else message[:200] + "…"
 
     def _on_done(self):
         self.finished.emit()

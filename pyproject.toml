@@ -41,7 +41,7 @@ dependencies = [
 
 [project.optional-dependencies]
 fem = ["gmsh"]
-gui = ["PySide6"]
+gui = ["PySide6", "pyobjc-framework-Cocoa; sys_platform == 'darwin'"]
 ai = ["litellm", "keyring"]
 
 [project.scripts]

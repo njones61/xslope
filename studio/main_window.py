@@ -259,10 +259,26 @@ class MainWindow(QMainWindow):
 
     def refresh_inputs_view(self):
         """Re-render the Inputs canvas and the inputs tree after an external edit
-        (e.g. the assistant mutated slope_data via run_python)."""
-        if self.doc.is_open:
-            self._render()
-            self._populate_inputs_tree()
+        (e.g. the assistant mutated slope_data via run_python). Resyncs derived
+        structures first, since the renderer reads those — e.g. reinforcement is
+        plotted from the derived ``reinforce_lines``, not the ``reinforcement_lines``
+        table the assistant edits, and geometry from ``polygons``/``ground_surface``."""
+        if not self.doc.is_open:
+            return
+        sd = self.doc.slope_data
+        try:
+            from .editors import _resync_geometry
+            _resync_geometry(sd)          # polygons/ground surface from profile_lines
+        except Exception:
+            traceback.print_exc()
+        try:
+            from xslope.fileio import build_reinforce_lines
+            if sd.get("reinforcement_lines") is not None:
+                sd["reinforce_lines"] = build_reinforce_lines(sd["reinforcement_lines"])
+        except Exception:
+            traceback.print_exc()
+        self._render()
+        self._populate_inputs_tree()
 
     def _install_log_capture(self):
         sys.stdout = _LogStream(self.log, sys.__stdout__)

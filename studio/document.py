@@ -102,6 +102,14 @@ class ProjectDocument(QObject):
         self._set_dirty(True)
         self.changed.emit()
 
+    def rollback_edit(self):
+        """Discard the in-place mutation made since ``begin_edit`` by restoring the
+        snapshot. Used when an assistant ``run_python`` edit raised, so a partial
+        (and possibly repeated) mutation from a failed snippet doesn't stick."""
+        if self._undo:
+            self.slope_data = self._undo.pop()
+            self.changed.emit()
+
     def can_undo(self) -> bool:
         return bool(self._undo)
 

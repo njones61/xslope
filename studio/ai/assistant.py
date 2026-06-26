@@ -61,6 +61,13 @@ files for the build case.
 print any numbers you need to reason about.
 - Prefer one focused snippet per step. Keep code short and readable. Print a \
 brief result. Don't reformat or refactor the user's data beyond the request.
+- **Only do what was asked.** If asked to edit inputs, just edit `slope_data` — \
+do NOT run an analysis afterward unless the user also asked to run/solve.
+- **Edits apply immediately and persist on success.** Put a mutating edit in its \
+own snippet, separate from analysis. NEVER re-run a mutating snippet — re-running \
+`x += 5` doubles the effect. A relative change (`+=`, append, scale) must run \
+exactly once. If a snippet fails, fix that snippet; do not repeat an edit that \
+already ran. If unsure whether an edit applied, print the current value first.
 - When unsure of a key or signature, inspect at runtime instead of guessing: \
 `print(sorted(slope_data))`, `print(slope_data['materials'][0])`, \
 `import xslope; print([n for n in dir(xslope.solve)])`, `help(fn)`.
@@ -346,9 +353,14 @@ class Assistant(QObject):
 
     def _run_python(self, code):
         doc = self._mw.doc
-        doc.begin_edit()                    # snapshot for undo
+        doc.begin_edit()                    # snapshot for undo / rollback
         stdout, figures, error = self._kernel.run(code)
-        doc.commit_edit()                   # re-render + mark dirty
+        if error:
+            # Transactional: a snippet that raised leaves no partial edit, so
+            # trial-and-error retries can't compound (e.g. a +5 applied 5 times).
+            doc.rollback_edit()
+        else:
+            doc.commit_edit()               # keep edit -> re-render + mark dirty
         try:
             self._mw.refresh_inputs_view()
         except Exception:

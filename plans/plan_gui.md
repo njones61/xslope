@@ -228,7 +228,7 @@ don't litter sidecars). "Set as default" → write current overrides to the glob
 ## 9. File / Project Lifecycle
 
 - **New** → copy standard template (`docs/inputs/input_template.xlsx`) into a working doc; user fills via forms; `save_slope_data_to_xlsx` writes it.
-- **Open** → `load_slope_data`; render Inputs view. Auto-load `{stem}_mesh.json` / `{stem}_seep.csv` if present (already handled by `load_slope_data`), and `{stem}_style.json` if present (§8a).
+- **Open** → `load_slope_data`; render Inputs view. Auto-load `{stem}_mesh.json` / `{stem}_seep.csv` if present (already handled by `load_slope_data`), and `{stem}_style.json` if present (§8a). **Auto-restore saved solutions:** if the mesh is present, rebuild seep/FEM data on it and read back any `{stem}_seep.csv` and `{stem}_fem_nodes/elements.csv` sidecars (engine `import_seep_solution` / `import_fem_solution`, the inverses of the export functions), populating the Seep · Solution and FEM · Results tabs immediately — no re-solve. Best-effort: a sidecar whose node/element count no longer matches the mesh is skipped, not fatal.
 - **Save / Save As** → `save_slope_data_to_xlsx` (§5.1), preserving the existing format; also writes the `{stem}_style.json` style sidecar when the style differs from default (§8a).
 - **Recent files**, dirty-state prompt on close, and per-project sidecars (`{stem}_mesh.json`, `{stem}_seep.csv`, `{stem}_style.json`) all following the existing `{stem}_*` convention.
 

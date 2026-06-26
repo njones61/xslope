@@ -109,6 +109,63 @@ def export_fem_solution(fem_data, solution, output_stem):
     print(f"Exported FEM element results to {elements_file}")
 
 
+def import_fem_solution(fem_data, output_stem):
+    """Reconstruct an FEM ``solution`` dict from the CSV pair written by
+    :func:`export_fem_solution` — the inverse operation. Lets a previously saved
+    solution be re-plotted (``plot_fem_results``) without re-running solve_fem.
+
+    Only the quantities the result plots need are restored: total and elastic
+    displacements (rebuilt into the mixed-DOF vector via ``dof_offset``; pile
+    rotational DOFs, which the CSV does not store, are left zero — the plots use
+    only translations), element stresses/strains, vp shear strain, the plastic
+    mask, and the yield function.
+
+    Raises:
+        ValueError: if the file node/element counts do not match ``fem_data``.
+    """
+    import pandas as pd
+    from pathlib import Path
+
+    output_stem = Path(output_stem)
+    nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
+    elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
+    node_df = pd.read_csv(nodes_file)
+    element_df = pd.read_csv(elements_file)
+
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    if len(node_df) != len(nodes):
+        raise ValueError(
+            f"FEM solution has {len(node_df)} nodes but the mesh has {len(nodes)} — "
+            "the saved solution does not match this mesh.")
+    if len(element_df) != len(elements):
+        raise ValueError(
+            f"FEM solution has {len(element_df)} elements but the mesh has "
+            f"{len(elements)} — the saved solution does not match this mesh.")
+
+    dof_offset = fem_data.get("dof_offset", None)
+    n_dof = int(dof_offset[len(nodes)]) if dof_offset is not None else 2 * len(nodes)
+    disp_total = np.zeros(n_dof)
+    disp_vp = np.zeros(n_dof)
+    ux, uy = node_df["u_x"].to_numpy(), node_df["u_y"].to_numpy()
+    uxv, uyv = node_df["u_x_vp"].to_numpy(), node_df["u_y_vp"].to_numpy()
+    for i in range(len(nodes)):
+        base = int(dof_offset[i]) if dof_offset is not None else 2 * i
+        disp_total[base], disp_total[base + 1] = ux[i], uy[i]
+        disp_vp[base], disp_vp[base + 1] = uxv[i], uyv[i]
+
+    return {
+        "displacements": disp_total,
+        "displacements_elastic": disp_total - disp_vp,
+        "stresses": element_df[["sigma_x", "sigma_y", "tau_xy", "sigma_vm"]].to_numpy(),
+        "strains": element_df[["eps_x", "eps_y", "gamma_xy", "max_shear_strain"]].to_numpy(),
+        "vp_shear_strain": element_df["vp_shear_strain"].to_numpy(),
+        "plastic_elements": element_df["plastic"].to_numpy(),
+        "yield_function": element_df["yield_function"].to_numpy(),
+        "converged": True,
+    }
+
+
 def build_fem_data(slope_data, mesh=None):
     """
     Build a fem_data dictionary from slope_data and optional mesh.

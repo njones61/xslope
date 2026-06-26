@@ -2959,6 +2959,56 @@ def export_seep_solution(seep_data, solution, filename):
 
     print(f"Exported solution to {filename}")
 
+
+def import_seep_solution(seep_data, filename):
+    """Reconstruct a seepage ``solution`` dict from a CSV written by
+    :func:`export_seep_solution` — the inverse operation. Lets a previously
+    saved solution be re-plotted (``plot_seep_solution``) without re-running the
+    analysis.
+
+    Args:
+        seep_data: Seep data for the mesh the solution was computed on (used to
+            validate the node count).
+        filename: Path to a ``*_seep.csv`` / ``*_seep2.csv`` file.
+
+    Returns:
+        dict: solution with the keys ``plot_seep_solution`` expects — head, u,
+        velocity, v_mag, gradient, i_mag, q, phi, flowrate.
+
+    Raises:
+        ValueError: if the file's node count does not match the mesh.
+    """
+    import pandas as pd
+    # The trailing '# Total Flowrate: …' line is a comment, skipped on read.
+    df = pd.read_csv(filename, comment="#")
+    n_nodes = len(seep_data["nodes"])
+    if len(df) != n_nodes:
+        raise ValueError(
+            f"Seepage solution has {len(df)} nodes but the mesh has {n_nodes} — "
+            "the saved solution does not match this mesh.")
+
+    flowrate = None
+    with open(filename) as f:
+        for line in f:
+            if line.startswith("# Total Flowrate:"):
+                try:
+                    flowrate = float(line.split(":", 1)[1])
+                except ValueError:
+                    pass
+
+    return {
+        "head": df["head"].to_numpy(),
+        "u": df["u"].to_numpy(),
+        "velocity": df[["v_x", "v_y"]].to_numpy(),
+        "v_mag": df["v_mag"].to_numpy(),
+        "gradient": df[["i_x", "i_y"]].to_numpy(),
+        "i_mag": df["i_mag"].to_numpy(),
+        "q": df["q"].to_numpy(),
+        "phi": df["phi"].to_numpy(),
+        "flowrate": flowrate,
+    }
+
+
 def print_seep_data_diagnostics(seep_data):
     """
     Diagnostic function to print out the contents of seep_data after loading.

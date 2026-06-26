@@ -376,12 +376,62 @@ class MainWindow(QMainWindow):
         self.canvas.reset_fit()       # fit the fresh file to the window
         self._render()
         self._populate_inputs_tree()
+        self._load_solution_sidecars()
         self._update_title()
         n = len(self.doc.slope_data.get("materials", []))
         name = os.path.basename(self.doc.path) if self.doc.path else "untitled"
         self.statusBar().showMessage(
             f"Loaded {name} — {n} material(s). "
             f"Click an underlined input to edit it.")
+
+    def _load_solution_sidecars(self):
+        """Restore any saved seep / FEM solution sidecars next to the .xlsx so
+        their result tabs appear immediately — no re-solve needed. The mesh is
+        loaded by ``load_slope_data`` (``{stem}_mesh.json``); we rebuild the
+        seep/FEM data on it and read the saved nodal/element results back in.
+        Best-effort: a mismatched or unreadable sidecar is skipped, not fatal."""
+        if not self.doc.path:
+            return
+        mesh = self.doc.slope_data.get("mesh")
+        if mesh is None:                       # no mesh -> no FE solution to restore
+            return
+        stem = os.path.splitext(self.doc.path)[0]
+        self._restore_seep_sidecar(mesh, stem)
+        self._restore_fem_sidecar(mesh, stem)
+
+    def _restore_seep_sidecar(self, mesh, stem):
+        path = f"{stem}_seep.csv"
+        if not os.path.exists(path):
+            return
+        try:
+            from xslope.seep import build_seep_data, import_seep_solution
+            seep_data = build_seep_data(mesh, self.doc.slope_data, seep_bc=1)
+            solution = import_seep_solution(seep_data, path)
+        except Exception:
+            traceback.print_exc()       # streams to the Log pane; load still succeeds
+            return
+        self.doc.results["seep_solution"] = {
+            "seep_data": seep_data, "solution": solution, "options": {"bc": 1}}
+        self._show_seep_data(seep_data)
+        self._show_seep_solution()
+        print(f"Restored saved seepage solution from {os.path.basename(path)}.")
+
+    def _restore_fem_sidecar(self, mesh, stem):
+        if not os.path.exists(f"{stem}_fem_nodes.csv"):
+            return
+        try:
+            from xslope.fem import build_fem_data, import_fem_solution
+            fem_data = build_fem_data(self.doc.slope_data, mesh)
+            solution = import_fem_solution(fem_data, stem)
+        except Exception:
+            traceback.print_exc()
+            return
+        self.doc.results["fem_solution"] = {
+            "fem_data": fem_data, "solution": solution, "FS": None,
+            "analysis": "loaded"}
+        self._show_fem_data(fem_data)
+        self._show_fem_results()
+        print(f"Restored saved FEM solution from {os.path.basename(stem)}_fem_*.csv.")
 
     def _render(self):
         if not self.doc.is_open:

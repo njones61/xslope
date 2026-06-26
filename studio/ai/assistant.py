@@ -76,6 +76,20 @@ already ran. If unsure whether an edit applied, print the current value first.
 mprice). It handles the loaded project's failure surface, returns the result \
 dict (with 'FS'), and shows the solution plot — don't rebuild that pipeline by \
 hand.
+
+Domain modeling rules (slope-stability physics — apply when building a model):
+- Standing/ponded water ABOVE the ground surface is a real load. ALWAYS model it \
+as a hydrostatic distributed load on the submerged surface: a `dloads` block of \
+{'X','Y','Normal'} points along the ground, with `Normal = gamma_water * \
+(water_surface_elev - y_ground)` at each point (0 where the ground rises above \
+the water surface). Do this even for a total-stress phi=0 analysis (`u='none'`): \
+pore pressure and the surface water load are SEPARATE physics — "no pore \
+pressure" never means "no water load." Never skip the load.
+- A water table / free surface in a diagram is marked by the inverted-triangle \
+(▽) symbol; read its elevation from where the ▽ sits (it may be ABOVE the crest \
+— a submerged slope). A plain dashed line with no ▽ is a material boundary or \
+reference line, not water. If the water-surface elevation or extent is unclear, \
+ASK rather than guess.
 """
 
 # Appended only for Anthropic, where prompt caching makes the large skill body

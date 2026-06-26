@@ -258,7 +258,13 @@ class MainWindow(QMainWindow):
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []))
         add("Piles", len(d.get("pile_lines") or []))
         sbc = d.get("seepage_bc") or {}
-        add("Seepage heads", len(sbc.get("specified_heads", [])))
+        n_heads = len(sbc.get("specified_heads", []))
+        parts = [f"{n_heads} head BC(s)"] if n_heads else []
+        if sbc.get("exit_face"):
+            parts.append("exit face")
+        if d.get("has_seepage_bc2"):
+            parts.append("+ set 2")
+        add("Seepage BC (input)", ", ".join(parts) if parts else 0)
         add("Mesh", "yes" if d.get("mesh") is not None else "no")
         self.inputs_tree.expandAll()
 

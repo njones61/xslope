@@ -22,6 +22,68 @@ FEM_PLOT_TYPES = [
 ]
 
 
+class _CheckboxPanel(QWidget):
+    """Base for panels that are just a column of checkboxes. Subclasses list
+    ``_FIELDS`` as ``(key, label, default)`` and read values via ``options()``."""
+
+    changed = Signal()
+    _FIELDS = ()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        form = QFormLayout(self)
+        self._boxes = {}
+        for key, label, default in self._FIELDS:
+            box = QCheckBox(label)
+            box.setChecked(default)
+            box.toggled.connect(self._emit)
+            form.addRow("", box)
+            self._boxes[key] = box
+
+    def _emit(self, *_):
+        self.changed.emit()
+
+    def options(self):
+        return {key: box.isChecked() for key, box in self._boxes.items()}
+
+
+class InputsDisplayPanel(_CheckboxPanel):
+    """Display options for the Inputs view."""
+    _FIELDS = (("mat_table", "Material property table", False),)
+
+
+class SolutionDisplayPanel(_CheckboxPanel):
+    """Display options for an LEM solution plot."""
+    _FIELDS = (
+        ("slice_numbers", "Slice numbers", False),
+        ("seep_contours", "Seepage contours", True),
+    )
+
+
+class SearchDisplayPanel(_CheckboxPanel):
+    """Display options for an LEM auto-search plot."""
+    _FIELDS = (("highlight_fs", "Highlight critical surface", True),)
+
+
+class MeshDisplayPanel(_CheckboxPanel):
+    """Display options for a mesh plot (no boundary conditions)."""
+    _FIELDS = (
+        ("show_nodes", "Show nodes", True),
+        ("label_elements", "Element numbers", False),
+        ("label_nodes", "Node numbers", False),
+    )
+
+
+class FeDataDisplayPanel(_CheckboxPanel):
+    """Display options for a seep/FEM data plot (mesh + boundary conditions)."""
+    _FIELDS = (
+        ("show_bc", "Boundary conditions", True),
+        ("show_nodes", "Show nodes", False),
+        ("label_elements", "Element numbers", False),
+        ("label_nodes", "Node numbers", False),
+    )
+
+
 class SeepDisplayPanel(QWidget):
     """Display options for a seepage solution plot."""
 

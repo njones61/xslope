@@ -24,7 +24,10 @@ from PySide6.QtWidgets import (
 
 from .canvas import MplCanvas
 from .dialogs import BuildMeshDialog, RunFemDialog, RunLemDialog, RunSeepDialog
-from .display_panels import FemResultsDisplayPanel, SeepDisplayPanel
+from .display_panels import (
+    FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
+    MeshDisplayPanel, SearchDisplayPanel, SeepDisplayPanel, SolutionDisplayPanel,
+)
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
 from .runners import FemRunner, LemRunner, MeshWorker, SeepRunner
@@ -181,6 +184,13 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.LeftDockWidgetArea, dock)
         self.splitDockWidget(self.inputs_dock, dock, Qt.Vertical)
         self.display_dock = dock
+
+        # The Inputs view's display options (always present — the Inputs canvas
+        # exists for the life of the window and survives _clear_result_tabs).
+        self.inputs_panel = InputsDisplayPanel()
+        self.inputs_panel.changed.connect(self._render)
+        self.display_stack.addWidget(self.inputs_panel)
+        self._display_panels[self.canvas] = self.inputs_panel
 
     def _make_log_dock(self):
         self.log = QPlainTextEdit()
@@ -378,7 +388,9 @@ class MainWindow(QMainWindow):
             self.canvas.clear()
             return
         try:
-            self.canvas.render_inputs(self.doc.slope_data, mode=self._mode)
+            self.canvas.render_inputs(
+                self.doc.slope_data, mode=self._mode,
+                mat_table=self.inputs_panel.options().get("mat_table", False))
         except Exception:
             traceback.print_exc()
         self.act_undo.setEnabled(self.doc.can_undo())
@@ -531,11 +543,22 @@ class MainWindow(QMainWindow):
         if self.mesh_canvas is None:
             self.mesh_canvas = MplCanvas(self)
             self.view_tabs.insertTab(1, self.mesh_canvas, "Mesh")
-        try:
-            self.mesh_canvas.render_mesh(mesh, self.doc.slope_data.get("materials"))
-        except Exception:
-            traceback.print_exc()
+            panel = MeshDisplayPanel()
+            panel.changed.connect(self._rerender_mesh)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.mesh_canvas] = panel
+        self._rerender_mesh()
         self.view_tabs.setCurrentWidget(self.mesh_canvas)
+
+    def _rerender_mesh(self):
+        mesh = self.doc.results.get("mesh") or self.doc.slope_data.get("mesh")
+        panel = self._display_panels.get(self.mesh_canvas)
+        if mesh and panel and self.mesh_canvas is not None:
+            try:
+                self.mesh_canvas.render_mesh(
+                    mesh, self.doc.slope_data.get("materials"), panel.options())
+            except Exception:
+                traceback.print_exc()
 
     # --- seepage ---------------------------------------------------------
     def run_seep(self):
@@ -595,10 +618,20 @@ class MainWindow(QMainWindow):
         if self.seep_data_canvas is None:
             self.seep_data_canvas = MplCanvas(self)
             self.view_tabs.addTab(self.seep_data_canvas, "Seep · Data")
-        try:
-            self.seep_data_canvas.render_seep_data(seep_data)
-        except Exception:
-            traceback.print_exc()
+            panel = FeDataDisplayPanel()
+            panel.changed.connect(self._rerender_seep_data)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.seep_data_canvas] = panel
+        self._rerender_seep_data()
+
+    def _rerender_seep_data(self):
+        bundle = self.doc.results.get("seep_solution")
+        panel = self._display_panels.get(self.seep_data_canvas)
+        if bundle and panel and self.seep_data_canvas is not None:
+            try:
+                self.seep_data_canvas.render_seep_data(bundle["seep_data"], panel.options())
+            except Exception:
+                traceback.print_exc()
 
     def _show_seep_solution(self):
         if self.seep_solution_canvas is None:
@@ -687,10 +720,20 @@ class MainWindow(QMainWindow):
         if self.fem_data_canvas is None:
             self.fem_data_canvas = MplCanvas(self)
             self.view_tabs.addTab(self.fem_data_canvas, "FEM · Data")
-        try:
-            self.fem_data_canvas.render_fem_data(fem_data)
-        except Exception:
-            traceback.print_exc()
+            panel = FeDataDisplayPanel()
+            panel.changed.connect(self._rerender_fem_data)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.fem_data_canvas] = panel
+        self._rerender_fem_data()
+
+    def _rerender_fem_data(self):
+        bundle = self.doc.results.get("fem_solution")
+        panel = self._display_panels.get(self.fem_data_canvas)
+        if bundle and panel and self.fem_data_canvas is not None:
+            try:
+                self.fem_data_canvas.render_fem_data(bundle["fem_data"], panel.options())
+            except Exception:
+                traceback.print_exc()
 
     def _show_fem_results(self):
         if self.fem_results_canvas is None:
@@ -803,10 +846,21 @@ class MainWindow(QMainWindow):
             self.search_canvas = MplCanvas(self)
             # Keep order Inputs → Search → Solution.
             self.view_tabs.insertTab(1, self.search_canvas, "LEM · Search")
-        try:
-            self.search_canvas.render_search(self.doc.slope_data, search)
-        except Exception:
-            traceback.print_exc()
+            panel = SearchDisplayPanel()
+            panel.changed.connect(self._rerender_search)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.search_canvas] = panel
+        self._rerender_search()
+
+    def _rerender_search(self):
+        bundle = self.doc.results.get("lem_solution")
+        search = bundle.get("search") if bundle else None
+        panel = self._display_panels.get(self.search_canvas)
+        if search and panel and self.search_canvas is not None:
+            try:
+                self.search_canvas.render_search(self.doc.slope_data, search, panel.options())
+            except Exception:
+                traceback.print_exc()
 
     def _show_reliability(self, reliability_data):
         if self.reliability_canvas is None:
@@ -821,12 +875,23 @@ class MainWindow(QMainWindow):
         if self.solution_canvas is None:
             self.solution_canvas = MplCanvas(self)
             self.view_tabs.addTab(self.solution_canvas, "LEM · Solution")
-        try:
-            self.solution_canvas.render_solution(
-                self.doc.slope_data, bundle["slice_df"],
-                bundle["failure_surface"], bundle["results"])
-        except Exception:
-            traceback.print_exc()
+            panel = SolutionDisplayPanel()
+            panel.changed.connect(self._rerender_solution)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.solution_canvas] = panel
+        self._rerender_solution()
+
+    def _rerender_solution(self):
+        bundle = self.doc.results.get("lem_solution")
+        panel = self._display_panels.get(self.solution_canvas)
+        if (bundle and panel and self.solution_canvas is not None
+                and isinstance(bundle.get("results"), dict)):
+            try:
+                self.solution_canvas.render_solution(
+                    self.doc.slope_data, bundle["slice_df"],
+                    bundle["failure_surface"], bundle["results"], panel.options())
+            except Exception:
+                traceback.print_exc()
 
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
@@ -845,7 +910,9 @@ class MainWindow(QMainWindow):
                     panel.deleteLater()
                 canvas.deleteLater()
                 setattr(self, attr, None)
-        self.display_stack.setCurrentWidget(self._display_placeholder)
+        # Removing tabs may not fire currentChanged if Inputs was already active,
+        # so point the Display dock at whatever tab remains current.
+        self._show_display_for_tab(self.view_tabs.currentWidget())
 
     def _on_view_tab_changed(self, index):
         w = self.view_tabs.widget(index)

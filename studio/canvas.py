@@ -96,30 +96,44 @@ class MplCanvas(QWidget):
         self._draw(lambda fig: plot_inputs(slope_data, fig=fig, mode=mode,
                                            mat_table=mat_table))
 
-    def render_solution(self, slope_data, slice_df, failure_surface, results):
-        self._draw(lambda fig: plot_solution(slope_data, slice_df, failure_surface,
-                                             results, fig=fig))
+    def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None):
+        opts = opts or {}
+        self._draw(lambda fig: plot_solution(
+            slope_data, slice_df, failure_surface, results,
+            slice_numbers=opts.get("slice_numbers", False),
+            seep_contours=opts.get("seep_contours", True), fig=fig))
 
-    def render_search(self, slope_data, search):
+    def render_search(self, slope_data, search, opts=None):
         """Render auto-search results (all trial surfaces + critical + search path)."""
+        opts = opts or {}
+        highlight = opts.get("highlight_fs", True)
         if search["kind"] == "circular":
             self._draw(lambda fig: plot_circular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
-                circle_cache=search["circle_cache"], fig=fig))
+                circle_cache=search["circle_cache"], highlight_fs=highlight, fig=fig))
         else:
             self._draw(lambda fig: plot_noncircular_search_results(
-                slope_data, search["fs_cache"], search["search_path"], fig=fig))
+                slope_data, search["fs_cache"], search["search_path"],
+                highlight_fs=highlight, fig=fig))
 
     def render_reliability(self, slope_data, reliability_data):
         self._draw(lambda fig: plot_reliability_results(
             slope_data, reliability_data, fig=fig))
 
-    def render_mesh(self, mesh, materials=None):
-        self._draw(lambda fig: plot_mesh(mesh, materials=materials, fig=fig))
+    def render_mesh(self, mesh, materials=None, opts=None):
+        opts = opts or {}
+        self._draw(lambda fig: plot_mesh(
+            mesh, materials=materials, show_nodes=opts.get("show_nodes", True),
+            label_elements=opts.get("label_elements", False),
+            label_nodes=opts.get("label_nodes", False), fig=fig))
 
-    def render_seep_data(self, seep_data):
-        self._draw(lambda fig: plot_seep_data(seep_data, show_nodes=False,
-                                              show_bc=True, fig=fig))
+    def render_seep_data(self, seep_data, opts=None):
+        opts = opts or {}
+        self._draw(lambda fig: plot_seep_data(
+            seep_data, show_nodes=opts.get("show_nodes", False),
+            show_bc=opts.get("show_bc", True),
+            label_elements=opts.get("label_elements", False),
+            label_nodes=opts.get("label_nodes", False), fig=fig))
 
     def render_seep_solution(self, seep_data, solution, opts):
         opts = opts or {}
@@ -131,8 +145,13 @@ class MplCanvas(QWidget):
             fill_contours=opts.get("fill_contours", False),
             phreatic=opts.get("phreatic", True), mesh=False, fig=fig))
 
-    def render_fem_data(self, fem_data):
-        self._draw(lambda fig: plot_fem_data(fem_data, show_bc=True, fig=fig))
+    def render_fem_data(self, fem_data, opts=None):
+        opts = opts or {}
+        self._draw(lambda fig: plot_fem_data(
+            fem_data, show_nodes=opts.get("show_nodes", False),
+            show_bc=opts.get("show_bc", True),
+            label_elements=opts.get("label_elements", False),
+            label_nodes=opts.get("label_nodes", False), fig=fig))
 
     def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}

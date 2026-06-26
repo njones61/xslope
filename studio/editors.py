@@ -12,11 +12,20 @@ from __future__ import annotations
 
 import math
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QPushButton, QTableWidget,
     QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
+
+# Column "usage" tags: which analysis a field applies to. Header text is colored
+# to mirror the input template's header coloring (red = LEM-specific inputs,
+# blue = FEM-specific inputs); seepage/reliability extend the same idea.
+USAGE_COLOR = {"lem": "#c00000", "fem": "#0432ff", "seep": "#2e7d32", "rel": "#9a7d0a"}
+USAGE_NAME = {"lem": "LEM only", "fem": "FEM only",
+              "seep": "Seepage only", "rel": "Reliability"}
 
 
 # --------------------------------------------------------------------------- #
@@ -31,11 +40,12 @@ class Field:
 
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": ""}
 
-    def __init__(self, key, header, kind="float", choices=None, default=None):
+    def __init__(self, key, header, kind="float", choices=None, default=None, usage=None):
         self.key = key
         self.header = header
         self.kind = kind
         self.choices = [str(c) for c in (choices or [])]
+        self.usage = usage  # None | 'lem' | 'fem' | 'seep' | 'rel' -> header color
         if default is None:
             default = self.choices[0] if kind == "choice" and self.choices else self._BLANK[kind]
         self.default = default
@@ -101,6 +111,14 @@ class _EditableTable(QWidget):
         self.table = QTableWidget(len(rows), len(fields))
         self.table.setHorizontalHeaderLabels([f.header for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        for j, f in enumerate(fields):  # color usage-tagged headers (red=LEM, blue=FEM, …)
+            if f.usage:
+                hi = self.table.horizontalHeaderItem(j)
+                if hi is not None:
+                    hi.setForeground(QColor(USAGE_COLOR[f.usage]))
+                    fnt = hi.font()
+                    fnt.setBold(True)
+                    hi.setFont(fnt)
         layout.addWidget(self.table)
         for i, row in enumerate(rows):
             self._set_row(i, row)
@@ -161,6 +179,19 @@ def _help_label(text):
     return lbl
 
 
+def _usage_legend(fields):
+    """A colored legend for any usage-tagged columns, or None if there are none."""
+    present = [u for u in ("lem", "fem", "seep", "rel")
+               if any(getattr(f, "usage", None) == u for f in fields)]
+    if not present:
+        return None
+    spans = [f'<b><span style="color:{USAGE_COLOR[u]}">&#9632; {USAGE_NAME[u]}</span></b>'
+             for u in present]
+    lbl = QLabel("Header colors:&nbsp;&nbsp; " + "&nbsp;&nbsp;&nbsp; ".join(spans))
+    lbl.setTextFormat(Qt.RichText)
+    return lbl
+
+
 def _ok_cancel(dialog, layout):
     bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     bb.accepted.connect(dialog.accept)
@@ -178,6 +209,9 @@ class TableEditorDialog(QDialog):
         layout = QVBoxLayout(self)
         if help_text:
             layout.addWidget(_help_label(help_text))
+        legend = _usage_legend(fields)
+        if legend:
+            layout.addWidget(legend)
         self._editable = _EditableTable(fields, rows, new_row)
         layout.addWidget(self._editable)
         _ok_cancel(self, layout)
@@ -485,64 +519,149 @@ class DloadsEditor(CategoryEditor):
         slope_data["dloads2"] = w2.result_blocks()
 
 
-# --- head BC (two sets; each: specified-head groups + an exit face) --------- #
-HEAD_FIELDS = [Field("Head", "Head #", "int", default=1), Field("HeadValue", "Head value"),
-               Field("X", "X"), Field("Y", "Y")]
-XY_FIELDS = [Field("X", "X"), Field("Y", "Y")]
+# --- seep BC (two sets; each: a list of specified-head BCs + an exit face) --- #
+XY_FIELDS = [Field("x", "x"), Field("y", "y")]
 
 
-def _new_head_row():
-    return {"Head": 1, "HeadValue": 0.0, "X": 0.0, "Y": 0.0}
+class _SeepHeadsWidget(QWidget):
+    """Master/detail list of specified-head boundaries: the list (left) + the
+    selected boundary's head value and point table (right)."""
+
+    def __init__(self, heads, parent=None):
+        super().__init__(parent)
+        self._heads = [{"head": h.get("head", 0.0),
+                        "coords": [tuple(c) for c in h.get("coords", [])]}
+                       for h in (heads or [])]
+        self._cur = -1
+        self.table = None
+
+        body = QHBoxLayout(self)
+        body.setContentsMargins(0, 0, 0, 0)
+        left = QVBoxLayout()
+        body.addLayout(left)
+        self.list = QListWidget()
+        self.list.currentRowChanged.connect(self._on_select)
+        left.addWidget(self.list)
+        lb = QHBoxLayout()
+        b_add = QPushButton("Add head")
+        b_add.clicked.connect(self._add)
+        b_rem = QPushButton("Remove")
+        b_rem.clicked.connect(self._remove)
+        lb.addWidget(b_add)
+        lb.addWidget(b_rem)
+        left.addLayout(lb)
+
+        right = QVBoxLayout()
+        body.addLayout(right, 1)
+        hrow = QHBoxLayout()
+        hrow.addWidget(QLabel("Head value:"))
+        self.head_edit = QLineEdit()
+        hrow.addWidget(self.head_edit, 1)
+        right.addLayout(hrow)
+        self._holder = QVBoxLayout()
+        right.addLayout(self._holder, 1)
+
+        self._refresh()
+        if self._heads:
+            self.list.setCurrentRow(0)
+        else:
+            self.head_edit.setEnabled(False)
+
+    def _refresh(self):
+        self.list.blockSignals(True)
+        self.list.clear()
+        for i, h in enumerate(self._heads):
+            self.list.addItem(f"Head {i + 1}  (h={h['head']})")
+        self.list.blockSignals(False)
+
+    def _commit(self):
+        if 0 <= self._cur < len(self._heads):
+            try:
+                self._heads[self._cur]["head"] = float(self.head_edit.text() or 0)
+            except ValueError:
+                self._heads[self._cur]["head"] = 0.0
+            if self.table is not None:
+                self._heads[self._cur]["coords"] = [(r["x"], r["y"])
+                                                    for r in self.table.result_rows()]
+
+    def _load(self, idx):
+        if self.table is not None:
+            self.table.setParent(None)
+            self.table = None
+        if not (0 <= idx < len(self._heads)):
+            self.head_edit.setText("")
+            self.head_edit.setEnabled(False)
+            return
+        self.head_edit.setEnabled(True)
+        h = self._heads[idx]
+        self.head_edit.setText(str(h["head"]))
+        rows = [{"x": x, "y": y} for (x, y) in h["coords"]]
+        self.table = _EditableTable(XY_FIELDS, rows, _new_pt)
+        self._holder.addWidget(self.table)
+
+    def _on_select(self, idx):
+        self._commit()
+        self._cur = idx
+        self._load(idx)
+
+    def _add(self):
+        self._commit()
+        self._heads.append({"head": 0.0, "coords": []})
+        self._refresh()
+        self.list.setCurrentRow(len(self._heads) - 1)
+
+    def _remove(self):
+        idx = self.list.currentRow()
+        if idx < 0:
+            return
+        self._heads.pop(idx)
+        self._cur = -1
+        self._refresh()
+        if self._heads:
+            self.list.setCurrentRow(min(idx, len(self._heads) - 1))
+        else:
+            self._load(-1)
+
+    def result_heads(self):
+        self._commit()
+        return [{"head": h["head"], "coords": list(h["coords"])} for h in self._heads]
 
 
-class _HeadBcSetWidget(QWidget):
-    """One seepage BC set: a specified-head table (grouped by Head #) + an exit-face table."""
+class _SeepBcSetWidget(QWidget):
+    """One seepage BC set: specified-head boundaries (master/detail) + exit face."""
 
     def __init__(self, bc, parent=None):
         super().__init__(parent)
         bc = bc or {}
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Specified-head boundaries"))
-        head_rows = []
-        for i, hg in enumerate(bc.get("specified_heads") or [], start=1):
-            for (x, y) in hg.get("coords", []):
-                head_rows.append({"Head": i, "HeadValue": hg.get("head", 0.0), "X": x, "Y": y})
-        self.heads = _EditableTable(HEAD_FIELDS, head_rows, _new_head_row)
-        layout.addWidget(self.heads)
+        self.heads = _SeepHeadsWidget(bc.get("specified_heads"))
+        layout.addWidget(self.heads, 1)
         layout.addWidget(QLabel("Exit face"))
         exit_rows = [{"x": x, "y": y} for (x, y) in (bc.get("exit_face") or [])]
         self.exit = _EditableTable(XY_FIELDS, exit_rows, _new_pt)
         layout.addWidget(self.exit)
 
     def result(self):
-        groups, order = {}, []
-        for r in self.heads.result_rows():
-            k = int(r.get("Head", 1) or 1)
-            if k not in groups:
-                groups[k] = {"head": r["HeadValue"], "coords": []}
-                order.append(k)
-            groups[k]["coords"].append((r["X"], r["Y"]))
-        specified_heads = [groups[k] for k in sorted(order)]
-        exit_face = [(r["x"], r["y"]) for r in self.exit.result_rows()]
-        return {"specified_heads": specified_heads, "exit_face": exit_face}
+        return {"specified_heads": self.heads.result_heads(),
+                "exit_face": [(r["x"], r["y"]) for r in self.exit.result_rows()]}
 
 
-class HeadBcEditor(CategoryEditor):
-    label = "Head BC"
+class SeepBcEditor(CategoryEditor):
+    label = "Seep BC"
 
     def build(self, slope_data, parent):
         dlg = QDialog(parent)
-        dlg.setWindowTitle("Head BC")
-        dlg.resize(560, 620)
+        dlg.setWindowTitle("Seep BC")
+        dlg.resize(640, 660)
         layout = QVBoxLayout(dlg)
         layout.addWidget(_help_label(
-            "Seepage boundary conditions: specified-head boundaries (free water on the face) "
-            "and an exit face (where water leaves the slope). Group head points with the same "
-            "Head # — the Head value is taken from the first row of each group. Set 2 is used "
-            "for rapid-drawdown (the second seepage solution)."))
+            "Seepage boundary conditions: a list of specified-head boundaries (each a head "
+            "value + its points) and an exit face (where water leaves the slope). Set 2 is "
+            "used for rapid-drawdown (the second seepage solution)."))
         tabs = QTabWidget()
-        w1 = _HeadBcSetWidget(slope_data.get("seepage_bc"))
-        w2 = _HeadBcSetWidget(slope_data.get("seepage_bc2"))
+        w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"))
+        w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"))
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
         layout.addWidget(tabs)
@@ -570,11 +689,12 @@ class PilesEditor(CategoryEditor):
     FIELDS = [
         Field("label", "Label", "str"),
         Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
-        Field("H", "H", "optfloat"), Field("D_pile", "D", "optfloat"),
-        Field("S", "S", "optfloat"), Field("E", "E", "optfloat"),
-        Field("I", "I", "optfloat"), Field("area", "Area", "optfloat"),
-        Field("V_cap", "Vcap", "optfloat"), Field("M_cap", "Mcap", "optfloat"),
-        Field("fixity", "Fixity", "choice", choices=["free", "fixed"]),
+        Field("H", "H", "optfloat"),
+        Field("D_pile", "D", "optfloat", usage="lem"), Field("S", "S", "optfloat", usage="lem"),
+        Field("E", "E", "optfloat", usage="fem"), Field("I", "I", "optfloat", usage="fem"),
+        Field("area", "Area", "optfloat", usage="fem"),
+        Field("V_cap", "Vcap", "optfloat", usage="lem"), Field("M_cap", "Mcap", "optfloat", usage="lem"),
+        Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem"),
     ]
 
     def build(self, slope_data, parent):
@@ -765,8 +885,9 @@ class ReinforcementEditor(CategoryEditor):
     label = "Reinforcement"
     FIELDS = [
         Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
-        Field("t_max", "Tmax"), Field("t_res", "Tres"),
-        Field("lp1", "Lp1"), Field("lp2", "Lp2"), Field("E", "E"), Field("area", "Area"),
+        Field("t_max", "Tmax", usage="lem"), Field("t_res", "Tres", usage="fem"),
+        Field("lp1", "Lp1", usage="lem"), Field("lp2", "Lp2", usage="lem"),
+        Field("E", "E", usage="fem"), Field("area", "Area", usage="fem"),
     ]
 
     def build(self, slope_data, parent):
@@ -791,7 +912,7 @@ CATEGORY_EDITORS = {
     "non_circ": NonCircEditor(),
     "piezo": PiezoEditor(),
     "dloads": DloadsEditor(),
-    "seep_bc": HeadBcEditor(),
+    "seep_bc": SeepBcEditor(),
     "piles": PilesEditor(),
     "reinforce": ReinforcementEditor(),
     "profile": ProfileEditor(),

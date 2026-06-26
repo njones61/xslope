@@ -270,8 +270,7 @@ class MainWindow(QMainWindow):
             parts.append("exit face")
         if d.get("has_seepage_bc2"):
             parts.append("+ set 2")
-        add("Head BC", ", ".join(parts) if parts else 0, category="seep_bc")
-        add("Mesh", "yes" if d.get("mesh") is not None else "no")
+        add("Seep BC", ", ".join(parts) if parts else 0, category="seep_bc")
         self.inputs_tree.expandAll()
 
     # --- editing ---------------------------------------------------------

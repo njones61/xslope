@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout,
-    QLabel, QSpinBox, QVBoxLayout,
+    QGroupBox, QLabel, QSpinBox, QVBoxLayout,
 )
 
 LEM_METHODS = [
@@ -294,11 +294,48 @@ class RunLemDialog(QDialog):
         form.addRow("", self.diagnostic)
 
         layout.addLayout(form)
+
+        # Search-convergence tolerances — only meaningful for auto-search and
+        # reliability (both drive the search loops). ``tol`` is the circular-search
+        # geometric refinement tolerance and has no noncircular counterpart, so it
+        # is greyed out for non-circular surfaces.
+        self.tol_group = QGroupBox("Search tolerances")
+        tform = QFormLayout(self.tol_group)
+
+        self.fs_tol = QDoubleSpinBox()
+        self.fs_tol.setDecimals(6)
+        self.fs_tol.setRange(1e-8, 1.0)
+        self.fs_tol.setSingleStep(1e-4)
+        self.fs_tol.setValue(float(defaults.get("fs_tol", 5e-4)))
+        self.fs_tol.setToolTip("Factor-of-safety convergence tolerance for the search.")
+        tform.addRow("FS tol", self.fs_tol)
+
+        self.tol = QDoubleSpinBox()
+        self.tol.setDecimals(6)
+        self.tol.setRange(1e-8, 1.0)
+        self.tol.setSingleStep(1e-3)
+        self.tol.setValue(float(defaults.get("tol", 1e-2)))
+        self.tol.setToolTip("Geometric refinement tolerance (circular search only).")
+        tform.addRow("Geometric tol", self.tol)
+
+        self.max_iter = QSpinBox()
+        self.max_iter.setRange(1, 1000)
+        self.max_iter.setValue(int(defaults.get("max_iter", 50)))
+        self.max_iter.setToolTip("Maximum search refinement iterations.")
+        tform.addRow("Max iterations", self.max_iter)
+
+        layout.addWidget(self.tol_group)
+
         note = QLabel("Single surface analyzes the first circle / the non-circular "
                       "surface as entered. Auto-search refines from there to the "
                       "critical surface.")
         note.setWordWrap(True)
         layout.addWidget(note)
+
+        self.analysis.currentIndexChanged.connect(self._sync_tols)
+        if self.surface is not None:
+            self.surface.currentIndexChanged.connect(self._sync_tols)
+        self._sync_tols()
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText("Run")
@@ -316,12 +353,24 @@ class RunLemDialog(QDialog):
             combo.setCurrentIndex(idx)
         return combo
 
+    def _surface_value(self):
+        return self._fixed_surface or self.surface.currentData()
+
+    def _sync_tols(self):
+        is_search = self.analysis.currentData() in ("auto_search", "reliability")
+        self.tol_group.setEnabled(is_search)
+        # Geometric tol applies to circular search only.
+        self.tol.setEnabled(is_search and self._surface_value() == "circular")
+
     def options(self):
         return {
             "method": self.method.currentData(),
             "analysis": self.analysis.currentData(),
-            "surface": self._fixed_surface or self.surface.currentData(),
+            "surface": self._surface_value(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),
+            "fs_tol": self.fs_tol.value(),
+            "tol": self.tol.value(),
+            "max_iter": self.max_iter.value(),
         }

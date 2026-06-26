@@ -181,12 +181,27 @@ class LemRunner(QThread):
         self._num_slices = options.get("num_slices", 40)
         self._rapid = options.get("rapid", False)
         self._diagnostic = options.get("diagnostic", False)
+        self._fs_tol = options.get("fs_tol")
+        self._tol = options.get("tol")
+        self._max_iter = options.get("max_iter")
         self._cancel = threading.Event()
 
     def cancel(self):
         """Request cooperative cancellation; the search loops stop at the next
         iteration boundary and the run emits ``cancelled``."""
         self._cancel.set()
+
+    def _search_kwargs(self, circular):
+        """Tolerance kwargs to forward to the search functions. ``tol`` is only
+        accepted by ``circular_search`` (noncircular has no geometric tol)."""
+        kw = {}
+        if self._fs_tol is not None:
+            kw["fs_tol"] = self._fs_tol
+        if self._max_iter is not None:
+            kw["max_iter"] = self._max_iter
+        if circular and self._tol is not None:
+            kw["tol"] = self._tol
+        return kw
 
     def run(self):
         from xslope.search import AnalysisCancelled
@@ -258,7 +273,8 @@ class LemRunner(QThread):
                   f"{self._method.upper()}{self._rapid_tag()}…")
             fs_cache, converged, search_path, circle_cache = circular_search(
                 sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
-                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set)
+                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set,
+                **self._search_kwargs(circular=True))
             search = {"kind": "circular", "fs_cache": fs_cache,
                       "search_path": search_path, "circle_cache": circle_cache}
         else:
@@ -269,7 +285,8 @@ class LemRunner(QThread):
                   f"{self._method.upper()}{self._rapid_tag()}…")
             fs_cache, converged, search_path = noncircular_search(
                 sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
-                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set)
+                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set,
+                **self._search_kwargs(circular=False))
             search = {"kind": "noncircular", "fs_cache": fs_cache,
                       "search_path": search_path, "circle_cache": None}
 
@@ -308,7 +325,9 @@ class LemRunner(QThread):
 
         ok, result = reliability(sd, self._method, rapid=self._rapid, circular=circular,
                                  debug_level=1 if self._diagnostic else 0,
-                                 progress_callback=cb, cancel_check=self._cancel.is_set)
+                                 progress_callback=cb, cancel_check=self._cancel.is_set,
+                                 fs_tol=self._fs_tol, tol=self._tol,
+                                 max_iter=self._max_iter)
         if not ok:
             self.failed.emit(str(result))
             return

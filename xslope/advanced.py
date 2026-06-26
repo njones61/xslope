@@ -268,7 +268,8 @@ def rapid_drawdown(df, method_name, debug_level=1):
 
 
 def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
-                progress_callback=None, cancel_check=None):
+                progress_callback=None, cancel_check=None,
+                fs_tol=None, tol=None, max_iter=None):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -288,10 +289,25 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
             The analysis runs ``1 + 2N`` searches (one critical-surface search plus
             ``F+``/``F-`` per uncertain parameter ``N``); ``total`` is None until the
             parameter count is known. Exceptions raised by the callback are ignored.
+        fs_tol, tol, max_iter : float/int, optional
+            Search-convergence tolerances forwarded to the internal
+            ``circular_search`` / ``noncircular_search`` calls (all ``1 + 2N`` of
+            them). Any left as ``None`` use that search function's own default.
+            ``tol`` only applies to circular search (noncircular has no ``tol``).
 
     Returns:
         tuple: (success, result) where result contains reliability analysis results
     """
+
+    # Only forward tolerances the user actually set; circular search also takes tol.
+    _search_kwargs = {}
+    if fs_tol is not None:
+        _search_kwargs['fs_tol'] = fs_tol
+    if max_iter is not None:
+        _search_kwargs['max_iter'] = max_iter
+    _circ_kwargs = dict(_search_kwargs)
+    if tol is not None:
+        _circ_kwargs['tol'] = tol
 
     def _progress(done, total, label):
         if progress_callback is not None:
@@ -327,11 +343,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
     if circular:
         if debug_level >= 1:
             print("Performing circular search...")
-        fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check)
+        fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
     else:
         if debug_level >= 1:
             print("Performing noncircular search...")
-        fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check)
+        fs_cache, converged, search_path = noncircular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check, **_search_kwargs)
     
     if not fs_cache:
         return False, "Search failed - no results found"
@@ -427,11 +443,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
         
         # Calculate F+ and F-
         if circular:
-            fs_cache_plus, _, _, _ = circular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check)
-            fs_cache_minus, _, _, _ = circular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check)
+            fs_cache_plus, _, _, _ = circular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
+            fs_cache_minus, _, _, _ = circular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
         else:
-            fs_cache_plus, _, _ = noncircular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check)
-            fs_cache_minus, _, _ = noncircular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check)
+            fs_cache_plus, _, _ = noncircular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check, **_search_kwargs)
+            fs_cache_minus, _, _ = noncircular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check, **_search_kwargs)
         
         if not fs_cache_plus or not fs_cache_minus:
             return False, f"Failed to calculate F+ or F- for parameter {param['param']}"

@@ -36,8 +36,13 @@ def _extract_nodal_uv(disp, fem_data):
     return u, v
 
 
-def export_fem_solution(fem_data, solution, output_stem):
-    """Export FEM nodal and element results to CSV files using a common stem."""
+def export_fem_solution(fem_data, solution, output_stem, meta=None):
+    """Export FEM nodal and element results to CSV files using a common stem.
+
+    If ``meta`` (a dict) is given, it is also written to ``{stem}_fem_meta.json`` —
+    use it for run metadata that is not in the node/element CSVs, e.g. the SSRM
+    factor of safety and the analysis type, so they survive a reload.
+    """
     import pandas as pd
     from pathlib import Path
 
@@ -107,6 +112,31 @@ def export_fem_solution(fem_data, solution, output_stem):
 
     print(f"Exported FEM nodal results to {nodes_file}")
     print(f"Exported FEM element results to {elements_file}")
+
+    if meta is not None:
+        import json
+        meta_file = output_stem.parent / f"{output_stem.name}_fem_meta.json"
+        with open(meta_file, "w") as f:
+            json.dump(meta, f, indent=2)
+        print(f"Exported FEM run metadata to {meta_file}")
+
+
+def import_fem_meta(output_stem):
+    """Read the ``{stem}_fem_meta.json`` sidecar written by
+    :func:`export_fem_solution`, or ``None`` if it is absent or unreadable. Carries
+    run metadata not stored in the node/element CSVs (FS, analysis type)."""
+    import json
+    from pathlib import Path
+
+    output_stem = Path(output_stem)
+    meta_file = output_stem.parent / f"{output_stem.name}_fem_meta.json"
+    if not meta_file.exists():
+        return None
+    try:
+        with open(meta_file) as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def import_fem_solution(fem_data, output_stem):

@@ -97,8 +97,8 @@ class MainWindow(QMainWindow):
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
-        self.seep_data_canvas = None
-        self.seep_solution_canvas = None
+        self.seep_data_canvas = {}        # bc set -> MplCanvas
+        self.seep_solution_canvas = {}    # bc set -> MplCanvas
         self.fem_data_canvas = None
         self.fem_results_canvas = None
         self.view_tabs = QTabWidget()
@@ -400,38 +400,45 @@ class MainWindow(QMainWindow):
         self._restore_fem_sidecar(mesh, stem)
 
     def _restore_seep_sidecar(self, mesh, stem):
-        path = f"{stem}_seep.csv"
-        if not os.path.exists(path):
-            return
-        try:
-            from xslope.seep import build_seep_data, import_seep_solution
-            seep_data = build_seep_data(mesh, self.doc.slope_data, seep_bc=1)
-            solution = import_seep_solution(seep_data, path)
-        except Exception:
-            traceback.print_exc()       # streams to the Log pane; load still succeeds
-            return
-        self.doc.results["seep_solution"] = {
-            "seep_data": seep_data, "solution": solution, "options": {"bc": 1}}
-        self._show_seep_data(seep_data)
-        self._show_seep_solution()
-        print(f"Restored saved seepage solution from {os.path.basename(path)}.")
+        # Restore each BC set that has a sidecar: _seep.csv (BC 1) and _seep2.csv
+        # (BC 2, rapid drawdown). Each lands in its own pair of tabs.
+        for bc, suffix in ((1, "_seep.csv"), (2, "_seep2.csv")):
+            path = f"{stem}{suffix}"
+            if not os.path.exists(path):
+                continue
+            try:
+                from xslope.seep import build_seep_data, import_seep_solution
+                seep_data = build_seep_data(mesh, self.doc.slope_data, seep_bc=bc)
+                solution = import_seep_solution(seep_data, path)
+            except Exception:
+                traceback.print_exc()   # streams to the Log pane; load still succeeds
+                continue
+            self.doc.results.setdefault("seep_solutions", {})[bc] = {
+                "seep_data": seep_data, "solution": solution, "options": {"bc": bc}}
+            self._show_seep_data(seep_data, bc)
+            self._show_seep_solution(bc)
+            print(f"Restored saved seepage solution (BC set {bc}) from "
+                  f"{os.path.basename(path)}.")
 
     def _restore_fem_sidecar(self, mesh, stem):
         if not os.path.exists(f"{stem}_fem_nodes.csv"):
             return
         try:
-            from xslope.fem import build_fem_data, import_fem_solution
+            from xslope.fem import build_fem_data, import_fem_solution, import_fem_meta
             fem_data = build_fem_data(self.doc.slope_data, mesh)
             solution = import_fem_solution(fem_data, stem)
+            meta = import_fem_meta(stem) or {}
         except Exception:
             traceback.print_exc()
             return
         self.doc.results["fem_solution"] = {
-            "fem_data": fem_data, "solution": solution, "FS": None,
-            "analysis": "loaded"}
+            "fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+            "analysis": meta.get("analysis") or "loaded"}
         self._show_fem_data(fem_data)
         self._show_fem_results()
-        print(f"Restored saved FEM solution from {os.path.basename(stem)}_fem_*.csv.")
+        fs = meta.get("FS")
+        fs_note = f" (SSRM FS = {fs:.3f})" if isinstance(fs, (int, float)) else ""
+        print(f"Restored saved FEM solution from {os.path.basename(stem)}_fem_*.csv{fs_note}.")
 
     def _render(self):
         if not self.doc.is_open:
@@ -635,8 +642,10 @@ class MainWindow(QMainWindow):
         self._seep_runner.start()
 
     def _on_seep_succeeded(self, bundle):
-        self.doc.results["seep_solution"] = bundle
         bc = bundle["options"].get("bc", 1)
+        # Keep one solution per BC set so BC 1 and BC 2 (rapid drawdown) coexist
+        # in separate tabs and can be compared side by side.
+        self.doc.results.setdefault("seep_solutions", {})[bc] = bundle
         # Persist the solution next to the .xlsx ({stem}_seep.csv / _seep2.csv).
         if self.doc.path:
             try:
@@ -646,10 +655,11 @@ class MainWindow(QMainWindow):
                 export_seep_solution(bundle["seep_data"], bundle["solution"], stem + suffix)
             except Exception:
                 traceback.print_exc()
-        self._show_seep_data(bundle["seep_data"])
-        self._show_seep_solution()
-        if self.seep_solution_canvas is not None:
-            self.view_tabs.setCurrentWidget(self.seep_solution_canvas)
+        self._show_seep_data(bundle["seep_data"], bc)
+        self._show_seep_solution(bc)
+        canvas = self.seep_solution_canvas.get(bc)
+        if canvas is not None:
+            self.view_tabs.setCurrentWidget(canvas)
         self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
 
     def _on_seep_failed(self, message):
@@ -664,42 +674,50 @@ class MainWindow(QMainWindow):
             self._seep_runner = None
         self._update_run_actions()
 
-    def _show_seep_data(self, seep_data):
-        if self.seep_data_canvas is None:
-            self.seep_data_canvas = MplCanvas(self)
-            self.view_tabs.addTab(self.seep_data_canvas, "Seep · Data")
-            panel = FeDataDisplayPanel()
-            panel.changed.connect(self._rerender_seep_data)
-            self.display_stack.addWidget(panel)
-            self._display_panels[self.seep_data_canvas] = panel
-        self._rerender_seep_data()
+    @staticmethod
+    def _seep_tab_label(base, bc):
+        return base if bc == 1 else f"{base} {bc}"
 
-    def _rerender_seep_data(self):
-        bundle = self.doc.results.get("seep_solution")
-        panel = self._display_panels.get(self.seep_data_canvas)
-        if bundle and panel and self.seep_data_canvas is not None:
+    def _show_seep_data(self, seep_data, bc=1):
+        if bc not in self.seep_data_canvas:
+            canvas = MplCanvas(self)
+            self.seep_data_canvas[bc] = canvas
+            self.view_tabs.addTab(canvas, self._seep_tab_label("Seep · Data", bc))
+            panel = FeDataDisplayPanel()
+            panel.changed.connect(lambda *_dummy, b=bc: self._rerender_seep_data(b))
+            self.display_stack.addWidget(panel)
+            self._display_panels[canvas] = panel
+        self._rerender_seep_data(bc)
+
+    def _rerender_seep_data(self, bc=1):
+        bundle = self.doc.results.get("seep_solutions", {}).get(bc)
+        canvas = self.seep_data_canvas.get(bc)
+        panel = self._display_panels.get(canvas)
+        if bundle and panel and canvas is not None:
             try:
-                self.seep_data_canvas.render_seep_data(bundle["seep_data"], panel.options())
+                canvas.render_seep_data(bundle["seep_data"], panel.options())
             except Exception:
                 traceback.print_exc()
 
-    def _show_seep_solution(self):
-        if self.seep_solution_canvas is None:
-            self.seep_solution_canvas = MplCanvas(self)
-            self.view_tabs.addTab(self.seep_solution_canvas, "Seep · Solution")
+    def _show_seep_solution(self, bc=1):
+        if bc not in self.seep_solution_canvas:
+            canvas = MplCanvas(self)
+            self.seep_solution_canvas[bc] = canvas
+            self.view_tabs.addTab(canvas, self._seep_tab_label("Seep · Solution", bc))
             panel = SeepDisplayPanel(self.doc.slope_data.get("materials"))
-            panel.changed.connect(self._rerender_seep_solution)
+            panel.changed.connect(lambda *_dummy, b=bc: self._rerender_seep_solution(b))
             self.display_stack.addWidget(panel)
-            self._display_panels[self.seep_solution_canvas] = panel
-        self._rerender_seep_solution()
+            self._display_panels[canvas] = panel
+        self._rerender_seep_solution(bc)
 
-    def _rerender_seep_solution(self):
-        """Re-render the cached seep solution with the current Display options."""
-        bundle = self.doc.results.get("seep_solution")
-        panel = self._display_panels.get(self.seep_solution_canvas)
-        if bundle and panel and self.seep_solution_canvas is not None:
+    def _rerender_seep_solution(self, bc=1):
+        """Re-render a cached seep solution (per BC set) with its Display options."""
+        bundle = self.doc.results.get("seep_solutions", {}).get(bc)
+        canvas = self.seep_solution_canvas.get(bc)
+        panel = self._display_panels.get(canvas)
+        if bundle and panel and canvas is not None:
             try:
-                self.seep_solution_canvas.render_seep_solution(
+                canvas.render_seep_solution(
                     bundle["seep_data"], bundle["solution"], panel.options())
             except Exception:
                 traceback.print_exc()
@@ -738,7 +756,9 @@ class MainWindow(QMainWindow):
             try:
                 from xslope.fem import export_fem_solution
                 export_fem_solution(bundle["fem_data"], bundle["solution"],
-                                    os.path.splitext(self.doc.path)[0])
+                                    os.path.splitext(self.doc.path)[0],
+                                    meta={"FS": bundle.get("FS"),
+                                          "analysis": bundle.get("analysis")})
             except Exception:
                 traceback.print_exc()
         self._show_fem_data(bundle["fem_data"])
@@ -947,10 +967,13 @@ class MainWindow(QMainWindow):
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
-        for attr in ("mesh_canvas", "search_canvas", "solution_canvas",
-                     "reliability_canvas", "seep_data_canvas", "seep_solution_canvas",
-                     "fem_data_canvas", "fem_results_canvas"):
-            canvas = getattr(self, attr)
+        single = ("mesh_canvas", "search_canvas", "solution_canvas",
+                  "reliability_canvas", "fem_data_canvas", "fem_results_canvas")
+        # The seep canvases are per-BC dicts; flatten them in with the rest.
+        canvases = [getattr(self, a) for a in single]
+        canvases += list(self.seep_data_canvas.values())
+        canvases += list(self.seep_solution_canvas.values())
+        for canvas in canvases:
             if canvas is not None:
                 idx = self.view_tabs.indexOf(canvas)
                 if idx >= 0:
@@ -960,7 +983,10 @@ class MainWindow(QMainWindow):
                     self.display_stack.removeWidget(panel)
                     panel.deleteLater()
                 canvas.deleteLater()
-                setattr(self, attr, None)
+        for a in single:
+            setattr(self, a, None)
+        self.seep_data_canvas = {}
+        self.seep_solution_canvas = {}
         # Removing tabs may not fire currentChanged if Inputs was already active,
         # so point the Display dock at whatever tab remains current.
         self._show_display_for_tab(self.view_tabs.currentWidget())

@@ -425,9 +425,10 @@ class Assistant(QObject):
     def _run_python(self, code):
         doc = self._mw.doc
         before = _input_signature(doc.slope_data)
+        mesh_before = self._mw.mesh_signature(doc.slope_data)
         doc.begin_edit()                    # snapshot for undo / rollback
         stdout, figures, error = self._kernel.run(code)
-        edited = False
+        edited = geom_changed = False
         if error:
             # Transactional: a snippet that raised leaves no partial edit, so
             # trial-and-error retries can't compound (e.g. a +5 applied 5 times).
@@ -437,12 +438,14 @@ class Assistant(QObject):
             if before is None or after is None or after != before:
                 doc.commit_edit()           # real edit -> re-render + mark dirty
                 edited = True
+                geom_changed = self._mw.mesh_signature(doc.slope_data) != mesh_before
             else:
                 doc.cancel_edit()           # read-only run -> no dirty, no undo step
         try:
             if edited:
-                # Inputs changed: any cached solution is now stale.
-                self._mw.invalidate_results()
+                # Inputs changed: any cached solution is now stale (and the mesh
+                # too, if the geometry changed).
+                self._mw.invalidate_results(clear_mesh=geom_changed)
             self._mw.refresh_inputs_view()
         except Exception:
             pass

@@ -9,6 +9,7 @@ and saving arrive in later phases.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import traceback
@@ -650,6 +651,7 @@ class MainWindow(QMainWindow):
             return
         dlg = editor.build(self.doc.slope_data, self)
         if dlg.exec():
+            mesh_before = self.mesh_signature(self.doc.slope_data)
             self.doc.begin_edit()
             try:
                 editor.apply(self.doc.slope_data, dlg)
@@ -657,17 +659,53 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()
-            self.invalidate_results()     # inputs changed -> solution is stale
+            # inputs changed -> solution is stale; if the geometry changed, the
+            # mesh is stale too (it embeds the profile/polygon/reinforce/pile lines).
+            geom_changed = self.mesh_signature(self.doc.slope_data) != mesh_before
+            self.invalidate_results(clear_mesh=geom_changed)
 
-    def invalidate_results(self):
+    # Source inputs whose change makes the mesh stale (the domain geometry plus
+    # the reinforcement/pile lines baked in as mesh constraint lines).
+    MESH_KEYS = ("profile_lines", "polygons", "max_depth", "reinforcement_lines",
+                 "pile_lines")
+
+    @staticmethod
+    def mesh_signature(sd):
+        """JSON signature of the mesh-affecting inputs, to detect geometry edits."""
+        def clean(o):
+            if hasattr(o, "wkt"):
+                return o.wkt
+            try:
+                import numpy as np
+                if isinstance(o, np.ndarray):
+                    return o.tolist()
+                if isinstance(o, np.generic):
+                    return o.item()
+            except Exception:
+                pass
+            if isinstance(o, dict):
+                return {k: clean(v) for k, v in o.items()}
+            if isinstance(o, (list, tuple)):
+                return [clean(x) for x in o]
+            return o
+        try:
+            return json.dumps({k: clean(sd.get(k)) for k in MainWindow.MESH_KEYS},
+                              sort_keys=True, default=str)
+        except Exception:
+            return None
+
+    def invalidate_results(self, clear_mesh=False):
         """Inputs changed (via an editor or the assistant), so any cached analysis
-        solution is stale — drop the solution result tabs and their cached results
-        (the Mesh tab is kept; it is rebuilt explicitly). Leaves the user on a
-        valid view (Inputs), which is why an edit visibly refreshes."""
+        solution is stale — drop the solution result tabs and their cached results.
+        ``clear_mesh`` (set when the geometry changed) also drops the mesh, which
+        is then rebuilt explicitly. Leaves the user on a valid view (Inputs), which
+        is why an edit visibly refreshes."""
         if not self.doc.is_open:
             return
-        single = ("search_canvas", "solution_canvas", "reliability_canvas",
-                  "fem_data_canvas", "fem_results_canvas")
+        single = ["search_canvas", "solution_canvas", "reliability_canvas",
+                  "fem_data_canvas", "fem_results_canvas"]
+        if clear_mesh:
+            single.append("mesh_canvas")
         canvases = [getattr(self, a) for a in single]
         canvases += list(self.seep_data_canvas.values())
         canvases += list(self.seep_solution_canvas.values())
@@ -689,10 +727,14 @@ class MainWindow(QMainWindow):
         self.seep_solution_canvas = {}
         for key in ("lem_solution", "seep_solutions", "fem_solution"):
             self.doc.results.pop(key, None)
+        if clear_mesh:
+            self.doc.slope_data["mesh"] = None
+            self.doc.results.pop("mesh", None)
+            self._update_run_actions()       # Seep/FEM Run re-gated on a built mesh
         if removed:
             self._show_display_for_tab(self.view_tabs.currentWidget())
-            self.statusBar().showMessage(
-                "Inputs changed — cleared the now-stale analysis result(s).")
+            what = "results and mesh" if clear_mesh else "result(s)"
+            self.statusBar().showMessage(f"Inputs changed — cleared the now-stale {what}.")
 
     # --- meshing ---------------------------------------------------------
     def build_mesh(self):

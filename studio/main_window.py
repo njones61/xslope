@@ -208,6 +208,10 @@ class MainWindow(QMainWindow):
         self.log_dock = dock
 
     def _arrange_docks(self):
+        # Widen the left column so the Inputs tree (180px name col + count) and the
+        # display-options panels aren't cramped on first launch.
+        self.resizeDocks([self.inputs_dock, self.display_dock], [320, 320],
+                         Qt.Horizontal)
         # The left column now spans the full height (it owns the bottom-left
         # corner), so give the Display dock the larger share — the Inputs tree is
         # short, and per-plot display options want the room.

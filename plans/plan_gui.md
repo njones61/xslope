@@ -335,3 +335,149 @@ Nothing blocking remains; detail-level choices (icon/branding, menu layout) sett
 - **Packaging heavy deps** — gmsh (FEM) and the scientific stack inflate installer size and complicate signing.
 - **Coincident smart-editing** — genuinely tricky geometry bookkeeping; keep it opt-in and late.
 ```
+
+---
+
+## 14. AI Chat Assistant (scoping — not yet built)
+
+A dockable **chat panel** inside Studio that drives the app and the engine with
+natural language and images, against a user-chosen model (Claude, OpenAI/GPT,
+local Ollama, …). The aim is **far more than the existing `/xslope` skill**:
+not just "build an input file from a sketch," but *any* interaction with the
+project data and the `xslope` Python API — e.g. "vary the slope angle 20→30° and
+plot FS vs angle," "add a piezo line 2 ft below the crest and re-run Spencer,"
+"why did the SSRM not converge?".
+
+### 14.1 Use cases (what "more than the skill" means)
+
+- **Build / edit inputs** — from a sketch (vision) or prose: materials, geometry,
+  piezo lines, loads, reinforcement, BCs.
+- **Run analyses** — LEM / seepage / FEM / meshing, single or parametric sweeps.
+- **Arbitrary scripting** — parameter studies, custom plots, batch over files,
+  post-processing of `slice_df` / `fs_cache` / seep & FEM solutions, exporting
+  CSVs — i.e. anything you'd do in a notebook with `import xslope`.
+- **Explain / debug** — interpret results, diagnose non-convergence, suggest fixes.
+
+### 14.2 This is an agent with code execution, not a chatbot
+
+The decisive capability is a **Python execution tool** the model drives — a
+persistent kernel/REPL with `xslope` imported and the **live document in scope**
+(`slope_data`, `results`, the current file path, a Matplotlib figure sink). Most
+requests reduce to "write and run a little Python, show me the figure/number,"
+exactly like the CLI/notebook workflow the user already relies on. Everything
+else (typed convenience tools, the skill knowledge) sits *around* that core.
+
+Two ways the agent can touch the project, likely both:
+1. **Live document tools** — call into `ProjectDocument` (`begin_edit`/`commit_edit`)
+   and the existing run-controllers so edits re-render on the canvas and land on
+   the undo stack; results flow into the existing result tabs. Tight, native feel.
+2. **Code execution** — a sandboxed-ish `run_python(code)` with the engine and the
+   document handed in, capturing stdout + any figures. This is what unlocks
+   "anything a notebook can do" and is the main reuse of the skill's existing code
+   patterns. Figures it produces are shown inline in the chat (and/or a result tab).
+
+### 14.3 Provider abstraction (bring-your-own-model)
+
+Each provider differs in API shape and tool-call format (Anthropic Messages,
+OpenAI function-calling/Responses, Ollama's OpenAI-compatible endpoint, etc.).
+Options, roughly increasing in effort/control:
+
+- **LiteLLM** (recommended starting point) — one Python interface over Anthropic /
+  OpenAI / Ollama / many more, including tool-calling and vision; we implement the
+  agent loop once. Optional `xslope[ai]` extra.
+- **Provider SDK adapters** — thin in-house `LLMProvider` interface with per-vendor
+  adapters; more code, no extra dep, full control of quirks.
+- **Subprocess an existing agent** (e.g. the Claude Code CLI / Claude Agent SDK)
+  pointed at the project dir — reuses a battle-tested agent + the skill verbatim,
+  but is Claude-only and shells out, so it doesn't satisfy the multi-provider goal.
+  Possible as a fast Claude-only spike to validate UX before building the native loop.
+
+A **Settings** panel selects provider + model, stores API keys (OS keychain via
+`keyring`, *not* plaintext in QSettings), and sets the Ollama base URL for local
+models. Capability varies by model — tool use and vision aren't universal (esp.
+small local models); the UI should degrade (e.g. disable image attach when the
+selected model has no vision).
+
+### 14.4 Tool surface (what the model can call)
+
+- `run_python(code)` — **the core**; persistent namespace, engine + live document
+  preloaded, returns stdout/result + captured figures.
+- `get_inputs()` / `update_inputs(category, data)` — structured read/edit of
+  `slope_data` (reuse the §6 editor `apply` logic so validation/resync is shared).
+- `build_mesh` / `run_lem` / `run_seep` / `run_fem` — reuse the Phase 3/4 runners
+  (already threaded + cancellable); results populate the existing tabs.
+- `get_results()` — FS, flowrate, SSRM FS, convergence, etc.
+- `show_plot(view)` / figure capture — surface plots in chat and/or the tab strip.
+- `read_file` / `write_file` (incl. the xlsx) — so the file-based skill patterns
+  still work and Studio reloads the document after.
+- Image attachment (vision) for the sketch→inputs use case.
+
+### 14.5 Reusing the existing skill
+
+`docs/usage/claude/xslope.md` (the `/xslope` skill body — template cell layout,
+the surgical xlsx writer, per-sheet helpers, run snippets) becomes **domain
+knowledge injected into the system prompt**, not the limit of behavior. Caveat:
+it's written for a file-first agent and currently lives in `docs/` and is
+repo-bound (the `SKILL.md` `!`cat …`` include only resolves inside the repo). To
+use it from an installed Studio we must **package the prompt** (ship it under
+`xslope/resources/` and locate it like the template) and keep the docs master and
+packaged copy in sync — the same two-copy + `run_tests.py` guard pattern we just
+set up for the template.
+
+### 14.6 Architecture & UI
+
+- **`ChatDock`** — a right-side `QDockWidget`: transcript (markdown + inline
+  figures + collapsible "ran code" blocks), input box with image attach, model
+  picker, Stop button.
+- **`AssistantController`** — owns the conversation, runs the agent loop on a
+  `QThread` (streaming tokens + tool calls back to the UI), dispatches tool calls
+  to the document/engine/runners, and feeds results back to the model.
+- **`providers/`** — the LiteLLM-or-adapter layer behind a small interface.
+- **`tools/`** — the tool schemas + their Python implementations (the bridge to
+  `ProjectDocument`, runners, and the kernel).
+- **Kernel** — an in-process namespace (or a Jupyter kernel) for `run_python`;
+  in-process is simplest but shares the GUI process (see safety).
+
+### 14.7 Safety, trust & cost
+
+- **Arbitrary code execution** is the point and the risk — same trust model as
+  Claude Code: the agent can read/write files and run Python as the user. Need an
+  **approval mode** (auto-run vs confirm-before-run, at least for `write_file`/
+  `run_python`), a visible log of every action, and easy Stop/undo (the snapshot
+  undo stack already helps for input edits).
+- **In-process vs sandbox** — running in the GUI process is simplest but a bad
+  snippet can hang/crash Studio; a subprocess/Jupyter kernel isolates it at the
+  cost of plumbing. Start in-process behind confirm-to-run; revisit.
+- **Network egress & keys** — prompts/images leave the machine for hosted models
+  (Ollama stays local); make that explicit. Keys in the OS keychain. Surface
+  token usage / rough cost.
+
+### 14.8 Packaging
+
+- Optional extra: `pip install "xslope[ai]"` pulls the provider lib (e.g.
+  LiteLLM). Studio degrades gracefully (chat dock hidden/disabled) when it's absent.
+- Bundle the skill prompt with the package (§14.5).
+- Native installers would include the AI deps; keep them out of the base install.
+
+### 14.9 Phased approach
+
+- **A — Spike:** Claude-only, in-process `run_python` + read/write file tools, the
+  skill prompt as system context, plain transcript. Validates the "drive Studio by
+  chat" UX end-to-end with the least scaffolding.
+- **B — Multi-provider:** LiteLLM layer + Settings (provider/model/keys/Ollama URL);
+  capability-aware UI.
+- **C — Native tools + live document:** structured input edit / run / results tools
+  wired to `ProjectDocument` and the runners, inline figures, confirm-to-run.
+- **D — Vision & polish:** sketch→inputs, parametric-sweep ergonomics, cost meter,
+  conversation save/restore.
+
+### 14.10 Open decisions (need input)
+
+1. **Provider strategy** — LiteLLM (fast, one dep) vs in-house adapters (no dep,
+   more control) vs a Claude-only subprocess spike first?
+2. **Execution model** — in-process kernel (simple) vs isolated subprocess/Jupyter
+   (safer) for `run_python`?
+3. **Autonomy** — auto-run tools, or confirm-before-acting (at least for writes/code)?
+4. **MVP target** — Claude-only spike first, or multi-provider from the start?
+5. **Scope of "edit"** — let the agent mutate the live document directly, write the
+   xlsx and reload, or both?

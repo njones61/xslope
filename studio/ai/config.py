@@ -25,7 +25,9 @@ PROVIDERS = {
     "openai": {
         "label": "OpenAI", "prefix": "openai/", "needs_key": True,
         "models": ["gpt-4o", "gpt-4o-mini", "o4-mini"],
-        "tools": True, "vision": True,
+        # Gets the full skill; OpenAI caches the prompt prefix server-side
+        # automatically, so repeat turns are cheap.
+        "tools": True, "vision": True, "skill": True,
     },
     "deepseek": {
         "label": "DeepSeek", "prefix": "deepseek/", "needs_key": True,

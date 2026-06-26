@@ -376,6 +376,17 @@ Two ways the agent can touch the project, likely both:
    "anything a notebook can do" and is the main reuse of the skill's existing code
    patterns. Figures it produces are shown inline in the chat (and/or a result tab).
 
+**Build = populate the in-memory project, not write a file (decided).** The
+`/xslope` skill ends by *saving an `.xlsx`*; inside Studio the agent instead
+**populates the live `slope_data` dict of a fresh (or current) project** — which
+renders immediately on the canvas for review — and the user persists it with
+**Save As** when satisfied. So the skill's surgical-xlsx-writer machinery is no
+longer needed for the build case; what we reuse is its **schema knowledge** (the
+sheet/category layout, geometry rules, examples) mapped onto `slope_data` keys and
+the §6 editor `apply` functions. File write/reload stays available as a secondary
+path (e.g. operating on an existing on-disk file), but the document is the primary
+target.
+
 ### 14.3 Provider abstraction (bring-your-own-model)
 
 Each provider differs in API shape and tool-call format (Anthropic Messages,
@@ -461,9 +472,11 @@ set up for the template.
 
 ### 14.9 Phased approach
 
-- **A — Spike:** Claude-only, in-process `run_python` + read/write file tools, the
-  skill prompt as system context, plain transcript. Validates the "drive Studio by
-  chat" UX end-to-end with the least scaffolding.
+- **A — Spike:** Claude-only, in-process `run_python` with the **live document**
+  (`slope_data`/`results`) and engine in scope + read/write file tools, the skill
+  prompt as system context, plain transcript, confirm-before-run. Validates the
+  "drive Studio by chat, building into the in-memory project" UX end-to-end with
+  the least scaffolding.
 - **B — Multi-provider:** LiteLLM layer + Settings (provider/model/keys/Ollama URL);
   capability-aware UI.
 - **C — Native tools + live document:** structured input edit / run / results tools
@@ -471,13 +484,21 @@ set up for the template.
 - **D — Vision & polish:** sketch→inputs, parametric-sweep ergonomics, cost meter,
   conversation save/restore.
 
-### 14.10 Open decisions (need input)
+### 14.10 Decisions (settled)
 
-1. **Provider strategy** — LiteLLM (fast, one dep) vs in-house adapters (no dep,
-   more control) vs a Claude-only subprocess spike first?
-2. **Execution model** — in-process kernel (simple) vs isolated subprocess/Jupyter
-   (safer) for `run_python`?
-3. **Autonomy** — auto-run tools, or confirm-before-acting (at least for writes/code)?
-4. **MVP target** — Claude-only spike first, or multi-provider from the start?
-5. **Scope of "edit"** — let the agent mutate the live document directly, write the
-   xlsx and reload, or both?
+1. **Provider strategy** — **LiteLLM**: one dependency unifying Claude / OpenAI /
+   Ollama (tool-calling + vision); the agent loop is written once behind a small
+   interface. Optional `xslope[ai]` extra.
+2. **Execution model** — **in-process kernel** for `run_python` (engine + live
+   document directly in scope); a bad snippet can hang Studio, so it's gated behind
+   the autonomy mode + a Stop button. Revisit isolation if it bites.
+3. **Autonomy** — **user-selectable mode** (like Claude Code permissions): an
+   *auto-run* mode and a *confirm-before-acting* mode (preview/diff + approve for
+   code execution and file/document writes), chosen in Settings and switchable per
+   session. Default to confirm.
+4. **MVP target** — **Claude-only spike first** (Phase A): in-process `run_python`
+   + file/document tools + skill prompt as system context + plain transcript;
+   generalize to multi-provider (Phase B) once the UX is proven.
+5. **Scope of "edit"** — the agent **populates / mutates the live `slope_data`
+   document** (rendered live, persisted via Save As); file write + reload is a
+   secondary path, not the primary one (see §14.2).

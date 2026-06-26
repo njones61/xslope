@@ -44,15 +44,34 @@ class PythonKernel:
         have to reconstruct the engine pipeline (a common failure mode)."""
         doc = self._doc
 
+        def resync_geometry(slope_data=None):
+            """Rebuild the derived geometry (ground_surface, polygons,
+            domain_polygon, tcrack) from the current profile_lines/polygons.
+
+            **Call this after editing geometry inside a snippet** — e.g. a
+            parametric sweep that moves a profile point in a loop. The canvas's
+            automatic resync runs only ONCE, after the whole snippet returns, not
+            between loop iterations — so without this, every iteration analyzes the
+            stale original geometry (a classic constant-result bug). `run_lem`
+            calls this for you; call it yourself before `generate_slices` /
+            `circular_search` / `solve_*` if you drive the pipeline directly."""
+            from studio.editors import _resync_geometry
+            sd = doc.slope_data if slope_data is None else slope_data
+            _resync_geometry(sd)
+            return sd.get("ground_surface")
+
         def run_lem(method="bishop", num_slices=40, rapid=False, plot=True,
                     slope_data=None):
             """Run a single-surface LEM analysis on the loaded project's failure
             surface and return the result dict (includes 'FS'). `method` is one of
             oms, bishop, janbu, spencer, corps, lowe, mprice. Shows the solution
-            plot when plot=True."""
+            plot when plot=True (pass plot=False in sweeps to avoid many figures).
+            Rebuilds derived geometry first, so edits to profile_lines/polygons
+            this snippet made are reflected."""
             from xslope.slice import generate_slices
             from xslope.solve import solve_selected
             sd = doc.slope_data if slope_data is None else slope_data
+            resync_geometry(sd)        # reflect any in-snippet geometry edits
             circle = (sd["circles"][0] if sd.get("circular") and sd.get("circles")
                       else None)
             non_circ = sd.get("non_circ") or None
@@ -75,7 +94,7 @@ class PythonKernel:
                               fig=plt.figure(figsize=(11, 6)))
             return result
 
-        return {"run_lem": run_lem}
+        return {"run_lem": run_lem, "resync_geometry": resync_geometry}
 
     @staticmethod
     def _normalize(code):

@@ -159,9 +159,17 @@ the canvas re-renders automatically.
 - scalars: gamma_water, max_depth (hard-base elevation), k_seismic, tcrack_depth,
   tcrack_water, circular (bool).
 
-Editing the source lists is enough — the canvas rebuilds derived geometry
-(ground_surface, polygons) and re-renders automatically; you need not call
-plot_inputs. Run LEM via the preloaded `run_lem(method=...)` helper.
+Editing the source lists re-renders the canvas — derived geometry (ground_surface,
+polygons, domain_polygon) is rebuilt automatically AFTER the snippet returns, so a
+one-off edit needs no plot_inputs call. But that auto-rebuild does NOT run between
+iterations WITHIN a snippet: if you vary geometry in a loop (e.g. a parametric
+sweep moving a profile point to change the slope angle), call `resync_geometry()`
+after each edit before analyzing — or use `run_lem(...)`, which resyncs for you.
+Otherwise every iteration analyzes the STALE original geometry and you get a
+constant/flat result. If a sweep result looks suspiciously constant, suspect stale
+derived geometry FIRST (did you resync?) before reaching for a physics explanation.
+Run LEM via the preloaded `run_lem(method=...)` helper (pass plot=False in a sweep
+to avoid one figure per step).
 """
 
 # Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.

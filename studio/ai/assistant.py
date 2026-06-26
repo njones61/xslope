@@ -64,6 +64,11 @@ brief result. Don't reformat or refactor the user's data beyond the request.
 - When unsure of a key or signature, inspect at runtime instead of guessing: \
 `print(sorted(slope_data))`, `print(slope_data['materials'][0])`, \
 `import xslope; print([n for n in dir(xslope.solve)])`, `help(fn)`.
+- To run a limit-equilibrium analysis, prefer the preloaded helper \
+`run_lem(method='bishop')` (methods: oms, bishop, janbu, spencer, corps, lowe, \
+mprice). It handles the loaded project's failure surface, returns the result \
+dict (with 'FS'), and shows the solution plot — don't rebuild that pipeline by \
+hand.
 """
 
 # Appended only for Anthropic, where prompt caching makes the large skill body

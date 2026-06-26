@@ -31,7 +31,46 @@ class PythonKernel:
         import pandas as pd
         import xslope
         self._ns.update({"np": np, "pd": pd, "plt": plt, "xslope": xslope})
+        self._ns.update(self._helpers())
         self._seeded = True
+
+    def _helpers(self):
+        """Convenience functions seeded into the namespace so the model doesn't
+        have to reconstruct the engine pipeline (a common failure mode)."""
+        doc = self._doc
+
+        def run_lem(method="bishop", num_slices=40, rapid=False, plot=True,
+                    slope_data=None):
+            """Run a single-surface LEM analysis on the loaded project's failure
+            surface and return the result dict (includes 'FS'). `method` is one of
+            oms, bishop, janbu, spencer, corps, lowe, mprice. Shows the solution
+            plot when plot=True."""
+            from xslope.slice import generate_slices
+            from xslope.solve import solve_selected
+            sd = doc.slope_data if slope_data is None else slope_data
+            circle = (sd["circles"][0] if sd.get("circular") and sd.get("circles")
+                      else None)
+            non_circ = sd.get("non_circ") or None
+            if circle is None and not non_circ:
+                raise RuntimeError("No failure surface defined (add a circle or "
+                                   "non-circular surface first).")
+            ok, res = generate_slices(sd, circle=circle, non_circ=non_circ,
+                                      num_slices=num_slices)
+            if not ok:
+                raise RuntimeError(res)
+            slice_df, surface = res
+            result = solve_selected(method, slice_df, rapid=rapid)
+            if not isinstance(result, dict):
+                raise RuntimeError(f"No solution: {result}")
+            print(f"{method}: FS = {result['FS']:.3f}")
+            if plot:
+                from xslope.plot import plot_solution
+                import matplotlib.pyplot as plt
+                plot_solution(sd, slice_df, surface, result,
+                              fig=plt.figure(figsize=(11, 6)))
+            return result
+
+        return {"run_lem": run_lem}
 
     def run(self, code):
         """Execute ``code``; return ``(stdout_text, [figure_png_paths], error_text)``.

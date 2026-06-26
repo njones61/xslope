@@ -1,9 +1,9 @@
 """Run-options dialogs (Phase 3).
 
-``RunLemDialog`` collects the options for an LEM solve. The thin first slice
-covers a **single circular surface**; the analysis-type / surface-type selectors
-are present but fixed to that case for now, and widen as the later increments
-(auto-search, reliability, non-circular) land.
+``RunLemDialog`` collects the options for an LEM solve: method, number of slices,
+analysis type (single surface / auto-search), surface type (circular /
+non-circular), rapid drawdown, and a diagnostic-output toggle. Reliability is the
+remaining analysis type (next increment).
 """
 
 from __future__ import annotations
@@ -23,9 +23,12 @@ LEM_METHODS = [
     ("mprice", "Morgenstern-Price"),
 ]
 
+ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search")]
+SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
+
 
 class RunLemDialog(QDialog):
-    """Options for a single-surface circular LEM solve."""
+    """Options for an LEM solve (single surface or auto-search; circular or not)."""
 
     def __init__(self, parent=None, defaults=None):
         super().__init__(parent)
@@ -35,11 +38,14 @@ class RunLemDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        self.method = QComboBox()
-        for key, label in LEM_METHODS:
-            self.method.addItem(label, key)
-        self._select_method(defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
         form.addRow("Method", self.method)
+
+        self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
+        form.addRow("Analysis", self.analysis)
+
+        self.surface = self._combo(SURFACE_TYPES, defaults.get("surface", "circular"))
+        form.addRow("Surface", self.surface)
 
         self.num_slices = QSpinBox()
         self.num_slices.setRange(5, 500)
@@ -50,9 +56,14 @@ class RunLemDialog(QDialog):
         self.rapid.setChecked(bool(defaults.get("rapid", False)))
         form.addRow("", self.rapid)
 
+        self.diagnostic = QCheckBox("Diagnostic output (verbose log)")
+        self.diagnostic.setChecked(bool(defaults.get("diagnostic", False)))
+        form.addRow("", self.diagnostic)
+
         layout.addLayout(form)
-        note = QLabel("Analyzes the first circular surface (single-surface). "
-                      "Auto-search and reliability arrive in the next increment.")
+        note = QLabel("Single surface analyzes the first circle / the non-circular "
+                      "surface as entered. Auto-search refines from there to the "
+                      "critical surface.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -62,14 +73,22 @@ class RunLemDialog(QDialog):
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
 
-    def _select_method(self, key):
-        idx = self.method.findData(key)
+    @staticmethod
+    def _combo(items, selected):
+        combo = QComboBox()
+        for key, label in items:
+            combo.addItem(label, key)
+        idx = combo.findData(selected)
         if idx >= 0:
-            self.method.setCurrentIndex(idx)
+            combo.setCurrentIndex(idx)
+        return combo
 
     def options(self):
         return {
             "method": self.method.currentData(),
+            "analysis": self.analysis.currentData(),
+            "surface": self.surface.currentData(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
+            "diagnostic": self.diagnostic.isChecked(),
         }

@@ -277,11 +277,12 @@ studio/                # XSlope Studio desktop app
 - ✅ New (from template) — `ProjectDocument.new()` seeds a minimal valid in-memory skeleton (the `xslope_simple1` single-material slope + one circle, since a blank template won't `load`); edited via the forms, written out by Save As.
 
 **Phase 3 — LEM analysis** 🚧 **IN PROGRESS**
-- ✅ Thin end-to-end slice: **single circular surface** solve. `RunLemDialog` (method / num_slices / rapid) → `LemRunner` (`QThread`, `studio/runners.py`) runs `generate_slices` + `solve_selected` off the GUI thread, capturing engine stdout and delivering it with the result → **LEM · Solution** result tab via `plot_solution(fig=…)` (the `fig=` param added to `plot.py`, mirroring `plot_inputs`). Central area is now a `QTabWidget` view strip (Inputs + lazily-added result tabs); result tabs cleared on Open/New.
-- ⬜ Auto-search (circular + non-circular) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, need `fig=`).
-- ⬜ Non-circular single surface; remaining run-options (surface type, tolerances).
-- ⬜ Reliability → **LEM · Reliability** tab (`plot_reliability_results`, need `fig=`).
-- ⬜ Rapid drawdown wired through search/reliability; progress/cancel.
+- ✅ End-to-end solve framework. `RunLemDialog` (method / analysis / surface / num_slices / rapid / diagnostic) → `LemRunner` (`QThread`, `studio/runners.py`) runs the engine off the GUI thread; engine output streams to the Log pane live via the thread-safe stdout tee. Central area is a `QTabWidget` view strip (Inputs + lazily-added result tabs, cleared on Open/New); a run logs a banner + result.
+- ✅ **Single surface** — circular *and* non-circular (`generate_slices` + `solve_selected`) → **LEM · Solution** tab via `plot_solution(fig=…)`.
+- ✅ **Auto-search** — circular (`circular_search`) and non-circular (`noncircular_search`) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, both given `fig=`) showing all trial surfaces + critical + search path, plus the critical surface in the Solution tab. Search iteration progress streams to the log.
+- ✅ Rapid drawdown flag wired through single/search; `fig=` added to all LEM plot functions, mirroring `plot_inputs`.
+- ⬜ Reliability → **LEM · Reliability** tab (`plot_reliability_results`, needs `fig=`).
+- ⬜ Progress bar + cooperative cancel (searches/SSRM); remaining tolerances in the dialog.
 
 **Phase 4 — Meshing + Seepage + FEM**
 - Meshing dialog; Seepage run + result view; FEM single/SSRM + result views; progress/cancel.

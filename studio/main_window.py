@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
         # Central area: a tab strip of result views (plan §7). The Inputs view is
         # always present; the LEM Solution view is added after the first solve.
         self.canvas = MplCanvas(self)
+        self.search_canvas = None
         self.solution_canvas = None
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
@@ -353,21 +354,15 @@ class MainWindow(QMainWindow):
     def run_lem(self):
         if not self.doc.is_open or self._runner is not None:
             return
-        if not self.doc.slope_data.get("circular"):
-            QMessageBox.information(
-                self, "Run LEM",
-                "This run analyzes a single circular surface, but no circles are "
-                "defined.\n\nAdd a circle (Inputs → Circles) first.")
-            return
         dlg = RunLemDialog(self, defaults=self._last_lem_opts)
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_lem_opts = opts
         self.act_run_lem.setEnabled(False)
-        self.statusBar().showMessage(f"Running {opts['method']} …")
-        self._runner = LemRunner(self.doc.slope_data, opts["method"],
-                                 opts["num_slices"], rapid=opts["rapid"], parent=self)
+        verb = "Searching" if opts["analysis"] == "auto_search" else "Running"
+        self.statusBar().showMessage(f"{verb} {opts['method']} …")
+        self._runner = LemRunner(self.doc.slope_data, opts, parent=self)
         self._runner.succeeded.connect(self._on_lem_succeeded)
         self._runner.failed.connect(self._on_lem_failed)
         self._runner.finished.connect(self._on_lem_finished)
@@ -375,7 +370,14 @@ class MainWindow(QMainWindow):
 
     def _on_lem_succeeded(self, bundle):
         self.doc.results["lem_solution"] = bundle
+        if bundle.get("search"):
+            self._show_search(bundle["search"])
         self._show_solution(bundle)
+        # For a search, lead with the Search view (all trial surfaces + critical);
+        # for a single surface, the Solution view is the result.
+        lead = self.search_canvas if bundle.get("search") else self.solution_canvas
+        if lead is not None:
+            self.view_tabs.setCurrentWidget(lead)
         res = bundle["results"]
         self.statusBar().showMessage(
             f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
@@ -390,6 +392,16 @@ class MainWindow(QMainWindow):
             self._runner.deleteLater()
             self._runner = None
 
+    def _show_search(self, search):
+        if self.search_canvas is None:
+            self.search_canvas = MplCanvas(self)
+            # Keep order Inputs → Search → Solution.
+            self.view_tabs.insertTab(1, self.search_canvas, "LEM · Search")
+        try:
+            self.search_canvas.render_search(self.doc.slope_data, search)
+        except Exception:
+            traceback.print_exc()
+
     def _show_solution(self, bundle):
         if self.solution_canvas is None:
             self.solution_canvas = MplCanvas(self)
@@ -400,17 +412,18 @@ class MainWindow(QMainWindow):
                 bundle["failure_surface"], bundle["results"])
         except Exception:
             traceback.print_exc()
-        self.view_tabs.setCurrentWidget(self.solution_canvas)
 
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
-        a stale solution from the previous project."""
-        if self.solution_canvas is not None:
-            idx = self.view_tabs.indexOf(self.solution_canvas)
-            if idx >= 0:
-                self.view_tabs.removeTab(idx)
-            self.solution_canvas.deleteLater()
-            self.solution_canvas = None
+        stale results from the previous project."""
+        for attr in ("search_canvas", "solution_canvas"):
+            canvas = getattr(self, attr)
+            if canvas is not None:
+                idx = self.view_tabs.indexOf(canvas)
+                if idx >= 0:
+                    self.view_tabs.removeTab(idx)
+                canvas.deleteLater()
+                setattr(self, attr, None)
 
     def _on_view_tab_changed(self, index):
         w = self.view_tabs.widget(index)

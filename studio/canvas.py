@@ -26,7 +26,10 @@ from PySide6.QtWidgets import (
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from xslope.plot import plot_inputs, plot_solution
+from xslope.plot import (
+    plot_circular_search_results, plot_inputs, plot_noncircular_search_results,
+    plot_solution,
+)
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
@@ -86,6 +89,16 @@ class MplCanvas(QWidget):
     def render_solution(self, slope_data, slice_df, failure_surface, results):
         self._draw(lambda fig: plot_solution(slope_data, slice_df, failure_surface,
                                              results, fig=fig))
+
+    def render_search(self, slope_data, search):
+        """Render auto-search results (all trial surfaces + critical + search path)."""
+        if search["kind"] == "circular":
+            self._draw(lambda fig: plot_circular_search_results(
+                slope_data, search["fs_cache"], search["search_path"],
+                circle_cache=search["circle_cache"], fig=fig))
+        else:
+            self._draw(lambda fig: plot_noncircular_search_results(
+                slope_data, search["fs_cache"], search["search_path"], fig=fig))
 
     def _draw(self, draw_fn):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.

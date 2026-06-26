@@ -2087,7 +2087,7 @@ def plot_search_path(ax, search_path):
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True,
                  gid='SEARCH_PATH')
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -2098,11 +2098,19 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         circle_cache: List of dictionaries containing all tested circles (for plotting)
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
         figsize: Tuple of (width, height) in inches for the plot
+        fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
+            GUI canvas). When None (default) a new pyplot figure is created and shown;
+            when provided, the figure is cleared and reused and plt.show() is skipped.
 
     Returns:
-        None
+        The Matplotlib Figure that was drawn into.
     """
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
 
     plot_base_geometry(ax, slope_data)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
@@ -2148,17 +2156,19 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
-    plt.tight_layout()
-    
+    fig.tight_layout()
+
     if save_png:
-        plt.savefig('plot_circular_search_results.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig('plot_circular_search_results.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, 'plot_circular_search_results.dxf')
-    
-    plt.show()
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300):
+    if own_fig:
+        plt.show()
+    return fig
+
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -2168,11 +2178,19 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         search_path: List of dictionaries containing search path coordinates
         highlight_fs: Boolean indicating whether to highlight the critical failure surface
         figsize: Tuple of (width, height) in inches for the plot
+        fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
+            GUI canvas). When None (default) a new pyplot figure is created and shown;
+            when provided, the figure is cleared and reused and plt.show() is skipped.
 
     Returns:
-        None
+        The Matplotlib Figure that was drawn into.
     """
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
 
     # Plot basic profile elements
     plot_base_geometry(ax, slope_data)
@@ -2225,15 +2243,17 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
-    plt.tight_layout()
+    fig.tight_layout()
 
     if save_png:
-        plt.savefig('plot_noncircular_search_results.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig('plot_noncircular_search_results.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, 'plot_noncircular_search_results.dxf')
-    
-    plt.show()
+
+    if own_fig:
+        plt.show()
+    return fig
 
 def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, dpi=300):
     """

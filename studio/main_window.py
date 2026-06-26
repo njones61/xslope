@@ -14,7 +14,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QObject, QSettings, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
@@ -36,12 +36,21 @@ TEMPLATE = Path(__file__).resolve().parent / "resources" / "input_template.xlsx"
 CATEGORY_ROLE = Qt.UserRole + 1
 
 
-class _LogStream:
-    """Minimal stdout/stderr tee: forwards to the original stream and the log pane."""
+class _LogStream(QObject):
+    """stdout/stderr tee: forwards to the original stream and the log pane.
+
+    Writes are marshaled to the GUI thread via a queued signal, so engine output
+    printed from a worker thread (e.g. an LEM solve) streams into the log pane
+    live and safely — Qt widgets must not be touched off the GUI thread.
+    """
+
+    _emitted = Signal(str)
 
     def __init__(self, widget, original):
-        self._widget = widget
+        super().__init__()
         self._original = original
+        # Queued so a worker-thread write() appends on the widget's (GUI) thread.
+        self._emitted.connect(widget.appendPlainText, Qt.QueuedConnection)
 
     def write(self, text):
         if self._original is not None:
@@ -51,7 +60,7 @@ class _LogStream:
                 pass
         text = text.rstrip("\n")
         if text:
-            self._widget.appendPlainText(text)
+            self._emitted.emit(text)
 
     def flush(self):
         if self._original is not None:
@@ -357,17 +366,13 @@ class MainWindow(QMainWindow):
         self._runner.start()
 
     def _on_lem_succeeded(self, bundle):
-        if bundle.get("log"):
-            self.log.appendPlainText(bundle["log"].rstrip("\n"))
         self.doc.results["lem_solution"] = bundle
         self._show_solution(bundle)
         res = bundle["results"]
         self.statusBar().showMessage(
             f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
 
-    def _on_lem_failed(self, message, log):
-        if log:
-            self.log.appendPlainText(log.rstrip("\n"))
+    def _on_lem_failed(self, message):
         QMessageBox.warning(self, "LEM run failed", message)
         self.statusBar().showMessage("LEM run failed.")
 

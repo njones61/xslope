@@ -111,25 +111,42 @@ existing record first when one is present; for an empty project, print \
 `sorted(slope_data)` and build the lists directly.
 """
 
-# A compact schema cheat-sheet for non-Anthropic models (the full skill is too
-# large to send every turn to a local model). Keeps them from inventing keys.
+# Authoritative in-memory record schemas. These ARE the ground truth for field
+# names, so the model never loads reference .xlsx files to reverse-engineer them
+# (slow, and reads the filesystem needlessly). Included on every path — compact
+# enough for local models, and it overrides the file-oriented skill.
 SCHEMA_BRIEF = """\
 
-`slope_data` top-level keys you edit in place (real names — don't invent others):
-- materials: list of dicts (name, gamma, c, phi, option, cp, k1, k2, E, nu, …).
-- profile_lines: list of {mat_id, coords:[(x,y),…]} — geometry (profile files).
-- polygons: list of {polygon (shapely), mat_id} — geometry (polygon files).
-- circles: list of {Xo, Yo, R, Option, Depth} — circular surfaces.
-- non_circ: list of {X, Y, Movement} — non-circular surface points.
-- piezo_line / piezo_line2: list of (x, y).
-- dloads / dloads2: distributed-load blocks.
-- reinforce_lines / reinforcement_lines: reinforcement; pile_lines: piles.
-- seepage_bc / seepage_bc2, mesh, max_depth, gamma_water, k_seismic, tcrack_depth.
+Authoritative `slope_data` record schemas — these key names are the ground truth.
+Do NOT load or read .xlsx files (or call `load_slope_data`) to discover the schema;
+the records below ARE the schema. For an empty project every list is `[]` — build
+the lists directly. To start an empty project: `doc.new()`.
 
-ALWAYS print one example record of a category before editing it — e.g.
-`print(slope_data['reinforcement_lines'][0])` — so you use its real field names.
-Then run analyses via the engine, e.g.
-`from xslope.slice import generate_slices; from xslope.solve import solve_selected`.
+- materials[i]: name, gamma, option ('mc' Mohr-Coulomb | 'cp'), c, phi, cp, r_elev,
+  d, psi, u ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if
+  unused), k1, k2, alpha, kr0, h0 (seepage), E, nu (FEM). Minimal MC example:
+  {'name':'Clay','gamma':130.0,'option':'mc','c':400.0,'phi':0.0,'u':'none',
+   'cp':0.0,'r_elev':0.0,'d':0,'psi':0,'sigma_gamma':0.0,'sigma_c':0.0,
+   'sigma_phi':0.0,'sigma_cp':0.0,'sigma_d':0.0,'sigma_psi':0.0,'k1':0.0,'k2':0.0,
+   'alpha':0.0,'kr0':0.0,'h0':0.0,'E':0.0,'nu':0.0}
+- profile_lines[i]: {'coords':[(x,y),...], 'mat_id':0}  # mat_id = 0-based index into
+  materials; lines are layer-top boundaries, ordered top to bottom.
+- circles[i]: {'Xo':20.0,'Yo':40.0,'Depth':-10.0,'R':50.0}  # Depth = elevation of
+  the circle's lowest point, R = Yo - Depth. There is NO intercept key — set R
+  yourself (toe circle: R = distance from center to the toe point).
+- non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
+- piezo_line / piezo_line2: list of (x, y) tuples.
+- dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
+- reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E'}
+  # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
+- pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
+  'theta_p','fixity','label','H'}
+- scalars: gamma_water, max_depth (hard-base elevation), k_seismic, tcrack_depth,
+  tcrack_water, circular (bool).
+
+Editing the source lists is enough — the canvas rebuilds derived geometry
+(ground_surface, polygons) and re-renders automatically; you need not call
+plot_inputs. Run LEM via the preloaded `run_lem(method=...)` helper.
 """
 
 
@@ -390,7 +407,10 @@ class Assistant(QObject):
         if self.config.supports_prompt_cache():
             skill = _load_skill_text()
             if skill:
-                return STUDIO_SYSTEM + _SKILL_HEADER + skill + _SKILL_TRAILER
+                # Authoritative records come LAST (after the file-oriented skill)
+                # so they win on recency — no .xlsx diving to learn the schema.
+                return (STUDIO_SYSTEM + _SKILL_HEADER + skill + _SKILL_TRAILER
+                        + SCHEMA_BRIEF)
         return STUDIO_SYSTEM + SCHEMA_BRIEF
 
     def send(self, user_text, images=None):

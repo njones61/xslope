@@ -368,21 +368,61 @@ class MainWindow(QMainWindow):
 
     # --- document signal handlers ---------------------------------------
     def _on_loaded(self):
-        self.mode_combo.setCurrentIndex([m for _, m in MODES].index(self._mode))
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
-        self._update_run_actions()
         self._clear_result_tabs()
+        # Restore saved solutions first so the default mode can see whether an FEM
+        # solution exists, then pick the mode that fits this file.
+        self._load_solution_sidecars()
+        self._mode = self._default_mode()
+        self.mode_combo.blockSignals(True)    # set silently; we render explicitly below
+        self.mode_combo.setCurrentIndex([m for _, m in MODES].index(self._mode))
+        self.mode_combo.blockSignals(False)
+        self._update_run_actions()
         self.canvas.reset_fit()       # fit the fresh file to the window
         self._render()
         self._populate_inputs_tree()
-        self._load_solution_sidecars()
         self._update_title()
         n = len(self.doc.slope_data.get("materials", []))
         name = os.path.basename(self.doc.path) if self.doc.path else "untitled"
         self.statusBar().showMessage(
             f"Loaded {name} — {n} material(s). "
             f"Click an underlined input to edit it.")
+
+    def _default_mode(self):
+        """Pick the mode that fits the loaded file: FEM if a mesh and a restored
+        FEM solution are present; Seep if the materials carry only seepage
+        properties (conductivity, no strength); otherwise LEM."""
+        sd = self.doc.slope_data
+        if sd.get("mesh") is not None and "fem_solution" in self.doc.results:
+            return "fem"
+        if self._materials_seep_only(sd.get("materials", [])):
+            return "seep"
+        return "lem"
+
+    @staticmethod
+    def _materials_seep_only(materials):
+        """True when at least one material defines seepage conductivity and none
+        defines strength — i.e. a pure seepage problem. A material is usable for
+        LEM only if it has unit weight / cohesion / friction angle; when gamma, c
+        and phi are all blank for every material, the file cannot be analyzed by
+        LEM."""
+        def num(v):
+            try:
+                return float(v or 0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        def lem_capable(m):
+            return num(m.get("gamma")) > 0 or num(m.get("c")) > 0 or num(m.get("phi")) > 0
+
+        def has_seep(m):
+            return num(m.get("k1")) > 0 or num(m.get("k2")) > 0
+
+        if not materials:
+            return False
+        return any(has_seep(m) for m in materials) and not any(
+            lem_capable(m) for m in materials)
 
     def _load_solution_sidecars(self):
         """Restore any saved seep / FEM solution sidecars next to the .xlsx so

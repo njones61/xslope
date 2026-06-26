@@ -23,6 +23,11 @@ class PythonKernel:
         self._ns = {}
         self._seeded = False
 
+    def reset(self):
+        """Drop all variables; the engine + helpers re-seed on the next run."""
+        self._ns = {}
+        self._seeded = False
+
     def _seed(self):
         import matplotlib
         matplotlib.use("Agg")          # pyplot figures render off-screen; we save them

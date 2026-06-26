@@ -321,6 +321,7 @@ class Assistant(QObject):
 
     def reset(self):
         self._messages = []
+        self._kernel.reset()          # fresh kernel — variables cleared, re-seeds
 
     def _system(self):
         # Full skill body only for Anthropic (prompt-cached, so cheap). Local /

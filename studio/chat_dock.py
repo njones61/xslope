@@ -49,8 +49,10 @@ class ChatDock(QWidget):
         self.send_btn = QPushButton("Send")
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setEnabled(False)
-        self.clear_btn = QPushButton("Clear")
-        self.clear_btn.setToolTip("Start a fresh conversation (clears history).")
+        self.clear_btn = QPushButton("New chat")
+        self.clear_btn.setToolTip("Start a fresh conversation (clears history and "
+                                  "the assistant's Python variables; your project "
+                                  "is unaffected).")
         self.settings_btn = QPushButton("Settings…")
 
         self.model_label = QLabel()

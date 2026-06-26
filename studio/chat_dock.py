@@ -48,12 +48,19 @@ class ChatDock(QWidget):
         top.addWidget(self.settings_btn)
         top.addWidget(self.autonomy)
 
+        # Capability caption (shown only when the model can't / may not run code).
+        self.caps_label = QLabel()
+        self.caps_label.setWordWrap(True)
+        self.caps_label.setStyleSheet("color:#9a6700;")
+        self.caps_label.setVisible(False)
+
         row = QHBoxLayout()
         row.addWidget(self.send_btn)
         row.addWidget(self.stop_btn)
 
         layout = QVBoxLayout(self)
         layout.addLayout(top)
+        layout.addWidget(self.caps_label)
         layout.addWidget(self.transcript, 1)
         layout.addWidget(self.input)
         layout.addLayout(row)
@@ -79,6 +86,16 @@ class ChatDock(QWidget):
 
     def _refresh_model_label(self):
         self.model_label.setText(self._assistant.config.display_name())
+        tools = self._assistant.config.capabilities().get("tools")
+        if tools is False:
+            msg = "This model has no tool support — it can chat but can't run code."
+        elif tools is None:
+            msg = ("Running code needs a tool-calling model; some local models "
+                   "don't support it, so run-code may not work.")
+        else:
+            msg = ""
+        self.caps_label.setText(msg)
+        self.caps_label.setVisible(bool(msg))
 
     def _open_settings(self):
         from .ai.settings_dialog import AssistantSettingsDialog

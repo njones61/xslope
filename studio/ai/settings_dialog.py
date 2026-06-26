@@ -84,9 +84,15 @@ class AssistantSettingsDialog(QDialog):
         self.api_key.setEnabled(needs_key)
         self.api_key.setText(self._config.api_key(prov) if needs_key else "")
         self.ollama_base.setEnabled(bool(spec.get("needs_base")))
-        self.note.setText(
-            "Local model — no key needed; runs on your machine, free." if not needs_key
-            else "Hosted model — billed per token to your API account.")
+        cost = ("Local model — no key needed; runs on your machine, free."
+                if not needs_key else
+                "Hosted model — billed per token to your API account.")
+        tools = spec.get("tools")
+        tool_note = ("Tool use (run code): supported." if tools is True else
+                     "Tool use (run code): not supported — chat only." if tools is False
+                     else "Tool use (run code): depends on the local model you pick.")
+        cache = " Prompt caching reduces repeat-turn cost." if spec.get("prompt_cache") else ""
+        self.note.setText(f"{cost}\n{tool_note}{cache}")
 
     def _save(self):
         prov = self.provider.currentData()

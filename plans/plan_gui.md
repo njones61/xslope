@@ -498,9 +498,15 @@ set up for the template.
   button in the dock; the dock shows the active provider·model. `litellm.drop_params`
   smooths over per-provider param gaps. Verified end-to-end with a mocked
   `litellm.completion` (tool_calls round-trip) plus config/keyring round-trip.
-  Refinements: prompt caching + adaptive-thinking are Claude-specific and not yet
-  re-threaded through LiteLLM; capability-aware UI (disable tools/vision for models
-  that lack them) still to do.
+  **Capability-aware UI** — `config.capabilities()` reports per-provider tool/vision
+  support (None = depends on a local model); the dock shows a caption when the
+  selected model can't / may not run code, and the Settings note states tool-use
+  support per provider. **Claude prompt caching** is re-threaded: for Anthropic the
+  system prompt goes out as a `cache_control: ephemeral` content block (plain string
+  for other providers, which would 400 on list content), so the large skill prompt
+  bills at cache-read rates on repeat turns. Refinement still open: adaptive thinking
+  is Claude-specific and not yet re-threaded; per-model (not per-provider) capability
+  detection.
 - **C — Native tools + live document:** structured input edit / run / results tools
   wired to `ProjectDocument` and the runners, inline figures, confirm-to-run.
 - **D — Vision & polish:** sketch→inputs, parametric-sweep ergonomics, cost meter,

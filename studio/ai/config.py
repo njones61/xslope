@@ -14,19 +14,24 @@ KEYRING_SERVICE = "XSlope Studio"
 
 # Provider catalog. `prefix` is the LiteLLM model-name prefix; `models` are
 # suggestions (the Ollama list is editable since the user picks their own).
+# `tools`/`vision` are capability defaults (True/False, or None = depends on the
+# chosen model — used for the hosted presets; local models vary).
 PROVIDERS = {
     "anthropic": {
         "label": "Claude (Anthropic)", "prefix": "anthropic/", "needs_key": True,
         "models": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
+        "tools": True, "vision": True, "prompt_cache": True,
     },
     "openai": {
         "label": "OpenAI", "prefix": "openai/", "needs_key": True,
         "models": ["gpt-4o", "gpt-4o-mini", "o4-mini"],
+        "tools": True, "vision": True,
     },
     "ollama": {
         "label": "Ollama (local, free)", "prefix": "ollama_chat/", "needs_key": False,
         "needs_base": True, "editable_model": True,
         "models": ["llama3.1", "qwen2.5-coder", "mistral"],
+        "tools": None, "vision": None,   # depends on the local model
     },
 }
 DEFAULT_PROVIDER = "anthropic"
@@ -102,6 +107,16 @@ class AssistantConfig:
 
     def display_name(self):
         return f"{PROVIDERS[self.provider()]['label']} · {self.model()}"
+
+    def capabilities(self):
+        """Capability hints for the current provider: ``{tools, vision}`` each
+        True / False / None (None = depends on the chosen local model)."""
+        spec = PROVIDERS[self.provider()]
+        return {"tools": spec.get("tools"), "vision": spec.get("vision")}
+
+    def supports_prompt_cache(self):
+        """Whether to mark the system prompt cacheable (Anthropic only)."""
+        return bool(PROVIDERS[self.provider()].get("prompt_cache"))
 
     def completion_kwargs(self):
         """The provider-specific kwargs for ``litellm.completion(...)``."""

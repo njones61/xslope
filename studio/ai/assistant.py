@@ -91,13 +91,24 @@ class _AgentWorker(QThread):
     failed = Signal(str)
     done = Signal()
 
-    def __init__(self, kwargs, system, messages, tools, parent=None):
+    def __init__(self, kwargs, system, messages, tools, cache_system=False, parent=None):
         super().__init__(parent)
         self._kwargs = kwargs       # provider/model kwargs for litellm.completion
         self._system = system
         self._messages = messages   # shared list (OpenAI format), mutated in place
         self._tools = tools
+        self._cache_system = cache_system   # Anthropic prompt caching of the system
         self._cancel = threading.Event()
+
+    def _system_message(self):
+        # Anthropic prompt caching: a content block carrying cache_control. The
+        # large skill prompt then bills at cache-read rates on repeat turns.
+        # Plain string for other providers (a list-content system can 400 there).
+        if self._cache_system:
+            return {"role": "system", "content": [
+                {"type": "text", "text": self._system,
+                 "cache_control": {"type": "ephemeral"}}]}
+        return {"role": "system", "content": self._system}
 
     def cancel(self):
         self._cancel.set()
@@ -114,7 +125,7 @@ class _AgentWorker(QThread):
         try:
             while not self._cancel.is_set():
                 resp = litellm.completion(
-                    messages=[{"role": "system", "content": self._system}] + self._messages,
+                    messages=[self._system_message()] + self._messages,
                     tools=self._tools, max_tokens=MAX_TOKENS, **self._kwargs)
                 msg = resp.choices[0].message
                 tool_calls = getattr(msg, "tool_calls", None) or []
@@ -197,7 +208,9 @@ class Assistant(QObject):
             return
         self._messages.append({"role": "user", "content": user_text})
         self._worker = _AgentWorker(self.config.completion_kwargs(), self._system(),
-                                    self._messages, [RUN_PYTHON_TOOL], parent=self)
+                                    self._messages, [RUN_PYTHON_TOOL],
+                                    cache_system=self.config.supports_prompt_cache(),
+                                    parent=self)
         self._worker.text.connect(self.assistant_text)
         self._worker.tool_call.connect(self._on_tool_call)   # queued -> GUI thread
         self._worker.failed.connect(self._on_failed)

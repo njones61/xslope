@@ -339,6 +339,10 @@ class FemResultsDisplayPanel(QWidget):
         self.plot_nodes = QCheckBox("Node dots")
         self.plot_elements = QCheckBox("Element edges")
         self.scale_vectors = QCheckBox("Auto-scale vectors")
+        self.scale_vectors.setChecked(True)
+        self.scale_vectors.setToolTip(
+            "On: size arrows for visibility (relative magnitudes kept).\n"
+            "Off: draw arrows at true displacement magnitude (may be tiny).")
         self.displacement_tolerance = _dspin(0.0, 1.0, 0.5, 0.05)
         self.displacement_tolerance.setToolTip(
             "Hide vectors below this fraction of the max displacement.")

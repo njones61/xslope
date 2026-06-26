@@ -177,7 +177,7 @@ class MplCanvas(QWidget):
             plot_boundary=opts.get("plot_boundary", True),
             plot_nodes=opts.get("plot_nodes", False),
             plot_elements=opts.get("plot_elements", False),
-            scale_vectors=opts.get("scale_vectors", False),
+            scale_vectors=opts.get("scale_vectors", True),
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
             fig=fig))
 

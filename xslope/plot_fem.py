@@ -428,7 +428,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=False, save_png=False, save_dxf=False, dpi=300, fig=None):
+                    scale_vectors=True, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -814,10 +814,16 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
         print("Warning: All displacements below tolerance")
         return
 
+    # scale_vectors=True: let Matplotlib auto-size the arrows so they are visible
+    # (relative magnitudes preserved). scale_vectors=False: draw each arrow at its
+    # true displacement magnitude in data units (may be very small for plastic VP
+    # displacements), useful for reading actual displacement sizes.
+    scale_kwargs = ({"scale": None} if scale_vectors
+                    else {"scale_units": "xy", "scale": 1.0})
     _q = ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask], gid='DISPLACE_VECTORS',
               angles='xy', color='black', alpha=0.7,
-              scale=None, width=0.002, headwidth=3, headlength=4,
-              headaxislength=3, pivot='tail')
+              width=0.002, headwidth=3, headlength=4,
+              headaxislength=3, pivot='tail', **scale_kwargs)
 
     # Plot node dots if requested
     if plot_nodes:

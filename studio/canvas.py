@@ -234,11 +234,21 @@ class MplCanvas(QWidget):
         self._schedule_refine()
 
     def ensure_fitted(self):
-        """Fit the figure to the window the first time the view has a real size."""
-        if not self._fitted and self._pixitem is not None \
-                and self.view.viewport().width() > 1:
+        """Fit the figure to the window once the view has a real size.
+
+        A result canvas is often rendered while its tab is hidden, and when the
+        tab is first shown the viewport may not be laid out yet (width 0). So:
+        only act while visible, and if not laid out yet, retry shortly — that
+        covers the "click the LEM Solution tab" case where the synchronous fit on
+        tab-change runs before the page is sized. The retry stops once fitted, and
+        never runs for a hidden tab (it waits for showEvent)."""
+        if self._fitted or self._pixitem is None or not self.isVisible():
+            return
+        if self.view.viewport().width() > 1:
             self.fit()
             self._fitted = True
+        else:
+            QTimer.singleShot(40, self.ensure_fitted)
 
     def reset_fit(self):
         """Re-arm the one-shot fit so the next render fits to the window (e.g. when

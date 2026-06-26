@@ -154,8 +154,14 @@ the canvas re-renders automatically.
 Editing the source lists is enough — the canvas rebuilds derived geometry
 (ground_surface, polygons) and re-renders automatically; you need not call
 plot_inputs. Run LEM via the preloaded `run_lem(method=...)` helper.
+"""
 
-Modeling rules (restated from the xslope skill — follow it for full detail):
+# Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.
+# for local/non-Anthropic models). On the Anthropic path the skill already carries
+# these in full, so mirroring them here would just duplicate cached tokens.
+MODELING_BRIEF = """\
+
+Modeling rules (slope-stability physics):
 - Starting circles: put Xo at the toe-crest midpoint and Yo = toe_elev + 2x slope
   height; ALWAYS include one circle through the toe and one tangent to the base of
   EACH material layer (including the hard base at max_depth).
@@ -429,11 +435,14 @@ class Assistant(QObject):
         if self.config.supports_prompt_cache():
             skill = _load_skill_text()
             if skill:
-                # Authoritative records come LAST (after the file-oriented skill)
-                # so they win on recency — no .xlsx diving to learn the schema.
+                # The skill already carries the modeling rules in full, so only the
+                # record schemas are appended (LAST, so they win on recency — no
+                # .xlsx diving to learn the schema). No MODELING_BRIEF here: it would
+                # just duplicate the skill.
                 return (STUDIO_SYSTEM + _SKILL_HEADER + skill + _SKILL_TRAILER
                         + SCHEMA_BRIEF)
-        return STUDIO_SYSTEM + SCHEMA_BRIEF
+        # No skill loaded (local/other model): the modeling rules live only here.
+        return STUDIO_SYSTEM + SCHEMA_BRIEF + MODELING_BRIEF
 
     def send(self, user_text, images=None):
         if self.is_busy():

@@ -518,6 +518,35 @@ class PilesEditor(CategoryEditor):
         slope_data["pile_lines"] = rows
 
 
+# --- reinforcement ---------------------------------------------------------- #
+def _new_reinf():
+    return {"x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "t_max": 0.0, "t_res": 0.0,
+            "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0}
+
+
+class ReinforcementEditor(CategoryEditor):
+    label = "Reinforcement"
+    FIELDS = [
+        Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
+        Field("t_max", "Tmax"), Field("t_res", "Tres"),
+        Field("lp1", "Lp1"), Field("lp2", "Lp2"), Field("E", "E"), Field("area", "Area"),
+    ]
+
+    def build(self, slope_data, parent):
+        return TableEditorDialog(
+            "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
+            _new_reinf, parent,
+            help_text="Lp1/Lp2 are the pullout lengths at each end (0 = fully anchored). "
+                      "The LEM tension distribution shown on the plot is derived from these.")
+
+    def apply(self, slope_data, dlg):
+        from xslope.fileio import build_reinforce_lines
+        rows = dlg.result_rows()
+        slope_data["reinforcement_lines"] = rows
+        # Rebuild the LEM display/analysis format so the canvas reflects the edit.
+        slope_data["reinforce_lines"] = build_reinforce_lines(rows)
+
+
 CATEGORY_EDITORS = {
     "global": GlobalEditor(),
     "materials": MaterialsEditor(),
@@ -527,4 +556,5 @@ CATEGORY_EDITORS = {
     "dloads": DloadsEditor(),
     "seep_bc": HeadBcEditor(),
     "piles": PilesEditor(),
+    "reinforce": ReinforcementEditor(),
 }

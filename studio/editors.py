@@ -258,23 +258,28 @@ def _new_material():
 
 class MaterialsEditor(CategoryEditor):
     label = "Materials"
+    # Columns mirror the 'mat' worksheet in order: name, g, option, c, f, c/p,
+    # r-elev, d, psi, u, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2, alpha,
+    # kr0, h0, E, n.
     FIELDS = [
-        Field("name", "Name", "str"),
-        Field("gamma", "γ"),
-        Field("option", "Option", "choice", choices=["mc", "cp"]),
-        Field("c", "c"), Field("phi", "φ"), Field("cp", "c/p"),
-        Field("r_elev", "r-elev"), Field("d", "d"), Field("psi", "ψ"),
+        Field("name", "name", "str"),
+        Field("gamma", "g"),
+        Field("option", "option", "choice", choices=["mc", "cp"]),
+        Field("c", "c"), Field("phi", "f"), Field("cp", "c/p"),
+        Field("r_elev", "r-elev"), Field("d", "d"), Field("psi", "psi"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep"]),
-        Field("E", "E"), Field("nu", "ν"),
-        Field("k1", "k1"), Field("k2", "k2"), Field("alpha", "α"),
-        Field("kr0", "kr0"), Field("h0", "h0"),
+        Field("sigma_gamma", "s(g)"), Field("sigma_c", "s(c)"), Field("sigma_phi", "s(f)"),
+        Field("sigma_cp", "s(c/p)"), Field("sigma_d", "s(d)"), Field("sigma_psi", "s(psi)"),
+        Field("k1", "k1"), Field("k2", "k2"), Field("alpha", "alpha"),
+        Field("kr0", "kr0"), Field("h0", "h0"), Field("E", "E"), Field("nu", "n"),
     ]
 
     def build(self, slope_data, parent):
         return TableEditorDialog(
             "Materials", self.FIELDS, slope_data.get("materials", []), _new_material, parent,
-            help_text="Row order = Mat ID order (row 1 → Mat ID 1). Reliability sigmas "
-                      "are preserved but not shown here.")
+            help_text="Columns mirror the 'mat' worksheet. Row order = Mat ID order "
+                      "(row 1 → Mat ID 1). s(...) columns are the reliability standard "
+                      "deviations.")
 
     def apply(self, slope_data, dlg):
         slope_data["materials"] = dlg.result_rows()

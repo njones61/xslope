@@ -18,12 +18,14 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
-    QPlainTextEdit, QToolBar, QTreeWidget, QTreeWidgetItem, QWidget,
+    QPlainTextEdit, QTabWidget, QToolBar, QTreeWidget, QTreeWidgetItem, QWidget,
 )
 
 from .canvas import MplCanvas
+from .dialogs import RunLemDialog
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
+from .runners import LemRunner
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -71,10 +73,18 @@ class MainWindow(QMainWindow):
         self.doc.changed.connect(self._render)
         self.doc.dirty_changed.connect(lambda *_: self._update_title())
 
+        # Central area: a tab strip of result views (plan §7). The Inputs view is
+        # always present; the LEM Solution view is added after the first solve.
         self.canvas = MplCanvas(self)
-        self.setCentralWidget(self.canvas)
+        self.solution_canvas = None
+        self.view_tabs = QTabWidget()
+        self.view_tabs.addTab(self.canvas, "Inputs")
+        self.view_tabs.currentChanged.connect(self._on_view_tab_changed)
+        self.setCentralWidget(self.view_tabs)
 
         self._mode = "lem"
+        self._runner = None
+        self._last_lem_opts = {}
         self._recent = [p for p in (self.settings.value("recent_files") or []) if p]
 
         self._make_inputs_dock()
@@ -129,6 +139,7 @@ class MainWindow(QMainWindow):
         self.act_save = QAction("&Save", self, shortcut=QKeySequence.Save,
                                 enabled=False, triggered=self.save)
         self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
+        self.act_run_lem = QAction("Run &LEM…", self, enabled=False, triggered=self.run_lem)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -146,6 +157,9 @@ class MainWindow(QMainWindow):
         m_edit = mb.addMenu("&Edit")
         m_edit.addAction(self.act_undo)
         m_edit.addAction(self.act_redo)
+
+        m_run = mb.addMenu("&Run")
+        m_run.addAction(self.act_run_lem)
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
@@ -167,6 +181,8 @@ class MainWindow(QMainWindow):
             self.mode_combo.addItem(label)
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         tb.addWidget(self.mode_combo)
+        tb.addSeparator()
+        tb.addAction(self.act_run_lem)
 
     # --- new / open / recent ---------------------------------------------
     def new_project(self):
@@ -232,6 +248,8 @@ class MainWindow(QMainWindow):
         self.mode_combo.setCurrentIndex([m for _, m in MODES].index(self._mode))
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
+        self.act_run_lem.setEnabled(True)
+        self._clear_result_tabs()
         self._render()
         self._populate_inputs_tree()
         self._update_title()
@@ -314,6 +332,78 @@ class MainWindow(QMainWindow):
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()
 
+    # --- LEM analysis ----------------------------------------------------
+    def run_lem(self):
+        if not self.doc.is_open or self._runner is not None:
+            return
+        if not self.doc.slope_data.get("circular"):
+            QMessageBox.information(
+                self, "Run LEM",
+                "This run analyzes a single circular surface, but no circles are "
+                "defined.\n\nAdd a circle (Inputs → Circles) first.")
+            return
+        dlg = RunLemDialog(self, defaults=self._last_lem_opts)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self._last_lem_opts = opts
+        self.act_run_lem.setEnabled(False)
+        self.statusBar().showMessage(f"Running {opts['method']} …")
+        self._runner = LemRunner(self.doc.slope_data, opts["method"],
+                                 opts["num_slices"], rapid=opts["rapid"], parent=self)
+        self._runner.succeeded.connect(self._on_lem_succeeded)
+        self._runner.failed.connect(self._on_lem_failed)
+        self._runner.finished.connect(self._on_lem_finished)
+        self._runner.start()
+
+    def _on_lem_succeeded(self, bundle):
+        if bundle.get("log"):
+            self.log.appendPlainText(bundle["log"].rstrip("\n"))
+        self.doc.results["lem_solution"] = bundle
+        self._show_solution(bundle)
+        res = bundle["results"]
+        self.statusBar().showMessage(
+            f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
+
+    def _on_lem_failed(self, message, log):
+        if log:
+            self.log.appendPlainText(log.rstrip("\n"))
+        QMessageBox.warning(self, "LEM run failed", message)
+        self.statusBar().showMessage("LEM run failed.")
+
+    def _on_lem_finished(self):
+        self.act_run_lem.setEnabled(self.doc.is_open)
+        if self._runner is not None:
+            self._runner.deleteLater()
+            self._runner = None
+
+    def _show_solution(self, bundle):
+        if self.solution_canvas is None:
+            self.solution_canvas = MplCanvas(self)
+            self.view_tabs.addTab(self.solution_canvas, "LEM · Solution")
+        try:
+            self.solution_canvas.render_solution(
+                self.doc.slope_data, bundle["slice_df"],
+                bundle["failure_surface"], bundle["results"])
+        except Exception:
+            traceback.print_exc()
+        self.view_tabs.setCurrentWidget(self.solution_canvas)
+
+    def _clear_result_tabs(self):
+        """Drop result views (e.g. on opening another file) so they don't show
+        a stale solution from the previous project."""
+        if self.solution_canvas is not None:
+            idx = self.view_tabs.indexOf(self.solution_canvas)
+            if idx >= 0:
+                self.view_tabs.removeTab(idx)
+            self.solution_canvas.deleteLater()
+            self.solution_canvas = None
+
+    def _on_view_tab_changed(self, index):
+        w = self.view_tabs.widget(index)
+        if hasattr(w, "ensure_fitted"):
+            w.ensure_fitted()
+
     # --- save ------------------------------------------------------------
     def save(self):
         if not self.doc.path:
@@ -360,6 +450,8 @@ class MainWindow(QMainWindow):
             f"engine.<br><br>Open an Excel input file to view its geometry and inputs.")
 
     def closeEvent(self, event):
+        if self._runner is not None and self._runner.isRunning():
+            self._runner.wait(5000)   # let an in-flight solve finish before teardown
         if self.doc.is_open and self.doc.dirty:
             res = QMessageBox.question(
                 self, "Unsaved changes", "Save changes before closing?",

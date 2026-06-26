@@ -76,6 +76,7 @@ class ProjectDocument(QObject):
         super().__init__(parent)
         self.slope_data = None
         self.path = None          # source .xlsx path (None until first save)
+        self.results = {}         # cached analysis results (e.g. 'lem_solution')
         self._dirty = False
         self._undo = []           # list of slope_data snapshots (deep copies)
         self._redo = []
@@ -99,6 +100,7 @@ class ProjectDocument(QObject):
         """Load a project from an Excel file. Raises ValueError on bad input."""
         self.slope_data = load_slope_data(str(path))
         self.path = str(path)
+        self.results.clear()
         self._undo.clear()
         self._redo.clear()
         self._dirty = False
@@ -109,6 +111,7 @@ class ProjectDocument(QObject):
         """Start a fresh, unsaved project from a minimal in-memory skeleton."""
         self.slope_data = new_slope_data()
         self.path = None          # no source file until first Save As
+        self.results.clear()
         self._undo.clear()
         self._redo.clear()
         self._dirty = True        # nothing on disk yet

@@ -276,9 +276,12 @@ studio/                # XSlope Studio desktop app
 - ✅ Polygon-sheet geometry editor (for polygon-based files; profile-based files use the profile editor). Shares one `MatGeometryDialog` master/detail with the profile editor; the Inputs tree marks **Polygons** editable only when there are no profile lines.
 - ✅ New (from template) — `ProjectDocument.new()` seeds a minimal valid in-memory skeleton (the `xslope_simple1` single-material slope + one circle, since a blank template won't `load`); edited via the forms, written out by Save As.
 
-**Phase 3 — LEM analysis**
-- Run-options dialog; worker-thread execution; Search + Solution + Reliability result tabs.
-- Single-surface, auto-search, rapid drawdown, reliability.
+**Phase 3 — LEM analysis** 🚧 **IN PROGRESS**
+- ✅ Thin end-to-end slice: **single circular surface** solve. `RunLemDialog` (method / num_slices / rapid) → `LemRunner` (`QThread`, `studio/runners.py`) runs `generate_slices` + `solve_selected` off the GUI thread, capturing engine stdout and delivering it with the result → **LEM · Solution** result tab via `plot_solution(fig=…)` (the `fig=` param added to `plot.py`, mirroring `plot_inputs`). Central area is now a `QTabWidget` view strip (Inputs + lazily-added result tabs); result tabs cleared on Open/New.
+- ⬜ Auto-search (circular + non-circular) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, need `fig=`).
+- ⬜ Non-circular single surface; remaining run-options (surface type, tolerances).
+- ⬜ Reliability → **LEM · Reliability** tab (`plot_reliability_results`, need `fig=`).
+- ⬜ Rapid drawdown wired through search/reliability; progress/cancel.
 
 **Phase 4 — Meshing + Seepage + FEM**
 - Meshing dialog; Seepage run + result view; FEM single/SSRM + result views; progress/cancel.

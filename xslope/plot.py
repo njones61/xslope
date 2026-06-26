@@ -1854,7 +1854,7 @@ def plot_inputs(
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -1864,11 +1864,19 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         failure_surface: Failure surface geometry
         results: Solution results
         figsize: Tuple of (width, height) in inches for the plot
+        fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
+            GUI canvas). When None (default) a new pyplot figure is created and shown;
+            when provided, the figure is cleared and reused and plt.show() is skipped.
 
     Returns:
-        None
+        The Matplotlib Figure that was drawn into.
     """
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
@@ -1975,7 +1983,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     )
 
     # Add vertical space below for the legend
-    plt.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(bottom=0.2)
     ax.set_aspect('equal')
 
     fs = results['FS']
@@ -2006,16 +2014,18 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
     ax.set_ylim(ymin, ymax)
 
-    plt.tight_layout()
-    
+    fig.tight_layout()
+
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg')
     if save_png:
-        plt.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
+        fig.savefig(base_name + '.png', dpi=dpi, bbox_inches='tight')
     if save_dxf:
         from .cad import axes_to_dxf
         axes_to_dxf(ax, base_name + '.dxf')
-    
-    plt.show()
+
+    if own_fig:
+        plt.show()
+    return fig
 
 # ========== Functions for Search Results =========
 

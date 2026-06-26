@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from xslope.plot import plot_inputs
+from xslope.plot import plot_inputs, plot_solution
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
@@ -80,13 +80,28 @@ class MplCanvas(QWidget):
 
     # --- rendering -------------------------------------------------------
     def render_inputs(self, slope_data, mode="lem", mat_table=False):
-        plot_inputs(slope_data, fig=self.figure, mode=mode, mat_table=mat_table)
+        self._draw(lambda fig: plot_inputs(slope_data, fig=fig, mode=mode,
+                                           mat_table=mat_table))
+
+    def render_solution(self, slope_data, slice_df, failure_surface, results):
+        self._draw(lambda fig: plot_solution(slope_data, slice_df, failure_surface,
+                                             results, fig=fig))
+
+    def _draw(self, draw_fn):
+        """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.
+        Fitting is deferred to ``ensure_fitted`` so a canvas drawn while its tab is
+        hidden (no viewport size yet) still fits when the tab is first shown."""
+        draw_fn(self.figure)
         self._rasterize(self._target_dpi())
-        if not self._fitted:
-            # Fit once the view has a real size (after layout settles).
-            QTimer.singleShot(0, self.fit)
-            self._fitted = True
+        QTimer.singleShot(0, self.ensure_fitted)
         self._schedule_refine()
+
+    def ensure_fitted(self):
+        """Fit the figure to the window the first time the view has a real size."""
+        if not self._fitted and self._pixitem is not None \
+                and self.view.viewport().width() > 1:
+            self.fit()
+            self._fitted = True
 
     def clear(self):
         self.figure.clear()

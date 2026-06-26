@@ -154,6 +154,7 @@ class RunSeepDialog(QDialog):
         self.bc.addItem("Set 1", 1)
         if has_bc2:
             self.bc.addItem("Set 2 (rapid drawdown)", 2)
+            self.bc.addItem("Both sets (1 & 2)", "both")
         idx = self.bc.findData(defaults.get("bc", 1))
         if idx >= 0:
             self.bc.setCurrentIndex(idx)

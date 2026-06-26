@@ -61,8 +61,10 @@ class MeshWorker(QObject):
 
 class SeepRunner(QThread):
     """Runs a seepage solve off the GUI thread (no gmsh, so a plain per-run
-    QThread is fine). Emits ``succeeded`` with ``{seep_data, solution, options}``
-    or ``failed``."""
+    QThread is fine). ``options['bc']`` may be 1, 2, or ``'both'``; for ``'both'``
+    it solves BC set 1 then 2, emitting ``succeeded`` once per set (each bundle's
+    ``options['bc']`` is the concrete set). Emits ``failed`` if a set errors, but
+    a later set still runs."""
 
     succeeded = Signal(object)
     failed = Signal(str)
@@ -74,24 +76,29 @@ class SeepRunner(QThread):
 
     def run(self):
         from xslope.seep import build_seep_data, run_seepage_analysis
-        try:
-            sd = self._sd
-            mesh = sd.get("mesh")
-            if mesh is None:
-                self.failed.emit("No mesh available — build a mesh first.")
-                return
-            bc = self._options.get("bc", 1)
-            tol = self._options.get("tol", 1e-4)
-            print(f"Building seepage data (BC set {bc})…")
-            seep_data = build_seep_data(mesh, sd, seep_bc=bc)
-            print(f"Running seepage analysis (tol={tol:g})…")
-            solution = run_seepage_analysis(seep_data, tol=tol)
-            print("Seepage analysis complete.")
-            self.succeeded.emit({"seep_data": seep_data, "solution": solution,
-                                 "options": self._options})
-        except Exception:
-            traceback.print_exc()
-            self.failed.emit("Seepage run failed — see the Log pane for details.")
+        sd = self._sd
+        mesh = sd.get("mesh")
+        if mesh is None:
+            self.failed.emit("No mesh available — build a mesh first.")
+            return
+        tol = self._options.get("tol", 1e-4)
+        bc_opt = self._options.get("bc", 1)
+        bcs = [1, 2] if bc_opt == "both" else [bc_opt]
+        any_failed = False
+        for bc in bcs:
+            try:
+                print(f"Building seepage data (BC set {bc})…")
+                seep_data = build_seep_data(mesh, sd, seep_bc=bc)
+                print(f"Running seepage analysis (BC set {bc}, tol={tol:g})…")
+                solution = run_seepage_analysis(seep_data, tol=tol)
+                print(f"Seepage analysis complete (BC set {bc}).")
+                self.succeeded.emit({"seep_data": seep_data, "solution": solution,
+                                     "options": {**self._options, "bc": bc}})
+            except Exception:
+                any_failed = True
+                traceback.print_exc()
+        if any_failed:
+            self.failed.emit("A seepage run failed — see the Log pane for details.")
 
 
 class FemRunner(QThread):

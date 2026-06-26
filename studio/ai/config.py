@@ -68,6 +68,13 @@ class AssistantConfig:
         if ollama_base is not None:
             self._s.setValue("ai/ollama_base", ollama_base)
 
+    def confirm_before_run(self):
+        v = self._s.value("ai/confirm", True)
+        return v if isinstance(v, bool) else str(v).lower() in ("true", "1")
+
+    def set_confirm_before_run(self, value):
+        self._s.setValue("ai/confirm", bool(value))
+
     # --- credentials -----------------------------------------------------
     def api_key(self, provider):
         kr = _keyring()

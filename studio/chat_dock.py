@@ -1,9 +1,10 @@
-"""ChatDock — the AI assistant panel (Phase A spike).
+"""ChatDock — the AI assistant panel.
 
-A right-side dock: a transcript (markdown-ish HTML with inline figures and
-collapsible "ran code" blocks), a multi-line input (Ctrl/Cmd+Enter sends), an
-autonomy toggle (confirm before running vs auto-run), and Stop. It wires to
-``studio.ai.assistant.Assistant`` and renders its signals.
+A narrow right-side dock: a transcript (markdown-ish HTML with inline figures and
+"ran code" blocks), a multi-line input (Ctrl/Cmd+Enter sends), Send/Stop, and a
+Settings button (provider/model, key, confirm-before-running). It wires to
+``studio.ai.assistant.Assistant`` and renders its signals. The header is kept
+minimal (a wrapping model label + Settings) so the dock can be made narrow.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from PySide6.QtGui import (
     QImage, QKeySequence, QShortcut, QTextCursor, QTextDocument,
 )
 from PySide6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
+    QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
 )
 
@@ -37,22 +38,12 @@ class ChatDock(QWidget):
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setEnabled(False)
         self.settings_btn = QPushButton("Settings…")
-        self.autonomy = QComboBox()
-        self.autonomy.addItem("Confirm before running", True)
-        self.autonomy.addItem("Auto-run", False)
 
         self.model_label = QLabel()
+        self.model_label.setWordWrap(True)        # wraps so the dock can be narrow
         top = QHBoxLayout()
-        top.addWidget(self.model_label)
-        top.addStretch(1)
-        top.addWidget(self.settings_btn)
-        top.addWidget(self.autonomy)
-
-        # Capability caption (shown only when the model can't / may not run code).
-        self.caps_label = QLabel()
-        self.caps_label.setWordWrap(True)
-        self.caps_label.setStyleSheet("color:#9a6700;")
-        self.caps_label.setVisible(False)
+        top.addWidget(self.model_label, 1)
+        top.addWidget(self.settings_btn, 0, Qt.AlignTop)
 
         row = QHBoxLayout()
         row.addWidget(self.send_btn)
@@ -60,15 +51,14 @@ class ChatDock(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addLayout(top)
-        layout.addWidget(self.caps_label)
         layout.addWidget(self.transcript, 1)
         layout.addWidget(self.input)
         layout.addLayout(row)
+        self.setMinimumWidth(220)
 
         self.send_btn.clicked.connect(self._send)
         self.stop_btn.clicked.connect(self._assistant.cancel)
         self.settings_btn.clicked.connect(self._open_settings)
-        self.autonomy.currentIndexChanged.connect(self._sync_autonomy)
         for seq in ("Ctrl+Return", "Ctrl+Enter", "Meta+Return", "Meta+Enter"):
             QShortcut(QKeySequence(seq), self.input, activated=self._send)
 
@@ -77,25 +67,11 @@ class ChatDock(QWidget):
         self._assistant.tool_declined.connect(self._on_tool_declined)
         self._assistant.failed.connect(self._on_failed)
         self._assistant.finished.connect(self._on_finished)
-        self._sync_autonomy()
         self._refresh_model_label()
 
     # --- actions ---------------------------------------------------------
-    def _sync_autonomy(self):
-        self._assistant.confirm = bool(self.autonomy.currentData())
-
     def _refresh_model_label(self):
         self.model_label.setText(self._assistant.config.display_name())
-        tools = self._assistant.config.capabilities().get("tools")
-        if tools is False:
-            msg = "This model has no tool support — it can chat but can't run code."
-        elif tools is None:
-            msg = ("Running code needs a tool-calling model; some local models "
-                   "don't support it, so run-code may not work.")
-        else:
-            msg = ""
-        self.caps_label.setText(msg)
-        self.caps_label.setVisible(bool(msg))
 
     def _open_settings(self):
         from .ai.settings_dialog import AssistantSettingsDialog
@@ -154,8 +130,9 @@ class ChatDock(QWidget):
         img = QImage(path)
         if img.isNull():
             return
-        if img.width() > 460:
-            img = img.scaledToWidth(460, Qt.SmoothTransformation)
+        cap = max(220, self.transcript.viewport().width() - 24)
+        if img.width() > cap:
+            img = img.scaledToWidth(cap, Qt.SmoothTransformation)
         self._img_seq += 1
         url = QUrl(f"xslope-fig://{self._img_seq}")
         self.transcript.document().addResource(QTextDocument.ImageResource, url, img)

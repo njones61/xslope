@@ -185,7 +185,6 @@ class Assistant(QObject):
         self.config = AssistantConfig(getattr(main_window, "settings", None))
         self._messages = []
         self._worker = None
-        self.confirm = True               # autonomy: confirm before running code
 
     # --- lifecycle -------------------------------------------------------
     def is_busy(self):
@@ -230,7 +229,7 @@ class Assistant(QObject):
             return
         code = (req["input"] or {}).get("code", "")
 
-        if self.confirm and not self._confirm_run(code):
+        if self.config.confirm_before_run() and not self._confirm_run(code):
             self.tool_declined.emit(code)
             holder["content"] = "The user declined to run this code."
             holder["event"].set()

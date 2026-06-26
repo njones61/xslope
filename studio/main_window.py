@@ -84,7 +84,14 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        self.resize(1200, 800)
+        # Launch large — the canvas is the main feature. Cap to the screen.
+        from PySide6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen()
+        avail = screen.availableGeometry() if screen else None
+        if avail is not None:
+            self.resize(min(1680, avail.width() - 80), min(1040, avail.height() - 120))
+        else:
+            self.resize(1680, 1040)
         self.settings = QSettings(ORG_NAME, APP_NAME)
 
         self.doc = ProjectDocument(self)
@@ -136,10 +143,11 @@ class MainWindow(QMainWindow):
         self._make_display_dock()
         self._make_log_dock()
         self._make_chat_dock()
-        # Let the left dock column own the bottom-left corner so it runs the full
-        # window height; the Log dock then starts at the central canvas's left edge
-        # instead of spanning under the Inputs/Display docks.
+        # Give both side columns the full window height (they own the bottom
+        # corners), so the Log dock spans only the central canvas's width and the
+        # left (Inputs/Display) and right (Assistant) columns run top to bottom.
         self.setCorner(Qt.BottomLeftCorner, Qt.LeftDockWidgetArea)
+        self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
         self._arrange_docks()
         self._make_actions()
         self._make_menus()
@@ -231,6 +239,9 @@ class MainWindow(QMainWindow):
         # scrolling; the Display panel takes the larger remaining share.
         self.resizeDocks([self.inputs_dock, self.display_dock], [300, 430],
                          Qt.Vertical)
+        # Keep the Assistant a relatively narrow right column so the canvas stays
+        # the main feature.
+        self.resizeDocks([self.chat_dock], [380], Qt.Horizontal)
 
     def _make_chat_dock(self):
         # AI assistant (Phase A spike) — a chat that drives the app/engine via an

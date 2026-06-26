@@ -7,8 +7,8 @@ variables). Ollama needs no key (local, free) but exposes a base-URL field.
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
-    QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel,
+    QLineEdit, QVBoxLayout,
 )
 
 from .config import PROVIDERS
@@ -42,10 +42,21 @@ class AssistantSettingsDialog(QDialog):
         self.ollama_base = QLineEdit(config.ollama_base())
         form.addRow("Ollama URL", self.ollama_base)
 
+        self.confirm = QCheckBox("Confirm before running code")
+        self.confirm.setChecked(config.confirm_before_run())
+        self.confirm.setToolTip("Show the code and ask before each run. Uncheck to "
+                                "let the assistant run code automatically.")
+        form.addRow("", self.confirm)
+
         layout.addLayout(form)
         self.note = QLabel()
         self.note.setWordWrap(True)
         layout.addWidget(self.note)
+        # Capability warning (shown only when the model can't / may not run code).
+        self.caps_warn = QLabel()
+        self.caps_warn.setWordWrap(True)
+        self.caps_warn.setStyleSheet("color:#9a6700;")
+        layout.addWidget(self.caps_warn)
         if not config.keyring_available():
             warn = QLabel("⚠ No system keychain found — the key will be stored in "
                           "app settings (less secure). Install 'keyring' for secure "
@@ -94,10 +105,22 @@ class AssistantSettingsDialog(QDialog):
         cache = " Prompt caching reduces repeat-turn cost." if spec.get("prompt_cache") else ""
         self.note.setText(f"{cost}\n{tool_note}{cache}")
 
+        # The relocated capability warning (was a caption in the dock).
+        if tools is False:
+            warn = "This model has no tool support — it can chat but can't run code."
+        elif tools is None:
+            warn = ("Running code needs a tool-calling model; some local models "
+                    "don't support it, so run-code may not work.")
+        else:
+            warn = ""
+        self.caps_warn.setText(warn)
+        self.caps_warn.setVisible(bool(warn))
+
     def _save(self):
         prov = self.provider.currentData()
         model = self.model.currentText().strip()
         self._config.set_selection(prov, model, self.ollama_base.text().strip())
         if self._spec()["needs_key"]:
             self._config.set_api_key(prov, self.api_key.text().strip())
+        self._config.set_confirm_before_run(self.confirm.isChecked())
         self.accept()

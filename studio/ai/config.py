@@ -27,6 +27,13 @@ PROVIDERS = {
         "models": ["gpt-4o", "gpt-4o-mini", "o4-mini"],
         "tools": True, "vision": True,
     },
+    "deepseek": {
+        "label": "DeepSeek", "prefix": "deepseek/", "needs_key": True,
+        "models": ["deepseek-chat"],   # V3 chat: function-calling capable
+        # Text-only (no vision). Cheap + caches the prompt prefix server-side, so
+        # it gets the full skill (`skill`) without Anthropic cache_control blocks.
+        "tools": True, "vision": False, "skill": True,
+    },
     "ollama": {
         "label": "Ollama (local, free)", "prefix": "ollama_chat/", "needs_key": False,
         "needs_base": True, "editable_model": True,
@@ -129,8 +136,17 @@ class AssistantConfig:
         return {"tools": spec.get("tools"), "vision": spec.get("vision")}
 
     def supports_prompt_cache(self):
-        """Whether to mark the system prompt cacheable (Anthropic only)."""
+        """Whether to mark the system prompt cacheable with cache_control blocks
+        (Anthropic only)."""
         return bool(PROVIDERS[self.provider()].get("prompt_cache"))
+
+    def wants_skill(self):
+        """Whether to send the full xslope skill body in the system prompt. True
+        for providers that can afford it — Anthropic (prompt-cached) and any
+        provider flagged ``skill`` (e.g. DeepSeek: cheap + server-side prefix
+        caching). Others get the compact prompt to keep per-turn cost/latency low."""
+        spec = PROVIDERS[self.provider()]
+        return bool(spec.get("prompt_cache") or spec.get("skill"))
 
     def completion_kwargs(self):
         """The provider-specific kwargs for ``litellm.completion(...)``."""

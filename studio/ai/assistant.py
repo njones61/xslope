@@ -445,7 +445,7 @@ class Assistant(QObject):
         # Full skill body only for Anthropic (prompt-cached, so cheap). Local /
         # other models get the compact prompt and introspect at runtime — sending
         # ~13k skill tokens every turn makes a local model crawl.
-        if self.config.supports_prompt_cache():
+        if self.config.wants_skill():
             skill = _load_skill_text()
             if skill:
                 # The skill already carries the modeling rules in full, so only the

@@ -72,6 +72,26 @@ class PythonKernel:
 
         return {"run_lem": run_lem}
 
+    @staticmethod
+    def _normalize(code):
+        """Salvage code from weaker models that emit literal ``\\n`` / ``\\t``
+        escape sequences instead of real newlines (so it lands as one unparseable
+        line). Only applied when the code won't compile as-is *and* the unescaped
+        version does — well-formed code (incl. real backslashes in strings) is
+        left untouched."""
+        try:
+            compile(code, "<assistant>", "exec")
+            return code
+        except SyntaxError:
+            if "\\n" in code or "\\t" in code:
+                fixed = code.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+                try:
+                    compile(fixed, "<assistant>", "exec")
+                    return fixed
+                except SyntaxError:
+                    pass
+        return code
+
     def run(self, code):
         """Execute ``code``; return ``(stdout_text, [figure_png_paths], error_text)``.
         ``error_text`` is ``None`` on success."""
@@ -85,6 +105,7 @@ class PythonKernel:
         self._ns["slope_data"] = self._doc.slope_data
         self._ns["results"] = self._doc.results
 
+        code = self._normalize(code)
         before = set(plt.get_fignums())
         buf = StringIO()
         error = None

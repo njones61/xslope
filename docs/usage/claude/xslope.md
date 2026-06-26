@@ -643,7 +643,7 @@ write_circle(1, xo=10, yo=40, option="Depth", depth=0)
 - **Center X**: Xo = halfway between slope toe and crest (midpoint of slope in plan)
 - **Center Y**: Yo = toe elevation + 2 × slope height (double the height above the toe)
 - For "Depth" option: Depth is an **elevation** (not a distance); R = Yo - Depth. E.g., Depth=0 means the circle bottom is at elevation 0
-- **Always** define one circle passing through the toe (`Option = "Intercept"`, Xi/Yi = toe coords)
+- **Always** define one circle passing through the toe (`Option = "Intercept"`, Xi/Yi = toe coords). A toe circle passes THROUGH the toe point — it is **not** the same as a circle tangent to the toe *elevation*. If you build circles in memory (no Intercept option), compute the toe circle as `R = distance(center, toe)`, `Depth = Yo - R`; do not just set `Depth = toe_elevation`.
 - **Always** define one circle tangent to the base (bottom) of each material layer
 - **Make sure trial circles daylight INSIDE the model.** The flat ground must extend far enough left and right that the largest trial circles exit on the ground surface, never at a vertical model edge. If a critical or trial circle reaches the boundary, widen the geometry (see the Sheet: profile extent rule) and re-run — a surface clipped by the domain edge is not the true critical surface.
 

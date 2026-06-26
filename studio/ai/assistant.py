@@ -139,8 +139,11 @@ the canvas re-renders automatically.
 - profile_lines[i]: {'coords':[(x,y),...], 'mat_id':0}  # mat_id = 0-based index into
   materials; lines are layer-top boundaries, ordered top to bottom.
 - circles[i]: {'Xo':20.0,'Yo':40.0,'Depth':-10.0,'R':50.0}  # Depth = elevation of
-  the circle's lowest point, R = Yo - Depth. (In-memory there is no intercept key;
-  for a toe circle set R = distance from center to the toe point.)
+  the circle's lowest point, R = Yo - Depth. In-memory there is no intercept key,
+  so a TOE circle (one passing THROUGH the toe point) is R = distance(center, toe),
+  Depth = Yo - R. Do NOT use Depth = toe_elevation for the toe circle — that is
+  merely tangent to the toe LEVEL (lowest point below the center), not through the
+  toe point, and is a different circle.
 - non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
 - piezo_line / piezo_line2: list of (x, y) tuples.
 - dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
@@ -164,7 +167,9 @@ MODELING_BRIEF = """\
 Modeling rules (slope-stability physics):
 - Starting circles: put Xo at the toe-crest midpoint and Yo = toe_elev + 2x slope
   height; ALWAYS include one circle through the toe and one tangent to the base of
-  EACH material layer (including the hard base at max_depth).
+  EACH material layer (including the hard base at max_depth). A toe circle PASSES
+  THROUGH the toe point: R = distance(center, toe), Depth = Yo - R — NOT Depth =
+  toe_elevation (that is only tangent to the toe level, a different circle).
 - Extent: extend the flat ground far enough on BOTH sides that every trial circle
   daylights on the ground INSIDE the model, never at a vertical edge (>= ~2x slope
   height beyond toe and crest, more for deep base circles). Do NOT copy the source

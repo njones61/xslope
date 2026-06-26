@@ -208,10 +208,15 @@ class MainWindow(QMainWindow):
         self.log_dock = dock
 
     def _arrange_docks(self):
+        # A QTreeWidget gives the dock almost no width hint, so without an explicit
+        # width the left column collapses to ~90px. Size it to fit the Inputs tree
+        # (180px name col + Count) without being wide.
+        self.resizeDocks([self.inputs_dock, self.display_dock], [290, 290],
+                         Qt.Horizontal)
         # The left column spans the full height (it owns the bottom-left corner).
-        # Give the Inputs tree enough room to show all categories without
-        # scrolling, while still leaving the Display panel a useful share.
-        self.resizeDocks([self.inputs_dock, self.display_dock], [440, 360],
+        # Give the Inputs tree enough height to show all categories without
+        # scrolling; the Display panel takes the larger remaining share.
+        self.resizeDocks([self.inputs_dock, self.display_dock], [300, 430],
                          Qt.Vertical)
 
     def _install_log_capture(self):

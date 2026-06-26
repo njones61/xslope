@@ -115,6 +115,8 @@ class MainWindow(QMainWindow):
 
     # --- actions / menus -------------------------------------------------
     def _make_actions(self):
+        self.act_new = QAction("&New", self, shortcut=QKeySequence.New,
+                               triggered=self.new_project)
         self.act_open = QAction("&Open…", self, shortcut=QKeySequence.Open,
                                 triggered=self.open_dialog)
         self.act_quit = QAction("&Quit", self, shortcut=QKeySequence.Quit,
@@ -132,6 +134,7 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
 
         m_file = mb.addMenu("&File")
+        m_file.addAction(self.act_new)
         m_file.addAction(self.act_open)
         self.recent_menu = m_file.addMenu("Open &Recent")
         m_file.addSeparator()
@@ -155,6 +158,7 @@ class MainWindow(QMainWindow):
         tb = QToolBar("Main", self)
         tb.setObjectName("main_toolbar")
         self.addToolBar(tb)
+        tb.addAction(self.act_new)
         tb.addAction(self.act_open)
         tb.addSeparator()
         tb.addWidget(QLabel(" Mode: "))
@@ -164,7 +168,29 @@ class MainWindow(QMainWindow):
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         tb.addWidget(self.mode_combo)
 
-    # --- open / recent ---------------------------------------------------
+    # --- new / open / recent ---------------------------------------------
+    def new_project(self):
+        if not self._confirm_discard():
+            return
+        self.doc.new()
+        self.statusBar().showMessage(
+            "New project — edit the inputs, then Save As to write an Excel file.")
+
+    def _confirm_discard(self):
+        """Prompt to save/discard if the current doc has unsaved edits.
+        Returns False if the user cancels (caller should abort)."""
+        if not (self.doc.is_open and self.doc.dirty):
+            return True
+        res = QMessageBox.question(
+            self, "Unsaved changes", "Discard unsaved changes to the current project?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        if res == QMessageBox.Cancel:
+            return False
+        if res == QMessageBox.Save:
+            self.save()
+            return not self.doc.dirty   # abort if the save failed/was cancelled
+        return True
+
     def open_dialog(self):
         start = os.path.dirname(self._recent[0]) if self._recent else ""
         path, _ = QFileDialog.getOpenFileName(
@@ -173,6 +199,8 @@ class MainWindow(QMainWindow):
             self.open_path(path)
 
     def open_path(self, path):
+        if not self._confirm_discard():
+            return
         try:
             self.doc.load(path)
         except Exception as exc:  # ValueError from the loader, or anything else
@@ -208,8 +236,9 @@ class MainWindow(QMainWindow):
         self._populate_inputs_tree()
         self._update_title()
         n = len(self.doc.slope_data.get("materials", []))
+        name = os.path.basename(self.doc.path) if self.doc.path else "untitled"
         self.statusBar().showMessage(
-            f"Loaded {os.path.basename(self.doc.path)} — {n} material(s). "
+            f"Loaded {name} — {n} material(s). "
             f"Click an underlined input to edit it.")
 
     def _render(self):
@@ -246,11 +275,15 @@ class MainWindow(QMainWindow):
 
         sbc = d.get("seepage_bc") or {}
         profile_lines = d.get("profile_lines") or []
+        polygons = d.get("polygons") or []
         add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
         add("Profile lines", len(profile_lines),
             category="profile" if profile_lines else None)
-        add("Polygons", len(d.get("polygons") or []))
+        # Polygons are derived from profile lines for profile-based files (edit them
+        # via the profile editor); only polygon-based files edit polygons directly.
+        add("Polygons", len(polygons),
+            category="polygons" if (polygons and not profile_lines) else None)
         add("Circles", len(d.get("circles") or []), category="circles")
         add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")
         add("Piezometric lines", len(d.get("piezo_line") or []), category="piezo")

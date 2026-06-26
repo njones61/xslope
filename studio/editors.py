@@ -701,22 +701,17 @@ class PilesEditor(CategoryEditor):
         slope_data["pile_lines"] = rows
 
 
-# --- profile lines (geometry; master/detail) -------------------------------- #
-def _resync_geometry(slope_data):
-    """Rebuild the derived geometry (polygons, domain, ground surface, t-crack)
-    from edited profile_lines — the resync the loader/design driver also do."""
-    from shapely.geometry import LineString, Polygon
-    from xslope.mesh import build_polygons
+# --- geometry: profile lines & polygons (master/detail) --------------------- #
+def _set_derived_geometry(slope_data, polys):
+    """Store material-zone polygons and rebuild the geometry derived from them
+    (ground surface, domain polygon, tension-crack line) — the resync the loader
+    performs after parsing. ``polys`` is the [{'polygon': Polygon, 'mat_id': int}]
+    list both the profile and polygon editors converge on."""
+    from shapely.geometry import LineString
     from xslope.fileio import build_ground_surface_from_polygons
 
-    profile_lines = slope_data.get("profile_lines") or []
-    if not profile_lines:
-        return
-    polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"]}
-             for p in build_polygons(slope_data={"profile_lines": profile_lines,
-                                                  "max_depth": slope_data.get("max_depth")})]
     slope_data["polygons"] = polys
-    gs, dom = build_ground_surface_from_polygons(polys)
+    gs, dom = (build_ground_surface_from_polygons(polys) if polys else (None, None))
     slope_data["ground_surface"] = gs
     slope_data["domain_polygon"] = dom
     td = slope_data.get("tcrack_depth", 0)
@@ -726,27 +721,45 @@ def _resync_geometry(slope_data):
         slope_data["tcrack_surface"] = None
 
 
-class ProfileLinesDialog(QDialog):
-    """Master/detail editor: a list of profile lines (left) + the selected line's
-    material and vertex table (right)."""
+def _resync_geometry(slope_data):
+    """Rebuild polygons (and the geometry derived from them) from edited
+    profile_lines — the resync the loader/design driver also do."""
+    from shapely.geometry import Polygon
+    from xslope.mesh import build_polygons
+
+    profile_lines = slope_data.get("profile_lines") or []
+    if not profile_lines:
+        return
+    polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"]}
+             for p in build_polygons(slope_data={"profile_lines": profile_lines,
+                                                  "max_depth": slope_data.get("max_depth")})]
+    _set_derived_geometry(slope_data, polys)
+
+
+class MatGeometryDialog(QDialog):
+    """Master/detail editor over a list of material-tagged coordinate sequences:
+    the items list (left) + the selected item's material and vertex table (right).
+    Shared by the profile-line editor (open polylines) and the polygon editor
+    (closed rings); the two differ only in labels, help text, and how coords are
+    extracted/rebuilt by the owning CategoryEditor."""
 
     XY = [Field("x", "x"), Field("y", "y")]
 
-    def __init__(self, profile_lines, materials, parent=None):
+    def __init__(self, title, help_text, item_label, items, materials, parent=None):
+        # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
         super().__init__(parent)
-        self.setWindowTitle("Profile lines")
+        self.setWindowTitle(title)
         self.resize(680, 540)
+        self._item_label = item_label
         self._materials = materials
-        self._lines = [{"mat_id": pl.get("mat_id"),
-                        "coords": [tuple(c) for c in pl.get("coords", [])]}
-                       for pl in (profile_lines or [])]
+        self._lines = [{"mat_id": it.get("mat_id"),
+                        "coords": [tuple(c) for c in it.get("coords", [])]}
+                       for it in (items or [])]
         self._cur = -1
         self.table = None
 
         main = QVBoxLayout(self)
-        main.addWidget(_help_label(
-            "Each profile line is the top of a material layer, drawn left→right and ordered "
-            "shallowest first. Select a line to edit its material and vertices."))
+        main.addWidget(_help_label(help_text))
         body = QHBoxLayout()
         main.addLayout(body, 1)
 
@@ -756,9 +769,9 @@ class ProfileLinesDialog(QDialog):
         self.list.currentRowChanged.connect(self._on_select)
         left.addWidget(self.list)
         lbtns = QHBoxLayout()
-        b_add = QPushButton("Add line")
+        b_add = QPushButton(f"Add {item_label.lower()}")
         b_add.clicked.connect(self._add_line)
-        b_rem = QPushButton("Remove line")
+        b_rem = QPushButton(f"Remove {item_label.lower()}")
         b_rem.clicked.connect(self._remove_line)
         lbtns.addWidget(b_add)
         lbtns.addWidget(b_rem)
@@ -786,8 +799,8 @@ class ProfileLinesDialog(QDialog):
     def _label(self, i):
         mid = self._lines[i]["mat_id"]
         if mid is not None and 0 <= mid < len(self._materials):
-            return f"Line {i + 1}  (mat {mid + 1}: {self._materials[mid].get('name', '')})"
-        return f"Line {i + 1}  (mat ?)"
+            return f"{self._item_label} {i + 1}  (mat {mid + 1}: {self._materials[mid].get('name', '')})"
+        return f"{self._item_label} {i + 1}  (mat ?)"
 
     def _refresh_list(self):
         self.list.blockSignals(True)
@@ -856,12 +869,48 @@ class ProfileEditor(CategoryEditor):
     label = "Profile lines"
 
     def build(self, slope_data, parent):
-        return ProfileLinesDialog(slope_data.get("profile_lines") or [],
-                                  slope_data.get("materials") or [], parent)
+        return MatGeometryDialog(
+            "Profile lines",
+            "Each profile line is the top of a material layer, drawn left→right and "
+            "ordered shallowest first. Select a line to edit its material and vertices.",
+            "Line",
+            slope_data.get("profile_lines") or [],
+            slope_data.get("materials") or [], parent)
 
     def apply(self, slope_data, dlg):
         slope_data["profile_lines"] = dlg.result_lines()
         _resync_geometry(slope_data)  # rebuild polygons / ground surface / t-crack
+
+
+class PolygonEditor(CategoryEditor):
+    """Geometry editor for polygon-based files (no profile sheet). Each polygon is
+    a closed material zone; the loader closes the ring implicitly, so the editor
+    shows/stores only the distinct exterior vertices."""
+
+    label = "Polygons"
+
+    def build(self, slope_data, parent):
+        items = []
+        for p in (slope_data.get("polygons") or []):
+            coords = list(p["polygon"].exterior.coords)
+            if len(coords) >= 2 and coords[0] == coords[-1]:
+                coords = coords[:-1]                       # drop the closing duplicate
+            items.append({"mat_id": p.get("mat_id"), "coords": coords})
+        return MatGeometryDialog(
+            "Polygons",
+            "Each polygon is a closed material zone (the ring is closed automatically, "
+            "so list each vertex once). Select a polygon to edit its material and vertices.",
+            "Polygon", items, slope_data.get("materials") or [], parent)
+
+    def apply(self, slope_data, dlg):
+        from shapely.geometry import Polygon
+        polys = []
+        for it in dlg.result_lines():
+            coords = it["coords"]
+            if len(coords) < 3:
+                continue                                   # not a valid ring; skip
+            polys.append({"polygon": Polygon(coords), "mat_id": it["mat_id"]})
+        _set_derived_geometry(slope_data, polys)
 
 
 # --- reinforcement ---------------------------------------------------------- #
@@ -905,4 +954,5 @@ CATEGORY_EDITORS = {
     "piles": PilesEditor(),
     "reinforce": ReinforcementEditor(),
     "profile": ProfileEditor(),
+    "polygons": PolygonEditor(),
 }

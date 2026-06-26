@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
 USAGE_COLOR = {"lem": "#c00000", "fem": "#0432ff", "seep": "#2e7d32", "rel": "#9a7d0a"}
 USAGE_NAME = {"lem": "LEM only", "fem": "FEM only",
               "seep": "Seepage only", "rel": "Reliability"}
+# Short labels for the show/hide toggles at the top of an editor.
+USAGE_TOGGLE_LABEL = {"lem": "LEM", "fem": "FEM", "seep": "Seepage", "rel": "Reliability"}
 
 
 # --------------------------------------------------------------------------- #
@@ -40,12 +42,23 @@ class Field:
 
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": ""}
 
-    def __init__(self, key, header, kind="float", choices=None, default=None, usage=None):
+    def __init__(self, key, header, kind="float", choices=None, default=None,
+                 usage=None, applies=None):
         self.key = key
         self.header = header
         self.kind = kind
         self.choices = [str(c) for c in (choices or [])]
-        self.usage = usage  # None | 'lem' | 'fem' | 'seep' | 'rel' -> header color
+        # `applies`: the set of analyses this field is used in — drives the
+        # show/hide column toggles; None = universal (geometry/identity, always
+        # shown). `usage`: the single analysis a field is *specific* to, used for
+        # the mirrored header color — only set when the field belongs to exactly
+        # one analysis (shared fields like c/φ stay uncolored but still hide when
+        # neither of their analyses is toggled on).
+        if applies is None and usage is not None:
+            applies = {usage}
+        self.applies = frozenset(applies) if applies is not None else None
+        self.usage = usage if usage is not None else (
+            next(iter(self.applies)) if (self.applies and len(self.applies) == 1) else None)
         if default is None:
             default = self.choices[0] if kind == "choice" and self.choices else self._BLANK[kind]
         self.default = default
@@ -133,6 +146,14 @@ class _EditableTable(QWidget):
         bar.addStretch(1)
         layout.addLayout(bar)
 
+    def apply_usage_filter(self, enabled):
+        """Show only columns whose ``applies`` set intersects ``enabled`` (a set of
+        analysis tags). Universal columns (applies=None) are always shown. Hidden
+        columns keep their data, so toggling never drops values on save."""
+        for j, f in enumerate(self._fields):
+            visible = f.applies is None or bool(f.applies & enabled)
+            self.table.setColumnHidden(j, not visible)
+
     def _set_row(self, i, row):
         for j, f in enumerate(self._fields):
             val = row.get(f.key, f.default)
@@ -200,21 +221,60 @@ def _ok_cancel(dialog, layout):
 
 
 class TableEditorDialog(QDialog):
-    """Editable table over a list of dict records."""
+    """Editable table over a list of dict records.
 
-    def __init__(self, title, fields, rows, new_row, parent=None, help_text=None):
+    ``usage_toggles`` (a list of analysis tags, e.g. ``["lem", "fem"]``) adds a row
+    of checkboxes that show/hide the columns specific to each analysis, so the user
+    sees only the inputs relevant to what they're doing. The toggle state persists
+    per dialog. When omitted, a static color legend is shown instead."""
+
+    def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
+                 usage_toggles=None):
         super().__init__(parent)
         self.setWindowTitle(title)
+        self._title = title
         self.resize(min(1200, 160 + 110 * len(fields)), 460)
         layout = QVBoxLayout(self)
         if help_text:
             layout.addWidget(_help_label(help_text))
-        legend = _usage_legend(fields)
-        if legend:
-            layout.addWidget(legend)
         self._editable = _EditableTable(fields, rows, new_row)
+        if usage_toggles:
+            layout.addLayout(self._build_toggle_bar(usage_toggles))
+        else:
+            legend = _usage_legend(fields)
+            if legend:
+                layout.addWidget(legend)
         layout.addWidget(self._editable)
         _ok_cancel(self, layout)
+        if usage_toggles:
+            self._apply_toggles()      # set initial column visibility
+
+    def _build_toggle_bar(self, tags):
+        from PySide6.QtWidgets import QCheckBox
+        from PySide6.QtCore import QSettings
+        s = QSettings("XSlope", "XSlope Studio")
+        bar = QHBoxLayout()
+        bar.addWidget(QLabel("Show columns for:"))
+        self._toggles = {}
+        for t in tags:
+            cb = QCheckBox(USAGE_TOGGLE_LABEL[t])
+            default = (t != "rel")     # reliability σ columns hidden by default (niche)
+            cb.setChecked(bool(s.value(f"editor_toggles/{self._title}/{t}",
+                                       default, type=bool)))
+            cb.setStyleSheet(f"color:{USAGE_COLOR[t]}; font-weight:bold;")
+            cb.toggled.connect(self._apply_toggles)
+            self._toggles[t] = cb
+            bar.addWidget(cb)
+        bar.addStretch(1)
+        return bar
+
+    def _apply_toggles(self):
+        from PySide6.QtCore import QSettings
+        enabled = {t for t, cb in self._toggles.items() if cb.isChecked()}
+        self._editable.apply_usage_filter(enabled)
+        s = QSettings("XSlope", "XSlope Studio")
+        for t, cb in self._toggles.items():
+            s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
 
     def result_rows(self):
         return self._editable.result_rows()
@@ -379,25 +439,35 @@ class MaterialsEditor(CategoryEditor):
     # Columns mirror the 'mat' worksheet in order: name, g, option, c, f, c/p,
     # r-elev, d, psi, u, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2, alpha,
     # kr0, h0, E, n.
+    # `applies` tags mirror the template's analysis usage (input_template.md):
+    # strength (g, option, c, f, c/p, r-elev, u) is shared by LEM+FEM; d/psi are
+    # rapid-drawdown (LEM); s(...) are reliability; k1..h0 seepage; E/n FEM.
+    LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "g"),
-        Field("option", "option", "choice", choices=["mc", "cp"]),
-        Field("c", "c"), Field("phi", "f"), Field("cp", "c/p"),
-        Field("r_elev", "r-elev"), Field("d", "d"), Field("psi", "psi"),
-        Field("u", "u", "choice", choices=["none", "piezo", "seep"]),
-        Field("sigma_gamma", "s(g)"), Field("sigma_c", "s(c)"), Field("sigma_phi", "s(f)"),
-        Field("sigma_cp", "s(c/p)"), Field("sigma_d", "s(d)"), Field("sigma_psi", "s(psi)"),
-        Field("k1", "k1"), Field("k2", "k2"), Field("alpha", "alpha"),
-        Field("kr0", "kr0"), Field("h0", "h0"), Field("E", "E"), Field("nu", "n"),
+        Field("gamma", "g", applies=LF),
+        Field("option", "option", "choice", choices=["mc", "cp"], applies=LF),
+        Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
+        Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
+        Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
+        Field("u", "u", "choice", choices=["none", "piezo", "seep"], applies=LF),
+        Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
+        Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
+        Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
+        Field("k1", "k1", usage="seep"), Field("k2", "k2", usage="seep"),
+        Field("alpha", "alpha", usage="seep"), Field("kr0", "kr0", usage="seep"),
+        Field("h0", "h0", usage="seep"),
+        Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
     ]
 
     def build(self, slope_data, parent):
         return TableEditorDialog(
             "Materials", self.FIELDS, slope_data.get("materials", []), _new_material, parent,
             help_text="Columns mirror the 'mat' worksheet. Row order = Mat ID order "
-                      "(row 1 → Mat ID 1). s(...) columns are the reliability standard "
-                      "deviations.")
+                      "(row 1 → Mat ID 1). Use the toggles to show only the columns "
+                      "for your analysis; reliability σ columns are hidden unless "
+                      "'Reliability' is on.",
+            usage_toggles=["lem", "seep", "fem", "rel"])
 
     def apply(self, slope_data, dlg):
         slope_data["materials"] = dlg.result_rows()
@@ -691,7 +761,8 @@ class PilesEditor(CategoryEditor):
             "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile, parent,
             help_text="Leave H blank for auto Ito & Matsui force. I / Area auto-compute "
                       "from D when blank. θ is auto-derived from the pile axis. Vcap/Mcap "
-                      "require S (spacing).")
+                      "require S (spacing).",
+            usage_toggles=["lem", "fem"])
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -953,7 +1024,8 @@ class ReinforcementEditor(CategoryEditor):
             "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
             _new_reinf, parent,
             help_text="Lp1/Lp2 are the pullout lengths at each end (0 = fully anchored). "
-                      "The LEM tension distribution shown on the plot is derived from these.")
+                      "The LEM tension distribution shown on the plot is derived from these.",
+            usage_toggles=["lem", "fem"])
 
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines

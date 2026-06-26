@@ -455,6 +455,8 @@ For effective stress with seepage solution: set option="mc", c=c', phi=phi', u="
 
 Profile lines define slope geometry. Each line = top of a soil layer. Draw top-to-bottom (shallowest layer first). Points within each line go left-to-right.
 
+**Extent rule:** the flat ground sections must extend well beyond the slope on both sides — at least ~2× the slope height beyond the toe and beyond the crest, and farther where deep base-tangent circles are expected — so that every trial failure surface daylights on the ground surface inside the model, never at a vertical edge. Do **not** copy the width shown in the source diagram; it is usually cropped to the area of interest, not the full domain the search needs. If a critical surface reaches the left/right boundary, widen the geometry and re-run.
+
 **Layout:**
 - B2: Max Depth (elevation of horizontal base; 0 means base at lowest profile point)
 - Profile lines arranged horizontally in 3-column groups:
@@ -643,6 +645,7 @@ write_circle(1, xo=10, yo=40, option="Depth", depth=0)
 - For "Depth" option: Depth is an **elevation** (not a distance); R = Yo - Depth. E.g., Depth=0 means the circle bottom is at elevation 0
 - **Always** define one circle passing through the toe (`Option = "Intercept"`, Xi/Yi = toe coords)
 - **Always** define one circle tangent to the base (bottom) of each material layer
+- **Make sure trial circles daylight INSIDE the model.** The flat ground must extend far enough left and right that the largest trial circles exit on the ground surface, never at a vertical model edge. If a critical or trial circle reaches the boundary, widen the geometry (see the Sheet: profile extent rule) and re-run — a surface clipped by the domain edge is not the true critical surface.
 
 ### Sheet: non-circ
 
@@ -1041,7 +1044,9 @@ else:
 
 3. **Material numbering is 1-based** in the Excel file. Mat ID 1 in the profile sheet references row 9 (first data row) of the mat sheet.
 
-4. **Max Depth** in the profile sheet defines a horizontal bedrock surface. Set to 0 if the lowest profile line IS the base, or set to the actual bedrock elevation if deeper.
+4. **Max Depth** in the profile sheet defines a horizontal bedrock surface. Set to 0 if the lowest profile line IS the base, or set to the actual bedrock elevation if deeper. Max Depth spans the full width of the profile.
+
+5. **Extend the geometry far enough horizontally.** The flat ground sections must run well beyond the slope on both sides so that every trial failure surface daylights on the ground surface inside the model — never at a vertical model edge. Rule of thumb: extend each flat at least ~2× the slope height beyond the toe and beyond the crest, and farther for deep circles tangent to the base. **Do not copy the width shown in the source diagram** — it is usually cropped to the area of interest, not the full domain needed for the search. If the critical surface reaches the left/right boundary, widen the geometry and re-run.
 
 5. **For seepage-only problems**, you do NOT need circles, piezo, or non-circ sheets. Only fill main, mat (with k1, k2, kr0, h0), profile, and seep bc.
 

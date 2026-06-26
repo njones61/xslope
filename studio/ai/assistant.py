@@ -77,26 +77,10 @@ mprice). It handles the loaded project's failure surface, returns the result \
 dict (with 'FS'), and shows the solution plot — don't rebuild that pipeline by \
 hand.
 
-Domain modeling rules (slope-stability physics — apply when building a model):
-- Standing/ponded water ABOVE the ground surface is a real load. ALWAYS model it \
-as a hydrostatic distributed load on the submerged surface: a `dloads` block of \
-{'X','Y','Normal'} points along the ground, with `Normal = gamma_water * \
-(water_surface_elev - y_ground)` at each point (0 where the ground rises above \
-the water surface). Do this even for a total-stress phi=0 analysis (`u='none'`): \
-pore pressure and the surface water load are SEPARATE physics — "no pore \
-pressure" never means "no water load." Never skip the load.
-- A water table / free surface in a diagram is marked by the inverted-triangle \
-(▽) symbol; read its elevation from where the ▽ sits (it may be ABOVE the crest \
-— a submerged slope). A plain dashed line with no ▽ is a material boundary or \
-reference line, not water. If the water-surface elevation or extent is unclear, \
-ASK rather than guess.
-- Extend the flat ground sections FAR ENOUGH on BOTH sides that every trial \
-failure surface daylights on the ground surface inside the model, never at a \
-vertical edge. The source diagram rarely shows the true extents — do not copy \
-its width. Rule of thumb: each flat should run at least ~2x the slope height \
-beyond the toe and beyond the crest, and MORE for deep circles tangent to the \
-hard base; if the critical or trial circles reach the left/right boundary, widen \
-the domain. The hard base (`max_depth`) spans the full profile width.
+For slope-stability modeling rules (geometry extents, starting circles, ponded \
+water, diagram reading, etc.) FOLLOW the xslope skill reference — it is the \
+authoritative source. The compact reminders below restate its key rules; the \
+skill has the full detail.
 """
 
 # Appended only for Anthropic, where prompt caching makes the large skill body
@@ -155,8 +139,8 @@ the canvas re-renders automatically.
 - profile_lines[i]: {'coords':[(x,y),...], 'mat_id':0}  # mat_id = 0-based index into
   materials; lines are layer-top boundaries, ordered top to bottom.
 - circles[i]: {'Xo':20.0,'Yo':40.0,'Depth':-10.0,'R':50.0}  # Depth = elevation of
-  the circle's lowest point, R = Yo - Depth. There is NO intercept key — set R
-  yourself (toe circle: R = distance from center to the toe point).
+  the circle's lowest point, R = Yo - Depth. (In-memory there is no intercept key;
+  for a toe circle set R = distance from center to the toe point.)
 - non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
 - piezo_line / piezo_line2: list of (x, y) tuples.
 - dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
@@ -170,6 +154,21 @@ the canvas re-renders automatically.
 Editing the source lists is enough — the canvas rebuilds derived geometry
 (ground_surface, polygons) and re-renders automatically; you need not call
 plot_inputs. Run LEM via the preloaded `run_lem(method=...)` helper.
+
+Modeling rules (restated from the xslope skill — follow it for full detail):
+- Starting circles: put Xo at the toe-crest midpoint and Yo = toe_elev + 2x slope
+  height; ALWAYS include one circle through the toe and one tangent to the base of
+  EACH material layer (including the hard base at max_depth).
+- Extent: extend the flat ground far enough on BOTH sides that every trial circle
+  daylights on the ground INSIDE the model, never at a vertical edge (>= ~2x slope
+  height beyond toe and crest, more for deep base circles). Do NOT copy the source
+  diagram's width — it is usually cropped. The hard base spans the full width.
+- Ponded/standing water above the ground surface is ALWAYS a hydrostatic dloads
+  block: Normal = gamma_water * (water_surface_elev - y_ground) at each ground
+  point. Apply it even for total-stress phi=0 (`u='none'`) — pore pressure and the
+  water load are separate; never skip it. A water table is the inverted-triangle
+  (▽) symbol (may sit above the crest = submerged); ask if its level/extent is
+  unclear rather than guessing.
 """
 
 

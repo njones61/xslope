@@ -348,10 +348,135 @@ class PiezoEditor(CategoryEditor):
         slope_data["piezo_line2"] = [(r["x"], r["y"]) for r in dlg.result_rows(1)]
 
 
+# --- distributed loads (two sets; each a set of point blocks) --------------- #
+DLOAD_FIELDS = [Field("Load", "Load #", "int", default=1),
+                Field("X", "X"), Field("Y", "Y"), Field("Normal", "Normal")]
+
+
+def _new_dload_row():
+    return {"Load": 1, "X": 0.0, "Y": 0.0, "Normal": 0.0}
+
+
+def _flatten_loads(blocks):
+    """[[pt,...], ...] -> flat rows tagged with a 1-based Load # for the table."""
+    rows = []
+    for i, block in enumerate(blocks or [], start=1):
+        for pt in block:
+            rows.append({"Load": i, "X": pt.get("X", 0.0),
+                         "Y": pt.get("Y", 0.0), "Normal": pt.get("Normal", 0.0)})
+    return rows
+
+
+def _group_loads(rows):
+    """Flat rows -> [[{X,Y,Normal}, ...], ...] grouped by Load #, row order kept."""
+    groups, order = {}, []
+    for r in rows:
+        k = int(r.get("Load", 1) or 1)
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append({"X": r["X"], "Y": r["Y"], "Normal": r["Normal"]})
+    return [groups[k] for k in sorted(order)]
+
+
+class DloadsEditor(CategoryEditor):
+    label = "Distributed loads"
+
+    def build(self, slope_data, parent):
+        return TabbedTableEditorDialog(
+            "Distributed loads",
+            [("Set 1", DLOAD_FIELDS, _flatten_loads(slope_data.get("dloads")), _new_dload_row),
+             ("Set 2 (rapid drawdown)", DLOAD_FIELDS,
+              _flatten_loads(slope_data.get("dloads2")), _new_dload_row)],
+            parent,
+            help_text="Each load is a left→right series of points (≥2 each). Use the Load # "
+                      "column to group points into separate loads. Set 2 is the second "
+                      "rapid-drawdown stage.")
+
+    def apply(self, slope_data, dlg):
+        slope_data["dloads"] = _group_loads(dlg.result_rows(0))
+        slope_data["dloads2"] = _group_loads(dlg.result_rows(1))
+
+
+# --- head BC (two sets; each: specified-head groups + an exit face) --------- #
+HEAD_FIELDS = [Field("Head", "Head #", "int", default=1), Field("HeadValue", "Head value"),
+               Field("X", "X"), Field("Y", "Y")]
+XY_FIELDS = [Field("X", "X"), Field("Y", "Y")]
+
+
+def _new_head_row():
+    return {"Head": 1, "HeadValue": 0.0, "X": 0.0, "Y": 0.0}
+
+
+class _HeadBcSetWidget(QWidget):
+    """One seepage BC set: a specified-head table (grouped by Head #) + an exit-face table."""
+
+    def __init__(self, bc, parent=None):
+        super().__init__(parent)
+        bc = bc or {}
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Specified-head boundaries"))
+        head_rows = []
+        for i, hg in enumerate(bc.get("specified_heads") or [], start=1):
+            for (x, y) in hg.get("coords", []):
+                head_rows.append({"Head": i, "HeadValue": hg.get("head", 0.0), "X": x, "Y": y})
+        self.heads = _EditableTable(HEAD_FIELDS, head_rows, _new_head_row)
+        layout.addWidget(self.heads)
+        layout.addWidget(QLabel("Exit face"))
+        exit_rows = [{"x": x, "y": y} for (x, y) in (bc.get("exit_face") or [])]
+        self.exit = _EditableTable(XY_FIELDS, exit_rows, _new_pt)
+        layout.addWidget(self.exit)
+
+    def result(self):
+        groups, order = {}, []
+        for r in self.heads.result_rows():
+            k = int(r.get("Head", 1) or 1)
+            if k not in groups:
+                groups[k] = {"head": r["HeadValue"], "coords": []}
+                order.append(k)
+            groups[k]["coords"].append((r["X"], r["Y"]))
+        specified_heads = [groups[k] for k in sorted(order)]
+        exit_face = [(r["x"], r["y"]) for r in self.exit.result_rows()]
+        return {"specified_heads": specified_heads, "exit_face": exit_face}
+
+
+class HeadBcEditor(CategoryEditor):
+    label = "Head BC"
+
+    def build(self, slope_data, parent):
+        dlg = QDialog(parent)
+        dlg.setWindowTitle("Head BC")
+        dlg.resize(560, 620)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(_help_label(
+            "Seepage boundary conditions: specified-head boundaries (free water on the face) "
+            "and an exit face (where water leaves the slope). Group head points with the same "
+            "Head # — the Head value is taken from the first row of each group. Set 2 is used "
+            "for rapid-drawdown (the second seepage solution)."))
+        tabs = QTabWidget()
+        w1 = _HeadBcSetWidget(slope_data.get("seepage_bc"))
+        w2 = _HeadBcSetWidget(slope_data.get("seepage_bc2"))
+        tabs.addTab(w1, "Set 1")
+        tabs.addTab(w2, "Set 2 (rapid drawdown)")
+        layout.addWidget(tabs)
+        _ok_cancel(dlg, layout)
+        dlg._sets = (w1, w2)
+        return dlg
+
+    def apply(self, slope_data, dlg):
+        w1, w2 = dlg._sets
+        slope_data["seepage_bc"] = w1.result()
+        slope_data["seepage_bc2"] = w2.result()
+        bc2 = slope_data["seepage_bc2"]
+        slope_data["has_seepage_bc2"] = bool(bc2.get("specified_heads") or bc2.get("exit_face"))
+
+
 CATEGORY_EDITORS = {
     "global": GlobalEditor(),
     "materials": MaterialsEditor(),
     "circles": CirclesEditor(),
     "non_circ": NonCircEditor(),
     "piezo": PiezoEditor(),
+    "dloads": DloadsEditor(),
+    "seep_bc": HeadBcEditor(),
 }

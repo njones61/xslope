@@ -254,17 +254,20 @@ class MainWindow(QMainWindow):
         add("Piezometric lines",
             f"{len(d.get('piezo_line') or [])}" + (f" / {n_pz2}" if n_pz2 else ""),
             category="piezo")
-        add("Distributed loads", len(d.get("dloads") or []))
+        n_dl2 = len(d.get("dloads2") or [])
+        add("Distributed loads",
+            f"{len(d.get('dloads') or [])}" + (f" / {n_dl2}" if n_dl2 else ""),
+            category="dloads")
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []))
         add("Piles", len(d.get("pile_lines") or []))
         sbc = d.get("seepage_bc") or {}
         n_heads = len(sbc.get("specified_heads", []))
-        parts = [f"{n_heads} head BC(s)"] if n_heads else []
+        parts = [f"{n_heads} head(s)"] if n_heads else []
         if sbc.get("exit_face"):
             parts.append("exit face")
         if d.get("has_seepage_bc2"):
             parts.append("+ set 2")
-        add("Seepage BC (input)", ", ".join(parts) if parts else 0)
+        add("Head BC", ", ".join(parts) if parts else 0, category="seep_bc")
         add("Mesh", "yes" if d.get("mesh") is not None else "no")
         self.inputs_tree.expandAll()
 

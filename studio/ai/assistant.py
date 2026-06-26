@@ -86,6 +86,31 @@ _SKILL_HEADER = ("\n\n---\n\nReference — the `slope_data` schema and engine AP
                  "file-based workflow, so favor the in-memory document over its "
                  ".xlsx-writing patterns):\n\n")
 
+# Appended AFTER the skill body so it is the last thing the model reads. The
+# standalone skill is written end-to-end around authoring an .xlsx input file;
+# without this override the model parrots its "build the input file" workflow
+# (creating/writing a spreadsheet) instead of editing the live document.
+_SKILL_TRAILER = """\
+
+---
+
+CRITICAL — you are inside XSlope Studio, NOT the standalone file-based skill. The \
+reference above describes a workflow that creates and writes an .xlsx input file. \
+That workflow does NOT apply here. Override it:
+- There is ALREADY an open project. Build and edit it by mutating the in-memory \
+`slope_data` dict in `run_python`. The canvas re-renders automatically.
+- NEVER create, open, write, or save an .xlsx (or any) file. Do not call \
+`save_slope_data_to_xlsx`, `pd.ExcelWriter`, `openpyxl`, `load_slope_data`, or \
+read/write the filesystem. The user persists the model themselves via Save As.
+- When the reference (or your own narration) says "build the input file," that \
+means populate `slope_data` in memory — say "I'll build the model" and mutate the \
+dict, never a file.
+- Construct geometry as the in-memory schema expects (e.g. `profile_lines` are \
+dicts with `mat_id` + shapely-ready coords, `materials` are dicts). Inspect an \
+existing record first when one is present; for an empty project, print \
+`sorted(slope_data)` and build the lists directly.
+"""
+
 # A compact schema cheat-sheet for non-Anthropic models (the full skill is too
 # large to send every turn to a local model). Keeps them from inventing keys.
 SCHEMA_BRIEF = """\
@@ -365,7 +390,7 @@ class Assistant(QObject):
         if self.config.supports_prompt_cache():
             skill = _load_skill_text()
             if skill:
-                return STUDIO_SYSTEM + _SKILL_HEADER + skill
+                return STUDIO_SYSTEM + _SKILL_HEADER + skill + _SKILL_TRAILER
         return STUDIO_SYSTEM + SCHEMA_BRIEF
 
     def send(self, user_text, images=None):

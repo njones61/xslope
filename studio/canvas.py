@@ -221,10 +221,15 @@ class MplCanvas(QWidget):
 
     def _draw(self, draw_fn):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.
-        Fitting is deferred to ``ensure_fitted`` so a canvas drawn while its tab is
-        hidden (no viewport size yet) still fits when the tab is first shown."""
+
+        Every (re)render re-arms the fit (``_fitted = False``) so the new content
+        is fitted to the window — a fresh solve/result always autofits, not just
+        the first plot ever drawn. The fit itself is deferred to ``ensure_fitted``
+        (and to ``showEvent`` for a canvas drawn while its tab is hidden), so it
+        runs once the viewport has a real size rather than at zero size."""
         draw_fn(self.figure)
         self._rasterize(self._target_dpi())
+        self._fitted = False
         QTimer.singleShot(0, self.ensure_fitted)
         self._schedule_refine()
 

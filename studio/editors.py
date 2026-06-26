@@ -721,19 +721,39 @@ def _set_derived_geometry(slope_data, polys):
         slope_data["tcrack_surface"] = None
 
 
+def _normalize_polygon(p):
+    """Coerce a polygon entry to the canonical {'polygon': Polygon, 'mat_id': int}.
+    Accepts entries that carry a shapely 'polygon', a 'coords' list, or a bare
+    shapely Polygon — so a model that built polygons with only 'coords' still
+    resyncs."""
+    from shapely.geometry import Polygon
+    if isinstance(p, dict):
+        poly = p.get("polygon")
+        if poly is None and p.get("coords"):
+            poly = Polygon(p["coords"])
+        return {"polygon": poly, "mat_id": p.get("mat_id")}
+    return {"polygon": p, "mat_id": None}
+
+
 def _resync_geometry(slope_data):
-    """Rebuild polygons (and the geometry derived from them) from edited
-    profile_lines — the resync the loader/design driver also do."""
+    """Rebuild polygons (and the geometry derived from them: ground surface,
+    domain polygon, t-crack line) from the edited source — the resync the loader/
+    design driver also do. Two source paths: profile_lines (build zone polygons
+    from them), or polygons set directly (e.g. a zoned dam built without
+    profile_lines), which are normalized and used as-is."""
     from shapely.geometry import Polygon
     from xslope.mesh import build_polygons
 
     profile_lines = slope_data.get("profile_lines") or []
-    if not profile_lines:
+    if profile_lines:
+        polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"]}
+                 for p in build_polygons(slope_data={"profile_lines": profile_lines,
+                                                      "max_depth": slope_data.get("max_depth")})]
+        _set_derived_geometry(slope_data, polys)
         return
-    polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"]}
-             for p in build_polygons(slope_data={"profile_lines": profile_lines,
-                                                  "max_depth": slope_data.get("max_depth")})]
-    _set_derived_geometry(slope_data, polys)
+    raw = slope_data.get("polygons") or []
+    if raw:
+        _set_derived_geometry(slope_data, [_normalize_polygon(p) for p in raw])
 
 
 class MatGeometryDialog(QDialog):

@@ -138,6 +138,11 @@ the canvas re-renders automatically.
    'alpha':0.0,'kr0':0.0,'h0':0.0,'E':0.0,'nu':0.0}
 - profile_lines[i]: {'coords':[(x,y),...], 'mat_id':0}  # mat_id = 0-based index into
   materials; lines are layer-top boundaries, ordered top to bottom.
+- polygons[i]: {'polygon': <shapely Polygon>, 'mat_id':0}  # zoned geometry (dams,
+  lenses); use INSTEAD of profile_lines, not both. Build the Polygon from coords
+  (`from shapely.geometry import Polygon`). The canvas rebuilds ground_surface and
+  domain_polygon from the polygons automatically — do NOT call plot_inputs,
+  build_ground_surface_*, or set ground_surface/domain_polygon yourself.
 - circles[i]: {'Xo':20.0,'Yo':40.0,'Depth':-10.0,'R':50.0}  # Depth = elevation of
   the circle's lowest point, R = Yo - Depth. In-memory there is no intercept key,
   so a TOE circle (one passing THROUGH the toe point) is R = distance(center, toe),
@@ -174,12 +179,15 @@ Modeling rules (slope-stability physics):
   daylights on the ground INSIDE the model, never at a vertical edge (>= ~2x slope
   height beyond toe and crest, more for deep base circles). Do NOT copy the source
   diagram's width — it is usually cropped. The hard base spans the full width.
-- Ponded/standing water above the ground surface is ALWAYS a hydrostatic dloads
-  block: Normal = gamma_water * (water_surface_elev - y_ground) at each ground
-  point. Apply it even for total-stress phi=0 (`u='none'`) — pore pressure and the
-  water load are separate; never skip it. A water table is the inverted-triangle
-  (▽) symbol (may sit above the crest = submerged); ask if its level/extent is
-  unclear rather than guessing.
+- Ponded/standing/reservoir water above the ground surface is ALWAYS a hydrostatic
+  dloads load: Normal = gamma_water * (water_surface_elev - y_ground) at each ground
+  point. Apply it over the ENTIRE submerged surface — flat foundation/bench areas
+  AND sloping faces, following the ground profile — not just the slope face. It is
+  SEPARATE from any phreatic/piezo line (pore pressure): a reservoir on a dam needs
+  BOTH the upstream surface-water load and the internal phreatic line. Apply even
+  for total-stress phi=0 (`u='none'`); never skip it. A water table is the inverted-
+  triangle (▽) symbol (may sit above the crest = submerged); ask if its level/extent
+  is unclear rather than guessing.
 """
 
 

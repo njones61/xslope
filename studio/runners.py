@@ -13,44 +13,42 @@ from __future__ import annotations
 import threading
 import traceback
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal
 
 
-class MeshRunner(QThread):
-    """Builds a finite-element mesh off the GUI thread (gmsh can take a few
-    seconds). Includes reinforcement/pile constraint lines so the mesh serves FEM
-    as well as seepage. Emits ``succeeded`` with the mesh dict or ``failed``."""
+class MeshWorker(QObject):
+    """Builds finite-element meshes on a single, long-lived thread.
+
+    gmsh is a global C singleton with thread affinity: initializing it on a fresh
+    OS thread for each build (a new ``QThread`` per call) segfaults on the second
+    build. So this worker is moved onto one persistent thread and its ``build``
+    slot is invoked there for every mesh, keeping gmsh on one consistent thread.
+    Includes reinforcement/pile constraint lines so the mesh also serves FEM.
+    """
 
     succeeded = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, slope_data, options, parent=None):
-        super().__init__(parent)
-        self._sd = slope_data
-        self._element_type = options["element_type"]
-        self._auto = options.get("auto_size", True)
-        self._divisions = options.get("size_divisions", 50)
-        self._target_size = options.get("target_size", 1.0)
-
-    def run(self):
+    def build(self, slope_data, options):
         from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                                  extract_constraint_line_geometry)
         try:
-            sd = self._sd
+            sd = slope_data
+            element_type = options["element_type"]
             constraint_lines, n_reinf, n_pile = extract_constraint_line_geometry(sd)
             polygons = get_material_polygons(sd, reinf_lines=constraint_lines)
-            if self._auto:
+            if options.get("auto_size", True):
+                divisions = options.get("size_divisions", 50)
                 xs = [x for x, _ in sd["ground_surface"].coords]
-                target = (max(xs) - min(xs)) / self._divisions
-                print(f"Auto element size: {target:.3f} "
-                      f"(slope width / {self._divisions} divisions)")
+                target = (max(xs) - min(xs)) / divisions
+                print(f"Auto element size: {target:.3f} (slope width / {divisions} divisions)")
             else:
-                target = self._target_size
+                target = options.get("target_size", 1.0)
             extra = (f", {n_reinf} reinforcement + {n_pile} pile line(s)"
                      if (n_reinf + n_pile) else "")
-            print(f"Building {self._element_type} mesh, target size {target:.3g}{extra}…")
+            print(f"Building {element_type} mesh, target size {target:.3g}{extra}…")
             mesh = build_mesh_from_polygons(polygons, target_size=target,
-                                            element_type=self._element_type,
+                                            element_type=element_type,
                                             lines=constraint_lines or None)
             n1d = len(mesh.get("elements_1d", []))
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "

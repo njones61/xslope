@@ -14,7 +14,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QObject, QSettings, Signal
+from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
@@ -26,7 +26,7 @@ from .canvas import MplCanvas
 from .dialogs import BuildMeshDialog, RunLemDialog
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
-from .runners import LemRunner, MeshRunner
+from .runners import LemRunner, MeshWorker
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -72,6 +72,9 @@ class _LogStream(QObject):
 
 
 class MainWindow(QMainWindow):
+    # Emitted to hand a mesh build to the persistent mesh thread (queued).
+    _mesh_requested = Signal(object, object)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP_NAME)
@@ -97,9 +100,20 @@ class MainWindow(QMainWindow):
 
         self._mode = "lem"
         self._runner = None
-        self._mesh_runner = None
+        self._mesh_busy = False
         self._last_lem_opts = {}
         self._last_mesh_opts = {}
+
+        # gmsh must run on one consistent thread (it segfaults if re-initialized on
+        # a fresh thread each build), so a single persistent worker thread handles
+        # every mesh build via a queued request signal.
+        self._mesh_thread = QThread(self)
+        self._mesh_worker = MeshWorker()
+        self._mesh_worker.moveToThread(self._mesh_thread)
+        self._mesh_requested.connect(self._mesh_worker.build)
+        self._mesh_worker.succeeded.connect(self._on_mesh_succeeded)
+        self._mesh_worker.failed.connect(self._on_mesh_failed)
+        self._mesh_thread.start()
         self._recent = [p for p in (self.settings.value("recent_files") or []) if p]
 
         self._make_inputs_dock()
@@ -373,22 +387,20 @@ class MainWindow(QMainWindow):
 
     # --- meshing ---------------------------------------------------------
     def build_mesh(self):
-        if not self.doc.is_open or self._mesh_runner is not None:
+        if not self.doc.is_open or self._mesh_busy:
             return
         dlg = BuildMeshDialog(self, defaults=self._last_mesh_opts)
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_mesh_opts = opts
+        self._mesh_busy = True
         self.act_build_mesh.setEnabled(False)
         self.statusBar().showMessage("Building mesh …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
-        self._mesh_runner = MeshRunner(self.doc.slope_data, opts, parent=self)
-        self._mesh_runner.succeeded.connect(self._on_mesh_succeeded)
-        self._mesh_runner.failed.connect(self._on_mesh_failed)
-        self._mesh_runner.finished.connect(self._on_mesh_finished)
-        self._mesh_runner.start()
+        # Runs on the persistent mesh thread (queued connection).
+        self._mesh_requested.emit(self.doc.slope_data, opts)
 
     def _on_mesh_succeeded(self, mesh):
         self.doc.slope_data["mesh"] = mesh   # used by Inputs render, Seep and FEM
@@ -407,18 +419,18 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Mesh built — {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements"
             + (f", {n1d} 1D elements." if n1d else "."))
+        self._mesh_done()
 
     def _on_mesh_failed(self, message):
         QMessageBox.warning(self, "Build mesh failed", message)
         self.statusBar().showMessage("Build mesh failed.")
+        self._mesh_done()
 
-    def _on_mesh_finished(self):
+    def _mesh_done(self):
+        self._mesh_busy = False
         self.act_build_mesh.setEnabled(self.doc.is_open)
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
-        if self._mesh_runner is not None:
-            self._mesh_runner.deleteLater()
-            self._mesh_runner = None
 
     def _show_mesh(self, mesh):
         if self.mesh_canvas is None:
@@ -610,8 +622,9 @@ class MainWindow(QMainWindow):
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()     # ask an in-flight run to stop, then wait briefly
             self._runner.wait(5000)
-        if self._mesh_runner is not None and self._mesh_runner.isRunning():
-            self._mesh_runner.wait(10000)   # meshing has no cancel hook; let it finish
+        # Stop the persistent mesh thread (lets an in-flight build finish first).
+        self._mesh_thread.quit()
+        self._mesh_thread.wait(10000)
         if self.doc.is_open and self.doc.dirty:
             res = QMessageBox.question(
                 self, "Unsaved changes", "Save changes before closing?",

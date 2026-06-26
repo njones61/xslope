@@ -45,7 +45,9 @@ SEEP_VARIABLES = [
 
 
 class RunSeepDialog(QDialog):
-    """Options for a seepage solve + its solution plot."""
+    """Solve parameters for a seepage run. Display options (variable, contours,
+    flow lines, base material, …) are not here — they live on the Seep Solution
+    view and re-render the cached solution without re-solving."""
 
     def __init__(self, parent=None, defaults=None, has_bc2=False):
         super().__init__(parent)
@@ -70,33 +72,12 @@ class RunSeepDialog(QDialog):
         self.tol.setValue(float(defaults.get("tol", 1e-4)))
         form.addRow("Convergence tol", self.tol)
 
-        self.variable = QComboBox()
-        for key, label in SEEP_VARIABLES:
-            self.variable.addItem(label, key)
-        vidx = self.variable.findData(defaults.get("variable", "head"))
-        if vidx >= 0:
-            self.variable.setCurrentIndex(vidx)
-        form.addRow("Plot variable", self.variable)
-
-        self.levels = QSpinBox()
-        self.levels.setRange(2, 100)
-        self.levels.setValue(int(defaults.get("levels", 20)))
-        form.addRow("Contour levels", self.levels)
-
-        self.flowlines = QCheckBox("Flow lines")
-        self.flowlines.setChecked(bool(defaults.get("flowlines", True)))
-        form.addRow("", self.flowlines)
-        self.vectors = QCheckBox("Velocity vectors")
-        self.vectors.setChecked(bool(defaults.get("vectors", False)))
-        form.addRow("", self.vectors)
-        self.fill_contours = QCheckBox("Filled contours")
-        self.fill_contours.setChecked(bool(defaults.get("fill_contours", False)))
-        form.addRow("", self.fill_contours)
-        self.phreatic = QCheckBox("Phreatic surface")
-        self.phreatic.setChecked(bool(defaults.get("phreatic", True)))
-        form.addRow("", self.phreatic)
-
         layout.addLayout(form)
+        note = QLabel("Display options (plotted variable, contours, flow lines, "
+                      "base material) are set on the solution view after solving.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText("Run")
         bb.accepted.connect(self.accept)
@@ -104,16 +85,7 @@ class RunSeepDialog(QDialog):
         layout.addWidget(bb)
 
     def options(self):
-        return {
-            "bc": self.bc.currentData(),
-            "tol": self.tol.value(),
-            "variable": self.variable.currentData(),
-            "levels": self.levels.value(),
-            "flowlines": self.flowlines.isChecked(),
-            "vectors": self.vectors.isChecked(),
-            "fill_contours": self.fill_contours.isChecked(),
-            "phreatic": self.phreatic.isChecked(),
-        }
+        return {"bc": self.bc.currentData(), "tol": self.tol.value()}
 
 
 class BuildMeshDialog(QDialog):

@@ -18,12 +18,13 @@ from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
-    QPlainTextEdit, QProgressBar, QPushButton, QTabWidget, QToolBar, QTreeWidget,
-    QTreeWidgetItem, QWidget,
+    QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget, QTabWidget,
+    QToolBar, QTreeWidget, QTreeWidgetItem, QWidget,
 )
 
 from .canvas import MplCanvas
 from .dialogs import BuildMeshDialog, RunLemDialog, RunSeepDialog
+from .display_panels import SeepDisplayPanel
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
 from .runners import LemRunner, MeshWorker, SeepRunner
@@ -121,7 +122,9 @@ class MainWindow(QMainWindow):
         self._mesh_thread.start()
         self._recent = [p for p in (self.settings.value("recent_files") or []) if p]
 
+        self._display_panels = {}     # result tab widget -> its display-options panel
         self._make_inputs_dock()
+        self._make_display_dock()
         self._make_log_dock()
         self._make_actions()
         self._make_menus()
@@ -153,6 +156,22 @@ class MainWindow(QMainWindow):
         dock.setWidget(self.inputs_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, dock)
         self.inputs_dock = dock
+
+    def _make_display_dock(self):
+        # Context-sensitive display options: a stack whose page follows the active
+        # result tab. Sits under the Inputs tree.
+        self.display_stack = QStackedWidget()
+        self._display_placeholder = QLabel("No display options for this view.")
+        self._display_placeholder.setWordWrap(True)
+        self._display_placeholder.setContentsMargins(8, 8, 8, 8)
+        self._display_placeholder.setAlignment(Qt.AlignTop)
+        self.display_stack.addWidget(self._display_placeholder)
+        dock = QDockWidget("Display", self)
+        dock.setObjectName("display_dock")
+        dock.setWidget(self.display_stack)
+        self.addDockWidget(Qt.LeftDockWidgetArea, dock)
+        self.splitDockWidget(self.inputs_dock, dock, Qt.Vertical)
+        self.display_dock = dock
 
     def _make_log_dock(self):
         self.log = QPlainTextEdit()
@@ -212,6 +231,7 @@ class MainWindow(QMainWindow):
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
+        m_view.addAction(self.display_dock.toggleViewAction())
         m_view.addAction(self.log_dock.toggleViewAction())
 
         m_help = mb.addMenu("&Help")
@@ -517,7 +537,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 traceback.print_exc()
         self._show_seep_data(bundle["seep_data"])
-        self._show_seep_solution(bundle)
+        self._show_seep_solution()
         if self.seep_solution_canvas is not None:
             self.view_tabs.setCurrentWidget(self.seep_solution_canvas)
         self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
@@ -543,15 +563,26 @@ class MainWindow(QMainWindow):
         except Exception:
             traceback.print_exc()
 
-    def _show_seep_solution(self, bundle):
+    def _show_seep_solution(self):
         if self.seep_solution_canvas is None:
             self.seep_solution_canvas = MplCanvas(self)
             self.view_tabs.addTab(self.seep_solution_canvas, "Seep · Solution")
-        try:
-            self.seep_solution_canvas.render_seep_solution(
-                bundle["seep_data"], bundle["solution"], bundle["options"])
-        except Exception:
-            traceback.print_exc()
+            panel = SeepDisplayPanel(self.doc.slope_data.get("materials"))
+            panel.changed.connect(self._rerender_seep_solution)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.seep_solution_canvas] = panel
+        self._rerender_seep_solution()
+
+    def _rerender_seep_solution(self):
+        """Re-render the cached seep solution with the current Display options."""
+        bundle = self.doc.results.get("seep_solution")
+        panel = self._display_panels.get(self.seep_solution_canvas)
+        if bundle and panel and self.seep_solution_canvas is not None:
+            try:
+                self.seep_solution_canvas.render_seep_solution(
+                    bundle["seep_data"], bundle["solution"], panel.options())
+            except Exception:
+                traceback.print_exc()
 
     # --- LEM analysis ----------------------------------------------------
     def run_lem(self):
@@ -677,13 +708,25 @@ class MainWindow(QMainWindow):
                 idx = self.view_tabs.indexOf(canvas)
                 if idx >= 0:
                     self.view_tabs.removeTab(idx)
+                panel = self._display_panels.pop(canvas, None)
+                if panel is not None:
+                    self.display_stack.removeWidget(panel)
+                    panel.deleteLater()
                 canvas.deleteLater()
                 setattr(self, attr, None)
+        self.display_stack.setCurrentWidget(self._display_placeholder)
 
     def _on_view_tab_changed(self, index):
         w = self.view_tabs.widget(index)
         if hasattr(w, "ensure_fitted"):
             w.ensure_fitted()
+        self._show_display_for_tab(w)
+
+    def _show_display_for_tab(self, widget):
+        """Point the Display dock at the active view's options panel (or a
+        placeholder when the view has none)."""
+        panel = self._display_panels.get(widget)
+        self.display_stack.setCurrentWidget(panel or self._display_placeholder)
 
     # --- save ------------------------------------------------------------
     def save(self):

@@ -116,7 +116,8 @@ class MplCanvas(QWidget):
         opts = opts or {}
         self._draw(lambda fig: plot_seep_solution(
             seep_data, solution, variable=opts.get("variable", "head"),
-            levels=opts.get("levels", 20), flowlines=opts.get("flowlines", True),
+            levels=opts.get("levels", 20), base_mat=opts.get("base_mat", 1),
+            flowlines=opts.get("flowlines", True),
             vectors=opts.get("vectors", False),
             fill_contours=opts.get("fill_contours", False),
             phreatic=opts.get("phreatic", True), mesh=False, fig=fig))

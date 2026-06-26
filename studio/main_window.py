@@ -862,7 +862,8 @@ class MainWindow(QMainWindow):
         if bundle and panel and self.fem_results_canvas is not None:
             try:
                 self.fem_results_canvas.render_fem_results(
-                    bundle["fem_data"], bundle["solution"], panel.options())
+                    bundle["fem_data"], bundle["solution"], panel.options(),
+                    fs=bundle.get("FS"))
             except Exception:
                 traceback.print_exc()
 

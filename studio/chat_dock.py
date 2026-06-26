@@ -11,12 +11,25 @@ from __future__ import annotations
 
 import html
 
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QImage, QKeySequence, QShortcut, QTextDocument
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QImage, QTextDocument
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
 )
+
+
+class _ChatInput(QPlainTextEdit):
+    """Input box where Enter sends and Shift+Enter inserts a newline."""
+
+    submit = Signal()
+
+    def keyPressEvent(self, event):
+        if (event.key() in (Qt.Key_Return, Qt.Key_Enter)
+                and not (event.modifiers() & Qt.ShiftModifier)):
+            self.submit.emit()
+            return
+        super().keyPressEvent(event)
 
 
 class ChatDock(QWidget):
@@ -28,8 +41,9 @@ class ChatDock(QWidget):
         self.transcript = QTextBrowser()
         self.transcript.setOpenExternalLinks(False)
 
-        self.input = QPlainTextEdit()
-        self.input.setPlaceholderText("Ask the assistant…  (Ctrl/Cmd+Enter to send)")
+        self.input = _ChatInput()
+        self.input.setPlaceholderText("Ask the assistant…  (Enter to send, "
+                                      "Shift+Enter for a new line)")
         self.input.setFixedHeight(72)
 
         self.send_btn = QPushButton("Send")
@@ -58,11 +72,10 @@ class ChatDock(QWidget):
         layout.addLayout(row)
         self.setMinimumWidth(220)
 
+        self.input.submit.connect(self._send)         # Enter sends
         self.send_btn.clicked.connect(self._send)
         self.stop_btn.clicked.connect(self._assistant.cancel)
         self.settings_btn.clicked.connect(self._open_settings)
-        for seq in ("Ctrl+Return", "Ctrl+Enter", "Meta+Return", "Meta+Enter"):
-            QShortcut(QKeySequence(seq), self.input, activated=self._send)
 
         self._assistant.assistant_text.connect(self._on_assistant_text)
         self._assistant.tool_ran.connect(self._on_tool_ran)

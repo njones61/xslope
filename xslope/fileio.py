@@ -236,6 +236,108 @@ def _parse_polygon_sheet(xls, materials):
 
 
 
+def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area):
+    """Build the LEM tension-distribution point list for ONE reinforcement line
+    from its raw endpoints + pullout lengths. Returns [] for a zero-length line.
+
+    Extracted from load_slope_data so the same derivation can be reused (e.g. by
+    the GUI) to rebuild the display format after editing the raw line data."""
+    import math
+    line_length = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    if line_length == 0:
+        return []
+
+    # Unit vector from (x1,y1) to (x2,y2)
+    dx = (x2 - x1) / line_length
+    dy = (y2 - y1) / line_length
+
+    line_points = []
+
+    # Handle different cases based on pullout lengths
+    if Lp1 + Lp2 >= line_length:
+        # Line too short - create single interior point
+        if Lp1 == 0 and Lp2 == 0:
+            # Both ends anchored - uniform tension
+            line_points = [
+                {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
+                {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
+            ]
+        else:
+            # Find equilibrium point where tensions are equal
+            if Lp1 == 0:
+                # End 1 anchored, all tension at end 1
+                line_points = [
+                    {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
+                    {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
+                ]
+            elif Lp2 == 0:
+                # End 2 anchored, all tension at end 2
+                line_points = [
+                    {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
+                    {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
+                ]
+            else:
+                # Both ends have pullout - find equilibrium point
+                ratio_sum = 1.0 / Lp1 + 1.0 / Lp2
+                d1 = line_length / (Lp2 * ratio_sum)
+                T_eq = Tmax * d1 / Lp1  # = Tmax * d2 / Lp2
+                x_int = x1 + d1 * dx
+                y_int = y1 + d1 * dy
+                line_points = [
+                    {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
+                    {"X": x_int, "Y": y_int, "T": T_eq, "Tres": Tres, "E": E, "Area": Area},
+                    {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
+                ]
+    else:
+        # Normal case - line long enough for 4 points
+        points_to_add = []
+        points_to_add.append((x1, y1, 0.0, 0.0))                 # Point 1: start
+        if Lp1 > 0:                                              # Point 2: Lp1 from start
+            points_to_add.append((x1 + Lp1 * dx, y1 + Lp1 * dy, Tmax, Tres))
+        else:
+            points_to_add[0] = (x1, y1, Tmax, Tres)              # start gets Tmax
+        if Lp2 > 0:                                              # Point 3: Lp2 back from end
+            points_to_add.append((x2 - Lp2 * dx, y2 - Lp2 * dy, Tmax, Tres))
+        if Lp2 > 0:                                              # Point 4: end
+            points_to_add.append((x2, y2, 0.0, 0.0))
+        else:
+            points_to_add.append((x2, y2, Tmax, Tres))
+
+        # Remove duplicate points (same x,y), keeping the max tension at a location
+        unique_points = []
+        tolerance = 1e-6
+        for x, y, T, Tr in points_to_add:
+            is_duplicate = False
+            for ux, uy, uT, uTres in unique_points:
+                if abs(x - ux) < tolerance and abs(y - uy) < tolerance:
+                    for k, (px, py, pT, pTres) in enumerate(unique_points):
+                        if abs(x - px) < tolerance and abs(y - py) < tolerance:
+                            unique_points[k] = (px, py, max(pT, T), max(pTres, Tr))
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                unique_points.append((x, y, T, Tr))
+
+        line_points = [{"X": x, "Y": y, "T": T, "Tres": Tr, "E": E, "Area": Area}
+                       for x, y, T, Tr in unique_points]
+
+    return line_points
+
+
+def build_reinforce_lines(reinforcement_lines):
+    """Map raw FEM-format reinforcement dicts (x1,y1,x2,y2,t_max,t_res,lp1,lp2,E,
+    area) to the LEM display/analysis format (a list of tension point-lists).
+    Lines resolving to fewer than 2 points are dropped, matching load_slope_data."""
+    lines = []
+    for r in reinforcement_lines:
+        pts = _reinforce_line_points(
+            r["x1"], r["y1"], r["x2"], r["y2"], r["t_max"], r["t_res"],
+            r["lp1"], r["lp2"], r["E"], r["area"])
+        if len(pts) >= 2:
+            lines.append(pts)
+    return lines
+
+
 def load_slope_data(filepath):
     """
     This function reads input data from various Excel sheets and parses it into
@@ -709,7 +811,6 @@ def load_slope_data(filepath):
 
     # === REINFORCEMENT LINES ===
     reinforce_df = xls.parse('reinforce', header=1)  # Header in row 2 (0-indexed row 1)
-    reinforce_lines = []        # LEM format: list of point lists with tension distributions
     reinforcement_lines = []    # FEM format: list of dicts with raw line endpoints and properties
 
     # Process rows starting from row 3 (Excel) which is 0-indexed row 0 in pandas after header=1
@@ -718,142 +819,30 @@ def load_slope_data(filepath):
         # Check if column B (x1 coordinate) is empty - stop reading if empty
         if pd.isna(row.iloc[1]):
             break  # Stop reading when column B is empty
-        
+
         # Check if other required coordinates are present
         if pd.isna(row.iloc[2]) or pd.isna(row.iloc[3]) or pd.isna(row.iloc[4]):
             continue  # Skip rows with incomplete coordinate data
-            
+
         # If coordinates are present, check for required parameters (Tmax, Lp1, Lp2)
         if pd.isna(row.iloc[5]) or pd.isna(row.iloc[7]) or pd.isna(row.iloc[8]):
             raise ValueError(f"Reinforcement line in row {i + 3} has coordinates but missing required parameters (Tmax, Lp1, Lp2). All three must be specified.")
-            
+
         try:
-            # Extract coordinates and parameters
-            x1, y1 = float(row.iloc[1]), float(row.iloc[2])  # Columns B, C
-            x2, y2 = float(row.iloc[3]), float(row.iloc[4])  # Columns D, E
-            Tmax = float(row.iloc[5])  # Column F
-            Tres = float(row.iloc[6])  # Column G
-            Lp1 = float(row.iloc[7]) if not pd.isna(row.iloc[7]) else 0.0   # Column H
-            Lp2 = float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0   # Column I
-            E = float(row.iloc[9])     # Column J
-            Area = float(row.iloc[10]) # Column K
-
-            # Store raw line data for FEM (endpoints + properties)
+            # Extract coordinates and parameters into the raw (FEM) format.
             reinforcement_lines.append({
-                "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-                "t_max": Tmax, "t_res": Tres,
-                "lp1": Lp1, "lp2": Lp2,
-                "E": E, "area": Area,
+                "x1": float(row.iloc[1]), "y1": float(row.iloc[2]),  # Columns B, C
+                "x2": float(row.iloc[3]), "y2": float(row.iloc[4]),  # Columns D, E
+                "t_max": float(row.iloc[5]), "t_res": float(row.iloc[6]),  # Columns F, G
+                "lp1": float(row.iloc[7]) if not pd.isna(row.iloc[7]) else 0.0,  # Column H
+                "lp2": float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0,  # Column I
+                "E": float(row.iloc[9]), "area": float(row.iloc[10]),  # Columns J, K
             })
-
-            # Calculate line length and direction
-            import math
-            line_length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-            if line_length == 0:
-                continue  # Skip zero-length lines
-                
-            # Unit vector from (x1,y1) to (x2,y2)
-            dx = (x2 - x1) / line_length
-            dy = (y2 - y1) / line_length
-            
-            line_points = []
-            
-            # Handle different cases based on pullout lengths
-            if Lp1 + Lp2 >= line_length:
-                # Line too short - create single interior point
-                if Lp1 == 0 and Lp2 == 0:
-                    # Both ends anchored - uniform tension
-                    line_points = [
-                        {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
-                        {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
-                    ]
-                else:
-                    # Find equilibrium point where tensions are equal
-                    # T1 = Tmax * d1/Lp1, T2 = Tmax * d2/Lp2
-                    # At equilibrium: d1/Lp1 = d2/Lp2 and d1 + d2 = line_length
-                    if Lp1 == 0:
-                        # End 1 anchored, all tension at end 1
-                        line_points = [
-                            {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
-                            {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
-                        ]
-                    elif Lp2 == 0:
-                        # End 2 anchored, all tension at end 2
-                        line_points = [
-                            {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
-                            {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
-                        ]
-                    else:
-                        # Both ends have pullout - find equilibrium point
-                        ratio_sum = 1.0/Lp1 + 1.0/Lp2
-                        d1 = line_length / (Lp2 * ratio_sum)
-                        d2 = line_length / (Lp1 * ratio_sum)
-                        T_eq = Tmax * d1 / Lp1  # = Tmax * d2 / Lp2
-                        
-                        # Interior point location
-                        x_int = x1 + d1 * dx
-                        y_int = y1 + d1 * dy
-                        
-                        line_points = [
-                            {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
-                            {"X": x_int, "Y": y_int, "T": T_eq, "Tres": Tres, "E": E, "Area": Area},
-                            {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
-                        ]
-            else:
-                # Normal case - line long enough for 4 points
-                points_to_add = []
-                
-                # Point 1: Start point
-                points_to_add.append((x1, y1, 0.0, 0.0))
-                
-                # Point 2: At distance Lp1 from start (if Lp1 > 0)
-                if Lp1 > 0:
-                    x_p2 = x1 + Lp1 * dx
-                    y_p2 = y1 + Lp1 * dy
-                    points_to_add.append((x_p2, y_p2, Tmax, Tres))
-                else:
-                    # Lp1 = 0, so start point gets Tmax tension
-                    points_to_add[0] = (x1, y1, Tmax, Tres)
-                
-                # Point 3: At distance Lp2 back from end (if Lp2 > 0)
-                if Lp2 > 0:
-                    x_p3 = x2 - Lp2 * dx
-                    y_p3 = y2 - Lp2 * dy
-                    points_to_add.append((x_p3, y_p3, Tmax, Tres))
-                else:
-                    # Lp2 = 0, so end point gets Tmax tension
-                    pass  # Will be handled when adding end point
-                
-                # Point 4: End point
-                if Lp2 > 0:
-                    points_to_add.append((x2, y2, 0.0, 0.0))
-                else:
-                    points_to_add.append((x2, y2, Tmax, Tres))
-                
-                # Remove duplicate points (same x,y coordinates)
-                unique_points = []
-                tolerance = 1e-6
-                for x, y, T, Tres in points_to_add:
-                    is_duplicate = False
-                    for ux, uy, uT, uTres in unique_points:
-                        if abs(x - ux) < tolerance and abs(y - uy) < tolerance:
-                            # Update tension to maximum value at this location
-                            for i, (px, py, pT, pTres) in enumerate(unique_points):
-                                if abs(x - px) < tolerance and abs(y - py) < tolerance:
-                                    unique_points[i] = (px, py, max(pT, T), max(pTres, Tres))
-                            is_duplicate = True
-                            break
-                    if not is_duplicate:
-                        unique_points.append((x, y, T, Tres))
-                
-                # Convert to required format
-                line_points = [{"X": x, "Y": y, "T": T, "Tres": Tres, "E": E, "Area": Area} for x, y, T, Tres in unique_points]
-            
-            if len(line_points) >= 2:
-                reinforce_lines.append(line_points)
-                
         except Exception as e:
             raise ValueError(f"Error processing reinforcement line in row {row.name + 3}: {e}")
+
+    # LEM tension-distribution format, derived from the raw endpoints/pullout data.
+    reinforce_lines = build_reinforce_lines(reinforcement_lines)
 
 
     # === PILE LINES ===

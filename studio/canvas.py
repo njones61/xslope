@@ -50,7 +50,7 @@ class MplCanvas(QWidget):
         self.view.setDragMode(QGraphicsView.ScrollHandDrag)
         self.view.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        self.view.setBackgroundBrush(Qt.lightGray)
+        self.view.setBackgroundBrush(Qt.white)
         self.view.viewport().installEventFilter(self)
 
         # Debounce re-rasterization so a flurry of wheel ticks redraws once.
@@ -102,6 +102,11 @@ class MplCanvas(QWidget):
                 and self.view.viewport().width() > 1:
             self.fit()
             self._fitted = True
+
+    def reset_fit(self):
+        """Re-arm the one-shot fit so the next render fits to the window (e.g. when
+        a different file is loaded), rather than keeping the previous view."""
+        self._fitted = False
 
     def clear(self):
         self.figure.clear()

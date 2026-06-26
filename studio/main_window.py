@@ -266,6 +266,7 @@ class MainWindow(QMainWindow):
         self.act_save_as.setEnabled(True)
         self.act_run_lem.setEnabled(True)
         self._clear_result_tabs()
+        self.canvas.reset_fit()       # fit the fresh file to the window
         self._render()
         self._populate_inputs_tree()
         self._update_title()

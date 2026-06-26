@@ -267,10 +267,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
     return True, result
 
 
-def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
+def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
+                progress_callback=None):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
-    
+
     Parameters:
         slope_data : dict
             Dictionary containing slope geometry, materials, and other input data
@@ -282,11 +283,23 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
             If True, uses circular search; if False, uses noncircular search (default: True)
         debug_level : int, optional
             Debug output level: 0=basic, 1=intermediate, 2=detailed (default: 0)
-    
+        progress_callback : callable, optional
+            Called as ``progress_callback(done, total, label)`` to report progress.
+            The analysis runs ``1 + 2N`` searches (one critical-surface search plus
+            ``F+``/``F-`` per uncertain parameter ``N``); ``total`` is None until the
+            parameter count is known. Exceptions raised by the callback are ignored.
+
     Returns:
         tuple: (success, result) where result contains reliability analysis results
     """
-    
+
+    def _progress(done, total, label):
+        if progress_callback is not None:
+            try:
+                progress_callback(done, total, label)
+            except Exception:
+                pass
+
     start_time = time.time()
 
     # Validate that at least one material has non-zero standard deviations
@@ -310,6 +323,7 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         print(f"Circular search: {circular}")
     
     # Step 1: Find the critical failure surface using search
+    _progress(0, None, "Searching for the critical surface…")
     if circular:
         if debug_level >= 1:
             print("Performing circular search...")
@@ -387,6 +401,8 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
                        "standard deviation(s) so mean - sigma >= 0.")
 
     # Step 3: Calculate F+ and F- for each parameter using TSPM
+    total_steps = 1 + 2 * len(param_info)   # critical search + F+/F- per parameter
+    _progress(1, total_steps, "Critical surface found")
     delta_F_values = []
 
     for i, param in enumerate(param_info):
@@ -437,7 +453,11 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0):
         param['F_plus'] = F_plus
         param['F_minus'] = F_minus
         param['delta_F'] = delta_F
-        
+
+        _progress(1 + 2 * (i + 1), total_steps,
+                  f"Parameter {i + 1}/{len(param_info)}: "
+                  f"mat {param['material_id']} {param['param']}")
+
         if debug_level >= 1:
             print(f"  F+ = {F_plus:.4f}, F- = {F_minus:.4f}, ΔF = {delta_F:.4f}")
     

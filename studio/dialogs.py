@@ -23,7 +23,8 @@ LEM_METHODS = [
     ("mprice", "Morgenstern-Price"),
 ]
 
-ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search")]
+ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search"),
+                  ("reliability", "Reliability")]
 SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
 
 

@@ -25,6 +25,7 @@ class LemRunner(QThread):
 
     succeeded = Signal(object)
     failed = Signal(str)
+    progress = Signal(int, int, str)   # done, total (-1 = indeterminate), label
 
     def __init__(self, slope_data, options, parent=None):
         super().__init__(parent)
@@ -38,7 +39,9 @@ class LemRunner(QThread):
 
     def run(self):
         try:
-            if self._analysis == "auto_search":
+            if self._analysis == "reliability":
+                self._run_reliability()
+            elif self._analysis == "auto_search":
                 self._run_search()
             else:
                 self._run_single()
@@ -128,6 +131,39 @@ class LemRunner(QThread):
         self.succeeded.emit({"slice_df": critical.get("slices"),
                              "failure_surface": critical.get("failure_surface"),
                              "results": results, "search": search})
+
+    # --- reliability -----------------------------------------------------
+    def _run_reliability(self):
+        from xslope.advanced import reliability
+
+        sd = self._sd
+        circular = self._surface == "circular"
+        if circular and not (sd.get("circular") and sd.get("circles")):
+            self.failed.emit("Reliability (circular) needs at least one starting circle.")
+            return
+        if not circular and not sd.get("non_circ"):
+            self.failed.emit("Reliability (non-circular) needs a starting "
+                             "non-circular surface.")
+            return
+        print(f"Running reliability — {self._method.upper()}, "
+              f"{'circular' if circular else 'non-circular'}{self._rapid_tag()}…")
+
+        def cb(done, total, label):
+            self.progress.emit(int(done), int(total) if total is not None else -1, str(label))
+
+        ok, result = reliability(sd, self._method, rapid=self._rapid, circular=circular,
+                                 debug_level=1 if self._diagnostic else 0,
+                                 progress_callback=cb)
+        if not ok:
+            self.failed.emit(str(result))
+            return
+        # The MLV entry carries the standard solver_result for the Solution view.
+        mlv = result["fs_cache"][0]["result"] if result.get("fs_cache") else None
+        solver = mlv.get("solver_result") if isinstance(mlv, dict) else None
+        self.succeeded.emit({"reliability": result,
+                             "slice_df": result.get("critical_slices"),
+                             "failure_surface": result.get("critical_surface"),
+                             "results": solver, "search": None})
 
     def _rapid_tag(self):
         return " (rapid drawdown)" if self._rapid else ""

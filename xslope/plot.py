@@ -2255,19 +2255,27 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         plt.show()
     return fig
 
-def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, dpi=300):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, dpi=300, fig=None):
     """
     Creates a plot showing the results of reliability analysis.
-    
+
     Parameters:
         slope_data: Dictionary containing plot data
         reliability_data: Dictionary containing reliability analysis results
         figsize: Tuple of (width, height) in inches for the plot
-    
+        fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
+            GUI canvas). When None (default) a new pyplot figure is created and shown;
+            when provided, the figure is cleared and reused and plt.show() is skipped.
+
     Returns:
-        None
+        The Matplotlib Figure that was drawn into.
     """
-    fig, ax = plt.subplots(figsize=figsize)
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
 
     # Plot basic slope elements (same as other search functions)
     plot_base_geometry(ax, slope_data)
@@ -2338,13 +2346,15 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
                 f"$COV_F$ = {COV_F:.3f}\n"
                 f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
 
-    plt.tight_layout()
-    
+    fig.tight_layout()
+
     if save_png:
         filename = 'plot_reliability_results.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
-    
-    plt.show()
+        fig.savefig(filename, dpi=dpi, bbox_inches='tight')
+
+    if own_fig:
+        plt.show()
+    return fig
 
 def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300):
     """

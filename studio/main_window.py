@@ -18,7 +18,8 @@ from PySide6.QtCore import Qt, QObject, QSettings, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox,
-    QPlainTextEdit, QTabWidget, QToolBar, QTreeWidget, QTreeWidgetItem, QWidget,
+    QPlainTextEdit, QProgressBar, QTabWidget, QToolBar, QTreeWidget,
+    QTreeWidgetItem, QWidget,
 )
 
 from .canvas import MplCanvas
@@ -87,6 +88,7 @@ class MainWindow(QMainWindow):
         self.canvas = MplCanvas(self)
         self.search_canvas = None
         self.solution_canvas = None
+        self.reliability_canvas = None
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
         self.view_tabs.currentChanged.connect(self._on_view_tab_changed)
@@ -105,6 +107,11 @@ class MainWindow(QMainWindow):
         self._update_recent_menu()
         self._update_title()
         self._install_log_capture()
+        # A run progress bar lives at the right of the status bar (hidden when idle).
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMaximumWidth(220)
+        self.progress_bar.setVisible(False)
+        self.statusBar().addPermanentWidget(self.progress_bar)
         self.statusBar().showMessage("Open an Excel input file to begin.")
 
     # --- docks -----------------------------------------------------------
@@ -361,27 +368,52 @@ class MainWindow(QMainWindow):
         opts = dlg.options()
         self._last_lem_opts = opts
         self.act_run_lem.setEnabled(False)
-        verb = "Searching" if opts["analysis"] == "auto_search" else "Running"
+        verb = {"auto_search": "Searching", "reliability": "Running reliability"}.get(
+            opts["analysis"], "Running")
         self.statusBar().showMessage(f"{verb} {opts['method']} …")
+        # Show a busy bar immediately; reliability switches it to determinate.
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
         self._runner = LemRunner(self.doc.slope_data, opts, parent=self)
         self._runner.succeeded.connect(self._on_lem_succeeded)
         self._runner.failed.connect(self._on_lem_failed)
+        self._runner.progress.connect(self._on_lem_progress)
         self._runner.finished.connect(self._on_lem_finished)
         self._runner.start()
+
+    def _on_lem_progress(self, done, total, label):
+        if total <= 0:                       # indeterminate
+            self.progress_bar.setRange(0, 0)
+        else:
+            self.progress_bar.setRange(0, total)
+            self.progress_bar.setValue(done)
+        if label:
+            self.statusBar().showMessage(f"{label}  ({done}/{total})" if total > 0 else label)
 
     def _on_lem_succeeded(self, bundle):
         self.doc.results["lem_solution"] = bundle
         if bundle.get("search"):
             self._show_search(bundle["search"])
-        self._show_solution(bundle)
-        # For a search, lead with the Search view (all trial surfaces + critical);
-        # for a single surface, the Solution view is the result.
-        lead = self.search_canvas if bundle.get("search") else self.solution_canvas
+        if bundle.get("reliability"):
+            self._show_reliability(bundle["reliability"])
+        if isinstance(bundle.get("results"), dict):
+            self._show_solution(bundle)
+        # Lead with the most specific result view produced by this run.
+        lead = (self.reliability_canvas if bundle.get("reliability")
+                else self.search_canvas if bundle.get("search")
+                else self.solution_canvas)
         if lead is not None:
             self.view_tabs.setCurrentWidget(lead)
-        res = bundle["results"]
-        self.statusBar().showMessage(
-            f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
+        if bundle.get("reliability"):
+            r = bundle["reliability"]
+            self.statusBar().showMessage(
+                f"Reliability done — F_MLV = {r['F_MLV']:.3f}, "
+                f"reliability = {r['reliability'] * 100:.2f}%, "
+                f"Pf = {r['prob_failure'] * 100:.2f}%")
+        else:
+            res = bundle["results"]
+            self.statusBar().showMessage(
+                f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
 
     def _on_lem_failed(self, message):
         QMessageBox.warning(self, "LEM run failed", message)
@@ -389,6 +421,8 @@ class MainWindow(QMainWindow):
 
     def _on_lem_finished(self):
         self.act_run_lem.setEnabled(self.doc.is_open)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
         if self._runner is not None:
             self._runner.deleteLater()
             self._runner = None
@@ -400,6 +434,15 @@ class MainWindow(QMainWindow):
             self.view_tabs.insertTab(1, self.search_canvas, "LEM · Search")
         try:
             self.search_canvas.render_search(self.doc.slope_data, search)
+        except Exception:
+            traceback.print_exc()
+
+    def _show_reliability(self, reliability_data):
+        if self.reliability_canvas is None:
+            self.reliability_canvas = MplCanvas(self)
+            self.view_tabs.insertTab(1, self.reliability_canvas, "LEM · Reliability")
+        try:
+            self.reliability_canvas.render_reliability(self.doc.slope_data, reliability_data)
         except Exception:
             traceback.print_exc()
 
@@ -417,7 +460,7 @@ class MainWindow(QMainWindow):
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
-        for attr in ("search_canvas", "solution_canvas"):
+        for attr in ("search_canvas", "solution_canvas", "reliability_canvas"):
             canvas = getattr(self, attr)
             if canvas is not None:
                 idx = self.view_tabs.indexOf(canvas)

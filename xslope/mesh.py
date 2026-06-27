@@ -1806,8 +1806,10 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
             "mat_id": mat_id
         })
     
-    # Distributed load points are handled by the FEM load partitioning in fem.py
-    # (not added to polygon edges, which would split curves and cause local refinement)
+    # Distributed-load endpoints are inserted as polygon vertices by
+    # get_material_polygons() (via add_dload_points_to_polygons) — not here, since
+    # build_polygons() also produces LEM slicing geometry, which doesn't need them.
+    # That keeps element edges aligned to the loaded span for the FEM load assembly.
     
     # Add intersection points with reinforcement lines if provided
     if reinf_lines is not None:
@@ -1829,14 +1831,21 @@ def get_material_polygons(slope_data, reinf_lines=None):
 
     Callers (main_seep/main_fem/main_mesh) should use this instead of calling
     build_polygons() directly, so they work on polygon-sheet inputs.
+
+    Distributed-load endpoints (and intermediate vertices) are inserted as polygon
+    vertices when they fall on a boundary edge, so the mesh places nodes there and
+    element edges align to the loaded span. Without this, the consistent edge-load
+    integrator in fem.py (Pass 2a) drops the element edges that straddle a load end
+    and under-applies the load (~one element edge of traction at each end).
     """
     if slope_data.get('profile_lines'):
-        return build_polygons(slope_data, reinf_lines=reinf_lines)
-    polygons = slope_data.get('polygons') or []
-    return [
-        {'coords': list(p['polygon'].exterior.coords), 'mat_id': p['mat_id']}
-        for p in polygons
-    ]
+        polygons = build_polygons(slope_data, reinf_lines=reinf_lines)
+    else:
+        polygons = [
+            {'coords': list(p['polygon'].exterior.coords), 'mat_id': p['mat_id']}
+            for p in (slope_data.get('polygons') or [])
+        ]
+    return add_dload_points_to_polygons(polygons, slope_data)
 
 
 def add_dload_points_to_polygons(polygons, slope_data):

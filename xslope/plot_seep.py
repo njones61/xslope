@@ -188,14 +188,9 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
             h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)", gid='SEEP_EXIT_FACE')
             legend_handles.append(h2)
 
-    # Single combined legend outside the plot
-    ax.legend(
-        handles=legend_handles,
-        loc='upper center',
-        bbox_to_anchor=(0.5, -0.1),
-        ncol=3,  # or more, depending on how many items you have
-        frameon=False
-    )
+    # Single combined legend below the plot, auto-fit to the axes width.
+    from .plot import _legend_below
+    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles, frameon=False)
     ax.set_aspect("equal")
 
     # Add a bit of headroom so the mesh/BC markers don't touch the top border

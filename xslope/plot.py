@@ -1581,6 +1581,22 @@ def _fit_legend_ncol(ax, fig, handles, labels, anchor):
     return max(1, math.ceil(n / rows))         # fewest cols for that many rows
 
 
+def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None, **kw):
+    """Draw a horizontal legend below the axes with an auto-fit column count — as
+    wide as fits the axes width, with the fewest, neatly-balanced rows (see
+    _fit_legend_ncol). Pass explicit handles/labels, else they come from the
+    axes. Extra kwargs (e.g. frameon) pass through to ax.legend."""
+    if handles is None:
+        handles, labels = ax.get_legend_handles_labels()
+    if labels is None:                       # handles given without explicit labels
+        labels = [h.get_label() for h in handles]
+    if not handles:
+        return None
+    ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
+    return ax.legend(handles=handles, labels=labels, loc="upper center",
+                     bbox_to_anchor=anchor, ncol=ncol, **kw)
+
+
 def plot_inputs(
     slope_data,
     title="Slope Geometry and Inputs",
@@ -2000,13 +2016,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         handles.append(dummy_line)
         labels.append('Distributed Load')
     
-    ax.legend(
-        handles=handles,
-        labels=labels,
-        loc='upper center',
-        bbox_to_anchor=(0.5, -0.15),
-        ncol=3
-    )
+    _legend_below(ax, fig, anchor=(0.5, -0.15), handles=handles, labels=labels)
 
     # Add vertical space below for the legend
     fig.subplots_adjust(bottom=0.2)
@@ -2176,7 +2186,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    ax.legend()
+    _legend_below(ax, fig, anchor=(0.5, -0.15))
 
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
@@ -2263,7 +2273,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4)
+    _legend_below(ax, fig, anchor=(0.5, -0.15))
 
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
@@ -2358,7 +2368,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    _legend_below(ax, fig, anchor=(0.5, -0.15))
     
     # Title with reliability statistics using mathtext
     F_MLV = reliability_data['F_MLV']
@@ -2567,7 +2577,7 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     
     # Add legend if we have materials
     if legend_elements:
-        ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=min(len(legend_elements), 4))
+        _legend_below(ax, fig, anchor=(0.5, -0.05), handles=legend_elements)
 
     # Add cushion
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()

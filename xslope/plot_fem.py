@@ -252,14 +252,9 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         saved_roller_x = fem_data.get("roller_x_nodes", set())
         _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size, saved_roller_x)
 
-    # Single combined legend outside the plot
-    ax.legend(
-        handles=legend_handles,
-        loc='upper center',
-        bbox_to_anchor=(0.5, -0.1),
-        ncol=3,  # or more, depending on how many items you have
-        frameon=False
-    )
+    # Single combined legend below the plot, auto-fit to the axes width.
+    from .plot import _legend_below
+    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles, frameon=False)
     # Adjust plot limits to accommodate force arrows
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
@@ -606,7 +601,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     if has_deform_legend and legend_ax is not None:
         handles, labels = axes[0].get_legend_handles_labels()
         if handles:
-            legend_ax.legend(handles, labels, loc='center', ncol=4, fontsize=10,
+            from .plot import _fit_legend_ncol
+            ncol = _fit_legend_ncol(legend_ax, fig, handles, labels, (0.5, 0.5))
+            legend_ax.legend(handles, labels, loc='center', ncol=ncol, fontsize=10,
                              frameon=False)
 
     if save_png:

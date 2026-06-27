@@ -865,7 +865,9 @@ class MatGeometryDialog(QDialog):
             self._max_depth_edit.setToolTip(
                 "Elevation of the model's bottom boundary, used to build the zone "
                 "polygons from the profile lines.")
-            mdrow.addWidget(self._max_depth_edit, 1)
+            self._max_depth_edit.setMaximumWidth(90)
+            mdrow.addWidget(self._max_depth_edit)
+            mdrow.addStretch(1)
             main.addLayout(mdrow)
 
         body = QHBoxLayout()

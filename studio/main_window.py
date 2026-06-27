@@ -1289,17 +1289,27 @@ class MainWindow(QMainWindow):
         self._mesh_thread.quit()
         self._mesh_thread.wait(10000)
         if self.doc.is_open and self.doc.dirty:
-            res = QMessageBox.question(
-                self, "Unsaved changes", "Save changes before closing?",
-                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
-            if res == QMessageBox.Cancel:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Question)
+            box.setWindowTitle("Unsaved changes")
+            box.setText("Save changes before closing?")
+            save_btn = box.addButton(QMessageBox.Save)
+            discard_btn = box.addButton(QMessageBox.Discard)
+            cancel_btn = box.addButton(QMessageBox.Cancel)
+            box.setDefaultButton(save_btn)
+            box.exec()
+            # Compare the actual clicked button by identity — the StandardButton
+            # return value is unreliable for Discard ("Don't Save") on macOS.
+            clicked = box.clickedButton()
+            if clicked is cancel_btn or clicked is None:
                 event.ignore()
                 return
-            if res == QMessageBox.Save:
+            if clicked is save_btn:
                 self.save()
                 if self.doc.dirty:        # save failed or was cancelled
                     event.ignore()
                     return
+            # discard_btn → fall through and close without saving
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
         super().closeEvent(event)

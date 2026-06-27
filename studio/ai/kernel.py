@@ -112,7 +112,94 @@ class PythonKernel:
                               fig=plt.figure(figsize=(11, 6)))
             return result
 
-        return {"run_lem": run_lem, "resync_geometry": resync_geometry}
+        def sensitivity(values, apply, param="value", method="spencer", search=True,
+                        num_slices=40, rapid=False, name="sensitivity", plot=True,
+                        ylabel="FS"):
+            """Run a parametric sensitivity sweep and produce a summary CSV + ONE
+            plot — the right tool for "FS vs <parameter>" studies.
+
+            For each v in `values`: call apply(v) to edit slope_data, recompute the
+            factor of safety, and record (v, FS) — with NO per-step solution plot.
+            Writes `<name>.csv` and one `<name>.png` (FS vs param) to the output
+            folder, restores the project to its original state (a sweep is analysis,
+            not an edit), and returns the DataFrame.
+
+            apply  : callable(v) that edits slope_data in place, setting the
+                     parameter to an ABSOLUTE value (not an increment), e.g. to vary
+                     the slope angle:
+                         def set_angle(a):
+                             import numpy as np
+                             slope_data['profile_lines'][0]['coords'][1] = (
+                                 20/np.tan(np.radians(a)), 20)
+                         sensitivity(np.arange(20, 31), set_angle, param='angle (deg)')
+            search : True recomputes the CRITICAL surface each step (correct but
+                     slower); False uses the project's first circle / non-circ
+                     surface for a quick look.
+            """
+            import copy
+            import contextlib
+            import io as _io
+            import numpy as np
+            import pandas as pd
+            import matplotlib.pyplot as plt
+            from xslope.slice import generate_slices
+            from xslope.solve import solve_selected
+            from xslope.search import circular_search, noncircular_search
+
+            sd = doc.slope_data
+            snapshot = copy.deepcopy(sd)
+            rows = []
+            try:
+                for v in values:
+                    apply(v)
+                    resync_geometry(sd)
+                    non_circ = sd.get("non_circ") or None
+                    fs = float("nan")
+                    with contextlib.redirect_stdout(_io.StringIO()):  # quiet the engine
+                        if search:
+                            if non_circ:
+                                fs_cache, *_ = noncircular_search(
+                                    sd, method, rapid=rapid, num_slices=num_slices,
+                                    diagnostic=False)
+                            else:
+                                fs_cache, *_ = circular_search(
+                                    sd, method, rapid=rapid, num_slices=num_slices,
+                                    diagnostic=False)
+                            if fs_cache:
+                                sr = fs_cache[0].get("solver_result")
+                                fs = sr["FS"] if isinstance(sr, dict) and "FS" in sr \
+                                    else fs_cache[0].get("fs", float("nan"))
+                        else:
+                            circle = (sd["circles"][0] if sd.get("circular")
+                                      and sd.get("circles") else None)
+                            ok, res = generate_slices(sd, circle=circle,
+                                                      non_circ=non_circ,
+                                                      num_slices=num_slices)
+                            if ok:
+                                r = solve_selected(method, res[0], rapid=rapid)
+                                if isinstance(r, dict):
+                                    fs = r["FS"]
+                    rows.append((v, fs))
+                    print(f"  {param}={v}: FS={fs:.3f}")
+            finally:
+                sd.clear()
+                sd.update(snapshot)     # leave the project exactly as it was
+
+            df = pd.DataFrame(rows, columns=[param, ylabel])
+            df.to_csv(f"{name}.csv", index=False)
+            if plot:
+                fig, ax = plt.subplots(figsize=(8, 5))
+                ax.plot(df[param], df[ylabel], "o-")
+                ax.set_xlabel(param)
+                ax.set_ylabel(ylabel)
+                ax.set_title(f"{ylabel} vs {param}")
+                ax.grid(True, alpha=0.3)
+                fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
+            print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
+            return df
+
+        return {"run_lem": run_lem, "resync_geometry": resync_geometry,
+                "sensitivity": sensitivity}
 
     @staticmethod
     def _normalize(code):

@@ -167,14 +167,19 @@ the canvas re-renders automatically.
 Editing the source lists re-renders the canvas — derived geometry (ground_surface,
 polygons, domain_polygon) is rebuilt automatically AFTER the snippet returns, so a
 one-off edit needs no plot_inputs call. But that auto-rebuild does NOT run between
-iterations WITHIN a snippet: if you vary geometry in a loop (e.g. a parametric
-sweep moving a profile point to change the slope angle), call `resync_geometry()`
-after each edit before analyzing — or use `run_lem(...)`, which resyncs for you.
-Otherwise every iteration analyzes the STALE original geometry and you get a
-constant/flat result. If a sweep result looks suspiciously constant, suspect stale
-derived geometry FIRST (did you resync?) before reaching for a physics explanation.
-Run LEM via the preloaded `run_lem(method=...)` helper (pass plot=False in a sweep
-to avoid one figure per step).
+iterations WITHIN a snippet: if you vary geometry in a loop, call
+`resync_geometry()` after each edit before analyzing — or use `run_lem(...)`, which
+resyncs for you. Otherwise every iteration analyzes the STALE original geometry and
+you get a constant/flat result; if a sweep looks suspiciously constant, suspect
+stale derived geometry FIRST before reaching for a physics explanation.
+
+For a sensitivity study ("FS vs <parameter>" — slope angle, a strength, a water
+level, …) use the preloaded `sensitivity(values, apply, param=...)` helper: it
+sweeps the parameter with NO per-step plot, computes the critical FS each step,
+writes a summary CSV + ONE plot to the output folder, and restores the project.
+`apply(v)` is your callback that edits slope_data to an absolute value (e.g. moves
+the crest). Don't hand-roll the loop with a solution plot per step. For a single
+analysis, use `run_lem(method=...)` (pass plot=False to suppress its plot).
 """
 
 # Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.

@@ -121,10 +121,14 @@ class MplCanvas(QWidget):
         # Zoom-to-box: a checkable mode that swaps drag-to-pan for drag-a-rectangle.
         self._zoom_box_btn = QToolButton()
         self._zoom_box_btn.setIcon(_magnifier_icon())
-        self._zoom_box_btn.setIconSize(QSize(20, 20))
         self._zoom_box_btn.setToolTip("Zoom to box — drag a rectangle to zoom into it")
         self._zoom_box_btn.setCheckable(True)
         self._zoom_box_btn.toggled.connect(self._toggle_zoom_box)
+        # Match the text buttons' height; an icon button is otherwise taller. Size
+        # the glyph to fill that height (minus a small margin) so it stays prominent.
+        _bh = btn.sizeHint().height()
+        self._zoom_box_btn.setFixedHeight(_bh)
+        self._zoom_box_btn.setIconSize(QSize(_bh - 4, _bh - 4))
         bar.addWidget(self._zoom_box_btn)
         bar.addStretch(1)
         # Export the current figure to an image file (per-view, so it sits next to

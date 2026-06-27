@@ -36,7 +36,7 @@ def _extract_uv(disp, fem_data):
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
-                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, fig=None):
+                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
 
@@ -254,7 +254,8 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
 
     # Single combined legend below the plot, auto-fit to the axes width.
     from .plot import _legend_below
-    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles, frameon=False)
+    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
+                  legend_ncol=legend_ncol, frameon=False)
     # Adjust plot limits to accommodate force arrows
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
@@ -423,7 +424,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=True, save_png=False, save_dxf=False, dpi=300, fig=None):
+                    scale_vectors=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -602,7 +603,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         handles, labels = axes[0].get_legend_handles_labels()
         if handles:
             from .plot import _fit_legend_ncol
-            ncol = _fit_legend_ncol(legend_ax, fig, handles, labels, (0.5, 0.5))
+            ncol = (_fit_legend_ncol(legend_ax, fig, handles, labels, (0.5, 0.5))
+                    if legend_ncol == "auto" else max(1, int(legend_ncol)))
             legend_ax.legend(handles, labels, loc='center', ncol=ncol, fontsize=10,
                              frameon=False)
 

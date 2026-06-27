@@ -106,24 +106,29 @@ class MplCanvas(QWidget):
         self._draw(lambda fig: plot_solution(
             slope_data, slice_df, failure_surface, results,
             slice_numbers=opts.get("slice_numbers", False),
-            seep_contours=opts.get("seep_contours", True), fig=fig))
+            seep_contours=opts.get("seep_contours", True),
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
 
     def render_search(self, slope_data, search, opts=None):
         """Render auto-search results (all trial surfaces + critical + search path)."""
         opts = opts or {}
         highlight = opts.get("highlight_fs", True)
+        ncol = opts.get("legend_ncol", "auto")
         if search["kind"] == "circular":
             self._draw(lambda fig: plot_circular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
-                circle_cache=search["circle_cache"], highlight_fs=highlight, fig=fig))
+                circle_cache=search["circle_cache"], highlight_fs=highlight,
+                legend_ncol=ncol, fig=fig))
         else:
             self._draw(lambda fig: plot_noncircular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
-                highlight_fs=highlight, fig=fig))
+                highlight_fs=highlight, legend_ncol=ncol, fig=fig))
 
-    def render_reliability(self, slope_data, reliability_data):
+    def render_reliability(self, slope_data, reliability_data, opts=None):
+        opts = opts or {}
         self._draw(lambda fig: plot_reliability_results(
-            slope_data, reliability_data, fig=fig))
+            slope_data, reliability_data,
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
 
     def render_mesh(self, mesh, materials=None, opts=None):
         opts = opts or {}
@@ -131,7 +136,8 @@ class MplCanvas(QWidget):
             mesh, materials=materials, show_nodes=opts.get("show_nodes", True),
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
-            pad_frac=opts.get("pad_frac", 0.05), fig=fig))
+            pad_frac=opts.get("pad_frac", 0.05),
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
 
     def render_seep_data(self, seep_data, opts=None):
         opts = opts or {}
@@ -140,7 +146,8 @@ class MplCanvas(QWidget):
             show_bc=opts.get("show_bc", True),
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
-            alpha=opts.get("alpha", 0.4), fig=fig))
+            alpha=opts.get("alpha", 0.4),
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
 
     def render_seep_solution(self, seep_data, solution, opts):
         opts = opts or {}
@@ -163,7 +170,8 @@ class MplCanvas(QWidget):
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
             alpha=opts.get("alpha", 0.4),
-            bc_symbol_size=opts.get("bc_symbol_size", 0.03), fig=fig))
+            bc_symbol_size=opts.get("bc_symbol_size", 0.03),
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
 
     def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}
@@ -179,7 +187,7 @@ class MplCanvas(QWidget):
             plot_elements=opts.get("plot_elements", False),
             scale_vectors=opts.get("scale_vectors", True),
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
-            fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
 
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):

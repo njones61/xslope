@@ -28,7 +28,8 @@ from .canvas import MplCanvas
 from .dialogs import BuildMeshDialog, RunFemDialog, RunLemDialog, RunSeepDialog
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
-    MeshDisplayPanel, SearchDisplayPanel, SeepDisplayPanel, SolutionDisplayPanel,
+    MeshDisplayPanel, ReliabilityDisplayPanel, SearchDisplayPanel,
+    SeepDisplayPanel, SolutionDisplayPanel,
 )
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
@@ -1165,10 +1166,22 @@ class MainWindow(QMainWindow):
         if self.reliability_canvas is None:
             self.reliability_canvas = MplCanvas(self)
             self.view_tabs.insertTab(1, self.reliability_canvas, "LEM · Reliability")
-        try:
-            self.reliability_canvas.render_reliability(self.doc.slope_data, reliability_data)
-        except Exception:
-            traceback.print_exc()
+            panel = ReliabilityDisplayPanel()
+            panel.changed.connect(self._rerender_reliability)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.reliability_canvas] = panel
+        self._rerender_reliability()
+
+    def _rerender_reliability(self):
+        bundle = self.doc.results.get("lem_solution")
+        rel = bundle.get("reliability") if bundle else None
+        panel = self._display_panels.get(self.reliability_canvas)
+        if rel and panel and self.reliability_canvas is not None:
+            try:
+                self.reliability_canvas.render_reliability(
+                    self.doc.slope_data, rel, panel.options())
+            except Exception:
+                traceback.print_exc()
 
     def _show_solution(self, bundle):
         if self.solution_canvas is None:

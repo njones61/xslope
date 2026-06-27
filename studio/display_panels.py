@@ -54,12 +54,44 @@ def _ispin(lo, hi, val, suffix=""):
     return s
 
 
+def _add_legend_controls(panel, form):
+    """Append the shared 'Auto legend columns' + 'Legend columns' controls to a
+    panel's form and wire them to ``panel._emit``. Auto lays the legend out as
+    wide as fits the axes with the fewest neatly-balanced rows; unchecking it
+    enables an explicit column count. Stashes the widgets on the panel and exposes
+    the value via ``_legend_option(panel)`` (folded into the panel's options())."""
+    auto = QCheckBox("Auto legend columns")
+    auto.setChecked(True)
+    ncol = _ispin(1, 12, 3)
+    form.addRow("", auto)
+    form.addRow("Legend columns", ncol)
+
+    def sync(*_):
+        ncol.setEnabled(not auto.isChecked())
+
+    auto.toggled.connect(sync)
+    auto.toggled.connect(panel._emit)
+    ncol.valueChanged.connect(panel._emit)
+    sync()
+    panel._legend_auto = auto
+    panel._legend_ncol = ncol
+
+
+def _legend_option(panel):
+    """The legend_ncol value for a panel built with _add_legend_controls:
+    "auto" when the Auto box is checked, else the explicit column count."""
+    return "auto" if panel._legend_auto.isChecked() else panel._legend_ncol.value()
+
+
 class _CheckboxPanel(QWidget):
-    """Base for panels that are just a column of checkboxes. Subclasses list
-    ``_FIELDS`` as ``(key, label, default)`` and read values via ``options()``."""
+    """Base for panels that are just a column of checkboxes (plus, optionally, the
+    shared legend controls). Subclasses list ``_FIELDS`` as ``(key, label,
+    default)`` and set ``_WITH_LEGEND`` to add the legend column controls; values
+    are read via ``options()``."""
 
     changed = Signal()
     _FIELDS = ()
+    _WITH_LEGEND = False
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -71,16 +103,22 @@ class _CheckboxPanel(QWidget):
             box.toggled.connect(self._emit)
             form.addRow("", box)
             self._boxes[key] = box
+        if self._WITH_LEGEND:
+            _add_legend_controls(self, form)
 
     def _emit(self, *_):
         self.changed.emit()
 
     def options(self):
-        return {key: box.isChecked() for key, box in self._boxes.items()}
+        d = {key: box.isChecked() for key, box in self._boxes.items()}
+        if self._WITH_LEGEND:
+            d["legend_ncol"] = _legend_option(self)
+        return d
 
 
 class SolutionDisplayPanel(_CheckboxPanel):
     """Display options for an LEM solution plot."""
+    _WITH_LEGEND = True
     _FIELDS = (
         ("slice_numbers", "Slice numbers", False),
         ("seep_contours", "Seepage contours", True),
@@ -89,7 +127,14 @@ class SolutionDisplayPanel(_CheckboxPanel):
 
 class SearchDisplayPanel(_CheckboxPanel):
     """Display options for an LEM auto-search plot."""
+    _WITH_LEGEND = True
     _FIELDS = (("highlight_fs", "Highlight critical surface", True),)
+
+
+class ReliabilityDisplayPanel(_CheckboxPanel):
+    """Display options for an LEM reliability plot — just the legend controls (the
+    plot itself has no other toggles)."""
+    _WITH_LEGEND = True
 
 
 class InputsDisplayPanel(QWidget):
@@ -160,6 +205,7 @@ class MeshDisplayPanel(QWidget):
             c.toggled.connect(self._emit)
         form.addRow("Padding", self.pad_frac)
         self.pad_frac.valueChanged.connect(self._emit)
+        _add_legend_controls(self, form)
 
     def _emit(self, *_):
         self.changed.emit()
@@ -170,6 +216,7 @@ class MeshDisplayPanel(QWidget):
             "label_elements": self.label_elements.isChecked(),
             "label_nodes": self.label_nodes.isChecked(),
             "pad_frac": self.pad_frac.value(),
+            "legend_ncol": _legend_option(self),
         }
 
 
@@ -202,6 +249,8 @@ class FeDataDisplayPanel(QWidget):
             form.addRow("BC symbol size", self.bc_symbol_size)
             self.bc_symbol_size.valueChanged.connect(self._emit)
 
+        _add_legend_controls(self, form)
+
     def _emit(self, *_):
         self.changed.emit()
 
@@ -212,6 +261,7 @@ class FeDataDisplayPanel(QWidget):
             "label_elements": self.label_elements.isChecked(),
             "label_nodes": self.label_nodes.isChecked(),
             "alpha": self.alpha.value(),
+            "legend_ncol": _legend_option(self),
         }
         if self.bc_symbol_size is not None:
             d["bc_symbol_size"] = self.bc_symbol_size.value()
@@ -350,6 +400,8 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.plot_elements)
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
+        # Legend column controls (the deformation plot's deformed/undeformed legend).
+        _add_legend_controls(self, form)
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.deform_percent.valueChanged.connect(self._emit)
@@ -389,4 +441,5 @@ class FemResultsDisplayPanel(QWidget):
             "plot_elements": self.plot_elements.isChecked(),
             "scale_vectors": self.scale_vectors.isChecked(),
             "displacement_tolerance": self.displacement_tolerance.value(),
+            "legend_ncol": _legend_option(self),
         }

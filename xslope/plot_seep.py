@@ -6,7 +6,7 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, fig=None):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -190,7 +190,8 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
 
     # Single combined legend below the plot, auto-fit to the axes width.
     from .plot import _legend_below
-    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles, frameon=False)
+    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
+                  legend_ncol=legend_ncol, frameon=False)
     ax.set_aspect("equal")
 
     # Add a bit of headroom so the mesh/BC markers don't touch the top border

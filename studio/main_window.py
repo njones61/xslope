@@ -104,6 +104,9 @@ class MainWindow(QMainWindow):
         # Central area: a tab strip of result views (plan §7). The Inputs view is
         # always present; the LEM Solution view is added after the first solve.
         self.canvas = MplCanvas(self)
+        # Double-click an input on the Inputs canvas to edit it (plan §6/§8).
+        # Only the Inputs view is wired; result-view canvases stay view-only.
+        self.canvas.picked.connect(self._on_canvas_pick)
         self.mesh_canvas = None
         self.search_canvas = None
         self.solution_canvas = None
@@ -681,6 +684,17 @@ class MainWindow(QMainWindow):
     # --- editing ---------------------------------------------------------
     def _on_tree_click(self, item, _column):
         category = item.data(0, CATEGORY_ROLE)
+        if category:
+            self.edit_category(category)
+
+    def _on_canvas_pick(self, x, y, tol):
+        """Open the editor for the input feature the user double-clicked on the
+        Inputs canvas. The hit-test maps the click back to a slope_data object and
+        returns its editor category (plan §6/§8)."""
+        if not self.doc.is_open:
+            return
+        from .picking import pick_category
+        category = pick_category(self.doc.slope_data, x, y, max(tol, 1e-9))
         if category:
             self.edit_category(category)
 

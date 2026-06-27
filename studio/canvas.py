@@ -20,7 +20,7 @@ os.environ.setdefault("QT_API", "pyside6")
 
 import math
 
-from PySide6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor, QGuiApplication, QIcon, QImage, QPainter, QPen, QPixmap,
 )
@@ -77,6 +77,11 @@ def _magnifier_icon(px=20, color="#2b2b2b"):
 
 
 class MplCanvas(QWidget):
+    # Emitted on a double-click that lands inside the main axes: (data_x, data_y,
+    # tol) where tol is ~a dozen screen px expressed in data units. The Inputs
+    # view connects this to open the editor for the feature under the cursor.
+    picked = Signal(float, float, float)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.figure = Figure(figsize=(12, 6), dpi=BASE_DPI)
@@ -513,4 +518,49 @@ class MplCanvas(QWidget):
             self._schedule_refine()
             self._restore_pan_cursor()
             return True
+        if (obj is self.view.viewport()
+                and event.type() == QEvent.MouseButtonDblClick
+                and event.button() == Qt.LeftButton and not self._zoom_box_mode):
+            self._emit_pick(event.position().toPoint())
+            return True
         return super().eventFilter(obj, event)
+
+    # --- pick (double-click to edit) -------------------------------------
+    def _emit_pick(self, vp_point):
+        """Map a viewport double-click to axes data coords and emit `picked`,
+        with a tolerance set from a ~12px offset so picking stays pixel-accurate
+        at any zoom (more zoomed in → tighter tolerance)."""
+        hit = self._viewport_to_data(vp_point)
+        if hit is None:
+            return
+        x, y = hit
+        off = self._viewport_to_data(vp_point + QPoint(12, 0))
+        tol = math.hypot(x - off[0], y - off[1]) if off else 0.0
+        self.picked.emit(x, y, tol)
+
+    def _viewport_to_data(self, vp_point):
+        """Map a point in viewport pixels to (x, y) in the main axes' data coords,
+        or None if there's no figure or the click falls outside the axes. Goes
+        viewport → scene → figure fraction → display px → data; the transFigure /
+        transData pair is DPI-independent so it works at the current render DPI."""
+        ax = self._main_axes()
+        if ax is None or self._pixitem is None:
+            return None
+        scene_pt = self.view.mapToScene(vp_point)
+        w_in, h_in = self.figure.get_size_inches()
+        W, H = w_in * BASE_DPI, h_in * BASE_DPI
+        if W <= 0 or H <= 0:
+            return None
+        # scene origin is top-left, y down; Matplotlib figure fraction is y up.
+        disp = self.figure.transFigure.transform(
+            (scene_pt.x() / W, 1.0 - scene_pt.y() / H))
+        try:
+            bb = ax.get_window_extent()
+            pad = 6.0
+            if not (bb.x0 - pad <= disp[0] <= bb.x1 + pad
+                    and bb.y0 - pad <= disp[1] <= bb.y1 + pad):
+                return None
+        except Exception:
+            pass
+        x, y = ax.transData.inverted().transform(disp)
+        return float(x), float(y)

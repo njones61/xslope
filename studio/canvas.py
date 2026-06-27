@@ -373,6 +373,13 @@ class MplCanvas(QWidget):
             self._rasterize(need)
 
     # --- zoom / pan ------------------------------------------------------
+    def _restore_pan_cursor(self):
+        """Re-assert the open-hand pan cursor on the viewport. fitInView /
+        resetTransform / scale leave the viewport cursor as a plain arrow until
+        the next mouse press, which makes the canvas look un-pannable right after
+        a Fit or zoom; restoring it keeps the ScrollHandDrag affordance visible."""
+        self.view.viewport().setCursor(Qt.OpenHandCursor)
+
     def fit(self):
         if self._content_rect is not None and not self._content_rect.isEmpty():
             # Add a small cushion so the content isn't flush against the edges.
@@ -384,18 +391,22 @@ class MplCanvas(QWidget):
         elif self._pixitem is not None:
             self.view.fitInView(self._pixitem, Qt.KeepAspectRatio)
             self._schedule_refine()
+        self._restore_pan_cursor()
 
     def reset_100(self):
         self.view.resetTransform()
         self._schedule_refine()
+        self._restore_pan_cursor()
 
     def zoom_in(self):
         self.view.scale(ZOOM_STEP, ZOOM_STEP)
         self._schedule_refine()
+        self._restore_pan_cursor()
 
     def zoom_out(self):
         self.view.scale(1 / ZOOM_STEP, 1 / ZOOM_STEP)
         self._schedule_refine()
+        self._restore_pan_cursor()
 
     def showEvent(self, event):
         super().showEvent(event)

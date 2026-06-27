@@ -36,10 +36,13 @@ from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
-SUPERSAMPLE = 2.0     # render this many device px per on-screen px (crisp text)
+SUPERSAMPLE = 2.0     # bitmap px per *device* px (crisp text; combined with the
+                      # display's devicePixelRatio in _target_dpi)
 MIN_DPI = 100
-MAX_DPI = 600         # caps pixmap memory (12×6in @600dpi RGBA ≈ 100 MB)
+MAX_DPI = 900         # caps pixmap memory (raised for Retina, where the effective
+                      # DPI is doubled by devicePixelRatio)
 REFINE_MS = 90        # debounce before re-rasterizing after a zoom change
+FIT_PAD = 0.04        # cushion around the content when fitting (fraction per side)
 
 
 class MplCanvas(QWidget):
@@ -338,10 +341,12 @@ class MplCanvas(QWidget):
         return rect.intersected(QRectF(0, 0, w_in * BASE_DPI, h_in * BASE_DPI))
 
     def _target_dpi(self):
-        """DPI needed so the pixmap has SUPERSAMPLE device px per on-screen px at
-        the current zoom level."""
+        """DPI needed so the pixmap has SUPERSAMPLE bitmap px per *device* px at
+        the current zoom. Includes the display's devicePixelRatio so text stays
+        crisp on Retina/HiDPI screens (where one logical px is 2+ device px)."""
         scale = self.view.transform().m11() or 1.0
-        return BASE_DPI * scale * SUPERSAMPLE
+        dpr = self.devicePixelRatioF() or 1.0
+        return BASE_DPI * scale * dpr * SUPERSAMPLE
 
     def _schedule_refine(self):
         self._refine_timer.start()
@@ -358,7 +363,11 @@ class MplCanvas(QWidget):
     # --- zoom / pan ------------------------------------------------------
     def fit(self):
         if self._content_rect is not None and not self._content_rect.isEmpty():
-            self.view.fitInView(self._content_rect, Qt.KeepAspectRatio)
+            # Add a small cushion so the content isn't flush against the edges.
+            px = self._content_rect.width() * FIT_PAD
+            py = self._content_rect.height() * FIT_PAD
+            self.view.fitInView(self._content_rect.adjusted(-px, -py, px, py),
+                                Qt.KeepAspectRatio)
             self._schedule_refine()
         elif self._pixitem is not None:
             self.view.fitInView(self._pixitem, Qt.KeepAspectRatio)

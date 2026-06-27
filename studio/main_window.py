@@ -1254,7 +1254,67 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Save failed", str(exc))
             return
+        self._sync_sidecars(os.path.splitext(self.doc.path)[0])
         self.statusBar().showMessage(f"Saved {os.path.basename(self.doc.path)}")
+
+    def _sync_sidecars(self, stem):
+        """Make the mesh / seep / FEM sidecars next to the saved .xlsx match the
+        in-memory project. (Re)write those whose artifact is present (so Save As
+        carries them to the new name), and DELETE those whose artifact was
+        invalidated — e.g. a geometry edit cleared the mesh and solutions. Without
+        this, a stale ``{stem}_mesh.json`` / ``_seep.csv`` / ``_fem_*.csv`` would be
+        auto-loaded on the next Open and silently mismatch the edited inputs.
+        Best-effort: a failure on one sidecar is logged, not fatal."""
+        sd = self.doc.slope_data
+        results = self.doc.results
+
+        def remove(path):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                traceback.print_exc()
+
+        # Mesh ({stem}_mesh.json), auto-loaded by load_slope_data.
+        mesh = sd.get("mesh")
+        if mesh is not None:
+            try:
+                from xslope.mesh import export_mesh_to_json
+                export_mesh_to_json(mesh, f"{stem}_mesh.json")
+            except Exception:
+                traceback.print_exc()
+        else:
+            remove(f"{stem}_mesh.json")
+
+        # Seepage solutions, per BC set ({stem}_seep.csv / _seep2.csv).
+        seep = results.get("seep_solutions", {})
+        for bc, suffix in ((1, "_seep.csv"), (2, "_seep2.csv")):
+            path = stem + suffix
+            bundle = seep.get(bc)
+            if bundle:
+                try:
+                    from xslope.seep import export_seep_solution
+                    export_seep_solution(bundle["seep_data"], bundle["solution"], path)
+                except Exception:
+                    traceback.print_exc()
+            else:
+                remove(path)
+
+        # FEM solution ({stem}_fem_nodes.csv / _fem_elements.csv / _fem_meta.json).
+        fem = results.get("fem_solution")
+        if fem:
+            try:
+                from xslope.fem import export_fem_solution
+                export_fem_solution(fem["fem_data"], fem["solution"], stem,
+                                    meta={"FS": fem.get("FS"),
+                                          "analysis": fem.get("analysis"),
+                                          "F": fem["solution"].get("F")})
+            except Exception:
+                traceback.print_exc()
+        else:
+            for f in (f"{stem}_fem_nodes.csv", f"{stem}_fem_elements.csv",
+                      f"{stem}_fem_meta.json"):
+                remove(f)
 
     def save_as(self):
         start = self.doc.path or (self._recent[0] if self._recent else "")
@@ -1270,6 +1330,7 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             QMessageBox.critical(self, "Save failed", str(exc))
             return
+        self._sync_sidecars(os.path.splitext(path)[0])
         self._add_recent(path)
         self._update_title()
         self.statusBar().showMessage(f"Saved {os.path.basename(path)}")

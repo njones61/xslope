@@ -19,7 +19,7 @@ import os
 os.environ.setdefault("QT_API", "pyside6")
 
 from PySide6.QtCore import QEvent, QRectF, Qt, QTimer
-from PySide6.QtGui import QImage, QPainter, QPixmap
+from PySide6.QtGui import QGuiApplication, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QFileDialog, QGraphicsScene, QGraphicsView, QHBoxLayout, QInputDialog,
     QMessageBox, QToolButton, QVBoxLayout, QWidget,
@@ -340,13 +340,20 @@ class MplCanvas(QWidget):
                       tb.width * BASE_DPI, tb.height * BASE_DPI)
         return rect.intersected(QRectF(0, 0, w_in * BASE_DPI, h_in * BASE_DPI))
 
+    def _device_pixel_ratio(self):
+        """The display's device-pixel ratio (2.0 on Retina). Read from the screen
+        rather than the widget's devicePixelRatioF(), which returns 1.0 when the
+        widget has no backing store yet — e.g. a result tab rendered while hidden,
+        which is exactly when result canvases are first drawn."""
+        scr = self.screen() or QGuiApplication.primaryScreen()
+        return scr.devicePixelRatio() if scr is not None else 1.0
+
     def _target_dpi(self):
         """DPI needed so the pixmap has SUPERSAMPLE bitmap px per *device* px at
         the current zoom. Includes the display's devicePixelRatio so text stays
         crisp on Retina/HiDPI screens (where one logical px is 2+ device px)."""
         scale = self.view.transform().m11() or 1.0
-        dpr = self.devicePixelRatioF() or 1.0
-        return BASE_DPI * scale * dpr * SUPERSAMPLE
+        return BASE_DPI * scale * self._device_pixel_ratio() * SUPERSAMPLE
 
     def _schedule_refine(self):
         self._refine_timer.start()

@@ -125,11 +125,17 @@ class ChatDock(QWidget):
 
         self.model_label = QLabel()
         self.model_label.setWordWrap(True)        # wraps so the dock can be narrow
-        top = QHBoxLayout()
-        top.addWidget(self.model_label, 1)
-        top.addWidget(self.files_btn, 0, Qt.AlignTop)
-        top.addWidget(self.clear_btn, 0, Qt.AlignTop)
-        top.addWidget(self.settings_btn, 0, Qt.AlignTop)
+        self.model_label.setStyleSheet("color:#444;")
+        # Buttons on their own row; the model label sits just below them so it has
+        # the full dock width instead of being squeezed beside the buttons.
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.files_btn)
+        btn_row.addWidget(self.clear_btn)
+        btn_row.addWidget(self.settings_btn)
+        btn_row.addStretch(1)
+        top = QVBoxLayout()
+        top.addLayout(btn_row)
+        top.addWidget(self.model_label)
 
         self.status_label = QLabel()
         self.status_label.setStyleSheet("color:#666; font-style:italic;")

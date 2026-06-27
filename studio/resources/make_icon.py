@@ -94,6 +94,12 @@ def main():
                   solid_joinstyle="round", zorder=5)
     tile_clipped.append(gl)
 
+    # Brand mark: a bold "X" in the empty upper-left blue field.
+    xmark = ax.text(295, 790, "X", ha="center", va="center",
+                    fontsize=240, fontweight="bold", color="#f5f1e6",
+                    family="DejaVu Sans", zorder=6)
+    tile_clipped.append(xmark)
+
     for a in tile_clipped:
         a.set_clip_path(tile)
     for a in soil_clipped:        # slip surface + slices stay inside the slope body

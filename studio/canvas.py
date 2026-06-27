@@ -50,6 +50,7 @@ class MplCanvas(QWidget):
         self._pixitem = None
         self._fitted = False
         self._render_dpi = 0          # DPI the current pixmap was rasterized at
+        self._content_rect = None     # tight bbox of inked content, in scene coords
         self._dxf_supported = False   # current view exports to DXF (set per render)
 
         self.scene = QGraphicsScene(self)
@@ -295,6 +296,7 @@ class MplCanvas(QWidget):
     def clear(self):
         self.figure.clear()
         self._dxf_supported = False
+        self._content_rect = None
         self._rasterize(BASE_DPI)
 
     def _rasterize(self, dpi):
@@ -318,6 +320,22 @@ class MplCanvas(QWidget):
         w_in, h_in = self.figure.get_size_inches()
         self.scene.setSceneRect(QRectF(0, 0, w_in * BASE_DPI, h_in * BASE_DPI))
         self._render_dpi = dpi
+        self._content_rect = self._tight_content_rect(w_in, h_in)
+
+    def _tight_content_rect(self, w_in, h_in):
+        """The inked content's bounding box in scene coords (inches × BASE_DPI),
+        so Fit frames the actual plot rather than the whole figure — which, with
+        equal-aspect axes, leaves wide margins on one side. Mirrors what Save's
+        bbox_inches='tight' crops to. Returns None if it can't be computed (Fit
+        then falls back to the full figure)."""
+        try:
+            tb = self.figure.get_tightbbox(self._agg.get_renderer())  # inches, btm-left
+        except Exception:
+            return None
+        # Matplotlib bbox origin is bottom-left; the scene's is top-left, so flip y.
+        rect = QRectF(tb.x0 * BASE_DPI, (h_in - tb.y1) * BASE_DPI,
+                      tb.width * BASE_DPI, tb.height * BASE_DPI)
+        return rect.intersected(QRectF(0, 0, w_in * BASE_DPI, h_in * BASE_DPI))
 
     def _target_dpi(self):
         """DPI needed so the pixmap has SUPERSAMPLE device px per on-screen px at
@@ -339,7 +357,10 @@ class MplCanvas(QWidget):
 
     # --- zoom / pan ------------------------------------------------------
     def fit(self):
-        if self._pixitem is not None:
+        if self._content_rect is not None and not self._content_rect.isEmpty():
+            self.view.fitInView(self._content_rect, Qt.KeepAspectRatio)
+            self._schedule_refine()
+        elif self._pixitem is not None:
             self.view.fitInView(self._pixitem, Qt.KeepAspectRatio)
             self._schedule_refine()
 

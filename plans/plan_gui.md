@@ -302,7 +302,8 @@ studio/                # XSlope Studio desktop app
 - ✅ **Stale-result invalidation** — editing inputs invalidates a stale LEM solution, and a geometry edit that makes the mesh invalid clears the mesh (Seep/FEM re-gate on a rebuild).
 
 **Phase 5 — Canvas selection + Display Options + style persistence** 🚧 **PARTIAL**
-- ⬜ Pick/double-click-to-edit; `StyleConfig` + Display Options dialog (visibility/colors/styles). *(Per-view Display dock panels exist from Phase 4, but the per-layer `StyleConfig` over colors/line-styles is not yet built.)*
+- ⬜ Pick / double-click-to-edit on the canvas (map a picked artist back to its `slope_data` object → open the right editor).
+- ⬜ `StyleConfig` + Display Options dialog (per-layer visibility / colors / line-styles). *(Per-view Display dock panels exist from Phase 4, but the per-layer `StyleConfig` over colors/line-styles is not yet built.)*
 - ⬜ Style persistence (§8a): factory/global/project 3-tier resolve+merge, `{stem}_style.json` sidecar I/O, "Set as default" / "Reset to factory" actions.
 - ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
 

@@ -91,6 +91,11 @@ class MplCanvas(QWidget):
         # Zoom-to-box: a checkable mode that swaps drag-to-pan for drag-a-rectangle.
         self._zoom_box_btn = QToolButton()
         self._zoom_box_btn.setText("⌕")
+        # The magnifier glyph renders small at the default button font; enlarge it
+        # so it reads clearly rather than sitting tiny in the middle of the button.
+        _zb_font = self._zoom_box_btn.font()
+        _zb_font.setPointSizeF(_zb_font.pointSizeF() * 1.8)
+        self._zoom_box_btn.setFont(_zb_font)
         self._zoom_box_btn.setToolTip("Zoom to box — drag a rectangle to zoom into it")
         self._zoom_box_btn.setCheckable(True)
         self._zoom_box_btn.toggled.connect(self._toggle_zoom_box)

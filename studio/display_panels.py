@@ -105,34 +105,29 @@ class InputsDisplayPanel(QWidget):
         self.mat_table = QCheckBox("Material property table")
         self.tab_loc = QComboBox()
         self.tab_loc.addItems(TAB_LOCATIONS)
+        # Auto = lay the legend out automatically (as wide as fits the axes, with
+        # the fewest neatly-balanced rows). Uncheck to force an exact column count.
         self.legend_auto = QCheckBox("Auto legend columns")
         self.legend_auto.setChecked(True)
         self.legend_ncol = _ispin(1, 12, 3)
-        self.legend_max_cols = _ispin(1, 12, 6)
-        self.legend_max_rows = _ispin(1, 12, 4)
 
         form.addRow("", self.mat_table)
         form.addRow("Table position", self.tab_loc)
         form.addRow("", self.legend_auto)
         form.addRow("Legend columns", self.legend_ncol)
-        form.addRow("Max columns", self.legend_max_cols)
-        form.addRow("Max rows", self.legend_max_rows)
 
         self.mat_table.toggled.connect(self._sync)
         self.legend_auto.toggled.connect(self._sync)
         for w in (self.mat_table, self.legend_auto):
             w.toggled.connect(self._emit)
         self.tab_loc.currentIndexChanged.connect(self._emit)
-        for s in (self.legend_ncol, self.legend_max_cols, self.legend_max_rows):
-            s.valueChanged.connect(self._emit)
+        self.legend_ncol.valueChanged.connect(self._emit)
         self._sync()
 
     def _sync(self, *_):
         self.tab_loc.setEnabled(self.mat_table.isChecked())
-        auto = self.legend_auto.isChecked()
-        self.legend_ncol.setEnabled(not auto)         # explicit count when manual
-        self.legend_max_cols.setEnabled(auto)         # caps only apply to "auto"
-        self.legend_max_rows.setEnabled(auto)
+        # The explicit column count applies only when auto is off.
+        self.legend_ncol.setEnabled(not self.legend_auto.isChecked())
 
     def _emit(self, *_):
         self.changed.emit()
@@ -143,8 +138,6 @@ class InputsDisplayPanel(QWidget):
             "tab_loc": self.tab_loc.currentText(),
             "legend_ncol": ("auto" if self.legend_auto.isChecked()
                             else self.legend_ncol.value()),
-            "legend_max_cols": self.legend_max_cols.value(),
-            "legend_max_rows": self.legend_max_rows.value(),
         }
 
 

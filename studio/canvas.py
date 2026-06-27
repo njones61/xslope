@@ -99,9 +99,7 @@ class MplCanvas(QWidget):
             slope_data, fig=fig, mode=mode,
             mat_table=opts.get("mat_table", False),
             tab_loc=opts.get("tab_loc", "top"),
-            legend_ncol=opts.get("legend_ncol", "auto"),
-            legend_max_cols=opts.get("legend_max_cols", 6),
-            legend_max_rows=opts.get("legend_max_rows", 4)))
+            legend_ncol=opts.get("legend_ncol", "auto")))
 
     def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None):
         opts = opts or {}

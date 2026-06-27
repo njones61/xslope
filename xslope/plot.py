@@ -1548,6 +1548,39 @@ def plot_piles(ax, slope_data, slice_df=None):
                        label='Pile-Surface Intersection')
 
 
+def _fit_legend_ncol(ax, fig, handles, labels, anchor):
+    """Choose a legend column count that is wide but neat.
+
+    Goals (in order): the legend never exceeds the axes width; rows are
+    minimized (don't hog vertical space); the last row isn't left sparse. We
+    measure candidate legends' rendered width against the axes width — widest
+    that fits gives the fewest rows — then rebalance columns to that row count
+    so e.g. 8 items become 4×2 rather than 5+3. Falls back to a character-width
+    estimate when no renderer is available (e.g. a backend without one)."""
+    n = len(labels)
+    if n <= 1:
+        return max(1, n)
+    max_fit = 1
+    try:
+        fig.canvas.draw()                      # ensure a renderer + axes layout
+        renderer = fig.canvas.get_renderer()
+        ax_w = ax.get_window_extent(renderer).width
+        for trial in range(n, 0, -1):          # widest first; first that fits wins
+            leg = ax.legend(handles=handles, labels=labels, loc="upper center",
+                            bbox_to_anchor=anchor, ncol=trial)
+            fits = leg.get_window_extent(renderer).width <= ax_w
+            leg.remove()
+            if fits:
+                max_fit = trial
+                break
+    except Exception:
+        # No renderer: estimate columns from the longest label vs a nominal width.
+        longest = max(len(s) for s in labels)
+        max_fit = max(1, min(n, 90 // (longest + 6)))
+    rows = max(1, math.ceil(n / max_fit))      # fewest rows that fit width-wise
+    return max(1, math.ceil(n / rows))         # fewest cols for that many rows
+
+
 def plot_inputs(
     slope_data,
     title="Slope Geometry and Inputs",
@@ -1559,8 +1592,6 @@ def plot_inputs(
     mode="lem",
     tab_loc="top",
     legend_ncol="auto",
-    legend_max_cols=6,
-    legend_max_rows=4,
     fig=None,
 ):
     """
@@ -1592,11 +1623,9 @@ def plot_inputs(
             - "center right": Middle-right of plot area
             - "center": Center of plot area
             - "top": Above plot area, horizontally centered
-        legend_ncol: Legend column count. Use "auto" (default) to choose a value that
-            keeps the legend from getting too tall, or pass an int to force a width.
-        legend_max_cols: When legend_ncol="auto", cap the number of columns (default: 6).
-        legend_max_rows: When legend_ncol="auto", try to keep legend rows <= this value
-            by increasing columns (default: 4).
+        legend_ncol: Legend column count. Use "auto" (default) to lay it out
+            automatically — as wide as fits the axes, with the fewest, neatly
+            balanced rows — or pass an int to force a specific column count.
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -1813,14 +1842,11 @@ def plot_inputs(
     # off the bottom of the window. We auto-increase columns to cap row count,
     # and we also reserve bottom margin so the legend stays visible.
     n_items = len(labels)
+    anchor = (0.5, -0.12)
     if legend_ncol == "auto":
-        # Choose enough columns to keep row count <= legend_max_rows (as best we can),
-        # but never exceed legend_max_cols.
-        required_cols = max(1, math.ceil(n_items / max(1, int(legend_max_rows))))
-        ncol = min(int(legend_max_cols), required_cols)
-        # Keep at least 2 columns once there's more than one entry (matches prior look).
-        if n_items > 1:
-            ncol = max(2, ncol)
+        # Wide-but-neat: as many columns as fit the axes width, fewest rows,
+        # then rebalanced so the last row isn't sparse (see _fit_legend_ncol).
+        ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
     else:
         ncol = max(1, int(legend_ncol))
 
@@ -1832,7 +1858,7 @@ def plot_inputs(
         handles=handles,
         labels=labels,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.12),
+        bbox_to_anchor=anchor,
         ncol=ncol,
     )
 

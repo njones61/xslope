@@ -93,6 +93,7 @@ class MplCanvas(QWidget):
         self._dxf_supported = False   # current view exports to DXF (set per render)
         self._zoom_box_mode = False   # drag-a-rectangle zoom (vs. drag-to-pan)
         self._band_scene = None       # scene rect of the in-progress rubber band
+        self._pick_enabled = False    # double-click selects a feature (Inputs view)
 
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
@@ -437,14 +438,24 @@ class MplCanvas(QWidget):
     def _restore_pan_cursor(self):
         """Set the viewport cursor for the active mode. fitInView / resetTransform
         / scale otherwise leave it as a plain arrow until the next mouse press.
-        Box-zoom → cross; pan → open hand, but only when there's actually room to
+        Box-zoom → cross; a pick-enabled view (Inputs) → pointing hand to signal
+        double-click-to-select; otherwise pan → open hand when there's room to
         pan (a fully-fitted view shows the normal arrow instead)."""
         if self._zoom_box_mode:
-            self.view.viewport().setCursor(Qt.CrossCursor)
+            cursor = Qt.CrossCursor
+        elif self._pick_enabled:
+            cursor = Qt.PointingHandCursor
         elif self._can_pan():
-            self.view.viewport().setCursor(Qt.OpenHandCursor)
+            cursor = Qt.OpenHandCursor
         else:
-            self.view.viewport().setCursor(Qt.ArrowCursor)
+            cursor = Qt.ArrowCursor
+        self.view.viewport().setCursor(cursor)
+
+    def set_pick_enabled(self, on):
+        """Enable double-click-to-select on this canvas (the Inputs view). Shows a
+        select (pointing-hand) cursor instead of the pan/grab hand."""
+        self._pick_enabled = bool(on)
+        self._restore_pan_cursor()
 
     def _toggle_zoom_box(self, on):
         """Switch between drag-to-pan (ScrollHandDrag) and drag-a-rectangle zoom
@@ -523,6 +534,11 @@ class MplCanvas(QWidget):
                 and event.button() == Qt.LeftButton and not self._zoom_box_mode):
             self._emit_pick(event.position().toPoint())
             return True
+        if (obj is self.view.viewport() and self._pick_enabled
+                and event.type() == QEvent.MouseButtonRelease):
+            # ScrollHandDrag resets the cursor to the open hand on release; re-assert
+            # the select cursor after Qt's own handler runs. Don't consume the event.
+            QTimer.singleShot(0, self._restore_pan_cursor)
         return super().eventFilter(obj, event)
 
     # --- pick (double-click to edit) -------------------------------------

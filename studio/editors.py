@@ -836,8 +836,13 @@ class MatGeometryDialog(QDialog):
 
     XY = [Field("x", "x"), Field("y", "y")]
 
-    def __init__(self, title, help_text, item_label, items, materials, parent=None):
+    def __init__(self, title, help_text, item_label, items, materials, parent=None,
+                 select=None, max_depth=None):
         # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
+        # select: row to pre-highlight (e.g. the double-clicked line); else first.
+        # max_depth: when not None, show a "Max depth" field (profile sheet only —
+        #   it has no meaning for polygon input); the bottom boundary elevation
+        #   used when building zone polygons from the profile lines.
         super().__init__(parent)
         self.setWindowTitle(title)
         self.resize(680, 540)
@@ -851,6 +856,18 @@ class MatGeometryDialog(QDialog):
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
+
+        self._max_depth_edit = None
+        if max_depth is not None:
+            mdrow = QHBoxLayout()
+            mdrow.addWidget(QLabel("Max depth (bottom boundary elevation):"))
+            self._max_depth_edit = QLineEdit(str(max_depth))
+            self._max_depth_edit.setToolTip(
+                "Elevation of the model's bottom boundary, used to build the zone "
+                "polygons from the profile lines.")
+            mdrow.addWidget(self._max_depth_edit, 1)
+            main.addLayout(mdrow)
+
         body = QHBoxLayout()
         main.addLayout(body, 1)
 
@@ -885,7 +902,8 @@ class MatGeometryDialog(QDialog):
 
         self._refresh_list()
         if self._lines:
-            self.list.setCurrentRow(0)
+            row = select if (select is not None and 0 <= select < len(self._lines)) else 0
+            self.list.setCurrentRow(row)
 
     def _label(self, i):
         mid = self._lines[i]["mat_id"]
@@ -955,21 +973,34 @@ class MatGeometryDialog(QDialog):
         self._commit_current()
         return [{"coords": list(ln["coords"]), "mat_id": ln["mat_id"]} for ln in self._lines]
 
+    def result_max_depth(self):
+        """The edited max-depth value (float), or None if the field isn't shown."""
+        if self._max_depth_edit is None:
+            return None
+        try:
+            return float(self._max_depth_edit.text())
+        except (TypeError, ValueError):
+            return None
+
 
 class ProfileEditor(CategoryEditor):
     label = "Profile lines"
 
-    def build(self, slope_data, parent):
+    def build(self, slope_data, parent, select=None):
         return MatGeometryDialog(
             "Profile lines",
             "Each profile line is the top of a material layer, drawn left→right and "
             "ordered shallowest first. Select a line to edit its material and vertices.",
             "Line",
             slope_data.get("profile_lines") or [],
-            slope_data.get("materials") or [], parent)
+            slope_data.get("materials") or [], parent,
+            select=select, max_depth=slope_data.get("max_depth") or 0.0)
 
     def apply(self, slope_data, dlg):
         slope_data["profile_lines"] = dlg.result_lines()
+        md = dlg.result_max_depth()
+        if md is not None:
+            slope_data["max_depth"] = md
         _resync_geometry(slope_data)  # rebuild polygons / ground surface / t-crack
 
 
@@ -980,7 +1011,7 @@ class PolygonEditor(CategoryEditor):
 
     label = "Polygons"
 
-    def build(self, slope_data, parent):
+    def build(self, slope_data, parent, select=None):
         items = []
         for p in (slope_data.get("polygons") or []):
             coords = list(p["polygon"].exterior.coords)
@@ -991,7 +1022,7 @@ class PolygonEditor(CategoryEditor):
             "Polygons",
             "Each polygon is a closed material zone (the ring is closed automatically, "
             "so list each vertex once). Select a polygon to edit its material and vertices.",
-            "Polygon", items, slope_data.get("materials") or [], parent)
+            "Polygon", items, slope_data.get("materials") or [], parent, select=select)
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon

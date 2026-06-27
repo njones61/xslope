@@ -35,51 +35,53 @@ def _line_dist(pt, points):
 
 
 def pick_category(slope_data, x, y, tol):
-    """Return the editor category for the input feature nearest to (x, y) within
-    `tol` data units, or None. Geometry that isn't editable for this project type
-    (e.g. polygons on a profile-based file) is simply not offered."""
+    """Return ``(category, index)`` for the input feature nearest to (x, y) within
+    `tol` data units, or None. `index` is the feature's position in its list (so
+    the editor can pre-highlight it); it's None when not meaningful. Geometry that
+    isn't editable for this project type (e.g. polygons on a profile-based file) is
+    simply not offered."""
     d = slope_data
     pt = Point(x, y)
-    cands = []  # (distance, category)
+    cands = []  # (distance, category, index)
 
-    for p in d.get("pile_lines") or []:
-        cands.append((_line_dist(pt, [(p["x1"], p["y1"]), (p["x2"], p["y2"])]), "piles"))
-    for r in d.get("reinforcement_lines") or []:
-        cands.append((_line_dist(pt, [(r["x1"], r["y1"]), (r["x2"], r["y2"])]), "reinforce"))
-    for line in d.get("dloads") or []:
-        cands.append((_line_dist(pt, line), "dloads"))
+    for i, p in enumerate(d.get("pile_lines") or []):
+        cands.append((_line_dist(pt, [(p["x1"], p["y1"]), (p["x2"], p["y2"])]), "piles", i))
+    for i, r in enumerate(d.get("reinforcement_lines") or []):
+        cands.append((_line_dist(pt, [(r["x1"], r["y1"]), (r["x2"], r["y2"])]), "reinforce", i))
+    for i, line in enumerate(d.get("dloads") or []):
+        cands.append((_line_dist(pt, line), "dloads", i))
     for key in ("piezo_line", "piezo_line2"):
-        cands.append((_line_dist(pt, d.get(key) or []), "piezo"))
-    for c in d.get("circles") or []:
+        cands.append((_line_dist(pt, d.get(key) or []), "piezo", None))
+    for i, c in enumerate(d.get("circles") or []):
         try:
             r = ((x - c["Xo"]) ** 2 + (y - c["Yo"]) ** 2) ** 0.5
-            cands.append((abs(r - c["R"]), "circles"))
+            cands.append((abs(r - c["R"]), "circles", i))
         except Exception:
             pass
-    cands.append((_line_dist(pt, d.get("non_circ") or []), "non_circ"))
+    cands.append((_line_dist(pt, d.get("non_circ") or []), "non_circ", None))
 
     # Geometry: profile lines (profile-based files) or polygon edges (polygon-based).
     profile_lines = d.get("profile_lines") or []
     polygons = d.get("polygons") or []
     if profile_lines:
-        for pl in profile_lines:
-            cands.append((_line_dist(pt, pl.get("coords") or []), "profile"))
+        for i, pl in enumerate(profile_lines):
+            cands.append((_line_dist(pt, pl.get("coords") or []), "profile", i))
     elif polygons:
-        for poly in polygons:
+        for i, poly in enumerate(polygons):
             try:
-                cands.append((poly["polygon"].exterior.distance(pt), "polygons"))
+                cands.append((poly["polygon"].exterior.distance(pt), "polygons", i))
             except Exception:
                 pass
 
-    near = sorted((dist, cat) for dist, cat in cands if dist <= tol)
+    near = sorted((c for c in cands if c[0] <= tol), key=lambda c: c[0])
     if near:
-        return near[0][1]
+        return near[0][1], near[0][2]
 
     # Fallback: a click inside a material zone edits that zone's material.
-    for poly in polygons:
+    for i, poly in enumerate(polygons):
         try:
             if poly["polygon"].contains(pt):
-                return "materials"
+                return "materials", poly.get("mat_id")
         except Exception:
             pass
     return None

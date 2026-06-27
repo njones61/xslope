@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
         # Double-click an input on the Inputs canvas to edit it (plan §6/§8).
         # Only the Inputs view is wired; result-view canvases stay view-only.
         self.canvas.picked.connect(self._on_canvas_pick)
+        self.canvas.set_pick_enabled(True)  # show the select cursor on the Inputs view
         self.mesh_canvas = None
         self.search_canvas = None
         self.solution_canvas = None
@@ -690,19 +691,26 @@ class MainWindow(QMainWindow):
     def _on_canvas_pick(self, x, y, tol):
         """Open the editor for the input feature the user double-clicked on the
         Inputs canvas. The hit-test maps the click back to a slope_data object and
-        returns its editor category (plan §6/§8)."""
+        returns its editor category and index (plan §6/§8)."""
         if not self.doc.is_open:
             return
         from .picking import pick_category
-        category = pick_category(self.doc.slope_data, x, y, max(tol, 1e-9))
-        if category:
-            self.edit_category(category)
+        hit = pick_category(self.doc.slope_data, x, y, max(tol, 1e-9))
+        if hit:
+            category, index = hit
+            self.edit_category(category, select=index)
 
-    def edit_category(self, category):
+    def edit_category(self, category, select=None):
         editor = CATEGORY_EDITORS.get(category)
         if editor is None or not self.doc.is_open:
             return
-        dlg = editor.build(self.doc.slope_data, self)
+        # Pass the picked index to editors that can pre-highlight it (profile /
+        # polygon dialogs); others keep the simple build(slope_data, parent) shape.
+        import inspect
+        if "select" in inspect.signature(editor.build).parameters:
+            dlg = editor.build(self.doc.slope_data, self, select=select)
+        else:
+            dlg = editor.build(self.doc.slope_data, self)
         if dlg.exec():
             mesh_before = self.mesh_signature(self.doc.slope_data)
             self.doc.begin_edit()

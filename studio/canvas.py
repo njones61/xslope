@@ -18,8 +18,12 @@ import os
 
 os.environ.setdefault("QT_API", "pyside6")
 
-from PySide6.QtCore import QEvent, QRectF, Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QImage, QPainter, QPixmap
+import math
+
+from PySide6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
+from PySide6.QtGui import (
+    QColor, QGuiApplication, QIcon, QImage, QPainter, QPen, QPixmap,
+)
 from PySide6.QtWidgets import (
     QFileDialog, QGraphicsScene, QGraphicsView, QHBoxLayout, QInputDialog,
     QMessageBox, QToolButton, QVBoxLayout, QWidget,
@@ -44,6 +48,32 @@ MAX_DPI = 900         # caps pixmap memory (raised for Retina, where the effecti
                       # DPI is doubled by devicePixelRatio)
 REFINE_MS = 90        # debounce before re-rasterizing after a zoom change
 FIT_PAD = 0.04        # cushion around the content when fitting (fraction per side)
+
+
+def _magnifier_icon(px=20, color="#2b2b2b"):
+    """Draw a magnifying-glass icon (lens circle + handle) at ``px`` logical size.
+
+    A drawn icon (rather than a font glyph like "⌕", which renders tiny inside its
+    em-box) fills the button predictably and stays crisp on Retina via the 2×
+    backing pixmap."""
+    dpr = 2
+    pm = QPixmap(px * dpr, px * dpr)
+    pm.setDevicePixelRatio(dpr)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    pen = QPen(QColor(color))
+    pen.setWidthF(px * 0.12)
+    pen.setCapStyle(Qt.RoundCap)
+    p.setPen(pen)
+    r = px * 0.30                      # lens radius
+    cx = cy = px * 0.38                # lens centre
+    p.drawEllipse(QPointF(cx, cy), r, r)
+    a = math.radians(45)               # handle runs out from the lens at 45°
+    p.drawLine(QPointF(cx + r * math.cos(a), cy + r * math.sin(a)),
+               QPointF(px * 0.86, px * 0.86))
+    p.end()
+    return QIcon(pm)
 
 
 class MplCanvas(QWidget):
@@ -90,12 +120,8 @@ class MplCanvas(QWidget):
             bar.addWidget(btn)
         # Zoom-to-box: a checkable mode that swaps drag-to-pan for drag-a-rectangle.
         self._zoom_box_btn = QToolButton()
-        self._zoom_box_btn.setText("⌕")
-        # The magnifier glyph renders small at the default button font; enlarge it
-        # so it reads clearly rather than sitting tiny in the middle of the button.
-        _zb_font = self._zoom_box_btn.font()
-        _zb_font.setPointSizeF(_zb_font.pointSizeF() * 1.8)
-        self._zoom_box_btn.setFont(_zb_font)
+        self._zoom_box_btn.setIcon(_magnifier_icon())
+        self._zoom_box_btn.setIconSize(QSize(20, 20))
         self._zoom_box_btn.setToolTip("Zoom to box — drag a rectangle to zoom into it")
         self._zoom_box_btn.setCheckable(True)
         self._zoom_box_btn.toggled.connect(self._toggle_zoom_box)

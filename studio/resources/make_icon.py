@@ -95,7 +95,7 @@ def main():
     tile_clipped.append(gl)
 
     # Brand mark: a bold "X" in the empty upper-left blue field.
-    xmark = ax.text(295, 790, "X", ha="center", va="center",
+    xmark = ax.text(355, 720, "X", ha="center", va="center",
                     fontsize=240, fontweight="bold", color="#f5f1e6",
                     family="DejaVu Sans", zorder=6)
     tile_clipped.append(xmark)

@@ -449,7 +449,7 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     if fill_contours:
         contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax, alpha=0.5)
         contourf.set_gid('CONTOUR_FILL')
-        cbar = plt.colorbar(contourf, ax=ax, label=variable_label, shrink=0.8, pad=0.02)
+        cbar = ax.figure.colorbar(contourf, ax=ax, label=variable_label, shrink=0.8, pad=0.02)
         cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
         cbar.update_ticks()
 

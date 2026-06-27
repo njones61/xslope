@@ -665,7 +665,7 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
                            levels=20, cmap='viridis', alpha=0.8)
         
         # Colorbar
-        cbar = plt.colorbar(tcf, ax=ax, shrink=cbar_shrink)
+        cbar = ax.figure.colorbar(tcf, ax=ax, shrink=cbar_shrink)
         cbar.set_label('Displacement Magnitude', rotation=270, labelpad=cbar_labelpad)
     
     # Plot mesh
@@ -839,7 +839,7 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     # Dummy colorbar for axis alignment with other subplots
     dummy_data = np.array([[0, 1]])
     dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
-    cbar = plt.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
+    cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
     cbar.set_label('', color='white')
     cbar.set_ticks([])
     cbar.set_ticklabels([])
@@ -911,7 +911,7 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         ax.add_collection(p)
         
         # Colorbar
-        cbar = plt.colorbar(p, ax=ax, shrink=cbar_shrink)
+        cbar = ax.figure.colorbar(p, ax=ax, shrink=cbar_shrink)
         cbar.set_label('von Mises Stress', rotation=270, labelpad=cbar_labelpad)
     
     # Highlight plastic elements with thick boundary
@@ -1002,7 +1002,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     # This ensures the x-axis alignment is consistent across all subplots
     dummy_data = np.array([[0, 1]])
     dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
-    cbar = plt.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
+    cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
     cbar.set_label('Deformation Scale', rotation=270, labelpad=cbar_labelpad, color='white')
     cbar.set_ticks([])  # Remove tick marks
     cbar.set_ticklabels([])  # Remove tick labels
@@ -1210,7 +1210,7 @@ def plot_reinforcement_forces(ax, fem_data, solution):
         # Add colorbar
         sm = cm.ScalarMappable(cmap=force_cmap, norm=plt.Normalize(0, t_max_global))
         sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+        cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
         cbar.set_label('Reinforcement Force', rotation=270, labelpad=15, fontsize=10)
 
     # Draw elements at Tres (magenta)
@@ -1242,7 +1242,7 @@ def plot_reinforcement_forces(ax, fem_data, solution):
         ax.add_collection(lc)
         sm = cm.ScalarMappable(cmap=pile_cmap, norm=pile_norm)
         sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+        cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
         cbar.set_label('Pile Shear Force', rotation=270, labelpad=15, fontsize=10)
 
     # Add legend if any special states exist
@@ -1545,7 +1545,7 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
         ax.add_collection(p)
         
         # Add colorbar with custom ticks
-        cbar = plt.colorbar(p, ax=ax, shrink=cbar_shrink)
+        cbar = ax.figure.colorbar(p, ax=ax, shrink=cbar_shrink)
         cbar.set_label('Yield Function F', rotation=270, labelpad=cbar_labelpad)
         
         # Set custom ticks to highlight key values
@@ -1692,7 +1692,7 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
         # Create colorbar using a ScalarMappable
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, shrink=cbar_shrink, pad=0.05)
+        cbar = ax.figure.colorbar(sm, ax=ax, shrink=cbar_shrink, pad=0.05)
         cbar.set_label(label, rotation=270, labelpad=cbar_labelpad)
     else:
         # Uniform values - just color all elements the same
@@ -1813,7 +1813,7 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
         cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
 
         # Add colorbar
-        cbar = plt.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
+        cbar = ax.figure.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
         cbar.set_label(label, rotation=270, labelpad=20)
     else:
         # Uniform values - just color all elements the same

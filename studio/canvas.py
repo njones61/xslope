@@ -50,6 +50,7 @@ class MplCanvas(QWidget):
         self._pixitem = None
         self._fitted = False
         self._render_dpi = 0          # DPI the current pixmap was rasterized at
+        self._dxf_supported = False   # current view exports to DXF (set per render)
 
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
@@ -82,7 +83,7 @@ class MplCanvas(QWidget):
         # the image it saves and works for views without a Display panel).
         save_btn = QToolButton()
         save_btn.setText("Save…")
-        save_btn.setToolTip("Export this view to a PNG / PDF / SVG file")
+        save_btn.setToolTip("Export this view to a PNG / PDF / SVG / DXF file")
         save_btn.clicked.connect(self.save_image)
         bar.addWidget(save_btn)
 
@@ -184,49 +185,79 @@ class MplCanvas(QWidget):
 
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):
-        """Export the current figure to a file. PNG prompts for a DPI; PDF/SVG are
-        vector and need none. Saves at the figure's true size in inches, so output
-        resolution is independent of the on-screen zoom."""
+        """Export the current figure to a file. PNG prompts for a DPI; PDF/SVG/DXF
+        are vector and need none. Raster/vector image formats save at the figure's
+        true size in inches, so output resolution is independent of the on-screen
+        zoom. DXF re-emits the rendered geometry layer-by-layer via the engine's
+        ``axes_to_dxf`` (the same path as the plot functions' ``save_dxf`` kwarg),
+        offered only for views whose engine plot supports it (§ not Reliability)."""
+        filters = ["PNG image (*.png)", "PDF document (*.pdf)", "SVG image (*.svg)"]
+        if self._dxf_supported:
+            filters.append("DXF drawing (*.dxf)")
         path, sel = QFileDialog.getSaveFileName(
-            self, "Save image", suggested_name,
-            "PNG image (*.png);;PDF document (*.pdf);;SVG image (*.svg)")
+            self, "Save view", suggested_name, ";;".join(filters))
         if not path:
             return
         ext = os.path.splitext(path)[1].lower()
         if not ext:                       # user typed no extension — infer from filter
             ext = {"PDF document (*.pdf)": ".pdf",
-                   "SVG image (*.svg)": ".svg"}.get(sel, ".png")
+                   "SVG image (*.svg)": ".svg",
+                   "DXF drawing (*.dxf)": ".dxf"}.get(sel, ".png")
             path += ext
-        dpi = 300
-        if ext not in (".pdf", ".svg"):   # raster formats need a resolution
-            dpi, ok = QInputDialog.getInt(self, "Image resolution",
-                                          "DPI:", 300, 50, 1200, 50)
-            if not ok:
-                return
         try:
-            # Restore the on-screen render DPI afterwards so the live pixmap is
-            # unaffected by the export DPI.
-            self.figure.savefig(path, dpi=dpi, bbox_inches="tight")
-            self.figure.set_dpi(self._render_dpi or BASE_DPI)
+            if ext == ".dxf":
+                ax = self._main_axes()
+                if ax is None:
+                    raise RuntimeError("no geometry axes to export")
+                from xslope.cad import axes_to_dxf
+                axes_to_dxf(ax, path)
+            else:
+                dpi = 300
+                if ext not in (".pdf", ".svg"):   # raster formats need a resolution
+                    dpi, ok = QInputDialog.getInt(self, "Image resolution",
+                                                  "DPI:", 300, 50, 1200, 50)
+                    if not ok:
+                        return
+                # Restore the on-screen render DPI afterwards so the live pixmap is
+                # unaffected by the export DPI.
+                self.figure.savefig(path, dpi=dpi, bbox_inches="tight")
+                self.figure.set_dpi(self._render_dpi or BASE_DPI)
         except Exception:
             import traceback
             traceback.print_exc()
-            QMessageBox.warning(self, "Save image failed",
-                                "Could not write the image — see the Log pane.")
+            QMessageBox.warning(self, "Save view failed",
+                                "Could not write the file — see the Log pane.")
             return
         # Visible confirmation via the window's status bar if available.
         win = self.window()
         if hasattr(win, "statusBar"):
             win.statusBar().showMessage(f"Saved {os.path.basename(path)}")
 
-    def _draw(self, draw_fn):
+    def _main_axes(self):
+        """The largest axes on the figure — the main geometry plot, which is what
+        the engine's ``axes_to_dxf`` expects (legends/colorbars/tables are smaller
+        sibling axes). Returns None for an empty figure."""
+        axs = self.figure.get_axes()
+        if not axs:
+            return None
+        def area(a):
+            bb = a.get_position()
+            return bb.width * bb.height
+        return max(axs, key=area)
+
+    def _draw(self, draw_fn, dxf=True):
         """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.
+
+        ``dxf`` records whether this view's geometry can be exported to DXF (every
+        engine plot here can except an empty canvas), gating the DXF option in the
+        Save dialog.
 
         Every (re)render re-arms the fit (``_fitted = False``) so the new content
         is fitted to the window — a fresh solve/result always autofits, not just
         the first plot ever drawn. The fit itself is deferred to ``ensure_fitted``
         (and to ``showEvent`` for a canvas drawn while its tab is hidden), so it
         runs once the viewport has a real size rather than at zero size."""
+        self._dxf_supported = dxf
         draw_fn(self.figure)
         self._rasterize(self._target_dpi())
         self._fitted = False
@@ -257,6 +288,7 @@ class MplCanvas(QWidget):
 
     def clear(self):
         self.figure.clear()
+        self._dxf_supported = False
         self._rasterize(BASE_DPI)
 
     def _rasterize(self, dpi):

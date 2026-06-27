@@ -2255,7 +2255,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         plt.show()
     return fig
 
-def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, dpi=300, fig=None):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Creates a plot showing the results of reliability analysis.
 
@@ -2351,6 +2351,10 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     if save_png:
         filename = 'plot_reliability_results.png'
         fig.savefig(filename, dpi=dpi, bbox_inches='tight')
+
+    if save_dxf:
+        from .cad import axes_to_dxf
+        axes_to_dxf(ax, 'plot_reliability_results.dxf')
 
     if own_fig:
         plt.show()

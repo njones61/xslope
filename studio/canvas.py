@@ -36,8 +36,9 @@ from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
-SUPERSAMPLE = 2.0     # bitmap px per *device* px (crisp text; combined with the
-                      # display's devicePixelRatio in _target_dpi)
+SUPERSAMPLE = 1.5     # bitmap px per *device* px. Above 1 gives anti-aliasing
+                      # headroom; too high means a big downscale, which bilinear
+                      # sampling renders poorly (grainy). ~1.5 is the sweet spot.
 MIN_DPI = 100
 MAX_DPI = 900         # caps pixmap memory (raised for Retina, where the effective
                       # DPI is doubled by devicePixelRatio)
@@ -359,12 +360,16 @@ class MplCanvas(QWidget):
         self._refine_timer.start()
 
     def _refine_resolution(self):
-        """After a zoom change, re-rasterize if the pixmap is now too coarse for
-        the on-screen size (pixelated) or wastefully fine (free memory)."""
+        """After a zoom/fit change, re-rasterize if the pixmap no longer matches
+        the on-screen size: too coarse (pixelated/upscaled) OR too fine (a large
+        downscale, which bilinear sampling renders grainy — and wastes memory).
+        The initial render happens before Fit, so the post-fit scale almost always
+        differs; keep the band tight so the bitmap tracks it."""
         if self._pixitem is None:
             return
         need = max(MIN_DPI, min(MAX_DPI, self._target_dpi()))
-        if need > self._render_dpi * 1.05 or need < self._render_dpi * 0.6:
+        ratio = need / self._render_dpi
+        if ratio > 1.05 or ratio < 0.85:
             self._rasterize(need)
 
     # --- zoom / pan ------------------------------------------------------

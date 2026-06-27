@@ -90,7 +90,7 @@ class MplCanvas(QWidget):
             bar.addWidget(btn)
         # Zoom-to-box: a checkable mode that swaps drag-to-pan for drag-a-rectangle.
         self._zoom_box_btn = QToolButton()
-        self._zoom_box_btn.setText("⌕ Box")
+        self._zoom_box_btn.setText("⌕")
         self._zoom_box_btn.setToolTip("Zoom to box — drag a rectangle to zoom into it")
         self._zoom_box_btn.setCheckable(True)
         self._zoom_box_btn.toggled.connect(self._toggle_zoom_box)
@@ -385,14 +385,26 @@ class MplCanvas(QWidget):
             self._rasterize(need)
 
     # --- zoom / pan ------------------------------------------------------
+    def _can_pan(self):
+        """True when the scene is larger than the viewport in either axis, i.e.
+        there is somewhere to scroll to. After a Fit the content fills the window
+        with no slack, so the hand cursor would be misleading — there's nothing to
+        pan. The scrollbar ranges are the authoritative signal for ScrollHandDrag."""
+        h = self.view.horizontalScrollBar()
+        v = self.view.verticalScrollBar()
+        return h.minimum() != h.maximum() or v.minimum() != v.maximum()
+
     def _restore_pan_cursor(self):
-        """Re-assert the viewport cursor for the active mode. fitInView /
-        resetTransform / scale leave the cursor as a plain arrow until the next
-        mouse press, which makes the canvas look un-pannable right after a Fit or
-        zoom; restoring it keeps the drag affordance (open hand to pan, cross to
-        box-zoom) visible."""
-        self.view.viewport().setCursor(
-            Qt.CrossCursor if self._zoom_box_mode else Qt.OpenHandCursor)
+        """Set the viewport cursor for the active mode. fitInView / resetTransform
+        / scale otherwise leave it as a plain arrow until the next mouse press.
+        Box-zoom → cross; pan → open hand, but only when there's actually room to
+        pan (a fully-fitted view shows the normal arrow instead)."""
+        if self._zoom_box_mode:
+            self.view.viewport().setCursor(Qt.CrossCursor)
+        elif self._can_pan():
+            self.view.viewport().setCursor(Qt.OpenHandCursor)
+        else:
+            self.view.viewport().setCursor(Qt.ArrowCursor)
 
     def _toggle_zoom_box(self, on):
         """Switch between drag-to-pan (ScrollHandDrag) and drag-a-rectangle zoom
@@ -464,5 +476,6 @@ class MplCanvas(QWidget):
             factor = ZOOM_STEP if event.angleDelta().y() > 0 else 1 / ZOOM_STEP
             self.view.scale(factor, factor)
             self._schedule_refine()
+            self._restore_pan_cursor()
             return True
         return super().eventFilter(obj, event)

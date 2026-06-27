@@ -276,7 +276,7 @@ studio/                # XSlope Studio desktop app
 - ✅ Polygon-sheet geometry editor (for polygon-based files; profile-based files use the profile editor). Shares one `MatGeometryDialog` master/detail with the profile editor; the Inputs tree marks **Polygons** editable only when there are no profile lines.
 - ✅ New — `ProjectDocument.new()` creates an **empty** project: every `slope_data` category present but empty, no geometry, blank canvas. The Inputs tree starts at zero and stays editable (Profile lines editable so the first line can be added); the user builds up via the editors (add a material, then a profile line — the profile editor rebuilds the ground surface), and Save As writes it through the template.
 
-**Phase 3 — LEM analysis** 🚧 **IN PROGRESS**
+**Phase 3 — LEM analysis** ✅ **DONE**
 - ✅ End-to-end solve framework. `RunLemDialog` (method / analysis / surface / num_slices / rapid / diagnostic) → `LemRunner` (`QThread`, `studio/runners.py`) runs the engine off the GUI thread; engine output streams to the Log pane live via the thread-safe stdout tee. Central area is a `QTabWidget` view strip (Inputs + lazily-added result tabs, cleared on Open/New); a run logs a banner + result.
 - ✅ **Single surface** — circular *and* non-circular (`generate_slices` + `solve_selected`) → **LEM · Solution** tab via `plot_solution(fig=…)`.
 - ✅ **Auto-search** — circular (`circular_search`) and non-circular (`noncircular_search`) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, both given `fig=`) showing all trial surfaces + critical + search path, plus the critical surface in the Solution tab. Search iteration progress streams to the log.
@@ -290,21 +290,30 @@ studio/                # XSlope Studio desktop app
 - ✅ **Mode-driven Run** — one Run action whose label/dispatch follow the LEM/Seep/FEM mode; Build Mesh shows only in Seep/FEM; Seep/FEM Run gated on a built mesh (`_update_run_actions`).
 - ✅ **Run Seep** — `RunSeepDialog` (BC set 1/2, tol, plot variable head/u/v_mag/i_mag, contour levels, flowlines/vectors/fill/phreatic) → `SeepRunner` (`QThread`) runs `build_seep_data` → `run_seepage_analysis`; **Seep · Data** + **Seep · Solution** result tabs (`plot_seep_data` / `plot_seep_solution`, both given `fig=`); solution written to `{stem}_seep.csv` (`_seep2.csv` for BC 2). Convergence trace streams to the Log pane. **Each BC set keeps its own tab pair** (BC 2 → "Seep · Data 2" / "Seep · Solution 2"), so rapid-drawdown problems show BC 1 and BC 2 side by side and switch freely; results are held per BC in `doc.results["seep_solutions"][bc]`.
 - ✅ **Display dock** — per-plot-type display options live in a context-sensitive "Display" dock under the Inputs tree (not in the run dialogs); its page follows the active result tab and re-renders the cached result live. Panels for every view that has options, each exposing the full set of display kwargs the underlying `plot_*` accepts: Inputs (material table + placement, legend column layout), LEM · Search (highlight critical), LEM · Solution (slice numbers, seep contours), Mesh (nodes / labels / padding), Seep · Data and FEM · Data (BC / nodes / labels / fill opacity; FEM also BC symbol size), Seep · Solution (variable, levels, fill opacity, vector scale, padding, flow lines / vectors / fill / phreatic), FEM · Results (shear strain / deformation / displacement vectors — the diagnostic stress/strain/yield/displace_mag types are omitted; deform %, mesh / reinforcement / element labels, and the displacement-vector options gated to that plot type). Styling the `plot_*` functions hardcode (colors, widths, fonts) is still deferred to the Phase 5 `StyleConfig`. Reliability has no plot options, so it shows the placeholder.
-- ✅ **Image export** — a per-view **"Save…"** button on each canvas toolbar writes the current figure to PNG / PDF / SVG via `savefig`; PNG prompts for a DPI, vector formats skip it. Saves at the figure's true inch size so resolution is independent of on-screen zoom. Per-view (not per-panel) so Inputs / Reliability can export too.
+- ✅ **Image export** — a per-view **"Save…"** button on each canvas toolbar writes the current figure to PNG / PDF / SVG via `savefig`; PNG prompts for a DPI, vector formats skip it. Saves at the figure's true inch size so resolution is independent of on-screen zoom. Per-view (not per-panel) so Inputs / Reliability can export too. The Save button also offers **DXF export** of the current view.
+- ✅ **Auto legend layout** — engine-side measure-based legend layout across all result-view plots (wide but neat, multi-column), with **legend column controls** exposed on every result-view Display panel (so notebooks benefit too).
 - ✅ **Run FEM** — `RunFemDialog` (single trial / SSRM, F or F_min/F_max + tolerance + failure criterion) → `FemRunner` (`QThread`) runs `build_fem_data` → `solve_fem` / `solve_ssrm`; **FEM · Data** + **FEM · Results** tabs (`plot_fem_data` / `plot_fem_results`, both given `fig=`), display options (plot type, deform %) on the Display dock. SSRM reports FS and supports **cancel** (a `cancel_check` threaded through `solve_ssrm` + its helpers); solution exported via `export_fem_solution`.
 - Decisions: Run is **mode-driven** with dynamic text ("Run LEM/Seep/FEM"); a mesh is **explicit** (Build Mesh first — Seep/FEM stay disabled until `slope_data['mesh']` is present), not auto-built.
 
-**Phase 4 — done** (Meshing + Seepage + FEM all wired; display panels for all views; image export). Remaining polish: progress granularity for FEM.
+**Phase 4 — done** (Meshing + Seepage + FEM all wired; display panels for all views; image export incl. DXF; auto legend layout). Remaining polish: progress granularity for FEM.
 
-**Phase 5 — Canvas selection + Display Options + style persistence**
-- Pick/double-click-to-edit; `StyleConfig` + Display Options dialog (visibility/colors/styles).
-- Style persistence (§8a): factory/global/project 3-tier resolve+merge, `{stem}_style.json` sidecar I/O, "Set as default" / "Reset to factory" actions.
+**File lifecycle (§9) updates landed:**
+- ✅ **Sidecar reconciliation on save** — Save/Save As reconciles the `{stem}_mesh.json` / `{stem}_seep(.2).csv` / FEM sidecars against the current document so stale solution files don't outlive the inputs they came from.
+- ✅ **Stale-result invalidation** — editing inputs invalidates a stale LEM solution, and a geometry edit that makes the mesh invalid clears the mesh (Seep/FEM re-gate on a rebuild).
 
-**Phase 6 — DXF + Smart editing + polish**
-- DXF import wizard and export-current-view; optional coincident smart-editing; undo/redo.
+**Phase 5 — Canvas selection + Display Options + style persistence** 🚧 **PARTIAL**
+- ⬜ Pick/double-click-to-edit; `StyleConfig` + Display Options dialog (visibility/colors/styles). *(Per-view Display dock panels exist from Phase 4, but the per-layer `StyleConfig` over colors/line-styles is not yet built.)*
+- ⬜ Style persistence (§8a): factory/global/project 3-tier resolve+merge, `{stem}_style.json` sidecar I/O, "Set as default" / "Reset to factory" actions.
+- ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
 
-**Phase 7 — Packaging & distribution**
-- PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
+**Phase 6 — DXF + Smart editing + polish** 🚧 **PARTIAL**
+- ✅ **DXF export** — offered on each view's Save button (export current view).
+- ✅ **DXF import** — File → Import DXF brings polygons into the live document.
+- ⬜ DXF import *wizard* (layer→material mapping); optional coincident smart-editing; full undo/redo coverage.
+
+**Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
+- ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
+- ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
 
 ---
 
@@ -507,10 +516,21 @@ set up for the template.
   bills at cache-read rates on repeat turns. Refinement still open: adaptive thinking
   is Claude-specific and not yet re-threaded; per-model (not per-provider) capability
   detection.
-- **C — Native tools + live document:** structured input edit / run / results tools
-  wired to `ProjectDocument` and the runners, inline figures, confirm-to-run.
-- **D — Vision & polish:** sketch→inputs, parametric-sweep ergonomics, cost meter,
-  conversation save/restore.
+- **C — Native tools + live document:** 🚧 **PARTIAL** — the live document, runners,
+  and convenience helpers are reachable from the kernel: a preloaded **`run_lem()`**
+  helper drives the LEM runner, a **`sensitivity()`** helper does parametric sweeps
+  (writes a CSV + one plot to an accessible output folder), and assistant edits are
+  **transactional** (resynced derived geometry, no auto-solve), invalidating stale
+  mesh/solution like the GUI editors. Authoritative `slope_data` schemas are injected
+  so the assistant builds the **live doc** (not an `.xlsx`); an empty project auto-opens
+  so the first snippet works. **Still open:** dedicated structured input-edit / run /
+  results *tools* (vs. `run_python` helpers), inline-figure refinements, richer
+  confirm-to-run diffs.
+- **D — Vision & polish:** 🚧 **PARTIAL** — **vision** is in (paste/drop images into the
+  chat); provider coverage broadened beyond Claude / OpenAI / Ollama to **DeepSeek** and
+  **Z.ai (GLM)** with per-model vision capability; chat UX polish (Enter-to-send,
+  wrapping message blocks, "New chat" resets the kernel, actionable error messages).
+  **Still open:** sketch→inputs ergonomics, cost meter, conversation save/restore.
 
 ### 14.10 Decisions (settled)
 

@@ -291,6 +291,8 @@ class MainWindow(QMainWindow):
                                triggered=self.new_project)
         self.act_open = QAction("&Open…", self, shortcut=QKeySequence.Open,
                                 triggered=self.open_dialog)
+        self.act_import_dxf = QAction("&Import DXF…", self,
+                                      triggered=self.import_dxf_dialog)
         self.act_quit = QAction("&Quit", self, shortcut=QKeySequence.Quit,
                                 triggered=self.close)
         self.act_undo = QAction("&Undo", self, shortcut=QKeySequence.Undo,
@@ -312,6 +314,8 @@ class MainWindow(QMainWindow):
         m_file.addAction(self.act_new)
         m_file.addAction(self.act_open)
         self.recent_menu = m_file.addMenu("Open &Recent")
+        m_file.addSeparator()
+        m_file.addAction(self.act_import_dxf)
         m_file.addSeparator()
         m_file.addAction(self.act_save)
         m_file.addAction(self.act_save_as)
@@ -401,6 +405,40 @@ class MainWindow(QMainWindow):
                                  f"{os.path.basename(path)}:\n\n{exc}")
             return
         self._add_recent(path)
+
+    def import_dxf_dialog(self):
+        """Import material-zone polygons from a DXF into a fresh project. Replaces
+        the current project (confirm discard first, like Open), populates polygons
+        + placeholder materials, and leaves it unsaved so the user fills in
+        properties / a failure surface and then Save As."""
+        if not self._confirm_discard():
+            return
+        start = os.path.dirname(self._recent[0]) if self._recent else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import DXF", start, "DXF drawings (*.dxf);;All files (*)")
+        if not path:
+            return
+        try:
+            warnings = self.doc.import_dxf(path)   # emits loaded -> _on_loaded renders
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import DXF",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+        n_poly = len(self.doc.slope_data.get("polygons", []))
+        n_mat = len(self.doc.slope_data.get("materials", []))
+        for w in warnings:                         # surface to the Log pane
+            print(f"DXF import warning: {w}")
+        self.statusBar().showMessage(
+            f"Imported {os.path.basename(path)} — {n_poly} polygon(s), {n_mat} "
+            f"material(s). Fill in material properties and a failure surface, "
+            f"then Save As.")
+        if warnings:
+            QMessageBox.warning(
+                self, "DXF imported with warnings",
+                "The DXF was imported, but with notes:\n\n• " +
+                "\n• ".join(warnings) +
+                "\n\nSee the Log pane for details.")
 
     def _add_recent(self, path):
         path = os.path.abspath(path)

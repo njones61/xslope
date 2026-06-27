@@ -39,6 +39,19 @@ def new_slope_data():
     }
 
 
+def _blank_material(name):
+    """A placeholder material carrying only a name, every property zeroed — the
+    same key set ``load_slope_data`` produces. Used by DXF import, which yields
+    layer names (→ material names) but no properties for the user to fill in."""
+    return {
+        "name": str(name), "gamma": 0.0, "option": "", "c": 0.0, "phi": 0.0,
+        "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0, "u": "none",
+        "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
+        "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
+        "kr0": 0.0, "h0": 0.0, "E": 0.0, "nu": 0.0,
+    }
+
+
 class ProjectDocument(QObject):
     loaded = Signal()             # a project was loaded/created (full reset)
     changed = Signal()            # slope_data mutated (re-render)
@@ -89,6 +102,50 @@ class ProjectDocument(QObject):
         self._dirty = True        # nothing on disk yet
         self.loaded.emit()
         self.dirty_changed.emit(True)
+
+    def import_dxf(self, dxf_path):
+        """Start a fresh project from a DXF's material-zone polygons.
+
+        Reads closed polygons grouped by DXF layer (the engine's
+        ``dxf_to_polygons``), maps each unique layer — in first-appearance order
+        — to a placeholder material named after the layer, populates
+        ``polygons``/``materials`` directly into the live dict, and rebuilds the
+        derived geometry (ground surface, domain, t-crack) the way the polygon
+        editor does. Like Open/New, this REPLACES the current project, so callers
+        must confirm discard first; the result is unsaved (no path → Save As).
+
+        A DXF carries no failure surface or material properties, so the user
+        fills those in through the editors afterwards. Returns the engine's
+        warnings (e.g. open rings auto-closed, loose segments stitched)."""
+        from shapely.geometry import Polygon
+        from xslope.cad import dxf_to_polygons
+        from studio.editors import _resync_geometry
+
+        polygons, warnings = dxf_to_polygons(str(dxf_path))
+        if not polygons:
+            raise ValueError("No material-zone polygons found in the DXF.")
+
+        layers = []                       # unique layers, first-appearance order
+        for p in polygons:
+            if p["layer"] not in layers:
+                layers.append(p["layer"])
+        layer_to_idx = {lyr: i for i, lyr in enumerate(layers)}   # 0-based mat_id
+
+        sd = new_slope_data()
+        sd["materials"] = [_blank_material(lyr) for lyr in layers]
+        sd["polygons"] = [{"polygon": Polygon(p["coords"]),
+                           "mat_id": layer_to_idx[p["layer"]]} for p in polygons]
+        _resync_geometry(sd)              # ground surface / domain / t-crack
+
+        self.slope_data = sd
+        self.path = None                  # an import is a new, unsaved project
+        self.results.clear()
+        self._undo.clear()
+        self._redo.clear()
+        self._dirty = True
+        self.loaded.emit()
+        self.dirty_changed.emit(True)
+        return warnings
 
     # --- editing / snapshot undo ----------------------------------------
     def begin_edit(self):

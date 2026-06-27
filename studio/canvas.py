@@ -56,6 +56,8 @@ class MplCanvas(QWidget):
         self._render_dpi = 0          # DPI the current pixmap was rasterized at
         self._content_rect = None     # tight bbox of inked content, in scene coords
         self._dxf_supported = False   # current view exports to DXF (set per render)
+        self._zoom_box_mode = False   # drag-a-rectangle zoom (vs. drag-to-pan)
+        self._band_scene = None       # scene rect of the in-progress rubber band
 
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
@@ -64,6 +66,9 @@ class MplCanvas(QWidget):
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.view.setBackgroundBrush(Qt.white)
         self.view.viewport().installEventFilter(self)
+        # In zoom-box mode the view uses RubberBandDrag; this fires as the band is
+        # dragged (and once with a null rect on release) so we can fit to it.
+        self.view.rubberBandChanged.connect(self._on_rubber_band)
 
         # Debounce re-rasterization so a flurry of wheel ticks redraws once.
         self._refine_timer = QTimer(self)
@@ -83,6 +88,13 @@ class MplCanvas(QWidget):
             btn.setToolTip(tip)
             btn.clicked.connect(slot)
             bar.addWidget(btn)
+        # Zoom-to-box: a checkable mode that swaps drag-to-pan for drag-a-rectangle.
+        self._zoom_box_btn = QToolButton()
+        self._zoom_box_btn.setText("⌕ Box")
+        self._zoom_box_btn.setToolTip("Zoom to box — drag a rectangle to zoom into it")
+        self._zoom_box_btn.setCheckable(True)
+        self._zoom_box_btn.toggled.connect(self._toggle_zoom_box)
+        bar.addWidget(self._zoom_box_btn)
         bar.addStretch(1)
         # Export the current figure to an image file (per-view, so it sits next to
         # the image it saves and works for views without a Display panel).
@@ -374,11 +386,36 @@ class MplCanvas(QWidget):
 
     # --- zoom / pan ------------------------------------------------------
     def _restore_pan_cursor(self):
-        """Re-assert the open-hand pan cursor on the viewport. fitInView /
-        resetTransform / scale leave the viewport cursor as a plain arrow until
-        the next mouse press, which makes the canvas look un-pannable right after
-        a Fit or zoom; restoring it keeps the ScrollHandDrag affordance visible."""
-        self.view.viewport().setCursor(Qt.OpenHandCursor)
+        """Re-assert the viewport cursor for the active mode. fitInView /
+        resetTransform / scale leave the cursor as a plain arrow until the next
+        mouse press, which makes the canvas look un-pannable right after a Fit or
+        zoom; restoring it keeps the drag affordance (open hand to pan, cross to
+        box-zoom) visible."""
+        self.view.viewport().setCursor(
+            Qt.CrossCursor if self._zoom_box_mode else Qt.OpenHandCursor)
+
+    def _toggle_zoom_box(self, on):
+        """Switch between drag-to-pan (ScrollHandDrag) and drag-a-rectangle zoom
+        (RubberBandDrag). Stays active until toggled off, so several box-zooms can
+        be done in a row; the user toggles it off to pan again."""
+        self._zoom_box_mode = on
+        self.view.setDragMode(QGraphicsView.RubberBandDrag if on
+                              else QGraphicsView.ScrollHandDrag)
+        self._restore_pan_cursor()
+
+    def _on_rubber_band(self, rect, from_pt, to_pt):
+        """Capture the rubber-band extent while dragging and, on release, zoom to
+        it. On release the rect is null and the end-points come back null too, so
+        the scene rect is remembered from the last non-null update. Tiny bands
+        (an accidental click) are ignored."""
+        if not rect.isNull():
+            self._band_scene = QRectF(from_pt, to_pt).normalized()
+            return
+        band, self._band_scene = self._band_scene, None
+        if self._zoom_box_mode and band is not None \
+                and band.width() > 2 and band.height() > 2:
+            self.view.fitInView(band, Qt.KeepAspectRatio)
+            self._schedule_refine()
 
     def fit(self):
         if self._content_rect is not None and not self._content_rect.isEmpty():

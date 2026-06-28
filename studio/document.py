@@ -93,15 +93,21 @@ class ProjectDocument(QObject):
         self.dirty_changed.emit(False)
 
     def new(self):
-        """Start a fresh, unsaved project from a minimal in-memory skeleton."""
+        """Start a fresh, unsaved project from a minimal in-memory skeleton.
+
+        An untouched empty project is NOT dirty — there's nothing to lose, so
+        quitting/opening shouldn't prompt to save. It becomes dirty on the first
+        edit (commit_edit). DXF import, which actually populates content, marks
+        itself dirty.
+        """
         self.slope_data = new_slope_data()
         self.path = None          # no source file until first Save As
         self.results.clear()
         self._undo.clear()
         self._redo.clear()
-        self._dirty = True        # nothing on disk yet
+        self._dirty = False
         self.loaded.emit()
-        self.dirty_changed.emit(True)
+        self.dirty_changed.emit(False)
 
     def import_dxf(self, dxf_path):
         """Start a fresh project from a DXF's material-zone polygons.

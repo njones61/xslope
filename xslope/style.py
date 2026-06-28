@@ -51,7 +51,8 @@ def default_style_sheet():
             "failure_surface": {"color": "red", "linestyle": "--", "linewidth": 1.5},
             "reinforcement": {"color": "darkgray", "linewidth": 3.0,
                               "linestyle": "-", "alpha": 0.8},
-            "mesh": {"color": "gray", "linestyle": "-", "linewidth": 0.5, "alpha": 0.25},
+            # No linestyle — mesh edges are always solid (color + width only).
+            "mesh": {"color": "gray", "linewidth": 0.5, "alpha": 0.25},
         },
     }
 

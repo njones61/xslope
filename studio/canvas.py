@@ -26,7 +26,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QFileDialog, QGraphicsScene, QGraphicsView, QHBoxLayout, QInputDialog,
-    QMessageBox, QToolButton, QVBoxLayout, QWidget,
+    QLabel, QMessageBox, QToolButton, QVBoxLayout, QWidget,
 )
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
@@ -136,6 +136,13 @@ class MplCanvas(QWidget):
         self._zoom_box_btn.setFixedHeight(_bh)
         self._zoom_box_btn.setIconSize(QSize(_bh - 4, _bh - 4))
         bar.addWidget(self._zoom_box_btn)
+        bar.addStretch(1)
+        # Pick hint, centered between the zoom tools and Save — shown only on the
+        # Inputs view (pick enabled) and hidden while the zoom-box tool is active.
+        self._hint_label = QLabel("(double-click on a feature to edit)")
+        self._hint_label.setStyleSheet("color: gray;")
+        self._hint_label.setVisible(False)
+        bar.addWidget(self._hint_label)
         bar.addStretch(1)
         # Export the current figure to an image file (per-view, so it sits next to
         # the image it saves and works for views without a Display panel).
@@ -453,9 +460,15 @@ class MplCanvas(QWidget):
 
     def set_pick_enabled(self, on):
         """Enable double-click-to-select on this canvas (the Inputs view). Shows a
-        standard arrow (select) cursor instead of the pan/grab hand."""
+        standard arrow (select) cursor instead of the pan/grab hand, plus a hint."""
         self._pick_enabled = bool(on)
         self._restore_pan_cursor()
+        self._update_hint()
+
+    def _update_hint(self):
+        """The double-click hint is shown only when picking is active — i.e. on
+        the Inputs view and not while the zoom-box tool has taken over the drag."""
+        self._hint_label.setVisible(self._pick_enabled and not self._zoom_box_mode)
 
     def _toggle_zoom_box(self, on):
         """Switch between drag-to-pan (ScrollHandDrag) and drag-a-rectangle zoom
@@ -465,6 +478,7 @@ class MplCanvas(QWidget):
         self.view.setDragMode(QGraphicsView.RubberBandDrag if on
                               else QGraphicsView.ScrollHandDrag)
         self._restore_pan_cursor()
+        self._update_hint()
 
     def _on_rubber_band(self, rect, from_pt, to_pt):
         """Capture the rubber-band extent while dragging and, on release, zoom to

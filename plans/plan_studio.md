@@ -1,9 +1,17 @@
-# XSLOPE Graphical User Interface
+# XSlope Studio — Design & Status
 
-A design + implementation plan for a cross-platform desktop application that wraps
-the existing `xslope` Python package. The GUI lets a user open a problem from an
-Excel file, view and edit the inputs graphically, run LEM / seepage / FEM analyses,
-and view results — without writing code or running a notebook.
+The design + build record for **XSlope Studio**, a cross-platform desktop app that
+wraps the `xslope` engine: open a problem from Excel, view and edit the inputs
+graphically, run LEM / seepage / FEM, and view results — without writing code or
+running a notebook.
+
+**Status (current):** Phases 0–4 (engine prereq, viewer, editing, LEM, mesh/seep/FEM)
+are **done**; Phase 5 (canvas pick-to-edit + rendering polish) and Phase 6 (DXF
+import/export) are **largely done**; the AI assistant (§14) is **built** (multi-provider,
+`run_python` kernel). **Remaining:** the per-layer `StyleConfig` / Display Options
+dialog + style persistence (§8a), native installers (Phase 7), user docs (Phase 8).
+The live status is the phase roadmap in §11. Sections §1–§10 are the original design;
+where the as-built implementation diverged, the text has been updated to match.
 
 ---
 
@@ -33,9 +41,9 @@ and view results — without writing code or running a notebook.
 
 **PySide6 (Qt for Python) + embedded Matplotlib**, single Python process, calling `xslope` directly. Reasons tied to this codebase:
 
-- **Reuse all plotting for free** — every low-level `plot_*` helper already takes an `ax`, so we embed a Matplotlib `FigureCanvasQTAgg` and call the existing plotting code unchanged. The single biggest lever.
+- **Reuse all plotting for free** — every high-level `plot_*` helper takes a `fig=`, so the GUI hands it a Matplotlib `Figure` and calls the existing plotting code unchanged. The single biggest lever. *(As built: the figure is rasterised to a pixmap shown in a `QGraphicsView` — see §8 — rather than a live `FigureCanvasQTAgg`, so the whole figure zooms/pans like an image viewer.)*
 - **No language/process boundary** — the GUI imports `xslope` and calls functions directly; `slope_data`/results (Shapely geometry, NumPy arrays, pandas DataFrames) pass by reference, so there is no serialization layer to build or maintain.
-- **Zoom/pan + pick built in** — `NavigationToolbar2QT` gives zoom/pan/home; Matplotlib events (`button_press_event`, `pick_event`) give double-click-to-edit.
+- **Zoom/pan + pick** — a custom `QGraphicsView` gives wheel-zoom / drag-pan / zoom-to-box / Fit; double-click-to-edit is done by mapping the click to axes data coords and hit-testing the geometry (the pixmap has no Matplotlib `pick_event`) — see §6/§8.
 - **Rich forms/tables** — Qt's `QTableView`/`QFormLayout`/`QDockWidget` suit the materials/vertex tables and run-options dialogs.
 - **Background work** — `QThread` workers run long solves (searches, SSRM) with progress/cancel.
 - **Licensing & packaging** — PySide6 is LGPL (compatible with Apache-2.0; PyQt is GPL — avoid); PyInstaller/Briefcase produce native installers.
@@ -61,9 +69,9 @@ Single Python process, document-view (MVC-ish) structure:
 │                     PySide6 Application                       │
 │                                                               │
 │  ┌─────────────┐   ┌──────────────────────┐  ┌────────────┐  │
-│  │  Editors /  │   │   Canvas (Matplotlib  │  │  Results / │  │
-│  │  Forms      │◄─►│   FigureCanvasQTAgg)  │  │  Log panes │  │
-│  │  (dock)     │   │   zoom/pan/pick       │  │  (tabs)    │  │
+│  │  Editors /  │   │  Canvas (Matplotlib   │  │  Results / │  │
+│  │  Forms      │◄─►│  fig → pixmap in a    │  │  Log panes │  │
+│  │  (dock)     │   │  QGraphicsView)       │  │  (tabs)    │  │
 │  └─────┬───────┘   └──────────┬───────────┘  └─────┬──────┘  │
 │        │                      │                     │         │
 │        ▼                      ▼                     ▼         │
@@ -86,7 +94,7 @@ Single Python process, document-view (MVC-ish) structure:
 ### Key components
 
 - **`ProjectDocument`** — owns `slope_data`, the source file path, a dirty flag, and cached results. Provides typed accessors/mutators per input category and emits change signals. Owns **snapshot-based undo/redo** (deep-copies `slope_data` onto an undo stack on each edit).
-- **`CanvasWidget`** — embeds a Matplotlib figure; renders the current view by calling existing `xslope.plot` helpers with the document's `slope_data` and a `StyleConfig`. Handles pan/zoom (toolbar) and pick events (double-click → open editor).
+- **`MplCanvas`** (`studio/canvas.py`) — renders the current view by calling existing `xslope.plot` helpers with the document's `slope_data`, rasterises the figure to a pixmap in a `QGraphicsView`, and handles zoom/pan/zoom-to-box plus double-click picking (hit-test → open editor). *(Per-layer `StyleConfig` styling is still pending — Phase 5.)*
 - **Editor panels/dialogs** — one per input category (see §6). Tables for tabular data, forms for scalars.
 - **Run controllers** — assemble kwargs from run-options dialogs, launch engine calls on a worker thread, stream progress/log, store results on the document.
 - **Result views** — tabbed canvases for the different display modes (see §7).
@@ -94,9 +102,9 @@ Single Python process, document-view (MVC-ish) structure:
 
 ---
 
-## 5. Engine Integration — what exists vs. what we must add
+## 5. Engine Integration
 
-The Explore of the codebase confirms a clean, callable API. Mapping of GUI actions → engine calls:
+The `xslope` engine exposes a clean, callable API. Mapping of GUI actions → engine calls:
 
 | GUI action | Engine call(s) |
 | --- | --- |
@@ -113,14 +121,14 @@ The Explore of the codebase confirms a clean, callable API. Mapping of GUI actio
 | Build mesh | `get_material_polygons(...)` + `build_mesh_from_polygons(...)`; `export_mesh_to_json` |
 | Seepage | `build_seep_data(mesh, slope_data)` → `run_seepage_analysis(...)`; `plot_seep_*` |
 | FEM | `build_fem_data(slope_data, mesh)` → `solve_fem` / `solve_ssrm`; `plot_fem_*` |
-| DXF import | `cad.import_dxf(...)` / `read_dxf_polygons(...)` |
-| DXF export | `save_dxf=True` on the active `plot_*` call, or `cad.export_dxf(...)` |
+| DXF import | `cad.read_dxf_layers(...)` → wizard mapping → `ProjectDocument.build_from_dxf_mapping(...)` |
+| DXF export | `cad.export_dxf(...)` (structured geometry) or `cad.axes_to_dxf(...)` (rendered view) |
 
-### Gaps to build **in the `xslope` package** (so notebooks/scripts benefit too)
+### Gaps built **in the `xslope` package** (so notebooks/scripts benefit too)
 
-1. **`save_slope_data_to_xlsx(slope_data, path, template=…)`** — ✅ **DONE** (`xslope/fileio.py`). Inverse of `load_slope_data`: writes the source input tables back into the template via the formatting-preserving `write_cells_to_xlsx`. `template=<blank>` creates a new file (New / Save As); `template=None` edits in place (Save). Verified by a load→save→load round-trip across 13 files spanning all input categories, wired into `run_tests.py` (`--roundtrip`).
-2. **Embeddable, styleable plotting.** Add optional `ax=`/`fig=` and `style=` (`StyleConfig`) params to the high-level `plot_*` functions (`plot_inputs`, `plot_solution`, the search/seep/fem plots) so the GUI passes its embedded Matplotlib figure and applies per-layer styling, instead of each function creating its own figure with hardcoded styles. Keeps a single layout path — no GUI-side re-implementation. Start by reusing plots as-is (figure embedding first), then thread `style=` through incrementally.
-3. **Progress/cancel callbacks (nice-to-have).** Searches and SSRM print to stdout today — capture that for the log pane initially; later thread an optional `progress_callback` through `circular_search` / `solve_ssrm` for a real progress bar and cancellation.
+1. **`save_slope_data_to_xlsx(slope_data, path, template=…)`** — ✅ **DONE** (`xslope/fileio.py`). Inverse of `load_slope_data`: writes the source input tables back into the template via the formatting-preserving `write_cells_to_xlsx`. `template=<blank>` creates a new file (New / Save As); `template=None` edits in place (Save). Verified by a load→save→load round-trip across 13 files, wired into `run_tests.py` (`--roundtrip`).
+2. **Embeddable plotting.** ✅ `fig=` added to the high-level `plot_*` functions (`plot_inputs`, `plot_solution`, search/seep/fem plots) so the GUI passes its figure — one layout path, no GUI-side re-implementation. ⬜ The optional `style=` (`StyleConfig`) for per-layer styling is **still pending** (Phase 5); the `plot_*` colors/widths/fonts are hardcoded for now.
+3. **Progress/cancel callbacks.** ✅ `progress_callback` / `cancel_check` threaded through `circular_search` / `noncircular_search` / `reliability` / `solve_ssrm` (engine-side), driving the status-bar progress bar and the Cancel button; engine stdout also streams to the Log pane.
 
 ---
 
@@ -143,8 +151,8 @@ The Explore of the codebase confirms a clean, callable API. Mapping of GUI actio
 
 **Interaction model**
 
-- A dockable **Inputs panel** (tree or accordion) lists categories; selecting one opens its editor.
-- **Double-click on the canvas** maps the picked Matplotlib artist back to a `slope_data` object and opens the right editor (requires tagging artists with identifiers when rendering).
+- A dockable **Inputs tree** lists categories; clicking one opens its editor.
+- **Double-click on the canvas** maps the click to axes data coordinates and hit-tests the input geometry (`studio/picking.py`) to open the right editor, pre-selecting the picked item (the pixmap canvas has no Matplotlib `pick_event`, so this is geometric hit-testing, not artist tagging) — see §8.
 - Edits validate, mutate `slope_data`, mark the document dirty, and trigger a re-render of affected layers.
 - ~~**Smart editing (global toggle, later phase):** maintain a coincidence index so that moving a profile vertex also moves coincident dload/piezo/reinforcement/BC points.~~ **Dropped** (see Phase 6) — separate feature, presupposes interactive geometry dragging not planned.
 
@@ -181,10 +189,10 @@ This cleanly resolves the "two LEM display types" question: they're just two tab
 ## 8. Canvas: Zoom / Pan / Select / DXF
 
 - **Zoom/pan:** the figure is rendered to a pixmap shown in a `QGraphicsView`, so the **whole figure** (axes, title, labels, margins) zooms/pans uniformly like an image viewer — wheel-zoom anchored at the cursor, drag-to-pan, a checkable **Zoom-to-box** tool (drag a rectangle to zoom into it, via `RubberBandDrag`), Fit / 100% / +/− (not Matplotlib's axes-only data zoom). To keep text crisp instead of pixelating on zoom-in, the pixmap is **re-rasterized on demand**: the scene uses fixed logical units (inches × `BASE_DPI`) while the backing bitmap is redrawn at a DPI matched to the current zoom (× a supersample factor), debounced and capped to bound memory (see `studio/canvas.py`).
-- **Select / edit:** enable `picker` on rendered artists, tag each with its `slope_data` reference; double-click → open editor (§6).
-- **Display Options dialog:** a `StyleConfig` of per-layer `{visible, color, linestyle, linewidth/size, alpha, ...}` plus figure-level settings (background, font size, DPI); the renderer reads it. Editing re-renders live. (Drives the §5.2 styling work, and is persisted per §8a.)
-- **DXF export:** "Export current view to DXF" calls the active `plot_*` with `save_dxf=True` (already supported across plot functions), or `cad.export_dxf(slope_data, path)` for a clean geometry export.
-- **DXF import:** wizard → `cad.read_dxf_polygons` to list layers → map layers to materials → `cad.import_dxf(...)` writes into a template copy → `load_slope_data` opens it.
+- **Select / edit (built):** since the canvas is a rasterised pixmap (no Matplotlib `pick_event`), a double-click is mapped viewport → scene → axes data coords and **hit-tested against the input geometry** (`studio/picking.py`) to open the right editor with the picked item pre-selected. Mode-aware (seep BCs only in seep mode, dloads only outside it). Inputs view only.
+- **Display Options dialog (⬜ Phase 5):** a `StyleConfig` of per-layer `{visible, color, linestyle, linewidth/size, alpha, ...}` plus figure-level settings; the renderer reads it, editing re-renders live, and it is persisted per §8a. *(Per-view Display dock panels exist from Phase 4, but the per-layer `StyleConfig` over colors/styles is not yet built.)*
+- **DXF export (built):** File → Export Geometry (DXF) → `cad.export_dxf(slope_data, path)` (structured); the per-view Save button → `cad.axes_to_dxf(ax, path)` (rendered view).
+- **DXF import (built):** wizard maps **each layer to an input feature** (material zone / profile / piezo / dload / reinforcement / circles / ignore) → `cad.read_dxf_layers` + `ProjectDocument.build_from_dxf_mapping` populate the live document (Phase 6).
 
 ### 8a. Style persistence (per-project + global default)
 
@@ -227,10 +235,10 @@ don't litter sidecars). "Set as default" → write current overrides to the glob
 
 ## 9. File / Project Lifecycle
 
-- **New** → copy standard template (`docs/inputs/input_template.xlsx`) into a working doc; user fills via forms; `save_slope_data_to_xlsx` writes it.
-- **Open** → `load_slope_data`; render Inputs view. Auto-load `{stem}_mesh.json` / `{stem}_seep.csv` if present (already handled by `load_slope_data`), and `{stem}_style.json` if present (§8a). **Auto-restore saved solutions:** if the mesh is present, rebuild seep/FEM data on it and read back any `{stem}_seep.csv` / `{stem}_seep2.csv` (both BC sets) and `{stem}_fem_nodes/elements.csv` sidecars (engine `import_seep_solution` / `import_fem_solution`, the inverses of the export functions), populating the Seep · Solution (per BC) and FEM · Results tabs immediately — no re-solve. The FEM SSRM factor of safety is restored from a `{stem}_fem_meta.json` sidecar (`import_fem_meta`), since it is not in the node/element CSVs. Best-effort: a sidecar whose node/element count no longer matches the mesh is skipped, not fatal.
-- **Save / Save As** → `save_slope_data_to_xlsx` (§5.1), preserving the existing format; also writes the `{stem}_style.json` style sidecar when the style differs from default (§8a).
-- **Recent files**, dirty-state prompt on close, and per-project sidecars (`{stem}_mesh.json`, `{stem}_seep.csv`, `{stem}_style.json`) all following the existing `{stem}_*` convention.
+- **New** → create an **empty** in-memory `slope_data` (every category present but empty, blank canvas, not dirty); the user builds it up via the editors / assistant; **Save As** writes it through the bundled blank template via `save_slope_data_to_xlsx`.
+- **Open** → `load_slope_data`; render Inputs view. Auto-load `{stem}_mesh.json` / `{stem}_seep.csv` if present (already handled by `load_slope_data`); `{stem}_style.json` (§8a) ⬜ *pending Phase 5*. **Auto-restore saved solutions:** if the mesh is present, rebuild seep/FEM data on it and read back any `{stem}_seep.csv` / `{stem}_seep2.csv` (both BC sets) and `{stem}_fem_nodes/elements.csv` sidecars (engine `import_seep_solution` / `import_fem_solution`, the inverses of the export functions), populating the Seep · Solution (per BC) and FEM · Results tabs immediately — no re-solve. The FEM SSRM factor of safety is restored from a `{stem}_fem_meta.json` sidecar (`import_fem_meta`), since it is not in the node/element CSVs. Best-effort: a sidecar whose node/element count no longer matches the mesh is skipped, not fatal.
+- **Save / Save As** → `save_slope_data_to_xlsx`, preserving the existing format; reconciles the mesh/seep/FEM sidecars against the document. *(Writing a `{stem}_style.json` style sidecar is ⬜ pending Phase 5.)*
+- **Recent files**, dirty-state prompt on close, and per-project sidecars (`{stem}_mesh.json`, `{stem}_seep.csv`, …) follow the existing `{stem}_*` convention.
 
 ---
 
@@ -238,20 +246,25 @@ don't litter sidecars). "Set as default" → write current overrides to the glob
 
 The GUI lives in a **`studio/`** subfolder inside the existing repo, separate from the engine package:
 
+As built (flat modules, not the per-area subpackages originally sketched):
+
 ```
-xslope/                # engine package (unchanged; now includes save_slope_data_to_xlsx)
+xslope/                # engine package (now includes save_slope_data_to_xlsx, cad DXF I/O)
 studio/                # XSlope Studio desktop app
   __init__.py
   app.py              # QApplication entry point  → console_script "xslope-studio"
-  document.py         # ProjectDocument (slope_data + results + signals)
-  canvas.py           # Matplotlib canvas widget, pick/zoom/pan
-  renderer.py         # StyleConfig + compose plot_* helpers
-  views/              # inputs, lem_search, lem_solution, seep, fem result views
-  editors/            # one module per input category (forms/tables)
-  runners/            # lem, seep, fem, mesh run-controllers (QThread workers)
-  dialogs/            # run-options, display-options, dxf import/export wizards
-  style.py            # StyleConfig + 3-tier resolve/merge + sidecar I/O (§8a)
-  resources/          # icons, bundled blank template, style_factory.json
+  main_window.py      # MainWindow: menus, docks, view tabs, run/import/export actions
+  document.py         # ProjectDocument (slope_data + results + signals + undo)
+  canvas.py           # MplCanvas: fig→pixmap in QGraphicsView, zoom/pan/box, pick
+  picking.py          # double-click hit-test → editor category + index
+  editors.py          # all input-category editors (forms/tables, CATEGORY_EDITORS)
+  dialogs.py          # run-options + DXF import wizard dialogs
+  display_panels.py   # per-result-view Display dock panels
+  runners.py          # LEM / seep / FEM / mesh QThread workers
+  ai/                 # assistant: kernel.py, assistant.py, config.py, settings_dialog.py
+  chat_dock.py        # assistant chat dock
+  resources/          # app icon, bundled blank template
+  # ⬜ pending (Phase 5): a StyleConfig module + style_factory.json sidecar I/O
 ```
 
 - The app imports the engine as `import xslope` — no copy of the engine, single source of truth.
@@ -285,7 +298,7 @@ studio/                # XSlope Studio desktop app
 - ✅ **Cooperative cancel** — a `cancel_check` callable is threaded through `circular_search` / `noncircular_search` / `reliability` (engine-side; checked at iteration boundaries, raises `AnalysisCancelled`). The worker exposes `cancel()` (sets a `threading.Event`) and a Cancel button by the progress bar; cancelling aborts cleanly without killing the thread, emits `cancelled`, and leaves no result tab. Close also cancels an in-flight run.
 - ✅ Remaining solver tolerances in the dialog (`fs_tol`, `tol`, `max_iter`). A **"Search tolerances"** group on `RunLemDialog`, enabled only for auto-search / reliability (the search-driven analyses); `tol` (geometric refinement) is greyed out for non-circular surfaces, which have no such parameter. Threaded through `LemRunner` to `circular_search` / `noncircular_search`, and through `reliability()` (engine-side — added `fs_tol`/`tol`/`max_iter` params that forward to its `1 + 2N` internal searches, so notebooks benefit too). Unset values fall through to each engine function's own default.
 
-**Phase 4 — Meshing + Seepage + FEM** 🚧 **IN PROGRESS**
+**Phase 4 — Meshing + Seepage + FEM** ✅ **DONE** (remaining polish: FEM progress granularity)
 - ✅ **Build Mesh** — `BuildMeshDialog` (element type; target size, entered or auto-sized as slope-width / divisions per the drivers) → `MeshRunner` (`QThread`) builds via `get_material_polygons` + `build_mesh_from_polygons`, including reinforcement/pile constraint lines so the mesh also serves FEM. Result shows in a **Mesh** tab (`plot_mesh`, given `fig=`) and the mesh is stored on `slope_data['mesh']` (so it appears in the Inputs view) and written to the `{stem}_mesh.json` sidecar. Build progress shows a busy bar.
 - ✅ **Mode-driven Run** — one Run action whose label/dispatch follow the LEM/Seep/FEM mode; Build Mesh shows only in Seep/FEM; Seep/FEM Run gated on a built mesh (`_update_run_actions`).
 - ✅ **Run Seep** — `RunSeepDialog` (BC set 1/2, tol, plot variable head/u/v_mag/i_mag, contour levels, flowlines/vectors/fill/phreatic) → `SeepRunner` (`QThread`) runs `build_seep_data` → `run_seepage_analysis`; **Seep · Data** + **Seep · Solution** result tabs (`plot_seep_data` / `plot_seep_solution`, both given `fig=`); solution written to `{stem}_seep.csv` (`_seep2.csv` for BC 2). Convergence trace streams to the Log pane. **Each BC set keeps its own tab pair** (BC 2 → "Seep · Data 2" / "Seep · Solution 2"), so rapid-drawdown problems show BC 1 and BC 2 side by side and switch freely; results are held per BC in `doc.results["seep_solutions"][bc]`.
@@ -360,21 +373,28 @@ Nothing blocking remains; detail-level choices (icon/branding, menu layout) sett
 
 - **Save fidelity** — done and covered by the `--roundtrip` test; keep that test green as input categories evolve.
 - **Long solves blocking the UI** — must run on worker threads from the start; FEM/SSRM also need cancellation.
-- **Restyling existing plots** — the hardcoded styles in `plot_*` mean Display Options needs either added style kwargs or a GUI-side renderer; scope carefully.
-- **Packaging heavy deps** — gmsh (FEM) and the scientific stack inflate installer size and complicate signing.
-```
+- **Restyling existing plots** — the hardcoded styles in `plot_*` mean Display Options needs either added style kwargs or a GUI-side renderer; scope carefully. *(Still open — Phase 5.)*
+- **Packaging heavy deps** — gmsh (FEM) and the scientific stack inflate installer size and complicate signing. *(Still open — Phase 7.)*
 
 ---
 
-## 14. AI Chat Assistant (scoping — not yet built)
+## 14. AI Chat Assistant (built)
 
 A dockable **chat panel** inside Studio that drives the app and the engine with
 natural language and images, against a user-chosen model (Claude, OpenAI/GPT,
-local Ollama, …). The aim is **far more than the existing `/xslope` skill**:
-not just "build an input file from a sketch," but *any* interaction with the
-project data and the `xslope` Python API — e.g. "vary the slope angle 20→30° and
-plot FS vs angle," "add a piezo line 2 ft below the crest and re-run Spencer,"
+local Ollama, DeepSeek, Z.ai/GLM, …). It goes **far beyond the standalone `/xslope`
+skill**: not just "build an input file from a sketch," but *any* interaction with
+the project data and the `xslope` Python API — e.g. "vary the slope angle 20→30°
+and plot FS vs angle," "add a piezo line 2 ft below the crest and re-run Spencer,"
 "why did the SSRM not converge?".
+
+> **As built (status):** the assistant is **working and in use** — a multi-provider
+> agent loop over LiteLLM, an in-process `run_python` kernel with the live document
+> + engine preloaded, vision (image paste/drop), the skill prompt as system context,
+> confirm-vs-auto autonomy, and a Stop button. **§14.9 is the authoritative
+> phase status** (A & B built; C & D partial). §14.1–14.8 below are the original
+> scoping/design, retained for context; where a decision settled, §14.9/§14.10 reflect
+> what shipped. Remaining work is refinement and testing, not core build-out.
 
 ### 14.1 Use cases (what "more than the skill" means)
 

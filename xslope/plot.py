@@ -1980,7 +1980,7 @@ def plot_inputs(
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -2007,11 +2007,11 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ax.set_ylabel("y")
     ax.grid(False)
 
-    plot_base_geometry(ax, slope_data)
+    plot_base_geometry(ax, slope_data, style=style)
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data)
+        plot_piezo_line(ax, slope_data, style=style)
 
     # Seep overlays: head contours and phreatic surface when any material uses seep
     has_seep = any(m.get('u') == 'seep' for m in slope_data.get('materials', []))
@@ -2067,11 +2067,11 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
                                 linestyle="None", transform=trans, alpha=0.5)
                         break  # marker on the longest/first segment only
 
-    plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data)
+    plot_dloads(ax, slope_data, style=style)
+    plot_tcrack_surface(ax, slope_data, style=style)
     plot_tcrack_water_force(ax, slice_df, slope_data)
-    plot_reinforcement_lines(ax, slope_data)
-    plot_piles(ax, slope_data, slice_df=slice_df)
+    plot_reinforcement_lines(ax, slope_data, style=style)
+    plot_piles(ax, slope_data, slice_df=slice_df, style=style)
     if slice_numbers:
         plot_slice_numbers(ax, slice_df)
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
@@ -2208,7 +2208,7 @@ def plot_search_path(ax, search_path):
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True,
                  gid='SEARCH_PATH')
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -2233,11 +2233,11 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         fig.clear()
         ax = fig.add_subplot(111)
 
-    plot_base_geometry(ax, slope_data)
+    plot_base_geometry(ax, slope_data, style=style)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data)
-    plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data)
+        plot_piezo_line(ax, slope_data, style=style)
+    plot_dloads(ax, slope_data, style=style)
+    plot_tcrack_surface(ax, slope_data, style=style)
 
     # Plot all tested circles from circle_cache (light gray)
     if circle_cache:
@@ -2289,7 +2289,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         plt.show()
     return fig
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -2314,11 +2314,11 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         ax = fig.add_subplot(111)
 
     # Plot basic profile elements
-    plot_base_geometry(ax, slope_data)
+    plot_base_geometry(ax, slope_data, style=style)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data)
-    plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data)
+        plot_piezo_line(ax, slope_data, style=style)
+    plot_dloads(ax, slope_data, style=style)
+    plot_tcrack_surface(ax, slope_data, style=style)
 
     # Plot all failure surfaces from cache
     first_tested = True
@@ -2376,7 +2376,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         plt.show()
     return fig
 
-def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Creates a plot showing the results of reliability analysis.
 
@@ -2399,11 +2399,11 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         ax = fig.add_subplot(111)
 
     # Plot basic slope elements (same as other search functions)
-    plot_base_geometry(ax, slope_data)
+    plot_base_geometry(ax, slope_data, style=style)
     if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data)
-    plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data)
+        plot_piezo_line(ax, slope_data, style=style)
+    plot_dloads(ax, slope_data, style=style)
+    plot_tcrack_surface(ax, slope_data, style=style)
 
     # Plot reliability-specific failure surfaces
     fs_cache = reliability_data['fs_cache']

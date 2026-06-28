@@ -775,15 +775,24 @@ class MainWindow(QMainWindow):
 
         def preview(style):
             self.doc.style = style
-            self._render()
+            self._render()                 # Inputs
+            self._rerender_styled_results()  # LEM solution/search/reliability
 
         dlg = StylesDialog(self.doc.slope_data.get("materials") or [],
                            self.doc.style, preview, self)
         if dlg.exec():
-            self.doc.set_style(dlg.result())     # mark dirty + re-render
+            self.doc.set_style(dlg.result())     # mark dirty + re-render Inputs
+            self._rerender_styled_results()
         else:
             self.doc.style = orig
             self._render()
+            self._rerender_styled_results()
+
+    def _rerender_styled_results(self):
+        """Re-render the styled result views (so a Styles change previews there too)."""
+        self._rerender_solution()
+        self._rerender_search()
+        self._rerender_reliability()
 
     def _on_canvas_pick(self, x, y, tol):
         """Open the editor for the input feature the user double-clicked on the
@@ -1277,7 +1286,8 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.search_canvas)
         if search and panel and self.search_canvas is not None:
             try:
-                self.search_canvas.render_search(self.doc.slope_data, search, panel.options())
+                self.search_canvas.render_search(self.doc.slope_data, search,
+                                                 panel.options(), style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 
@@ -1298,7 +1308,7 @@ class MainWindow(QMainWindow):
         if rel and panel and self.reliability_canvas is not None:
             try:
                 self.reliability_canvas.render_reliability(
-                    self.doc.slope_data, rel, panel.options())
+                    self.doc.slope_data, rel, panel.options(), style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 
@@ -1320,7 +1330,8 @@ class MainWindow(QMainWindow):
             try:
                 self.solution_canvas.render_solution(
                     self.doc.slope_data, bundle["slice_df"],
-                    bundle["failure_surface"], bundle["results"], panel.options())
+                    bundle["failure_surface"], bundle["results"], panel.options(),
+                    style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 

@@ -166,15 +166,15 @@ class MplCanvas(QWidget):
             tab_loc=opts.get("tab_loc", "top"),
             legend_ncol=opts.get("legend_ncol", "auto"), style=style))
 
-    def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None):
+    def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_solution(
             slope_data, slice_df, failure_surface, results,
             slice_numbers=opts.get("slice_numbers", False),
             seep_contours=opts.get("seep_contours", True),
-            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig, style=style))
 
-    def render_search(self, slope_data, search, opts=None):
+    def render_search(self, slope_data, search, opts=None, style=None):
         """Render auto-search results (all trial surfaces + critical + search path)."""
         opts = opts or {}
         highlight = opts.get("highlight_fs", True)
@@ -183,17 +183,17 @@ class MplCanvas(QWidget):
             self._draw(lambda fig: plot_circular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
                 circle_cache=search["circle_cache"], highlight_fs=highlight,
-                legend_ncol=ncol, fig=fig))
+                legend_ncol=ncol, fig=fig, style=style))
         else:
             self._draw(lambda fig: plot_noncircular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
-                highlight_fs=highlight, legend_ncol=ncol, fig=fig))
+                highlight_fs=highlight, legend_ncol=ncol, fig=fig, style=style))
 
-    def render_reliability(self, slope_data, reliability_data, opts=None):
+    def render_reliability(self, slope_data, reliability_data, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_reliability_results(
             slope_data, reliability_data,
-            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig, style=style))
 
     def render_mesh(self, mesh, materials=None, opts=None):
         opts = opts or {}

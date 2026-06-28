@@ -194,42 +194,68 @@ This cleanly resolves the "two LEM display types" question: they're just two tab
 - **DXF export (built):** File → Export Geometry (DXF) → `cad.export_dxf(slope_data, path)` (structured); the per-view Save button → `cad.axes_to_dxf(ax, path)` (rendered view).
 - **DXF import (built):** wizard maps **each layer to an input feature** (material zone / profile / piezo / dload / reinforcement / circles / ignore) → `cad.read_dxf_layers` + `ProjectDocument.build_from_dxf_mapping` populate the live document (Phase 6).
 
-### 8a. Style persistence (per-project + global default)
+### 8a. Styles & style sheets (settled — simplified)
 
-Styling (colors, line styles, widths, visibility, fills, figure background/fonts) is
-**not** stored in the Excel file — the input template format stays untouched. Instead it
-is kept in JSON sidecars, resolved in three deep-merged tiers:
+**Terminology.** "**Styles** / **style sheets**" = the persistent *per-feature visual
+identity* (color, line style, line width, fill pattern/hatch, alpha). These are
+distinct from the **Display options** in the left contextual dock, which are
+*per-plot view toggles* (show nodes/labels, contour levels, vector scale, legend
+columns, which variable to plot) — **ephemeral, not persisted, view-specific**. Rule
+of thumb: *how a feature looks* → style; *what the plot shows* → display.
 
-1. **Factory defaults** — shipped with the app (`studio/resources/style_factory.json`). Always present, so "Reset to factory" can never fail.
-2. **User global default** — written by a **"Set as default"** action. Lives in the OS app-config dir via Qt's `QStandardPaths.AppConfigLocation` (macOS `~/Library/Application Support/XSlope Studio/style_default.json`, Windows `%APPDATA%\XSlope Studio\…`) — not a home-dir dotfile.
-3. **Per-project sidecar** — `{stem}_style.json`, written **next to the `.xlsx`**, matching the existing `{stem}_mesh.json` / `{stem}_seep.csv` sidecar convention. So styling travels with the project when the xlsx + sidecar are shared, without altering the xlsx.
+**Two tiers only (no factory JSON, no global tier):**
 
-**Effective style = factory ⊕ global ⊕ project** (deep-merge). Each file stores only
-**sparse overrides relative to factory** (not a full snapshot) plus a `version` field —
-so files stay tiny, remain portable (a colleague sees your exact styling regardless of
-*their* global default), and unset keys automatically pick up new factory values when the
-app updates. The `StyleConfig` the renderer reads is the merged result; the plot path
-never needs to know which tier a value came from.
+1. **Defaults baked in code** — a single `default_style_sheet()` function (engine-side)
+   returns the complete default style dict. It *is* the "factory" — expressed in code,
+   so nothing ships/loads/version-syncs, and "no style passed" reproduces today's look
+   byte-for-byte. The existing `get_material_color(idx)` (tab10) is the default material
+   palette.
+2. **Per-project sidecar** — `{stem}_styles.json` written next to the `.xlsx`
+   (same `{stem}_*` convention as mesh/seep sidecars), holding **only the deltas** from
+   `default_style_sheet()`. **Effective = deep_merge(default_style_sheet(), project_deltas)**;
+   on save, `delta = whatever differs from the defaults`. "Reset to factory" = clear the
+   deltas / delete the sidecar.
 
-Example `{stem}_style.json`:
+  *Deliberately dropped for v1:* a user "Save as default" / global tier. Each user just
+  keeps the (good) code defaults; sharing a project shows the recipient *their* defaults
+  ⊕ the project deltas — which is fine. Adding a global tier later is a strict superset
+  (insert one merge layer) with no schema/dialog/`style=` rework, so nothing is lost.
+
+**Schema — per-feature only** (figure-level background/font/DPI are *not* features →
+they stay in the Display panel / export, out of the style sheet):
+
+- **`materials`** — keyed by **`mat_id` index** (matching how `polygons`/`profile_lines`
+  reference materials): `{color, hatch, alpha}`. Color default = `get_material_color(idx)`.
+  Hatch is a curated soil-ish set over Matplotlib's built-in hatches (none / dots / lines /
+  circles / cross, with density) — an approximation of USCS symbols, not publication-grade.
+- **`features`** — per feature type, `{color, linestyle, linewidth, alpha, marker, ...}`:
+  - `profile_line`, `polygon` — **color inherited from the material**; carry their own
+    stroke/alpha/hatch (the asymmetry: material owns color, feature owns the rest).
+  - `piezo_line`, `tcrack`, `ground_surface`, `max_depth`, `circles`, `noncirc`,
+    `circle_centers`, `dloads`, `reinforcement`, `piles`, seep BC lines, mesh edges.
+
+Example `{stem}_styles.json` (deltas only):
 
 ```json
 {
   "version": 1,
-  "layers": {
-    "failure_surface": { "color": "#cc0000", "linewidth": 2.0 },
-    "slices":          { "facecolor": "#e8f0ff", "alpha": 0.3 },
-    "piezo_line":      { "color": "#1f77b4", "linestyle": "--", "visible": true }
-  },
-  "figure": { "dpi": 300, "font_size": 9 }
+  "materials": { "0": { "color": "#a8742c", "hatch": "....", "alpha": 0.5 } },
+  "features":  { "piezo_line": { "color": "#1f77b4", "linestyle": "--" },
+                 "circles":    { "color": "#cc0000", "linewidth": 2.0 } }
 }
 ```
 
-**Lifecycle hooks:** Open → load `{stem}_style.json` if present, else global, else factory.
-Display Options edits → live `StyleConfig` re-render. Save / Save As → also write
-`{stem}_style.json` beside the xlsx (only if it differs from default, so unstyled projects
-don't litter sidecars). "Set as default" → write current overrides to the global file.
-"Reset to factory" / "Revert to default" → clear the relevant override tier.
+**Engine integration (safe, incremental).** Each high-level `plot_*` gains an optional
+`style=None` kwarg; at the top it does `style = resolve_style(style)` (`None` →
+`default_style_sheet()`; a dict → deep-merge over defaults). Hardcoded color/linestyle/
+alpha literals become `style[...]` lookups. No style passed → identical to today, so
+notebooks/CLI are unaffected. Roll out **`plot_inputs` first** (where styling matters in
+v1), verify unchanged no-style output, then thread the rest.
+
+**UI.** Styles are **project-global** (a material's color is the same in every view), so a
+single **Styles dialog** edits them (opened from a menu/toolbar entry *and* a "Styles…"
+button at the bottom of each Display panel). Editing re-renders the current view live;
+Save / Save As writes `{stem}_styles.json` when it differs from defaults.
 
 ---
 

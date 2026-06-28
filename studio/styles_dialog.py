@@ -37,6 +37,9 @@ FEATURES = [
     ("Distributed load", "dloads"),
     ("Distributed load 2", "dloads2"),
     ("Reinforcement", "reinforcement"),
+    ("Seep BC — head line", "seep_bc"),
+    ("Seep BC — water level", "seep_water_level"),
+    ("Seep BC — exit face", "seep_exit_face"),
     ("Mesh (background)", "mesh"),
 ]
 LINESTYLES = [("Solid", "-"), ("Dashed", "--"), ("Dotted", ":"), ("Dash-dot", "-.")]
@@ -70,9 +73,8 @@ def hatch_pixmap(hatch, w=48, h=18):
     _hatch_pixmaps[key] = pm
     return pm
 
-# Curated preset palette for the color popup — earth/soil tones, greens, blues,
-# accents, neutrals (6 columns). "Custom…" falls back to the OS color dialog.
-COLOR_PALETTE = [
+# Earth/soil-tone palette for MATERIAL fills (6 columns).
+MATERIAL_PALETTE = [
     ("saddlebrown", "#8b4513"), ("sienna", "#a0522d"), ("peru", "#cd853f"),
     ("tan", "#d2b48c"), ("burlywood", "#deb887"), ("wheat", "#f5deb3"),
     ("goldenrod", "#daa520"), ("darkkhaki", "#bdb76b"), ("olive", "#808000"),
@@ -87,6 +89,22 @@ COLOR_PALETTE = [
     ("darkgray", "#a9a9a9"), ("lightgray", "#d3d3d3"), ("white", "#ffffff"),
 ]
 
+# Standard Python/Matplotlib named colors for line FEATURES (6 columns).
+STANDARD_PALETTE = [
+    ("black", "#000000"), ("dimgray", "#696969"), ("gray", "#808080"),
+    ("darkgray", "#a9a9a9"), ("lightgray", "#d3d3d3"), ("white", "#ffffff"),
+    ("red", "#ff0000"), ("firebrick", "#b22222"), ("crimson", "#dc143c"),
+    ("darkred", "#8b0000"), ("tomato", "#ff6347"), ("salmon", "#fa8072"),
+    ("orange", "#ffa500"), ("darkorange", "#ff8c00"), ("gold", "#ffd700"),
+    ("yellow", "#ffff00"), ("olive", "#808000"), ("khaki", "#f0e68c"),
+    ("green", "#008000"), ("forestgreen", "#228b22"), ("limegreen", "#32cd32"),
+    ("darkgreen", "#006400"), ("teal", "#008080"), ("cyan", "#00ffff"),
+    ("blue", "#0000ff"), ("navy", "#000080"), ("royalblue", "#4169e1"),
+    ("dodgerblue", "#1e90ff"), ("steelblue", "#4682b4"), ("skyblue", "#87ceeb"),
+    ("purple", "#800080"), ("magenta", "#ff00ff"), ("violet", "#ee82ee"),
+    ("indigo", "#4b0082"), ("brown", "#a52a2a"), ("saddlebrown", "#8b4513"),
+]
+
 
 class ColorButton(QToolButton):
     """A swatch button showing the current color; clicking pops up a preset palette
@@ -95,10 +113,11 @@ class ColorButton(QToolButton):
 
     colorChanged = Signal(str)
 
-    def __init__(self, hex_color, default_hex=None, parent=None):
+    def __init__(self, hex_color, default_hex=None, palette=None, parent=None):
         super().__init__(parent)
         self._hex = hex_color
         self._default = default_hex or hex_color   # the factory/palette color
+        self._palette = palette if palette is not None else STANDARD_PALETTE
         self.setFixedSize(60, 22)
         self.setCursor(Qt.PointingHandCursor)
         self._apply()
@@ -144,7 +163,7 @@ class ColorButton(QToolButton):
         g = QGridLayout(grid)
         g.setSpacing(2)
         g.setContentsMargins(6, 2, 6, 6)
-        for i, (name, hexc) in enumerate(COLOR_PALETTE):
+        for i, (name, hexc) in enumerate(self._palette):
             sw = QToolButton()
             sw.setFixedSize(20, 20)
             sw.setToolTip(name)
@@ -267,7 +286,8 @@ class StylesDialog(QDialog):
             self.table.setItem(idx, 0, item)
 
             default_color = to_hex(get_material_color(idx))
-            btn = ColorButton(ov.get("color") or default_color, default_hex=default_color)
+            btn = ColorButton(ov.get("color") or default_color, default_hex=default_color,
+                              palette=MATERIAL_PALETTE)
             btn.colorChanged.connect(self._emit)
             self.table.setCellWidget(idx, 1, btn)
 

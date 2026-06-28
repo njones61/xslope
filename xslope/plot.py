@@ -488,13 +488,17 @@ def plot_piezo_line(ax, slope_data, style=None):
     plot_single_piezo_line(ax, slope_data.get('piezo_line2'), f2.get('color', 'skyblue'),
                            "Piezometric Line 2", f2.get('linewidth', 2), f2.get('linestyle', '-'))
 
-def plot_seepage_bc_lines(ax, slope_data):
+def plot_seepage_bc_lines(ax, slope_data, style=None):
     """
     Plots seep boundary-condition lines for seep-only workflows.
 
     Plots the primary seepage BCs (seepage_bc) and, if present, the second set
-    (seepage_bc2) with different colors to distinguish them.
+    (seepage_bc2) with different colors to distinguish them. `style` (see
+    xslope.style) styles BC set 1; set 2 keeps its distinct default colors so a
+    rapid-drawdown pair stays visually separable.
     """
+    from .style import resolve_style, feature_style
+    style = resolve_style(style)
     def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=2.0):
         """Place an inverted triangle so its tip visually sits on the line at (x, y)."""
         from matplotlib.markers import MarkerStyle
@@ -509,7 +513,8 @@ def plot_seepage_bc_lines(ax, slope_data):
         ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
 
     def _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
-                         head_line_color, water_level_color, exit_face_color, label_suffix=""):
+                         head_line_color, water_level_color, exit_face_color, label_suffix="",
+                         head_lw=3, head_ls="--", water_lw=2, exit_lw=3, exit_ls="--"):
         """Plot a single set of seepage boundary conditions."""
         specified_heads = seepage_bc.get("specified_heads") or []
         exit_face = seepage_bc.get("exit_face") or []
@@ -522,7 +527,7 @@ def plot_seepage_bc_lines(ax, slope_data):
             xs, ys = zip(*coords)
             ax.plot(
                 xs, ys,
-                color=head_line_color, linewidth=3, linestyle="--",
+                color=head_line_color, linewidth=head_lw, linestyle=head_ls,
                 label=f"Specified Head Line{label_suffix}" if i == 0 else "",
             )
 
@@ -560,7 +565,7 @@ def plot_seepage_bc_lines(ax, slope_data):
 
             ax.plot(
                 wl_xs, wl_ys,
-                color=water_level_color, linewidth=2, linestyle="-",
+                color=water_level_color, linewidth=water_lw, linestyle="-",
                 label=f"Specified Head Water Level{label_suffix}" if i == 0 else "",
             )
 
@@ -578,7 +583,7 @@ def plot_seepage_bc_lines(ax, slope_data):
             ex_xs, ex_ys = zip(*exit_face)
             ax.plot(
                 ex_xs, ex_ys,
-                color=exit_face_color, linewidth=3, linestyle="--",
+                color=exit_face_color, linewidth=exit_lw, linestyle=exit_ls,
                 label=f"Exit Face{label_suffix}",
             )
 
@@ -601,9 +606,16 @@ def plot_seepage_bc_lines(ax, slope_data):
     seepage_bc = slope_data.get("seepage_bc") or {}
     has_bc2 = slope_data.get("has_seepage_bc2", False)
     label_suffix = " (BC 1)" if has_bc2 else ""
+    fh = feature_style(style, "seep_bc")
+    fw = feature_style(style, "seep_water_level")
+    fe = feature_style(style, "seep_exit_face")
     _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
-                     head_line_color="darkblue", water_level_color="lightskyblue",
-                     exit_face_color="red", label_suffix=label_suffix)
+                     head_line_color=fh.get("color", "darkblue"),
+                     water_level_color=fw.get("color", "lightskyblue"),
+                     exit_face_color=fe.get("color", "red"), label_suffix=label_suffix,
+                     head_lw=fh.get("linewidth", 3), head_ls=fh.get("linestyle", "--"),
+                     water_lw=fw.get("linewidth", 2),
+                     exit_lw=fe.get("linewidth", 3), exit_ls=fe.get("linestyle", "--"))
 
     # Plot second set of BCs if present
     if has_bc2:
@@ -1749,7 +1761,7 @@ def plot_inputs(
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data, style=style)
     if mode == "seep":
-        plot_seepage_bc_lines(ax, slope_data)
+        plot_seepage_bc_lines(ax, slope_data, style=style)
     if mode != "seep":
         plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)

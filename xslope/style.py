@@ -52,6 +52,11 @@ def default_style_sheet():
             "tcrack": {"color": "red", "linestyle": ":", "linewidth": 1.5},
             # One style shared by both circular and non-circular failure surfaces.
             "failure_surface": {"color": "red", "linestyle": "--", "linewidth": 1.5},
+            # Seepage BCs (set 1; set 2 keeps distinct defaults). Head + exit face
+            # overlay other lines → thick dashed; the derived water level is solid.
+            "seep_bc": {"color": "darkblue", "linestyle": "--", "linewidth": 3.0},
+            "seep_water_level": {"color": "lightskyblue", "linewidth": 2.0},
+            "seep_exit_face": {"color": "red", "linestyle": "--", "linewidth": 3.0},
             # No linestyle — reinforcement is a structural element, drawn solid.
             "reinforcement": {"color": "darkgray", "linewidth": 3.0, "alpha": 0.8},
             # No linestyle — mesh edges are always solid (color + width only).

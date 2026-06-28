@@ -1364,14 +1364,23 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         None
     """
     u = slice_df['u'].values  # pore pressure (stress)
-    n_eff = slice_df['n_eff'].values / slice_df['dl'].values  # convert effective normal force to stress
     dl = slice_df['dl'].values
+    with np.errstate(divide='ignore', invalid='ignore'):
+        # convert effective normal force to stress; a degenerate dl→0 yields
+        # inf/nan, filtered out below rather than warning.
+        n_eff = slice_df['n_eff'].values / dl
     heights = slice_df['y_ct'] - slice_df['y_cb']
     max_ht = heights.max() if not heights.empty else 1.0
     max_bar_len = max_ht * scale_frac
 
-    max_stress = np.max(np.abs(n_eff)) if len(n_eff) > 0 else 1.0
-    max_u = np.max(u) if len(u) > 0 else 1.0
+    # Guard against degenerate slices (dl→0 gives inf/nan n_eff) and an all-zero
+    # stress field: use only finite values and never divide by zero below.
+    finite_neff = n_eff[np.isfinite(n_eff)]
+    max_stress = float(np.max(np.abs(finite_neff))) if finite_neff.size else 1.0
+    if max_stress == 0:
+        max_stress = 1.0
+    finite_u = u[np.isfinite(u)]
+    max_u = float(np.max(finite_u)) if finite_u.size else 1.0
 
     for i, (index, row) in enumerate(slice_df.iterrows()):
         if i >= len(n_eff):
@@ -1382,6 +1391,11 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
 
         stress = n_eff[i]
         pore = u[i]
+
+        if not np.isfinite(stress):
+            continue                 # degenerate slice (dl→0); nothing to draw
+        if not np.isfinite(pore):
+            pore = 0.0
 
         dx = x2 - x1
         dy = y2 - y1

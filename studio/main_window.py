@@ -300,6 +300,8 @@ class MainWindow(QMainWindow):
                                 triggered=self.open_dialog)
         self.act_import_dxf = QAction("&Import DXF…", self,
                                       triggered=self.import_dxf_dialog)
+        self.act_export_dxf = QAction("&Export Geometry (DXF)…", self, enabled=False,
+                                      triggered=self.export_dxf_dialog)
         self.act_quit = QAction("&Quit", self, shortcut=QKeySequence.Quit,
                                 triggered=self.close)
         self.act_undo = QAction("&Undo", self, shortcut=QKeySequence.Undo,
@@ -323,6 +325,7 @@ class MainWindow(QMainWindow):
         self.recent_menu = m_file.addMenu("Open &Recent")
         m_file.addSeparator()
         m_file.addAction(self.act_import_dxf)
+        m_file.addAction(self.act_export_dxf)
         m_file.addSeparator()
         m_file.addAction(self.act_save)
         m_file.addAction(self.act_save_as)
@@ -472,6 +475,39 @@ class MainWindow(QMainWindow):
                 "\n• ".join(warnings) +
                 "\n\nSee the Log pane for details.")
 
+    def export_dxf_dialog(self):
+        """Export the current model's geometry to a structured (layered) DXF via
+        the engine's ``export_dxf`` — material zones on per-material layers, and
+        profile lines / circles / reinforcement / dloads / piezo on their reserved
+        feature layers. Unlike the per-view canvas Save→DXF (which writes the
+        rendered picture), this is the clean geometry export meant for re-import."""
+        if not self.doc.is_open:
+            return
+        stem = os.path.splitext(os.path.basename(self.doc.path))[0] if self.doc.path else "geometry"
+        start = os.path.join(os.path.dirname(self.doc.path), stem + ".dxf") if self.doc.path else stem + ".dxf"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export geometry (DXF)", start, "DXF drawings (*.dxf)")
+        if not path:
+            return
+        if not path.lower().endswith(".dxf"):
+            path += ".dxf"
+        try:
+            from xslope.cad import export_dxf
+            export_dxf(self.doc.slope_data, path)
+        except ImportError:
+            traceback.print_exc()
+            QMessageBox.critical(
+                self, "DXF support not installed",
+                "Writing DXF files needs the 'ezdxf' package.\n\nInstall it with:\n\n"
+                "    pip install ezdxf\n\nthen restart XSlope Studio.")
+            return
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not export DXF",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+        self.statusBar().showMessage(f"Exported geometry to {os.path.basename(path)}")
+
     def _add_recent(self, path):
         path = os.path.abspath(path)
         self._recent = [path] + [p for p in self._recent if p != path]
@@ -493,6 +529,7 @@ class MainWindow(QMainWindow):
     def _on_loaded(self):
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
+        self.act_export_dxf.setEnabled(True)
         self.assistant.reset()        # new project -> fresh conversation
         self._clear_result_tabs()
         # Restore saved solutions first so the default mode can see whether an FEM

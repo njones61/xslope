@@ -136,9 +136,9 @@ class MplCanvas(QWidget):
         self._zoom_box_btn.setFixedHeight(_bh)
         self._zoom_box_btn.setIconSize(QSize(_bh - 4, _bh - 4))
         bar.addWidget(self._zoom_box_btn)
-        bar.addStretch(1)
-        # Pick hint, centered between the zoom tools and Save — shown only on the
-        # Inputs view (pick enabled) and hidden while the zoom-box tool is active.
+        # Pick hint, just right of the zoom tools — shown only on the Inputs view
+        # (pick enabled) and hidden while the zoom-box tool is active.
+        bar.addSpacing(10)
         self._hint_label = QLabel("(double-click on a feature to edit)")
         self._hint_label.setStyleSheet("color: gray;")
         self._hint_label.setVisible(False)

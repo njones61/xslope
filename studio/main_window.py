@@ -428,6 +428,15 @@ class MainWindow(QMainWindow):
             return
         try:
             polygons, warnings = self.doc.read_dxf(path)
+        except ImportError:
+            traceback.print_exc()
+            QMessageBox.critical(
+                self, "DXF support not installed",
+                "Reading and writing DXF files needs the 'ezdxf' package, which "
+                "isn't installed in this environment.\n\nInstall it with:\n\n"
+                "    pip install ezdxf\n\n(or reinstall with the 'cad'/'gui' extra: "
+                "pip install \"xslope[gui]\"), then restart XSlope Studio.")
+            return
         except Exception as exc:
             traceback.print_exc()
             QMessageBox.critical(self, "Could not import DXF",

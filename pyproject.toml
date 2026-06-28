@@ -41,7 +41,8 @@ dependencies = [
 
 [project.optional-dependencies]
 fem = ["gmsh"]
-gui = ["PySide6", "pyobjc-framework-Cocoa; sys_platform == 'darwin'"]
+cad = ["ezdxf"]                  # DXF import/export (xslope.cad)
+gui = ["PySide6", "pyobjc-framework-Cocoa; sys_platform == 'darwin'", "ezdxf"]
 ai = ["litellm", "keyring"]
 
 [project.scripts]

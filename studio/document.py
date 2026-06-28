@@ -130,7 +130,7 @@ class ProjectDocument(QObject):
         circle depth) come in as editable placeholders. Profile-based if any layer
         maps to a profile line, else polygon-based. REPLACES the current project
         (callers confirm discard); result is unsaved. Returns caveat strings."""
-        from xslope.cad import fit_circle, _stitch_lines
+        from xslope.cad import fit_circle, _stitch_lines, chain_segments
         from xslope.fileio import build_reinforce_lines
         from studio.editors import _resync_geometry
 
@@ -172,14 +172,17 @@ class ProjectDocument(QObject):
                         dload_blocks.append([{"X": x, "Y": y, "Normal": 0.0} for x, y in coords])
                         placeholder = True
             elif t == "reinforce":
-                segs = list(geom["lines"])
-                for coords in geom["open"]:
-                    segs += list(zip(coords[:-1], coords[1:]))
-                for a, b in segs:
+                # Reconnect loose LINE segments into chains (export split each line
+                # into per-point segments); each chain / open polyline → one
+                # reinforcement line, defined by its two extreme endpoints.
+                chains = [c for c in geom["open"] if len(c) >= 2]
+                chains += chain_segments(geom["lines"]) if geom["lines"] else []
+                for chain in chains:
+                    a, b = chain[0], chain[-1]
                     reinforcement_lines.append(
                         {"x1": a[0], "y1": a[1], "x2": b[0], "y2": b[1], "t_max": 0.0,
                          "t_res": 0.0, "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0})
-                placeholder = placeholder or bool(segs)
+                placeholder = placeholder or bool(chains)
             elif t == "circles":
                 for cx, cy, r in geom["circles"]:
                     circles.append({"Xo": cx, "Yo": cy, "R": r, "Depth": 0.0})

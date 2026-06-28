@@ -197,6 +197,43 @@ def _stitch_lines(segments, tol=1e-6):
     return rings, leftover
 
 
+def chain_segments(segments, tol=1e-6):
+    """Link loose ``((x1,y1),(x2,y2))`` segments into ordered open polylines by
+    shared endpoints. Returns a list of coordinate chains (each ≥ 2 points).
+
+    Used to rebuild reinforcement lines that export split into per-tension-point
+    segments: a chain's two extreme endpoints are the reinforcement line's ends.
+    Greedy first-match linking — fine for the collinear chains export produces."""
+    def key(p):
+        return (round(p[0] / tol), round(p[1] / tol))
+
+    used = [False] * len(segments)
+    chains = []
+    for i in range(len(segments)):
+        if used[i]:
+            continue
+        used[i] = True
+        a, b = segments[i]
+        chain = [a, b]
+        for grow_tail in (True, False):           # extend forward, then backward
+            extended = True
+            while extended:
+                extended = False
+                end = key(chain[-1] if grow_tail else chain[0])
+                for j in range(len(segments)):
+                    if used[j]:
+                        continue
+                    p, q = segments[j]
+                    nxt = q if key(p) == end else (p if key(q) == end else None)
+                    if nxt is not None:
+                        chain.append(nxt) if grow_tail else chain.insert(0, nxt)
+                        used[j] = True
+                        extended = True
+                        break
+        chains.append(chain)
+    return chains
+
+
 def read_dxf_polygons(dxf_path, arc_sag=0.05):
     """Read closed zones from a DXF as {'coords', 'layer'} dicts, with warnings.
 

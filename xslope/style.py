@@ -49,8 +49,8 @@ def default_style_sheet():
             "tcrack": {"color": "red", "linestyle": ":", "linewidth": 1.5},
             # One style shared by both circular and non-circular failure surfaces.
             "failure_surface": {"color": "red", "linestyle": "--", "linewidth": 1.5},
-            "reinforcement": {"color": "darkgray", "linewidth": 3.0,
-                              "linestyle": "-", "alpha": 0.8},
+            # No linestyle — reinforcement is a structural element, drawn solid.
+            "reinforcement": {"color": "darkgray", "linewidth": 3.0, "alpha": 0.8},
             # No linestyle — mesh edges are always solid (color + width only).
             "mesh": {"color": "gray", "linewidth": 0.5, "alpha": 0.25},
         },

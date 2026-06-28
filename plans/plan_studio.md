@@ -314,6 +314,18 @@ studio/                # XSlope Studio desktop app
 - ⬜ Full undo/redo coverage (audit every mutation path; decide derived-result/mesh policy on undo).
 - ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
 
+  **🧪 DXF import/export — manual test checklist (unverified in-app; only round-tripped headlessly so far):**
+  - [ ] **Geometry export** — open a model → File → Export Geometry (DXF); open the `.dxf` in a CAD viewer and confirm layers: material-named zones, `PROFILE_<mat>`, `SEARCH_CIRCLES`, `REINFORCEMENT`, `DLOADS`, `PIEZO`.
+  - [ ] **Profile-based round-trip** — export a profile-based model (e.g. `arai_tagyo`), re-import: PROFILE_* layers default to *Profile line*, circles to *Failure circles*; accept defaults → geometry matches the original on the canvas; ground surface present.
+  - [ ] **Polygon-based round-trip** — export a polygon-sheet model, re-import: material-zone layers default to *Material zone*; zones + materials come back.
+  - [ ] **Reinforcement rejoin** — a model with reinforcement: confirm the import yields the *same number of reinforcement lines* (not one per segment), endpoints correct.
+  - [ ] **Circles** — confirm `Xo,Yo,R` recovered (radius fit from the arc) and Depth defaults to 0.
+  - [ ] **Placeholders** — dload magnitudes and reinforcement strengths import as 0; the "imported with notes" dialog lists the placeholder caveat; edit them in the editors and re-render.
+  - [ ] **Wizard overrides** — change a layer's target (e.g. set a layer to *Ignore*, or remap zone↔profile, rename/merge materials) and confirm the result honors it.
+  - [ ] **External CAD DXF** — import a DXF *not* produced by xslope (arbitrary layer names): defaults fall back sensibly (closed rings → Material zone, else Ignore), and manual mapping populates the right features.
+  - [ ] **All-Ignore** — set every layer to Ignore → friendly "nothing selected" error, no project change.
+  - [ ] **Missing ezdxf** — (optional) in an env without `ezdxf`, import/export show the actionable install message.
+
 **Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
 - ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
 - ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.

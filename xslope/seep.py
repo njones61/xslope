@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import time
 
 import matplotlib.pyplot as plt
@@ -19,6 +20,8 @@ import numpy as np
 from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import spsolve
 from shapely.geometry import LineString, Point
+
+logger = logging.getLogger(__name__)
 
 
 def _min_distance_to_polyline(points, polyline):
@@ -127,7 +130,7 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
     typical_element_size = min(x_range, y_range) / np.sqrt(len(nodes))  # Approximate element size
     tolerance = typical_element_size * 0.1  # 10% of typical element size
     
-    print(f"Mesh tolerance for boundary conditions: {tolerance:.6f}")
+    logger.debug("Mesh tolerance for boundary conditions: %.6f", tolerance)
     
     # Process specified head boundary conditions
     # Vectorized: compute distance from all nodes to each BC line at once

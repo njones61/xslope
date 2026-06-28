@@ -1,3 +1,5 @@
+import logging
+
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 from matplotlib.collections import LineCollection, PatchCollection
@@ -6,6 +8,8 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
+
+logger = logging.getLogger(__name__)
 
 
 def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
@@ -346,8 +350,9 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     quad8_count = np.sum(element_types == 8)
     quad9_count = np.sum(element_types == 9)
     
-    print(f"Plotting {tri3_count} linear triangles, {tri6_count} quadratic triangles, "
-          f"{quad4_count} linear quads, {quad8_count} 8-node quads, {quad9_count} 9-node quads")
+    logger.debug("Plotting %s linear triangles, %s quadratic triangles, "
+                 "%s linear quads, %s 8-node quads, %s 9-node quads",
+                 tri3_count, tri6_count, quad4_count, quad8_count, quad9_count)
 
     # Plot material zones first (if element_materials provided)
     if element_materials is not None:
@@ -490,7 +495,8 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
         ne = levels - 1
         nf = (flowrate * ne) / (base_k * hdrop)
         phi_levels = max(round(nf) + 1, 2)
-        print(f"Computed nf: {nf:.2f}, using {phi_levels} φ contours (flowrate={flowrate:.3f}, base k={base_k:.4f}, head drop={hdrop:.3f})")
+        logger.debug("Computed nf: %.2f, using %s φ contours (flowrate=%.3f, base k=%.4f, head drop=%.3f)",
+                     nf, phi_levels, flowrate, base_k, hdrop)
         phi_contours = np.linspace(np.min(phi), np.max(phi), phi_levels)
         _csf = ax.tricontour(triang, phi, levels=phi_contours, colors="blue", linewidths=0.7, linestyles="solid")
         _csf.set_gid('FLOWLINES')

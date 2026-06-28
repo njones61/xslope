@@ -541,7 +541,25 @@ class MplCanvas(QWidget):
         self.fit()
 
     def eventFilter(self, obj, event):
+        if obj is self.view.viewport() and event.type() == QEvent.NativeGesture:
+            # Trackpad pinch-to-zoom (macOS): value() is the incremental
+            # magnification — positive when spreading fingers (zoom in), negative
+            # when pinching (zoom out), anchored under the cursor.
+            if event.gestureType() == Qt.ZoomNativeGesture:
+                factor = 1.0 + event.value()
+                if factor > 0:
+                    self.view.scale(factor, factor)
+                    self._schedule_refine()
+                    self._restore_pan_cursor()
+                return True
+            return False
         if obj is self.view.viewport() and event.type() == QEvent.Wheel:
+            # A real mouse wheel (angle-only, no pixelDelta) zooms; a trackpad
+            # two-finger scroll (pixelDelta set) falls through to the view's
+            # normal scrolling so it pans instead of zooming. Pinch arrives as a
+            # NativeGesture, handled above.
+            if not event.pixelDelta().isNull():
+                return super().eventFilter(obj, event)
             factor = ZOOM_STEP if event.angleDelta().y() > 0 else 1 / ZOOM_STEP
             self.view.scale(factor, factor)
             self._schedule_refine()

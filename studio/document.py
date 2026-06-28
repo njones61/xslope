@@ -109,38 +109,47 @@ class ProjectDocument(QObject):
         self.loaded.emit()
         self.dirty_changed.emit(False)
 
-    def import_dxf(self, dxf_path):
-        """Start a fresh project from a DXF's material-zone polygons.
+    def read_dxf(self, dxf_path):
+        """Read material-zone polygons from a DXF WITHOUT mutating the project.
 
-        Reads closed polygons grouped by DXF layer (the engine's
-        ``dxf_to_polygons``), maps each unique layer — in first-appearance order
-        — to a placeholder material named after the layer, populates
-        ``polygons``/``materials`` directly into the live dict, and rebuilds the
-        derived geometry (ground surface, domain, t-crack) the way the polygon
-        editor does. Like Open/New, this REPLACES the current project, so callers
-        must confirm discard first; the result is unsaved (no path → Save As).
-
-        A DXF carries no failure surface or material properties, so the user
-        fills those in through the editors afterwards. Returns the engine's
-        warnings (e.g. open rings auto-closed, loose segments stitched)."""
-        from shapely.geometry import Polygon
+        Returns ``(polygons, warnings)`` where polygons is a list of
+        ``{'layer', 'coords'}`` (the engine's ``dxf_to_polygons``). The import
+        wizard uses this to show the layers, collect a layer→material mapping,
+        and then call ``build_from_dxf``."""
         from xslope.cad import dxf_to_polygons
-        from studio.editors import _resync_geometry
-
         polygons, warnings = dxf_to_polygons(str(dxf_path))
         if not polygons:
             raise ValueError("No material-zone polygons found in the DXF.")
+        return polygons, warnings
 
-        layers = []                       # unique layers, first-appearance order
+    def build_from_dxf(self, polygons, layer_to_material):
+        """Start a fresh project from DXF polygons under an explicit mapping.
+
+        ``layer_to_material`` maps each DXF layer name → a material name (give two
+        layers the same name to MERGE them into one zone), or a falsy value to
+        EXCLUDE that layer. Materials are created in first-appearance order of the
+        distinct names. Populates ``polygons``/``materials`` and rebuilds the
+        derived geometry (ground surface, domain, t-crack) like the polygon
+        editor. REPLACES the current project (callers confirm discard first); the
+        result is unsaved (no path → Save As). A DXF carries no failure surface or
+        material properties, so the user fills those in through the editors."""
+        from shapely.geometry import Polygon
+        from studio.editors import _resync_geometry
+
+        names = []                        # distinct material names, first-appearance
         for p in polygons:
-            if p["layer"] not in layers:
-                layers.append(p["layer"])
-        layer_to_idx = {lyr: i for i, lyr in enumerate(layers)}   # 0-based mat_id
+            nm = layer_to_material.get(p["layer"])
+            if nm and nm not in names:
+                names.append(nm)
+        if not names:
+            raise ValueError("No layers selected for import.")
+        name_to_idx = {nm: i for i, nm in enumerate(names)}
 
         sd = new_slope_data()
-        sd["materials"] = [_blank_material(lyr) for lyr in layers]
+        sd["materials"] = [_blank_material(nm) for nm in names]
         sd["polygons"] = [{"polygon": Polygon(p["coords"]),
-                           "mat_id": layer_to_idx[p["layer"]]} for p in polygons]
+                           "mat_id": name_to_idx[layer_to_material[p["layer"]]]}
+                          for p in polygons if layer_to_material.get(p["layer"])]
         _resync_geometry(sd)              # ground surface / domain / t-crack
 
         self.slope_data = sd
@@ -151,6 +160,16 @@ class ProjectDocument(QObject):
         self._dirty = True
         self.loaded.emit()
         self.dirty_changed.emit(True)
+
+    def import_dxf(self, dxf_path):
+        """Convenience: read + build with the default mapping (one material per
+        layer, named after the layer). Kept for callers that skip the wizard."""
+        polygons, warnings = self.read_dxf(dxf_path)
+        layers = []
+        for p in polygons:
+            if p["layer"] not in layers:
+                layers.append(p["layer"])
+        self.build_from_dxf(polygons, {lyr: lyr for lyr in layers})
         return warnings
 
     # --- editing / snapshot undo ----------------------------------------

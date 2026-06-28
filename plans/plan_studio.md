@@ -310,7 +310,7 @@ studio/                # XSlope Studio desktop app
 **Phase 6 — DXF + polish** 🚧 **PARTIAL**
 - ✅ **DXF export** — offered on each view's Save button (export current view).
 - ✅ **DXF import** — File → Import DXF brings polygons into the live document.
-- ⬜ **DXF import wizard** (layer→material mapping): a dialog after reading the DXF to map/merge layers to materials, exclude non-zone layers (annotations/dimensions), and set material order — instead of the current blind first-appearance auto-map.
+- ✅ **DXF import wizard** (layer→material mapping) — `DxfImportDialog` (`studio/dialogs.py`) lists each DXF layer with its polygon count and lets the user include/exclude it and name the material it becomes (same name on two layers → merge; material order follows first-appearance of names). Import is split engine-side into `read_dxf` (no mutation) → wizard → `build_from_dxf(polygons, layer→material)` on the document, replacing the blind first-appearance auto-map.
 - ⬜ Full undo/redo coverage (audit every mutation path; decide derived-result/mesh policy on undo).
 - ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
 

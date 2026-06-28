@@ -8,9 +8,11 @@ remaining analysis type (next increment).
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout,
-    QGroupBox, QLabel, QSpinBox, QVBoxLayout,
+    QGroupBox, QHeaderView, QLabel, QSpinBox, QTableWidget, QTableWidgetItem,
+    QVBoxLayout,
 )
 
 LEM_METHODS = [
@@ -375,3 +377,65 @@ class RunLemDialog(QDialog):
             "tol": self.tol.value(),
             "max_iter": self.max_iter.value(),
         }
+
+
+class DxfImportDialog(QDialog):
+    """Layer→material mapping wizard for DXF import.
+
+    Lists each DXF layer (with its polygon count) and lets the user include or
+    exclude it and name the material it becomes. Giving two layers the same
+    material name MERGES them into one zone; materials are created in the order
+    their names first appear. ``result()`` returns ``{layer: material_name|None}``
+    (None = excluded), suitable for ``ProjectDocument.build_from_dxf``.
+    """
+
+    def __init__(self, layers, parent=None):
+        # layers: list of (layer_name, polygon_count) in first-appearance order.
+        super().__init__(parent)
+        self.setWindowTitle("Import DXF — map layers to materials")
+        self.resize(560, 420)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "Choose which DXF layers to import and the material each becomes.\n"
+            "• Uncheck a layer to skip it (annotations, dimensions, …).\n"
+            "• Give two layers the same material name to merge them.\n"
+            "Material order follows the first appearance of each name."))
+
+        self.table = QTableWidget(len(layers), 3, self)
+        self.table.setHorizontalHeaderLabels(["Import — layer", "Polygons", "Material"])
+        self.table.verticalHeader().setVisible(False)
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(2, QHeaderView.Stretch)
+        for row, (name, count) in enumerate(layers):
+            chk = QTableWidgetItem(name)
+            chk.setFlags((chk.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable)
+            chk.setCheckState(Qt.Checked)
+            chk.setData(Qt.UserRole, name)            # keep the raw layer name
+            self.table.setItem(row, 0, chk)
+            cnt = QTableWidgetItem(str(count))
+            cnt.setFlags(cnt.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(row, 1, cnt)
+            self.table.setItem(row, 2, QTableWidgetItem(name))   # default = layer name
+        layout.addWidget(self.table, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def result(self):
+        """{layer_name: material_name or None}. Excluded (unchecked) or blank-named
+        rows map to None. A blank material name on an included row falls back to the
+        layer name, so a checked layer is never silently dropped."""
+        out = {}
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            layer = item.data(Qt.UserRole)
+            if item.checkState() != Qt.Checked:
+                out[layer] = None
+                continue
+            mat = (self.table.item(row, 2).text() or "").strip()
+            out[layer] = mat or layer
+        return out

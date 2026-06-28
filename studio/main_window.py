@@ -25,7 +25,9 @@ from PySide6.QtWidgets import (
 from xslope.fileio import default_template_path
 
 from .canvas import MplCanvas
-from .dialogs import BuildMeshDialog, RunFemDialog, RunLemDialog, RunSeepDialog
+from .dialogs import (
+    BuildMeshDialog, DxfImportDialog, RunFemDialog, RunLemDialog, RunSeepDialog,
+)
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
     MeshDisplayPanel, ReliabilityDisplayPanel, SearchDisplayPanel,
@@ -413,8 +415,9 @@ class MainWindow(QMainWindow):
 
     def import_dxf_dialog(self):
         """Import material-zone polygons from a DXF into a fresh project. Replaces
-        the current project (confirm discard first, like Open), populates polygons
-        + placeholder materials, and leaves it unsaved so the user fills in
+        the current project (confirm discard first, like Open). A wizard maps each
+        DXF layer to a material (merge/exclude/rename); the result populates
+        polygons + placeholder materials, left unsaved so the user fills in
         properties / a failure surface and then Save As."""
         if not self._confirm_discard():
             return
@@ -424,7 +427,22 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            warnings = self.doc.import_dxf(path)   # emits loaded -> _on_loaded renders
+            polygons, warnings = self.doc.read_dxf(path)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import DXF",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+        # Unique layers (first-appearance order) with their polygon counts.
+        counts = {}
+        for p in polygons:
+            counts[p["layer"]] = counts.get(p["layer"], 0) + 1
+        layers = list(counts.items())
+        wizard = DxfImportDialog(layers, self)
+        if not wizard.exec():
+            return
+        try:
+            self.doc.build_from_dxf(polygons, wizard.result())  # emits loaded -> render
         except Exception as exc:
             traceback.print_exc()
             QMessageBox.critical(self, "Could not import DXF",

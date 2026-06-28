@@ -19,7 +19,8 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
-    QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem, QWidget,
+    QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 from xslope.fileio import default_template_path
@@ -197,9 +198,20 @@ class MainWindow(QMainWindow):
         self._display_placeholder.setContentsMargins(8, 8, 8, 8)
         self._display_placeholder.setAlignment(Qt.AlignTop)
         self.display_stack.addWidget(self._display_placeholder)
+        # The panel stack + a Styles button pinned at the bottom (plan §8a): styles
+        # are project-global, so one button here opens the shared Styles dialog.
+        display_container = QWidget()
+        dv = QVBoxLayout(display_container)
+        dv.setContentsMargins(0, 0, 0, 0)
+        dv.addWidget(self.display_stack, 1)
+        self.styles_btn = QPushButton("Styles…")
+        self.styles_btn.setEnabled(False)
+        self.styles_btn.setToolTip("Edit per-feature styles (color, hatch, opacity)")
+        self.styles_btn.clicked.connect(self.open_styles_dialog)
+        dv.addWidget(self.styles_btn)
         dock = QDockWidget("Display", self)
         dock.setObjectName("display_dock")
-        dock.setWidget(self.display_stack)
+        dock.setWidget(display_container)
         self.addDockWidget(Qt.LeftDockWidgetArea, dock)
         self.splitDockWidget(self.inputs_dock, dock, Qt.Vertical)
         self.display_dock = dock
@@ -315,8 +327,6 @@ class MainWindow(QMainWindow):
         self.act_run = QAction("Run &LEM…", self, enabled=False, triggered=self.run_current)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
-        self.act_styles = QAction("&Styles…", self, enabled=False,
-                                  triggered=self.open_styles_dialog)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -337,8 +347,6 @@ class MainWindow(QMainWindow):
         m_edit = mb.addMenu("&Edit")
         m_edit.addAction(self.act_undo)
         m_edit.addAction(self.act_redo)
-        m_edit.addSeparator()
-        m_edit.addAction(self.act_styles)
 
         m_run = mb.addMenu("&Run")
         m_run.addAction(self.act_build_mesh)
@@ -371,8 +379,6 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_build_mesh)
         tb.addAction(self.act_run)
-        tb.addSeparator()
-        tb.addAction(self.act_styles)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
@@ -533,7 +539,7 @@ class MainWindow(QMainWindow):
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
         self.act_export_dxf.setEnabled(True)
-        self.act_styles.setEnabled(True)
+        self.styles_btn.setEnabled(True)
         self.assistant.reset()        # new project -> fresh conversation
         self._clear_result_tabs()
         # Restore saved solutions first so the default mode can see whether an FEM

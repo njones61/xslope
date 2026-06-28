@@ -5,6 +5,8 @@ from matplotlib.patches import Polygon
 from matplotlib.ticker import MaxNLocator
 import numpy as np
 
+from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
+
 
 def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
     """
@@ -226,7 +228,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, save_png=False, save_dxf=False, dpi=300, fig=None):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, save_png=False, save_dxf=False, dpi=300, fig=None):
     """
     Plot seep analysis results including head contours, flowlines, and phreatic surface.
     
@@ -447,9 +449,9 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
 
     # Filled contours (only if fill_contours=True)
     if fill_contours:
-        contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap="Spectral_r", vmin=vmin, vmax=vmax, alpha=0.5)
+        contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap=cmap, vmin=vmin, vmax=vmax, alpha=0.5)
         contourf.set_gid('CONTOUR_FILL')
-        cbar = ax.figure.colorbar(contourf, ax=ax, label=variable_label, shrink=0.8, pad=0.02)
+        cbar = ax.figure.colorbar(contourf, ax=ax, label=variable_label, shrink=cbar_shrink, pad=0.02)
         cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
         cbar.update_ticks()
 

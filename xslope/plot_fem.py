@@ -21,6 +21,8 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
 
+from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
+
 
 def _extract_uv(disp, fem_data):
     """Extract per-node u,v displacements from a mixed-DOF displacement vector."""
@@ -424,7 +426,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -449,6 +451,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_boundary: For displace_vector, show boundary edges only (default)
         displacement_tolerance: Fraction of max displacement below which vectors are hidden
         scale_vectors: For displace_vector, auto-scale vectors for visibility
+        cmap: Color ramp for the shear-strain contours (matplotlib colormap name).
+            None keeps the default ('coolwarm').
+        cbar_shrink: Colorbar length as a fraction of the axes height (0–1).
+            None keeps the automatic size (depends on the number of panels).
         save_png: Save figure to PNG file
         dpi: Resolution for saved PNG
     """
@@ -560,38 +566,42 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         
         # Calculate colorbar parameters based on number of plots
         if n_plots == 1:
-            cbar_shrink = 0.8
+            cb_shrink = 0.8
             cbar_labelpad = 20
         elif n_plots == 2:
-            cbar_shrink = 0.7  # Slightly larger than before
+            cb_shrink = 0.7  # Slightly larger than before
             cbar_labelpad = 15
         else:  # 3 or more plots
-            cbar_shrink = 0.5  # Slightly larger than before
+            cb_shrink = 0.5  # Slightly larger than before
             cbar_labelpad = 12
-        
+        # Explicit override from the caller (the Studio colorbar-size control).
+        if cbar_shrink is not None:
+            cb_shrink = cbar_shrink
+
         if pt == 'displace_mag':
             plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement, 
-                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'displace_vector':
             plot_displacement_vectors(ax, fem_data, solution, show_mesh, show_reinforcement, 
-                                    cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
+                                    cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                                     plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
                                     displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
-                             cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                               cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'strain':
             plot_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                               cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                               cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'shear_strain':
             plot_shear_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                                     cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
+                                     cmap=cmap)
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                                        cbar_shrink=cbar_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                                        cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         
         # Set consistent axis limits for all plots (including single plots)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
@@ -1435,7 +1445,7 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
-                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
+                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None):
     """
     Plot viscoplastic max shear strain contours.
 
@@ -1458,7 +1468,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
                         False, False, cbar_shrink, cbar_labelpad,
-                        colormap='coolwarm', label_elements=label_elements)
+                        colormap=cmap or 'coolwarm', label_elements=label_elements)
 
     # Draw reinforcement with force-based coloring
     if show_reinforcement and 'elements_1d' in fem_data:

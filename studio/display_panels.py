@@ -12,12 +12,19 @@ fonts, fills) is not exposed yet — that arrives with the Phase 5 ``StyleConfig
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+import numpy as np
+from matplotlib import colormaps as _mpl_colormaps
+from PySide6.QtCore import QSize, Signal
+from PySide6.QtGui import QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QSpinBox, QWidget,
 )
 
+from xslope.colormaps import RAMP_CHOICES
 from .dialogs import SEEP_VARIABLES
+
+# Size of the gradient preview swatch shown beside each colormap name.
+_CMAP_ICON_SIZE = QSize(72, 14)
 
 # Material-table placements accepted by plot_inputs(tab_loc=…).
 TAB_LOCATIONS = [
@@ -34,6 +41,11 @@ FEM_PLOT_TYPES = [
 ]
 
 
+# Minimum width for spin boxes so the value isn't clipped by the up/down arrows
+# (notably 3-decimal values like "0.050").
+_SPIN_MIN_W = 78
+
+
 def _dspin(lo, hi, val, step, decimals=2, suffix=""):
     s = QDoubleSpinBox()
     s.setRange(lo, hi)
@@ -42,15 +54,18 @@ def _dspin(lo, hi, val, step, decimals=2, suffix=""):
     s.setValue(val)
     if suffix:
         s.setSuffix(suffix)
+    s.setMinimumWidth(_SPIN_MIN_W)
     return s
 
 
-def _ispin(lo, hi, val, suffix=""):
+def _ispin(lo, hi, val, suffix="", step=1):
     s = QSpinBox()
     s.setRange(lo, hi)
     s.setValue(val)
+    s.setSingleStep(step)
     if suffix:
         s.setSuffix(suffix)
+    s.setMinimumWidth(_SPIN_MIN_W)
     return s
 
 
@@ -81,6 +96,32 @@ def _legend_option(panel):
     """The legend_ncol value for a panel built with _add_legend_controls:
     "auto" when the Auto box is checked, else the explicit column count."""
     return "auto" if panel._legend_auto.isChecked() else panel._legend_ncol.value()
+
+
+def _cmap_icon(name):
+    """A horizontal gradient swatch of colormap ``name`` as a QIcon, so the
+    selector previews each ramp the way the screenshot does."""
+    w, h = _CMAP_ICON_SIZE.width(), _CMAP_ICON_SIZE.height()
+    cmap = _mpl_colormaps[name]
+    row = (cmap(np.linspace(0.0, 1.0, w)) * 255).astype(np.uint8)   # (w, 4) RGBA
+    arr = np.ascontiguousarray(np.broadcast_to(row, (h, w, 4)))     # (h, w, 4)
+    img = QImage(arr.data, w, h, 4 * w, QImage.Format_RGBA8888).copy()
+    return QIcon(QPixmap.fromImage(img))
+
+
+def _make_cmap_combo(default):
+    """A QComboBox of the curated color ramps, each shown with a gradient preview,
+    with ``default`` (a matplotlib colormap name) pre-selected. ``currentData()``
+    returns the selected colormap name to pass through as ``cmap=…``."""
+    combo = QComboBox()
+    combo.setIconSize(_CMAP_ICON_SIZE)
+    names = [name for name, _ in RAMP_CHOICES]
+    for name, label in RAMP_CHOICES:
+        combo.addItem(_cmap_icon(name), label, name)
+    if default not in names:   # keep an off-list default selectable
+        combo.addItem(_cmap_icon(default), default, default)
+    combo.setCurrentIndex(combo.findData(default))
+    return combo
 
 
 class _CheckboxPanel(QWidget):
@@ -289,10 +330,15 @@ class SeepDisplayPanel(QWidget):
         self.base_mat.setToolTip("Reference material for the flow-net "
                                  "(base permeability / number of flow channels).")
 
-        self.levels = _ispin(2, 100, 20)
+        self.levels = _ispin(2, 100, 20, step=5)
         self.alpha = _dspin(0.0, 1.0, 0.4, 0.05)
         self.vector_scale = _dspin(0.001, 10.0, 0.05, 0.01, decimals=3)
         self.pad_frac = _dspin(0.0, 1.0, 0.05, 0.01)
+        self.cmap = _make_cmap_combo("Spectral_r")
+        self.cmap.setToolTip("Color ramp for the filled contours.")
+        self.cbar_size = _dspin(0.1, 1.0, 0.8, 0.05)
+        self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
+                                  "a fraction of the plot height.")
 
         self.flowlines = QCheckBox("Flow lines")
         self.flowlines.setChecked(True)
@@ -302,23 +348,28 @@ class SeepDisplayPanel(QWidget):
         self.phreatic.setChecked(True)
 
         form.addRow("Variable", self.variable)
-        form.addRow("Base material", self.base_mat)
-        form.addRow("Contour levels", self.levels)
-        form.addRow("Fill opacity", self.alpha)
-        form.addRow("Vector scale", self.vector_scale)
-        form.addRow("Padding", self.pad_frac)
         form.addRow("", self.flowlines)
         form.addRow("", self.vectors)
         form.addRow("", self.fill)
         form.addRow("", self.phreatic)
+        form.addRow("Base material", self.base_mat)
+        form.addRow("Contour levels", self.levels)
+        form.addRow("Color ramp", self.cmap)
+        form.addRow("Colorbar size", self.cbar_size)
+        form.addRow("Fill opacity", self.alpha)
+        form.addRow("Vector scale", self.vector_scale)
+        form.addRow("Padding", self.pad_frac)
 
         self.variable.currentIndexChanged.connect(self._on_variable)
         self.base_mat.currentIndexChanged.connect(self._emit)
-        for s in (self.levels, self.alpha, self.vector_scale, self.pad_frac):
+        self.cmap.currentIndexChanged.connect(self._emit)
+        for s in (self.levels, self.alpha, self.vector_scale, self.pad_frac,
+                  self.cbar_size):
             s.valueChanged.connect(self._emit)
         for c in (self.flowlines, self.vectors, self.fill, self.phreatic):
             c.toggled.connect(self._emit)
         self.vectors.toggled.connect(self._sync_enabled)
+        self.fill.toggled.connect(self._sync_enabled)
         self._sync_enabled()
 
     def _on_variable(self, *_):
@@ -335,6 +386,9 @@ class SeepDisplayPanel(QWidget):
         self.flowlines.setEnabled(head)
         self.base_mat.setEnabled(head)
         self.vector_scale.setEnabled(self.vectors.isChecked())
+        # The ramp and its colorbar only apply to the filled contours.
+        self.cmap.setEnabled(self.fill.isChecked())
+        self.cbar_size.setEnabled(self.fill.isChecked())
 
     def options(self):
         return {
@@ -348,6 +402,8 @@ class SeepDisplayPanel(QWidget):
             "vectors": self.vectors.isChecked(),
             "fill_contours": self.fill.isChecked(),
             "phreatic": self.phreatic.isChecked(),
+            "cmap": self.cmap.currentData(),
+            "cbar_shrink": self.cbar_size.value(),
         }
 
 
@@ -370,6 +426,12 @@ class FemResultsDisplayPanel(QWidget):
         self.deform_percent.setToolTip("Deformed-shape exaggeration as a percent "
                                        "of slope height.")
 
+        self.cmap = _make_cmap_combo("coolwarm")
+        self.cmap.setToolTip("Color ramp for the shear-strain contours.")
+        self.cbar_size = _dspin(0.1, 1.0, 0.8, 0.05)
+        self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
+                                  "a fraction of the plot height.")
+
         self.show_mesh = QCheckBox("Show mesh")
         self.show_mesh.setChecked(True)
         self.show_reinforcement = QCheckBox("Reinforcement")
@@ -391,6 +453,8 @@ class FemResultsDisplayPanel(QWidget):
             "Hide vectors below this fraction of the max displacement.")
 
         form.addRow("Plot type", self.plot_type)
+        form.addRow("Color ramp", self.cmap)
+        form.addRow("Colorbar size", self.cbar_size)
         form.addRow("Deform", self.deform_percent)
         form.addRow("", self.show_mesh)
         form.addRow("", self.show_reinforcement)
@@ -404,6 +468,8 @@ class FemResultsDisplayPanel(QWidget):
         _add_legend_controls(self, form)
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
+        self.cmap.currentIndexChanged.connect(self._emit)
+        self.cbar_size.valueChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
         for c in (self.show_mesh, self.show_reinforcement, self.label_elements,
@@ -425,13 +491,18 @@ class FemResultsDisplayPanel(QWidget):
         self.changed.emit()
 
     def _sync_enabled(self):
-        vec = self.plot_type.currentData() == "displace_vector"
+        pt = self.plot_type.currentData()
         for w in self._vector_widgets:
-            w.setEnabled(vec)
+            w.setEnabled(pt == "displace_vector")
+        # Only the shear-strain plot draws a color ramp and its colorbar.
+        self.cmap.setEnabled(pt == "shear_strain")
+        self.cbar_size.setEnabled(pt == "shear_strain")
 
     def options(self):
         return {
             "plot_type": self.plot_type.currentData(),
+            "cmap": self.cmap.currentData(),
+            "cbar_shrink": self.cbar_size.value(),
             "deform_percent": self.deform_percent.value(),
             "show_mesh": self.show_mesh.isChecked(),
             "show_reinforcement": self.show_reinforcement.isChecked(),

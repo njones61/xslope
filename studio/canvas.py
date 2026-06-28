@@ -225,7 +225,9 @@ class MplCanvas(QWidget):
             flowlines=opts.get("flowlines", True),
             vectors=opts.get("vectors", False),
             fill_contours=opts.get("fill_contours", False),
-            phreatic=opts.get("phreatic", True), mesh=False, fig=fig))
+            phreatic=opts.get("phreatic", True),
+            cmap=opts.get("cmap", "Spectral_r"),
+            cbar_shrink=opts.get("cbar_shrink", 0.8), mesh=False, fig=fig))
 
     def render_fem_data(self, fem_data, opts=None):
         opts = opts or {}
@@ -243,6 +245,8 @@ class MplCanvas(QWidget):
         self._draw(lambda fig: plot_fem_results(
             fem_data, solution,
             plot_type=[opts.get("plot_type", "shear_strain")],
+            cmap=opts.get("cmap"),
+            cbar_shrink=opts.get("cbar_shrink"),
             deform_percent=opts.get("deform_percent", 15),
             show_mesh=opts.get("show_mesh", True),
             show_reinforcement=opts.get("show_reinforcement", True),

@@ -18,12 +18,27 @@ from matplotlib.colors import to_hex
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
-    QColorDialog, QDialog, QDialogButtonBox, QDoubleSpinBox, QGridLayout,
-    QHBoxLayout, QHeaderView, QLabel, QMenu, QTableWidget, QTableWidgetItem,
-    QToolButton, QVBoxLayout, QWidget, QWidgetAction,
+    QColorDialog, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
+    QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMenu, QTableWidget,
+    QTableWidgetItem, QToolButton, QVBoxLayout, QWidget, QWidgetAction,
 )
 
 from xslope.plot import get_material_color
+from xslope.style import default_style_sheet
+
+# Non-material features exposed in the dialog (label, feature key). Profile/polygon
+# inherit material color, so they're not listed here.
+FEATURES = [
+    ("Piezometric line", "piezo_line"),
+    ("Piezometric line 2", "piezo_line2"),
+    ("Max depth", "max_depth"),
+    ("Tension crack", "tcrack"),
+    ("Failure circles", "circles"),
+    ("Non-circular surface", "noncirc"),
+    ("Reinforcement", "reinforcement"),
+    ("Mesh (background)", "mesh"),
+]
+LINESTYLES = [("Solid", "-"), ("Dashed", "--"), ("Dotted", ":"), ("Dash-dot", "-.")]
 
 
 _hatch_pixmaps = {}
@@ -220,16 +235,19 @@ class StylesDialog(QDialog):
         # with the original) so the canvas re-renders.
         super().__init__(parent)
         self.setWindowTitle("Styles")
-        self.resize(520, 420)
+        self.resize(560, 620)
         self._materials = materials or []
         self._orig = copy.deepcopy(style or {})
         self._on_preview = on_preview
         mat_overrides = (style or {}).get("materials") or {}
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
-            "Per-material fill style. Color seeds the zone and profile/polygon lines; "
-            "hatch and opacity apply to filled zones. Changes preview live."))
+        intro = QLabel(
+            "Material color seeds the zone fill and its profile/polygon lines; hatch "
+            "and opacity apply to filled zones. Feature styles set the look of the "
+            "other layers. Changes preview live.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
 
         self.table = QTableWidget(len(self._materials), 4, self)
         self.table.setHorizontalHeaderLabels(["Material", "Color", "Hatch", "Opacity"])
@@ -265,7 +283,58 @@ class StylesDialog(QDialog):
             self.table.setCellWidget(idx, 3, spin)
 
             self._rows.append((idx, btn, hatch_btn, spin))
-        layout.addWidget(self.table, 1)
+        # Cap the materials table height so it doesn't hog space when there are
+        # few materials; it scrolls past the cap when there are many.
+        self.table.setMaximumHeight(min(220, 30 * len(self._materials) + 34))
+        layout.addWidget(QLabel("Materials"))
+        layout.addWidget(self.table)
+
+        # --- Features (non-material line styles) ----------------------------
+        feat_overrides = (style or {}).get("features") or {}
+        defaults = default_style_sheet()["features"]
+        layout.addWidget(QLabel("Features"))
+        self.ftable = QTableWidget(len(FEATURES), 4, self)
+        self.ftable.setHorizontalHeaderLabels(["Feature", "Color", "Style", "Width"])
+        self.ftable.verticalHeader().setVisible(False)
+        fhh = self.ftable.horizontalHeader()
+        fhh.setSectionResizeMode(0, QHeaderView.Stretch)
+        for c in (1, 2, 3):
+            fhh.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+
+        self._frows = []   # (key, default, color_btn, style_combo|None, width_spin)
+        for row, (label, key) in enumerate(FEATURES):
+            d = defaults.get(key, {})
+            ov = feat_overrides.get(key) or {}
+            item = QTableWidgetItem(label)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            self.ftable.setItem(row, 0, item)
+
+            dcol = to_hex(d["color"]) if d.get("color") else "#000000"
+            cbtn = ColorButton(to_hex(ov.get("color") or d.get("color") or "#000000"),
+                               default_hex=dcol)
+            cbtn.colorChanged.connect(self._emit)
+            self.ftable.setCellWidget(row, 1, cbtn)
+
+            combo = None
+            if "linestyle" in d:                # only line features use a dash style
+                combo = QComboBox()
+                for lbl, ls in LINESTYLES:
+                    combo.addItem(lbl, ls)
+                ci = max(0, combo.findData(ov.get("linestyle", d.get("linestyle"))))
+                combo.setCurrentIndex(ci)
+                combo.currentIndexChanged.connect(self._emit)
+                self.ftable.setCellWidget(row, 2, combo)
+
+            wspin = QDoubleSpinBox()
+            wspin.setRange(0.1, 10.0)
+            wspin.setSingleStep(0.5)
+            wspin.setDecimals(1)
+            wspin.setValue(float(ov.get("linewidth", d.get("linewidth", 1.0))))
+            wspin.valueChanged.connect(self._emit)
+            self.ftable.setCellWidget(row, 3, wspin)
+
+            self._frows.append((key, d, cbtn, combo, wspin))
+        layout.addWidget(self.ftable, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -292,6 +361,22 @@ class StylesDialog(QDialog):
             out["materials"] = mats
         else:
             out.pop("materials", None)
+
+        feats = {}
+        for key, d, cbtn, combo, wspin in self._frows:
+            entry = {}
+            if d.get("color") and cbtn.hex.lower() != to_hex(d["color"]).lower():
+                entry["color"] = cbtn.hex
+            if combo is not None and combo.currentData() != d.get("linestyle"):
+                entry["linestyle"] = combo.currentData()
+            if abs(wspin.value() - float(d.get("linewidth", 1.0))) > 1e-9:
+                entry["linewidth"] = round(wspin.value(), 2)
+            if entry:
+                feats[key] = entry
+        if feats:
+            out["features"] = feats
+        else:
+            out.pop("features", None)
         return out
 
     def _emit(self, *_):

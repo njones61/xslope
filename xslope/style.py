@@ -35,10 +35,22 @@ def default_style_sheet():
         "materials": {},
         # Defaults shared by every material's fill (overridden per-id above).
         "material": {"hatch": None, "alpha": 0.6},
-        # Per-feature-type styling. Profile/polygon take color from the material.
+        # Per-feature-type styling. Profile/polygon take color from the material;
+        # every other feature carries its own color/linestyle/width/alpha. Defaults
+        # match the literals the plot_* functions used, so no-style output is
+        # unchanged.
         "features": {
             "profile_line": {"linewidth": 1.0, "linestyle": "-"},
             "polygon": {"linewidth": 1.0},
+            "piezo_line": {"color": "b", "linewidth": 2.0},
+            "piezo_line2": {"color": "skyblue", "linewidth": 2.0},
+            "max_depth": {"color": "black", "linewidth": 1.5},
+            "tcrack": {"color": "red", "linestyle": ":", "linewidth": 1.5},
+            "circles": {"color": "red", "linestyle": "--", "linewidth": 1.5},
+            "noncirc": {"color": "red", "linestyle": "--", "linewidth": 1.5},
+            "reinforcement": {"color": "darkgray", "linewidth": 3.0,
+                              "linestyle": "-", "alpha": 0.8},
+            "mesh": {"color": "gray", "linewidth": 0.5, "alpha": 0.25},
         },
     }
 

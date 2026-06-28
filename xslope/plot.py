@@ -251,7 +251,7 @@ def plot_polygons_on_ax(ax, polygons, materials=None, labels=False, style=None):
             )
 
 
-def plot_max_depth(ax, profile_lines, max_depth):
+def plot_max_depth(ax, profile_lines, max_depth, style=None):
     """
     Plots a horizontal line representing the maximum depth limit with hash marks.
 
@@ -265,10 +265,14 @@ def plot_max_depth(ax, profile_lines, max_depth):
     """
     if max_depth is None:
         return
+    from .style import resolve_style, feature_style
+    fs = feature_style(resolve_style(style), "max_depth")
+    color = fs.get("color", "black")
+    lw = fs.get("linewidth", 1.5)
     x_vals = [x for line in profile_lines for x, _ in line['coords']]
     x_min = min(x_vals)
     x_max = max(x_vals)
-    ax.hlines(max_depth, x_min, x_max, colors='black', linewidth=1.5, label='Max Depth', gid='MAX_DEPTH')
+    ax.hlines(max_depth, x_min, x_max, colors=color, linewidth=lw, label='Max Depth', gid='MAX_DEPTH')
 
     x_diff = x_max - x_min
     spacing = x_diff / 100
@@ -279,7 +283,7 @@ def plot_max_depth(ax, profile_lines, max_depth):
     dy = length * np.sin(angle_rad)
     x_hashes = np.arange(x_min, x_max, spacing)[1:]
     for x in x_hashes:
-        ax.plot([x, x - dx], [max_depth, max_depth - dy], color='black', linewidth=1, gid='MAX_DEPTH')
+        ax.plot([x, x - dx], [max_depth, max_depth - dy], color=color, linewidth=1, gid='MAX_DEPTH')
 
 
 def _domain_lower_envelope(domain):
@@ -305,19 +309,23 @@ def _domain_lower_envelope(domain):
     return pts
 
 
-def plot_domain_base(ax, domain_polygon, label='Max Depth'):
+def plot_domain_base(ax, domain_polygon, label='Max Depth', style=None):
     """Draw the domain's lower boundary as a hatched base line (the polygon
     analog of plot_max_depth). Works for a flat bottom — reproducing the old
     horizontal hatched 'Max Depth' line — and for an irregular/sloping bottom,
     where the hatch marks follow the base."""
     if domain_polygon is None:
         return
+    from .style import resolve_style, feature_style
+    fs = feature_style(resolve_style(style), "max_depth")
+    color = fs.get("color", "black")
+    lw = fs.get("linewidth", 1.5)
     base = _domain_lower_envelope(domain_polygon)
     if len(base) < 2:
         return
     bx = np.array([p[0] for p in base])
     by = np.array([p[1] for p in base])
-    ax.plot(bx, by, color='black', linewidth=1.5, label=label, gid='MAX_DEPTH')
+    ax.plot(bx, by, color=color, linewidth=lw, label=label, gid='MAX_DEPTH')
 
     x_min, x_max = bx[0], bx[-1]
     x_diff = x_max - x_min
@@ -330,7 +338,7 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth'):
     dy = length * np.sin(angle_rad)
     for x in np.arange(x_min, x_max, spacing)[1:]:
         y = np.interp(x, bx, by)
-        ax.plot([x, x - dx], [y, y - dy], color='black', linewidth=1, gid='MAX_DEPTH')
+        ax.plot([x, x - dx], [y, y - dy], color=color, linewidth=1, gid='MAX_DEPTH')
 
 
 def plot_base_geometry(ax, slope_data, labels=False, style=None):
@@ -343,11 +351,11 @@ def plot_base_geometry(ax, slope_data, labels=False, style=None):
         plot_profile_lines(ax, slope_data['profile_lines'],
                            materials=slope_data.get('materials'), labels=labels,
                            style=style)
-        plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
+        plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'], style=style)
     elif slope_data.get('polygons'):
         plot_polygons_on_ax(ax, slope_data['polygons'],
                             materials=slope_data.get('materials'), style=style)
-        plot_domain_base(ax, slope_data.get('domain_polygon'))
+        plot_domain_base(ax, slope_data.get('domain_polygon'), style=style)
 
 
 def plot_failure_surface(ax, failure_surface):
@@ -414,18 +422,21 @@ def plot_slice_numbers(ax, slice_df):
                    ha='center', va='center', fontsize=8, fontweight='bold',
                    bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
 
-def plot_piezo_line(ax, slope_data):
+def plot_piezo_line(ax, slope_data, style=None):
     """
     Plots the piezometric line(s) with markers at their midpoints.
 
     Parameters:
         ax: matplotlib Axes object
         data: Dictionary containing plot data with 'piezo_line' and optionally 'piezo_line2'
+        style: optional style sheet (see xslope.style); None → defaults.
 
     Returns:
         None
     """
-    
+    from .style import resolve_style, feature_style
+    style = resolve_style(style)
+
     def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=0.0):
         """
         Place an inverted triangle marker so its tip visually touches the line at (x, y).
@@ -446,13 +457,13 @@ def plot_piezo_line(ax, slope_data):
         trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
         ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
 
-    def plot_single_piezo_line(ax, piezo_line, color, label):
+    def plot_single_piezo_line(ax, piezo_line, color, label, linewidth=2):
         """Internal function to plot a single piezometric line"""
         if not piezo_line:
             return
-            
+
         piezo_xs, piezo_ys = zip(*piezo_line)
-        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=2, label=label, gid='PIEZO')
+        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=linewidth, label=label, gid='PIEZO')
         
         # Find middle x-coordinate and corresponding y value
         if len(piezo_xs) > 1:
@@ -466,8 +477,12 @@ def plot_piezo_line(ax, slope_data):
             _plot_touching_v_marker(ax, mid_x, mid_y, color=color, markersize=8, extra_gap_points=2.0)
     
     # Plot both piezometric lines
-    plot_single_piezo_line(ax, slope_data.get('piezo_line'), 'b', "Piezometric Line")
-    plot_single_piezo_line(ax, slope_data.get('piezo_line2'), 'skyblue', "Piezometric Line 2")
+    f1 = feature_style(style, "piezo_line")
+    f2 = feature_style(style, "piezo_line2")
+    plot_single_piezo_line(ax, slope_data.get('piezo_line'), f1.get('color', 'b'),
+                           "Piezometric Line", f1.get('linewidth', 2))
+    plot_single_piezo_line(ax, slope_data.get('piezo_line2'), f2.get('color', 'skyblue'),
+                           "Piezometric Line 2", f2.get('linewidth', 2))
 
 def plot_seepage_bc_lines(ax, slope_data):
     """
@@ -593,7 +608,7 @@ def plot_seepage_bc_lines(ax, slope_data):
                          head_line_color="steelblue", water_level_color="powderblue",
                          exit_face_color="orangered", label_suffix=" (BC 2)")
 
-def plot_tcrack_surface(ax, slope_data):
+def plot_tcrack_surface(ax, slope_data, style=None):
     """
     Plots the tension crack surface as a thin dashed red line, clipped to max_depth.
 
@@ -608,9 +623,11 @@ def plot_tcrack_surface(ax, slope_data):
     if tcrack_surface is None:
         return
 
-    color = 'red'
-    linestyle = ':'
-    linewidth = 1.5
+    from .style import resolve_style, feature_style
+    fs = feature_style(resolve_style(style), "tcrack")
+    color = fs.get('color', 'red')
+    linestyle = fs.get('linestyle', ':')
+    linewidth = fs.get('linewidth', 1.5)
 
     max_depth = slope_data.get('max_depth')
     if max_depth is None:
@@ -887,7 +904,7 @@ def plot_dloads(ax, slope_data):
     plot_single_dload_set(ax, dloads, 'purple', 'Distributed Load')
     plot_single_dload_set(ax, dloads2, 'orange', 'Distributed Load 2')
 
-def plot_circles(ax, slope_data):
+def plot_circles(ax, slope_data, style=None):
     """
     Plots starting circles with center markers and arrows.
 
@@ -898,6 +915,12 @@ def plot_circles(ax, slope_data):
     Returns:
         None
     """
+    from .style import resolve_style, feature_style
+    fs = feature_style(resolve_style(style), "circles")
+    c_color = fs.get('color', 'red')
+    c_ls = fs.get('linestyle', '--')
+    c_lw = fs.get('linewidth', 1.5)
+
     circles = slope_data['circles']
     tcrack_depth = slope_data.get('tcrack_depth', 0)
 
@@ -921,10 +944,11 @@ def plot_circles(ax, slope_data):
         if not isinstance(clipped_surface, LineString):
             clipped_surface = LineString(clipped_surface)
         x_clip, y_clip = zip(*clipped_surface.coords)
-        ax.plot(x_clip, y_clip, 'r--', label="Circle", gid='CIRCLES')
+        ax.plot(x_clip, y_clip, color=c_color, linestyle=c_ls, linewidth=c_lw,
+                label="Circle", gid='CIRCLES')
 
         # Center marker
-        ax.plot(Xo, Yo, 'r+', markersize=10, gid='CIRCLES')
+        ax.plot(Xo, Yo, marker='+', color=c_color, linestyle='None', markersize=10, gid='CIRCLES')
 
         # Arrow direction: point from center to midpoint of failure surface
         mid_idx = len(x_clip) // 2
@@ -946,12 +970,12 @@ def plot_circles(ax, slope_data):
                     xytext=(Xo, Yo),                 # arrow start
                     arrowprops=dict(
                         arrowstyle='-|>',
-                        color='red',
+                        color=c_color,
                         lw=1.0,            # shaft width in points
                         mutation_scale=20  # head size in points
                     ))
 
-def plot_non_circ(ax, non_circ):
+def plot_non_circ(ax, non_circ, style=None):
     """
     Plots a non-circular failure surface.
 
@@ -964,13 +988,16 @@ def plot_non_circ(ax, non_circ):
     """
     if not non_circ or len(non_circ) == 0:
         return
+    from .style import resolve_style, feature_style
+    fs = feature_style(resolve_style(style), "noncirc")
     # Handle both dict format {'X': x, 'Y': y} and tuple format (x, y)
     if isinstance(non_circ[0], dict):
         xs = [p['X'] for p in non_circ]
         ys = [p['Y'] for p in non_circ]
     else:
         xs, ys = zip(*non_circ)
-    ax.plot(xs, ys, 'r--', label='Non-Circular Surface')
+    ax.plot(xs, ys, color=fs.get('color', 'red'), linestyle=fs.get('linestyle', '--'),
+            linewidth=fs.get('linewidth', 1.5), label='Non-Circular Surface')
 
 def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
     """
@@ -1486,7 +1513,7 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-def plot_reinforcement_lines(ax, slope_data):
+def plot_reinforcement_lines(ax, slope_data, style=None):
     """
     Plots the reinforcement lines from slope_data.
     
@@ -1499,17 +1526,20 @@ def plot_reinforcement_lines(ax, slope_data):
     """
     if 'reinforce_lines' not in slope_data or not slope_data['reinforce_lines']:
         return
-        
+
+    from .style import resolve_style, feature_style
+    rfs = feature_style(resolve_style(style), "reinforcement")
     tension_points_plotted = False  # Track if tension points have been added to legend
-    
+
     for i, line in enumerate(slope_data['reinforce_lines']):
         # Extract x and y coordinates from the line points
         xs = [point['X'] for point in line]
         ys = [point['Y'] for point in line]
-        
+
         # Plot the reinforcement line with a distinctive style
-        ax.plot(xs, ys, color='darkgray', linewidth=3, linestyle='-', 
-                alpha=0.8, label='Reinforcement Line' if i == 0 else "")
+        ax.plot(xs, ys, color=rfs.get('color', 'darkgray'),
+                linewidth=rfs.get('linewidth', 3), linestyle=rfs.get('linestyle', '-'),
+                alpha=rfs.get('alpha', 0.8), label='Reinforcement Line' if i == 0 else "")
         
         # Add markers at each point to show tension values
         for j, point in enumerate(line):
@@ -1673,6 +1703,9 @@ def plot_inputs(
         fig.clear()
         ax = fig.add_subplot(111)
 
+    from .style import resolve_style
+    style = resolve_style(style)
+
     # Plot mesh in background if available
     mesh = slope_data.get('mesh')
     if mesh is not None:
@@ -1692,29 +1725,31 @@ def plot_inputs(
             for n0, n1 in edges:
                 lines.append(m_nodes[[n0, n1]])
         if lines:
-            lc = LineCollection(lines, colors='gray', alpha=0.25, linewidths=0.5)
+            from .style import feature_style as _fs
+            mfs = _fs(style, "mesh")
+            lc = LineCollection(lines, colors=mfs.get("color", "gray"),
+                                alpha=mfs.get("alpha", 0.25),
+                                linewidths=mfs.get("linewidth", 0.5))
             ax.add_collection(lc)
 
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
-    from .style import resolve_style
-    style = resolve_style(style)
     plot_base_geometry(ax, slope_data, labels=True, style=style)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
-        plot_piezo_line(ax, slope_data)
+        plot_piezo_line(ax, slope_data, style=style)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data)
     if mode != "seep":
         plot_dloads(ax, slope_data)
-    plot_tcrack_surface(ax, slope_data)
-    plot_reinforcement_lines(ax, slope_data)
+    plot_tcrack_surface(ax, slope_data, style=style)
+    plot_reinforcement_lines(ax, slope_data, style=style)
     plot_piles(ax, slope_data)
 
     if mode == "lem":
         if slope_data['circular']:
-            plot_circles(ax, slope_data)
+            plot_circles(ax, slope_data, style=style)
         elif slope_data.get('non_circ') and len(slope_data['non_circ']) > 0:
-            plot_non_circ(ax, slope_data['non_circ'])
+            plot_non_circ(ax, slope_data['non_circ'], style=style)
 
     # Seismic coefficient annotation
     k_seismic = slope_data.get('k_seismic', 0.0)

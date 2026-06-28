@@ -54,7 +54,7 @@ def get_dload_legend_handler():
     return None, dummy_line
 
 
-def plot_profile_lines(ax, profile_lines, materials=None, labels=False):
+def plot_profile_lines(ax, profile_lines, materials=None, labels=False, style=None):
     """
     Plots the profile lines for each material in the slope.
 
@@ -63,27 +63,28 @@ def plot_profile_lines(ax, profile_lines, materials=None, labels=False):
         profile_lines: List of profile line dicts, each with 'coords' and 'mat_id' keys
         materials: List of material dictionaries (optional, for color mapping)
         labels: If True, add index labels to each profile line (default: False)
+        style: optional style sheet (see xslope.style); None → defaults. Line color
+            comes from the material; the profile_line feature owns width/linestyle.
 
     Returns:
         None
     """
+    from .style import resolve_style, material_style, feature_style
+    style = resolve_style(style)
+    fs = feature_style(style, "profile_line")
     for i, line in enumerate(profile_lines):
         coords = line['coords']
         xs, ys = zip(*coords)
-        
-        # Get material index from mat_id (already 0-based)
-        if materials and line.get('mat_id') is not None:
-            mat_idx = line['mat_id']
-            if 0 <= mat_idx < len(materials):
-                color = get_material_color(mat_idx)
-            else:
-                # Fallback to index-based color if mat_id out of range
-                color = get_material_color(i)
-        else:
-            # Fallback to index-based color if no materials or mat_id
-            color = get_material_color(i)
-        
-        ax.plot(xs, ys, color=color, linewidth=1, label=f'Profile {i+1}', gid=f'PROFILE_{i+1}')
+
+        # Material index from mat_id (already 0-based); fall back to the line index.
+        mat_idx = line.get('mat_id') if (materials and line.get('mat_id') is not None) else i
+        if not (materials and 0 <= mat_idx < len(materials)):
+            mat_idx = i
+        color = material_style(style, mat_idx)["color"]
+
+        ax.plot(xs, ys, color=color, linewidth=fs.get("linewidth", 1.0),
+                linestyle=fs.get("linestyle", "-"),
+                label=f'Profile {i+1}', gid=f'PROFILE_{i+1}')
 
         if labels:
             _add_profile_index_label(ax, coords, i + 1, color)
@@ -192,7 +193,7 @@ def _add_profile_index_label(ax, line, index, color):
     )
 
 
-def plot_polygons_on_ax(ax, polygons, materials=None, labels=False):
+def plot_polygons_on_ax(ax, polygons, materials=None, labels=False, style=None):
     """
     Fill the material-zone polygons on an existing Axes (the polygon analog of
     plot_profile_lines). Used by plot_inputs when geometry is defined by polygons
@@ -203,14 +204,21 @@ def plot_polygons_on_ax(ax, polygons, materials=None, labels=False):
         polygons: list of dicts with a 'polygon' (shapely Polygon) and 'mat_id' key
         materials: list of material dicts (for color + legend names), optional
         labels: if True, place the material number at each polygon centroid
+        style: optional style sheet (see xslope.style); None → defaults. Fill
+            color/alpha/hatch come from the material; the polygon feature owns the
+            edge line width.
     """
+    from .style import resolve_style, material_style, feature_style
+    style = resolve_style(style)
+    lw = feature_style(style, "polygon").get("linewidth", 1.0)
     seen_labels = set()
     for i, poly in enumerate(polygons):
         geom = poly['polygon'] if isinstance(poly, dict) else poly
         mat_idx = poly.get('mat_id') if isinstance(poly, dict) else i
         if mat_idx is None:
             mat_idx = i
-        color = get_material_color(mat_idx)
+        ms = material_style(style, mat_idx)
+        color = ms["color"]
 
         # Legend label: material name if available, once per material.
         mat_name = None
@@ -223,12 +231,13 @@ def plot_polygons_on_ax(ax, polygons, materials=None, labels=False):
             seen_labels.add(label)
 
         xs, ys = geom.exterior.xy
-        ax.fill(xs, ys, color=color, alpha=0.6, label=legend_label, gid=label)
-        ax.plot(xs, ys, color=color, linewidth=1, gid=label)
+        ax.fill(xs, ys, color=color, alpha=ms.get("alpha", 0.6),
+                hatch=ms.get("hatch"), label=legend_label, gid=label)
+        ax.plot(xs, ys, color=color, linewidth=lw, gid=label)
         # Draw any interior rings (holes) as outlines.
         for ring in geom.interiors:
             rx, ry = ring.xy
-            ax.plot(rx, ry, color=color, linewidth=1, linestyle='--', gid=label)
+            ax.plot(rx, ry, color=color, linewidth=lw, linestyle='--', gid=label)
 
         if labels:
             c = geom.representative_point()
@@ -324,18 +333,20 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth'):
         ax.plot([x, x - dx], [y, y - dy], color='black', linewidth=1, gid='MAX_DEPTH')
 
 
-def plot_base_geometry(ax, slope_data, labels=False):
+def plot_base_geometry(ax, slope_data, labels=False, style=None):
     """Plot the base geometry on an Axes: profile lines + max-depth line when the
     input uses profile lines, or filled material polygons + a hatched domain base
     when it uses polygons. Shared by plot_inputs and all the solution/search plots
-    so both geometry types render consistently everywhere."""
+    so both geometry types render consistently everywhere. `style` (see
+    xslope.style) styles the material/profile/polygon layers; None → defaults."""
     if slope_data.get('profile_lines'):
         plot_profile_lines(ax, slope_data['profile_lines'],
-                           materials=slope_data.get('materials'), labels=labels)
+                           materials=slope_data.get('materials'), labels=labels,
+                           style=style)
         plot_max_depth(ax, slope_data['profile_lines'], slope_data['max_depth'])
     elif slope_data.get('polygons'):
         plot_polygons_on_ax(ax, slope_data['polygons'],
-                            materials=slope_data.get('materials'))
+                            materials=slope_data.get('materials'), style=style)
         plot_domain_base(ax, slope_data.get('domain_polygon'))
 
 
@@ -1614,6 +1625,7 @@ def plot_inputs(
     tab_loc="top",
     legend_ncol="auto",
     fig=None,
+    style=None,
 ):
     """
     Creates a plot showing the slope geometry and input parameters.
@@ -1685,7 +1697,9 @@ def plot_inputs(
 
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
-    plot_base_geometry(ax, slope_data, labels=True)
+    from .style import resolve_style
+    style = resolve_style(style)
+    plot_base_geometry(ax, slope_data, labels=True, style=style)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data)
     if mode == "seep":

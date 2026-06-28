@@ -62,6 +62,7 @@ class ProjectDocument(QObject):
         self.slope_data = None
         self.path = None          # source .xlsx path (None until first save)
         self.results = {}         # cached analysis results (e.g. 'lem_solution')
+        self.style = {}           # sparse feature-style deltas (see xslope.style; §8a)
         self._dirty = False
         self._undo = []           # list of slope_data snapshots (deep copies)
         self._redo = []
@@ -86,11 +87,49 @@ class ProjectDocument(QObject):
         self.slope_data = load_slope_data(str(path))
         self.path = str(path)
         self.results.clear()
+        self.style = self._read_styles_sidecar(self.path)
         self._undo.clear()
         self._redo.clear()
         self._dirty = False
         self.loaded.emit()
         self.dirty_changed.emit(False)
+
+    # --- styles (per-project sidecar; §8a) -------------------------------
+    @staticmethod
+    def _styles_sidecar_path(xlsx_path):
+        import os
+        stem = os.path.splitext(str(xlsx_path))[0]
+        return stem + "_styles.json"
+
+    def _read_styles_sidecar(self, xlsx_path):
+        """Read `{stem}_styles.json` (sparse style deltas) next to the xlsx, or {}."""
+        import json
+        path = self._styles_sidecar_path(xlsx_path)
+        try:
+            with open(path) as fh:
+                data = json.load(fh)
+            return data if isinstance(data, dict) else {}
+        except (FileNotFoundError, ValueError):
+            return {}
+
+    def _write_styles_sidecar(self, xlsx_path):
+        """Write the project's style deltas to `{stem}_styles.json`; remove the file
+        when there are no deltas, so unstyled projects don't litter sidecars."""
+        import json
+        import os
+        path = self._styles_sidecar_path(xlsx_path)
+        if self.style:
+            with open(path, "w") as fh:
+                json.dump(self.style, fh, indent=2)
+        elif os.path.exists(path):
+            os.remove(path)
+
+    def set_style(self, style):
+        """Replace the project's style deltas (sparse, see xslope.style), mark dirty,
+        and trigger a re-render."""
+        self.style = style or {}
+        self._set_dirty(True)
+        self.changed.emit()
 
     def new(self):
         """Start a fresh, unsaved project from a minimal in-memory skeleton.
@@ -103,6 +142,7 @@ class ProjectDocument(QObject):
         self.slope_data = new_slope_data()
         self.path = None          # no source file until first Save As
         self.results.clear()
+        self.style = {}
         self._undo.clear()
         self._redo.clear()
         self._dirty = False
@@ -228,6 +268,7 @@ class ProjectDocument(QObject):
         self.slope_data = sd
         self.path = None
         self.results.clear()
+        self.style = {}
         self._undo.clear()
         self._redo.clear()
         self._dirty = True
@@ -291,4 +332,5 @@ class ProjectDocument(QObject):
             raise ValueError("No path to save to (use Save As).")
         save_slope_data_to_xlsx(self.slope_data, target, template=template)
         self.path = target
+        self._write_styles_sidecar(target)      # {stem}_styles.json (or remove if none)
         self._set_dirty(False)

@@ -158,13 +158,13 @@ class MplCanvas(QWidget):
         layout.addWidget(self.view)
 
     # --- rendering -------------------------------------------------------
-    def render_inputs(self, slope_data, mode="lem", opts=None):
+    def render_inputs(self, slope_data, mode="lem", opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_inputs(
             slope_data, fig=fig, mode=mode,
             mat_table=opts.get("mat_table", False),
             tab_loc=opts.get("tab_loc", "top"),
-            legend_ncol=opts.get("legend_ncol", "auto")))
+            legend_ncol=opts.get("legend_ncol", "auto"), style=style))
 
     def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None):
         opts = opts or {}

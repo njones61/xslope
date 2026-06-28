@@ -315,6 +315,8 @@ class MainWindow(QMainWindow):
         self.act_run = QAction("Run &LEM…", self, enabled=False, triggered=self.run_current)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
+        self.act_styles = QAction("&Styles…", self, enabled=False,
+                                  triggered=self.open_styles_dialog)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -335,6 +337,8 @@ class MainWindow(QMainWindow):
         m_edit = mb.addMenu("&Edit")
         m_edit.addAction(self.act_undo)
         m_edit.addAction(self.act_redo)
+        m_edit.addSeparator()
+        m_edit.addAction(self.act_styles)
 
         m_run = mb.addMenu("&Run")
         m_run.addAction(self.act_build_mesh)
@@ -367,6 +371,8 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_build_mesh)
         tb.addAction(self.act_run)
+        tb.addSeparator()
+        tb.addAction(self.act_styles)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
@@ -527,6 +533,7 @@ class MainWindow(QMainWindow):
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
         self.act_export_dxf.setEnabled(True)
+        self.act_styles.setEnabled(True)
         self.assistant.reset()        # new project -> fresh conversation
         self._clear_result_tabs()
         # Restore saved solutions first so the default mode can see whether an FEM
@@ -657,7 +664,8 @@ class MainWindow(QMainWindow):
         else:
             try:
                 self.canvas.render_inputs(sd, mode=self._mode,
-                                          opts=self.inputs_panel.options())
+                                          opts=self.inputs_panel.options(),
+                                          style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
         self.act_undo.setEnabled(self.doc.can_undo())
@@ -748,6 +756,28 @@ class MainWindow(QMainWindow):
         category = item.data(0, CATEGORY_ROLE)
         if category:
             self.edit_category(category)
+
+    def open_styles_dialog(self):
+        """Edit per-feature styles (plan §8a). Previews live on the canvas; OK keeps
+        the change (and marks dirty → written to {stem}_styles.json on Save), Cancel
+        restores the prior style."""
+        if not self.doc.is_open:
+            return
+        import copy as _copy
+        from .styles_dialog import StylesDialog
+        orig = _copy.deepcopy(self.doc.style)
+
+        def preview(style):
+            self.doc.style = style
+            self._render()
+
+        dlg = StylesDialog(self.doc.slope_data.get("materials") or [],
+                           self.doc.style, preview, self)
+        if dlg.exec():
+            self.doc.set_style(dlg.result())     # mark dirty + re-render
+        else:
+            self.doc.style = orig
+            self._render()
 
     def _on_canvas_pick(self, x, y, tol):
         """Open the editor for the input feature the user double-clicked on the

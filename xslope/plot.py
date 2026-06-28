@@ -1377,10 +1377,14 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
     # stress field: use only finite values and never divide by zero below.
     finite_neff = n_eff[np.isfinite(n_eff)]
     max_stress = float(np.max(np.abs(finite_neff))) if finite_neff.size else 1.0
-    if max_stress == 0:
-        max_stress = 1.0
     finite_u = u[np.isfinite(u)]
-    max_u = float(np.max(finite_u)) if finite_u.size else 1.0
+    max_u = float(np.max(np.abs(finite_u))) if finite_u.size else 1.0
+    # Scale BOTH the effective-stress and pore-pressure bars by a shared reference
+    # so neither overruns the plot. Using max_stress alone blows up the pore bars
+    # in rapid drawdown, where pore pressure ≫ the (tiny) effective normal stress.
+    ref = max(max_stress, max_u)
+    if ref == 0:
+        ref = 1.0
 
     for i, (index, row) in enumerate(slice_df.iterrows()):
         if i >= len(n_eff):
@@ -1407,7 +1411,7 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         ny = dx / length
 
         # --- Normal stress trapezoid ---
-        bar_len = (abs(stress) / max_stress) * max_bar_len
+        bar_len = (abs(stress) / ref) * max_bar_len
         direction = -np.sign(stress)
 
         x1_top = x1 + direction * bar_len * nx
@@ -1422,7 +1426,7 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
                 linewidth=1, gid='EFF_NORMAL_STRESS')
 
         # --- Pore pressure trapezoid ---
-        u_len = (pore / max_stress) * max_bar_len
+        u_len = (pore / ref) * max_bar_len
         u_dir = -1  # always into the base
 
         ux1_top = x1 + u_dir * u_len * nx

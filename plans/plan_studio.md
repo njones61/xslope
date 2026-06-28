@@ -19,7 +19,7 @@ and view results — without writing code or running a notebook.
 - Display results, including the two LEM display modes (search results vs. solution).
 - Zoom/pan/select on the main graphics canvas; double-click an input to edit it.
 - DXF import (to start a project) and DXF export (of the current display).
-- Optional "smart editing" so coincident features move together.
+- ~~Optional "smart editing" so coincident features move together.~~ (dropped — see Phase 6.)
 - Display-options dialog: per-feature visibility toggles + color/line-style/size.
 
 **Hard constraints**
@@ -146,7 +146,7 @@ The Explore of the codebase confirms a clean, callable API. Mapping of GUI actio
 - A dockable **Inputs panel** (tree or accordion) lists categories; selecting one opens its editor.
 - **Double-click on the canvas** maps the picked Matplotlib artist back to a `slope_data` object and opens the right editor (requires tagging artists with identifiers when rendering).
 - Edits validate, mutate `slope_data`, mark the document dirty, and trigger a re-render of affected layers.
-- **Smart editing (global toggle, later phase):** maintain a coincidence index so that moving a profile vertex also moves coincident dload/piezo/reinforcement/BC points. Implement as an opt-in pass over `slope_data` after a geometry edit.
+- ~~**Smart editing (global toggle, later phase):** maintain a coincidence index so that moving a profile vertex also moves coincident dload/piezo/reinforcement/BC points.~~ **Dropped** (see Phase 6) — separate feature, presupposes interactive geometry dragging not planned.
 
 ---
 
@@ -307,14 +307,21 @@ studio/                # XSlope Studio desktop app
 - ⬜ Style persistence (§8a): factory/global/project 3-tier resolve+merge, `{stem}_style.json` sidecar I/O, "Set as default" / "Reset to factory" actions.
 - ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
 
-**Phase 6 — DXF + Smart editing + polish** 🚧 **PARTIAL**
+**Phase 6 — DXF + polish** 🚧 **PARTIAL**
 - ✅ **DXF export** — offered on each view's Save button (export current view).
 - ✅ **DXF import** — File → Import DXF brings polygons into the live document.
-- ⬜ DXF import *wizard* (layer→material mapping); optional coincident smart-editing; full undo/redo coverage.
+- ⬜ **DXF import wizard** (layer→material mapping): a dialog after reading the DXF to map/merge layers to materials, exclude non-zone layers (annotations/dimensions), and set material order — instead of the current blind first-appearance auto-map.
+- ⬜ Full undo/redo coverage (audit every mutation path; decide derived-result/mesh policy on undo).
+- ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
 
 **Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
 - ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
 - ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
+
+**Phase 8 — Documentation** ⬜ **NOT STARTED**
+- ⬜ User documentation for XSlope Studio in the existing mkdocs site: install/launch, the Inputs view + editors, double-click-to-edit, running LEM/Seep/FEM, the result views and Display options, image/DXF export, and the AI assistant.
+- ⬜ Screenshots / short walkthroughs of a full workflow (open → edit → mesh → solve → view).
+- ⬜ Keep it in sync as features land (the docs site is already built via `mkdocs`).
 
 ---
 
@@ -343,7 +350,6 @@ Nothing blocking remains; detail-level choices (icon/branding, menu layout) sett
 - **Long solves blocking the UI** — must run on worker threads from the start; FEM/SSRM also need cancellation.
 - **Restyling existing plots** — the hardcoded styles in `plot_*` mean Display Options needs either added style kwargs or a GUI-side renderer; scope carefully.
 - **Packaging heavy deps** — gmsh (FEM) and the scientific stack inflate installer size and complicate signing.
-- **Coincident smart-editing** — genuinely tricky geometry bookkeeping; keep it opt-in and late.
 ```
 
 ---
@@ -551,3 +557,32 @@ set up for the template.
 5. **Scope of "edit"** — the agent **populates / mutates the live `slope_data`
    document** (rendered live, persisted via Save As); file write + reload is a
    secondary path, not the primary one (see §14.2).
+
+---
+
+## 15. Exploration: importing from other LEM packages (not scoped)
+
+Beyond DXF, a high-value direction is **importing problems from other slope-stability
+software** — GeoStudio **SLOPE/W**, Rocscience **Slide2**, and similar — mapping their
+geometry, materials, piezometric/water conditions, and (where sensible) failure
+surfaces onto `slope_data`, the same target the DXF importer and Studio assistant
+already populate. This would let users bring existing models into XSlope without
+re-drawing them.
+
+**Unknowns to resolve first (this is exploration, not a committed feature):**
+- **File formats & docs.** What does each package's native file look like, and is the
+  format documented or reverse-engineerable? Some are XML-ish or text; others are
+  opaque/binary or project bundles. SLOPE/W (`.gsz` — a zipped XML project) and Slide
+  are the obvious first targets to investigate.
+- **Sample files.** We need a corpus of real `.gsz` / Slide files (ideally with known
+  answers) to develop and regression-test an importer.
+- **Semantic mapping.** Their material models, pore-pressure definitions (Ru, piezo
+  lines, pressure grids), and surface conventions don't map 1:1 onto `slope_data`;
+  scope what's faithfully importable vs. flagged-for-review.
+- **Per-importer module.** Likely one `xslope` importer per format (engine-side, so
+  notebooks benefit too), surfaced in Studio as File → Import → <format>, each
+  returning a populated `slope_data` + a list of caveats — mirroring the DXF path.
+
+Next step is a **feasibility spike**: collect format documentation and a few sample
+files per package, then prototype a parser for the most tractable one (likely
+SLOPE/W's zipped XML) to see how cleanly its geometry/materials map across.

@@ -586,3 +586,26 @@ re-drawing them.
 Next step is a **feasibility spike**: collect format documentation and a few sample
 files per package, then prototype a parser for the most tractable one (likely
 SLOPE/W's zipped XML) to see how cleanly its geometry/materials map across.
+
+**Findings from an initial scout (2026-06-27):**
+- **SLOPE/W `.gsz` is the strong first target — confirmed parseable.** A `.gsz` is a
+  ZIP holding the model as plain XML (`GSIData` root) + a `mesh_*.ply` + result CSVs.
+  The XML maps closely onto `slope_data`: `<Geometries>` → **Points** `(X,Y)` / **Lines**
+  / **Regions** (material zones → `polygons` + `mat_id`); `<Materials>` → `<Material>`
+  (strength/hydraulic) → `materials`; `<WaterItems>` → pore-pressure/piezo;
+  `<StabilityItems>` → slip surfaces; `<Analyses>` → analysis defs. (Verified by
+  unzipping `Rapid drawdown.gsz` and walking the XML.)
+- **Reference implementation:** [PyGeoStudio](https://github.com/MoiseRousseau/PyGeoStudio)
+  — a Python `.gsz` reader/writer to study (or depend on). ⚠️ **No LICENSE file** as of
+  the scout — check rights before reusing its code or redistributing its samples.
+- **Sample files:** PyGeoStudio's `examples/GeoStudio_files/` has 5 real `.gsz` files,
+  incl. `Rapid drawdown.gsz` and `Reinforcement with Anchors.gsz` (both relevant here).
+  Official GeoStudio examples (Seequent/GeoSlope) exist but sit behind a Seequent-ID
+  login. ⚠️ These are Seequent's example files — keep them in a **git-ignored** dev
+  folder, don't commit, until licensing is clear.
+- **Slide2 `.slmd`:** harder — samples ship with the install
+  (`C:\Users\Public\Documents\Rocscience\Slide2 Examples`), not freely downloadable;
+  format undocumented/proprietary. Notably Slide2 *imports* SLOPE/W `.gsz`, reinforcing
+  `.gsz` as the de-facto interchange format and first target.
+- **Recommendation:** start with `.gsz` → `slope_data` (Regions→polygons, Materials,
+  WaterItems), using PyGeoStudio's samples + parser as the reference for a spike.

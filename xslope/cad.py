@@ -241,6 +241,97 @@ def read_dxf_polygons(dxf_path, arc_sag=0.05):
     return polygons, warnings
 
 
+# Feature targets a DXF layer can be mapped onto by the import wizard.
+DXF_TARGETS = ('material_zone', 'profile', 'piezo', 'dload', 'reinforce',
+               'circles', 'ignore')
+
+
+def suggest_dxf_target(layer_name, geom):
+    """Default import target for a DXF layer — a *suggestion* only (the user can
+    override in the wizard). Seeds from xslope's own export layer names when they
+    match (so re-importing an xslope DXF auto-fills), else from the geometry kind.
+    Never assumes the feature purely from an arbitrary CAD layer name."""
+    up = (layer_name or '').strip().upper()
+    if up.startswith('PROFILE_'):
+        return 'profile'
+    by_name = {'PIEZO': 'piezo', 'DLOADS': 'dload', 'REINFORCEMENT': 'reinforce',
+               'SEARCH_CIRCLES': 'circles', 'CIRCLES': 'circles'}
+    if up in by_name:
+        return by_name[up]
+    if up in RESERVED_LAYERS:        # other xslope feature layers (SLICES, MESH…)
+        return 'ignore'
+    # Unknown (external CAD) layer: closed rings look like material zones.
+    if geom.get('closed') or geom.get('lines'):
+        return 'material_zone'
+    return 'ignore'
+
+
+def read_dxf_layers(dxf_path, arc_sag=0.05):
+    """Read a DXF and group ALL geometry by layer, classified by kind — for the
+    feature-aware importer.
+
+    Unlike ``read_dxf_polygons`` (closed zones only), this keeps open polylines,
+    loose line segments, circles, and points too, so a caller can map each layer
+    onto any xslope input feature (material zone, profile line, piezo line,
+    distributed load, reinforcement, failure circle) rather than assuming the
+    feature from the layer name.
+
+    Returns ``(layers, warnings)`` where ``layers`` is a dict in first-appearance
+    order: ``layer -> {'closed': [coords…], 'open': [coords…], 'lines':
+    [((x1,y1),(x2,y2))…], 'circles': [(cx,cy,r)…], 'points': [(x,y)…]}``.
+    """
+    doc = ezdxf.readfile(dxf_path)
+    msp = doc.modelspace()
+    layers = {}
+    warnings = []
+
+    def lay(name):
+        return layers.setdefault(name, {'closed': [], 'open': [], 'lines': [],
+                                        'circles': [], 'points': []})
+
+    for e in msp.query('LWPOLYLINE POLYLINE'):
+        coords = _dedupe_closing_vertex(_entity_coords(e, arc_sag))
+        if len(coords) < 2:
+            continue
+        d = lay(e.dxf.layer)
+        (d['closed'] if _entity_is_closed(e) else d['open']).append(coords)
+    for e in msp.query('LINE'):
+        lay(e.dxf.layer)['lines'].append(
+            ((e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)))
+    for e in msp.query('CIRCLE'):
+        lay(e.dxf.layer)['circles'].append(
+            (e.dxf.center.x, e.dxf.center.y, e.dxf.radius))
+    for e in msp.query('ARC'):           # tessellate to an open polyline (circle fit)
+        try:
+            pts = [(v.x, v.y) for v in ezpath.make_path(e).flattening(arc_sag)]
+            if len(pts) >= 2:
+                lay(e.dxf.layer)['open'].append(pts)
+        except Exception:
+            pass
+    for e in msp.query('POINT'):
+        lay(e.dxf.layer)['points'].append((e.dxf.location.x, e.dxf.location.y))
+    return layers, warnings
+
+
+def fit_circle(center, arcs):
+    """Recover a circle radius for a center point from nearby arc polylines (how
+    export_dxf writes a search circle: a clipped arc polyline + a center POINT).
+    Returns the mean distance from `center` to the vertices of the nearest arc, or
+    None if there are no arcs."""
+    import math
+    cx, cy = center
+    best = None
+    for arc in arcs:
+        if not arc:
+            continue
+        ds = [math.hypot(x - cx, y - cy) for x, y in arc]
+        r = sum(ds) / len(ds)
+        spread = max(ds) - min(ds)
+        if best is None or spread < best[1]:
+            best = (r, spread)
+    return best[0] if best else None
+
+
 def dxf_to_polygons(dxf_path, layers=None, arc_sag=0.05):
     """Read material-zone polygons from a DXF (the import primitive).
 

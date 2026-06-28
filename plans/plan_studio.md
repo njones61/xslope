@@ -308,9 +308,9 @@ studio/                # XSlope Studio desktop app
 - ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
 
 **Phase 6 — DXF + polish** 🚧 **PARTIAL**
-- ✅ **DXF export** — offered on each view's Save button (export current view).
-- ✅ **DXF import** — File → Import DXF brings polygons into the live document.
-- ✅ **DXF import wizard** (layer→material mapping) — `DxfImportDialog` (`studio/dialogs.py`) lists each DXF layer with its polygon count and lets the user include/exclude it and name the material it becomes (same name on two layers → merge; material order follows first-appearance of names). Import is split engine-side into `read_dxf` (no mutation) → wizard → `build_from_dxf(polygons, layer→material)` on the document, replacing the blind first-appearance auto-map.
+- ✅ **DXF export (view)** — the per-view Save button exports the *rendered* figure to DXF (`axes_to_dxf`); good for CAD viewing, lossy (a poor re-import source).
+- ✅ **DXF export (geometry)** — File → Export Geometry (DXF) writes the structured `export_dxf`: material zones on per-material layers, profile lines / circles / reinforcement / dloads / piezo on reserved feature layers. The clean companion the importer reads.
+- ✅ **Feature-aware DXF import wizard** — `read_dxf_layers` (engine) classifies all geometry per layer (closed/open polylines, lines, circles, points); `DxfImportDialog` lets the user map **each layer to an input feature** — material zone, profile line, piezo, distributed load, reinforcement, failure circles, or ignore — with a Material column for zone/profile. Defaults are *seeded* from xslope's own export layer names and the geometry kind but never assumed from arbitrary CAD names, so externally-drawn DXFs map too. `build_from_dxf_mapping` (document) routes geometry into the features and resyncs; non-geometric properties (load magnitudes, reinforcement strengths, material props, circle depth) come in as editable placeholders. Circle radius is fit from the exported arc; profile-based if any profile layer, else polygon-based.
 - ⬜ Full undo/redo coverage (audit every mutation path; decide derived-result/mesh policy on undo).
 - ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
 

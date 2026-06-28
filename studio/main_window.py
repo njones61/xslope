@@ -417,11 +417,12 @@ class MainWindow(QMainWindow):
         self._add_recent(path)
 
     def import_dxf_dialog(self):
-        """Import material-zone polygons from a DXF into a fresh project. Replaces
-        the current project (confirm discard first, like Open). A wizard maps each
-        DXF layer to a material (merge/exclude/rename); the result populates
-        polygons + placeholder materials, left unsaved so the user fills in
-        properties / a failure surface and then Save As."""
+        """Import a DXF into a fresh project (confirm discard first, like Open). A
+        wizard maps each DXF layer to an input feature — material zone, profile
+        line, piezo line, distributed load, reinforcement, failure circles, or
+        ignore. Geometry populates the features; non-geometric properties come in
+        as editable placeholders. Left unsaved so the user fills those in and
+        Saves As."""
         if not self._confirm_discard():
             return
         start = os.path.dirname(self._recent[0]) if self._recent else ""
@@ -430,7 +431,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            polygons, warnings = self.doc.read_dxf(path)
+            layers, warnings = self.doc.read_dxf_layers(path)
         except ImportError:
             traceback.print_exc()
             QMessageBox.critical(
@@ -445,34 +446,30 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Could not import DXF",
                                  f"{os.path.basename(path)}:\n\n{exc}")
             return
-        # Unique layers (first-appearance order) with their polygon counts.
-        counts = {}
-        for p in polygons:
-            counts[p["layer"]] = counts.get(p["layer"], 0) + 1
-        layers = list(counts.items())
-        wizard = DxfImportDialog(layers, self)
+        from xslope.cad import suggest_dxf_target
+        wizard = DxfImportDialog(layers, suggest_dxf_target, self)
         if not wizard.exec():
             return
         try:
-            self.doc.build_from_dxf(polygons, wizard.result())  # emits loaded -> render
+            notes = self.doc.build_from_dxf_mapping(layers, wizard.result())
         except Exception as exc:
             traceback.print_exc()
             QMessageBox.critical(self, "Could not import DXF",
                                  f"{os.path.basename(path)}:\n\n{exc}")
             return
-        n_poly = len(self.doc.slope_data.get("polygons", []))
-        n_mat = len(self.doc.slope_data.get("materials", []))
+        d = self.doc.slope_data
         for w in warnings:                         # surface to the Log pane
             print(f"DXF import warning: {w}")
         self.statusBar().showMessage(
-            f"Imported {os.path.basename(path)} — {n_poly} polygon(s), {n_mat} "
-            f"material(s). Fill in material properties and a failure surface, "
-            f"then Save As.")
-        if warnings:
-            QMessageBox.warning(
-                self, "DXF imported with warnings",
-                "The DXF was imported, but with notes:\n\n• " +
-                "\n• ".join(warnings) +
+            f"Imported {os.path.basename(path)} — "
+            f"{len(d.get('materials') or [])} material(s), "
+            f"{len(d.get('profile_lines') or d.get('polygons') or [])} geometry item(s), "
+            f"{len(d.get('circles') or [])} circle(s). Fill in properties, then Save As.")
+        allnotes = list(notes) + list(warnings)
+        if allnotes:
+            QMessageBox.information(
+                self, "DXF imported",
+                "Imported with notes:\n\n• " + "\n• ".join(allnotes) +
                 "\n\nSee the Log pane for details.")
 
     def export_dxf_dialog(self):

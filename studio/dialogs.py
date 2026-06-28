@@ -379,63 +379,115 @@ class RunLemDialog(QDialog):
         }
 
 
-class DxfImportDialog(QDialog):
-    """Layer→material mapping wizard for DXF import.
+# Import targets shown in the wizard (label, cad.DXF_TARGETS key). "Ignore" first
+# so it's the obvious skip; "Material zone"/"Profile line" use the material column.
+_DXF_TARGET_CHOICES = [
+    ("Ignore", "ignore"),
+    ("Material zone", "material_zone"),
+    ("Profile line", "profile"),
+    ("Piezometric line", "piezo"),
+    ("Distributed load", "dload"),
+    ("Reinforcement", "reinforce"),
+    ("Failure circles", "circles"),
+]
+_MATERIAL_TARGETS = ("material_zone", "profile")
 
-    Lists each DXF layer (with its polygon count) and lets the user include or
-    exclude it and name the material it becomes. Giving two layers the same
-    material name MERGES them into one zone; materials are created in the order
-    their names first appear. ``result()`` returns ``{layer: material_name|None}``
-    (None = excluded), suitable for ``ProjectDocument.build_from_dxf``.
+
+def _dxf_layer_summary(geom):
+    """One-line description of a layer's geometry for the wizard."""
+    bits = []
+    for key, noun in (("closed", "zone"), ("open", "polyline"),
+                      ("lines", "line"), ("circles", "circle"), ("points", "point")):
+        n = len(geom.get(key) or [])
+        if n:
+            bits.append(f"{n} {noun}{'s' if n != 1 else ''}")
+    return ", ".join(bits) or "(empty)"
+
+
+class DxfImportDialog(QDialog):
+    """Feature-aware DXF import wizard: map each layer to an xslope input feature.
+
+    For every DXF layer the user picks a target (material zone, profile line,
+    piezo line, distributed load, reinforcement, failure circles, or ignore) and,
+    for material-zone / profile layers, the material it belongs to (same name →
+    merge). Defaults are seeded from xslope's own export layer names and the
+    geometry kind, but the user can override anything — so a DXF drawn in external
+    CAD with arbitrary layer names maps just as well. ``result()`` returns
+    ``{layer: {'target': key, 'material': name|None}}`` for
+    ``ProjectDocument.build_from_dxf_mapping``.
     """
 
-    def __init__(self, layers, parent=None):
-        # layers: list of (layer_name, polygon_count) in first-appearance order.
+    def __init__(self, layers, suggest, parent=None):
+        # layers: dict {name: geom} from read_dxf_layers (first-appearance order).
+        # suggest: callable(name, geom) -> default target key (cad.suggest_dxf_target).
         super().__init__(parent)
-        self.setWindowTitle("Import DXF — map layers to materials")
-        self.resize(560, 420)
+        self.setWindowTitle("Import DXF — map layers to features")
+        self.resize(680, 460)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
-            "Choose which DXF layers to import and the material each becomes.\n"
-            "• Uncheck a layer to skip it (annotations, dimensions, …).\n"
-            "• Give two layers the same material name to merge them.\n"
-            "Material order follows the first appearance of each name."))
+            "Map each DXF layer to an input feature (or Ignore).\n"
+            "• Material zone / Profile line use the Material column (same name → merge).\n"
+            "• Loads, reinforcement and circles import geometry only — set magnitudes "
+            "and strengths in the editors afterward."))
 
-        self.table = QTableWidget(len(layers), 3, self)
-        self.table.setHorizontalHeaderLabels(["Import — layer", "Polygons", "Material"])
+        self.table = QTableWidget(len(layers), 4, self)
+        self.table.setHorizontalHeaderLabels(["Layer", "Contents", "Import as", "Material"])
         self.table.verticalHeader().setVisible(False)
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        hh.setSectionResizeMode(2, QHeaderView.Stretch)
-        for row, (name, count) in enumerate(layers):
-            chk = QTableWidgetItem(name)
-            chk.setFlags((chk.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable)
-            chk.setCheckState(Qt.Checked)
-            chk.setData(Qt.UserRole, name)            # keep the raw layer name
-            self.table.setItem(row, 0, chk)
-            cnt = QTableWidgetItem(str(count))
-            cnt.setFlags(cnt.flags() & ~Qt.ItemIsEditable)
-            self.table.setItem(row, 1, cnt)
-            self.table.setItem(row, 2, QTableWidgetItem(name))   # default = layer name
-        layout.addWidget(self.table, 1)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(3, QHeaderView.Stretch)
 
+        self._rows = []   # (layer_name, target_combo, material_edit)
+        for row, (name, geom) in enumerate(layers.items()):
+            lyr = QTableWidgetItem(name)
+            lyr.setFlags(lyr.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(row, 0, lyr)
+            cont = QTableWidgetItem(_dxf_layer_summary(geom))
+            cont.setFlags(cont.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(row, 1, cont)
+
+            combo = QComboBox()
+            for label, key in _DXF_TARGET_CHOICES:
+                combo.addItem(label, key)
+            default = suggest(name, geom)
+            di = combo.findData(default)
+            combo.setCurrentIndex(di if di >= 0 else 0)
+            self.table.setCellWidget(row, 2, combo)
+
+            # Material defaults to the layer name (PROFILE_ prefix stripped).
+            mat_default = name[8:] if name.upper().startswith("PROFILE_") else name
+            edit = QTableWidgetItem(mat_default)
+            self.table.setItem(row, 3, edit)
+
+            combo.currentIndexChanged.connect(
+                lambda _i, r=row: self._sync_material_enabled(r))
+            self._rows.append((name, combo, edit))
+            self._sync_material_enabled(row)
+
+        layout.addWidget(self.table, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+    def _sync_material_enabled(self, row):
+        """Grey out the Material cell unless the target uses it (zone / profile)."""
+        _, combo, edit = self._rows[row]
+        uses_mat = combo.currentData() in _MATERIAL_TARGETS
+        flags = edit.flags()
+        edit.setFlags((flags | Qt.ItemIsEditable | Qt.ItemIsEnabled) if uses_mat
+                      else (flags & ~Qt.ItemIsEditable & ~Qt.ItemIsEnabled))
+
     def result(self):
-        """{layer_name: material_name or None}. Excluded (unchecked) or blank-named
-        rows map to None. A blank material name on an included row falls back to the
-        layer name, so a checked layer is never silently dropped."""
+        """{layer: {'target': key, 'material': name|None}}. Material is the column
+        text for zone/profile targets (falling back to the layer name), else None."""
         out = {}
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, 0)
-            layer = item.data(Qt.UserRole)
-            if item.checkState() != Qt.Checked:
-                out[layer] = None
-                continue
-            mat = (self.table.item(row, 2).text() or "").strip()
-            out[layer] = mat or layer
+        for name, combo, edit in self._rows:
+            target = combo.currentData()
+            mat = None
+            if target in _MATERIAL_TARGETS:
+                mat = (edit.text() or "").strip() or name
+            out[name] = {"target": target, "material": mat}
         return out

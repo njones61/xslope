@@ -109,72 +109,128 @@ class ProjectDocument(QObject):
         self.loaded.emit()
         self.dirty_changed.emit(False)
 
-    def read_dxf(self, dxf_path):
-        """Read material-zone polygons from a DXF WITHOUT mutating the project.
+    def read_dxf_layers(self, dxf_path):
+        """Read ALL geometry from a DXF, grouped/classified by layer, without
+        mutating the project (the engine's ``read_dxf_layers``). The feature-aware
+        import wizard uses this to show each layer, collect a target mapping, then
+        call ``build_from_dxf_mapping``."""
+        from xslope.cad import read_dxf_layers
+        layers, warnings = read_dxf_layers(str(dxf_path))
+        if not layers:
+            raise ValueError("No geometry found in the DXF.")
+        return layers, warnings
 
-        Returns ``(polygons, warnings)`` where polygons is a list of
-        ``{'layer', 'coords'}`` (the engine's ``dxf_to_polygons``). The import
-        wizard uses this to show the layers, collect a layer→material mapping,
-        and then call ``build_from_dxf``."""
-        from xslope.cad import dxf_to_polygons
-        polygons, warnings = dxf_to_polygons(str(dxf_path))
-        if not polygons:
-            raise ValueError(
-                "No material-zone polygons found in the DXF. Import reads closed "
-                "polygons as material zones; xslope's own DXF export holds feature "
-                "layers (profile lines, circles, loads…), not zones — to reopen a "
-                "saved model use File → Open on its .xlsx instead.")
-        return polygons, warnings
+    def build_from_dxf_mapping(self, layers, mapping):
+        """Build a fresh project from classified DXF layers under a per-layer
+        mapping. ``layers`` is ``read_dxf_layers`` output; ``mapping`` maps each
+        layer name to ``{'target': one of cad.DXF_TARGETS, 'material': name|None}``.
 
-    def build_from_dxf(self, polygons, layer_to_material):
-        """Start a fresh project from DXF polygons under an explicit mapping.
-
-        ``layer_to_material`` maps each DXF layer name → a material name (give two
-        layers the same name to MERGE them into one zone), or a falsy value to
-        EXCLUDE that layer. Materials are created in first-appearance order of the
-        distinct names. Populates ``polygons``/``materials`` and rebuilds the
-        derived geometry (ground surface, domain, t-crack) like the polygon
-        editor. REPLACES the current project (callers confirm discard first); the
-        result is unsaved (no path → Save As). A DXF carries no failure surface or
-        material properties, so the user fills those in through the editors."""
-        from shapely.geometry import Polygon
+        Each layer's geometry is routed to the chosen input feature; non-geometric
+        properties (load magnitudes, reinforcement strengths, material properties,
+        circle depth) come in as editable placeholders. Profile-based if any layer
+        maps to a profile line, else polygon-based. REPLACES the current project
+        (callers confirm discard); result is unsaved. Returns caveat strings."""
+        from xslope.cad import fit_circle, _stitch_lines
+        from xslope.fileio import build_reinforce_lines
         from studio.editors import _resync_geometry
 
-        names = []                        # distinct material names, first-appearance
-        for p in polygons:
-            nm = layer_to_material.get(p["layer"])
-            if nm and nm not in names:
-                names.append(nm)
-        if not names:
-            raise ValueError("No layers selected for import.")
-        name_to_idx = {nm: i for i, nm in enumerate(names)}
-
+        notes = []
         sd = new_slope_data()
-        sd["materials"] = [_blank_material(nm) for nm in names]
-        sd["polygons"] = [{"polygon": Polygon(p["coords"]),
-                           "mat_id": name_to_idx[layer_to_material[p["layer"]]]}
-                          for p in polygons if layer_to_material.get(p["layer"])]
-        _resync_geometry(sd)              # ground surface / domain / t-crack
+
+        names = []                        # materials used by zone/profile mappings
+        for m in mapping.values():
+            if m.get("target") in ("material_zone", "profile") and m.get("material"):
+                if m["material"] not in names:
+                    names.append(m["material"])
+        name_to_idx = {n: i for i, n in enumerate(names)}
+        sd["materials"] = [_blank_material(n) for n in names]
+
+        profile_lines, polygons, piezo_polylines = [], [], []
+        reinforcement_lines, dload_blocks, circles = [], [], []
+        placeholder = False
+
+        for lyr, geom in layers.items():
+            t = (mapping.get(lyr) or {}).get("target", "ignore")
+            if t == "ignore":
+                continue
+            mid = name_to_idx.get((mapping.get(lyr) or {}).get("material"), 0)
+            if t == "material_zone":
+                for coords in geom["closed"] + geom["open"]:   # open rings force-close
+                    if len(coords) >= 3:
+                        polygons.append({"coords": list(coords), "mat_id": mid})
+                rings, _ = _stitch_lines(geom["lines"]) if geom["lines"] else ([], 0)
+                polygons += [{"coords": r, "mat_id": mid} for r in rings if len(r) >= 3]
+            elif t == "profile":
+                for coords in geom["open"] + geom["closed"]:
+                    if len(coords) >= 2:
+                        profile_lines.append({"coords": list(coords), "mat_id": mid})
+            elif t == "piezo":
+                piezo_polylines += [c for c in geom["open"] + geom["closed"] if len(c) >= 2]
+            elif t == "dload":
+                for coords in geom["open"] + geom["closed"]:
+                    if len(coords) >= 2:
+                        dload_blocks.append([{"X": x, "Y": y, "Normal": 0.0} for x, y in coords])
+                        placeholder = True
+            elif t == "reinforce":
+                segs = list(geom["lines"])
+                for coords in geom["open"]:
+                    segs += list(zip(coords[:-1], coords[1:]))
+                for a, b in segs:
+                    reinforcement_lines.append(
+                        {"x1": a[0], "y1": a[1], "x2": b[0], "y2": b[1], "t_max": 0.0,
+                         "t_res": 0.0, "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0})
+                placeholder = placeholder or bool(segs)
+            elif t == "circles":
+                for cx, cy, r in geom["circles"]:
+                    circles.append({"Xo": cx, "Yo": cy, "R": r, "Depth": 0.0})
+                for pt in geom["points"]:
+                    r = fit_circle(pt, geom["open"])
+                    if r:
+                        circles.append({"Xo": pt[0], "Yo": pt[1], "R": r, "Depth": 0.0})
+                    else:
+                        notes.append(f"circle center on layer '{lyr}' had no arc to "
+                                     "size its radius — skipped")
+
+        if not (profile_lines or polygons or piezo_polylines or dload_blocks
+                or reinforcement_lines or circles):
+            raise ValueError("Nothing selected to import (all layers set to Ignore).")
+
+        if profile_lines:
+            sd["profile_lines"] = profile_lines
+            if polygons:
+                notes.append("both profile lines and material zones were mapped; used "
+                             "the profile lines (zones are derived from them)")
+        elif polygons:
+            sd["polygons"] = polygons          # coords form; _resync normalizes
+        if piezo_polylines:
+            sd["piezo_line"] = [tuple(p) for p in piezo_polylines[0]]
+            if len(piezo_polylines) > 1:
+                sd["piezo_line2"] = [tuple(p) for p in piezo_polylines[1]]
+            if len(piezo_polylines) > 2:
+                notes.append(f"{len(piezo_polylines) - 2} extra piezo polyline(s) ignored (max 2)")
+        if dload_blocks:
+            sd["dloads"] = dload_blocks
+        if reinforcement_lines:
+            sd["reinforcement_lines"] = reinforcement_lines
+            sd["reinforce_lines"] = build_reinforce_lines(reinforcement_lines)
+        if circles:
+            sd["circles"] = circles
+            sd["circular"] = True
+        if placeholder:
+            notes.append("distributed-load magnitudes and reinforcement strengths "
+                         "imported as 0 — set them in the editors")
+
+        _resync_geometry(sd)               # ground surface / domain / t-crack
 
         self.slope_data = sd
-        self.path = None                  # an import is a new, unsaved project
+        self.path = None
         self.results.clear()
         self._undo.clear()
         self._redo.clear()
         self._dirty = True
         self.loaded.emit()
         self.dirty_changed.emit(True)
-
-    def import_dxf(self, dxf_path):
-        """Convenience: read + build with the default mapping (one material per
-        layer, named after the layer). Kept for callers that skip the wizard."""
-        polygons, warnings = self.read_dxf(dxf_path)
-        layers = []
-        for p in polygons:
-            if p["layer"] not in layers:
-                layers.append(p["layer"])
-        self.build_from_dxf(polygons, {lyr: lyr for lyr in layers})
-        return warnings
+        return notes
 
     # --- editing / snapshot undo ----------------------------------------
     def begin_edit(self):

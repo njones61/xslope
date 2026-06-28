@@ -34,12 +34,16 @@ def _line_dist(pt, points):
         return float("inf")
 
 
-def pick_category(slope_data, x, y, tol):
+def pick_category(slope_data, x, y, tol, mode=None):
     """Return ``(category, index)`` for the input feature nearest to (x, y) within
     `tol` data units, or None. `index` is the feature's position in its list (so
     the editor can pre-highlight it); it's None when not meaningful. Geometry that
     isn't editable for this project type (e.g. polygons on a profile-based file) is
-    simply not offered."""
+    simply not offered.
+
+    `mode` ('lem'/'seep'/'fem') matches the picks to what the Inputs plot actually
+    draws: seepage BCs only in seep mode, distributed loads only outside it (the
+    two otherwise overlap along the surface). None includes everything."""
     d = slope_data
     pt = Point(x, y)
     cands = []  # (distance, category, index)
@@ -48,8 +52,15 @@ def pick_category(slope_data, x, y, tol):
         cands.append((_line_dist(pt, [(p["x1"], p["y1"]), (p["x2"], p["y2"])]), "piles", i))
     for i, r in enumerate(d.get("reinforcement_lines") or []):
         cands.append((_line_dist(pt, [(r["x1"], r["y1"]), (r["x2"], r["y2"])]), "reinforce", i))
-    for i, line in enumerate(d.get("dloads") or []):
-        cands.append((_line_dist(pt, line), "dloads", i))
+    if mode != "seep":
+        for i, line in enumerate(d.get("dloads") or []):
+            cands.append((_line_dist(pt, line), "dloads", i))
+    if mode is None or mode == "seep":
+        for key in ("seepage_bc", "seepage_bc2"):
+            bc = d.get(key) or {}
+            for sh in bc.get("specified_heads") or []:
+                cands.append((_line_dist(pt, sh.get("coords") or []), "seep_bc", None))
+            cands.append((_line_dist(pt, bc.get("exit_face") or []), "seep_bc", None))
     for key in ("piezo_line", "piezo_line2"):
         cands.append((_line_dist(pt, d.get(key) or []), "piezo", None))
     for i, c in enumerate(d.get("circles") or []):

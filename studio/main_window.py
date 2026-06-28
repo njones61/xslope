@@ -695,7 +695,7 @@ class MainWindow(QMainWindow):
         if not self.doc.is_open:
             return
         from .picking import pick_category
-        hit = pick_category(self.doc.slope_data, x, y, max(tol, 1e-9))
+        hit = pick_category(self.doc.slope_data, x, y, max(tol, 1e-9), mode=self._mode)
         if hit:
             category, index = hit
             self.edit_category(category, select=index)

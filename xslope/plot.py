@@ -269,10 +269,12 @@ def plot_max_depth(ax, profile_lines, max_depth, style=None):
     fs = feature_style(resolve_style(style), "max_depth")
     color = fs.get("color", "black")
     lw = fs.get("linewidth", 1.5)
+    ls = fs.get("linestyle", "-")
     x_vals = [x for line in profile_lines for x, _ in line['coords']]
     x_min = min(x_vals)
     x_max = max(x_vals)
-    ax.hlines(max_depth, x_min, x_max, colors=color, linewidth=lw, label='Max Depth', gid='MAX_DEPTH')
+    ax.hlines(max_depth, x_min, x_max, colors=color, linewidth=lw, linestyles=ls,
+              label='Max Depth', gid='MAX_DEPTH')
 
     x_diff = x_max - x_min
     spacing = x_diff / 100
@@ -320,12 +322,13 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth', style=None):
     fs = feature_style(resolve_style(style), "max_depth")
     color = fs.get("color", "black")
     lw = fs.get("linewidth", 1.5)
+    ls = fs.get("linestyle", "-")
     base = _domain_lower_envelope(domain_polygon)
     if len(base) < 2:
         return
     bx = np.array([p[0] for p in base])
     by = np.array([p[1] for p in base])
-    ax.plot(bx, by, color=color, linewidth=lw, label=label, gid='MAX_DEPTH')
+    ax.plot(bx, by, color=color, linewidth=lw, linestyle=ls, label=label, gid='MAX_DEPTH')
 
     x_min, x_max = bx[0], bx[-1]
     x_diff = x_max - x_min
@@ -457,13 +460,14 @@ def plot_piezo_line(ax, slope_data, style=None):
         trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
         ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
 
-    def plot_single_piezo_line(ax, piezo_line, color, label, linewidth=2):
+    def plot_single_piezo_line(ax, piezo_line, color, label, linewidth=2, linestyle='-'):
         """Internal function to plot a single piezometric line"""
         if not piezo_line:
             return
 
         piezo_xs, piezo_ys = zip(*piezo_line)
-        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=linewidth, label=label, gid='PIEZO')
+        ax.plot(piezo_xs, piezo_ys, color=color, linewidth=linewidth,
+                linestyle=linestyle, label=label, gid='PIEZO')
         
         # Find middle x-coordinate and corresponding y value
         if len(piezo_xs) > 1:
@@ -480,9 +484,9 @@ def plot_piezo_line(ax, slope_data, style=None):
     f1 = feature_style(style, "piezo_line")
     f2 = feature_style(style, "piezo_line2")
     plot_single_piezo_line(ax, slope_data.get('piezo_line'), f1.get('color', 'b'),
-                           "Piezometric Line", f1.get('linewidth', 2))
+                           "Piezometric Line", f1.get('linewidth', 2), f1.get('linestyle', '-'))
     plot_single_piezo_line(ax, slope_data.get('piezo_line2'), f2.get('color', 'skyblue'),
-                           "Piezometric Line 2", f2.get('linewidth', 2))
+                           "Piezometric Line 2", f2.get('linewidth', 2), f2.get('linestyle', '-'))
 
 def plot_seepage_bc_lines(ax, slope_data):
     """
@@ -1729,7 +1733,8 @@ def plot_inputs(
             mfs = _fs(style, "mesh")
             lc = LineCollection(lines, colors=mfs.get("color", "gray"),
                                 alpha=mfs.get("alpha", 0.25),
-                                linewidths=mfs.get("linewidth", 0.5))
+                                linewidths=mfs.get("linewidth", 0.5),
+                                linestyles=mfs.get("linestyle", "-"))
             ax.add_collection(lc)
 
     # Plot geometry: profile lines if provided (drawn as before), otherwise the

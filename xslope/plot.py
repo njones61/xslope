@@ -920,7 +920,7 @@ def plot_circles(ax, slope_data, style=None):
         None
     """
     from .style import resolve_style, feature_style
-    fs = feature_style(resolve_style(style), "circles")
+    fs = feature_style(resolve_style(style), "failure_surface")
     c_color = fs.get('color', 'red')
     c_ls = fs.get('linestyle', '--')
     c_lw = fs.get('linewidth', 1.5)
@@ -993,7 +993,7 @@ def plot_non_circ(ax, non_circ, style=None):
     if not non_circ or len(non_circ) == 0:
         return
     from .style import resolve_style, feature_style
-    fs = feature_style(resolve_style(style), "noncirc")
+    fs = feature_style(resolve_style(style), "failure_surface")
     # Handle both dict format {'X': x, 'Y': y} and tuple format (x, y)
     if isinstance(non_circ[0], dict):
         xs = [p['X'] for p in non_circ]

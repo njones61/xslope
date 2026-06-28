@@ -44,10 +44,11 @@ def default_style_sheet():
             "polygon": {"linewidth": 1.0},
             "piezo_line": {"color": "b", "linestyle": "-", "linewidth": 2.0},
             "piezo_line2": {"color": "skyblue", "linestyle": "-", "linewidth": 2.0},
-            "max_depth": {"color": "black", "linestyle": "-", "linewidth": 1.5},
+            # No linestyle — the max-depth line carries hatch marks, always solid.
+            "max_depth": {"color": "black", "linewidth": 1.5},
             "tcrack": {"color": "red", "linestyle": ":", "linewidth": 1.5},
-            "circles": {"color": "red", "linestyle": "--", "linewidth": 1.5},
-            "noncirc": {"color": "red", "linestyle": "--", "linewidth": 1.5},
+            # One style shared by both circular and non-circular failure surfaces.
+            "failure_surface": {"color": "red", "linestyle": "--", "linewidth": 1.5},
             "reinforcement": {"color": "darkgray", "linewidth": 3.0,
                               "linestyle": "-", "alpha": 0.8},
             "mesh": {"color": "gray", "linestyle": "-", "linewidth": 0.5, "alpha": 0.25},

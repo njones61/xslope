@@ -33,8 +33,7 @@ FEATURES = [
     ("Piezometric line 2", "piezo_line2"),
     ("Max depth", "max_depth"),
     ("Tension crack", "tcrack"),
-    ("Failure circles", "circles"),
-    ("Non-circular surface", "noncirc"),
+    ("Failure surfaces (circular & non-circular)", "failure_surface"),
     ("Reinforcement", "reinforcement"),
     ("Mesh (background)", "mesh"),
 ]

@@ -64,8 +64,18 @@ def _nearest_aci(rgb):
 
 # Reserved layer names used by export for non-polygon features. On import these
 # are ignored (import is polygons-only); every other layer is a material zone.
+# Two exporters write features on different layer names: export_dxf() (clean
+# geometry) and axes_to_dxf() (the rendered view, layer = plot gid). This set is
+# the UNION of both so re-importing an xslope DXF — from either path — never picks
+# a feature layer up as a spurious material zone (e.g. CIRCLES auto-closed).
 RESERVED_LAYERS = {
+    # export_dxf() feature layers
     'FAILURE_SURFACE', 'SEARCH_CIRCLES', 'REINFORCEMENT', 'DLOADS', 'PIEZO',
+    # axes_to_dxf() feature layers (plot gids) + common label-derived names
+    'CIRCLES', 'CIRCLE_CENTERS', 'CRITICAL_SURFACE', 'TESTED_SURFACES',
+    'SEARCH_PATH', 'LINE_OF_THRUST', 'EFF_NORMAL_STRESS', 'PORE_PRESSURE',
+    'SLICES', 'MESH', 'MAX_DEPTH', 'TENSION_CRACK', 'GROUND_SURFACE',
+    'PONDED_WATER',
 }
 RESERVED_PREFIXES = ('PROFILE_',)
 
@@ -234,9 +244,10 @@ def read_dxf_polygons(dxf_path, arc_sag=0.05):
 def dxf_to_polygons(dxf_path, layers=None, arc_sag=0.05):
     """Read material-zone polygons from a DXF (the import primitive).
 
-    Reserved feature layers (PROFILE_*, FAILURE_SURFACE, SEARCH_CIRCLES,
-    REINFORCEMENT, DLOADS, PIEZO) are ignored — import is polygons-only. If
-    `layers` is given (an iterable of layer names), only those layers are kept.
+    Reserved feature layers (PROFILE_*, and the names in RESERVED_LAYERS — the
+    feature layers both DXF exporters write, e.g. CIRCLES / MAX_DEPTH / SLICES)
+    are ignored — import is polygons-only. If `layers` is given (an iterable of
+    layer names), only those layers are kept.
 
     Returns:
         (polygons, warnings): polygons is a list of {'coords', 'layer'}.

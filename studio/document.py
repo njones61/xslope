@@ -119,7 +119,11 @@ class ProjectDocument(QObject):
         from xslope.cad import dxf_to_polygons
         polygons, warnings = dxf_to_polygons(str(dxf_path))
         if not polygons:
-            raise ValueError("No material-zone polygons found in the DXF.")
+            raise ValueError(
+                "No material-zone polygons found in the DXF. Import reads closed "
+                "polygons as material zones; xslope's own DXF export holds feature "
+                "layers (profile lines, circles, loads…), not zones — to reopen a "
+                "saved model use File → Open on its .xlsx instead.")
         return polygons, warnings
 
     def build_from_dxf(self, polygons, layer_to_material):

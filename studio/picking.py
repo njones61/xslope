@@ -66,6 +66,13 @@ def pick_category(slope_data, x, y, tol):
     if profile_lines:
         for i, pl in enumerate(profile_lines):
             cands.append((_line_dist(pt, pl.get("coords") or []), "profile", i))
+        # The max-depth line (the model's bottom boundary, drawn across the profile
+        # x-extent) also opens the profile editor.
+        md = d.get("max_depth")
+        if md is not None:
+            xs = [x for pl in profile_lines for (x, _) in (pl.get("coords") or [])]
+            if xs:
+                cands.append((_line_dist(pt, [(min(xs), md), (max(xs), md)]), "profile", None))
     elif polygons:
         for i, poly in enumerate(polygons):
             try:

@@ -57,8 +57,9 @@ def default_style_sheet():
             "seep_bc": {"color": "darkblue", "linestyle": "--", "linewidth": 3.0},
             "seep_water_level": {"color": "lightskyblue", "linewidth": 2.0},
             "seep_exit_face": {"color": "red", "linestyle": "--", "linewidth": 3.0},
-            # No linestyle — reinforcement is a structural element, drawn solid.
+            # No linestyle — structural elements (reinforcement, piles), drawn solid.
             "reinforcement": {"color": "darkgray", "linewidth": 3.0, "alpha": 0.8},
+            "piles": {"color": "green", "linewidth": 4.0},
             # No linestyle — mesh edges are always solid (color + width only).
             "mesh": {"color": "gray", "linewidth": 0.5, "alpha": 0.25},
         },

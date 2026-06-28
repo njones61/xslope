@@ -1576,7 +1576,7 @@ def plot_reinforcement_lines(ax, slope_data, style=None):
                 tension_points_plotted = True
 
 
-def plot_piles(ax, slope_data, slice_df=None):
+def plot_piles(ax, slope_data, slice_df=None, style=None):
     """
     Plots pile lines from slope_data and optionally marks failure surface intersections.
 
@@ -1584,14 +1584,21 @@ def plot_piles(ax, slope_data, slice_df=None):
         ax: matplotlib Axes object
         slope_data: Dictionary containing slope data with 'pile_lines' key
         slice_df: Optional DataFrame — if provided, marks pile-failure surface intersection points
+        style: optional style sheet (see xslope.style); None → defaults. Piles are
+            structural, so color + width only (always solid).
     """
     if 'pile_lines' not in slope_data or not slope_data['pile_lines']:
         return
 
+    from .style import resolve_style, feature_style
+    pf = feature_style(resolve_style(style), "piles")
+    pcolor = pf.get('color', 'green')
+    plw = pf.get('linewidth', 4)
+
     for i, pile in enumerate(slope_data['pile_lines']):
         xs = [pile['x1'], pile['x2']]
         ys = [pile['y1'], pile['y2']]
-        ax.plot(xs, ys, color='green', linewidth=4, linestyle='-',
+        ax.plot(xs, ys, color=pcolor, linewidth=plw, linestyle='-',
                 alpha=0.9, solid_capstyle='butt',
                 label='Pile' if i == 0 else "")
         # Annotate with H value
@@ -1600,7 +1607,7 @@ def plot_piles(ax, slope_data, slice_df=None):
             mid_y = (pile['y1'] + pile['y2']) / 2
             ax.annotate(f"H={pile['H']:.0f}", (mid_x, mid_y),
                         textcoords="offset points", xytext=(8, 0),
-                        fontsize=8, color='green', fontweight='bold')
+                        fontsize=8, color=pcolor, fontweight='bold')
 
     # Mark failure surface intersection points from slice_df
     if slice_df is not None and 'h_pile' in slice_df.columns:
@@ -1766,7 +1773,7 @@ def plot_inputs(
         plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
     plot_reinforcement_lines(ax, slope_data, style=style)
-    plot_piles(ax, slope_data)
+    plot_piles(ax, slope_data, style=style)
 
     if mode == "lem":
         if slope_data['circular']:

@@ -37,6 +37,7 @@ FEATURES = [
     ("Distributed load", "dloads"),
     ("Distributed load 2", "dloads2"),
     ("Reinforcement", "reinforcement"),
+    ("Piles", "piles"),
     ("Seep BC — head line", "seep_bc"),
     ("Seep BC — water level", "seep_water_level"),
     ("Seep BC — exit face", "seep_exit_face"),

@@ -768,14 +768,16 @@ def plot_tcrack_water_force(ax, slice_df, slope_data):
     ax.fill(triangle_x, triangle_y, color='lightblue', alpha=0.3, edgecolor='blue', linewidth=1)
 
 
-def plot_dloads(ax, slope_data):
+def plot_dloads(ax, slope_data, style=None):
     """
     Plots distributed loads as arrows along the surface.
     """
+    from .style import resolve_style, feature_style
+    style = resolve_style(style)
     gamma_w = slope_data['gamma_water']
     ground_surface = slope_data['ground_surface']
 
-    def plot_single_dload_set(ax, dloads, color, label):
+    def plot_single_dload_set(ax, dloads, color, label, linewidth=1.5):
         """Internal function to plot a single set of distributed loads"""
         if not dloads:
             return
@@ -898,15 +900,19 @@ def plot_dloads(ax, slope_data):
                 
                 # Draw connecting line at arrow tops
                 if top_xs:
-                    ax.plot(top_xs, top_ys, color=color, linewidth=1.5, alpha=0.8, gid='DLOADS')
-            
+                    ax.plot(top_xs, top_ys, color=color, linewidth=linewidth, alpha=0.8, gid='DLOADS')
+
             # Draw the surface line itself
-            ax.plot(xs, ys, color=color, linewidth=1.5, alpha=0.8, label=label, gid='DLOADS')
-    
+            ax.plot(xs, ys, color=color, linewidth=linewidth, alpha=0.8, label=label, gid='DLOADS')
+
+    df1 = feature_style(style, "dloads")
+    df2 = feature_style(style, "dloads2")
     dloads = slope_data['dloads']
     dloads2 = slope_data.get('dloads2', [])
-    plot_single_dload_set(ax, dloads, 'purple', 'Distributed Load')
-    plot_single_dload_set(ax, dloads2, 'orange', 'Distributed Load 2')
+    plot_single_dload_set(ax, dloads, df1.get('color', 'purple'), 'Distributed Load',
+                          df1.get('linewidth', 1.5))
+    plot_single_dload_set(ax, dloads2, df2.get('color', 'orange'), 'Distributed Load 2',
+                          df2.get('linewidth', 1.5))
 
 def plot_circles(ax, slope_data, style=None):
     """
@@ -1745,7 +1751,7 @@ def plot_inputs(
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data)
     if mode != "seep":
-        plot_dloads(ax, slope_data)
+        plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
     plot_reinforcement_lines(ax, slope_data, style=style)
     plot_piles(ax, slope_data)

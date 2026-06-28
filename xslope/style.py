@@ -44,6 +44,9 @@ def default_style_sheet():
             "polygon": {"linewidth": 1.0},
             "piezo_line": {"color": "b", "linestyle": "-", "linewidth": 2.0},
             "piezo_line2": {"color": "skyblue", "linestyle": "-", "linewidth": 2.0},
+            # Distributed loads — color + width only (the arrows define the look).
+            "dloads": {"color": "purple", "linewidth": 1.5},
+            "dloads2": {"color": "orange", "linewidth": 1.5},
             # No linestyle — the max-depth line carries hatch marks, always solid.
             "max_depth": {"color": "black", "linewidth": 1.5},
             "tcrack": {"color": "red", "linestyle": ":", "linewidth": 1.5},

@@ -34,6 +34,8 @@ FEATURES = [
     ("Max depth", "max_depth"),
     ("Tension crack", "tcrack"),
     ("Failure surfaces (circular & non-circular)", "failure_surface"),
+    ("Distributed load", "dloads"),
+    ("Distributed load 2", "dloads2"),
     ("Reinforcement", "reinforcement"),
     ("Mesh (background)", "mesh"),
 ]

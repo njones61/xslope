@@ -562,10 +562,26 @@ def _new_dload_pt():
     return {"X": 0.0, "Y": 0.0, "Normal": 0.0}
 
 
+def _apply_set_selection(widgets, tabs, select):
+    """Activate the tab and list row encoded in ``select = (set_idx, row)`` — shared
+    by the dload and seep-BC editors (both two-set tabbed master/detail dialogs), so
+    a canvas double-click jumps straight to the picked item. No-op for other
+    `select` shapes (e.g. None, or a plain index)."""
+    if not (isinstance(select, tuple) and len(select) == 2):
+        return
+    s, row = select
+    if s not in (0, 1):
+        return
+    tabs.setCurrentIndex(s)
+    w = widgets[s]
+    if row is not None and 0 <= row < w.list.count():
+        w.list.setCurrentRow(row)
+
+
 class DloadsEditor(CategoryEditor):
     label = "Distributed loads"
 
-    def build(self, slope_data, parent):
+    def build(self, slope_data, parent, select=None):
         dlg = QDialog(parent)
         dlg.setWindowTitle("Distributed loads")
         dlg.resize(640, 520)
@@ -581,6 +597,7 @@ class DloadsEditor(CategoryEditor):
         layout.addWidget(tabs)
         _ok_cancel(dlg, layout)
         dlg._sets = (w1, w2)
+        _apply_set_selection((w1, w2), tabs, select)
         return dlg
 
     def apply(self, slope_data, dlg):
@@ -709,7 +726,7 @@ class _SeepBcSetWidget(QWidget):
 class SeepBcEditor(CategoryEditor):
     label = "Seep BC"
 
-    def build(self, slope_data, parent):
+    def build(self, slope_data, parent, select=None):
         dlg = QDialog(parent)
         dlg.setWindowTitle("Seep BC")
         dlg.resize(640, 520)
@@ -726,6 +743,7 @@ class SeepBcEditor(CategoryEditor):
         layout.addWidget(tabs)
         _ok_cancel(dlg, layout)
         dlg._sets = (w1, w2)
+        _apply_set_selection((w1, w2), tabs, select)
         return dlg
 
     def apply(self, slope_data, dlg):

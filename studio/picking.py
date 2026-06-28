@@ -53,14 +53,20 @@ def pick_category(slope_data, x, y, tol, mode=None):
     for i, r in enumerate(d.get("reinforcement_lines") or []):
         cands.append((_line_dist(pt, [(r["x1"], r["y1"]), (r["x2"], r["y2"])]), "reinforce", i))
     if mode != "seep":
-        for i, line in enumerate(d.get("dloads") or []):
-            cands.append((_line_dist(pt, line), "dloads", i))
+        # Both sets are drawn (purple / orange); index is (set, block) so the
+        # editor can jump to the right tab + load.
+        for s, key in enumerate(("dloads", "dloads2")):
+            for i, line in enumerate(d.get(key) or []):
+                cands.append((_line_dist(pt, line), "dloads", (s, i)))
     if mode is None or mode == "seep":
-        for key in ("seepage_bc", "seepage_bc2"):
+        # index is (set, row) where row is the head index, or len(heads) for the
+        # exit face — matching the editor's list (heads… then "Exit face").
+        for s, key in enumerate(("seepage_bc", "seepage_bc2")):
             bc = d.get(key) or {}
-            for sh in bc.get("specified_heads") or []:
-                cands.append((_line_dist(pt, sh.get("coords") or []), "seep_bc", None))
-            cands.append((_line_dist(pt, bc.get("exit_face") or []), "seep_bc", None))
+            heads = bc.get("specified_heads") or []
+            for j, sh in enumerate(heads):
+                cands.append((_line_dist(pt, sh.get("coords") or []), "seep_bc", (s, j)))
+            cands.append((_line_dist(pt, bc.get("exit_face") or []), "seep_bc", (s, len(heads))))
     for key in ("piezo_line", "piezo_line2"):
         cands.append((_line_dist(pt, d.get(key) or []), "piezo", None))
     for i, c in enumerate(d.get("circles") or []):

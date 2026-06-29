@@ -7,10 +7,10 @@ running a notebook.
 
 **Status (current):** Phases 0–4 (engine prereq, viewer, editing, LEM, mesh/seep/FEM)
 are **done**; Phase 5 (canvas pick-to-edit + rendering polish) and Phase 6 (DXF
-import/export) are **largely done**; the AI assistant (§14) is **built** (multi-provider,
+import/export) are **largely done**; the AI assistant (§13) is **built** (multi-provider,
 `run_python` kernel). **Remaining:** the per-layer `StyleConfig` / Display Options
 dialog + style persistence (§8a), native installers (Phase 7), user docs (Phase 8).
-The live status is the phase roadmap in §11. Sections §1–§10 are the original design;
+The live status is the phase roadmap in §15. Sections §1–§10 are the original design;
 where the as-built implementation diverged, the text has been updated to match.
 
 ---
@@ -299,84 +299,7 @@ studio/                # XSlope Studio desktop app
 
 ---
 
-## 11. Phased Roadmap
-
-**Phase 0 — Engine prerequisite** ✅ **DONE**
-- `save_slope_data_to_xlsx(slope_data, path, template=…)` implemented in `xslope/fileio.py` and verified by a round-trip test across 13 representative files (all input categories). See §5.1. The round-trip check is wired into `run_tests.py` as a `roundtrip` test type (runs in the default suite; standalone via `python run_tests.py --roundtrip`).
-
-**Phase 1 — Skeleton + read-only viewer** ✅ **DONE**
-- `studio/` PySide6 app: shell, menus, dockable Inputs summary panel + Log pane, embedded Matplotlib canvas with zoom/pan + scroll-zoom, LEM/Seep/FEM mode selector, recent files.
-- File → Open renders the Inputs view via `plot_inputs(fig=…)` (the `fig=` param added to `plot.py`). `ProjectDocument` holds `slope_data` with snapshot undo/redo. Packaged as the `xslope-studio` entry point (`gui` extra). Verified headlessly (offscreen).
-
-**Phase 2 — Editing** ✅ **DONE**
-- ✅ Modal editor framework (`studio/editors.py`): `Field` spec + reusable `_EditableTable`, `TableEditorDialog`, `FormEditorDialog`, `TabbedTableEditorDialog`; launched by **single-click** on an Inputs-tree category; edits go through `ProjectDocument.begin_edit/commit_edit` → re-render + dirty. Editors preserve unshown record keys.
-- ✅ Editors for: global params, materials, circles (Option Depth/Radius/Intercept), non-circular surface, piezometric lines (2 tabs), distributed loads (2 sets), Head BC (2 sets: specified heads + exit face), piles (optional-float fields), reinforcement (rebuilds the derived display format via the extracted `build_reinforce_lines`), and profile-line geometry (master/detail, resyncs polygons/ground surface).
-- ✅ Save (in place) / Save As (fresh file from bundled blank template); unsaved-changes prompt on close and before New/Open.
-- ✅ Polygon-sheet geometry editor (for polygon-based files; profile-based files use the profile editor). Shares one `MatGeometryDialog` master/detail with the profile editor; the Inputs tree marks **Polygons** editable only when there are no profile lines.
-- ✅ New — `ProjectDocument.new()` creates an **empty** project: every `slope_data` category present but empty, no geometry, blank canvas. The Inputs tree starts at zero and stays editable (Profile lines editable so the first line can be added); the user builds up via the editors (add a material, then a profile line — the profile editor rebuilds the ground surface), and Save As writes it through the template.
-
-**Phase 3 — LEM analysis** ✅ **DONE**
-- ✅ End-to-end solve framework. `RunLemDialog` (method / analysis / surface / num_slices / rapid / diagnostic) → `LemRunner` (`QThread`, `studio/runners.py`) runs the engine off the GUI thread; engine output streams to the Log pane live via the thread-safe stdout tee. Central area is a `QTabWidget` view strip (Inputs + lazily-added result tabs, cleared on Open/New); a run logs a banner + result.
-- ✅ **Single surface** — circular *and* non-circular (`generate_slices` + `solve_selected`) → **LEM · Solution** tab via `plot_solution(fig=…)`.
-- ✅ **Auto-search** — circular (`circular_search`) and non-circular (`noncircular_search`) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, both given `fig=`) showing all trial surfaces + critical + search path, plus the critical surface in the Solution tab. Search iteration progress streams to the log.
-- ✅ Rapid drawdown flag wired through single/search; `fig=` added to all LEM plot functions, mirroring `plot_inputs`.
-- ✅ **Reliability** (`advanced.reliability`) → **LEM · Reliability** tab (`plot_reliability_results`, given `fig=`) + Solution tab for the MLV surface. A determinate **progress bar** in the status bar tracks the `1 + 2N` searches via a `progress_callback` threaded through `reliability()` (engine-side, so notebooks benefit too); other runs show a busy bar. Surface-type choice is hidden unless the file has both circular and non-circular.
-- ✅ **Cooperative cancel** — a `cancel_check` callable is threaded through `circular_search` / `noncircular_search` / `reliability` (engine-side; checked at iteration boundaries, raises `AnalysisCancelled`). The worker exposes `cancel()` (sets a `threading.Event`) and a Cancel button by the progress bar; cancelling aborts cleanly without killing the thread, emits `cancelled`, and leaves no result tab. Close also cancels an in-flight run.
-- ✅ Remaining solver tolerances in the dialog (`fs_tol`, `tol`, `max_iter`). A **"Search tolerances"** group on `RunLemDialog`, enabled only for auto-search / reliability (the search-driven analyses); `tol` (geometric refinement) is greyed out for non-circular surfaces, which have no such parameter. Threaded through `LemRunner` to `circular_search` / `noncircular_search`, and through `reliability()` (engine-side — added `fs_tol`/`tol`/`max_iter` params that forward to its `1 + 2N` internal searches, so notebooks benefit too). Unset values fall through to each engine function's own default.
-
-**Phase 4 — Meshing + Seepage + FEM** ✅ **DONE** (remaining polish: FEM progress granularity)
-- ✅ **Build Mesh** — `BuildMeshDialog` (element type; target size, entered or auto-sized as slope-width / divisions per the drivers) → `MeshRunner` (`QThread`) builds via `get_material_polygons` + `build_mesh_from_polygons`, including reinforcement/pile constraint lines so the mesh also serves FEM. Result shows in a **Mesh** tab (`plot_mesh`, given `fig=`) and the mesh is stored on `slope_data['mesh']` (so it appears in the Inputs view) and written to the `{stem}_mesh.json` sidecar. Build progress shows a busy bar.
-- ✅ **Mode-driven Run** — one Run action whose label/dispatch follow the LEM/Seep/FEM mode; Build Mesh shows only in Seep/FEM; Seep/FEM Run gated on a built mesh (`_update_run_actions`).
-- ✅ **Run Seep** — `RunSeepDialog` (BC set 1/2, tol, plot variable head/u/v_mag/i_mag, contour levels, flowlines/vectors/fill/phreatic) → `SeepRunner` (`QThread`) runs `build_seep_data` → `run_seepage_analysis`; **Seep · Data** + **Seep · Solution** result tabs (`plot_seep_data` / `plot_seep_solution`, both given `fig=`); solution written to `{stem}_seep.csv` (`_seep2.csv` for BC 2). Convergence trace streams to the Log pane. **Each BC set keeps its own tab pair** (BC 2 → "Seep · Data 2" / "Seep · Solution 2"), so rapid-drawdown problems show BC 1 and BC 2 side by side and switch freely; results are held per BC in `doc.results["seep_solutions"][bc]`.
-- ✅ **Display dock** — per-plot-type display options live in a context-sensitive "Display" dock under the Inputs tree (not in the run dialogs); its page follows the active result tab and re-renders the cached result live. Panels for every view that has options, each exposing the full set of display kwargs the underlying `plot_*` accepts: Inputs (material table + placement, legend column layout), LEM · Search (highlight critical), LEM · Solution (slice numbers, seep contours), Mesh (nodes / labels / padding), Seep · Data and FEM · Data (BC / nodes / labels / fill opacity; FEM also BC symbol size), Seep · Solution (variable, levels, fill opacity, vector scale, padding, flow lines / vectors / fill / phreatic), FEM · Results (shear strain / deformation / displacement vectors — the diagnostic stress/strain/yield/displace_mag types are omitted; deform %, mesh / reinforcement / element labels, and the displacement-vector options gated to that plot type). Styling the `plot_*` functions hardcode (colors, widths, fonts) is still deferred to the Phase 5 `StyleConfig`. Reliability has no plot options, so it shows the placeholder.
-- ✅ **Image export** — a per-view **"Save…"** button on each canvas toolbar writes the current figure to PNG / PDF / SVG via `savefig`; PNG prompts for a DPI, vector formats skip it. Saves at the figure's true inch size so resolution is independent of on-screen zoom. Per-view (not per-panel) so Inputs / Reliability can export too. The Save button also offers **DXF export** of the current view.
-- ✅ **Auto legend layout** — engine-side measure-based legend layout across all result-view plots (wide but neat, multi-column), with **legend column controls** exposed on every result-view Display panel (so notebooks benefit too).
-- ✅ **Run FEM** — `RunFemDialog` (single trial / SSRM, F or F_min/F_max + tolerance + failure criterion) → `FemRunner` (`QThread`) runs `build_fem_data` → `solve_fem` / `solve_ssrm`; **FEM · Data** + **FEM · Results** tabs (`plot_fem_data` / `plot_fem_results`, both given `fig=`), display options (plot type, deform %) on the Display dock. SSRM reports FS and supports **cancel** (a `cancel_check` threaded through `solve_ssrm` + its helpers); solution exported via `export_fem_solution`.
-- Decisions: Run is **mode-driven** with dynamic text ("Run LEM/Seep/FEM"); a mesh is **explicit** (Build Mesh first — Seep/FEM stay disabled until `slope_data['mesh']` is present), not auto-built.
-
-**Phase 4 — done** (Meshing + Seepage + FEM all wired; display panels for all views; image export incl. DXF; auto legend layout). Remaining polish: progress granularity for FEM.
-
-**File lifecycle (§9) updates landed:**
-- ✅ **Sidecar reconciliation on save** — Save/Save As reconciles the `{stem}_mesh.json` / `{stem}_seep(.2).csv` / FEM sidecars against the current document so stale solution files don't outlive the inputs they came from.
-- ✅ **Stale-result invalidation** — editing inputs invalidates a stale LEM solution, and a geometry edit that makes the mesh invalid clears the mesh (Seep/FEM re-gate on a rebuild).
-
-**Phase 5 — Canvas selection + Display Options + style persistence** 🚧 **PARTIAL**
-- ✅ **Pick / double-click-to-edit** on the Inputs canvas. Since the canvas is a rasterised pixmap (no Matplotlib pick events), the double-click is mapped viewport → scene → axes data coords (`studio/canvas.py`, `picked` signal) and hit-tested against the input geometry (`studio/picking.py`) to resolve the editor category *and* the picked index — profile/polygon lines, the max-depth line, piezo lines, distributed loads, reinforcement, piles, circles, non-circular points, and seepage BCs (specified-head lines + exit face), with a material-zone interior falling back to the materials editor — then opens the same editor the Inputs tree uses, **pre-selecting the picked item** — the line in the profile/polygon master-detail dialogs, and the right tab + row in the two-set distributed-load and seep-BC dialogs (the specific load, head, or exit face). The hit-test is **mode-aware** (seep BCs only in seep mode, distributed loads only outside it) to match what the plot draws. Inputs view only; result canvases stay view-only, and the Inputs view shows a **select (arrow) cursor** plus a "(double-click on a feature to edit)" hint. Tolerance tracks zoom (~12 px in data units).
-- 🚧 **Styles (per-feature style sheet, §8a)** — built per the settled two-tier design. `xslope/style.py` holds `default_style_sheet()` (defaults baked in code) + `resolve_style`/`material_style`/`feature_style`/`style_delta`; each high-level `plot_*` takes an optional `style=` kwarg (no style passed → byte-identical to before, verified by render-hash). A **Styles dialog** (`studio/styles_dialog.py`, opened from a button at the bottom of the Display dock) edits **materials** (fill color from an earth-tone palette + soil-ish hatch + opacity, keyed by `mat_id`) and **features** (color from a standard-color palette, line style where conventional, width) with live preview; visual color/hatch popups + a "Default" swatch. Wired into the **Inputs** view, all **LEM result** views (solution / search / reliability), and the **mesh / seep / FEM** views (material-colored zones — also fixed a latent off-by-one so those zone colors finally match the Inputs view; mesh views take material *color* only, not hatch/opacity). A **Restore Defaults** button clears all deltas in one click. ⬜ Per-feature **visibility** toggles were considered and **deferred** — visibility is a *Display* concern (what's shown) rather than a style (how it looks), so its cleaner home is the contextual Display panel, not the Styles dialog.
-- ✅ **Style persistence (§8a)** — per-project `{stem}_styles.json` holding only sparse deltas vs the code defaults; loaded on Open, written on Save (removed when empty), reset on New / DXF import. (No factory JSON or global "Save as default" tier — deliberately dropped for v1; easy to add later.)
-- ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
-
-**Phase 6 — DXF + polish** 🚧 **PARTIAL**
-- ✅ **DXF export (view)** — the per-view Save button exports the *rendered* figure to DXF (`axes_to_dxf`); good for CAD viewing, lossy (a poor re-import source).
-- ✅ **DXF export (geometry)** — File → Export Geometry (DXF) writes the structured `export_dxf`: material zones on per-material layers, profile lines / circles / reinforcement / dloads / piezo on reserved feature layers. The clean companion the importer reads.
-- ✅ **Feature-aware DXF import wizard** — `read_dxf_layers` (engine) classifies all geometry per layer (closed/open polylines, lines, circles, points); `DxfImportDialog` lets the user map **each layer to an input feature** — material zone, profile line, piezo, distributed load, reinforcement, failure circles, or ignore — with a Material column for zone/profile. Defaults are *seeded* from xslope's own export layer names and the geometry kind but never assumed from arbitrary CAD names, so externally-drawn DXFs map too. `build_from_dxf_mapping` (document) routes geometry into the features and resyncs; non-geometric properties (load magnitudes, reinforcement strengths, material props, circle depth) come in as editable placeholders. Circle radius is fit from the exported arc; profile-based if any profile layer, else polygon-based.
-- ⬜ Full undo/redo coverage (audit every mutation path; decide derived-result/mesh policy on undo).
-- ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
-
-  **🧪 DXF import/export — manual test checklist (unverified in-app; only round-tripped headlessly so far):**
-  - [ ] **Geometry export** — open a model → File → Export Geometry (DXF); open the `.dxf` in a CAD viewer and confirm layers: material-named zones, `PROFILE_<mat>`, `SEARCH_CIRCLES`, `REINFORCEMENT`, `DLOADS`, `PIEZO`.
-  - [ ] **Profile-based round-trip** — export a profile-based model (e.g. `arai_tagyo`), re-import: PROFILE_* layers default to *Profile line*, circles to *Failure circles*; accept defaults → geometry matches the original on the canvas; ground surface present.
-  - [ ] **Polygon-based round-trip** — export a polygon-sheet model, re-import: material-zone layers default to *Material zone*; zones + materials come back.
-  - [ ] **Reinforcement rejoin** — a model with reinforcement: confirm the import yields the *same number of reinforcement lines* (not one per segment), endpoints correct.
-  - [ ] **Circles** — confirm `Xo,Yo,R` recovered (radius fit from the arc) and Depth defaults to 0.
-  - [ ] **Placeholders** — dload magnitudes and reinforcement strengths import as 0; the "imported with notes" dialog lists the placeholder caveat; edit them in the editors and re-render.
-  - [ ] **Wizard overrides** — change a layer's target (e.g. set a layer to *Ignore*, or remap zone↔profile, rename/merge materials) and confirm the result honors it.
-  - [ ] **External CAD DXF** — import a DXF *not* produced by xslope (arbitrary layer names): defaults fall back sensibly (closed rings → Material zone, else Ignore), and manual mapping populates the right features.
-  - [ ] **All-Ignore** — set every layer to Ignore → friendly "nothing selected" error, no project change.
-  - [ ] **Missing ezdxf** — (optional) in an env without `ezdxf`, import/export show the actionable install message.
-
-**Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
-- ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
-- ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
-
-**Phase 8 — Documentation** ⬜ **NOT STARTED**
-- ⬜ User documentation for XSlope Studio in the existing mkdocs site: install/launch, the Inputs view + editors, double-click-to-edit, running LEM/Seep/FEM, the result views and Display options, image/DXF export, and the AI assistant.
-- ⬜ Screenshots / short walkthroughs of a full workflow (open → edit → mesh → solve → view).
-- ⬜ Keep it in sync as features land (the docs site is already built via `mkdocs`).
-
----
-
-## 12. Decisions (all settled)
+## 11. Decisions (all settled)
 
 - **GUI stack:** PySide6 + embedded Matplotlib, single-process, calling `xslope` directly (§2).
 - **Application name:** XSlope Studio.
@@ -395,7 +318,7 @@ Nothing blocking remains; detail-level choices (icon/branding, menu layout) sett
 
 ---
 
-## 13. Key Risks / Watch-items
+## 12. Key Risks / Watch-items
 
 - **Save fidelity** — done and covered by the `--roundtrip` test; keep that test green as input categories evolve.
 - **Long solves blocking the UI** — must run on worker threads from the start; FEM/SSRM also need cancellation.
@@ -404,7 +327,7 @@ Nothing blocking remains; detail-level choices (icon/branding, menu layout) sett
 
 ---
 
-## 14. AI Chat Assistant (built)
+## 13. AI Chat Assistant (built)
 
 A dockable **chat panel** inside Studio that drives the app and the engine with
 natural language and images, against a user-chosen model (Claude, OpenAI/GPT,
@@ -417,12 +340,12 @@ and plot FS vs angle," "add a piezo line 2 ft below the crest and re-run Spencer
 > **As built (status):** the assistant is **working and in use** — a multi-provider
 > agent loop over LiteLLM, an in-process `run_python` kernel with the live document
 > + engine preloaded, vision (image paste/drop), the skill prompt as system context,
-> confirm-vs-auto autonomy, and a Stop button. **§14.9 is the authoritative
-> phase status** (A & B built; C & D partial). §14.1–14.8 below are the original
-> scoping/design, retained for context; where a decision settled, §14.9/§14.10 reflect
+> confirm-vs-auto autonomy, and a Stop button. **§13.9 is the authoritative
+> phase status** (A & B built; C & D partial). §13.1–14.8 below are the original
+> scoping/design, retained for context; where a decision settled, §13.9/§13.10 reflect
 > what shipped. Remaining work is refinement and testing, not core build-out.
 
-### 14.1 Use cases (what "more than the skill" means)
+### 13.1 Use cases (what "more than the skill" means)
 
 - **Build / edit inputs** — from a sketch (vision) or prose: materials, geometry,
   piezo lines, loads, reinforcement, BCs.
@@ -432,7 +355,7 @@ and plot FS vs angle," "add a piezo line 2 ft below the crest and re-run Spencer
   CSVs — i.e. anything you'd do in a notebook with `import xslope`.
 - **Explain / debug** — interpret results, diagnose non-convergence, suggest fixes.
 
-### 14.2 This is an agent with code execution, not a chatbot
+### 13.2 This is an agent with code execution, not a chatbot
 
 The decisive capability is a **Python execution tool** the model drives — a
 persistent kernel/REPL with `xslope` imported and the **live document in scope**
@@ -464,7 +387,7 @@ write/reload stays available as a secondary path. Net: two coexisting front ends
 the same engine — the file-first standalone skill *and* the document-first Studio
 assistant — not a replacement of one by the other.
 
-### 14.3 Provider abstraction (bring-your-own-model)
+### 13.3 Provider abstraction (bring-your-own-model)
 
 Each provider differs in API shape and tool-call format (Anthropic Messages,
 OpenAI function-calling/Responses, Ollama's OpenAI-compatible endpoint, etc.).
@@ -486,7 +409,7 @@ models. Capability varies by model — tool use and vision aren't universal (esp
 small local models); the UI should degrade (e.g. disable image attach when the
 selected model has no vision).
 
-### 14.4 Tool surface (what the model can call)
+### 13.4 Tool surface (what the model can call)
 
 - `run_python(code)` — **the core**; persistent namespace, engine + live document
   preloaded, returns stdout/result + captured figures.
@@ -500,13 +423,13 @@ selected model has no vision).
   still work and Studio reloads the document after.
 - Image attachment (vision) for the sketch→inputs use case.
 
-### 14.5 Reusing the existing skill
+### 13.5 Reusing the existing skill
 
-The standalone `/xslope` skill stays as-is (see §14.2) — this section is about how
+The standalone `/xslope` skill stays as-is (see §13.2) — this section is about how
 *Studio* draws on it. `docs/usage/claude/xslope.md` (the skill body — template cell
 layout, the surgical xlsx writer, per-sheet helpers, run snippets) becomes **domain
 knowledge injected into the Studio system prompt**, not the limit of behavior, and
-Studio leans on the schema parts rather than the file-writer (§14.2). Caveat:
+Studio leans on the schema parts rather than the file-writer (§13.2). Caveat:
 it's written for a file-first agent and currently lives in `docs/` and is
 repo-bound (the `SKILL.md` `!`cat …`` include only resolves inside the repo). To
 use it from an installed Studio we must **package the prompt** (ship it under
@@ -514,7 +437,7 @@ use it from an installed Studio we must **package the prompt** (ship it under
 packaged copy in sync — the same two-copy + `run_tests.py` guard pattern we just
 set up for the template.
 
-### 14.6 Architecture & UI
+### 13.6 Architecture & UI
 
 - **`ChatDock`** — a right-side `QDockWidget`: transcript (markdown + inline
   figures + collapsible "ran code" blocks), input box with image attach, model
@@ -528,7 +451,7 @@ set up for the template.
 - **Kernel** — an in-process namespace (or a Jupyter kernel) for `run_python`;
   in-process is simplest but shares the GUI process (see safety).
 
-### 14.7 Safety, trust & cost
+### 13.7 Safety, trust & cost
 
 - **Arbitrary code execution** is the point and the risk — same trust model as
   Claude Code: the agent can read/write files and run Python as the user. Need an
@@ -542,14 +465,14 @@ set up for the template.
   (Ollama stays local); make that explicit. Keys in the OS keychain. Surface
   token usage / rough cost.
 
-### 14.8 Packaging
+### 13.8 Packaging
 
 - Optional extra: `pip install "xslope[ai]"` pulls the provider lib (e.g.
   LiteLLM). Studio degrades gracefully (chat dock hidden/disabled) when it's absent.
-- Bundle the skill prompt with the package (§14.5).
+- Bundle the skill prompt with the package (§13.5).
 - Native installers would include the AI deps; keep them out of the base install.
 
-### 14.9 Phased approach
+### 13.9 Phased approach
 
 - **A — Spike** ✅ **BUILT** — Claude-only (`anthropic` SDK, `claude-opus-4-8`,
   adaptive thinking) in `studio/ai/` (`kernel.py` persistent in-process namespace
@@ -562,7 +485,7 @@ set up for the template.
   `xslope[ai]` extra; the dock loads without `anthropic` and reports if absent.
   Verified end-to-end with a mocked client (text → tool_use → run_python on the
   live doc → result → final text). **Remaining for Phase A polish:** package the
-  skill prompt (§14.5), streaming responses, API-key UX.
+  skill prompt (§13.5), streaming responses, API-key UX.
 - **B — Multi-provider** ✅ **BUILT** — the agent loop now runs over **LiteLLM**
   (OpenAI message format), so the same loop drives Claude / OpenAI / local **Ollama**
   (free, no key). `studio/ai/config.py` holds the provider/model selection
@@ -597,7 +520,7 @@ set up for the template.
   wrapping message blocks, "New chat" resets the kernel, actionable error messages).
   **Still open:** sketch→inputs ergonomics, cost meter, conversation save/restore.
 
-### 14.10 Decisions (settled)
+### 13.10 Decisions (settled)
 
 1. **Provider strategy** — **LiteLLM**: one dependency unifying Claude / OpenAI /
    Ollama (tool-calling + vision); the agent loop is written once behind a small
@@ -614,11 +537,11 @@ set up for the template.
    generalize to multi-provider (Phase B) once the UX is proven.
 5. **Scope of "edit"** — the agent **populates / mutates the live `slope_data`
    document** (rendered live, persisted via Save As); file write + reload is a
-   secondary path, not the primary one (see §14.2).
+   secondary path, not the primary one (see §13.2).
 
 ---
 
-## 15. Exploration: importing from other LEM packages (not scoped)
+## 14. Exploration: importing from other LEM packages (not scoped)
 
 Beyond DXF, a high-value direction is **importing problems from other slope-stability
 software** — GeoStudio **SLOPE/W**, Rocscience **Slide2**, and similar — mapping their
@@ -667,3 +590,81 @@ SLOPE/W's zipped XML) to see how cleanly its geometry/materials map across.
   `.gsz` as the de-facto interchange format and first target.
 - **Recommendation:** start with `.gsz` → `slope_data` (Regions→polygons, Materials,
   WaterItems), using PyGeoStudio's samples + parser as the reference for a spike.
+
+## 15. Phased Roadmap
+
+**Phase 0 — Engine prerequisite** ✅ **DONE**
+- `save_slope_data_to_xlsx(slope_data, path, template=…)` implemented in `xslope/fileio.py` and verified by a round-trip test across 13 representative files (all input categories). See §5.1. The round-trip check is wired into `run_tests.py` as a `roundtrip` test type (runs in the default suite; standalone via `python run_tests.py --roundtrip`).
+
+**Phase 1 — Skeleton + read-only viewer** ✅ **DONE**
+- `studio/` PySide6 app: shell, menus, dockable Inputs summary panel + Log pane, embedded Matplotlib canvas with zoom/pan + scroll-zoom, LEM/Seep/FEM mode selector, recent files.
+- File → Open renders the Inputs view via `plot_inputs(fig=…)` (the `fig=` param added to `plot.py`). `ProjectDocument` holds `slope_data` with snapshot undo/redo. Packaged as the `xslope-studio` entry point (`gui` extra). Verified headlessly (offscreen).
+
+**Phase 2 — Editing** ✅ **DONE**
+- ✅ Modal editor framework (`studio/editors.py`): `Field` spec + reusable `_EditableTable`, `TableEditorDialog`, `FormEditorDialog`, `TabbedTableEditorDialog`; launched by **single-click** on an Inputs-tree category; edits go through `ProjectDocument.begin_edit/commit_edit` → re-render + dirty. Editors preserve unshown record keys.
+- ✅ Editors for: global params, materials, circles (Option Depth/Radius/Intercept), non-circular surface, piezometric lines (2 tabs), distributed loads (2 sets), Head BC (2 sets: specified heads + exit face), piles (optional-float fields), reinforcement (rebuilds the derived display format via the extracted `build_reinforce_lines`), and profile-line geometry (master/detail, resyncs polygons/ground surface).
+- ✅ Save (in place) / Save As (fresh file from bundled blank template); unsaved-changes prompt on close and before New/Open.
+- ✅ Polygon-sheet geometry editor (for polygon-based files; profile-based files use the profile editor). Shares one `MatGeometryDialog` master/detail with the profile editor; the Inputs tree marks **Polygons** editable only when there are no profile lines.
+- ✅ New — `ProjectDocument.new()` creates an **empty** project: every `slope_data` category present but empty, no geometry, blank canvas. The Inputs tree starts at zero and stays editable (Profile lines editable so the first line can be added); the user builds up via the editors (add a material, then a profile line — the profile editor rebuilds the ground surface), and Save As writes it through the template.
+- ⬜ **Full undo/redo coverage** — snapshot undo/redo is built (deep-copy `slope_data` per edit, wired to the Undo/Redo actions, enable-state refreshed on render); the remaining work is an audit of every mutation path and a policy for derived results/mesh on undo. *(An editing concern — kept here rather than under DXF.)*
+
+**Phase 3 — LEM analysis** ✅ **DONE**
+- ✅ End-to-end solve framework. `RunLemDialog` (method / analysis / surface / num_slices / rapid / diagnostic) → `LemRunner` (`QThread`, `studio/runners.py`) runs the engine off the GUI thread; engine output streams to the Log pane live via the thread-safe stdout tee. Central area is a `QTabWidget` view strip (Inputs + lazily-added result tabs, cleared on Open/New); a run logs a banner + result.
+- ✅ **Single surface** — circular *and* non-circular (`generate_slices` + `solve_selected`) → **LEM · Solution** tab via `plot_solution(fig=…)`.
+- ✅ **Auto-search** — circular (`circular_search`) and non-circular (`noncircular_search`) → **LEM · Search** tab (`plot_circular_search_results` / `plot_noncircular_search_results`, both given `fig=`) showing all trial surfaces + critical + search path, plus the critical surface in the Solution tab. Search iteration progress streams to the log.
+- ✅ Rapid drawdown flag wired through single/search; `fig=` added to all LEM plot functions, mirroring `plot_inputs`.
+- ✅ **Reliability** (`advanced.reliability`) → **LEM · Reliability** tab (`plot_reliability_results`, given `fig=`) + Solution tab for the MLV surface. A determinate **progress bar** in the status bar tracks the `1 + 2N` searches via a `progress_callback` threaded through `reliability()` (engine-side, so notebooks benefit too); other runs show a busy bar. Surface-type choice is hidden unless the file has both circular and non-circular.
+- ✅ **Cooperative cancel** — a `cancel_check` callable is threaded through `circular_search` / `noncircular_search` / `reliability` (engine-side; checked at iteration boundaries, raises `AnalysisCancelled`). The worker exposes `cancel()` (sets a `threading.Event`) and a Cancel button by the progress bar; cancelling aborts cleanly without killing the thread, emits `cancelled`, and leaves no result tab. Close also cancels an in-flight run.
+- ✅ Remaining solver tolerances in the dialog (`fs_tol`, `tol`, `max_iter`). A **"Search tolerances"** group on `RunLemDialog`, enabled only for auto-search / reliability (the search-driven analyses); `tol` (geometric refinement) is greyed out for non-circular surfaces, which have no such parameter. Threaded through `LemRunner` to `circular_search` / `noncircular_search`, and through `reliability()` (engine-side — added `fs_tol`/`tol`/`max_iter` params that forward to its `1 + 2N` internal searches, so notebooks benefit too). Unset values fall through to each engine function's own default.
+
+**Phase 4 — Meshing + Seepage + FEM** ✅ **DONE** (remaining polish: FEM progress granularity)
+- ✅ **Build Mesh** — `BuildMeshDialog` (element type; target size, entered or auto-sized as slope-width / divisions per the drivers) → `MeshRunner` (`QThread`) builds via `get_material_polygons` + `build_mesh_from_polygons`, including reinforcement/pile constraint lines so the mesh also serves FEM. Result shows in a **Mesh** tab (`plot_mesh`, given `fig=`) and the mesh is stored on `slope_data['mesh']` (so it appears in the Inputs view) and written to the `{stem}_mesh.json` sidecar. Build progress shows a busy bar.
+- ✅ **Mode-driven Run** — one Run action whose label/dispatch follow the LEM/Seep/FEM mode; Build Mesh shows only in Seep/FEM; Seep/FEM Run gated on a built mesh (`_update_run_actions`).
+- ✅ **Run Seep** — `RunSeepDialog` (BC set 1/2, tol, plot variable head/u/v_mag/i_mag, contour levels, flowlines/vectors/fill/phreatic) → `SeepRunner` (`QThread`) runs `build_seep_data` → `run_seepage_analysis`; **Seep · Data** + **Seep · Solution** result tabs (`plot_seep_data` / `plot_seep_solution`, both given `fig=`); solution written to `{stem}_seep.csv` (`_seep2.csv` for BC 2). Convergence trace streams to the Log pane. **Each BC set keeps its own tab pair** (BC 2 → "Seep · Data 2" / "Seep · Solution 2"), so rapid-drawdown problems show BC 1 and BC 2 side by side and switch freely; results are held per BC in `doc.results["seep_solutions"][bc]`.
+- ✅ **Display dock** — per-plot-type display options live in a context-sensitive "Display" dock under the Inputs tree (not in the run dialogs); its page follows the active result tab and re-renders the cached result live. Panels for every view that has options, each exposing the full set of display kwargs the underlying `plot_*` accepts: Inputs (material table + placement, legend column layout), LEM · Search (highlight critical), LEM · Solution (slice numbers, seep contours), Mesh (nodes / labels / padding), Seep · Data and FEM · Data (BC / nodes / labels / fill opacity; FEM also BC symbol size), Seep · Solution (variable, levels, fill opacity, vector scale, padding, flow lines / vectors / fill / phreatic), FEM · Results (shear strain / deformation / displacement vectors — the diagnostic stress/strain/yield/displace_mag types are omitted; deform %, mesh / reinforcement / element labels, and the displacement-vector options gated to that plot type). Styling the `plot_*` functions hardcode (colors, widths, fonts) is still deferred to the Phase 5 `StyleConfig`. Reliability has no plot options, so it shows the placeholder.
+- ✅ **Image export** — a per-view **"Save…"** button on each canvas toolbar writes the current figure to PNG / PDF / SVG via `savefig`; PNG prompts for a DPI, vector formats skip it. Saves at the figure's true inch size so resolution is independent of on-screen zoom. Per-view (not per-panel) so Inputs / Reliability can export too. The Save button also offers **DXF export** of the current view.
+- ✅ **Auto legend layout** — engine-side measure-based legend layout across all result-view plots (wide but neat, multi-column), with **legend column controls** exposed on every result-view Display panel (so notebooks benefit too).
+- ✅ **Run FEM** — `RunFemDialog` (single trial / SSRM, F or F_min/F_max + tolerance + failure criterion) → `FemRunner` (`QThread`) runs `build_fem_data` → `solve_fem` / `solve_ssrm`; **FEM · Data** + **FEM · Results** tabs (`plot_fem_data` / `plot_fem_results`, both given `fig=`), display options (plot type, deform %) on the Display dock. SSRM reports FS and supports **cancel** (a `cancel_check` threaded through `solve_ssrm` + its helpers); solution exported via `export_fem_solution`.
+- Decisions: Run is **mode-driven** with dynamic text ("Run LEM/Seep/FEM"); a mesh is **explicit** (Build Mesh first — Seep/FEM stay disabled until `slope_data['mesh']` is present), not auto-built.
+
+**Phase 4 — done** (Meshing + Seepage + FEM all wired; display panels for all views; image export incl. DXF; auto legend layout). Remaining polish: progress granularity for FEM.
+
+**File lifecycle (§9) updates landed:**
+- ✅ **Sidecar reconciliation on save** — Save/Save As reconciles the `{stem}_mesh.json` / `{stem}_seep(.2).csv` / FEM sidecars against the current document so stale solution files don't outlive the inputs they came from.
+- ✅ **Stale-result invalidation** — editing inputs invalidates a stale LEM solution, and a geometry edit that makes the mesh invalid clears the mesh (Seep/FEM re-gate on a rebuild).
+
+**Phase 5 — Canvas selection + Display Options + style persistence** 🚧 **PARTIAL**
+- ✅ **Pick / double-click-to-edit** on the Inputs canvas. Since the canvas is a rasterised pixmap (no Matplotlib pick events), the double-click is mapped viewport → scene → axes data coords (`studio/canvas.py`, `picked` signal) and hit-tested against the input geometry (`studio/picking.py`) to resolve the editor category *and* the picked index — profile/polygon lines, the max-depth line, piezo lines, distributed loads, reinforcement, piles, circles, non-circular points, and seepage BCs (specified-head lines + exit face), with a material-zone interior falling back to the materials editor — then opens the same editor the Inputs tree uses, **pre-selecting the picked item** — the line in the profile/polygon master-detail dialogs, and the right tab + row in the two-set distributed-load and seep-BC dialogs (the specific load, head, or exit face). The hit-test is **mode-aware** (seep BCs only in seep mode, distributed loads only outside it) to match what the plot draws. Inputs view only; result canvases stay view-only, and the Inputs view shows a **select (arrow) cursor** plus a "(double-click on a feature to edit)" hint. Tolerance tracks zoom (~12 px in data units).
+- 🚧 **Styles (per-feature style sheet, §8a)** — built per the settled two-tier design. `xslope/style.py` holds `default_style_sheet()` (defaults baked in code) + `resolve_style`/`material_style`/`feature_style`/`style_delta`; each high-level `plot_*` takes an optional `style=` kwarg (no style passed → byte-identical to before, verified by render-hash). A **Styles dialog** (`studio/styles_dialog.py`, opened from a button at the bottom of the Display dock) edits **materials** (fill color from an earth-tone palette + soil-ish hatch + opacity, keyed by `mat_id`) and **features** (color from a standard-color palette, line style where conventional, width) with live preview; visual color/hatch popups + a "Default" swatch. Wired into the **Inputs** view, all **LEM result** views (solution / search / reliability), and the **mesh / seep / FEM** views (material-colored zones — also fixed a latent off-by-one so those zone colors finally match the Inputs view; mesh views take material *color* only, not hatch/opacity). A **Restore Defaults** button clears all deltas in one click. ⬜ Per-feature **visibility** toggles were considered and **deferred** — visibility is a *Display* concern (what's shown) rather than a style (how it looks), so its cleaner home is the contextual Display panel, not the Styles dialog.
+- ✅ **Style persistence (§8a)** — per-project `{stem}_styles.json` holding only sparse deltas vs the code defaults; loaded on Open, written on Save (removed when empty), reset on New / DXF import. (No factory JSON or global "Save as default" tier — deliberately dropped for v1; easy to add later.)
+- ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
+
+**Phase 6 — DXF + polish** 🚧 **PARTIAL**
+- ✅ **DXF export (view)** — the per-view Save button exports the *rendered* figure to DXF (`axes_to_dxf`); good for CAD viewing, lossy (a poor re-import source).
+- ✅ **DXF export (geometry)** — File → Export Geometry (DXF) writes the structured `export_dxf`: material zones on per-material layers, profile lines / circles / reinforcement / dloads / piezo on reserved feature layers. The clean companion the importer reads.
+- ✅ **Feature-aware DXF import wizard** — `read_dxf_layers` (engine) classifies all geometry per layer (closed/open polylines, lines, circles, points); `DxfImportDialog` lets the user map **each layer to an input feature** — material zone, profile line, piezo, distributed load, reinforcement, failure circles, or ignore — with a Material column for zone/profile. Defaults are *seeded* from xslope's own export layer names and the geometry kind but never assumed from arbitrary CAD names, so externally-drawn DXFs map too. `build_from_dxf_mapping` (document) routes geometry into the features and resyncs; non-geometric properties (load magnitudes, reinforcement strengths, material props, circle depth) come in as editable placeholders. Circle radius is fit from the exported arc; profile-based if any profile layer, else polygon-based.
+- ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
+
+  **🧪 DXF import/export — manual test checklist (unverified in-app; only round-tripped headlessly so far):**
+  - [ ] **Geometry export** — open a model → File → Export Geometry (DXF); open the `.dxf` in a CAD viewer and confirm layers: material-named zones, `PROFILE_<mat>`, `SEARCH_CIRCLES`, `REINFORCEMENT`, `DLOADS`, `PIEZO`.
+  - [ ] **Profile-based round-trip** — export a profile-based model (e.g. `arai_tagyo`), re-import: PROFILE_* layers default to *Profile line*, circles to *Failure circles*; accept defaults → geometry matches the original on the canvas; ground surface present.
+  - [ ] **Polygon-based round-trip** — export a polygon-sheet model, re-import: material-zone layers default to *Material zone*; zones + materials come back.
+  - [ ] **Reinforcement rejoin** — a model with reinforcement: confirm the import yields the *same number of reinforcement lines* (not one per segment), endpoints correct.
+  - [ ] **Circles** — confirm `Xo,Yo,R` recovered (radius fit from the arc) and Depth defaults to 0.
+  - [ ] **Placeholders** — dload magnitudes and reinforcement strengths import as 0; the "imported with notes" dialog lists the placeholder caveat; edit them in the editors and re-render.
+  - [ ] **Wizard overrides** — change a layer's target (e.g. set a layer to *Ignore*, or remap zone↔profile, rename/merge materials) and confirm the result honors it.
+  - [ ] **External CAD DXF** — import a DXF *not* produced by xslope (arbitrary layer names): defaults fall back sensibly (closed rings → Material zone, else Ignore), and manual mapping populates the right features.
+  - [ ] **All-Ignore** — set every layer to Ignore → friendly "nothing selected" error, no project change.
+  - [ ] **Missing ezdxf** — (optional) in an env without `ezdxf`, import/export show the actionable install message.
+
+**Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
+- ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
+- ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
+
+**Phase 8 — Documentation** ⬜ **NOT STARTED**
+- ⬜ User documentation for XSlope Studio in the existing mkdocs site: install/launch, the Inputs view + editors, double-click-to-edit, running LEM/Seep/FEM, the result views and Display options, image/DXF export, and the AI assistant.
+- ⬜ Screenshots / short walkthroughs of a full workflow (open → edit → mesh → solve → view).
+- ⬜ Keep it in sync as features land (the docs site is already built via `mkdocs`).
+
+---
+

@@ -260,6 +260,7 @@ class StylesDialog(QDialog):
         self._materials = materials or []
         self._orig = copy.deepcopy(style or {})
         self._on_preview = on_preview
+        self._resetting = False   # suppress per-widget preview during a bulk reset
         mat_overrides = (style or {}).get("materials") or {}
 
         layout = QVBoxLayout(self)
@@ -358,10 +359,33 @@ class StylesDialog(QDialog):
             self._frows.append((key, d, cbtn, combo, wspin))
         layout.addWidget(self.ftable, 1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+                                   | QDialogButtonBox.RestoreDefaults)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        buttons.button(QDialogButtonBox.RestoreDefaults).clicked.connect(self._reset_all)
         layout.addWidget(buttons)
+
+    def _reset_all(self):
+        """Reset every material and feature to its default (clears all deltas),
+        previewing the result live. Controls are updated with signals suppressed so
+        the canvas re-renders once at the end rather than per widget."""
+        self._resetting = True
+        try:
+            for idx, btn, hatch_btn, spin in self._rows:
+                btn.set_hex(to_hex(get_material_color(idx)))
+                hatch_btn.set_hatch(None)
+                spin.setValue(DEFAULT_ALPHA)
+            for key, d, cbtn, combo, wspin in self._frows:
+                if d.get("color"):
+                    cbtn.set_hex(to_hex(d["color"]))
+                if combo is not None:
+                    ci = combo.findData(d.get("linestyle"))
+                    combo.setCurrentIndex(ci if ci >= 0 else 0)
+                wspin.setValue(float(d.get("linewidth", 1.0)))
+        finally:
+            self._resetting = False
+        self._emit()
 
     # --- result / preview ------------------------------------------------
     def result(self):
@@ -402,6 +426,8 @@ class StylesDialog(QDialog):
         return out
 
     def _emit(self, *_):
+        if self._resetting:        # one combined preview fires after the bulk reset
+            return
         self._on_preview(self.result())
 
     def reject(self):

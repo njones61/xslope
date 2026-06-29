@@ -5,13 +5,13 @@ wraps the `xslope` engine: open a problem from Excel, view and edit the inputs
 graphically, run LEM / seepage / FEM, and view results — without writing code or
 running a notebook.
 
-**Status (current):** Phases 0–4 (engine prereq, viewer, editing, LEM, mesh/seep/FEM)
-are **done**; Phase 5 (canvas pick-to-edit + rendering polish) and Phase 6 (DXF
-import/export) are **largely done**; the AI assistant (§13) is **built** (multi-provider,
-`run_python` kernel). **Remaining:** the per-layer `StyleConfig` / Display Options
-dialog + style persistence (§8a), native installers (Phase 7), user docs (Phase 8).
-The live status is the phase roadmap in §15. Sections §1–§10 are the original design;
-where the as-built implementation diverged, the text has been updated to match.
+**Status (current):** Phases 0–6 (engine prereq, viewer, editing, LEM, mesh/seep/FEM,
+canvas pick-to-edit + styles/persistence, DXF import/export) are **done** — including
+full undo/redo hardening (labeled history, assistant-safe) and automated DXF round-trip
+verification; the AI assistant (§13) is **built** (multi-provider, `run_python` kernel).
+**Remaining:** native installers (Phase 7) and user docs (Phase 8). The live status is
+the phase roadmap in §15. Sections §1–§10 are the original design; where the as-built
+implementation diverged, the text has been updated to match.
 
 ---
 
@@ -648,23 +648,24 @@ SLOPE/W's zipped XML) to see how cleanly its geometry/materials map across.
 - ✅ **Style persistence (§8a)** — per-project `{stem}_styles.json` holding only sparse deltas vs the code defaults; loaded on Open, written on Save (removed when empty), reset on New / DXF import. (No factory JSON or global "Save as default" tier — deliberately dropped for v1; easy to add later.)
 - ✅ **Canvas rendering polish (§8):** Fit frames the content bbox (not the whole figure) with a cushion; crisp text on Retina by reading the device-pixel ratio from the screen and matching render DPI to the fitted scale; autofit retries until the shown tab is laid out and re-fits on each (re)render.
 
-**Phase 6 — DXF + polish** 🚧 **PARTIAL**
+**Phase 6 — DXF + polish** ✅ **DONE** (build + automated round-trip verification; only a purely-visual CAD-viewer/canvas glance remains optional)
 - ✅ **DXF export (view)** — the per-view Save button exports the *rendered* figure to DXF (`axes_to_dxf`); good for CAD viewing, lossy (a poor re-import source).
 - ✅ **DXF export (geometry)** — File → Export Geometry (DXF) writes the structured `export_dxf`: material zones on per-material layers, profile lines / circles / reinforcement / dloads / piezo on reserved feature layers. The clean companion the importer reads.
 - ✅ **Feature-aware DXF import wizard** — `read_dxf_layers` (engine) classifies all geometry per layer (closed/open polylines, lines, circles, points); `DxfImportDialog` lets the user map **each layer to an input feature** — material zone, profile line, piezo, distributed load, reinforcement, failure circles, or ignore — with a Material column for zone/profile. Defaults are *seeded* from xslope's own export layer names and the geometry kind but never assumed from arbitrary CAD names, so externally-drawn DXFs map too. `build_from_dxf_mapping` (document) routes geometry into the features and resyncs; non-geometric properties (load magnitudes, reinforcement strengths, material props, circle depth) come in as editable placeholders. Circle radius is fit from the exported arc; profile-based if any profile layer, else polygon-based.
 - ~~Optional coincident smart-editing~~ — **dropped** (separate, low-value feature; presupposed interactive geometry dragging we don't plan).
 
-  **🧪 DXF import/export — manual test checklist (unverified in-app; only round-tripped headlessly so far):**
-  - [ ] **Geometry export** — open a model → File → Export Geometry (DXF); open the `.dxf` in a CAD viewer and confirm layers: material-named zones, `PROFILE_<mat>`, `SEARCH_CIRCLES`, `REINFORCEMENT`, `DLOADS`, `PIEZO`.
-  - [ ] **Profile-based round-trip** — export a profile-based model (e.g. `arai_tagyo`), re-import: PROFILE_* layers default to *Profile line*, circles to *Failure circles*; accept defaults → geometry matches the original on the canvas; ground surface present.
-  - [ ] **Polygon-based round-trip** — export a polygon-sheet model, re-import: material-zone layers default to *Material zone*; zones + materials come back.
-  - [ ] **Reinforcement rejoin** — a model with reinforcement: confirm the import yields the *same number of reinforcement lines* (not one per segment), endpoints correct.
-  - [ ] **Circles** — confirm `Xo,Yo,R` recovered (radius fit from the arc) and Depth defaults to 0.
-  - [ ] **Placeholders** — dload magnitudes and reinforcement strengths import as 0; the "imported with notes" dialog lists the placeholder caveat; edit them in the editors and re-render.
-  - [ ] **Wizard overrides** — change a layer's target (e.g. set a layer to *Ignore*, or remap zone↔profile, rename/merge materials) and confirm the result honors it.
-  - [ ] **External CAD DXF** — import a DXF *not* produced by xslope (arbitrary layer names): defaults fall back sensibly (closed rings → Material zone, else Ignore), and manual mapping populates the right features.
-  - [ ] **All-Ignore** — set every layer to Ignore → friendly "nothing selected" error, no project change.
-  - [ ] **Missing ezdxf** — (optional) in an env without `ezdxf`, import/export show the actionable install message.
+  **🧪 DXF import/export — verification (automated, driving the real engine + the `DxfImportDialog` widget + `build_from_dxf_mapping`).** A `dxf` test type in `run_tests.py` (`python run_tests.py --dxf`, also in the default suite; skipped cleanly when ezdxf/PySide6 are absent) round-trips a profile, a reinforcement, and a polygon model through `export_dxf → read_dxf_layers → default wizard mapping → build_from_dxf_mapping`, asserting feature counts, reinforcement rejoin, circle recovery, and ground-surface rebuild. A broader scratch harness additionally exercised wizard overrides, external-CAD default seeding, placeholder caveats, and the all-ignore error. Status per original checklist item:
+  - [x] **Geometry export** — exported layers confirmed programmatically (`SEARCH_CIRCLES`, `PROFILE_<mat>`, `REINFORCEMENT`, material zones) by reading the `.dxf` back. *(Visual CAD-viewer confirmation is the only remaining manual nicety.)*
+  - [x] **Profile-based round-trip** — PROFILE_* default to *Profile line*, circles to *Failure circles*; `profile_lines` count matches and `ground_surface` rebuilt. *(in the `--dxf` suite)*
+  - [x] **Polygon-based round-trip** — material-zone layers default to *Material zone*; polygon count + materials recovered. *(in the `--dxf` suite)*
+  - [x] **Reinforcement rejoin** — import yields the *same number* of reinforcement lines (not one per segment). *(in the `--dxf` suite)*
+  - [x] **Circles** — `Xo,Yo,R` recovered (radius fit from the arc within 5%) and Depth defaults to 0.
+  - [x] **Placeholders** — dload/reinforcement strengths import as 0 and the notes list the caveat (scratch harness).
+  - [x] **Wizard overrides** — driving the real combo/edit cells, setting a layer to *Ignore* is honored (scratch harness).
+  - [x] **External CAD DXF** — arbitrary layer names: closed rings → *Material zone*, open polylines → *Ignore* via `suggest_dxf_target`; manual mapping populates the zone (scratch harness).
+  - [x] **All-Ignore** — `build_from_dxf_mapping` raises the friendly "nothing selected" `ValueError`, no project change (scratch harness).
+  - [x] **Missing ezdxf** — verified by inspection: `import_dxf_dialog`/`export_dxf_dialog` catch `ImportError` and show the actionable "install ezdxf" message.
+  - ⬜ Remaining is purely-visual in-app confirmation (does the re-imported geometry *look* right on the canvas, does the exported `.dxf` open cleanly in a CAD viewer) — the data path is verified.
 
 **Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
 - ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.

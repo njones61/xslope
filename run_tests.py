@@ -61,6 +61,15 @@ ROUNDTRIP_FILES = [
     'docs/seep/files/xslope_levee_poly.xlsx',
     'docs/inputs/seep/xslope_lost_lake.xlsx',
 ]
+# Structured-DXF round-trip files (export_dxf -> read_dxf_layers -> default wizard
+# mapping -> build_from_dxf_mapping). Each entry is (file, kind) where kind drives
+# the per-feature assertion: 'profile', 'polygon', or 'reinforce'. Needs ezdxf +
+# PySide6 (build_from_dxf_mapping lives in studio); skipped when either is absent.
+DXF_FILES = [
+    ('docs/inputs/slope/xslope_simple1.xlsx', 'profile'),
+    ('docs/inputs/slope/xslope_reinf.xlsx', 'reinforce'),
+    ('docs/seep/files/xslope_levee_poly.xlsx', 'polygon'),
+]
 # Source (non-derived) keys that must survive a round-trip. Derived geometry
 # (ground_surface, domain_polygon, and polygons-from-profile) is recomputed by
 # the loader and so is compared separately (polygon geometry only).
@@ -427,11 +436,86 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
+def _default_dxf_mapping(layers):
+    """The per-layer mapping the import wizard seeds by default: target from
+    ``suggest_dxf_target`` (xslope's own export layer names + geometry kind), and
+    the material name from the layer name (PROFILE_ stripped). Mirrors
+    studio.dialogs.DxfImportDialog so the suite exercises the same defaults."""
+    from xslope.cad import suggest_dxf_target
+    out = {}
+    for name, geom in layers.items():
+        target = suggest_dxf_target(name, geom)
+        mat = (name[8:] if name.upper().startswith('PROFILE_') else name)
+        out[name] = {'target': target,
+                     'material': mat if target in ('material_zone', 'profile') else None}
+    return out
+
+
+def run_dxf_roundtrip_test(test):
+    """Round-trip a model through the structured DXF export/import path: load ->
+    export_dxf -> read_dxf_layers -> default wizard mapping -> build_from_dxf_mapping
+    must recover the geometry (feature counts + circles). Returns (0.0, None) or
+    (None, message)."""
+    import tempfile
+    # Ensure a (headless) QApplication exists — ProjectDocument is a QObject.
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from xslope.fileio import load_slope_data
+    from xslope.cad import export_dxf, read_dxf_layers
+    from studio.document import ProjectDocument
+
+    sd = load_slope_data(test['file'])
+    tmp = tempfile.NamedTemporaryFile(suffix='.dxf', delete=False).name
+    try:
+        export_dxf(sd, tmp)
+        layers, _ = read_dxf_layers(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+    mapping = _default_dxf_mapping(layers)
+    doc = ProjectDocument()
+    doc.build_from_dxf_mapping(layers, mapping)
+    out = doc.slope_data
+
+    problems = []
+    kind = test.get('kind')
+    if kind == 'profile':
+        n0, n1 = len(sd.get('profile_lines') or []), len(out.get('profile_lines') or [])
+        if n1 != n0:
+            problems.append(f"profile_lines {n1} vs {n0}")
+        if out.get('ground_surface') is None:
+            problems.append("ground_surface missing")
+    elif kind == 'polygon':
+        n0, n1 = len(sd.get('polygons') or []), len(out.get('polygons') or [])
+        if n1 != n0:
+            problems.append(f"polygons {n1} vs {n0}")
+        if not out.get('materials'):
+            problems.append("no materials")
+    elif kind == 'reinforce':
+        n0 = len(sd.get('reinforcement_lines') or sd.get('reinforce_lines') or [])
+        n1 = len(out.get('reinforcement_lines') or [])
+        if n1 != n0:                          # rejoin must not split into per-segment lines
+            problems.append(f"reinforcement {n1} vs {n0}")
+    # Circles are recovered (radius fit from the arc) wherever present.
+    if sd.get('circles'):
+        n0, n1 = len(sd['circles']), len(out.get('circles') or [])
+        if n1 != n0:
+            problems.append(f"circles {n1} vs {n0}")
+
+    if problems:
+        return None, "DXF round-trip: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
     if test_type == 'roundtrip':
         return run_roundtrip_test(test)
+    if test_type == 'dxf':
+        return run_dxf_roundtrip_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'fem_ssrm':
@@ -453,6 +537,9 @@ def main():
     parser.add_argument('--seep', action='store_true', help='Run only seepage tests')
     parser.add_argument('--roundtrip', action='store_true',
                         help='Run only the Excel save/load round-trip tests')
+    parser.add_argument('--dxf', action='store_true',
+                        help='Run only the structured DXF export/import round-trip '
+                             'tests (needs ezdxf + PySide6)')
     parser.add_argument('--tolerance', type=float, default=0.01,
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
@@ -468,11 +555,12 @@ def main():
     args = parser.parse_args()
 
     # If no specific flags, run all
-    run_all = not (args.lem or args.fem or args.seep or args.roundtrip)
+    run_all = not (args.lem or args.fem or args.seep or args.roundtrip or args.dxf)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
     run_roundtrip = args.roundtrip or run_all
+    run_dxf = args.dxf or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -555,6 +643,27 @@ def main():
         else:
             print(f"Skipping round-trip tests (template not found: {ROUNDTRIP_TEMPLATE})")
 
+    # Structured DXF export/import round-trip tests. These touch the studio layer
+    # (build_from_dxf_mapping) and ezdxf, so they're skipped cleanly when either
+    # dependency is absent — the engine-only suite stays runnable without the GUI.
+    if run_dxf:
+        try:
+            import ezdxf            # noqa: F401
+            import PySide6          # noqa: F401
+            dxf_ok = True
+        except ImportError:
+            dxf_ok = False
+            print("Skipping DXF round-trip tests (ezdxf/PySide6 not installed)")
+        if dxf_ok:
+            n_dxf = 0
+            for fp, kind in DXF_FILES:
+                if Path(fp).exists():
+                    tests.append({'type': 'dxf', 'file': fp, 'kind': kind,
+                                  'method': '-', 'source': 'dxf'})
+                    n_dxf += 1
+            if n_dxf and not run_all:
+                print(f"Including {n_dxf} DXF round-trip tests")
+
     if args.skip_benchmarks:
         n_before = len(tests)
         tests = [t for t in tests if 'benchmark' not in t]
@@ -601,7 +710,7 @@ def main():
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'
-        elif test_type in ('roundtrip', 'template_sync'):
+        elif test_type in ('roundtrip', 'template_sync', 'dxf'):
             expected = 0.0          # these return 0.0 on success
             tol = 0.0
             label = 'mismatch'

@@ -69,6 +69,13 @@ class ProjectDocument(QObject):
         # surfaced in the toolbar history dropdown (plan §Phase 2 undo hardening).
         self._undo = []
         self._redo = []
+        # Saved-state marker: the undo position (== len(self._undo)) the document
+        # was last saved at, so undo/redo back to that point clears the dirty flag
+        # (Office-style). None = the saved state is unreachable (never saved, or its
+        # branch was discarded by a later edit). `style` lives outside the undo
+        # stack, so its dirtiness is tracked separately and OR-ed in.
+        self._clean_index = 0
+        self._style_dirty = False
 
     # --- state -----------------------------------------------------------
     @property
@@ -84,6 +91,29 @@ class ProjectDocument(QObject):
             self._dirty = value
             self.dirty_changed.emit(value)
 
+    def _refresh_dirty(self):
+        """Recompute dirty from the undo position vs the saved marker (plus the
+        out-of-band style flag). Call after any settled history transition."""
+        position_dirty = self._clean_index is None or len(self._undo) != self._clean_index
+        self._set_dirty(self._style_dirty or position_dirty)
+
+    def _snapshot(self):
+        """A snapshot of ``slope_data`` for the undo stack. Everything is deep-copied
+        **except** ``mesh``, whose (potentially large) object is shared by reference:
+        the mesh is only ever replaced wholesale (Build Mesh / clear), never mutated
+        in place, so sharing is safe and keeps snapshots cheap once a mesh exists."""
+        sd = self.slope_data
+        mesh = sd.get("mesh")
+        if mesh is None:
+            return copy.deepcopy(sd)
+        sd["mesh"] = None
+        try:
+            snap = copy.deepcopy(sd)
+        finally:
+            sd["mesh"] = mesh
+        snap["mesh"] = mesh
+        return snap
+
     # --- load ------------------------------------------------------------
     def load(self, path):
         """Load a project from an Excel file. Raises ValueError on bad input."""
@@ -93,6 +123,8 @@ class ProjectDocument(QObject):
         self.style = self._read_styles_sidecar(self.path)
         self._undo.clear()
         self._redo.clear()
+        self._clean_index = 0
+        self._style_dirty = False
         self._dirty = False
         self.loaded.emit()
         self.dirty_changed.emit(False)
@@ -129,9 +161,11 @@ class ProjectDocument(QObject):
 
     def set_style(self, style):
         """Replace the project's style deltas (sparse, see xslope.style), mark dirty,
-        and trigger a re-render."""
+        and trigger a re-render. Styles live outside the undo stack, so their
+        dirtiness is tracked on its own flag (cleared on save)."""
         self.style = style or {}
-        self._set_dirty(True)
+        self._style_dirty = True
+        self._refresh_dirty()
         self.changed.emit()
 
     def new(self):
@@ -148,6 +182,8 @@ class ProjectDocument(QObject):
         self.style = {}
         self._undo.clear()
         self._redo.clear()
+        self._clean_index = 0
+        self._style_dirty = False
         self._dirty = False
         self.loaded.emit()
         self.dirty_changed.emit(False)
@@ -274,28 +310,40 @@ class ProjectDocument(QObject):
         self.style = {}
         self._undo.clear()
         self._redo.clear()
+        self._clean_index = None      # freshly imported, never saved -> dirty
+        self._style_dirty = False
         self._dirty = True
         self.loaded.emit()
         self.dirty_changed.emit(True)
         return notes
 
     # --- editing / snapshot undo ----------------------------------------
-    # Cap on the undo/redo depth: snapshots deep-copy slope_data (mesh included),
-    # so an unbounded stack would grow without limit on a long session.
+    # Cap on the undo/redo depth: each snapshot deep-copies slope_data (the mesh is
+    # shared, not copied — see _snapshot), so an unbounded stack would still grow on
+    # a long session.
     MAX_HISTORY = 100
 
     def begin_edit(self, label="Edit"):
         """Snapshot the current state before a mutation so it can be undone. ``label``
         is a short tag describing the edit, shown in the history dropdown."""
-        if self.slope_data is not None:
-            self._undo.append((label, copy.deepcopy(self.slope_data)))
-            if len(self._undo) > self.MAX_HISTORY:
-                self._undo.pop(0)         # drop the oldest step
-            self._redo.clear()
+        if self.slope_data is None:
+            return
+        # A new edit discards the redo branch. If the saved (clean) state lived on
+        # that branch, it's now unreachable -> mark it lost so we stay dirty.
+        if self._clean_index is not None and self._clean_index > len(self._undo):
+            self._clean_index = None
+        self._undo.append((label, self._snapshot()))
+        if len(self._undo) > self.MAX_HISTORY:
+            self._undo.pop(0)             # drop oldest; positions shift down by 1
+            if self._clean_index is not None:
+                self._clean_index -= 1
+                if self._clean_index < 0:
+                    self._clean_index = None   # saved state scrolled off the stack
+        self._redo.clear()
 
     def commit_edit(self):
         """Signal that an in-place mutation of slope_data is complete."""
-        self._set_dirty(True)
+        self._refresh_dirty()
         self.changed.emit()
 
     def rollback_edit(self):
@@ -305,6 +353,7 @@ class ProjectDocument(QObject):
         if self._undo:
             _, snap = self._undo.pop()
             self.slope_data = snap
+            self._refresh_dirty()
             self.changed.emit()
 
     def cancel_edit(self):
@@ -337,12 +386,12 @@ class ProjectDocument(QObject):
 
     def _undo_one(self):
         label, snap = self._undo.pop()
-        self._redo.append((label, copy.deepcopy(self.slope_data)))
+        self._redo.append((label, self._snapshot()))
         self.slope_data = snap
 
     def _redo_one(self):
         label, snap = self._redo.pop()
-        self._undo.append((label, copy.deepcopy(self.slope_data)))
+        self._undo.append((label, self._snapshot()))
         self.slope_data = snap
 
     def undo(self):
@@ -361,7 +410,7 @@ class ProjectDocument(QObject):
             return
         for _ in range(n):
             self._undo_one()
-        self._set_dirty(True)
+        self._refresh_dirty()
         self.changed.emit()
 
     def redo_steps(self, n):
@@ -371,7 +420,7 @@ class ProjectDocument(QObject):
             return
         for _ in range(n):
             self._redo_one()
-        self._set_dirty(True)
+        self._refresh_dirty()
         self.changed.emit()
 
     # --- save (scaffolded; wired into the UI in Phase 2) -----------------
@@ -382,4 +431,6 @@ class ProjectDocument(QObject):
         save_slope_data_to_xlsx(self.slope_data, target, template=template)
         self.path = target
         self._write_styles_sidecar(target)      # {stem}_styles.json (or remove if none)
+        self._clean_index = len(self._undo)     # this undo position is now saved
+        self._style_dirty = False
         self._set_dirty(False)

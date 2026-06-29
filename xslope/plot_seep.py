@@ -12,7 +12,7 @@ from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by
 logger = logging.getLogger(__name__)
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.4, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -42,9 +42,10 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         ax = fig.add_subplot(111)
     materials = np.unique(element_materials)
 
-    # Import get_material_color to ensure consistent colors with plot_mesh
-    from .plot import get_material_color
-    mat_to_color = {mat: get_material_color(mat) for mat in materials}
+    # Material colors (style overrides → palette default), consistent with plot_mesh.
+    from .style import resolve_style, material_style
+    _st = resolve_style(style)
+    mat_to_color = {mat: material_style(_st, int(mat))["color"] for mat in materials}
 
     # If element_types is not provided, assume all triangles (backward compatibility)
     if element_types is None:
@@ -194,10 +195,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
             h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)", gid='SEEP_EXIT_FACE')
             legend_handles.append(h2)
 
-    # Single combined legend below the plot, auto-fit to the axes width.
     from .plot import _legend_below
-    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
-                  legend_ncol=legend_ncol, frameon=False)
     ax.set_aspect("equal")
 
     # Add a bit of headroom so the mesh/BC markers don't touch the top border
@@ -205,7 +203,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     if y1 > y0:
         pad = 0.05 * (y1 - y0)
         ax.set_ylim(y0, y1 + pad)
-    
+
     # Count element types for title
     num_triangles = np.sum(element_types == 3)
     num_quads = np.sum(element_types == 4)
@@ -215,10 +213,13 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         title = f"Finite Element Mesh with Material Zones ({num_quads} quadrilaterals)"
     else:
         title = f"Finite Element Mesh with Material Zones ({num_triangles} triangles)"
-    
+
     ax.set_title(title)
-    # plt.subplots_adjust(bottom=0.2)  # Add vertical cushion
     fig.tight_layout()
+    # Single combined legend below the plot, after tight_layout so the reserved
+    # bottom margin (for multi-row legends) isn't clobbered.
+    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
+                  legend_ncol=legend_ncol, frameon=False)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:

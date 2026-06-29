@@ -254,10 +254,7 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         saved_roller_x = fem_data.get("roller_x_nodes", set())
         _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_symbol_size, saved_roller_x)
 
-    # Single combined legend below the plot, auto-fit to the axes width.
     from .plot import _legend_below
-    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
-                  legend_ncol=legend_ncol, frameon=False)
     # Adjust plot limits to accommodate force arrows
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
     y_min, y_max = nodes[:, 1].min(), nodes[:, 1].max()
@@ -300,6 +297,10 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     
     ax.set_title(title)
     fig.tight_layout()
+    # Combined legend below the plot, after tight_layout so its reserved bottom
+    # margin (for multi-row legends) isn't clobbered.
+    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
+                  legend_ncol=legend_ncol, frameon=False)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:

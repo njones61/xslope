@@ -1686,8 +1686,14 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
     else:
         ncol = max(1, int(legend_ncol))
-    return ax.legend(handles=handles, labels=labels, loc="upper center",
-                     bbox_to_anchor=anchor, ncol=ncol, **kw)
+    leg = ax.legend(handles=handles, labels=labels, loc="upper center",
+                    bbox_to_anchor=anchor, ncol=ncol, **kw)
+    # Reserve bottom margin so a multi-row legend below the axes fits inside the
+    # figure (otherwise the figure raster clips the lower rows). Grows with the
+    # row count; the anchor sits ~0.15 below the axes, hence the larger base.
+    n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
+    fig.subplots_adjust(bottom=min(0.55, 0.15 + 0.08 * n_rows))
+    return leg
 
 
 def plot_inputs(
@@ -2118,11 +2124,6 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         handles.append(dummy_line)
         labels.append('Distributed Load')
     
-    _legend_below(ax, fig, anchor=(0.5, -0.15), handles=handles, labels=labels,
-                  legend_ncol=legend_ncol)
-
-    # Add vertical space below for the legend
-    fig.subplots_adjust(bottom=0.2)
     ax.set_aspect('equal')
 
     fs = results['FS']
@@ -2154,6 +2155,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ax.set_ylim(ymin, ymax)
 
     fig.tight_layout()
+    _legend_below(ax, fig, anchor=(0.5, -0.15), handles=handles, labels=labels,
+                  legend_ncol=legend_ncol)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg')
     if save_png:
@@ -2289,13 +2292,12 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
-
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     fig.tight_layout()
+    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
 
     if save_png:
         fig.savefig('plot_circular_search_results.png', dpi=dpi, bbox_inches='tight')
@@ -2376,13 +2378,12 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
-
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     fig.tight_layout()
+    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
 
     if save_png:
         fig.savefig('plot_noncircular_search_results.png', dpi=dpi, bbox_inches='tight')
@@ -2471,21 +2472,21 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(False)
-    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
-    
+
     # Title with reliability statistics using mathtext
     F_MLV = reliability_data['F_MLV']
     sigma_F = reliability_data['sigma_F']
     COV_F = reliability_data['COV_F']
     reliability = reliability_data['reliability']
     prob_failure = reliability_data['prob_failure']
-    
+
     ax.set_title(f"Reliability Analysis Results\n"
                 f"$F_{{MLV}}$ = {F_MLV:.3f}, $\\sigma_F$ = {sigma_F:.3f}, "
                 f"$COV_F$ = {COV_F:.3f}\n"
                 f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
 
     fig.tight_layout()
+    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
 
     if save_png:
         filename = 'plot_reliability_results.png'
@@ -2677,11 +2678,6 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     
     ax.set_aspect('equal')
     ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
-    
-    # Add legend if we have materials
-    if legend_elements:
-        _legend_below(ax, fig, anchor=(0.5, -0.05), handles=legend_elements,
-                      legend_ncol=legend_ncol)
 
     # Add cushion
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
@@ -2690,11 +2686,13 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     y_pad = (y_max - y_min) * pad_frac
     ax.set_xlim(x_min - x_pad, x_max + x_pad)
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
-    
-    # Add extra cushion for legend space
-    ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
     fig.tight_layout()
+    # Add legend if we have materials (after tight_layout so its reserved bottom
+    # margin isn't clobbered)
+    if legend_elements:
+        _legend_below(ax, fig, anchor=(0.5, -0.05), handles=legend_elements,
+                      legend_ncol=legend_ncol)
 
     if save_png:
         fig.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')

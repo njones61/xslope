@@ -361,10 +361,12 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     if element_materials is not None:
         materials = np.unique(element_materials)
 
-        # Material colors (style overrides → palette default), consistent with plot_mesh.
+        # Material colors (style overrides → palette default). Mesh material IDs are
+        # 1-based (gmsh); the style sheet / inputs key by 0-based mat_id, so map mat-1
+        # — this also aligns the zone colors with the Inputs view.
         from .style import resolve_style, material_style
         _st = resolve_style(style)
-        mat_to_color = {mat: material_style(_st, int(mat))["color"] for mat in materials}
+        mat_to_color = {mat: material_style(_st, int(mat) - 1)["color"] for mat in materials}
 
         # Batch polygons by material for efficient rendering
         mat_fill_polys = {mat: [] for mat in materials}

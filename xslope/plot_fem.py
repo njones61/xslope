@@ -38,7 +38,7 @@ def _extract_uv(disp, fem_data):
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
-                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
 
@@ -70,9 +70,12 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         ax = fig.add_subplot(111)
     materials = np.unique(element_materials)
 
-    # Import get_material_color to ensure consistent colors with plot_mesh
-    from .plot import get_material_color
-    mat_to_color = {mat: get_material_color(mat) for mat in materials}
+    # Material colors (style overrides → palette default). Mesh material IDs are
+    # 1-based (gmsh); the style sheet / inputs key by 0-based mat_id, so map mat-1
+    # — this also aligns the zone colors with the Inputs view.
+    from .style import resolve_style, material_style
+    _st = resolve_style(style)
+    mat_to_color = {mat: material_style(_st, int(mat) - 1)["color"] for mat in materials}
 
     # If element_types is not provided, assume all triangles (backward compatibility)
     if element_types is None:

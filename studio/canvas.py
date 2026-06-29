@@ -195,16 +195,16 @@ class MplCanvas(QWidget):
             slope_data, reliability_data,
             legend_ncol=opts.get("legend_ncol", "auto"), fig=fig, style=style))
 
-    def render_mesh(self, mesh, materials=None, opts=None):
+    def render_mesh(self, mesh, materials=None, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_mesh(
             mesh, materials=materials, show_nodes=opts.get("show_nodes", True),
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
             pad_frac=opts.get("pad_frac", 0.05),
-            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig, style=style))
 
-    def render_seep_data(self, seep_data, opts=None):
+    def render_seep_data(self, seep_data, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_seep_data(
             seep_data, show_nodes=opts.get("show_nodes", False),
@@ -212,9 +212,9 @@ class MplCanvas(QWidget):
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
             alpha=opts.get("alpha", 0.4),
-            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig, style=style))
 
-    def render_seep_solution(self, seep_data, solution, opts):
+    def render_seep_solution(self, seep_data, solution, opts, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_seep_solution(
             seep_data, solution, variable=opts.get("variable", "head"),
@@ -227,9 +227,9 @@ class MplCanvas(QWidget):
             fill_contours=opts.get("fill_contours", False),
             phreatic=opts.get("phreatic", True),
             cmap=opts.get("cmap", "Spectral_r"),
-            cbar_shrink=opts.get("cbar_shrink", 0.8), mesh=False, fig=fig))
+            cbar_shrink=opts.get("cbar_shrink", 0.8), mesh=False, fig=fig, style=style))
 
-    def render_fem_data(self, fem_data, opts=None):
+    def render_fem_data(self, fem_data, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_fem_data(
             fem_data, show_nodes=opts.get("show_nodes", False),
@@ -238,7 +238,7 @@ class MplCanvas(QWidget):
             label_nodes=opts.get("label_nodes", False),
             alpha=opts.get("alpha", 0.4),
             bc_symbol_size=opts.get("bc_symbol_size", 0.03),
-            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), fig=fig, style=style))
 
     def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}

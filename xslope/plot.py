@@ -2500,7 +2500,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         plt.show()
     return fig
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
     """
     Plot the finite element mesh with material regions.
 
@@ -2595,11 +2595,19 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
             legend_elements.append(plt.Line2D([0], [0], color='red', linewidth=3, 
                                             alpha=0.8, label='1D Elements'))
     
+    # Material colors (style overrides → palette default). Mesh material IDs are
+    # 1-based (gmsh); the style sheet keys by 0-based mat_id, so map mid-1 — this
+    # also aligns the zone colors with the Inputs view.
+    from .style import resolve_style, material_style
+    _st = resolve_style(style)
+    def _mat_color(mid):
+        return material_style(_st, int(mid) - 1)["color"]
+
     # Plot 2D elements SECOND (middle layer)
     for mid, elements_list in material_elements.items():
         # Create polygon collection for this material
         poly_collection = PolyCollection(elements_list, gid='MESH',
-                                       facecolor=get_material_color(mid),
+                                       facecolor=_mat_color(mid),
                                        edgecolor='k',
                                        alpha=0.4,
                                        linewidth=0.5)
@@ -2611,9 +2619,9 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
         else:
             label = f'Material {mid}'
         
-        legend_elements.append(Patch(facecolor=get_material_color(mid), 
-                                   edgecolor='k', 
-                                   alpha=0.4, 
+        legend_elements.append(Patch(facecolor=_mat_color(mid),
+                                   edgecolor='k',
+                                   alpha=0.4,
                                    label=label))
     
     # Label 2D elements if requested

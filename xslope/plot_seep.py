@@ -42,10 +42,12 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
         ax = fig.add_subplot(111)
     materials = np.unique(element_materials)
 
-    # Material colors (style overrides → palette default), consistent with plot_mesh.
+    # Material colors (style overrides → palette default). Mesh material IDs are
+    # 1-based (gmsh); the style sheet / inputs key by 0-based mat_id, so map mat-1
+    # — this also aligns the zone colors with the Inputs view.
     from .style import resolve_style, material_style
     _st = resolve_style(style)
-    mat_to_color = {mat: material_style(_st, int(mat))["color"] for mat in materials}
+    mat_to_color = {mat: material_style(_st, int(mat) - 1)["color"] for mat in materials}
 
     # If element_types is not provided, assume all triangles (backward compatibility)
     if element_types is None:
@@ -233,7 +235,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, save_png=False, save_dxf=False, dpi=300, fig=None):
+def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, save_png=False, save_dxf=False, dpi=300, fig=None, style=None):
     """
     Plot seep analysis results including head contours, flowlines, and phreatic surface.
     
@@ -359,9 +361,10 @@ def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat
     if element_materials is not None:
         materials = np.unique(element_materials)
 
-        # Import get_material_color to ensure consistent colors with plot_mesh
-        from .plot import get_material_color
-        mat_to_color = {mat: get_material_color(mat) for mat in materials}
+        # Material colors (style overrides → palette default), consistent with plot_mesh.
+        from .style import resolve_style, material_style
+        _st = resolve_style(style)
+        mat_to_color = {mat: material_style(_st, int(mat))["color"] for mat in materials}
 
         # Batch polygons by material for efficient rendering
         mat_fill_polys = {mat: [] for mat in materials}

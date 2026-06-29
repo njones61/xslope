@@ -793,6 +793,11 @@ class MainWindow(QMainWindow):
         self._rerender_solution()
         self._rerender_search()
         self._rerender_reliability()
+        self._rerender_mesh()
+        for bc in list(self.doc.results.get("seep_solutions", {})):
+            self._rerender_seep_data(bc)
+            self._rerender_seep_solution(bc)
+        self._rerender_fem_data()
 
     def _on_canvas_pick(self, x, y, tol):
         """Open the editor for the input feature the user double-clicked on the
@@ -967,7 +972,8 @@ class MainWindow(QMainWindow):
         if mesh and panel and self.mesh_canvas is not None:
             try:
                 self.mesh_canvas.render_mesh(
-                    mesh, self.doc.slope_data.get("materials"), panel.options())
+                    mesh, self.doc.slope_data.get("materials"), panel.options(),
+                    style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 
@@ -1049,7 +1055,8 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(canvas)
         if bundle and panel and canvas is not None:
             try:
-                canvas.render_seep_data(bundle["seep_data"], panel.options())
+                canvas.render_seep_data(bundle["seep_data"], panel.options(),
+                                        style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 
@@ -1072,7 +1079,8 @@ class MainWindow(QMainWindow):
         if bundle and panel and canvas is not None:
             try:
                 canvas.render_seep_solution(
-                    bundle["seep_data"], bundle["solution"], panel.options())
+                    bundle["seep_data"], bundle["solution"], panel.options(),
+                    style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 
@@ -1159,7 +1167,8 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(self.fem_data_canvas)
         if bundle and panel and self.fem_data_canvas is not None:
             try:
-                self.fem_data_canvas.render_fem_data(bundle["fem_data"], panel.options())
+                self.fem_data_canvas.render_fem_data(bundle["fem_data"], panel.options(),
+                                                     style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
 

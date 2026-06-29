@@ -18,6 +18,13 @@ uppercased, with spaces and DXF-illegal characters (`< > / \ " : ; ? * | =` plus
 the backtick) replaced by underscores — so a material named "Silty Clay" becomes
 layer `SILTY_CLAY`.
 
+!!! tip "DXF in the desktop app"
+    [XSlope Studio](../studio/index.md) exposes this functionality graphically:
+    **File → Export Geometry (DXF)** writes the structured layered DXF, the per-view
+    **Save…** button exports the rendered picture, and **File → Import DXF…** opens a
+    feature-aware wizard that maps each layer to an input feature. See
+    [Studio → DXF import and export](../studio/analysis.md#dxf-import-and-export).
+
 ---
 
 ## Exporting a model to DXF

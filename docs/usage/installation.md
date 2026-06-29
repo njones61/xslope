@@ -7,6 +7,12 @@ also install directly from the source repository.
     You can run XSLOPE entirely in your browser with no local installation using the
     pre-configured Google Colab notebooks. See [Colab Notebooks](notebooks.md) for details.
 
+!!! tip "Want the graphical desktop app?"
+    The [XSlope Studio](../studio/index.md) desktop application installs with the
+    `gui` extra (`pip install "xslope[gui]"`). See
+    [XSlope Studio → Installation](../studio/index.md#installation) for the extras
+    (`gui`, `fem`, `ai`) and launch instructions.
+
 ## Installing with pip
 
 XSLOPE is available on PyPI. If you intend to only run limit equilibrium problems, you can install xslope as follows:

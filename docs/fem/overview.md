@@ -7,7 +7,11 @@ many fundamental limitations of traditional limit equilibrium methods. While lim
 
 ![plot_fem_results.png](images/plot_fem_results.png){width=800}
 
-## Governing Equations
+!!! tip "Run FEM interactively"
+    The finite-element / SSRM analysis described here can be run point-and-click in
+    [XSlope Studio](../studio/index.md): build a mesh, run a single trial or an SSRM
+    factor-of-safety search (with cancel), and view deformation and shear-strain
+    results. See [Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
 
 ### Equilibrium Equations
 

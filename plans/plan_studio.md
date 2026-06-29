@@ -671,10 +671,13 @@ SLOPE/W's zipped XML) to see how cleanly its geometry/materials map across.
 - ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
 - ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
 
-**Phase 8 — Documentation** ⬜ **NOT STARTED**
-- ⬜ User documentation for XSlope Studio in the existing mkdocs site: install/launch, the Inputs view + editors, double-click-to-edit, running LEM/Seep/FEM, the result views and Display options, image/DXF export, and the AI assistant.
-- ⬜ Screenshots / short walkthroughs of a full workflow (open → edit → mesh → solve → view).
-- ⬜ Keep it in sync as features land (the docs site is already built via `mkdocs`).
+**Phase 8 — Documentation** 🚧 **PARTIAL** (first pass written; screenshots + installer section pending)
+- ✅ User documentation for XSlope Studio in the mkdocs site — a new **XSlope Studio** nav section (`docs/studio/`): **Overview** (install via the `gui`/`fem`/`ai` extras + launch), **The Interface** (window layout, canvas zoom/pan, view tabs, mode selector, Display + Log docks), **Editing Inputs** (editors, double-click-to-edit, labeled undo/redo, styles, file lifecycle), **Running Analyses** (meshing + LEM/Seep/FEM, result views, Display options, image/DXF export + import wizard), and **AI Assistant** (providers, autonomy modes, vision). Builds clean (no broken links).
+- ✅ Landing page (`docs/index.md`) — Studio called out in the intro paragraph + a dedicated "XSlope Studio — Desktop Application" section with a (placeholder) hero screenshot.
+- ✅ Cross-references seeded across the site where Studio is relevant: the Claude skill page, installation, the DXF page, and the LEM/Seep/FEM overviews each link to the matching Studio page.
+- ⬜ **Installer / App-management content** — `docs/studio/app_management.md` is a deliberate **placeholder** pending Phase 7 (native installers): install/update/uninstall, first-launch security prompts, where files live. The Overview's Installation section also carries a Phase-7 warning admonition.
+- ⬜ **Screenshots** — every page carries inline `<!-- screenshot: … -->` markers + italic placeholders; real captures (incl. a full open → edit → mesh → solve → view walkthrough) still to be taken. The landing-page hero is a generated placeholder PNG to swap out.
+- ⬜ Keep it in sync as features land (the docs site is built via `mkdocs`).
 
 ---
 

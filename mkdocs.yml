@@ -34,6 +34,13 @@ nav:
     - Colab Notebooks: usage/notebooks.md
     - Claude Code Skill: usage/claude/index.md
     - DXF Import/Export: usage/dxf.md
+  - XSlope Studio:
+    - Overview: studio/index.md
+    - The Interface: studio/interface.md
+    - Editing Inputs: studio/editing.md
+    - Running Analyses: studio/analysis.md
+    - AI Assistant: studio/assistant.md
+    - App Management: studio/app_management.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

@@ -76,7 +76,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
 
     # Work on a copy: the analysis overwrites strength and load columns (Stage 2
     # swaps in the drawdown pore pressures / loads and undrained strengths), so do
-    # not mutate the caller's slice DataFrame.
+    # not mutate the caller's slice DataFrame. We DO write the winning stage's
+    # per-slice results (n_eff, u, c, phi) back to it at the end, so the caller —
+    # and the plots/search cache that read it — see the rapid-drawdown stresses
+    # rather than the stale Stage-0 values.
+    caller_df = df
     df = df.copy()
 
     # Validate that d and psi parameters are present for at least some slices
@@ -194,7 +198,9 @@ def rapid_drawdown(df, method_name, debug_level=1):
     stage2_FS = result_stage2['FS']
     if debug_level >= 1:
         print(f"Stage 2 FS = {stage2_FS:.4f}")
-    
+
+    stage2_state = df.copy()   # per-slice n_eff/u/c/phi for the Stage-2 result
+
     # Stage 3: Check drained strengths
     if debug_level >= 1:
         print("Stage 3: Checking drained strengths...")
@@ -246,14 +252,24 @@ def rapid_drawdown(df, method_name, debug_level=1):
         result_stage3 = result_stage2
         if debug_level >= 1:
             print("Stage 3: No drained strength adjustments needed")
-    
+
+    stage3_state = df.copy()   # per-slice state after Stage 3 (== Stage 2 if skipped)
+
     # Final FS is the lower of Stage 2 and Stage 3
     if stage2_FS < stage3_FS:
         final_FS = stage2_FS
         result = result_stage2
+        winning_state = stage2_state
     else:
         final_FS = stage3_FS
         result = result_stage3
+        winning_state = stage3_state
+
+    # Hand the winning stage's per-slice results back to the caller's DataFrame so
+    # the cached/plotted slices carry real rapid-drawdown stresses (not Stage-0).
+    for col in ("n_eff", "u", "c", "phi"):
+        if col in winning_state.columns and col in caller_df.columns:
+            caller_df[col] = winning_state[col].values
     
     if debug_level >= 1:
         print(f"Final rapid drawdown FS = {final_FS:.4f}")

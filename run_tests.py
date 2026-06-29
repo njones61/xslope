@@ -185,6 +185,11 @@ def run_lem_test(test):
         solver_result = solve_selected(method, slice_df, rapid=rapid)
         if isinstance(solver_result, str):
             return None, f"solve failed: {solver_result}"
+        # Regression guard: rapid drawdown must write the winning stage's stresses
+        # back to the caller's slice_df (else plots get n_eff=0 — see
+        # advanced.rapid_drawdown). The FS can be correct while n_eff is stale.
+        if rapid and not bool((slice_df['n_eff'].abs() > 0).any()):
+            return None, "rapid drawdown left n_eff all-zero in the slice_df (not written back)"
         return solver_result['FS'], None
 
     elif test_type == 'circular_search':
@@ -193,6 +198,10 @@ def run_lem_test(test):
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "circular_search found no valid surface"
+        if rapid:
+            crit = fs_cache[0].get('slices')
+            if crit is not None and not bool((crit['n_eff'].abs() > 0).any()):
+                return None, "rapid search: critical-surface n_eff all-zero (not written back)"
         return fs_cache[0]['FS'], None
 
     elif test_type == 'noncircular_search':

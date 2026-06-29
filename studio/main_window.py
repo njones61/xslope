@@ -18,7 +18,7 @@ from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
+    QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
     QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,
 )
@@ -317,9 +317,9 @@ class MainWindow(QMainWindow):
         self.act_quit = QAction("&Quit", self, shortcut=QKeySequence.Quit,
                                 triggered=self.close)
         self.act_undo = QAction("&Undo", self, shortcut=QKeySequence.Undo,
-                                triggered=self.doc.undo, enabled=False)
+                                triggered=self._undo, enabled=False)
         self.act_redo = QAction("&Redo", self, shortcut=QKeySequence.Redo,
-                                triggered=self.doc.redo, enabled=False)
+                                triggered=self._redo, enabled=False)
         self.act_about = QAction("&About", self, triggered=self._about)
         self.act_save = QAction("&Save", self, shortcut=QKeySequence.Save,
                                 enabled=False, triggered=self.save)
@@ -369,6 +369,13 @@ class MainWindow(QMainWindow):
         tb.addAction(self.act_new)
         tb.addAction(self.act_open)
         tb.addSeparator()
+        # Undo / Redo split-buttons: the button does a single step; the dropdown
+        # lists the labeled history and jumps to a chosen point (plan §Phase 2).
+        self.undo_btn = self._make_history_button(self.act_undo, redo=False)
+        self.redo_btn = self._make_history_button(self.act_redo, redo=True)
+        tb.addWidget(self.undo_btn)
+        tb.addWidget(self.redo_btn)
+        tb.addSeparator()
         self.mode_label = QLabel(" Mode: ")
         tb.addWidget(self.mode_label)
         self.mode_combo = QComboBox()
@@ -385,6 +392,54 @@ class MainWindow(QMainWindow):
         pt = self.mode_label.font().pointSizeF()
         if pt > 0:
             tb.setStyleSheet(f"QToolButton {{ font-size: {pt:g}pt; }}")
+
+    # --- undo / redo history ---------------------------------------------
+    def _make_history_button(self, action, redo):
+        """A toolbar split-button: clicking runs ``action`` (single step); the
+        dropdown lists the labeled history and jumps to a chosen point."""
+        btn = QToolButton(self)
+        btn.setDefaultAction(action)
+        btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        btn.setPopupMode(QToolButton.MenuButtonPopup)
+        menu = QMenu(btn)
+        menu.aboutToShow.connect(lambda m=menu, r=redo: self._populate_history_menu(m, r))
+        btn.setMenu(menu)
+        return btn
+
+    def _populate_history_menu(self, menu, redo):
+        menu.clear()
+        labels = self.doc.redo_labels() if redo else self.doc.undo_labels()
+        verb = "Redo" if redo else "Undo"
+        if not labels:
+            menu.addAction(f"Nothing to {verb.lower()}").setEnabled(False)
+            return
+        for i, label in enumerate(labels):
+            # Selecting entry i means jump past steps 0..i, i.e. i+1 steps.
+            act = menu.addAction(f"{verb} {label}")
+            act.triggered.connect(lambda _=False, n=i + 1, r=redo: self._history_multi(n, r))
+
+    def _undo(self):
+        self._history_step(self.doc.undo)
+
+    def _redo(self):
+        self._history_step(self.doc.redo)
+
+    def _history_multi(self, n, redo):
+        self._history_step((lambda: self.doc.redo_steps(n)) if redo
+                           else (lambda: self.doc.undo_steps(n)))
+
+    def _history_step(self, fn):
+        """Run an undo/redo on the document, then reconcile derived state: the
+        restored ``slope_data`` (mesh included) time-travels inside the snapshot, but
+        cached LEM/seep/FEM *solutions* live outside it and are now stale, so drop
+        them and re-sync the mesh/run gating to the restored geometry."""
+        if not self.doc.is_open:
+            return
+        fn()                                  # emits changed -> _render (redraw + enable)
+        self.invalidate_results(clear_mesh=False)   # drop stale solution tabs; keep mesh
+        self.doc.results["mesh"] = self.doc.slope_data.get("mesh")
+        self._update_run_actions()            # Seep/FEM gate follows the restored mesh
+        self._populate_inputs_tree()
 
     # --- new / open / recent ---------------------------------------------
     def new_project(self):
@@ -824,17 +879,29 @@ class MainWindow(QMainWindow):
             dlg = editor.build(self.doc.slope_data, self)
         if dlg.exec():
             mesh_before = self.mesh_signature(self.doc.slope_data)
-            self.doc.begin_edit()
+            self.doc.begin_edit(f"Edit {self.EDIT_LABELS.get(category, category)}")
             try:
                 editor.apply(self.doc.slope_data, dlg)
             except Exception:
+                # A failed apply must not leave a partial edit on the undo stack —
+                # restore the snapshot and bail (the document is unchanged).
                 traceback.print_exc()
+                self.doc.rollback_edit()
+                return
             self.doc.commit_edit()        # -> re-render + mark dirty
             self._populate_inputs_tree()
             # inputs changed -> solution is stale; if the geometry changed, the
             # mesh is stale too (it embeds the profile/polygon/reinforce/pile lines).
             geom_changed = self.mesh_signature(self.doc.slope_data) != mesh_before
             self.invalidate_results(clear_mesh=geom_changed)
+
+    # Human labels for the undo-history dropdown, keyed by CATEGORY_EDITORS key.
+    EDIT_LABELS = {
+        "global": "Global Parameters", "materials": "Materials", "circles": "Circles",
+        "non_circ": "Non-Circular Surface", "piezo": "Piezometric Lines",
+        "dloads": "Distributed Loads", "seep_bc": "Seepage BC", "piles": "Piles",
+        "reinforce": "Reinforcement", "profile": "Profile Lines", "polygons": "Polygons",
+    }
 
     # Source inputs whose change makes the mesh stale (the domain geometry plus
     # the reinforcement/pile lines baked in as mesh constraint lines).

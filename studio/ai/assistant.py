@@ -284,37 +284,64 @@ def _extract_code(content):
 
 _SOURCE_KEYS = (
     "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
-    "materials", "profile_lines", "circles", "non_circ", "piezo_line",
+    "materials", "profile_lines", "polygons", "circles", "non_circ", "piezo_line",
     "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "pile_lines",
     "seepage_bc", "seepage_bc2",
 )
 
+# Short tags for the undo-history dropdown, keyed by source input. Several keys map
+# to the same tag (e.g. both piezo lines -> "piezo") so a multi-key edit reads cleanly.
+_KEY_LABELS = {
+    "gamma_water": "global", "tcrack_depth": "global", "tcrack_water": "global",
+    "k_seismic": "global", "max_depth": "global",
+    "materials": "materials", "profile_lines": "profile", "polygons": "polygons",
+    "circles": "circles", "non_circ": "non-circular", "piezo_line": "piezo",
+    "piezo_line2": "piezo", "dloads": "dloads", "dloads2": "dloads",
+    "reinforcement_lines": "reinforcement", "pile_lines": "piles",
+    "seepage_bc": "seep BC", "seepage_bc2": "seep BC",
+}
 
-def _input_signature(sd):
-    """A JSON signature of the editable source inputs, to tell whether a code run
-    actually changed the inputs (vs a read-only query). Returns None if it can't
-    be built (then the caller treats the run as a possible edit, to be safe)."""
-    def clean(o):
-        if hasattr(o, "wkt"):
-            return o.wkt
-        try:
-            import numpy as np
-            if isinstance(o, np.ndarray):
-                return o.tolist()
-            if isinstance(o, np.generic):
-                return o.item()
-        except Exception:
-            pass
-        if isinstance(o, dict):
-            return {k: clean(v) for k, v in o.items()}
-        if isinstance(o, (list, tuple)):
-            return [clean(x) for x in o]
-        return o
+
+def _clean(o):
+    if hasattr(o, "wkt"):
+        return o.wkt
     try:
-        return json.dumps({k: clean(sd.get(k)) for k in _SOURCE_KEYS},
-                          sort_keys=True, default=str)
+        import numpy as np
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        if isinstance(o, np.generic):
+            return o.item()
+    except Exception:
+        pass
+    if isinstance(o, dict):
+        return {k: _clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_clean(x) for x in o]
+    return o
+
+
+def _source_key_sigs(sd):
+    """Per-key JSON signatures of the editable source inputs, to tell whether (and
+    which part of) a code run changed the inputs vs a read-only query. Returns None
+    if it can't be built (then the caller treats the run as a possible edit)."""
+    try:
+        return {k: json.dumps(_clean(sd.get(k)), sort_keys=True, default=str)
+                for k in _SOURCE_KEYS}
     except Exception:
         return None
+
+
+def _assistant_edit_label(changed_keys):
+    """A short 'Assistant: …' label from the source keys an edit touched."""
+    tags = []
+    for k in changed_keys:
+        tag = _KEY_LABELS.get(k, k)
+        if tag not in tags:
+            tags.append(tag)
+    if not tags:
+        return "Assistant edit"
+    shown = ", ".join(tags[:3]) + ("…" if len(tags) > 3 else "")
+    return f"Assistant: {shown}"
 
 
 def _load_skill_text():
@@ -544,9 +571,9 @@ class Assistant(QObject):
             # an empty project so `slope_data` is a real dict from the first snippet
             # (otherwise the model wastes turns on doc.new() + re-fetch).
             doc.new()
-        before = _input_signature(doc.slope_data)
+        before = _source_key_sigs(doc.slope_data)
         mesh_before = self._mw.mesh_signature(doc.slope_data)
-        doc.begin_edit()                    # snapshot for undo / rollback
+        doc.begin_edit("Assistant edit")    # snapshot for undo / rollback
         stdout, outputs, error = self._kernel.run(code)
         edited = geom_changed = False
         if error:
@@ -554,10 +581,16 @@ class Assistant(QObject):
             # trial-and-error retries can't compound (e.g. a +5 applied 5 times).
             doc.rollback_edit()
         else:
-            after = _input_signature(doc.slope_data)
-            if before is None or after is None or after != before:
+            after = _source_key_sigs(doc.slope_data)
+            if before is None or after is None:
+                changed = None              # couldn't compare -> assume an edit
+            else:
+                changed = [k for k in _SOURCE_KEYS if before.get(k) != after.get(k)]
+            if changed is None or changed:
                 doc.commit_edit()           # real edit -> re-render + mark dirty
                 edited = True
+                if changed:                 # tag the undo step by what it touched
+                    doc.relabel_last_edit(_assistant_edit_label(changed))
                 geom_changed = self._mw.mesh_signature(doc.slope_data) != mesh_before
             else:
                 doc.cancel_edit()           # read-only run -> no dirty, no undo step

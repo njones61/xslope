@@ -64,7 +64,10 @@ class ProjectDocument(QObject):
         self.results = {}         # cached analysis results (e.g. 'lem_solution')
         self.style = {}           # sparse feature-style deltas (see xslope.style; §8a)
         self._dirty = False
-        self._undo = []           # list of slope_data snapshots (deep copies)
+        # Undo/redo stacks of (label, slope_data snapshot) records. The label is a
+        # short human tag for the edit ("Edit Materials", "Assistant: dloads"),
+        # surfaced in the toolbar history dropdown (plan §Phase 2 undo hardening).
+        self._undo = []
         self._redo = []
 
     # --- state -----------------------------------------------------------
@@ -277,10 +280,17 @@ class ProjectDocument(QObject):
         return notes
 
     # --- editing / snapshot undo ----------------------------------------
-    def begin_edit(self):
-        """Snapshot the current state before a mutation so it can be undone."""
+    # Cap on the undo/redo depth: snapshots deep-copy slope_data (mesh included),
+    # so an unbounded stack would grow without limit on a long session.
+    MAX_HISTORY = 100
+
+    def begin_edit(self, label="Edit"):
+        """Snapshot the current state before a mutation so it can be undone. ``label``
+        is a short tag describing the edit, shown in the history dropdown."""
         if self.slope_data is not None:
-            self._undo.append(copy.deepcopy(self.slope_data))
+            self._undo.append((label, copy.deepcopy(self.slope_data)))
+            if len(self._undo) > self.MAX_HISTORY:
+                self._undo.pop(0)         # drop the oldest step
             self._redo.clear()
 
     def commit_edit(self):
@@ -293,7 +303,8 @@ class ProjectDocument(QObject):
         snapshot. Used when an assistant ``run_python`` edit raised, so a partial
         (and possibly repeated) mutation from a failed snippet doesn't stick."""
         if self._undo:
-            self.slope_data = self._undo.pop()
+            _, snap = self._undo.pop()
+            self.slope_data = snap
             self.changed.emit()
 
     def cancel_edit(self):
@@ -303,25 +314,63 @@ class ProjectDocument(QObject):
         if self._undo:
             self._undo.pop()
 
+    def relabel_last_edit(self, label):
+        """Rename the most recent undo step — used by the assistant to tag a step
+        with what it changed once that's known (after the snippet ran)."""
+        if self._undo:
+            _, snap = self._undo[-1]
+            self._undo[-1] = (label, snap)
+
     def can_undo(self) -> bool:
         return bool(self._undo)
 
     def can_redo(self) -> bool:
         return bool(self._redo)
 
+    def undo_labels(self):
+        """Edit labels on the undo stack, most-recent first (for the history menu)."""
+        return [label for label, _ in reversed(self._undo)]
+
+    def redo_labels(self):
+        """Edit labels on the redo stack, next-to-redo first (for the history menu)."""
+        return [label for label, _ in reversed(self._redo)]
+
+    def _undo_one(self):
+        label, snap = self._undo.pop()
+        self._redo.append((label, copy.deepcopy(self.slope_data)))
+        self.slope_data = snap
+
+    def _redo_one(self):
+        label, snap = self._redo.pop()
+        self._undo.append((label, copy.deepcopy(self.slope_data)))
+        self.slope_data = snap
+
     def undo(self):
-        if not self._undo:
+        """Undo a single step. No-arg so it can wire directly to a QAction."""
+        self.undo_steps(1)
+
+    def redo(self):
+        """Redo a single step. No-arg so it can wire directly to a QAction."""
+        self.redo_steps(1)
+
+    def undo_steps(self, n):
+        """Undo ``n`` steps at once (history-dropdown 'undo to here'), emitting one
+        change. Clamped to the available depth."""
+        n = min(int(n), len(self._undo))
+        if n <= 0:
             return
-        self._redo.append(copy.deepcopy(self.slope_data))
-        self.slope_data = self._undo.pop()
+        for _ in range(n):
+            self._undo_one()
         self._set_dirty(True)
         self.changed.emit()
 
-    def redo(self):
-        if not self._redo:
+    def redo_steps(self, n):
+        """Redo ``n`` steps at once, emitting one change. Clamped to the available depth."""
+        n = min(int(n), len(self._redo))
+        if n <= 0:
             return
-        self._undo.append(copy.deepcopy(self.slope_data))
-        self.slope_data = self._redo.pop()
+        for _ in range(n):
+            self._redo_one()
         self._set_dirty(True)
         self.changed.emit()
 

@@ -4,9 +4,7 @@ This page is a tour of the Studio window. Later pages cover
 [editing](editing.md), [running analyses](analysis.md), and the
 [AI assistant](assistant.md) in depth.
 
-<!-- screenshot: annotated main window — toolbar, Inputs tree, Display dock, canvas
-     with result tabs, Log pane, Assistant dock -->
-*Screenshot placeholder — the main window with callouts for each region.*
+![Annotated main window](images/interface_overview.png){width="1200"}
 
 ---
 
@@ -33,6 +31,8 @@ one back on.
 Every view — Inputs and all result tabs — is an image of a Matplotlib figure shown
 in a zoomable, pannable canvas. Each canvas has a small toolbar:
 
+![Canvas toolbar](images/interface_canvas_toolbar.png){width="900"}
+
 | Control | Action |
 | --- | --- |
 | **Fit** | Frame the drawing to the window. |
@@ -58,6 +58,8 @@ level rather than scaled as pixels.
 
 A **Mode** selector in the toolbar switches between the three analysis types:
 
+![Mode selector](images/interface_mode_selector.png){width="600"}
+
 - **LEM** — limit-equilibrium slope stability.
 - **Seepage** — finite-element groundwater flow.
 - **FEM** — finite-element slope stability (SSRM).
@@ -77,6 +79,8 @@ The mode controls two things:
 
 The central area is a tab strip. The **Inputs** tab is always first; running an
 analysis adds the relevant result tab(s) and switches to them:
+
+![View tabs](images/interface_view_tabs.png){width="900"}
 
 | Tab | Shown after | Content |
 | --- | --- | --- |
@@ -109,6 +113,8 @@ flowlines/vectors on the Seep · Solution view; plot type and deformation scale 
 FEM · Results. Changing an option re-renders the cached result immediately — no
 re-solve.
 
+![Display dock](images/interface_display_dock.png){width="360"}
+
 At the bottom of the dock, the **Styles…** button opens the project-wide
 [Styles dialog](editing.md#styles) for per-feature colors, hatches, and line
 styles.
@@ -126,3 +132,5 @@ Long-running solves stream their engine output to the **Log pane** live — Bish
 iteration counts, search refinement steps, seepage convergence traces, SSRM factor
 brackets. A progress bar and a **Cancel** button appear at the right of the status
 bar during a run; cancelling aborts cleanly and leaves no partial result tab.
+
+![Log pane during a run](images/interface_log_pane.png){width="1200"}

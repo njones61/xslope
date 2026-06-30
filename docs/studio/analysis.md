@@ -14,6 +14,8 @@ follows the mode: **Run LEM…**, **Run Seep…**, **Run FEM…**).
 
 In **LEM** mode, **Run LEM…** opens a dialog with:
 
+![Run LEM dialog](images/analysis_run_lem_dialog.png){width="560"}
+
 - **Method** — OMS, Bishop, Janbu, Corps of Engineers, Lowe & Karafiath, Spencer,
   or Morgenstern–Price.
 - **Analysis** — single surface, automated search, or reliability.
@@ -30,12 +32,15 @@ The result depends on the analysis type:
 | **Automated search** | **LEM · Search** (all trial surfaces + critical + search path) *and* **LEM · Solution** (the critical surface). |
 | **Reliability** | **LEM · Reliability** plus the **Solution** for the most-likely-value surface. A determinate progress bar tracks the `1 + 2N` searches. |
 
+![LEM Search view](images/analysis_lem_search.png){width="1100"}
+
+![LEM Solution view](images/analysis_lem_solution.png){width="1100"}
+
 Both circular and non-circular surfaces are supported for single solves and
 searches. Search iteration progress streams to the Log pane, and a search (or a
 reliability run) can be **cancelled** from the status bar.
 
-<!-- screenshot: LEM · Search and LEM · Solution tabs for a worked example -->
-*Screenshot placeholder — the LEM Search and Solution views.*
+![LEM Reliability view](images/analysis_lem_reliability.png){width="1100"}
 
 ---
 
@@ -43,6 +48,8 @@ reliability run) can be **cancelled** from the status bar.
 
 Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 **Seepage** or **FEM** mode, **Build Mesh** opens a dialog with:
+
+![Build Mesh dialog](images/analysis_build_mesh_dialog.png){width="560"}
 
 - **Element type** — `tri3`, `tri6`, `quad4`, `quad8`, or `quad9`.
 - **Target size** — entered directly, or auto-sized as the slope width divided by a
@@ -52,6 +59,8 @@ The mesh is built on a background thread (it includes reinforcement and pile
 constraint lines, so it serves FEM too), shown in a **Mesh** tab, and written to a
 `{stem}_mesh.json` sidecar. Seep/FEM **Run** stays disabled until a mesh exists; a
 geometry edit that invalidates the mesh clears it and re-gates Run.
+
+![Mesh view](images/analysis_mesh_view.png){width="1100"}
 
 !!! note "Meshing needs gmsh"
     Mesh generation uses **gmsh**, which is installed by the `fem` extra
@@ -66,11 +75,17 @@ the **BC set** (1 or 2), the **variable to plot** (head, pressure, velocity
 magnitude, gradient magnitude), contour levels, and toggles for flow lines,
 vectors, fill, and the phreatic surface.
 
+![Run Seep dialog](images/analysis_run_seep_dialog.png){width="560"}
+
 The run produces two tabs — **Seep · Data** (mesh + boundary conditions) and
 **Seep · Solution** (the chosen variable, contours, phreatic surface, flow lines /
 vectors) — and writes the solution to `{stem}_seep.csv` (`_seep2.csv` for BC 2).
 The convergence trace streams to the Log pane. Each BC set keeps its own tab pair,
 so rapid-drawdown problems show BC 1 and BC 2 together.
+
+![Seep Data view](images/analysis_seep_data.png){width="1100"}
+
+![Seep Solution view](images/analysis_seep_solution.png){width="1100"}
 
 ---
 
@@ -80,14 +95,17 @@ In **FEM** mode, **Run FEM…** offers a **single trial** or an **SSRM** run (th
 Shear Strength Reduction Method), with `F` (or `F_min`/`F_max`), a tolerance, and
 the failure criterion.
 
+![Run FEM dialog](images/analysis_run_fem_dialog.png){width="560"}
+
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
 **FEM · Results** (deformation, shear strain, displacement vectors). An SSRM run
 reports the factor of safety and can be **cancelled** mid-run. The solution is
 exported alongside the model so it can be restored on the next Open without
 re-solving.
 
-<!-- screenshot: FEM · Results showing shear-strain contours -->
-*Screenshot placeholder — the FEM Results view.*
+![FEM Data view](images/analysis_fem_data.png){width="1100"}
+
+![FEM Results view](images/analysis_fem_results.png){width="1100"}
 
 ---
 
@@ -101,11 +119,15 @@ results; legend column layout on every view. Changing an option re-renders the
 **cached** result instantly — there's no re-solve. See
 [The Display dock](interface.md#the-display-dock).
 
+![A Display panel](images/analysis_display_panel.png){width="360"}
+
 ---
 
 ## Exporting views: images and DXF
 
 Every canvas has a **Save…** button that exports the **current view**:
+
+![Save view dialog](images/analysis_save_dialog.png){width="560"}
 
 - **Image** — PNG, PDF, or SVG. PNG prompts for a DPI; vector formats don't. The
   figure is saved at its true inch size, so resolution is independent of the
@@ -129,16 +151,17 @@ DXF above).
 **Import** — **File → Import DXF…** opens a wizard that lists every layer in the
 drawing and lets you map each one to an input feature — material zone, profile
 line, piezo line, distributed load, reinforcement, failure circles, or *ignore* —
-with a material column for zones and profiles. Defaults are seeded from xslope's
-own export layer names and the geometry kind, but you can override anything, so a
-DXF drawn in external CAD with arbitrary layer names maps just as well. Geometry
-populates the features; non-geometric properties (load magnitudes, reinforcement
-strengths, material properties, circle depth) come in as editable **placeholders**
-to fill in afterward. The import replaces the current project (you're prompted to
-discard first) and is left unsaved so you can complete it and Save As.
+with a material column for zones and profiles.
 
-<!-- screenshot: the DXF import wizard mapping layers to features -->
-*Screenshot placeholder — the DXF import wizard.*
+![DXF import wizard](images/analysis_dxf_import_wizard.png){width="1100"}
+
+Defaults are seeded from xslope's own export layer names and the geometry kind, but
+you can override anything, so a DXF drawn in external CAD with arbitrary layer names
+maps just as well. Geometry populates the features; non-geometric properties (load
+magnitudes, reinforcement strengths, material properties, circle depth) come in as
+editable **placeholders** to fill in afterward. The import replaces the current
+project (you're prompted to discard first) and is left unsaved so you can complete
+it and Save As.
 
 !!! info "DXF layer conventions"
     The layer naming and entity conventions are shared with the library's

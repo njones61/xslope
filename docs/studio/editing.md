@@ -12,6 +12,8 @@ lifecycle.
 The **Inputs tree** (left dock) lists every input category. Click a category to
 open its editor:
 
+![Inputs tree](images/editing_inputs_tree.png){width="360"}
+
 | Category | What you edit |
 | --- | --- |
 | **Global parameters** | Unit weight of water, tension-crack depth/water, seismic coefficient, max depth. |
@@ -26,10 +28,20 @@ open its editor:
 | **Seepage BC** | Specified-head lines and exit faces (two BC sets). |
 
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
-you add, remove, and reorder rows. Edits are validated, applied to the model,
-mark the document **dirty** (an asterisk in the title bar), and re-render the
-affected layers. Records preserve fields that aren't shown in a given editor, so
-editing one column never drops the others.
+you add, remove, and reorder rows.
+
+![Materials table editor](images/editing_materials_table.png){width="760"}
+
+![Global parameters form](images/editing_global_form.png){width="520"}
+
+Edits are validated, applied to the model, mark the document **dirty** (an asterisk
+in the title bar), and re-render the affected layers. Records preserve fields that
+aren't shown in a given editor, so editing one column never drops the others.
+
+The geometry editors (profile lines and polygons) use a master/detail layout — pick
+a line on the left, edit its vertices on the right:
+
+![Geometry master-detail editor](images/editing_geometry_dialog.png){width="760"}
 
 !!! note "Profile-based vs. polygon-based models"
     A model defines its geometry either through **profile lines** (stacked
@@ -44,6 +56,9 @@ editing one column never drops the others.
 
 On the **Inputs** view, double-clicking a feature on the canvas opens the right
 editor with the picked item pre-selected — no need to find it in the tree first.
+
+![Double-click to edit a feature](images/editing_double_click.png){width="1100"}
+
 Studio maps the click to the drawing's coordinates and hit-tests the geometry, so
 this works on:
 
@@ -70,8 +85,7 @@ while the **dropdown arrow** shows the labeled history — *"Edit Materials"*,
 *"Edit Profile Lines"*, *"Assistant: materials, dloads"* — and selecting an entry
 jumps straight to that point in one action (an Office/Photoshop-style history).
 
-<!-- screenshot: the undo split-button dropdown showing a labeled history -->
-*Screenshot placeholder — the undo history dropdown with labeled steps.*
+![Undo history dropdown](images/editing_undo_history.png){width="520"}
 
 A few behaviors worth knowing:
 
@@ -107,6 +121,8 @@ material fill color/hatch/opacity, and line color/style/width for features like
 piezo lines, circles, and reinforcement. Open the **Styles…** button at the bottom
 of the [Display dock](interface.md#the-display-dock) to edit them, with a live
 preview.
+
+![Styles dialog](images/editing_styles_dialog.png){width="760"}
 
 - **Materials** are styled by their `mat_id`: a fill color from an earth-tone
   palette, a soil-ish hatch, and an opacity.

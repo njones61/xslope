@@ -14,9 +14,7 @@ Examples of what you can ask:
 - *"Why did the SSRM not converge?"*
 - *"Build this slope from the attached sketch."* (with an image)
 
-<!-- screenshot: the Assistant dock mid-conversation, with an inline figure and a
-     collapsible "ran code" block -->
-*Screenshot placeholder — the Assistant dock with an inline result figure.*
+![The Assistant dock](images/assistant_dock.png){width="380"}
 
 !!! note "Requires the `ai` extra"
     The assistant needs the provider library, installed with the `ai` extra
@@ -60,6 +58,8 @@ a dialog to pick the provider and model and store credentials:
 | **DeepSeek** | Tool use; vision per model. |
 | **Z.ai (GLM)** | Tool use; vision per model. |
 
+![Assistant Settings dialog](images/assistant_settings.png){width="560"}
+
 API keys are stored in the **OS keychain** (not in plaintext), and the Ollama base
 URL is configurable for local models. The dock shows the active provider · model,
 and a caption warns when the selected model can't (or may not) run code or accept
@@ -76,6 +76,8 @@ an **autonomy mode**, switchable in the dock:
 - **Confirm** (default) — you review and approve each code run before it executes.
 - **Auto** — the assistant runs code without prompting.
 
+![Confirm-before-run](images/assistant_confirm.png){width="560"}
+
 Every action is visible in the transcript as a collapsible "ran code" block, and a
 **Stop** button halts the agent at any time. Because the kernel runs in Studio's own
 process, a bad snippet could hang the app — the confirm mode and Stop button are
@@ -89,6 +91,8 @@ your guardrails.
 ---
 
 ## Vision and chat UX
+
+![Building from a sketch (vision)](images/assistant_vision.png){width="1100"}
 
 - **Images** — paste or drop an image into the chat (e.g. a hand sketch or a screen
   capture) for models that support vision.

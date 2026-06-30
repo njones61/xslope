@@ -676,7 +676,7 @@ SLOPE/W's zipped XML) to see how cleanly its geometry/materials map across.
 - ✅ Landing page (`docs/index.md`) — Studio called out in the intro paragraph + a dedicated "XSlope Studio — Desktop Application" section with a (placeholder) hero screenshot.
 - ✅ Cross-references seeded across the site where Studio is relevant: the Claude skill page, installation, the DXF page, and the LEM/Seep/FEM overviews each link to the matching Studio page.
 - ⬜ **Installer / App-management content** — `docs/studio/app_management.md` is a deliberate **placeholder** pending Phase 7 (native installers): install/update/uninstall, first-launch security prompts, where files live. The Overview's Installation section also carries a Phase-7 warning admonition.
-- ⬜ **Screenshots** — every page carries inline `<!-- screenshot: … -->` markers + italic placeholders; real captures (incl. a full open → edit → mesh → solve → view walkthrough) still to be taken. The landing-page hero is a generated placeholder PNG to swap out.
+- ⬜ **Screenshots** — every slot is a **visible, captioned placeholder PNG** (34 of them under `docs/studio/images/`, embedded as real `![]()` tags throughout the pages + the landing-page hero), each labeled with what to capture. Real screenshots just replace the file at the same path — no markdown edits. A full open → edit → mesh → solve → view walkthrough still to be captured.
 - ⬜ Keep it in sync as features land (the docs site is built via `mkdocs`).
 
 ---

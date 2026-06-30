@@ -11,9 +11,7 @@ is produced by the same `plot_*` functions used from scripts. Anything you can d
 in Studio you can also do from Python; Studio simply makes the common workflow
 point-and-click.
 
-<!-- screenshot: the Studio main window with a model open (Inputs view, Inputs tree,
-     Display dock, Log pane, Assistant dock) -->
-*Screenshot placeholder — the Studio main window with a model open.*
+![The XSlope Studio main window](images/studio_main_window.png){width="1200"}
 
 ---
 
@@ -84,6 +82,8 @@ xslope-studio
 This opens the Studio window. From there, use **File → Open** to load an Excel
 problem, or **File → New** to start an empty project and build it up with the
 editors (or the assistant).
+
+![The File menu](images/overview_file_menu.png){width="380"}
 
 ---
 

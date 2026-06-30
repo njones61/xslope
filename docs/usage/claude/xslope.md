@@ -565,6 +565,20 @@ polygons should tile the cross-section with no gaps or overlaps (except intentio
 The ground surface and bottom/side boundaries are derived from the **union of all polygons**,
 so there is no Max Depth and an irregular bedrock surface is represented directly.
 
+**Keep zones minimal and conforming:**
+- Use the **fewest polygons** that describe the section. A zone that **wraps around**
+  another — e.g. a shell embankment around a central core — is **one concave polygon with a
+  notch cut for the inner zone**, not two pieces split on either side. Do not split a zone
+  just because it is non-convex; XSLOPE polygons may be concave.
+- Avoid **redundant collinear vertices** (a point lying on the straight segment between its
+  two neighbors). They add nothing, and if one sits on a **boundary shared with another
+  zone**, the neighbor must carry the same vertex or the two sides disagree on that interface.
+- On any **shared boundary between two zones**, the interface must have **matching vertices
+  on both sides**: every vertex one zone places on a shared edge should also be a vertex of
+  the neighbor (or be absent from both). A vertex on one side only (a "T-junction") forces a
+  non-conforming mesh across that interface. (The mesher now auto-inserts the missing shared
+  vertex, but clean, minimal, conforming geometry is still the goal.)
+
 ```python
 updates['polygon'] = {}
 

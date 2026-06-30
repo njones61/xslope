@@ -7,9 +7,13 @@ surfaces onto `slope_data`, the same target the DXF importer and the Studio assi
 already populate. This would let users bring existing models into XSlope without
 re-drawing them.
 
-**Status:** 🟡 **Exploration — not scoped.** An initial scout (2026-06-27) confirmed
-SLOPE/W `.gsz` is parseable and the strong first target. Next step is a feasibility
-spike (§4). Extracted from `plan_studio.md` so it can grow on its own.
+**Status:** 🟢 **Committed — gathering inputs.** The author is acquiring licenses to
+GeoStudio and Rocscience Slide2 (and similar) to download a real corpus of files and
+tutorials, then will (1) reverse-engineer the formats, (2) import and re-solve the
+problems in xslope as a form of **validation** against the commercial codes' answers,
+and (3) wire it into the Studio interface. An initial scout (2026-06-27, §5) already
+confirmed SLOPE/W `.gsz` is parseable and the strong first target. Extracted from
+`plan_studio.md` so it can grow on its own.
 
 ---
 
@@ -44,12 +48,38 @@ Surfaced in Studio as **File → Import → <format>**, mirroring the DXF import
   notebooks benefit too), surfaced in Studio as File → Import → <format>, each
   returning a populated `slope_data` + a list of caveats — mirroring the DXF path.
 
-## 4. Next step — feasibility spike
+## 4. Approach & phased roadmap
 
-Collect format documentation and a few sample files per package, then prototype a
-parser for the most tractable one (likely SLOPE/W's zipped XML) to see how cleanly its
-geometry/materials map across. Deliver a `.gsz → slope_data` proof of concept
-(Regions→polygons, Materials, WaterItems) + a caveats list, on the PyGeoStudio samples.
+With licensed access to the source software and its tutorial corpus, the work proceeds
+in three phases (per format, easiest format — `.gsz` — first):
+
+- **Phase A — Reverse-engineer the format.** Acquire licenses, download the example
+  files and tutorials, and map the on-disk structure to `slope_data`. `.gsz` is zipped
+  XML (tractable — see §5); `.slmd` is proprietary/binary (harder — may lean on Slide2's
+  own `.gsz` export as a bridge, or reverse-engineer the binary). Output: a per-format
+  engine-side parser returning a populated `slope_data` + a list of caveats (mirroring
+  the DXF path).
+- **Phase B — Import & test = validation.** Import each corpus problem and **re-solve it
+  in xslope**, comparing the result (FS, flowrate, etc.) against the value the source
+  software reports — many tutorials ship with **known answers**, making this a broad,
+  independent **cross-validation** of xslope's LEM/seep/FEM solvers against the
+  commercial codes. Build a regression table (problem → source answer → xslope answer →
+  Δ) and capture it the way the existing `run_tests.py` benchmarks do. *This is the
+  external validation deferred elsewhere (e.g. [`plan_vg.md`](plan_vg.md) §7) — the corpus
+  supplies the reference answers for seepage and LEM at once.*
+- **Phase C — Wire into Studio.** Surface as **File → Import → <format>** with a wizard
+  that shows the parsed entities + caveats, populates the live document (renders on the
+  canvas for review), and leaves it unsaved for the user to complete and Save As — the
+  same pattern as the DXF importer.
+
+**Corpus & licensing.** Licensed access lets us *use* the vendor files and tutorials for
+development and validation, but **redistributing** them (committing the `.gsz`/`.slmd`
+samples into the public repo) is a separate rights question — keep the sample corpus in
+a **git-ignored** dev folder (or a private sibling repo, like the existing
+`xslope_private_tests`). What *can* be committed is the **derived regression data**: the
+problem name, geometry summary, and the source software's reported answer + xslope's
+computed answer + tolerance — i.e. the Phase B validation table, without the proprietary
+files themselves.
 
 ## 5. Findings from an initial scout (2026-06-27)
 

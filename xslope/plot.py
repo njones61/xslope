@@ -2024,7 +2024,7 @@ def plot_inputs(
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -2047,8 +2047,6 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     else:
         fig.clear()
         ax = fig.add_subplot(111)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     ax.grid(False)
 
     plot_base_geometry(ax, slope_data, style=style)
@@ -2175,8 +2173,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ax.set_ylim(ymin, ymax)
 
     fig.tight_layout()
-    _legend_below(ax, fig, anchor=(0.5, -0.15), handles=handles, labels=labels,
-                  legend_ncol=legend_ncol)
+    _legend_below(ax, fig, handles=handles, labels=labels,
+                  legend_ncol=legend_ncol, frameon=legend_frame)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg')
     if save_png:
@@ -2249,7 +2247,7 @@ def plot_search_path(ax, search_path):
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True,
                  gid='SEARCH_PATH')
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -2309,15 +2307,13 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         plot_search_path(ax, search_path)
 
     ax.set_aspect('equal')
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     ax.grid(False)
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     fig.tight_layout()
-    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame)
 
     if save_png:
         fig.savefig('plot_circular_search_results.png', dpi=dpi, bbox_inches='tight')
@@ -2329,7 +2325,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         plt.show()
     return fig
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -2395,15 +2391,13 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
                             length_includes_head=True, alpha=0.6, gid='SEARCH_PATH')
 
     ax.set_aspect('equal')
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     ax.grid(False)
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     fig.tight_layout()
-    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame)
 
     if save_png:
         fig.savefig('plot_noncircular_search_results.png', dpi=dpi, bbox_inches='tight')
@@ -2415,7 +2409,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         plt.show()
     return fig
 
-def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Creates a plot showing the results of reliability analysis.
 
@@ -2489,8 +2483,6 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
 
     # Standard finalization
     ax.set_aspect('equal')
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     ax.grid(False)
 
     # Title with reliability statistics using mathtext
@@ -2506,7 +2498,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
                 f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
 
     fig.tight_layout()
-    _legend_below(ax, fig, anchor=(0.5, -0.15), legend_ncol=legend_ncol)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame)
 
     if save_png:
         filename = 'plot_reliability_results.png'
@@ -2520,7 +2512,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         plt.show()
     return fig
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
+def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plot the finite element mesh with material regions.
 
@@ -2719,8 +2711,8 @@ def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=T
     # Add legend if we have materials (after tight_layout so its reserved bottom
     # margin isn't clobbered)
     if legend_elements:
-        _legend_below(ax, fig, anchor=(0.5, -0.05), handles=legend_elements,
-                      legend_ncol=legend_ncol)
+        _legend_below(ax, fig, handles=legend_elements,
+                      legend_ncol=legend_ncol, frameon=legend_frame)
 
     if save_png:
         fig.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')

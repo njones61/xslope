@@ -38,7 +38,7 @@ def _extract_uv(disp, fem_data):
 
 
 def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
-                  label_elements=False, label_nodes=False, alpha=0.4, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None, style=None):
+                  label_elements=False, label_nodes=False, alpha=0.6, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
 
@@ -219,7 +219,8 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
         else:
             label = f"Material {mat}"
         legend_handles.append(
-            plt.Line2D([0], [0], color=mat_to_color[mat], lw=4, label=label)
+            patches.Patch(facecolor=mat_to_color[mat], alpha=alpha,
+                          edgecolor="none", label=label)
         )
 
     # Plot 1D elements (reinforcement truss + pile beam) using LineCollection
@@ -302,8 +303,8 @@ def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
     fig.tight_layout()
     # Combined legend below the plot, after tight_layout so its reserved bottom
     # margin (for multi-row legends) isn't clobbered.
-    _legend_below(ax, fig, anchor=(0.5, -0.1), handles=legend_handles,
-                  legend_ncol=legend_ncol, frameon=False)
+    _legend_below(ax, fig, handles=legend_handles,
+                  legend_ncol=legend_ncol, frameon=legend_frame)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:
@@ -430,7 +431,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", fig=None):
+                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -620,7 +621,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             ncol = (_fit_legend_ncol(legend_ax, fig, handles, labels, (0.5, 0.5))
                     if legend_ncol == "auto" else max(1, int(legend_ncol)))
             legend_ax.legend(handles, labels, loc='center', ncol=ncol, fontsize=10,
-                             frameon=False)
+                             frameon=legend_frame)
 
     if save_png:
         fig.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
@@ -696,8 +697,6 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
     
     ax.set_aspect('equal')
     ax.set_title('Displacement Magnitude Contours')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
 
 
 def _get_mesh_boundary(fem_data):
@@ -964,8 +963,6 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     
     ax.set_aspect('equal')
     ax.set_title('von Mises Stress (Red outline = Yielding/Plastic Elements)')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
 
 
 def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True, 
@@ -1034,8 +1031,6 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     if F is not None:
         title += f'  F={F:.2f}'
     ax.set_title(title, fontsize=12, pad=15)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
 
 
 def _add_element_labels(ax, fem_data):

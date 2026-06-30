@@ -1454,6 +1454,22 @@ class MainWindow(QMainWindow):
     def save(self):
         if not self.doc.path:
             return self.save_as()
+        # Heads-up: saving in place onto an older-format file that now uses a
+        # v11-only feature (e.g. a van Genuchten material) will upgrade the file to
+        # the current template format. Use the engine's own predicate so the dialog
+        # appears exactly when the upgrade will happen.
+        try:
+            from xslope.fileio import _inplace_save_would_drop
+            if _inplace_save_would_drop(self.doc.path,
+                                        self.doc.slope_data.get("materials", [])):
+                QMessageBox.information(
+                    self, "File will be upgraded",
+                    f"“{os.path.basename(self.doc.path)}” was created in an "
+                    "older template version that lacks columns this model now uses "
+                    "(e.g. van Genuchten unsaturated parameters). Saving will upgrade "
+                    "it to the current template format.")
+        except Exception:
+            pass
         try:
             self.doc.save(template=None)   # edit in place, preserve formatting
         except Exception as exc:

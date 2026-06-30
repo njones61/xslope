@@ -431,17 +431,18 @@ def _new_material():
             "cp": 0.0, "r_elev": 0.0, "d": 0.0, "psi": 0.0, "u": "none",
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
-            "kr0": 0.0, "h0": 0.0, "E": 0.0, "nu": 0.0}
+            "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
+            "E": 0.0, "nu": 0.0}
 
 
 class MaterialsEditor(CategoryEditor):
     label = "Materials"
     # Columns mirror the 'mat' worksheet in order: name, g, option, c, f, c/p,
     # r-elev, d, psi, u, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2, alpha,
-    # kr0, h0, E, n.
+    # unsat, kr0, h0, vg_a, vg_n, E, n.
     # `applies` tags mirror the template's analysis usage (input_template.md):
     # strength (g, option, c, f, c/p, r-elev, u) is shared by LEM+FEM; d/psi are
-    # rapid-drawdown (LEM); s(...) are reliability; k1..h0 seepage; E/n FEM.
+    # rapid-drawdown (LEM); s(...) are reliability; k1..vg_n seepage; E/n FEM.
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
@@ -455,8 +456,11 @@ class MaterialsEditor(CategoryEditor):
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
         Field("k1", "k1", usage="seep"), Field("k2", "k2", usage="seep"),
-        Field("alpha", "alpha", usage="seep"), Field("kr0", "kr0", usage="seep"),
-        Field("h0", "h0", usage="seep"),
+        Field("alpha", "alpha", usage="seep"),
+        # Unsaturated model: lf (linear front -> kr0/h0) or vg (van Genuchten -> vg_a/vg_n).
+        Field("unsat", "unsat", "choice", choices=["lf", "vg"], usage="seep"),
+        Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep"),
+        Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
         Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
     ]
 

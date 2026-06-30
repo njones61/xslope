@@ -1772,7 +1772,7 @@ def material_legend_handles(materials, style=None, alpha=None):
 def plot_inputs(
     slope_data,
     title="Slope Geometry and Inputs",
-    figsize=(12, 6),
+    figsize=(12, 7),
     mat_table=False,
     save_png=False,
     save_dxf=False,
@@ -2540,7 +2540,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         plt.show()
     return fig
 
-def plot_mesh(mesh, materials=None, figsize=(14, 6), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plot the finite element mesh with material regions.
 

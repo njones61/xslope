@@ -37,7 +37,7 @@ def _extract_uv(disp, fem_data):
     return u, v
 
 
-def plot_fem_data(fem_data, figsize=(14, 6), show_nodes=False, show_bc=True,
+def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
                   label_elements=False, label_nodes=False, alpha=0.6, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.

@@ -86,7 +86,7 @@ class MplCanvas(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.figure = Figure(figsize=(12, 6), dpi=BASE_DPI)
+        self.figure = Figure(figsize=(12, 7), dpi=BASE_DPI)
         self._agg = FigureCanvasAgg(self.figure)
         self._pixitem = None
         self._fitted = False

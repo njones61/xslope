@@ -13,7 +13,7 @@ from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by
 logger = logging.getLogger(__name__)
 
 
-def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.6, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.6, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plots a mesh colored by material zone.
     Supports both triangular and quadrilateral elements.
@@ -237,7 +237,7 @@ def plot_seep_data(seep_data, figsize=(14, 6), show_nodes=False, show_bc=False, 
     return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(14, 6), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
     """
     Plot seep analysis results including head contours, flowlines, and phreatic surface.
     

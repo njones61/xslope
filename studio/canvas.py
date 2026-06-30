@@ -435,7 +435,10 @@ class MplCanvas(QWidget):
             return
         need = max(MIN_DPI, min(MAX_DPI, self._target_dpi()))
         ratio = need / self._render_dpi
-        if ratio > 1.05 or ratio < 0.85:
+        # Tight band so the bitmap tracks the on-screen size closely — any residual
+        # fractional up/down-scale by the view transform softens text. Re-rasterize
+        # (debounced) on a small zoom-in especially, where upscaling blurs most.
+        if ratio > 1.02 or ratio < 0.88:
             self._rasterize(need)
 
     # --- zoom / pan ------------------------------------------------------

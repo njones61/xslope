@@ -1680,20 +1680,65 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         handles, labels = ax.get_legend_handles_labels()
     if labels is None:                       # handles given without explicit labels
         labels = [h.get_label() for h in handles]
+    # De-duplicate by label, preserving order, and drop matplotlib's "_"-hidden
+    # labels — so e.g. N failure circles all labeled "Circle" yield one entry.
+    if handles:
+        seen, dh, dl = set(), [], []
+        for h, l in zip(handles, labels):
+            if l in seen or (isinstance(l, str) and l.startswith("_")):
+                continue
+            seen.add(l); dh.append(h); dl.append(l)
+        handles, labels = dh, dl
     if not handles:
         return None
+    kw.setdefault("frameon", False)          # frameless by default; toggle via legend_frame
     if legend_ncol == "auto":
         ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
     else:
         ncol = max(1, int(legend_ncol))
     leg = ax.legend(handles=handles, labels=labels, loc="upper center",
                     bbox_to_anchor=anchor, ncol=ncol, **kw)
-    # Reserve bottom margin so a multi-row legend below the axes fits inside the
-    # figure (otherwise the figure raster clips the lower rows). Grows with the
-    # row count; the anchor sits ~0.15 below the axes, hence the larger base.
+    # Manual margins must survive the next canvas draw — an active tight/constrained
+    # layout engine would repack the title against the top edge (clipping it) and
+    # undo the reserved bottom. Disable it, then set top (title room) and bottom
+    # (legend rows) explicitly.
+    try:
+        fig.set_layout_engine("none")
+    except Exception:
+        try:
+            fig.set_tight_layout(False)
+        except Exception:
+            pass
     n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
-    fig.subplots_adjust(bottom=min(0.55, 0.15 + 0.08 * n_rows))
+    bottom = min(0.55, 0.15 + 0.08 * n_rows)
+    top = 0.92
+    if ax.get_title():                       # reserve enough top for the (maybe multi-line) title
+        try:
+            th = ax.title.get_window_extent(fig.canvas.get_renderer()).height / fig.bbox.height
+            top = max(0.80, min(0.94, 1.0 - th - 0.03))
+        except Exception:
+            pass
+    fig.subplots_adjust(top=top, bottom=bottom)
     return leg
+
+
+def material_legend_handles(materials, style=None, alpha=None):
+    """Filled-patch legend handles for material zones — the single consistent
+    material-zone swatch used across the inputs / mesh / seep / fem plots, so a zone
+    looks the same (filled patch in its style color) in every view. One patch per
+    material, labeled by material name. ``alpha`` overrides the per-material style
+    alpha when given (e.g. a busier result view that wants lighter zones)."""
+    import matplotlib.patches as mpatches
+    from .style import resolve_style, material_style
+    style = resolve_style(style)
+    handles = []
+    for i, m in enumerate(materials or []):
+        ms = material_style(style, i)
+        a = ms.get("alpha", 0.6) if alpha is None else alpha
+        name = (m.get("name") if isinstance(m, dict) else m) or f"Material {i + 1}"
+        handles.append(mpatches.Patch(facecolor=ms["color"], alpha=a,
+                                      edgecolor="none", label=name))
+    return handles
 
 
 def plot_inputs(
@@ -1707,6 +1752,7 @@ def plot_inputs(
     mode="lem",
     tab_loc="top",
     legend_ncol="auto",
+    legend_frame=False,
     fig=None,
     style=None,
 ):
@@ -1947,49 +1993,23 @@ def plot_inputs(
     if y1 > y0:
         pad = 0.05 * (y1 - y0)
         ax.set_ylim(y0, y1 + pad)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     ax.grid(False)
 
     # Get legend handles and labels
     handles, labels = ax.get_legend_handles_labels()
-    
+
     # Add distributed load to legend if present
     if slope_data['dloads']:
         handler_class, dummy_line = get_dload_legend_handler()
         handles.append(dummy_line)
         labels.append('Distributed Load')
-    
-    # --- Legend layout ---
-    # Historically this legend used ncol=2 and was anchored below the axes.
-    # If there are many entries, that makes the legend tall and it can fall
-    # off the bottom of the window. We auto-increase columns to cap row count,
-    # and we also reserve bottom margin so the legend stays visible.
-    n_items = len(labels)
-    anchor = (0.5, -0.12)
-    if legend_ncol == "auto":
-        # Wide-but-neat: as many columns as fit the axes width, fewest rows,
-        # then rebalanced so the last row isn't sparse (see _fit_legend_ncol).
-        ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
-    else:
-        ncol = max(1, int(legend_ncol))
-
-    n_rows = max(1, math.ceil(n_items / max(1, ncol)))
-    # Reserve a bit more space as the legend grows so it doesn't get clipped.
-    bottom_margin = min(0.45, 0.10 + 0.04 * n_rows)
-
-    ax.legend(
-        handles=handles,
-        labels=labels,
-        loc="upper center",
-        bbox_to_anchor=anchor,
-        ncol=ncol,
-    )
 
     ax.set_title(title)
-
-    fig.subplots_adjust(bottom=bottom_margin)
     fig.tight_layout()
+    # Single shared legend recipe: below the axes, auto-columns, frameless by
+    # default (frame toggled per-view via legend_frame). Reserves bottom margin.
+    _legend_below(ax, fig, handles=handles, labels=labels,
+                  legend_ncol=legend_ncol, frameon=legend_frame)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:

@@ -40,9 +40,11 @@ from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ZOOM_STEP = 1.25
 BASE_DPI = 100        # logical scene units per inch (1 unit ≈ 1 screen px at 100%)
-SUPERSAMPLE = 1.5     # bitmap px per *device* px. Above 1 gives anti-aliasing
-                      # headroom; too high means a big downscale, which bilinear
-                      # sampling renders poorly (grainy). ~1.5 is the sweet spot.
+SUPERSAMPLE = 1.0     # bitmap px per *device* px. 1.0 renders the figure at exactly
+                      # the device resolution and shows it 1:1, so Matplotlib's own
+                      # text antialiasing stays crisp with no bilinear resample
+                      # (>1 forces a downscale that grains thin text). The tight
+                      # refine band re-rasterizes on zoom so lines don't alias.
 MIN_DPI = 100
 MAX_DPI = 900         # caps pixmap memory (raised for Retina, where the effective
                       # DPI is doubled by devicePixelRatio)

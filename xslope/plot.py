@@ -1636,6 +1636,10 @@ def plot_piles(ax, slope_data, slice_df=None, style=None):
                        label='Pile-Surface Intersection')
 
 
+# Figure-fraction y the legend's bottom is pinned to (consistent across plots).
+_LEGEND_BOTTOM = 0.03
+
+
 def _fit_legend_ncol(ax, fig, handles, labels, anchor):
     """Choose a legend column count that is wide but neat.
 
@@ -1696,12 +1700,18 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
     else:
         ncol = max(1, int(legend_ncol))
-    leg = ax.legend(handles=handles, labels=labels, loc="upper center",
-                    bbox_to_anchor=anchor, ncol=ncol, **kw)
+    # Pin the legend to a FIXED position at the figure bottom (figure coordinates),
+    # not relative to the axes — otherwise the gap below the axes scales with the
+    # axes height, so plots with a taller data range (e.g. inputs showing circle
+    # centers high up) push the legend far down while compact plots hug it. Figure-
+    # anchoring makes the placement identical across every plot type.
+    leg = ax.legend(handles=handles, labels=labels, loc="lower center",
+                    bbox_to_anchor=(0.5, _LEGEND_BOTTOM), bbox_transform=fig.transFigure,
+                    ncol=ncol, **kw)
     # Manual margins must survive the next canvas draw — an active tight/constrained
     # layout engine would repack the title against the top edge (clipping it) and
     # undo the reserved bottom. Disable it, then set top (title room) and bottom
-    # (legend rows) explicitly.
+    # (legend room) explicitly.
     try:
         fig.set_layout_engine("none")
     except Exception:
@@ -1709,9 +1719,14 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
             fig.set_tight_layout(False)
         except Exception:
             pass
-    n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
-    bottom = min(0.55, 0.15 + 0.08 * n_rows)
-    top = 0.92
+    try:
+        fig.canvas.draw()
+        leg_h = leg.get_window_extent().height / fig.bbox.height
+    except Exception:
+        n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
+        leg_h = 0.055 * n_rows
+    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + 0.04)
+    top = 0.94
     if ax.get_title():                       # reserve enough top for the (maybe multi-line) title
         try:
             th = ax.title.get_window_extent(fig.canvas.get_renderer()).height / fig.bbox.height

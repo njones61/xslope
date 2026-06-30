@@ -104,7 +104,7 @@ where $S_s$ is the specific storage coefficient. Such analysis would enable mode
 
 ### Unsaturated Flow Formulation
 
-Unsaturated flow analysis becomes necessary when analyzing slopes with significant vadose zones above the phreatic surface. XSLOPE implements unsaturated flow using a **linear front method** for the relative conductivity function, which provides a simplified but effective approach for modeling partially saturated conditions.
+Unsaturated flow analysis becomes necessary when analyzing slopes with significant vadose zones above the phreatic surface. XSLOPE models the relative conductivity function with a **linear front method** by default — a simplified but robust approach for partially saturated conditions — and (input template v11+) optionally with the **van Genuchten** model, selected per material through the `unsat` property (`lf` or `vg`).
 
 The governing equation for steady-state unsaturated flow is:
 
@@ -139,6 +139,49 @@ This linear front approach provides several advantages:
 - **Parameter Simplicity:** Only two parameters ($kr_0$ and $h_0$) needed per material
 
 The iterative solution process adjusts the relative conductivity within each element based on the computed pressure head sampled at the element's Gauss integration points (a quadrature-weighted average of $k_r(\psi)$ over the element), creating a spatially varying conductivity field that reflects the degree of saturation throughout the domain.
+
+**Why the linear front is the default.** For slope-stability seepage the precise shape of the unsaturated conductivity curve has little influence on the results. Negative pore pressures (suction) above the phreatic surface are conservatively neglected in both the limit-equilibrium and finite-element stability analyses, so the unsaturated zone never enters the strength calculation. And because the seepage solve is steady-state, the pore pressures *below* the phreatic surface — the ones that actually drive stability — are largely insensitive to the unsaturated curve. The linear front captures the essential conductivity reduction above the water table while remaining numerically robust, which is why it is XSLOPE's recommended model. The van Genuchten option below is provided chiefly for compatibility (e.g. importing models from other software) and user preference, not because it changes stability results.
+
+#### van Genuchten Model
+
+The van Genuchten–Mualem function is the most widely used relative-conductivity model in unsaturated soil mechanics. It is selected per material by setting `unsat = "vg"` and supplying two parameters, $\alpha$ (`vg_a`) and $n$ (`vg_n`):
+
+>>$S_e = \left[\,1 + (\alpha\,|\psi|)^{\,n}\,\right]^{-m}, \qquad m = 1 - \dfrac{1}{n}$
+
+>>$k_r(\psi) = \begin{cases} 1.0 & \psi \geq 0 \\ S_e^{\,1/2}\left[\,1 - \left(1 - S_e^{\,1/m}\right)^{m}\,\right]^{2} & \psi < 0 \end{cases}$
+
+Because the seepage solve is steady-state, only $\alpha$ and $n$ are needed — the residual and saturated water contents affect storage, not the relative conductivity, and so are not required.
+
+!!! warning "Solver status"
+    The v11 input template stores the van Genuchten parameters (`unsat`, `vg_a`,
+    `vg_n`) and they load/save round-trip, but **solver support is in development**.
+    Until it lands, the unsaturated solver uses the linear-front model regardless of
+    `unsat`. This note will be removed when van Genuchten is active in the solver.
+
+**Typical parameter values.** The table below gives representative van Genuchten $\alpha$ and $n$ by USDA soil-texture class, after **Carsel & Parrish (1988)** — the standard reference dataset (the same source used by HYDRUS and most unsaturated-flow codes). Use them as starting estimates and adjust to site data.
+
+| Soil texture | `vg_a` = α (1/cm) | `vg_n` = n |
+| --- | --- | --- |
+| Sand | 0.145 | 2.68 |
+| Loamy sand | 0.124 | 2.28 |
+| Sandy loam | 0.075 | 1.89 |
+| Loam | 0.036 | 1.56 |
+| Silt | 0.016 | 1.37 |
+| Silt loam | 0.020 | 1.41 |
+| Sandy clay loam | 0.059 | 1.48 |
+| Clay loam | 0.019 | 1.31 |
+| Silty clay loam | 0.010 | 1.23 |
+| Sandy clay | 0.027 | 1.23 |
+| Silty clay | 0.005 | 1.09 |
+| Clay | 0.008 | 1.09 |
+
+!!! note "Units of α"
+    The $\alpha$ values above are in **1/cm** (the units in which Carsel & Parrish
+    are tabulated). XSLOPE is unit-agnostic — the length unit is whatever the rest of
+    the model uses — so convert $\alpha$ accordingly: for **metres** multiply by 100
+    (1/cm → 1/m); for **feet** multiply by 30.48. $n$ is dimensionless. As a rule of
+    thumb, larger $\alpha$ and $n$ mean a coarser, more freely-draining soil (sands),
+    while small $\alpha$ and $n \to 1$ mean a fine, slowly-draining soil (clays).
 
 ## Boundary Conditions
 

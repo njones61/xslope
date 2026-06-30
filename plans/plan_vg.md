@@ -151,13 +151,15 @@ The kr evaluation is centralized, so the change is localized:
 
 ## 6. Documentation changes
 
-- **`docs/seep/overview.md`** — add an "Unsaturated zone modeling" section:
-  - Position the **linear front** model as the deliberate, robust default, and
-    explain *why it's sufficient* (suction neglected in stability; steady-state
-    pore pressures below the phreatic surface insensitive to kr shape). *(This is
-    the "defuse the perceived limitation" track — worth writing regardless.)*
-  - Document the **vG** option, the (α, n)-only steady-state formulation, the
-    regularization, and when to choose which.
+- **`docs/seep/overview.md`** — ✅ done (ahead of the solver): the Unsaturated
+  Flow Formulation section now positions the **linear front** as the deliberate,
+  robust default (explaining why it's sufficient — suction neglected in stability,
+  steady-state insensitivity), adds a **van Genuchten** subsection with the
+  (α, n)-only steady-state formulation and a **Carsel & Parrish (1988)** typical-
+  value table (with the α unit caveat), and a **solver-status warning** admonition
+  to remove when vG goes live. `input_template.md` carries the same status caveat +
+  a link to the table. ⬜ Finalize the vG prose (regularization details, remove the
+  status note) when the solver lands.
 - **`docs/usage/input_template.md`** — document the `unsat`/`vg_a`/`vg_n` columns
   (the kr0/h0 section already exists at line ~142).
 - **`docs/api/seep.md`** — picks up the new functions via mkdocstrings.

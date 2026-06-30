@@ -147,7 +147,14 @@ slope-stability problems.
 
 Typically, alpha = 0 and K1 = Kx and K2 = Ky. Leave **unsat** blank or `lf` to use the
 linear-front model (the established default); set it to `vg` only when van Genuchten
-properties are wanted (e.g. imported from another package).
+properties are wanted (e.g. imported from another package). Typical `vg_a`/`vg_n`
+values by soil texture, and the unit convention for α, are tabulated in the
+[seepage overview](../seep/overview.md#van-genuchten-model).
+
+!!! note "van Genuchten solver status"
+    The `unsat`/`vg_a`/`vg_n` columns are read and round-trip through load/save, but
+    van Genuchten **solver support is still in development** — until it lands, the
+    seepage solver uses the linear-front (`lf`) model regardless of `unsat`.
 
 These parameters are defined in more detail in the [seepage analysis](../seep/overview.md) section.
 

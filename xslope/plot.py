@@ -1642,44 +1642,42 @@ _LEGEND_BOTTOM = 0.03
 _TITLE_FONTSIZE = 11
 _TICK_FONTSIZE = 8
 _LEGEND_FONTSIZE = 8
+# Tight legend packing (matplotlib's defaults — columnspacing 2.0, handlelength 2.0,
+# handletextpad 0.8 — are wide and waste row width, forcing long-label legends onto
+# extra rows). Applied to BOTH the column-fit trial and the final legend so the
+# measured width matches what's drawn.
+_LEGEND_PACK = dict(columnspacing=1.2, handlelength=1.6, handletextpad=0.5)
 
 
 def _fit_legend_ncol(ax, fig, handles, labels, anchor):
-    """Choose a legend column count that is wide but neat.
+    """Choose a legend column count: the fewest rows whose balanced columns fit.
 
-    Goals (in order): the legend never exceeds the axes width; rows are
-    minimized (don't hog vertical space); the last row isn't left sparse. We
-    measure candidate legends' rendered width against the axes width — widest
-    that fits gives the fewest rows — then rebalance columns to that row count
-    so e.g. 8 items become 4×2 rather than 5+3. Falls back to a character-width
-    estimate when no renderer is available (e.g. a backend without one)."""
+    The legend is anchored to (and centered on) the whole FIGURE width — not the
+    axes box, which equal-aspect box-adjust can shrink — so candidates are measured
+    against the figure width with the same tight packing the final legend uses
+    (_LEGEND_PACK). We try 1 row, then 2, … and take the first whose balanced
+    column count (ceil(n/rows)) fits; e.g. a 12-item legend lays out 6×2. Falls
+    back to two rows when no renderer is available (a backend without one)."""
     n = len(labels)
     if n <= 1:
         return max(1, n)
-    max_fit = 1
     try:
         fig.canvas.draw()                      # ensure a renderer + axes layout
         renderer = fig.canvas.get_renderer()
-        # The legend is anchored to the whole figure width (centered below the
-        # axes), not the axes box — which equal-aspect box-adjust can shrink. Fit
-        # against the figure width so a long-label legend still uses the full row
-        # (e.g. the 12-item solution legend lays out 6x2 like the search plot,
-        # instead of backing off to 4x3 against a narrow axes box).
-        avail_w = fig.bbox.width * 0.98
-        for trial in range(n, 0, -1):          # widest first; first that fits wins
+        budget = fig.bbox.width                # frameless, centered: may fill the width
+        for rows in range(1, n + 1):
+            ncol = math.ceil(n / rows)
             leg = ax.legend(handles=handles, labels=labels, loc="upper center",
-                            bbox_to_anchor=anchor, ncol=trial)
-            fits = leg.get_window_extent(renderer).width <= avail_w
+                            bbox_to_anchor=anchor, ncol=ncol,
+                            fontsize=_LEGEND_FONTSIZE, **_LEGEND_PACK)
+            fits = leg.get_window_extent(renderer).width <= budget
             leg.remove()
             if fits:
-                max_fit = trial
-                break
+                return ncol                    # fewest rows that fit width-wise
+        return 1
     except Exception:
-        # No renderer: estimate columns from the longest label vs a nominal width.
-        longest = max(len(s) for s in labels)
-        max_fit = max(1, min(n, 90 // (longest + 6)))
-    rows = max(1, math.ceil(n / max_fit))      # fewest rows that fit width-wise
-    return max(1, math.ceil(n / rows))         # fewest cols for that many rows
+        # No renderer: two rows is the common neat layout for these legends.
+        return max(1, math.ceil(n / 2))
 
 
 def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
@@ -1706,6 +1704,8 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         return None
     kw.setdefault("frameon", False)          # frameless by default; toggle via legend_frame
     kw.setdefault("fontsize", _LEGEND_FONTSIZE)
+    for k, v in _LEGEND_PACK.items():        # tight packing; must match _fit_legend_ncol
+        kw.setdefault(k, v)
     # Consistent, compact text across every plot (titles/ticks/legend looked
     # oversized): set the title and tick sizes here — _legend_below is the one
     # call every geometry plot ends with.

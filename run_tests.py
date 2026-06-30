@@ -576,9 +576,51 @@ def run_vg_kr_test(test):
     return 0.0, None
 
 
+def run_mesh_conform_test(test):
+    """Guard the conforming-edge preprocessing in build_mesh_from_polygons: a vertex
+    in the interior of a neighbour's shared edge (a T-junction) must be inserted so
+    the interface meshes without a slit. Builds the earth-dam shell/core case with a
+    T-junction at (55,18) on the core-top interface and checks (a) the preprocessor
+    inserts it into the core edge and (b) every interface node is shared by elements
+    of BOTH materials. Returns (0.0, None) on success, else (None, message)."""
+    import numpy as np
+    from collections import defaultdict
+    from xslope.mesh import build_mesh_from_polygons, make_polygons_conforming
+
+    core = [(46.5, 0.0), (63.5, 0.0), (59.0, 18.0), (51.0, 18.0)]
+    shell = [(0.0, 0.0), (51.0, 22.0), (59.0, 22.0), (110.0, 0.0), (63.5, 0.0),
+             (59.0, 18.0), (55.0, 18.0), (51.0, 18.0), (46.5, 0.0)]   # T-junction (55,18)
+
+    problems = []
+    pc = [list(shell), list(core)]
+    make_polygons_conforming(pc)
+    if (55.0, 18.0) not in [tuple(p) for p in pc[1]]:
+        problems.append("preprocessor did not insert the T-junction vertex (55,18) into the core edge")
+
+    mesh = build_mesh_from_polygons([{'coords': shell, 'mat_id': 0},
+                                     {'coords': core, 'mat_id': 1}], 3.0, 'tri3')
+    nodes = np.asarray(mesh['nodes']); el = np.asarray(mesh['elements'])
+    et = np.asarray(mesh['element_types']); em = np.asarray(mesh['element_materials'])
+    node_mats = defaultdict(set)
+    for ei in range(len(el)):
+        for nd in el[ei][:int(et[ei])]:
+            node_mats[int(nd)].add(int(em[ei]))
+    nonconf = sum(1 for i, (x, y) in enumerate(nodes)
+                  if abs(y - 18.0) < 1e-6 and 51.0 + 1e-6 < x < 59.0 - 1e-6
+                  and len(node_mats.get(i, set())) < 2)
+    if nonconf:
+        problems.append(f"{nonconf} non-conforming interface node(s) on the core-top edge")
+
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
+    if test_type == 'mesh_conform':
+        return run_mesh_conform_test(test)
     if test_type == 'vg_kr':
         return run_vg_kr_test(test)
     if test_type == 'roundtrip':
@@ -650,6 +692,9 @@ def main():
         # Fast, file-less unit check for the van Genuchten kr function + dispatch.
         tests.append({'type': 'vg_kr', 'file': 'kr_vg_vec (unit)', 'method': '-',
                       'source': 'vg_kr'})
+        # Mesh conforming-edge (T-junction) regression.
+        tests.append({'type': 'mesh_conform', 'file': 'conforming edges (mesh)',
+                      'method': '-', 'source': 'mesh_conform'})
         seep_samples = Path('docs/seep/samples.md')
         if seep_samples.exists():
             tests.extend(parse_test_tags(seep_samples))
@@ -782,7 +827,7 @@ def main():
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'
-        elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr'):
+        elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr', 'mesh_conform'):
             expected = 0.0          # these return 0.0 on success
             tol = 0.0
             label = 'mismatch'

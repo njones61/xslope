@@ -98,6 +98,81 @@ def ensure_ccw_elements(nodes, elements, element_types):
     return n_flipped
 
 
+def make_polygons_conforming(polygon_coords, tol=1e-8, debug=False):
+    """Make adjacent material-zone polygons share matching vertices along every
+    common boundary, so the mesh is conforming across interfaces.
+
+    The mesh builder shares an interface between two zones only when both define it
+    with identical endpoints (the gmsh edge is keyed on its endpoint points). If one
+    zone places a vertex partway along an edge that its neighbour treats as a single
+    straight segment — a **T-junction / hanging node** — the two sides become
+    independent geometric paths and the mesh comes out non-conforming across that
+    interface (a slit that blocks flow/stress transfer). This function detects any
+    polygon vertex lying in the *interior* of another polygon's edge and splits that
+    edge at the vertex, so both sides emit the same sub-edges and gmsh deduplicates
+    them into one conforming interface.
+
+    Operates on a list of per-polygon ``(x, y)`` coordinate lists (the closing
+    endpoint, if duplicated, is dropped). Mutates ``polygon_coords`` in place and
+    returns it. Inserted coordinates are the exact foreign-vertex tuples, so they
+    match the neighbour's point under the downstream exact-coordinate de-duplication.
+    """
+    # Normalise to tuples and drop any duplicate closing endpoint.
+    polys = []
+    for pts in polygon_coords:
+        pts = [tuple(p) for p in pts]
+        if len(pts) > 1 and abs(pts[0][0] - pts[-1][0]) < tol and abs(pts[0][1] - pts[-1][1]) < tol:
+            pts = pts[:-1]
+        polys.append(pts)
+
+    # All distinct vertices across every polygon = candidate split points.
+    all_verts, seen = [], set()
+    for pts in polys:
+        for p in pts:
+            key = (round(p[0], 9), round(p[1], 9))
+            if key not in seen:
+                seen.add(key)
+                all_verts.append(p)
+
+    def _same(u, v):
+        return abs(u[0] - v[0]) < tol and abs(u[1] - v[1]) < tol
+
+    def _t(v, a, b):                       # projection parameter of v along a->b
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        denom = dx * dx + dy * dy
+        return ((v[0] - a[0]) * dx + (v[1] - a[1]) * dy) / denom if denom else 0.0
+
+    n_inserted = 0
+    # Each pass only inserts already-existing vertices, so it converges quickly.
+    for _ in range(len(all_verts) + 1):
+        changed = False
+        for pi, pts in enumerate(polys):
+            n = len(pts)
+            if n < 2:
+                continue
+            new_pts = []
+            for i in range(n):
+                a, b = pts[i], pts[(i + 1) % n]
+                new_pts.append(a)
+                on_edge = [v for v in all_verts
+                           if not _same(v, a) and not _same(v, b)
+                           and is_point_on_edge(v, a, b, tol)]
+                for v in sorted(on_edge, key=lambda v: _t(v, a, b)):
+                    if not _same(v, new_pts[-1]):
+                        new_pts.append(v)
+                        changed = True
+                        n_inserted += 1
+            polys[pi] = new_pts
+        if not changed:
+            break
+
+    if debug and n_inserted:
+        print(f"make_polygons_conforming: inserted {n_inserted} vertex(es) to "
+              f"resolve T-junctions on shared edges")
+    polygon_coords[:] = polys
+    return polygon_coords
+
+
 def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None):
     """
     Build a finite element mesh with material regions using Gmsh.
@@ -146,6 +221,10 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         else:
             polygon_coords.append(polygon)
             polygon_mat_ids.append(None)
+
+    # Make adjacent zones conforming: split any edge at a neighbour's vertex that
+    # lies in its interior (a T-junction), so shared interfaces mesh without slits.
+    make_polygons_conforming(polygon_coords, debug=debug)
 
     # Build a list of region ids (list of material IDs - one per polygon)
     if any(mat_id is not None for mat_id in polygon_mat_ids):

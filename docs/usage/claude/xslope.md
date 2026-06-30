@@ -42,7 +42,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    **Required for seepage:**
    - Hydraulic conductivity (k1, k2) for every material
    - At least one specified head boundary condition
-   - For partially saturated problems: kr0 and h0 for every material
+   - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, or `unsat="vg"` (van Genuchten) with vg_a/vg_n
 
    **Required for reliability:**
    - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns L-Q). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
@@ -412,17 +412,22 @@ Row 8 is the header row. Data starts at row 9. Columns:
 | R | k1 | Major hydraulic conductivity (seepage) |
 | S | k2 | Minor hydraulic conductivity (seepage) |
 | T | alpha | Permeability tensor angle (usually 0) |
-| U | kr0 | Unsaturated relative conductivity (e.g., 0.001-0.01) |
-| V | h0 | Suction head parameter (e.g., -1) |
-| W | E | Young's modulus (FEM) |
-| X | n | Poisson's ratio (FEM) |
+| U | unsat | Unsaturated model: "lf" (linear front, default) or "vg" (van Genuchten) |
+| V | kr0 | Linear-front relative conductivity (unsat="lf"; e.g., 0.001-0.01) |
+| W | h0 | Linear-front suction head parameter (unsat="lf"; e.g., -1) |
+| X | vg_a | van Genuchten α (unsat="vg"; 1/length) |
+| Y | vg_n | van Genuchten n (unsat="vg") |
+| Z | E | Young's modulus (FEM) |
+| AA | n | Poisson's ratio (FEM) |
 
 ```python
 updates['mat'] = {}
 def write_material(row, mat_num, name, gamma, option, c, phi, u,
                    cp=None, r_elev=None, d=None, psi=None,
-                   k1=None, k2=None, alpha=None, kr0=None, h0=None,
-                   E=None, nu=None):
+                   k1=None, k2=None, alpha=None, unsat=None, kr0=None, h0=None,
+                   vg_a=None, vg_n=None, E=None, nu=None):
+    # Template v11 column layout: unsat=U(21), kr0=V(22), h0=W(23),
+    # vg_a=X(24), vg_n=Y(25), E=Z(26), n=AA(27).
     cells = {
         cell_ref(row, 1): mat_num, cell_ref(row, 2): name,
         cell_ref(row, 3): gamma, cell_ref(row, 4): option,
@@ -435,16 +440,20 @@ def write_material(row, mat_num, name, gamma, option, c, phi, u,
     if k1 is not None: cells[cell_ref(row, 18)] = k1
     if k2 is not None: cells[cell_ref(row, 19)] = k2
     if alpha is not None: cells[cell_ref(row, 20)] = alpha
-    if kr0 is not None: cells[cell_ref(row, 21)] = kr0
-    if h0 is not None: cells[cell_ref(row, 22)] = h0
-    if E is not None: cells[cell_ref(row, 23)] = E
-    if nu is not None: cells[cell_ref(row, 24)] = nu
+    if unsat is not None: cells[cell_ref(row, 21)] = unsat
+    if kr0 is not None: cells[cell_ref(row, 22)] = kr0
+    if h0 is not None: cells[cell_ref(row, 23)] = h0
+    if vg_a is not None: cells[cell_ref(row, 24)] = vg_a
+    if vg_n is not None: cells[cell_ref(row, 25)] = vg_n
+    if E is not None: cells[cell_ref(row, 26)] = E
+    if nu is not None: cells[cell_ref(row, 27)] = nu
     updates['mat'].update(cells)
 
-# Material 1 example
+# Material 1 example (linear-front unsaturated model is the default; omit unsat
+# or set "lf" with kr0/h0. For van Genuchten use unsat="vg" with vg_a/vg_n.)
 write_material(9, 1, "clay", 120, "mc", c=200, phi=28, u="piezo",
-               k1=0.5, k2=0.2, alpha=0, kr0=0.001, h0=-1,  # seepage
-               E=1000000, nu=0.3)                             # FEM
+               k1=0.5, k2=0.2, alpha=0, unsat="lf", kr0=0.001, h0=-1,  # seepage
+               E=1000000, nu=0.3)                                       # FEM
 ```
 
 For total stress analysis (undrained, Su analysis): set option="mc", c=Su, phi=0, u="none".
@@ -737,7 +746,7 @@ def write_reinforce(num, x1, y1, x2, y2, tmax, tres=None, lp1=0, lp2=0, E=None, 
     if area is not None: updates['reinforce'][cell_ref(row, 11)] = area
 ```
 
-### Sheet: piles (v10 template only)
+### Sheet: piles (v10 and later templates)
 
 Pile support elements. Row 2 is header. Data starts row 3.
 
@@ -1065,6 +1074,6 @@ else:
 
 9. **Always validate** by plotting inputs before running analysis. If geometry looks wrong, fix the template first.
 
-9. **Seepage material properties**: For fully saturated problems, kr0 and h0 are ignored but must still have placeholder values. For partially saturated (unconfined) problems, typical values are kr0=0.001 to 0.01 and h0=-1.
+9. **Seepage material properties**: For fully saturated problems, the unsaturated parameters are ignored but must still have placeholder values. For partially saturated (unconfined) problems, set the `unsat` model per material: `unsat="lf"` (linear front — the default and recommended model) with typical kr0=0.001 to 0.01 and h0=-1; or `unsat="vg"` (van Genuchten) with vg_a (α, 1/length) and vg_n. Use "vg" only when van Genuchten properties are specifically wanted.
 
 10. **When the user says "find the factor of safety"**, default to auto_search with Spencer's method unless they specify otherwise. Spencer's method satisfies both force and moment equilibrium and works for both circular and non-circular surfaces.

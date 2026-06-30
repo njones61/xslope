@@ -509,9 +509,78 @@ def run_dxf_roundtrip_test(test):
     return 0.0, None
 
 
+def run_vg_kr_test(test):
+    """Unit check for the van Genuchten relative-permeability function and the
+    kr-model dispatch (xslope.seep). Verifies kr_vg_vec against an independent
+    scalar evaluation of the Mualem-vG formula across pressure heads and (alpha, n),
+    the saturation / floor / monotonicity behavior, and that the dispatcher reduces
+    EXACTLY to the linear-front kr when no vG model is active. Returns (0.0, None)
+    on success, else (None, message). No mesh / gmsh needed."""
+    import numpy as np
+    from xslope.seep import (kr_vg_vec, kr_relative_vec, kr_relative,
+                             kr_frontal_vec, KR_LF, KR_VG)
+    KR_MIN = 1e-4
+
+    def vg_scalar(p, a, n):
+        # Independent scalar reference for Mualem-van Genuchten kr.
+        n = max(n, 1.0 + 1e-6)
+        m = 1.0 - 1.0 / n
+        if p >= 0.0:
+            return 1.0
+        se = (1.0 + (a * abs(p)) ** n) ** (-m)
+        kr = (se ** 0.5) * (1.0 - (1.0 - se ** (1.0 / m)) ** m) ** 2
+        return min(max(kr, KR_MIN), 1.0)
+
+    problems = []
+    heads = np.array([-200., -50., -10., -3., -1., -0.3, -0.05, 0.0, 2.0])
+    for a, n in [(0.075, 1.89), (2.286, 1.89), (1.097, 1.56), (0.5, 1.1), (3.0, 4.0)]:
+        got = kr_vg_vec(heads, a, n)
+        ref = np.array([vg_scalar(float(p), a, n) for p in heads])
+        if not np.allclose(got, ref, atol=1e-12, rtol=1e-9):
+            problems.append(f"kr_vg_vec != Mualem-vG for (a={a}, n={n}): max|d|={np.max(np.abs(got-ref)):.2e}")
+        if got[7] != 1.0 or got[8] != 1.0:
+            problems.append(f"kr not 1.0 at saturation for (a={a}, n={n})")
+        unsat = got[:7]
+        if np.any(unsat < KR_MIN - 1e-15) or np.any(unsat > 1.0 + 1e-12):
+            problems.append(f"kr out of [{KR_MIN},1] for (a={a}, n={n})")
+        if np.any(np.diff(unsat) < -1e-12):     # drier (more negative p) -> lower kr
+            problems.append(f"kr not monotonic in p for (a={a}, n={n})")
+
+    # Dispatch must reduce EXACTLY to the linear front when no vG model is active.
+    P = np.array([[-2.0, -1.0, 0.5], [-5.0, -0.2, 1.0]])
+    kr0 = np.array([0.001, 0.01]); h0 = np.array([-1.0, -2.0])
+    base = kr_frontal_vec(P, kr0[:, None], h0[:, None])
+    if not np.array_equal(kr_relative_vec(P, kr0[:, None], h0[:, None]), base):
+        problems.append("kr_relative_vec(model=None) != kr_frontal_vec (lf not bit-identical)")
+    alllf = kr_relative_vec(P, kr0[:, None], h0[:, None],
+                            vg_a=np.zeros((2, 1)), vg_n=np.zeros((2, 1)),
+                            model=np.array([[KR_LF], [KR_LF]]))
+    if not np.array_equal(alllf, base):
+        problems.append("kr_relative_vec(all-lf) != kr_frontal_vec")
+    mixed = kr_relative_vec(P, kr0[:, None], h0[:, None],
+                            vg_a=np.array([[0.075], [0.0]]), vg_n=np.array([[1.89], [0.0]]),
+                            model=np.array([[KR_VG], [KR_LF]]))
+    if not np.array_equal(mixed[1], base[1]):
+        problems.append("mixed dispatch perturbed the lf row")
+    if not np.allclose(mixed[0], kr_vg_vec(P[0], 0.075, 1.89)):
+        problems.append("mixed dispatch wrong on the vG row")
+
+    # Scalar kr_relative agrees with the vector path and dispatches on model.
+    if abs(kr_relative(-1.5, 0.01, -1.0, model=KR_LF) - float(kr_frontal_vec(np.array(-1.5), 0.01, -1.0))) > 1e-12:
+        problems.append("scalar kr_relative(lf) != kr_frontal")
+    if abs(kr_relative(-1.5, 0.0, 0.0, vg_a=0.075, vg_n=1.89, model=KR_VG) - vg_scalar(-1.5, 0.075, 1.89)) > 1e-12:
+        problems.append("scalar kr_relative(vg) != Mualem-vG")
+
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
+    if test_type == 'vg_kr':
+        return run_vg_kr_test(test)
     if test_type == 'roundtrip':
         return run_roundtrip_test(test)
     if test_type == 'dxf':
@@ -578,6 +647,9 @@ def main():
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
     if run_seep:
+        # Fast, file-less unit check for the van Genuchten kr function + dispatch.
+        tests.append({'type': 'vg_kr', 'file': 'kr_vg_vec (unit)', 'method': '-',
+                      'source': 'vg_kr'})
         seep_samples = Path('docs/seep/samples.md')
         if seep_samples.exists():
             tests.extend(parse_test_tags(seep_samples))
@@ -710,7 +782,7 @@ def main():
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'
-        elif test_type in ('roundtrip', 'template_sync', 'dxf'):
+        elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr'):
             expected = 0.0          # these return 0.0 on success
             tol = 0.0
             label = 'mismatch'

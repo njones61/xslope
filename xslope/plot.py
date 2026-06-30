@@ -1660,11 +1660,16 @@ def _fit_legend_ncol(ax, fig, handles, labels, anchor):
     try:
         fig.canvas.draw()                      # ensure a renderer + axes layout
         renderer = fig.canvas.get_renderer()
-        ax_w = ax.get_window_extent(renderer).width
+        # The legend is anchored to the whole figure width (centered below the
+        # axes), not the axes box — which equal-aspect box-adjust can shrink. Fit
+        # against the figure width so a long-label legend still uses the full row
+        # (e.g. the 12-item solution legend lays out 6x2 like the search plot,
+        # instead of backing off to 4x3 against a narrow axes box).
+        avail_w = fig.bbox.width * 0.98
         for trial in range(n, 0, -1):          # widest first; first that fits wins
             leg = ax.legend(handles=handles, labels=labels, loc="upper center",
                             bbox_to_anchor=anchor, ncol=trial)
-            fits = leg.get_window_extent(renderer).width <= ax_w
+            fits = leg.get_window_extent(renderer).width <= avail_w
             leg.remove()
             if fits:
                 max_fit = trial
@@ -2015,7 +2020,7 @@ def plot_inputs(
                         y_max_new = y_min_curr + (y_top - y_min_curr) / bottom_fraction
                         ax.set_ylim(y_min_curr, y_max_new)
 
-    ax.set_aspect('equal')  # ✅ Equal aspect
+    ax.set_aspect('equal', adjustable='datalim')  # ✅ Equal aspect
 
     # Add a bit of headroom so plotted lines/markers don't touch the top border
     y0, y1 = ax.get_ylim()
@@ -2171,7 +2176,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         handles.append(dummy_line)
         labels.append('Distributed Load')
     
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='datalim')
 
     fs = results['FS']
     method = results['method']
@@ -2335,7 +2340,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
     if search_path:
         plot_search_path(ax, search_path)
 
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
@@ -2419,7 +2424,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
                             head_width=1, head_length=2, fc='green', ec='green',
                             length_includes_head=True, alpha=0.6, gid='SEARCH_PATH')
 
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
     if highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
@@ -2511,7 +2516,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
 
 
     # Standard finalization
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
 
     # Title with reliability statistics using mathtext
@@ -2725,7 +2730,7 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
             ax.text(x + 0.5, y + 0.5, str(i+1), fontsize=6, color='blue', alpha=0.7,
                     ha='left', va='bottom', zorder=14)
     
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='datalim')
     ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
 
     # Add cushion
@@ -2806,7 +2811,7 @@ def plot_polygons(
     if legend:
         ax.legend()
     ax.grid(True, alpha=0.3)
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='datalim')
     plt.tight_layout()
     
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
@@ -2857,7 +2862,7 @@ def plot_polygons_separately(polygons, materials=None, save_png=False, dpi=300):
         else:
             ax.set_title(f'Material {mat_idx}')
         ax.grid(True, alpha=0.3)
-        ax.set_aspect('equal')
+        ax.set_aspect('equal', adjustable='datalim')
         # Intentionally no legend: these plots are typically used for debugging geometry,
         # and legends can obscure key vertices/edges.
     plt.tight_layout()

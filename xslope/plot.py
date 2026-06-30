@@ -1736,9 +1736,10 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     except Exception:
         n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
         leg_h = 0.045 * n_rows
-    # Bottom margin clears the legend AND the x-axis tick labels above it (the pad
-    # leaves a visible gap so the legend isn't crammed against the axis numbers).
-    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + 0.11)
+    # Bottom margin clears the legend plus the x-axis tick numbers above it, with a
+    # small gap (not crammed, not floating). The gap is fixed in figure units so it
+    # doesn't grow with the axes height.
+    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + 0.05)
     top = 0.94
     if ax.get_title():                       # reserve enough top for the (maybe multi-line) title
         try:

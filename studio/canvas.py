@@ -114,6 +114,14 @@ class MplCanvas(QWidget):
         self._refine_timer.setInterval(REFINE_MS)
         self._refine_timer.timeout.connect(self._refine_resolution)
 
+        # The figure is sized to the viewport (below), so re-layout it when the
+        # canvas resizes — debounced so a drag-resize redraws once, not per pixel.
+        self._draw_fn = None
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(120)
+        self._resize_timer.timeout.connect(self._on_resize)
+
         bar = QHBoxLayout()
         for text, tip, slot in [
             ("Fit", "Fit figure to window", self.fit),
@@ -337,11 +345,39 @@ class MplCanvas(QWidget):
         (and to ``showEvent`` for a canvas drawn while its tab is hidden), so it
         runs once the viewport has a real size rather than at zero size."""
         self._dxf_supported = dxf
+        self._draw_fn = draw_fn          # remembered so a resize can re-layout it
+        self._size_figure_to_viewport()  # figure matches the canvas → crisp 1:1 render
         draw_fn(self.figure)
         self._rasterize(self._target_dpi())
         self._fitted = False
         QTimer.singleShot(0, self.ensure_fitted)
         self._schedule_refine()
+
+    def _size_figure_to_viewport(self):
+        """Size the Matplotlib figure to the canvas viewport (pixels → inches at
+        BASE_DPI). The figure then matches the display, so it rasterizes at the
+        device resolution and shows 1:1 with no QGraphicsView resampling (crisp,
+        not grainy), and every plot fills the canvas the same way (consistent).
+        Returns True if it could read a real viewport size."""
+        vp = self.view.viewport()
+        w, h = vp.width(), vp.height()
+        if w > 1 and h > 1:
+            self.figure.set_size_inches(w / BASE_DPI, h / BASE_DPI, forward=False)
+            return True
+        return False
+
+    def _on_resize(self):
+        """Re-layout the figure to the new viewport size and redraw 1:1 (debounced)."""
+        if self._draw_fn is None or not self._size_figure_to_viewport():
+            self.fit()
+            return
+        self.figure.clear()
+        try:
+            self._draw_fn(self.figure)
+        except Exception:
+            return
+        self._rasterize(self._target_dpi())
+        self.fit()
 
     def ensure_fitted(self):
         """Fit the figure to the window once the view has a real size.
@@ -506,15 +542,10 @@ class MplCanvas(QWidget):
             self._schedule_refine()
 
     def fit(self):
-        if self._content_rect is not None and not self._content_rect.isEmpty():
-            # Add a small cushion so the content isn't flush against the edges.
-            px = self._content_rect.width() * FIT_PAD
-            py = self._content_rect.height() * FIT_PAD
-            self.view.fitInView(self._content_rect.adjusted(-px, -py, px, py),
-                                Qt.KeepAspectRatio)
-            self._schedule_refine()
-        elif self._pixitem is not None:
-            self.view.fitInView(self._pixitem, Qt.KeepAspectRatio)
+        # The figure is sized to the viewport, so fitting the whole figure gives a
+        # 1:1 mapping — crisp (no resampling) and identical framing for every plot.
+        if self._pixitem is not None:
+            self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
             self._schedule_refine()
         self._restore_pan_cursor()
 
@@ -544,8 +575,9 @@ class MplCanvas(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # Re-fit the whole figure to the new window size (re-rasterize debounced).
-        self.fit()
+        # The figure is sized to the viewport, so a resize re-lays-it-out (debounced)
+        # then re-fits 1:1 — keeping it crisp at the new size.
+        self._resize_timer.start()
 
     def eventFilter(self, obj, event):
         if obj is self.view.viewport() and event.type() == QEvent.NativeGesture:

@@ -165,10 +165,11 @@ Each carries a recommendation to converge quickly.
   drained c′/φ′ vs. undrained su? *Rec:* key strength by **class × drainage**;
   drained→`option=mc` (c,φ), undrained→`option=cp` with su as `c` and a typical
   su-rate as `cp` (leave `r_elev` to the user).
-- **D5 — Unsaturated model.** xslope's `kr0`/`h0` is simplified, not van Genuchten.
-  Provide approximate kr0/h0 presets by texture, or omit unsaturated from v1?
-  *Rec:* **omit unsaturated from v1**; revisit with a proper vG→(kr0,h0) mapping
-  once `seep.py`'s model is confirmed.
+- **D5 — Unsaturated model.** **Superseded by [`plan_vg.md`](plan_vg.md).** If xslope
+  gains native van Genuchten support (planned), the Carsel–Parrish (1988) α, n table
+  maps **1:1** onto the `vg_a`/`vg_n` columns with no conversion — so the unsaturated
+  cluster becomes cleanly in-scope rather than deferred. *Rec (revised):* sequence the
+  unsaturated cluster after vG lands; until then, omit it (no lossy kr0/h0 fitting).
 - **D6 — Data sourcing & licensing.** Which references, and is reproducing their
   tables acceptable? *Rec:* lead with public-domain (NAVFAC, USDA); cite and
   re-derive journal values; get explicit sign-off before publishing.

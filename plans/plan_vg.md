@@ -87,17 +87,24 @@ pore pressures that matter.
 
 ---
 
-## 3. Input / template changes
+## 3. Input / template changes — ✅ DONE (commit: template v11 fileio)
 
-| Area | Change |
-| --- | --- |
-| Template | Add the `unsat` model column (`lf`/`vg`) and the `vg_a` / `vg_n` parameter columns to the **mat** sheet. Author is redesigning the template. |
-| Back-compat | Missing `unsat` ⇒ default `lf`; existing files (no new columns) load unchanged and behave exactly as today. |
-| `fileio.load_slope_data` | Read the new columns into each material dict (`unsat`, `vg_a`, `vg_n`), with defaults (`unsat="lf"`, `vg_a`/`vg_n` = NaN/0 when lf). |
-| `_blank_material` (`document.py`) | Add the new keys so New/empty projects and DXF import carry them. |
-| `save_slope_data_to_xlsx` | Write the new columns back (round-trip fidelity). |
-| Validation | When `unsat=vg`, require valid `vg_a>0`, `vg_n>1`; when `unsat=lf`, require valid `kr0`/`h0` (existing check at `seep.py:168`). Clear error messages naming the offending material. |
-| Template sync + roundtrip | Update `run_tests.py` roundtrip key list + the docs-master/packaged template sync (the two-copy guard). Add at least one `vg` material to a roundtrip fixture. |
+Template **v11** added: `unsat` (col U), `vg_a` (X), `vg_n` (Y) — which shifted
+`kr0→V`, `h0→W`, `E→Z`, `nu→AA`.
+
+| Area | Change | Status |
+| --- | --- | --- |
+| Template | `unsat` (`lf`/`vg`) + `vg_a` / `vg_n` columns on the **mat** sheet (v10→v11). | ✅ (author) |
+| `fileio.load_slope_data` | Read `unsat` (default `lf`), `vg_a`, `vg_n` **by header name** — version-independent, back-compatible (older files default cleanly). | ✅ |
+| `save_slope_data_to_xlsx` | **Header-driven write** (`_read_mat_header_cols` reads the destination's row-8 headers; columns located by name, not hardcoded). Adapts to v11 and **stops in-place saves of v9/v10 files from corrupting** — strictly better than version-keying. | ✅ |
+| `_blank_material` (`document.py`) | Carries `unsat`/`vg_a`/`vg_n`. | ✅ |
+| Template sync + roundtrip | Packaged `resources` template synced to v11; `roundtrip`/`template_sync` green (14/14); `'materials'` compared recursively so lf round-trips are auto-guarded; a `vg` material verified to round-trip (cells land in X/Y; E/nu intact). | ✅ |
+| Docs | `input_template.md` documents the new columns. | ✅ |
+| Validation | When `unsat=vg`, require valid `vg_a>0`, `vg_n>1`; when `unsat=lf`, valid `kr0`/`h0`. Currently the loader accepts `unsat` permissively (unknown → `lf`); strict validation lands with the solver. | ⬜ (with solver) |
+
+**Decision recorded:** reading was already header-based, so **no template-version
+keying is needed**; the writer was made header-driven too, which removes version
+coupling for both directions and fixes the latent in-place-save corruption.
 
 ---
 

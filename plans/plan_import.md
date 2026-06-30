@@ -72,14 +72,17 @@ in three phases (per format, easiest format — `.gsz` — first):
   canvas for review), and leaves it unsaved for the user to complete and Save As — the
   same pattern as the DXF importer.
 
-**Corpus & licensing.** Licensed access lets us *use* the vendor files and tutorials for
-development and validation, but **redistributing** them (committing the `.gsz`/`.slmd`
-samples into the public repo) is a separate rights question — keep the sample corpus in
-a **git-ignored** dev folder (or a private sibling repo, like the existing
-`xslope_private_tests`). What *can* be committed is the **derived regression data**: the
-problem name, geometry summary, and the source software's reported answer + xslope's
-computed answer + tolerance — i.e. the Phase B validation table, without the proprietary
-files themselves.
+**Corpus & licensing (private sibling repo — decided).** Licensed access lets us *use*
+the vendor files and tutorials for development and validation, but **redistributing**
+them (the `.gsz`/`.slmd` samples) in the public repo is a separate rights question, so
+the corpus lives in the **private sibling repo `xslope_private_tests`** (already wired:
+`run_tests.py` auto-discovers it via the sibling path or `$XSLOPE_PRIVATE_TESTS` and is
+silently skipped in public CI). This means **Phase B needs almost no new harness**: a
+converted problem is committed there as an `.xlsx` (and, for import-fidelity tests, the
+original `.gsz`) plus a markdown `<!-- test: ... -->` tag carrying the source software's
+reported answer as `expected_fs` / `expected_flowrate` — exactly the existing tag format,
+routed by type. The public repo gets only the **derived validation table** (problem name,
+summary, both answers, Δ/tolerance), never the proprietary files.
 
 ## 5. Findings from an initial scout (2026-06-27)
 

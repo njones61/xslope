@@ -212,7 +212,7 @@ functions (no callers) were left untouched. Original design notes:
 - **Soils database** ([`plan_soils_db.md`](plan_soils_db.md)) — native vG flips **D5**:
   the Carsel–Parrish (1988) α, n table maps directly onto `vg_a`/`vg_n` with no
   conversion, so the unsaturated cluster can be in scope rather than deferred.
-- **Model importers** (plan_studio.md §14) — vG support makes `.gsz` / Slide hydraulic
+- **Model importers** ([`plan_import.md`](plan_import.md)) — vG support makes `.gsz` / Slide hydraulic
   functions import losslessly.
 
 ---

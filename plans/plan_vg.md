@@ -7,8 +7,13 @@ behavior and default) and `vg` (van Genuchten). This document captures the
 rationale, the design decision, and a full change scope (input, solver, plotting,
 docs, validation) before implementation.
 
-**Status:** 🟡 **Design / scoped** — approved to implement; template redesign by the
-author in progress. Open naming/parameter decisions in §9.
+**Status:** 🟢 **Implemented** — template v11 + fileio (header-driven read/write,
+upgrade-on-save), Studio Materials editor + Save heads-up, Claude skill writer, the
+seep.py solver (kr_vg_vec + kr_relative dispatch threaded through the head solve,
+stream function, velocity, and flow-potential BCs), and the docs all landed. Verified:
+lf path bit-identical (seep suite 12/12), kr_vg matches the closed form, lf dispatch
+bit-identical, vG converges end-to-end. Remaining: external cross-validation and a
+committed vG regression test (§7 follow-ups).
 
 ---
 
@@ -108,9 +113,17 @@ coupling for both directions and fixes the latent in-place-save corruption.
 
 ---
 
-## 4. Solver changes (`seep.py`)
+## 4. Solver changes (`seep.py`) — ✅ DONE
 
-The kr evaluation is centralized, so the change is localized:
+The kr evaluation is centralized, so the change was localized. Implemented:
+`kr_vg_vec` (Mualem–vG, steady-state, α/n only, `kr_min` floor) + `kr_relative_vec`
+/ `kr_relative` dispatchers (model None or all-lf → exactly `kr_frontal_vec`, so the
+lf path is bit-identical); per-material `unsat`/`vg_a`/`vg_n` arrays built in
+`build_seep_data` (+ model-aware missing-param validation) and threaded as
+per-element arrays through `solve_unsaturated` → `_assembly_data` (head **and**
+stream modes), `compute_velocity`, and `create_flow_potential_bc_from_elements`,
+all wired from `run_seepage_analysis`. The dead `*_stiffness_matrix_kr` / `_kr_factor`
+functions (no callers) were left untouched. Original design notes:
 
 - **New kr function** `kr_vg_vec(p, vg_a, vg_n, kr_min)` — the Mualem–vG kr above,
   vectorized over `(n_elements, n_sample_points)`, with the `kr_min` floor and

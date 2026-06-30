@@ -70,7 +70,21 @@ The solution should look something like this:
 
 <!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.44, tolerance=0.05 -->
 
-### 4. Johnson Reservoir {#johnson-reservoir}
+### 4. Earth Dam with Core — van Genuchten Unsaturated Model
+
+This is the same earth dam as [Problem 3](#3-earth-dam-with-core) — identical geometry, conductivities, and boundary conditions — but the unsaturated zone is modeled with the **van Genuchten** relative-conductivity function (`unsat = "vg"`) rather than the linear front. Only the per-material unsaturated parameters change: `vg_a` (van Genuchten α) and `vg_n` (n), set to representative values for the shell (sandy loam) and core (loam), converted to the model's length unit (1/ft). See the [van Genuchten Model](overview.md#van-genuchten-model) section for the typical-value table and the unit convention for α.
+
+[xslope_earth_dam1_vg.xlsx](files/xslope_earth_dam1_vg.xlsx)
+
+The solution should look something like this:
+
+![earth_dam1_vg_solution.png](images/earth_dam1_vg_solution.png){width=1200px}
+
+The computed flow rate (≈40.4) is close to the linear-front result of Problem 3 (≈42.4): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
+
+<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=40.37, tolerance=0.05 -->
+
+### 5. Johnson Reservoir {#johnson-reservoir}
 
 This is another earth dam problem with a shell, a core, and a foundation. 
 
@@ -106,7 +120,7 @@ detail; the bulk flow field agrees to about 0.1 ft. See the
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.958, tolerance=0.05, benchmark=SEEP-2 -->
 
-### 5. Earth Dam with Core and Filter
+### 6. Earth Dam with Core and Filter
 
 This problem has the following cross-section:
 
@@ -124,7 +138,7 @@ The solution should look something like this:
 
 <!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, expected_flowrate=1.275, tolerance=0.05 -->
 
-### 6. Levee with Grouted Foundation
+### 7. Levee with Grouted Foundation
 
 The following problem represents a levee underlain by a foundation with a grout curtain. 
 
@@ -172,7 +186,7 @@ The remaining problems are **verification benchmarks**: analytically-anchored
 cases used to validate the seepage implementation. Each is locked into the
 automated regression suite. See also the [Verification](../verification.md) page.
 
-### 7. Verification: Confined Radial Flow {#verification-confined-radial}
+### 8. Verification: Confined Radial Flow {#verification-confined-radial}
 
 A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer arc
 (r = 30) at head 10, straight radial edges as no-flow streamlines. This is best read
@@ -207,7 +221,7 @@ is faceting of the curved arcs by the polygon boundary. See the
 
 <!-- test: file=files/xslope_confined_radial.xlsx, type=seep, expected_flowrate=28.596, element_type=tri6, target_size=2.0, tolerance=0.01, benchmark=SEEP-1 -->
 
-### 8. Verification: Partially Penetrating Sheetpile {#verification-sheetpile}
+### 9. Verification: Partially Penetrating Sheetpile {#verification-sheetpile}
 
 A single sheetpile cutoff of depth s = 10 in a homogeneous confined stratum of
 thickness T = 20, head loss H = 10 across the wall, k = 1. The boundary heads

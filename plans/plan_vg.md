@@ -12,8 +12,10 @@ upgrade-on-save), Studio Materials editor + Save heads-up, Claude skill writer, 
 seep.py solver (kr_vg_vec + kr_relative dispatch threaded through the head solve,
 stream function, velocity, and flow-potential BCs), and the docs all landed. Verified:
 lf path bit-identical (seep suite 12/12), kr_vg matches the closed form, lf dispatch
-bit-identical, vG converges end-to-end. Remaining: external cross-validation and a
-committed vG regression test (§7 follow-ups).
+bit-identical, vG converges end-to-end. A documented **vG sample problem** (Earth Dam
+with Core, samples.md §4) with a flow-net figure and a committed seep regression test
+(flowrate 40.37, seep suite now 13/13) is in. Remaining: external cross-validation
+against another seepage code (§7 follow-up).
 
 ---
 

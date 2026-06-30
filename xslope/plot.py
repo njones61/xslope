@@ -1638,6 +1638,10 @@ def plot_piles(ax, slope_data, slice_df=None, style=None):
 
 # Figure-fraction y the legend's bottom is pinned to (consistent across plots).
 _LEGEND_BOTTOM = 0.03
+# Compact, consistent text sizes across all plots.
+_TITLE_FONTSIZE = 11
+_TICK_FONTSIZE = 8
+_LEGEND_FONTSIZE = 8
 
 
 def _fit_legend_ncol(ax, fig, handles, labels, anchor):
@@ -1696,6 +1700,13 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     if not handles:
         return None
     kw.setdefault("frameon", False)          # frameless by default; toggle via legend_frame
+    kw.setdefault("fontsize", _LEGEND_FONTSIZE)
+    # Consistent, compact text across every plot (titles/ticks/legend looked
+    # oversized): set the title and tick sizes here — _legend_below is the one
+    # call every geometry plot ends with.
+    ax.tick_params(labelsize=_TICK_FONTSIZE)
+    if ax.get_title():
+        ax.title.set_fontsize(_TITLE_FONTSIZE)
     if legend_ncol == "auto":
         ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
     else:
@@ -1724,8 +1735,10 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         leg_h = leg.get_window_extent().height / fig.bbox.height
     except Exception:
         n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
-        leg_h = 0.055 * n_rows
-    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + 0.04)
+        leg_h = 0.045 * n_rows
+    # Bottom margin clears the legend AND the x-axis tick labels above it (the pad
+    # leaves a visible gap so the legend isn't crammed against the axis numbers).
+    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + 0.11)
     top = 0.94
     if ax.get_title():                       # reserve enough top for the (maybe multi-line) title
         try:

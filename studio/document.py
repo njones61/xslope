@@ -48,7 +48,8 @@ def _blank_material(name):
         "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0, "u": "none",
         "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
         "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
-        "kr0": 0.0, "h0": 0.0, "E": 0.0, "nu": 0.0,
+        "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
+        "E": 0.0, "nu": 0.0,
     }
 
 

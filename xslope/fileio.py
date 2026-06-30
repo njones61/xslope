@@ -487,6 +487,17 @@ def load_slope_data(filepath):
                 f"Material '{material_name}' (Excel row {excel_row}) is blank in columns C:X."
             )
 
+        # Unsaturated relative-permeability model (template v11+): 'lf' (linear
+        # front, kr0/h0 apply) or 'vg' (van Genuchten, vg_a/vg_n apply). Older
+        # templates lack the column -> default 'lf' (current behavior). Read by
+        # header name, so column position is version-independent.
+        unsat_raw = row.get('unsat', 'lf')
+        unsat_val = str(unsat_raw).strip().lower() if (
+            pd.notna(unsat_raw) and str(unsat_raw).strip().lower() not in ('', 'nan')
+        ) else 'lf'
+        if unsat_val not in ('lf', 'vg'):
+            unsat_val = 'lf'
+
         materials.append({
             "name": str(material_name).strip(),
             "gamma": _num(row.get("g", 0)),
@@ -507,8 +518,11 @@ def load_slope_data(filepath):
             "k1": _num(row.get('k1', 0)),
             "k2": _num(row.get('k2', 0)),
             "alpha": _num(row.get('alpha', 0)),
+            "unsat": unsat_val,
             "kr0" : _num(row.get('kr0', 0)),
             "h0" : _num(row.get('h0', 0)),
+            "vg_a": _num(row.get('vg_a', 0)),
+            "vg_n": _num(row.get('vg_n', 0)),
             "E": _num(row.get('E', 0)),
             "nu": _num(row.get('n', 0))
         })
@@ -1150,6 +1164,27 @@ def default_template_path():
                         "resources", "input_template.xlsx")
 
 
+def _read_mat_header_cols(filepath):
+    """Map each 'mat' sheet header (Excel row 8) to its 1-based column index, read
+    from the destination workbook. This lets :func:`save_slope_data_to_xlsx` locate
+    material columns BY NAME rather than hardcoded positions, so the writer adapts
+    to the template version automatically (e.g. v11 inserted ``unsat`` and
+    ``vg_a``/``vg_n``, shifting ``kr0``/``h0``/``E``/``nu``). Headers absent in an
+    older template are simply skipped by the caller."""
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, read_only=True, data_only=False)
+    try:
+        ws = wb['mat']
+        cols = {}
+        for c in range(1, ws.max_column + 1):
+            v = ws.cell(row=8, column=c).value
+            if v is not None and str(v).strip() != '':
+                cols[str(v).strip()] = c
+        return cols
+    finally:
+        wb.close()
+
+
 def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     """
     Write an in-memory ``slope_data`` dict back to an XSLOPE Excel input file.
@@ -1218,27 +1253,41 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         'D11': _f(slope_data['k_seismic']),
     }
 
-    # === mat ===  (header row 8, data rows 9+; column order matches load_slope_data)
-    mat_num_cols = [
-        ('gamma', 3), ('c', 5), ('phi', 6), ('cp', 7), ('r_elev', 8),
-        ('d', 9), ('psi', 10),
-        ('sigma_gamma', 12), ('sigma_c', 13), ('sigma_phi', 14),
-        ('sigma_cp', 15), ('sigma_d', 16), ('sigma_psi', 17),
-        ('k1', 18), ('k2', 19), ('alpha', 20), ('kr0', 21), ('h0', 22),
-        ('E', 23), ('nu', 24),
+    # === mat ===  (header row 8, data rows 9+). Columns are located BY HEADER NAME
+    # read from the destination file, not hardcoded positions, so the writer adapts
+    # to the template version automatically (v11 inserted 'unsat' and 'vg_a'/'vg_n',
+    # shifting kr0/h0/E/nu). A header absent in an older template is skipped.
+    mat_cols = _read_mat_header_cols(filepath)
+    # in-memory key -> mat-sheet header text (numeric fields)
+    mat_num_headers = [
+        ('gamma', 'g'), ('c', 'c'), ('phi', 'f'), ('cp', 'c/p'), ('r_elev', 'r-elev'),
+        ('d', 'd'), ('psi', 'psi'),
+        ('sigma_gamma', 's(g)'), ('sigma_c', 's(c)'), ('sigma_phi', 's(f)'),
+        ('sigma_cp', 's(c/p)'), ('sigma_d', 's(d)'), ('sigma_psi', 's(psi)'),
+        ('k1', 'k1'), ('k2', 'k2'), ('alpha', 'alpha'),
+        ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vg_a'), ('vg_n', 'vg_n'),
+        ('E', 'E'), ('nu', 'n'),
     ]
     mat = {}
     for idx, material in enumerate(slope_data.get('materials', [])):
         row = 9 + idx
-        mat[cell_ref(row, 1)] = idx + 1                       # 1-based mat number
-        mat[cell_ref(row, 2)] = str(material.get('name', ''))
-        # option / u are strings; leave the cell blank when unset (the loader reads
-        # an empty cell back as 'nan', so writing the literal text would be noise).
-        for key, col in [('option', 4), ('u', 11)]:
+        if 'mat' in mat_cols:
+            mat[cell_ref(row, mat_cols['mat'])] = idx + 1     # 1-based mat number
+        if 'name' in mat_cols:
+            mat[cell_ref(row, mat_cols['name'])] = str(material.get('name', ''))
+        # option / u / unsat are strings; leave the cell blank when unset (the loader
+        # reads an empty cell back as a default, so writing literal text is noise).
+        for key, header in [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]:
+            col = mat_cols.get(header)
+            if col is None:
+                continue
             val = material.get(key)
             if val is not None and str(val).strip().lower() not in ('', 'nan'):
                 mat[cell_ref(row, col)] = str(val)
-        for key, col in mat_num_cols:
+        for key, header in mat_num_headers:
+            col = mat_cols.get(header)
+            if col is None:
+                continue
             mat[cell_ref(row, col)] = _f(material.get(key, 0) or 0)
     if mat:
         updates['mat'] = mat

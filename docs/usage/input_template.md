@@ -141,9 +141,13 @@ slope-stability problems.
 
 - **k1**, **k2**: Major and minor hydraulic conductivity (can be anisotropic)
 - **alpha**: Orientation angle of permeability tensor
-- **kr0**, **h0**: Unsaturated flow parameters (relative conductivity and suction head at which K = kr0)
+- **unsat**: Unsaturated relative-permeability model — `lf` (linear front, the default) or `vg` (van Genuchten). Selects which parameter pair below applies.
+- **kr0**, **h0**: Linear-front (`unsat = lf`) parameters — relative conductivity and suction head at which K = kr0.
+- **vg_a**, **vg_n**: van Genuchten (`unsat = vg`) parameters — α (1/length) and n. (For steady-state flow only α and n are needed; residual/saturated water contents are not required.)
 
-Typically, alpha = 0 and K1 = Kx and K2 = Ky.
+Typically, alpha = 0 and K1 = Kx and K2 = Ky. Leave **unsat** blank or `lf` to use the
+linear-front model (the established default); set it to `vg` only when van Genuchten
+properties are wanted (e.g. imported from another package).
 
 These parameters are defined in more detail in the [seepage analysis](../seep/overview.md) section.
 

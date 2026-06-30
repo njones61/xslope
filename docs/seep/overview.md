@@ -576,3 +576,9 @@ export_seepage_results()
 ```
 
 These examples demonstrate the full range of seepage analysis capabilities available in XSLOPE, from basic analysis workflows to advanced parametric studies and integration with limit equilibrium slope stability calculations. The modular design enables users to adapt these workflows to their specific analysis requirements while maintaining computational efficiency and solution accuracy.
+
+## References
+
+Carsel, R.F., & Parrish, R.S. (1988). Developing joint probability distributions of soil water retention characteristics. *Water Resources Research*, 24(5), 755-769. <https://doi.org/10.1029/WR024i005p00755>
+
+van Genuchten, M.Th. (1980). A closed-form equation for predicting the hydraulic conductivity of unsaturated soils. *Soil Science Society of America Journal*, 44(5), 892-898. <https://doi.org/10.2136/sssaj1980.03615995004400050002x>

@@ -1185,6 +1185,38 @@ def _read_mat_header_cols(filepath):
         wb.close()
 
 
+def _inplace_save_would_drop(filepath, materials):
+    """True if editing ``filepath`` in place would silently drop material data
+    because its 'mat' sheet lacks a column the data needs — e.g. a pre-v11 file
+    (no ``unsat``/``vg_a``/``vg_n`` columns) being saved with a van Genuchten
+    material. The caller then upgrades the file through the current template instead
+    of dropping the data. Only flags when a material carries a NON-default value for
+    a missing column, so old files that don't use the new feature still save in
+    place (preserving their formatting)."""
+    if not materials:
+        return False
+    have = set(_read_mat_header_cols(filepath))
+    # (header, key, default) for columns that may be absent in older templates.
+    checks = [('unsat', 'unsat', 'lf'), ('vg_a', 'vg_a', 0.0), ('vg_n', 'vg_n', 0.0)]
+    for header, key, default in checks:
+        if header in have:
+            continue
+        for m in materials:
+            val = m.get(key)
+            if val is None:
+                continue
+            if isinstance(default, str):
+                if str(val).strip().lower() not in ('', 'nan', default):
+                    return True
+            else:
+                try:
+                    if float(val) != default:
+                        return True
+                except (TypeError, ValueError):
+                    pass
+    return False
+
+
 def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     """
     Write an in-memory ``slope_data`` dict back to an XSLOPE Excel input file.
@@ -1233,6 +1265,17 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     ``theta`` (``qp``) column is left blank because the loader auto-derives it
     from the pile endpoints.
     """
+    # In-place save onto an older-format file that lacks a column this model needs
+    # (e.g. a pre-v11 file with a van Genuchten material) would silently drop the
+    # data. Upgrade the file through the current template instead — save rebuilds
+    # every input category from slope_data, so the result is faithful and current.
+    if template is None and os.path.exists(filepath) and \
+            _inplace_save_would_drop(filepath, slope_data.get('materials', [])):
+        template = default_template_path()
+        print(f"Note: upgrading '{os.path.basename(filepath)}' to the current input-"
+              f"template format (it lacked columns needed by this model, e.g. van "
+              f"Genuchten unsaturated parameters).")
+
     if template is not None:
         shutil.copy(template, filepath)
     elif not os.path.exists(filepath):

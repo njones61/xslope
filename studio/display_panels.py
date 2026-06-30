@@ -78,8 +78,11 @@ def _add_legend_controls(panel, form):
     auto = QCheckBox("Auto legend columns")
     auto.setChecked(True)
     ncol = _ispin(1, 12, 3)
+    frame = QCheckBox("Legend frame")            # frameless by default
+    frame.setChecked(False)
     form.addRow("", auto)
     form.addRow("Legend columns", ncol)
+    form.addRow("", frame)
 
     def sync(*_):
         ncol.setEnabled(not auto.isChecked())
@@ -87,15 +90,22 @@ def _add_legend_controls(panel, form):
     auto.toggled.connect(sync)
     auto.toggled.connect(panel._emit)
     ncol.valueChanged.connect(panel._emit)
+    frame.toggled.connect(panel._emit)
     sync()
     panel._legend_auto = auto
     panel._legend_ncol = ncol
+    panel._legend_frame = frame
 
 
 def _legend_option(panel):
     """The legend_ncol value for a panel built with _add_legend_controls:
     "auto" when the Auto box is checked, else the explicit column count."""
     return "auto" if panel._legend_auto.isChecked() else panel._legend_ncol.value()
+
+
+def _legend_frame_option(panel):
+    """Whether the legend frame is shown (panels built with _add_legend_controls)."""
+    return panel._legend_frame.isChecked()
 
 
 def _cmap_icon(name):
@@ -154,6 +164,7 @@ class _CheckboxPanel(QWidget):
         d = {key: box.isChecked() for key, box in self._boxes.items()}
         if self._WITH_LEGEND:
             d["legend_ncol"] = _legend_option(self)
+            d["legend_frame"] = _legend_frame_option(self)
         return d
 
 
@@ -196,15 +207,18 @@ class InputsDisplayPanel(QWidget):
         self.legend_auto = QCheckBox("Auto legend columns")
         self.legend_auto.setChecked(True)
         self.legend_ncol = _ispin(1, 12, 3)
+        self.legend_frame = QCheckBox("Legend frame")     # frameless by default
+        self.legend_frame.setChecked(False)
 
         form.addRow("", self.mat_table)
         form.addRow("Table position", self.tab_loc)
         form.addRow("", self.legend_auto)
         form.addRow("Legend columns", self.legend_ncol)
+        form.addRow("", self.legend_frame)
 
         self.mat_table.toggled.connect(self._sync)
         self.legend_auto.toggled.connect(self._sync)
-        for w in (self.mat_table, self.legend_auto):
+        for w in (self.mat_table, self.legend_auto, self.legend_frame):
             w.toggled.connect(self._emit)
         self.tab_loc.currentIndexChanged.connect(self._emit)
         self.legend_ncol.valueChanged.connect(self._emit)
@@ -224,6 +238,7 @@ class InputsDisplayPanel(QWidget):
             "tab_loc": self.tab_loc.currentText(),
             "legend_ncol": ("auto" if self.legend_auto.isChecked()
                             else self.legend_ncol.value()),
+            "legend_frame": self.legend_frame.isChecked(),
         }
 
 
@@ -258,6 +273,7 @@ class MeshDisplayPanel(QWidget):
             "label_nodes": self.label_nodes.isChecked(),
             "pad_frac": self.pad_frac.value(),
             "legend_ncol": _legend_option(self),
+            "legend_frame": _legend_frame_option(self),
         }
 
 
@@ -280,7 +296,7 @@ class FeDataDisplayPanel(QWidget):
             form.addRow("", c)
             c.toggled.connect(self._emit)
 
-        self.alpha = _dspin(0.0, 1.0, 0.4, 0.05)
+        self.alpha = _dspin(0.0, 1.0, 0.6, 0.05)   # match the inputs view's zone opacity
         form.addRow("Fill opacity", self.alpha)
         self.alpha.valueChanged.connect(self._emit)
 
@@ -303,6 +319,7 @@ class FeDataDisplayPanel(QWidget):
             "label_nodes": self.label_nodes.isChecked(),
             "alpha": self.alpha.value(),
             "legend_ncol": _legend_option(self),
+            "legend_frame": _legend_frame_option(self),
         }
         if self.bc_symbol_size is not None:
             d["bc_symbol_size"] = self.bc_symbol_size.value()
@@ -359,6 +376,7 @@ class SeepDisplayPanel(QWidget):
         form.addRow("Fill opacity", self.alpha)
         form.addRow("Vector scale", self.vector_scale)
         form.addRow("Padding", self.pad_frac)
+        _add_legend_controls(self, form)
 
         self.variable.currentIndexChanged.connect(self._on_variable)
         self.base_mat.currentIndexChanged.connect(self._emit)
@@ -404,6 +422,8 @@ class SeepDisplayPanel(QWidget):
             "phreatic": self.phreatic.isChecked(),
             "cmap": self.cmap.currentData(),
             "cbar_shrink": self.cbar_size.value(),
+            "legend_ncol": _legend_option(self),
+            "legend_frame": _legend_frame_option(self),
         }
 
 
@@ -513,4 +533,5 @@ class FemResultsDisplayPanel(QWidget):
             "scale_vectors": self.scale_vectors.isChecked(),
             "displacement_tolerance": self.displacement_tolerance.value(),
             "legend_ncol": _legend_option(self),
+            "legend_frame": _legend_frame_option(self),
         }

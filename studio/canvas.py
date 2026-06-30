@@ -124,8 +124,9 @@ class MplCanvas(QWidget):
 
         bar = QHBoxLayout()
         for text, tip, slot in [
-            ("Fit", "Fit figure to window", self.fit),
-            ("100%", "Actual size", self.reset_100),
+            # The figure is sized to the viewport, so "Fit" shows the whole plot at
+            # an exact 1:1 (crisp); a separate "100%" would be identical, so it's gone.
+            ("Fit", "Fit plot to window", self.fit),
             ("+", "Zoom in", self.zoom_in),
             ("−", "Zoom out", self.zoom_out),
         ]:
@@ -367,16 +368,9 @@ class MplCanvas(QWidget):
         return False
 
     def _on_resize(self):
-        """Re-layout the figure to the new viewport size and redraw 1:1 (debounced)."""
-        if self._draw_fn is None or not self._size_figure_to_viewport():
-            self.fit()
-            return
-        self.figure.clear()
-        try:
-            self._draw_fn(self.figure)
-        except Exception:
-            return
-        self._rasterize(self._target_dpi())
+        """Re-layout the figure to the new viewport size and redraw 1:1 (debounced).
+        fit() re-lays-out the figure (via _ensure_figure_matches_viewport) and
+        resets to an exact 1:1 transform."""
         self.fit()
 
     def ensure_fitted(self):
@@ -542,12 +536,38 @@ class MplCanvas(QWidget):
             self._schedule_refine()
 
     def fit(self):
-        # The figure is sized to the viewport, so fitting the whole figure gives a
-        # 1:1 mapping — crisp (no resampling) and identical framing for every plot.
-        if self._pixitem is not None:
-            self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
-            self._schedule_refine()
+        # The figure is sized to the viewport, so the whole plot already spans the
+        # canvas at 100%. Use an exact 1:1 transform (resetTransform) rather than
+        # fitInView — fitInView fits into the frame-inset viewport and yields a
+        # fractional scale (~0.99) that smooth-scales the bitmap and softens it.
+        if self._pixitem is None:
+            return
+        self.view.resetTransform()                 # exact 1:1 — view scale is 1.0
+        self._ensure_figure_matches_viewport()     # re-layout if the window resized
+        self._schedule_refine()
         self._restore_pan_cursor()
+
+    def _ensure_figure_matches_viewport(self):
+        """Make the figure match the current viewport, redrawing if its size has
+        drifted — e.g. it was first drawn while its tab was hidden (zero size), or
+        the window was resized. Keeps the 1:1 mapping exact so the bitmap never gets
+        fractionally rescaled."""
+        if self._draw_fn is None:
+            return
+        vp = self.view.viewport()
+        w, h = vp.width(), vp.height()
+        if w <= 1 or h <= 1:
+            return
+        cur_w, cur_h = self.figure.get_size_inches()
+        if abs(cur_w - w / BASE_DPI) < 0.01 and abs(cur_h - h / BASE_DPI) < 0.01:
+            return                                  # already matches the viewport
+        self.figure.set_size_inches(w / BASE_DPI, h / BASE_DPI, forward=False)
+        self.figure.clear()
+        try:
+            self._draw_fn(self.figure)
+        except Exception:
+            return
+        self._rasterize(self._target_dpi())
 
     def reset_100(self):
         self.view.resetTransform()

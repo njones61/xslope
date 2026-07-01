@@ -451,9 +451,8 @@ class FemResultsDisplayPanel(QWidget):
 
         self.cmap = _make_cmap_combo("coolwarm")
         self.cmap.setToolTip("Color ramp for the shear-strain contours.")
-        self.cbar_size = _dspin(0.1, 1.0, 1.0, 0.05)
-        self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
-                                  "a fraction of the plot height.")
+        # (No "Colorbar size" control: the colorbar now tracks the plot height
+        # automatically via make_axes_locatable, so there's nothing to tune.)
 
         # Universal control, but with a per-plot-type default (and per-type memory
         # of the user's choice): off for the contour/vector plots (keep them
@@ -486,7 +485,6 @@ class FemResultsDisplayPanel(QWidget):
 
         form.addRow("Plot type", self.plot_type)
         form.addRow("Color ramp", self.cmap)
-        form.addRow("Colorbar size", self.cbar_size)
         form.addRow("Deform", self.deform_percent)
         form.addRow("", self.element_edges)
         form.addRow("", self.show_reinforcement)
@@ -499,7 +497,6 @@ class FemResultsDisplayPanel(QWidget):
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)
-        self.cbar_size.valueChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
         for c in (self.element_edges, self.show_reinforcement, self.label_elements,
@@ -534,9 +531,8 @@ class FemResultsDisplayPanel(QWidget):
         # Vector-only controls.
         for w in self._vector_widgets:
             w.setEnabled(pt == "displace_vector")
-        # Color ramp + colorbar: shear-strain only. Deform scale: deformation only.
+        # Color ramp: shear-strain only. Deform scale: deformation only.
         self.cmap.setEnabled(pt == "shear_strain")
-        self.cbar_size.setEnabled(pt == "shear_strain")
         self.deform_percent.setEnabled(pt == "deformation")
 
     def options(self):
@@ -547,7 +543,6 @@ class FemResultsDisplayPanel(QWidget):
         return {
             "plot_type": self.plot_type.currentData(),
             "cmap": self.cmap.currentData(),
-            "cbar_shrink": self.cbar_size.value(),
             "deform_percent": self.deform_percent.value(),
             "show_mesh": edges,
             "plot_elements": edges,

@@ -635,37 +635,22 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         ax.set_ylim(y_min - y_margin, y_max + y_margin)
         ax.set_aspect('equal')
 
-    # Single-panel layout (mirrors plot_seep_solution): tighten margins so the
-    # wide/thin domain fills the width like the data/inputs plots, then place the
-    # colorbar (if any) manually at the plot-box height so it can't tower over a
-    # short plot. No layout engine here — it would clash with the manual axes.
+    # Single-panel layout (the Studio case: one result shown at a time). When
+    # there's a colorbar, attach it with make_axes_locatable so it tracks the
+    # (equal-aspect, wide/short) plot's real height instead of towering over it,
+    # then a single tight_layout gives symmetric margins AND reserves room for the
+    # colorbar's tick + axis labels so nothing is clipped. No hand-tuned margins.
     if single:
         ax = axes[0]
+        if single_mappable is not None:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+            cax = make_axes_locatable(ax).append_axes("right", size="3%", pad=0.15)
+            cbar = fig.colorbar(single_mappable, cax=cax)
+            cbar.set_label(single_cbar_label, rotation=270, labelpad=15)
         try:
             fig.tight_layout()
-            # Reserve a right-side cushion so the plot (and colorbar, when present)
-            # doesn't run to the figure edge — the canvas shows the figure 1:1, so
-            # its right margin *is* the visible cushion. Without a colorbar
-            # tight_layout leaves the axes nearly flush (right≈0.98); pull it in to
-            # ~0.94. With a colorbar reserve more (0.88) so the bar + rotated label
-            # still clear the edge.
-            right_cap = 0.88 if single_mappable is not None else 0.94
-            fig.subplots_adjust(right=min(fig.subplotpars.right, right_cap))
         except Exception:
             pass
-        if single_mappable is not None:
-            try:
-                fig.canvas.draw()
-                ax.apply_aspect()
-            except Exception:
-                pass
-            pos = ax.get_position()
-            shrink = min(1.0, max(0.1, cbar_shrink if cbar_shrink is not None else 0.8))
-            ch = pos.height * shrink
-            cy = pos.y0 + (pos.height - ch) / 2.0
-            cax = fig.add_axes([pos.x1 + 0.012, cy, 0.014, ch])
-            cbar = fig.colorbar(single_mappable, cax=cax)
-            cbar.set_label(single_cbar_label, rotation=270, labelpad=20)
 
     # Place deformation legend in the dedicated legend row
     if has_deform_legend and legend_ax is not None:

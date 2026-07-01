@@ -638,9 +638,14 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         ax = axes[0]
         try:
             fig.tight_layout()
-            if single_mappable is not None:
-                # Reserve right-side room only when a colorbar will be drawn.
-                fig.subplots_adjust(right=min(fig.subplotpars.right, 0.90))
+            # Reserve a right-side cushion so the plot (and colorbar, when present)
+            # doesn't run to the figure edge — the canvas shows the figure 1:1, so
+            # its right margin *is* the visible cushion. Without a colorbar
+            # tight_layout leaves the axes nearly flush (right≈0.98); pull it in to
+            # ~0.94. With a colorbar reserve more (0.88) so the bar + rotated label
+            # still clear the edge.
+            right_cap = 0.88 if single_mappable is not None else 0.94
+            fig.subplots_adjust(right=min(fig.subplotpars.right, right_cap))
         except Exception:
             pass
         if single_mappable is not None:

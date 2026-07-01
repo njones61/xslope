@@ -44,7 +44,24 @@ def _apply_icon(app):
             pass
 
 
+def _silence_aspect_limit_noise():
+    """Drop Matplotlib's "Ignoring fixed x/y limits to fulfill fixed data aspect
+    with adjustable data limits" warning. Many engine plots intentionally use
+    ``set_aspect('equal', adjustable='datalim')`` with explicit limits; Matplotlib
+    logs that warning (via ``matplotlib.axes._base``) on *every* redraw, which
+    floods Studio's Log pane. It's purely informational and not actionable by the
+    user, so filter just that message (leaving all other Matplotlib warnings)."""
+    import logging
+
+    class _DropAspectLimitNoise(logging.Filter):
+        def filter(self, record):
+            return "to fulfill fixed data aspect" not in record.getMessage()
+
+    logging.getLogger("matplotlib.axes._base").addFilter(_DropAspectLimitNoise())
+
+
 def main(argv=None):
+    _silence_aspect_limit_noise()
     argv = list(sys.argv if argv is None else argv)
     app = QApplication.instance() or QApplication(argv)
     app.setApplicationName(APP_NAME)

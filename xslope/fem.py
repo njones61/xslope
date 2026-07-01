@@ -1064,7 +1064,7 @@ def build_fem_data(slope_data, mesh=None):
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective',
-              early_exit=True):
+              early_exit=True, progress_callback=None):
     """
     Solve FEM using Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1117,6 +1117,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             viscoplastic strains (construction history: built, then filled).
         dt_scale (float): Multiplier on the viscoplastic pseudo-timestep
             (research/diagnostic knob; default 1.0).
+        progress_callback (callable or None): If given, called (throttled, ~every
+            10 iterations) as ``progress_callback(frac, label)`` where ``frac`` is
+            ``(iteration + 1) / max_iterations`` in [0, 1] and ``label`` is a short
+            status string. Lets a caller (e.g. SSRM, a GUI) show progress *within*
+            a single viscoplastic solve rather than only between solves. ``frac`` is
+            a pessimistic estimate — a trial that converges or exits early snaps to
+            its step boundary before reaching 1.0. Never allowed to break the solve.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1813,6 +1820,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 print(f"  Iter {iteration+1:4d}: max|du|/max|u| = {relative_change:.3e}, "
                       f"UFR = {unbalanced_force_ratio:.3e}, dUFR = {ufr_rate:.2e}, "
                       f"yielding = {n_yielding}/{n_total_gp}, max|u| = {np.max(np.abs(u_new)):.6f}")
+
+            # Report intra-solve progress (throttled) so a caller can advance a
+            # progress bar within this viscoplastic solve, not just between solves.
+            if progress_callback is not None and iteration % 10 == 0:
+                try:
+                    progress_callback((iteration + 1) / max_iterations,
+                                      f"vp iter {iteration + 1}/{max_iterations}, "
+                                      f"dUFR={ufr_rate:.1e}")
+                except Exception:
+                    pass
 
             # Displacement limit check: detect false convergence from unbounded plastic flow
             # When VP displacements exceed a fraction of mesh height, the slope has physically
@@ -2762,21 +2779,39 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
             print(f"  Displacement limit: {max_disp_factor:.0%} of mesh height")
 
     # Progress reported as: 2 bound checks + the (deterministic) bisection steps.
+    # Each step is a full solve_fem, so we subdivide it (SUBDIV) and let solve_fem's
+    # intra-solve progress fill its slice — the bar advances *within* each trial.
     n_steps = _ssrm_bisect_steps(F_max - F_min, tolerance)
     total = 2 + n_steps
+    SUBDIV = 100
+    total_fine = total * SUBDIV
+
+    def _fem_progress(step, prefix):
+        """Build a solve_fem progress_callback that maps its inner [0, 1] fraction
+        into ``step``'s slice of the overall SSRM bar."""
+        if progress_callback is None:
+            return None
+        step = min(step, total - 1)
+
+        def _cb(frac, info):
+            pos = (step + max(0.0, min(1.0, frac))) * SUBDIV
+            _ssrm_progress(progress_callback, min(int(pos), total_fine - 1),
+                           total_fine, f"{prefix} · {info}")
+        return _cb
 
     F_left = F_min
     F_right = F_max
 
     # Verify lower bound converges
-    _ssrm_progress(progress_callback, 0, total, f"Checking lower bound F={F_min:.3f}")
+    _ssrm_progress(progress_callback, 0, total_fine, f"Checking lower bound F={F_min:.3f}")
     if debug_level >= 1:
         print(f"  Verifying lower bound F={F_min:.2f} converges...")
     solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor, staged=staged,
                              tension_cutoff=tension_cutoff,
-                             early_exit=(max_disp_factor is None))
+                             early_exit=(max_disp_factor is None),
+                             progress_callback=_fem_progress(0, f"Lower bound F={F_min:.3f}"))
     if not solution_min["converged"]:
         msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_min:.2f} — it is "
                f"unstable at or below this strength-reduction factor (FS < {F_min:.2f}). "
@@ -2791,14 +2826,15 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         print(f"    -> Converged in {solution_min['iterations']} iters")
 
     # Verify upper bound does not converge
-    _ssrm_progress(progress_callback, 1, total, f"Checking upper bound F={F_max:.3f}")
+    _ssrm_progress(progress_callback, SUBDIV, total_fine, f"Checking upper bound F={F_max:.3f}")
     if debug_level >= 1:
         print(f"  Verifying upper bound F={F_max:.2f} does not converge...")
     solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor, staged=staged,
                              tension_cutoff=tension_cutoff,
-                             early_exit=(max_disp_factor is None))
+                             early_exit=(max_disp_factor is None),
+                             progress_callback=_fem_progress(1, f"Upper bound F={F_max:.3f}"))
     if solution_max["converged"]:
         msg = (f"SSRM: the slope still reaches equilibrium at F = {F_max:.2f}, so the factor "
                f"of safety exceeds the search ceiling (FS > {F_max:.2f}). No failure was found "
@@ -2823,7 +2859,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
 
-        _ssrm_progress(progress_callback, min(2 + iteration, total - 1), total,
+        step = min(2 + iteration, total - 1)
+        _ssrm_progress(progress_callback, step * SUBDIV, total_fine,
                        f"F={F_mid:.3f} in [{F_left:.3f}, {F_right:.3f}]")
         if debug_level >= 1:
             print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
@@ -2832,7 +2869,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                              max_iterations=max_iterations, tolerance=convergence_tol,
                              max_disp_factor=max_disp_factor, staged=staged,
                              tension_cutoff=tension_cutoff,
-                             early_exit=(max_disp_factor is None))
+                             early_exit=(max_disp_factor is None),
+                             progress_callback=_fem_progress(
+                                 step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]"))
 
         if solution["converged"]:
             F_left = F_mid
@@ -2850,7 +2889,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # the full bracket is returned in 'final_interval'.
     critical_FS = 0.5 * (F_left + F_right)
 
-    _ssrm_progress(progress_callback, total, total, f"FS = {critical_FS:.3f}")
+    _ssrm_progress(progress_callback, total_fine, total_fine, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
         print(f"\n  SSRM result: FS = {critical_FS:.4f}")
         print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")
@@ -2930,13 +2969,13 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         d = _node_vp_disp(sol)
         return float(d[cp_holder[0]]) if cp_holder[0] is not None else float(d.max())
 
-    def _get_max_vp_disp(F_val):
+    def _get_max_vp_disp(F_val, progress_cb=None):
         """Run solve_fem; return the displacement measure (characteristic-point
         VP displacement, or global max before the point is selected)."""
         sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
-                        tension_cutoff=tension_cutoff)
+                        tension_cutoff=tension_cutoff, progress_callback=progress_cb)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.
@@ -2946,6 +2985,20 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # from one sweep interval's width).
     n_refine = _ssrm_bisect_steps((F_max - F_min) / max(1, n_sweep - 1), tolerance)
     total = n_sweep + n_refine
+    SUBDIV = 100
+    total_fine = total * SUBDIV
+
+    def _fem_progress(step, prefix):
+        """Map a solve_fem inner [0, 1] fraction into ``step``'s slice of the bar."""
+        if progress_callback is None:
+            return None
+        step = min(step, total - 1)
+
+        def _cb(frac, info):
+            pos = (step + max(0.0, min(1.0, frac))) * SUBDIV
+            _ssrm_progress(progress_callback, min(int(pos), total_fine - 1),
+                           total_fine, f"{prefix} · {info}")
+        return _cb
 
     # Phase 1: Coarse sweep
     F_values = np.linspace(F_min, F_max, n_sweep)
@@ -2958,9 +3011,10 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     for i, F_val in enumerate(F_values):
         from .search import _check_cancel
         _check_cancel(cancel_check)
-        _ssrm_progress(progress_callback, i, total,
+        _ssrm_progress(progress_callback, i * SUBDIV, total_fine,
                        f"Sweep F={F_val:.3f} ({i + 1}/{n_sweep})")
-        max_vp, sol = _get_max_vp_disp(F_val)
+        max_vp, sol = _get_max_vp_disp(
+            F_val, _fem_progress(i, f"Sweep F={F_val:.3f} ({i + 1}/{n_sweep})"))
         displacements.append(max_vp)
         solutions.append(sol)
         if debug_level >= 1:
@@ -3022,9 +3076,11 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         from .search import _check_cancel
         _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
-        _ssrm_progress(progress_callback, min(n_sweep + iteration, total - 1), total,
+        step = min(n_sweep + iteration, total - 1)
+        _ssrm_progress(progress_callback, step * SUBDIV, total_fine,
                        f"Refine F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]")
-        d_mid, sol_mid = _get_max_vp_disp(F_mid)
+        d_mid, sol_mid = _get_max_vp_disp(
+            F_mid, _fem_progress(step, f"Refine F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]"))
 
         # Compute ratios for each half
         ratio_left_half = d_mid / d_left if d_left > 1e-12 else d_mid
@@ -3049,7 +3105,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
     critical_FS = (F_left + F_right) / 2.0
 
-    _ssrm_progress(progress_callback, total, total, f"FS = {critical_FS:.3f}")
+    _ssrm_progress(progress_callback, total_fine, total_fine, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
         print(f"\n  SSRM result: FS = {critical_FS:.4f}")
         print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")

@@ -144,7 +144,12 @@ class FemRunner(QThread):
             if opts.get("analysis", "ssrm") == "single":
                 F = opts.get("F", 1.0)
                 print(f"Solving FEM (single trial, F={F:g})…")
-                solution = solve_fem(fem_data, F=F, debug_level=1)
+
+                def fem_cb(frac, label):
+                    self.progress.emit(int(frac * 100), 100, str(label))
+
+                solution = solve_fem(fem_data, F=F, debug_level=1,
+                                     progress_callback=fem_cb)
                 print(f"FEM solve: converged={solution.get('converged')}, "
                       f"iterations={solution.get('iterations')}")
                 self.succeeded.emit({"fem_data": fem_data, "solution": solution,

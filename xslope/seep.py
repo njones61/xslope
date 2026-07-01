@@ -24,6 +24,14 @@ from shapely.geometry import LineString, Point
 logger = logging.getLogger(__name__)
 
 
+class SeepInputError(ValueError):
+    """Raised when a seepage analysis cannot run because of invalid/missing input
+    (e.g. an exit-face BC with materials that lack unsaturated parameters). Carries
+    a user-facing message so callers (CLI, Studio) can surface it directly rather
+    than crashing downstream on a None solution."""
+    pass
+
+
 def _min_distance_to_polyline(points, polyline):
     """Vectorized min distance from each point to a polyline (array of vertices).
 
@@ -223,7 +231,10 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         "vg_n_by_mat": vg_n_by_mat,
         "material_names": material_names,
         "unit_weight": unit_weight,
-        "missing_unsat_params": missing_unsat_params
+        "missing_unsat_params": missing_unsat_params,
+        # Per-material detail lines for the missing params (empty when all valid),
+        # so a caller can build a specific error message without re-deriving it.
+        "missing_unsat_detail": bad_mats if missing_unsat_params else [],
     }
 
     return seep_data
@@ -2913,15 +2924,21 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
     """
     start_time = time.time()
 
-    # Check for missing unsaturated parameters
+    # Missing unsaturated parameters: raise rather than return None. Returning None
+    # only pushed the failure downstream (export/plot index into the solution and
+    # crash with a cryptic TypeError); a raised SeepInputError carries a clear
+    # message that the CLI and Studio can surface directly.
     if seep_data.get("missing_unsat_params", False):
-        print("\n" + "="*70)
-        print("ERROR: Cannot run seepage analysis.")
-        print("One or more materials are missing unsaturated parameters (kr0, h0)")
-        print("which are required for unconfined seepage with an exit face BC.")
-        print("Please set valid kr0 (>0) and h0 (<0) values in the input file.")
-        print("="*70 + "\n")
-        return None
+        detail = seep_data.get("missing_unsat_detail") or []
+        msg = ("Cannot run seepage analysis: one or more materials are missing the "
+               "unsaturated parameters required for unconfined seepage with an "
+               "exit-face boundary condition.")
+        if detail:
+            msg += "\n\n" + "\n".join(detail)
+        msg += ("\n\nSet, per material, either kr0 (>0) and h0 (<0) for the "
+                "linear-front model, or vg_a (>0) and vg_n (>1) for the van "
+                "Genuchten model.")
+        raise SeepInputError(msg)
 
     # Extract data from seep_data
     nodes = seep_data["nodes"]

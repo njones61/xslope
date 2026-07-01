@@ -75,7 +75,7 @@ class SeepRunner(QThread):
         self._options = options
 
     def run(self):
-        from xslope.seep import build_seep_data, run_seepage_analysis
+        from xslope.seep import build_seep_data, run_seepage_analysis, SeepInputError
         sd = self._sd
         mesh = sd.get("mesh")
         if mesh is None:
@@ -84,21 +84,29 @@ class SeepRunner(QThread):
         tol = self._options.get("tol", 1e-4)
         bc_opt = self._options.get("bc", 1)
         bcs = [1, 2] if bc_opt == "both" else [bc_opt]
-        any_failed = False
+        errors = []
         for bc in bcs:
+            label = f"BC set {bc}" if len(bcs) > 1 else "Seepage"
             try:
                 print(f"Building seepage data (BC set {bc})…")
                 seep_data = build_seep_data(mesh, sd, seep_bc=bc)
                 print(f"Running seepage analysis (BC set {bc}, tol={tol:g})…")
                 solution = run_seepage_analysis(seep_data, tol=tol)
+                if solution is None:            # defensive: no solver should return None now
+                    raise RuntimeError("Seepage analysis returned no solution.")
                 print(f"Seepage analysis complete (BC set {bc}).")
                 self.succeeded.emit({"seep_data": seep_data, "solution": solution,
                                      "options": {**self._options, "bc": bc}})
-            except Exception:
-                any_failed = True
+            except SeepInputError as e:
+                # Expected, user-actionable input problem — show the message, no
+                # scary traceback needed (still logged for the record).
+                print(f"{label}: {e}")
+                errors.append(f"{label}: {e}")
+            except Exception as e:
                 traceback.print_exc()
-        if any_failed:
-            self.failed.emit("A seepage run failed — see the Log pane for details.")
+                errors.append(f"{label}: {e}  (see the Log pane for details.)")
+        if errors:
+            self.failed.emit("\n\n".join(errors))
 
 
 class FemRunner(QThread):

@@ -465,17 +465,15 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     }
     variable_label = variable_labels[variable]
 
-    # Filled contours (only if fill_contours=True)
+    # Filled contours (only if fill_contours=True). The colorbar itself is added at
+    # the very end (after _legend_below lays out the axes) so it can be sized to
+    # cbar_shrink × the plot height and tracks the box-adjusted plot box.
+    contourf = None
     if fill_contours:
-        contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap=cmap, vmin=vmin, vmax=vmax, alpha=0.5)
+        # Fill opacity drives the contour-fill wash (0 = clean line flow net, the
+        # default; raise it for a colored head field). The colorbar still shows.
+        contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap=cmap, vmin=vmin, vmax=vmax, alpha=alpha)
         contourf.set_gid('CONTOUR_FILL')
-        # Colorbar in an explicit divider axes (no layout engine needed): it tracks
-        # the plot's height and moves with it when _legend_below sets margins.
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        cax = make_axes_locatable(ax).append_axes("right", size="2.5%", pad=0.15)
-        cbar = fig.colorbar(contourf, cax=cax, label=variable_label)
-        cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
-        cbar.update_ticks()
 
     # Solid lines for contours
     _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k", linewidths=0.5)
@@ -609,13 +607,14 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
 
     # Legend (below the axes, frameless by default) for the flow-net features that
     # were actually drawn — material zones plus phreatic / contour / flow lines —
-    # alongside the colorbar. Material swatches use the zones' own fill alpha.
+    # alongside the colorbar. Swatches use a fixed readable alpha so the material
+    # color key stays visible even when the fill opacity is 0 (clean flow net).
     from .plot import _legend_below
     mat_names = seep_data.get("material_names", [])
     leg_handles = []
     for mat in materials:
         nm = mat_names[mat - 1] if (mat_names and mat <= len(mat_names)) else f"Material {mat}"
-        leg_handles.append(mpatches.Patch(facecolor=mat_to_color[mat], alpha=alpha,
+        leg_handles.append(mpatches.Patch(facecolor=mat_to_color[mat], alpha=0.6,
                                           edgecolor="none", label=nm))
     if has_phreatic:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=2.0, label="Phreatic surface"))
@@ -626,10 +625,34 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if vectors:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0, marker=r"$\rightarrow$",
                                       markersize=10, label="Velocity"))
-    # No tight_layout / engine juggling here — the figure has no layout engine and
-    # the colorbar is a divider axes, so _legend_below sets the margins (top for the
-    # title, bottom for the legend) directly, as on every other plot.
+    # No tight_layout / engine juggling here — the figure has no layout engine, so
+    # _legend_below sets the margins (top for the title, bottom for the legend)
+    # directly, as on every other plot.
     _legend_below(ax, fig, handles=leg_handles, legend_ncol=legend_ncol, frameon=legend_frame)
+
+    # Colorbar last: a manual axes to the right of the (now laid-out) plot, its
+    # height cbar_shrink × the plot height and centered on it. Manual placement (vs
+    # a gridspec/divider colorbar) needs no layout engine — which would clash with
+    # the manual margins above — and honors the "Colorbar size" control.
+    if contourf is not None:
+        try:
+            fig.canvas.draw()
+            ax.apply_aspect()
+        except Exception:
+            pass
+        pos = ax.get_position()
+        shrink = min(1.0, max(0.1, cbar_shrink))
+        ch = pos.height * shrink
+        cy = pos.y0 + (pos.height - ch) / 2.0
+        cax = fig.add_axes([pos.x1 + 0.012, cy, 0.014, ch])
+        # Build the colorbar from a full-opacity mappable so it stays a solid color
+        # key even when the fill wash is faint/off (fill opacity 0 = clean flow net).
+        from matplotlib.cm import ScalarMappable
+        from matplotlib.colors import Normalize
+        sm = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
+        cbar = fig.colorbar(sm, cax=cax, label=variable_label)
+        cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
+        cbar.update_ticks()
 
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('—', '').replace('(', '').replace(')', '')

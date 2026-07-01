@@ -348,7 +348,7 @@ class SeepDisplayPanel(QWidget):
                                  "(base permeability / number of flow channels).")
 
         self.levels = _ispin(2, 100, 20, step=5)
-        self.alpha = _dspin(0.0, 1.0, 0.4, 0.05)
+        self.alpha = _dspin(0.0, 1.0, 0.0, 0.05)   # filled contours transparent by default
         self.vector_scale = _dspin(0.001, 10.0, 0.05, 0.01, decimals=3)
         self.pad_frac = _dspin(0.0, 1.0, 0.05, 0.01)
         self.cmap = _make_cmap_combo("Spectral_r")

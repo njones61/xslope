@@ -116,7 +116,7 @@ Seequent User Terms v2.1:
   and publishing a validation table. A written yes converts grey to black-and-white
   (vendors often approve, since an importer drives format adoption).
 
-  > **Subject:** Academic license — studying GeoStudio and building a SLOPE/W `.gsz` importer
+  > **Subject:** Academic license — studying GeoStudio, plus GeoStudio importers and benchmarks
   >
   > Hello Seequent Legal team,
   >
@@ -124,17 +124,27 @@ Seequent User Terms v2.1:
   > to study the software's capabilities to inform my teaching in geotechnical/slope-
   > stability courses.
   >
-  > I also develop **XSlope**, a free, open-source Python package for slope-stability
-  > analysis. I originally built it for my own course, and I'm now preparing to release it
-  > more broadly. I'd like to add an importer that reads the SLOPE/W `.gsz` format so
-  > students can bring GeoStudio models into XSlope, and I would likely reverse-engineer
-  > the `.gsz` format from the sample files and example problems provided with GeoStudio.
-  > The importer would be my own code and contain no GeoStudio source or IP, and I would
-  > not redistribute any GeoStudio files or materials.
+  > I also develop **XSlope**, a free, open-source Python package for slope-stability and
+  > seepage analysis. I originally built it for my own course, and I'm now preparing to
+  > release it more broadly. Because it's a scriptable Python package, it's a valuable
+  > research and teaching tool, and I'd like users to get the most out of it by being able
+  > to bring their existing GeoStudio models in.
   >
-  > Before this broader release, I'd like to confirm the importer is acceptable under an
-  > academic license. Could you let me know whether it's permitted and any conditions that
-  > would apply?
+  > Before this broader release, I'd like to confirm the following would be acceptable under
+  > an academic license:
+  >
+  > 1. **Importers** that read GeoStudio files — starting with **SLOPE/W**, and later
+  >    **SEEP/W** and **SIGMA/W** — so students and researchers can bring their models into
+  >    XSlope. I would likely reverse-engineer the file format from the sample files and
+  >    example problems provided with GeoStudio. The importers would be my own code, contain
+  >    no GeoStudio source or IP, and I would not redistribute any GeoStudio files or
+  >    materials.
+  > 2. **Benchmarking** XSlope against GeoStudio example problems and publishing a validation
+  >    table (per problem: GeoStudio's reported answer, XSlope's answer, and the difference)
+  >    so users can have confidence XSlope produces correct results. I would publish only my
+  >    own code and my own measured numbers — no GeoStudio files.
+  >
+  > Could you let me know whether this is permitted and any conditions that would apply?
   >
   > Thank you,
   > [Name, title, institution]

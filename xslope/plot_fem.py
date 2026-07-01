@@ -505,17 +505,24 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     x_margin = (x_max - x_min) * 0.05
     y_margin = (y_max - y_min) * 0.05
 
+    # Single-panel plots (the Studio case: one result at a time) fill the space —
+    # no dummy colorbar, and the real colorbar is placed manually to the plot box
+    # height (mirroring plot_seep_solution). Multi-panel plots keep the dummy
+    # colorbars so all panels stay x-aligned, and use constrained layout.
+    single = n_plots == 1
+
     own_fig = fig is None
     if not own_fig:
         # Embedded: reuse the caller's figure (GUI canvas). Build the same panel
         # layout on it via fig.subplots instead of creating a new pyplot figure.
         fig.clear()
-        try:
-            fig.set_layout_engine("constrained")
-        except Exception:
-            pass
+        if not single:
+            try:
+                fig.set_layout_engine("constrained")
+            except Exception:
+                pass
 
-    if n_plots == 1:
+    if single:
         # With equal aspect, a wide/short slope only fills a thin band of a tall
         # figure, leaving the colorbar towering over the actual plot. Size the
         # figure height to the data aspect ratio so the image fills the figure
@@ -529,7 +536,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         else:
             single_height = figsize[1]
         if own_fig:
-            fig, ax = plt.subplots(figsize=(figsize[0], single_height), layout='constrained')
+            fig, ax = plt.subplots(figsize=(figsize[0], single_height))
         else:
             ax = fig.add_subplot(111)
         axes = [ax]
@@ -565,10 +572,16 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             axes = list(axes)
 
 
+    # For a single-panel plot, the colorbar is deferred and placed manually
+    # (seep-style) after layout so it matches the plot-box height; capture the
+    # contour mappable + its label here.
+    single_mappable = None
+    single_cbar_label = None
+
     # Plot each type
     for i, pt in enumerate(plot_types):
         ax = axes[i]
-        
+
         # Calculate colorbar parameters based on number of plots
         if n_plots == 1:
             cb_shrink = 0.8
@@ -584,16 +597,18 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             cb_shrink = cbar_shrink
 
         if pt == 'displace_mag':
-            plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement, 
+            plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'displace_vector':
-            plot_displacement_vectors(ax, fem_data, solution, show_mesh, show_reinforcement, 
+            plot_displacement_vectors(ax, fem_data, solution, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                                     plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
-                                    displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors)
+                                    displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors,
+                                    single_panel=single)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
-                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
+                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
+                             single_panel=single)
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -601,17 +616,46 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             plot_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'shear_strain':
-            plot_shear_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
-                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
-                                     cmap=cmap)
+            single_mappable = plot_shear_strain_contours(
+                ax, fem_data, solution, show_mesh, show_reinforcement,
+                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
+                cmap=cmap, single_panel=single)
+            single_cbar_label = 'VP Max Shear Strain'
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
                                         cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
-        
+
         # Set consistent axis limits for all plots (including single plots)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
         ax.set_ylim(y_min - y_margin, y_max + y_margin)
         ax.set_aspect('equal')
+
+    # Single-panel layout (mirrors plot_seep_solution): tighten margins so the
+    # wide/thin domain fills the width like the data/inputs plots, then place the
+    # colorbar (if any) manually at the plot-box height so it can't tower over a
+    # short plot. No layout engine here — it would clash with the manual axes.
+    if single:
+        ax = axes[0]
+        try:
+            fig.tight_layout()
+            if single_mappable is not None:
+                # Reserve right-side room only when a colorbar will be drawn.
+                fig.subplots_adjust(right=min(fig.subplotpars.right, 0.90))
+        except Exception:
+            pass
+        if single_mappable is not None:
+            try:
+                fig.canvas.draw()
+                ax.apply_aspect()
+            except Exception:
+                pass
+            pos = ax.get_position()
+            shrink = min(1.0, max(0.1, cbar_shrink if cbar_shrink is not None else 0.8))
+            ch = pos.height * shrink
+            cy = pos.y0 + (pos.height - ch) / 2.0
+            cax = fig.add_axes([pos.x1 + 0.012, cy, 0.014, ch])
+            cbar = fig.colorbar(single_mappable, cax=cax)
+            cbar.set_label(single_cbar_label, rotation=270, labelpad=20)
 
     # Place deformation legend in the dedicated legend row
     if has_deform_legend and legend_ax is not None:
@@ -743,7 +787,7 @@ def _get_mesh_boundary(fem_data):
 def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                              plot_nodes=False, plot_elements=False, plot_boundary=True,
-                             displacement_tolerance=1e-6, scale_vectors=True):
+                             displacement_tolerance=1e-6, scale_vectors=True, single_panel=False):
     """
     Plot displacement vectors at corner nodes of each element.
 
@@ -849,15 +893,18 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     if label_elements:
         _add_element_labels(ax, fem_data)
 
-    # Dummy colorbar for axis alignment with other subplots
-    dummy_data = np.array([[0, 1]])
-    dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
-    cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
-    cbar.set_label('', color='white')
-    cbar.set_ticks([])
-    cbar.set_ticklabels([])
-    cbar.outline.set_color('white')
-    cbar.outline.set_linewidth(0)
+    # Dummy colorbar for axis alignment with other subplots. Skipped for a
+    # single-panel plot (the Studio case), where it would only steal the right
+    # margin with nothing to align to.
+    if not single_panel:
+        dummy_data = np.array([[0, 1]])
+        dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
+        cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
+        cbar.set_label('', color='white')
+        cbar.set_ticks([])
+        cbar.set_ticklabels([])
+        cbar.outline.set_color('white')
+        cbar.outline.set_linewidth(0)
 
     F = solution.get("F", None)
     title = 'Viscoplastic Displacement Vectors' if disp_elastic is not None else 'Displacement Vectors'
@@ -965,8 +1012,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     ax.set_title('von Mises Stress (Red outline = Yielding/Plastic Elements)')
 
 
-def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True, 
-                       cbar_shrink=0.8, cbar_labelpad=20, label_elements=False):
+def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True,
+                       cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, single_panel=False):
     """
     Plot deformed mesh overlay on original mesh.
 
@@ -1009,19 +1056,22 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     if label_elements:
         _add_element_labels(ax, fem_data_deformed)  # Label on deformed mesh
     
-    # Add a dummy colorbar to maintain consistent spacing with other plots
-    # This ensures the x-axis alignment is consistent across all subplots
-    dummy_data = np.array([[0, 1]])
-    dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
-    cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
-    cbar.set_label('Deformation Scale', rotation=270, labelpad=cbar_labelpad, color='white')
-    cbar.set_ticks([])  # Remove tick marks
-    cbar.set_ticklabels([])  # Remove tick labels
-    
-    # Make the colorbar completely invisible by setting colors to background
-    cbar.outline.set_color('white')  # Make the border invisible
-    cbar.outline.set_linewidth(0)    # Remove the border line
-    
+    # Add a dummy colorbar to maintain consistent spacing with other plots so the
+    # x-axis alignment stays consistent across stacked subplots. Skipped for a
+    # single-panel plot (the Studio case), where there's nothing to align to and
+    # the invisible colorbar would just steal the right margin.
+    if not single_panel:
+        dummy_data = np.array([[0, 1]])
+        dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
+        cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
+        cbar.set_label('Deformation Scale', rotation=270, labelpad=cbar_labelpad, color='white')
+        cbar.set_ticks([])  # Remove tick marks
+        cbar.set_ticklabels([])  # Remove tick labels
+
+        # Make the colorbar completely invisible by setting colors to background
+        cbar.outline.set_color('white')  # Make the border invisible
+        cbar.outline.set_linewidth(0)    # Remove the border line
+
     # Note: Axis limits will be set by the calling function for consistent multi-plot alignment
     # When used as a standalone plot, matplotlib will auto-scale appropriately
     F = solution.get("F", None)
@@ -1444,12 +1494,17 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
-                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None):
+                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None,
+                              single_panel=False):
     """
     Plot viscoplastic max shear strain contours.
 
     Uses accumulated viscoplastic strains from the solution (vp_shear_strain key).
     Falls back to total shear strain if VP data is not available.
+
+    When ``single_panel`` is True the inline colorbar is suppressed and the contour
+    mappable is returned so the caller can place the colorbar manually (sized to the
+    plot box). Returns the mappable (or None).
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -1465,9 +1520,10 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
             print("Warning: Shear strain data not available")
             return
 
-    _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
+    mappable = _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
                         False, False, cbar_shrink, cbar_labelpad,
-                        colormap=cmap or 'coolwarm', label_elements=label_elements)
+                        colormap=cmap or 'coolwarm', label_elements=label_elements,
+                        draw_cbar=not single_panel)
 
     # Draw reinforcement with force-based coloring
     if show_reinforcement and 'elements_1d' in fem_data:
@@ -1478,6 +1534,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     if F is not None:
         title += f'  F={F:.2f}'
     ax.set_title(title, fontsize=12, pad=15)
+    return mappable
 
 
 def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 
@@ -1763,9 +1820,14 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
 
 
 def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, show_reinforcement=True,
-                        cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis', label_elements=False):
+                        cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis', label_elements=False,
+                        draw_cbar=True):
     """
     Plot smooth filled contours by averaging element values to nodes and triangulating.
+
+    Returns the contour mappable (or None if the field was uniform / empty) so a
+    caller can place the colorbar itself; when ``draw_cbar`` is True (default) the
+    colorbar is drawn inline as before.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -1806,8 +1868,8 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
     
     if not triangles:
         print("No valid elements for contouring")
-        return
-    
+        return None
+
     import matplotlib.tri as tri
     triangles = np.array(triangles)
     
@@ -1815,15 +1877,18 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
     triang = tri.Triangulation(nodes[:, 0], nodes[:, 1], triangles)
     
     # Create smooth contour plot
+    mappable = None
     if np.max(nodal_values) > np.min(nodal_values):  # Only plot if there's variation
         levels = np.linspace(np.min(nodal_values), np.max(nodal_values), 20)
         cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap)
         # DXF layer named after the plotted quantity (e.g. "VP Max Shear Strain").
         cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
+        mappable = cs
 
-        # Add colorbar
-        cbar = ax.figure.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
-        cbar.set_label(label, rotation=270, labelpad=20)
+        # Add colorbar (unless the caller will place it itself — single-panel case)
+        if draw_cbar:
+            cbar = ax.figure.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
+            cbar.set_label(label, rotation=270, labelpad=20)
     else:
         # Uniform values - just color all elements the same
         uniform_color = plt.get_cmap(colormap)(0.5)
@@ -1831,7 +1896,7 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
             coords = nodes[triangle_nodes]
             triangle = plt.Polygon(coords, facecolor=uniform_color, edgecolor='none', alpha=0.8)
             ax.add_patch(triangle)
-    
+
     # Overlay mesh if requested
     if show_mesh:
         for i, elem in enumerate(elements):
@@ -1852,7 +1917,7 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
                 coords = nodes[elem[:4]]
                 quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
                 ax.add_patch(quad)
-    
+
     # Add reinforcement if requested
     if show_reinforcement:
         elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
@@ -1862,9 +1927,10 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
                     x_coords = [nodes[elem[0], 0], nodes[elem[1], 0]]
                     y_coords = [nodes[elem[0], 1], nodes[elem[1], 1]]
                     ax.plot(x_coords, y_coords, 'r-', linewidth=2, alpha=0.8)
-    
+
     # Add element labels if requested
     if label_elements:
         _add_element_labels(ax, fem_data)
-    
+
     ax.set_aspect('equal')
+    return mappable

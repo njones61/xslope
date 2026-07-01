@@ -592,8 +592,10 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         title = f"{variable_label} Contours"
     ax.set_title(title)
 
-    # Set equal aspect ratio AFTER setting limits
-    ax.set_aspect("equal")
+    # Equal aspect (1:1) so the flow net reads as curvilinear squares; datalim
+    # fills the axes and keeps the legend-to-axis gap uniform with the other plots
+    # (datalim preserves the 1:1 scaling — it only expands limits, not the aspect).
+    ax.set_aspect("equal", adjustable="datalim")
 
     # Legend (below the axes, frameless by default) for the flow-net features that
     # were actually drawn — material zones plus phreatic / contour / flow lines —

@@ -845,16 +845,18 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     # Absolute threshold
     abs_tol = displacement_tolerance * max_disp_mag
 
-    # Plot boundary outline first
-    if show_mesh:
-        if plot_elements:
-            plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5, linewidth=0.5)
-        elif plot_boundary:
-            boundary_edges = _get_mesh_boundary(fem_data)
-            for edge in boundary_edges:
-                x_coords = [nodes[edge[0], 0], nodes[edge[1], 0]]
-                y_coords = [nodes[edge[0], 1], nodes[edge[1], 1]]
-                ax.plot(x_coords, y_coords, 'k-', alpha=0.7, linewidth=1.0)
+    # Element edges (full light-gray mesh) and the boundary outline (black) are
+    # independent context layers — either, both, or neither. (show_mesh is kept
+    # for API compatibility but no longer gates these; the caller drives them
+    # directly via plot_elements / plot_boundary.)
+    if plot_elements:
+        plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5, linewidth=0.5)
+    if plot_boundary:
+        boundary_edges = _get_mesh_boundary(fem_data)
+        for edge in boundary_edges:
+            x_coords = [nodes[edge[0], 0], nodes[edge[1], 0]]
+            y_coords = [nodes[edge[0], 1], nodes[edge[1], 1]]
+            ax.plot(x_coords, y_coords, 'k-', alpha=0.7, linewidth=1.0)
 
     # Plot small vectors at corner nodes
     corner_list = sorted(corner_nodes)
@@ -1520,8 +1522,10 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
             print("Warning: Shear strain data not available")
             return
 
+    # show_mesh draws the element edges over the contours (reinforcement is drawn
+    # separately below with force-based coloring, so it stays False here).
     mappable = _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
-                        False, False, cbar_shrink, cbar_labelpad,
+                        show_mesh, False, cbar_shrink, cbar_labelpad,
                         colormap=cmap or 'coolwarm', label_elements=label_elements,
                         draw_cbar=not single_panel)
 
@@ -1897,25 +1901,26 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
             triangle = plt.Polygon(coords, facecolor=uniform_color, edgecolor='none', alpha=0.8)
             ax.add_patch(triangle)
 
-    # Overlay mesh if requested
+    # Overlay mesh element edges if requested (light gray, matching the element
+    # edges drawn on the deformation / displacement-vector plots).
     if show_mesh:
         for i, elem in enumerate(elements):
             elem_type = element_types[i]
             if elem_type == 3:  # Triangle
                 coords = nodes[elem[:3]]
-                triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                triangle = plt.Polygon(coords, fill=False, edgecolor='lightgray', linewidth=0.5, alpha=0.6)
                 ax.add_patch(triangle)
             elif elem_type == 4:  # Quad
                 coords = nodes[elem[:4]]
-                quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                quad = plt.Polygon(coords, fill=False, edgecolor='lightgray', linewidth=0.5, alpha=0.6)
                 ax.add_patch(quad)
             elif elem_type == 6:  # 6-node triangle - use corner nodes
                 coords = nodes[elem[:3]]
-                triangle = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                triangle = plt.Polygon(coords, fill=False, edgecolor='lightgray', linewidth=0.5, alpha=0.6)
                 ax.add_patch(triangle)
             elif elem_type in [8, 9]:  # 8-node or 9-node quad - use corner nodes
                 coords = nodes[elem[:4]]
-                quad = plt.Polygon(coords, fill=False, edgecolor='black', linewidth=0.5, alpha=0.7)
+                quad = plt.Polygon(coords, fill=False, edgecolor='lightgray', linewidth=0.5, alpha=0.6)
                 ax.add_patch(quad)
 
     # Add reinforcement if requested

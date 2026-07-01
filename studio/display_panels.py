@@ -429,8 +429,11 @@ class SeepDisplayPanel(QWidget):
 
 class FemResultsDisplayPanel(QWidget):
     """Display options for an FEM results plot: plot type, deformation scale, and
-    the mesh/reinforcement/vector toggles. The displacement-vector options enable
-    only when the plot type is ``displace_vector``."""
+    the mesh/reinforcement/vector toggles. Controls dim to the active plot type —
+    color ramp + colorbar for shear strain, deform scale for deformation, and the
+    boundary/node/vector controls for displacement vectors. A single "Element
+    edges" toggle drives the mesh overlay in every plot type (the undeformed mesh
+    on the deformation plot)."""
 
     changed = Signal()
 
@@ -452,8 +455,12 @@ class FemResultsDisplayPanel(QWidget):
         self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
                                   "a fraction of the plot height.")
 
-        self.show_mesh = QCheckBox("Show mesh")
-        self.show_mesh.setChecked(True)
+        # Universal controls (apply to every plot type).
+        self.element_edges = QCheckBox("Element edges")
+        self.element_edges.setChecked(True)
+        self.element_edges.setToolTip(
+            "Overlay the mesh element edges (light gray). On the deformation plot "
+            "this is the original, undeformed mesh.")
         self.show_reinforcement = QCheckBox("Reinforcement")
         self.show_reinforcement.setChecked(True)
         self.label_elements = QCheckBox("Element numbers")
@@ -461,8 +468,8 @@ class FemResultsDisplayPanel(QWidget):
         # Displacement-vector-only controls.
         self.plot_boundary = QCheckBox("Boundary edges")
         self.plot_boundary.setChecked(True)
+        self.plot_boundary.setToolTip("Outline the domain boundary (black).")
         self.plot_nodes = QCheckBox("Node dots")
-        self.plot_elements = QCheckBox("Element edges")
         self.scale_vectors = QCheckBox("Auto-scale vectors")
         self.scale_vectors.setChecked(True)
         self.scale_vectors.setToolTip(
@@ -476,31 +483,28 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("Color ramp", self.cmap)
         form.addRow("Colorbar size", self.cbar_size)
         form.addRow("Deform", self.deform_percent)
-        form.addRow("", self.show_mesh)
+        form.addRow("", self.element_edges)
         form.addRow("", self.show_reinforcement)
         form.addRow("", self.label_elements)
         form.addRow("", self.plot_boundary)
         form.addRow("", self.plot_nodes)
-        form.addRow("", self.plot_elements)
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
-        # Legend column controls (the deformation plot's deformed/undeformed legend).
-        _add_legend_controls(self, form)
+        # No legend controls: the single-panel FEM result plots draw no legend.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)
         self.cbar_size.valueChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
-        for c in (self.show_mesh, self.show_reinforcement, self.label_elements,
-                  self.plot_boundary, self.plot_nodes, self.plot_elements,
-                  self.scale_vectors):
+        for c in (self.element_edges, self.show_reinforcement, self.label_elements,
+                  self.plot_boundary, self.plot_nodes, self.scale_vectors):
             c.toggled.connect(self._emit)
         self._sync_enabled()
 
     @property
     def _vector_widgets(self):
-        return (self.plot_boundary, self.plot_nodes, self.plot_elements,
+        return (self.plot_boundary, self.plot_nodes,
                 self.scale_vectors, self.displacement_tolerance)
 
     def _on_plot_type(self, *_):
@@ -512,26 +516,30 @@ class FemResultsDisplayPanel(QWidget):
 
     def _sync_enabled(self):
         pt = self.plot_type.currentData()
+        # Vector-only controls.
         for w in self._vector_widgets:
             w.setEnabled(pt == "displace_vector")
-        # Only the shear-strain plot draws a color ramp and its colorbar.
+        # Color ramp + colorbar: shear-strain only. Deform scale: deformation only.
         self.cmap.setEnabled(pt == "shear_strain")
         self.cbar_size.setEnabled(pt == "shear_strain")
+        self.deform_percent.setEnabled(pt == "deformation")
 
     def options(self):
+        # One universal "Element edges" toggle drives the mesh overlay in every
+        # plot type: show_mesh for the contour/deformation plots, plot_elements
+        # for the vector plot.
+        edges = self.element_edges.isChecked()
         return {
             "plot_type": self.plot_type.currentData(),
             "cmap": self.cmap.currentData(),
             "cbar_shrink": self.cbar_size.value(),
             "deform_percent": self.deform_percent.value(),
-            "show_mesh": self.show_mesh.isChecked(),
+            "show_mesh": edges,
+            "plot_elements": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
             "label_elements": self.label_elements.isChecked(),
             "plot_boundary": self.plot_boundary.isChecked(),
             "plot_nodes": self.plot_nodes.isChecked(),
-            "plot_elements": self.plot_elements.isChecked(),
             "scale_vectors": self.scale_vectors.isChecked(),
             "displacement_tolerance": self.displacement_tolerance.value(),
-            "legend_ncol": _legend_option(self),
-            "legend_frame": _legend_frame_option(self),
         }

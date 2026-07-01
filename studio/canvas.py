@@ -90,6 +90,9 @@ class MplCanvas(QWidget):
         self._agg = FigureCanvasAgg(self.figure)
         self._pixitem = None
         self._fitted = False
+        self._fitted_vp = None        # viewport (w, h) at the last auto-fit; a re-fit
+                                      # is needed only when this changes (so a user
+                                      # zoom — same size — is preserved across shows)
         self._render_dpi = 0          # DPI the current pixmap was rasterized at
         self._content_rect = None     # tight bbox of inked content, in scene coords
         self._dxf_supported = False   # current view exports to DXF (set per render)
@@ -351,6 +354,7 @@ class MplCanvas(QWidget):
         draw_fn(self.figure)
         self._rasterize(self._target_dpi())
         self._fitted = False
+        self._fitted_vp = None           # new content: fit afresh on next show/tick
         QTimer.singleShot(0, self.ensure_fitted)
         self._schedule_refine()
 
@@ -374,26 +378,33 @@ class MplCanvas(QWidget):
         self.fit()
 
     def ensure_fitted(self):
-        """Fit the figure to the window once the view has a real size.
+        """Fit the figure to the window once the view has a real, settled size.
 
-        A result canvas is often rendered while its tab is hidden, and when the
-        tab is first shown the viewport may not be laid out yet (width 0). So:
-        only act while visible, and if not laid out yet, retry shortly — that
-        covers the "click the LEM Solution tab" case where the synchronous fit on
-        tab-change runs before the page is sized. The retry stops once fitted, and
-        never runs for a hidden tab (it waits for showEvent)."""
-        if self._fitted or self._pixitem is None or not self.isVisible():
+        A result canvas is often rendered while its tab is hidden (viewport 0), so
+        the fit is deferred to when it's first shown. But when a tab is first shown
+        the page may still be laying out — the viewport reports a transient size (or
+        0), and fitting to that leaves the figure the wrong size (scrollbars) once
+        the layout settles. So: only act while visible; if not laid out yet, retry;
+        and re-fit whenever the viewport size differs from the size we last fitted
+        to — that corrects a fit that ran at a transient size, and also handles a
+        later resize. A fit at an *unchanged* size is skipped, so a user's zoom
+        (which doesn't change the viewport size) is preserved across tab switches."""
+        if self._pixitem is None or not self.isVisible():
             return
-        if self.view.viewport().width() > 1:
-            self.fit()
-            self._fitted = True
-        else:
+        vp = self.view.viewport()
+        w, h = vp.width(), vp.height()
+        if w <= 1 or h <= 1:
             QTimer.singleShot(40, self.ensure_fitted)
+            return
+        if self._fitted and self._fitted_vp == (w, h):
+            return                      # already fitted at this size; keep any zoom
+        self.fit()                      # records _fitted / _fitted_vp
 
     def reset_fit(self):
         """Re-arm the one-shot fit so the next render fits to the window (e.g. when
         a different file is loaded), rather than keeping the previous view."""
         self._fitted = False
+        self._fitted_vp = None
 
     def clear(self):
         self.figure.clear()
@@ -546,6 +557,12 @@ class MplCanvas(QWidget):
         self._ensure_figure_matches_viewport()     # re-layout if the window resized
         self._schedule_refine()
         self._restore_pan_cursor()
+        # Record the size we fitted at so ensure_fitted knows a later show at the
+        # same size needs no re-fit (preserving nothing here, but keeping the flag
+        # consistent whether the fit came from the button, a resize, or a show).
+        vp = self.view.viewport()
+        self._fitted = True
+        self._fitted_vp = (vp.width(), vp.height())
 
     def _ensure_figure_matches_viewport(self):
         """Make the figure match the current viewport, redrawing if its size has
@@ -587,11 +604,14 @@ class MplCanvas(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         # A result canvas is usually drawn while its tab is hidden (no viewport
-        # size yet), so the initial fit is skipped. Re-attempt it the moment the
-        # view becomes visible — deferred one cycle so the page has been laid out.
-        # Guarded by _fitted, so revisiting a tab won't clobber the user's zoom.
-        if not self._fitted:
-            QTimer.singleShot(0, self.ensure_fitted)
+        # size yet), so the initial fit is skipped. Re-attempt it once the view is
+        # visible. ensure_fitted only fits when the viewport size differs from the
+        # last fit, so re-running it here is safe: it corrects a fit that landed at
+        # a transient size while the page was still laying out, yet leaves a user's
+        # zoom (same size) untouched. Two attempts — immediately and after a short
+        # delay — cover a layout that is still settling one cycle after show.
+        QTimer.singleShot(0, self.ensure_fitted)
+        QTimer.singleShot(120, self.ensure_fitted)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

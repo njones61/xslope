@@ -196,7 +196,7 @@ def import_fem_solution(fem_data, output_stem):
     }
 
 
-def build_fem_data(slope_data, mesh=None):
+def build_fem_data(slope_data, mesh=None, verbose=False):
     """
     Build a fem_data dictionary from slope_data and optional mesh.
     
@@ -230,7 +230,11 @@ def build_fem_data(slope_data, mesh=None):
             - elements_1d: np.ndarray (n_1d_elements, 3) of 1D element node indices
             - element_types_1d: np.ndarray (n_1d_elements,) indicating 2 or 3 nodes per 1D element  
             - element_materials_1d: np.ndarray (n_1d_elements,) of reinforcement line IDs (1-based)
-    
+        verbose (bool): if True, print a per-distributed-load assembly report
+            (edges/nodes used and total force vs. expected) — a sanity check for
+            debugging load application. Off by default so it doesn't spam callers
+            (e.g. Studio) that build fem_data routinely.
+
     Returns:
         dict: fem_data dictionary with the following structure:
             - nodes: np.ndarray (n_nodes, 2) of node coordinates
@@ -893,9 +897,10 @@ def build_fem_data(slope_data, mesh=None):
                 expected_force = np.mean(load_values) * load_total_length
                 total_force = np.sqrt(
                     sum(nodal_fx.values())**2 + sum(nodal_fy.values())**2)
-                print(f"  Distributed load {load_idx}: {len(_load_edges)} edges / "
-                      f"{len(load_nodes)} nodes (consistent), "
-                      f"total force = {total_force:.1f}, expected ~{expected_force:.1f}")
+                if verbose:
+                    print(f"  Distributed load {load_idx}: {len(_load_edges)} edges / "
+                          f"{len(load_nodes)} nodes (consistent), "
+                          f"total force = {total_force:.1f}, expected ~{expected_force:.1f}")
                 continue
 
             # Pass 2b (fallback when no boundary edges found on the line):
@@ -976,9 +981,10 @@ def build_fem_data(slope_data, mesh=None):
                     f"Distributed load {load_idx}: only {n_load_nodes} mesh node(s) found "
                     f"on load line (tolerance={tolerance}). Increase mesh density along load line."
                 )
-            print(f"  Distributed load {load_idx}: {n_load_nodes} nodes, "
-                  f"total force = {total_force:.1f}, expected ~{expected_force:.1f}, "
-                  f"sum(trib) = {total_trib:.2f}")
+            if verbose:
+                print(f"  Distributed load {load_idx}: {n_load_nodes} nodes, "
+                      f"total force = {total_force:.1f}, expected ~{expected_force:.1f}, "
+                      f"sum(trib) = {total_trib:.2f}")
             
     
     # Get other parameters

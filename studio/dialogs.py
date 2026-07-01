@@ -213,7 +213,7 @@ class BuildMeshDialog(QDialog):
 
         self.size_divisions = QSpinBox()
         self.size_divisions.setRange(5, 1000)
-        self.size_divisions.setValue(int(defaults.get("size_divisions", 50)))
+        self.size_divisions.setValue(int(defaults.get("size_divisions", 100)))
         self.size_divisions.setToolTip("Number of elements across the slope width.")
         form.addRow("Size divisions", self.size_divisions)
 

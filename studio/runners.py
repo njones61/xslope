@@ -38,7 +38,7 @@ class MeshWorker(QObject):
             constraint_lines, n_reinf, n_pile = extract_constraint_line_geometry(sd)
             polygons = get_material_polygons(sd, reinf_lines=constraint_lines)
             if options.get("auto_size", True):
-                divisions = options.get("size_divisions", 50)
+                divisions = options.get("size_divisions", 100)
                 xs = [x for x, _ in sd["ground_surface"].coords]
                 target = (max(xs) - min(xs)) / divisions
                 print(f"Auto element size: {target:.3f} (slope width / {divisions} divisions)")

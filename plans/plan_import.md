@@ -84,6 +84,30 @@ reported answer as `expected_fs` / `expected_flowrate` — exactly the existing 
 routed by type. The public repo gets only the **derived validation table** (problem name,
 summary, both answers, Δ/tolerance), never the proprietary files.
 
+**Licensing & compliance — GeoStudio User Terms (reviewed 2026-06-30).** *(Not legal
+advice; confirm with counsel / Seequent before public release.)* Key constraints from the
+Seequent User Terms v2.1:
+
+- **Use an academic (or paid) license for development — NOT the free trial.** The terms
+  define **"trial" as a Tech Preview** (Section A definitions), which triggers Section B.3:
+  Tech Preview use is limited to **"testing or evaluation" only** (B.3.1) and imposes
+  **confidentiality** on anything derived from it (B.3.3). Building/validating an importer
+  under a trial would strain both. An academic license (Section B.1, a normal Product
+  license) carries neither restriction. **Decision: pursue an academic license.**
+- **Anchor format reverse-engineering to public sources.** Derive `.gsz` structure from
+  **PyGeoStudio's public samples + public docs**, not from license-derived artifacts, so
+  format knowledge is not "confidential information received in connection with" the
+  Product. Note A.2.5(a) prohibits reverse-engineering the *Product* (the software) — the
+  `.gsz` *file format* is a defensible interop grey area, but keep provenance clean.
+- **Never redistribute vendor files.** Sample `.gsz`/tutorials are "Materials" (Section
+  C.2.1) — personal, non-commercial, no redistribution. Already handled via the private
+  `xslope_private_tests` repo; the public repo gets only the derived validation table
+  (our own measured numbers, not their files).
+- **When in doubt, get written consent.** The terms repeatedly gate on "prior written
+  consent" — a short note to legal@seequent.com / sales asking whether an open-source
+  `.gsz` importer + public validation table is OK converts grey to black-and-white
+  (vendors often approve, since an importer drives format adoption).
+
 ## 5. Findings from an initial scout (2026-06-27)
 
 - **SLOPE/W `.gsz` is the strong first target — confirmed parseable.** A `.gsz` is a

@@ -592,26 +592,6 @@ class MplCanvas(QWidget):
         # Guarded by _fitted, so revisiting a tab won't clobber the user's zoom.
         if not self._fitted:
             QTimer.singleShot(0, self.ensure_fitted)
-        # The page layout can still be settling one cycle after show (e.g. a tab
-        # auto-rendered while hidden during file restore, then shown while the log
-        # dock is claiming space): the early fit then latches _fitted at a stale
-        # size, leaving the figure larger than the viewport (scrollbars). Re-match
-        # the figure to the viewport once it has settled. This only redraws on a
-        # genuine size mismatch, so it never clobbers a user's zoom.
-        QTimer.singleShot(120, self._settle_fit)
-
-    def _settle_fit(self):
-        """Correct a figure/viewport size mismatch left by a fit that ran before
-        the page finished laying out (see showEvent). No-ops when the size already
-        matches, so it's safe to run on every show."""
-        if self._pixitem is None or not self.isVisible():
-            return
-        cur_w, cur_h = self.figure.get_size_inches()
-        self._ensure_figure_matches_viewport()
-        # If the figure was resized to the settled viewport, re-fit 1:1 so the new
-        # (correct-size) scene fills the canvas without scrollbars.
-        if (cur_w, cur_h) != tuple(self.figure.get_size_inches()):
-            self.fit()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

@@ -93,6 +93,10 @@ class MplCanvas(QWidget):
         self._fitted_vp = None        # viewport (w, h) at the last auto-fit; a re-fit
                                       # is needed only when this changes (so a user
                                       # zoom — same size — is preserved across shows)
+        self._pending_render = False  # draw_fn stored but not yet rasterized because
+                                      # the canvas had no real size (hidden tab); the
+                                      # first raster is deferred to avoid a wrong-size
+                                      # flash — see _render_current / showEvent
         self._render_dpi = 0          # DPI the current pixmap was rasterized at
         self._content_rect = None     # tight bbox of inked content, in scene coords
         self._dxf_supported = False   # current view exports to DXF (set per render)
@@ -343,20 +347,38 @@ class MplCanvas(QWidget):
         engine plot here can except an empty canvas), gating the DXF option in the
         Save dialog.
 
-        Every (re)render re-arms the fit (``_fitted = False``) so the new content
-        is fitted to the window — a fresh solve/result always autofits, not just
-        the first plot ever drawn. The fit itself is deferred to ``ensure_fitted``
-        (and to ``showEvent`` for a canvas drawn while its tab is hidden), so it
-        runs once the viewport has a real size rather than at zero size."""
+        The actual raster is done by ``_render_current`` at the canvas's real size.
+        If the canvas has no size yet (a result tab drawn while hidden, e.g. an
+        auto-restored FEM/seep solution on file open), the raster is *deferred* to
+        when it's first shown, so the figure is never rasterized at the wrong size
+        and then visibly re-fitted — that double render is the "loads wrong, flashes,
+        refits" flash. New content re-arms the fit so it autofits when shown."""
         self._dxf_supported = dxf
         self._draw_fn = draw_fn          # remembered so a resize can re-layout it
-        self._size_figure_to_viewport()  # figure matches the canvas → crisp 1:1 render
-        draw_fn(self.figure)
-        self._rasterize(self._target_dpi())
         self._fitted = False
-        self._fitted_vp = None           # new content: fit afresh on next show/tick
-        QTimer.singleShot(0, self.ensure_fitted)
-        self._schedule_refine()
+        self._fitted_vp = None           # new content: fit afresh
+        self._render_current()
+
+    def _render_current(self):
+        """Rasterize the stored draw_fn at the current viewport size and fit 1:1.
+
+        Renders only when the canvas is visible and laid out (real size); otherwise
+        it marks the render pending and returns — a hidden tab waits for showEvent,
+        and a visible-but-still-settling canvas retries shortly (showEvent won't
+        fire again). Rendering only at the real size means the first pixmap the user
+        sees is already correct — no wrong-size flash."""
+        if self._draw_fn is None:
+            return
+        if self.isVisible() and self._size_figure_to_viewport():
+            self._pending_render = False
+            self._draw_fn(self.figure)
+            self._rasterize(self._target_dpi())
+            self.fit()                   # size is correct → clean 1:1; sets _fitted
+            self._schedule_refine()
+        else:
+            self._pending_render = True
+            if self.isVisible():
+                QTimer.singleShot(30, self._render_current)
 
     def _size_figure_to_viewport(self):
         """Size the Matplotlib figure to the canvas viewport (pixels → inches at
@@ -603,13 +625,16 @@ class MplCanvas(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        # A result canvas is usually drawn while its tab is hidden (no viewport
-        # size yet), so the initial fit is skipped. Re-attempt it once the view is
-        # visible. ensure_fitted only fits when the viewport size differs from the
-        # last fit, so re-running it here is safe: it corrects a fit that landed at
-        # a transient size while the page was still laying out, yet leaves a user's
-        # zoom (same size) untouched. Two attempts — immediately and after a short
-        # delay — cover a layout that is still settling one cycle after show.
+        if self._pending_render:
+            # Drawn while hidden — do the first (correct-size) raster now that it's
+            # visible. _render_current retries until the page is laid out.
+            QTimer.singleShot(0, self._render_current)
+            return
+        # Already rendered: re-fit once the view is visible. ensure_fitted only
+        # fits when the viewport size differs from the last fit, so this is safe —
+        # it corrects a fit that landed at a transient size while the page was still
+        # laying out, yet leaves a user's zoom (same size) untouched. Two attempts —
+        # immediately and after a short delay — cover a still-settling layout.
         QTimer.singleShot(0, self.ensure_fitted)
         QTimer.singleShot(120, self.ensure_fitted)
 

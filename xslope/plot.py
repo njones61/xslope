@@ -1721,7 +1721,10 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     # axes height, so plots with a taller data range (e.g. inputs showing circle
     # centers high up) push the legend far down while compact plots hug it. Figure-
     # anchoring makes the placement identical across every plot type.
-    leg = ax.legend(handles=handles, labels=labels, loc="lower center",
+    gap = 0.035                              # fixed figure-fraction gap below the axis
+    # Anchor the legend by its TOP (loc="upper center"); its exact y is set below,
+    # once layout tells us where the axes box actually sits.
+    leg = ax.legend(handles=handles, labels=labels, loc="upper center",
                     bbox_to_anchor=(0.5, _LEGEND_BOTTOM), bbox_transform=fig.transFigure,
                     ncol=ncol, **kw)
     # Manual margins must survive the next canvas draw — an active tight/constrained
@@ -1741,10 +1744,9 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     except Exception:
         n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
         leg_h = 0.045 * n_rows
-    # Bottom margin clears the legend plus the x-axis tick numbers above it, with a
-    # small gap (not crammed, not floating). The gap is fixed in figure units so it
-    # doesn't grow with the axes height.
-    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + 0.05)
+    # Reserve a bottom margin sized for the legend (as if the axes filled down to it)
+    # and a title-aware top, then lay out.
+    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + gap)
     top = 0.94
     if ax.get_title():                       # reserve enough top for the (maybe multi-line) title
         try:
@@ -1753,6 +1755,23 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         except Exception:
             pass
     fig.subplots_adjust(top=top, bottom=bottom)
+    # Pin the legend just under the REAL axes-box bottom so it hugs the x-axis on
+    # every plot. For datalim plots the box fills the figure, so its bottom sits at
+    # the reserved margin (unchanged placement). For box-adjust plots the box can be
+    # short and float high (a wide-thin seep domain) — the legend follows it up
+    # instead of stranding at the figure floor. (The title rides the box top the
+    # same way, so title + plot + legend stay grouped.)
+    try:
+        fig.canvas.draw()
+        ax.apply_aspect()                    # finalize the box-adjust position now
+        # Use the DRAWN box extent (reflects box-adjust shrink + any colorbar
+        # divider), converted to a figure fraction — get_position() can lag the
+        # aspect on the first draw.
+        y0 = ax.get_window_extent().y0 / fig.bbox.height
+    except Exception:
+        y0 = bottom
+    anchor_y = max(_LEGEND_BOTTOM + leg_h, y0 - gap)
+    leg.set_bbox_to_anchor((0.5, anchor_y), transform=fig.transFigure)
     return leg
 
 

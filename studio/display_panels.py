@@ -455,9 +455,14 @@ class FemResultsDisplayPanel(QWidget):
         self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
                                   "a fraction of the plot height.")
 
-        # Universal controls (apply to every plot type).
+        # Universal control, but with a per-plot-type default (and per-type memory
+        # of the user's choice): off for the contour/vector plots (keep them
+        # clean), on for the deformation plot (the undeformed reference).
+        self._edges_state = {"shear_strain": False, "deformation": True,
+                               "displace_vector": False}
+        self._current_pt = self.plot_type.currentData()
         self.element_edges = QCheckBox("Element edges")
-        self.element_edges.setChecked(True)
+        self.element_edges.setChecked(self._edges_state.get(self._current_pt, False))
         self.element_edges.setToolTip(
             "Overlay the mesh element edges (light gray). On the deformation plot "
             "this is the original, undeformed mesh.")
@@ -508,6 +513,16 @@ class FemResultsDisplayPanel(QWidget):
                 self.scale_vectors, self.displacement_tolerance)
 
     def _on_plot_type(self, *_):
+        # "Element edges" carries a per-type default and remembers the user's
+        # toggle per plot type: save the state we're leaving, load the one we're
+        # entering (falling back to that type's default the first time it's seen).
+        new_pt = self.plot_type.currentData()
+        if new_pt != self._current_pt:
+            self._edges_state[self._current_pt] = self.element_edges.isChecked()
+            self.element_edges.blockSignals(True)
+            self.element_edges.setChecked(self._edges_state.get(new_pt, False))
+            self.element_edges.blockSignals(False)
+            self._current_pt = new_pt
         self._sync_enabled()
         self.changed.emit()
 

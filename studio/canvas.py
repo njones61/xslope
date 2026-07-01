@@ -49,6 +49,9 @@ MIN_DPI = 100
 MAX_DPI = 900         # caps pixmap memory (raised for Retina, where the effective
                       # DPI is doubled by devicePixelRatio)
 REFINE_MS = 90        # debounce before re-rasterizing after a zoom change
+RENDER_DEBOUNCE_MS = 50   # debounce before rendering after draw/show/resize, so the
+                          # file-open / drag-resize layout burst settles first (one
+                          # render at the final size, no wrong-size-then-refit flash)
 FIT_PAD = 0.04        # cushion around the content when fitting (fraction per side)
 
 
@@ -89,14 +92,13 @@ class MplCanvas(QWidget):
         self.figure = Figure(figsize=(12, 7), dpi=BASE_DPI)
         self._agg = FigureCanvasAgg(self.figure)
         self._pixitem = None
-        self._fitted = False
-        self._fitted_vp = None        # viewport (w, h) at the last auto-fit; a re-fit
-                                      # is needed only when this changes (so a user
-                                      # zoom — same size — is preserved across shows)
-        self._pending_render = False  # draw_fn stored but not yet rasterized because
-                                      # the canvas had no real size (hidden tab); the
-                                      # first raster is deferred to avoid a wrong-size
-                                      # flash — see _render_current / showEvent
+        self._rendered_vp = None      # viewport (w, h) the current draw_fn was last
+                                      # rasterized at; None = not yet rendered (or a
+                                      # forced re-fit). _render_current renders only
+                                      # when this differs from the live viewport, so a
+                                      # settle/resize re-renders but a user zoom (same
+                                      # size) is preserved, and a hidden tab (no size)
+                                      # stays pending until shown.
         self._render_dpi = 0          # DPI the current pixmap was rasterized at
         self._content_rect = None     # tight bbox of inked content, in scene coords
         self._dxf_supported = False   # current view exports to DXF (set per render)
@@ -110,6 +112,14 @@ class MplCanvas(QWidget):
         self.view.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.view.setBackgroundBrush(Qt.white)
+        # Never show scrollbars. The figure is sized to the viewport and fit 1:1, so
+        # a scrollbar only ever appears transiently (rounding/settle) — and when it
+        # does it steals ~16px of viewport, shrinking it, which forces a re-raster at
+        # the smaller size, which drops the scrollbar, which grows it back… a
+        # feedback loop seen as a flash on load. Panning is by drag (ScrollHandDrag),
+        # so hidden scrollbars lose nothing.
+        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.viewport().installEventFilter(self)
         # In zoom-box mode the view uses RubberBandDrag; this fires as the band is
         # dragged (and once with a null rect on release) so we can fit to it.
@@ -121,13 +131,19 @@ class MplCanvas(QWidget):
         self._refine_timer.setInterval(REFINE_MS)
         self._refine_timer.timeout.connect(self._refine_resolution)
 
-        # The figure is sized to the viewport (below), so re-layout it when the
-        # canvas resizes — debounced so a drag-resize redraws once, not per pixel.
+        # The figure is sized to the viewport, so any layout change (new draw, tab
+        # shown, window/dock resize) needs a re-raster at the new size. Route them ALL
+        # through one debounced timer: a burst of layout changes — a drag-resize, or
+        # the flurry during file-open (result tabs added, Display dock switching
+        # panels) — then coalesces into a SINGLE render at the settled size, instead
+        # of rendering at a transient size and visibly re-rastering when it settles
+        # (the load flash). The debounce restarts on every trigger, so it fires only
+        # once the layout has stopped changing.
         self._draw_fn = None
-        self._resize_timer = QTimer(self)
-        self._resize_timer.setSingleShot(True)
-        self._resize_timer.setInterval(120)
-        self._resize_timer.timeout.connect(self._on_resize)
+        self._render_timer = QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.setInterval(RENDER_DEBOUNCE_MS)
+        self._render_timer.timeout.connect(self._render_current)
 
         bar = QHBoxLayout()
         for text, tip, slot in [
@@ -293,6 +309,12 @@ class MplCanvas(QWidget):
             self, "Save view", suggested_name, ";;".join(filters))
         if not path:
             return
+        # The on-screen render is debounced; if it hasn't fired yet, populate the
+        # figure now so we export the current content, not stale/empty axes.
+        if self._render_timer.isActive() or (
+                self._draw_fn is not None and self._rendered_vp is None):
+            self._render_timer.stop()
+            self._render_current()
         ext = os.path.splitext(path)[1].lower()
         if not ext:                       # user typed no extension — infer from filter
             ext = {"PDF document (*.pdf)": ".pdf",
@@ -341,95 +363,77 @@ class MplCanvas(QWidget):
         return max(axs, key=area)
 
     def _draw(self, draw_fn, dxf=True):
-        """Populate the embedded figure via ``draw_fn(fig)`` and rasterize it.
+        """Store ``draw_fn(fig)`` as this canvas's content and schedule a render.
 
         ``dxf`` records whether this view's geometry can be exported to DXF (every
         engine plot here can except an empty canvas), gating the DXF option in the
         Save dialog.
 
-        The actual raster is done by ``_render_current`` at the canvas's real size.
-        If the canvas has no size yet (a result tab drawn while hidden, e.g. an
-        auto-restored FEM/seep solution on file open), the raster is *deferred* to
-        when it's first shown, so the figure is never rasterized at the wrong size
-        and then visibly re-fitted — that double render is the "loads wrong, flashes,
-        refits" flash. New content re-arms the fit so it autofits when shown."""
+        The raster itself is done by ``_render_current`` (debounced), at the canvas's
+        real, settled size. New content resets ``_rendered_vp`` so it fits afresh; if
+        the canvas is hidden or still laying out when the timer fires, the render
+        stays pending until it's shown/settled — so the figure is never rasterized at
+        the wrong size and then visibly re-fitted (the "loads wrong, flashes, refits"
+        flash)."""
         self._dxf_supported = dxf
         self._draw_fn = draw_fn          # remembered so a resize can re-layout it
-        self._fitted = False
-        self._fitted_vp = None           # new content: fit afresh
-        self._render_current()
+        self._rendered_vp = None         # new content: render/fit afresh
+        self._schedule_render()
+
+    def _schedule_render(self):
+        """(Re)start the debounce so a burst of layout changes coalesces into one
+        render at the settled size. Every trigger (draw, show, resize, tab-change)
+        routes through here."""
+        self._render_timer.start()
 
     def _render_current(self):
-        """Rasterize the stored draw_fn at the current viewport size and fit 1:1.
+        """Rasterize the stored draw_fn at the current viewport size, 1:1.
 
-        Renders only when the canvas is visible and laid out (real size); otherwise
-        it marks the render pending and returns — a hidden tab waits for showEvent,
-        and a visible-but-still-settling canvas retries shortly (showEvent won't
-        fire again). Rendering only at the real size means the first pixmap the user
-        sees is already correct — no wrong-size flash."""
+        Renders only when visible and laid out (real size) AND the size differs from
+        the last raster — so a settle/resize re-renders, a hidden/zero-size tab stays
+        pending (``_rendered_vp`` left None; a later show/resize reschedules), and a
+        re-trigger at an unchanged size is a no-op that preserves the user's zoom."""
         if self._draw_fn is None:
             return
-        if self.isVisible() and self._size_figure_to_viewport():
-            self._pending_render = False
-            self._draw_fn(self.figure)
-            self._rasterize(self._target_dpi())
-            self.fit()                   # size is correct → clean 1:1; sets _fitted
-            self._schedule_refine()
-        else:
-            self._pending_render = True
-            if self.isVisible():
-                QTimer.singleShot(30, self._render_current)
-
-    def _size_figure_to_viewport(self):
-        """Size the Matplotlib figure to the canvas viewport (pixels → inches at
-        BASE_DPI). The figure then matches the display, so it rasterizes at the
-        device resolution and shows 1:1 with no QGraphicsView resampling (crisp,
-        not grainy), and every plot fills the canvas the same way (consistent).
-        Returns True if it could read a real viewport size."""
         vp = self.view.viewport()
         w, h = vp.width(), vp.height()
-        if w > 1 and h > 1:
-            self.figure.set_size_inches(w / BASE_DPI, h / BASE_DPI, forward=False)
-            return True
-        return False
-
-    def _on_resize(self):
-        """Re-layout the figure to the new viewport size and redraw 1:1 (debounced).
-        fit() re-lays-out the figure (via _ensure_figure_matches_viewport) and
-        resets to an exact 1:1 transform."""
-        self.fit()
+        if not self.isVisible() or w <= 1 or h <= 1:
+            return                       # can't render yet; show/resize will retry
+        if self._rendered_vp == (w, h):
+            return                       # unchanged size: keep the pixmap and any zoom
+        # Reset the view to 1:1 BEFORE rasterizing so (a) the pixmap lands at the
+        # fitted transform from its first frame — not briefly at the previous view's
+        # zoom/pan — and (b) _target_dpi() reads scale 1.0, so the first raster is
+        # already at the final DPI and the refine pass doesn't swap it. Both of those
+        # single-frame swaps would read as a flash.
+        self.view.resetTransform()
+        self.figure.set_size_inches(w / BASE_DPI, h / BASE_DPI, forward=False)
+        self.figure.clear()
+        try:
+            self._draw_fn(self.figure)
+        except Exception:
+            return
+        self._rasterize(self._target_dpi())
+        self._restore_pan_cursor()
+        self._rendered_vp = (w, h)
+        self._schedule_refine()
 
     def ensure_fitted(self):
-        """Fit the figure to the window once the view has a real, settled size.
-
-        A result canvas is often rendered while its tab is hidden (viewport 0), so
-        the fit is deferred to when it's first shown. But when a tab is first shown
-        the page may still be laying out — the viewport reports a transient size (or
-        0), and fitting to that leaves the figure the wrong size (scrollbars) once
-        the layout settles. So: only act while visible; if not laid out yet, retry;
-        and re-fit whenever the viewport size differs from the size we last fitted
-        to — that corrects a fit that ran at a transient size, and also handles a
-        later resize. A fit at an *unchanged* size is skipped, so a user's zoom
-        (which doesn't change the viewport size) is preserved across tab switches."""
-        if self._pixitem is None or not self.isVisible():
-            return
-        vp = self.view.viewport()
-        w, h = vp.width(), vp.height()
-        if w <= 1 or h <= 1:
-            QTimer.singleShot(40, self.ensure_fitted)
-            return
-        if self._fitted and self._fitted_vp == (w, h):
-            return                      # already fitted at this size; keep any zoom
-        self.fit()                      # records _fitted / _fitted_vp
+        """Re-render at the current size if it changed since the last raster — e.g.
+        this tab was last drawn at a different viewport size, or was drawn while
+        hidden and is now shown. A no-op when the size is unchanged, so a user's zoom
+        is preserved. Debounced. Called when a tab becomes the current one."""
+        self._schedule_render()
 
     def reset_fit(self):
-        """Re-arm the one-shot fit so the next render fits to the window (e.g. when
-        a different file is loaded), rather than keeping the previous view."""
-        self._fitted = False
-        self._fitted_vp = None
+        """Force the next render to re-fit to the window (e.g. when a different file
+        is loaded), discarding any zoom from the previous view."""
+        self._rendered_vp = None
 
     def clear(self):
         self.figure.clear()
+        self._draw_fn = None
+        self._rendered_vp = None
         self._dxf_supported = False
         self._content_rect = None
         self._rasterize(BASE_DPI)
@@ -570,43 +574,16 @@ class MplCanvas(QWidget):
 
     def fit(self):
         # The figure is sized to the viewport, so the whole plot already spans the
-        # canvas at 100%. Use an exact 1:1 transform (resetTransform) rather than
-        # fitInView — fitInView fits into the frame-inset viewport and yields a
-        # fractional scale (~0.99) that smooth-scales the bitmap and softens it.
+        # canvas at 100%. Force a fresh 1:1 render at the current size (resetTransform
+        # happens inside _render_current) — not fitInView, whose fractional scale
+        # (~0.99) smooth-scales the bitmap and softens it. Immediate (not debounced):
+        # the Fit button should respond at once.
         if self._pixitem is None:
             return
-        self.view.resetTransform()                 # exact 1:1 — view scale is 1.0
-        self._ensure_figure_matches_viewport()     # re-layout if the window resized
-        self._schedule_refine()
+        self._render_timer.stop()
+        self._rendered_vp = None        # force a re-render even at the current size
+        self._render_current()
         self._restore_pan_cursor()
-        # Record the size we fitted at so ensure_fitted knows a later show at the
-        # same size needs no re-fit (preserving nothing here, but keeping the flag
-        # consistent whether the fit came from the button, a resize, or a show).
-        vp = self.view.viewport()
-        self._fitted = True
-        self._fitted_vp = (vp.width(), vp.height())
-
-    def _ensure_figure_matches_viewport(self):
-        """Make the figure match the current viewport, redrawing if its size has
-        drifted — e.g. it was first drawn while its tab was hidden (zero size), or
-        the window was resized. Keeps the 1:1 mapping exact so the bitmap never gets
-        fractionally rescaled."""
-        if self._draw_fn is None:
-            return
-        vp = self.view.viewport()
-        w, h = vp.width(), vp.height()
-        if w <= 1 or h <= 1:
-            return
-        cur_w, cur_h = self.figure.get_size_inches()
-        if abs(cur_w - w / BASE_DPI) < 0.01 and abs(cur_h - h / BASE_DPI) < 0.01:
-            return                                  # already matches the viewport
-        self.figure.set_size_inches(w / BASE_DPI, h / BASE_DPI, forward=False)
-        self.figure.clear()
-        try:
-            self._draw_fn(self.figure)
-        except Exception:
-            return
-        self._rasterize(self._target_dpi())
 
     def reset_100(self):
         self.view.resetTransform()
@@ -625,24 +602,16 @@ class MplCanvas(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        if self._pending_render:
-            # Drawn while hidden — do the first (correct-size) raster now that it's
-            # visible. _render_current retries until the page is laid out.
-            QTimer.singleShot(0, self._render_current)
-            return
-        # Already rendered: re-fit once the view is visible. ensure_fitted only
-        # fits when the viewport size differs from the last fit, so this is safe —
-        # it corrects a fit that landed at a transient size while the page was still
-        # laying out, yet leaves a user's zoom (same size) untouched. Two attempts —
-        # immediately and after a short delay — cover a still-settling layout.
-        QTimer.singleShot(0, self.ensure_fitted)
-        QTimer.singleShot(120, self.ensure_fitted)
+        # First time shown (hidden result tab) or shown at a new size: schedule a
+        # (debounced) render. _render_current no-ops if the size is unchanged, so
+        # switching to an already-rendered tab keeps its pixmap and any zoom.
+        self._schedule_render()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # The figure is sized to the viewport, so a resize re-lays-it-out (debounced)
-        # then re-fits 1:1 — keeping it crisp at the new size.
-        self._resize_timer.start()
+        # The figure is sized to the viewport, so a resize re-lays it out at the new
+        # size (debounced, coalescing a drag) — see _schedule_render / _render_current.
+        self._schedule_render()
 
     def eventFilter(self, obj, event):
         if obj is self.view.viewport() and event.type() == QEvent.NativeGesture:

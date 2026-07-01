@@ -94,19 +94,50 @@ Seequent User Terms v2.1:
   **confidentiality** on anything derived from it (B.3.3). Building/validating an importer
   under a trial would strain both. An academic license (Section B.1, a normal Product
   license) carries neither restriction. **Decision: pursue an academic license.**
-- **Anchor format reverse-engineering to public sources.** Derive `.gsz` structure from
-  **PyGeoStudio's public samples + public docs**, not from license-derived artifacts, so
-  format knowledge is not "confidential information received in connection with" the
-  Product. Note A.2.5(a) prohibits reverse-engineering the *Product* (the software) — the
-  `.gsz` *file format* is a defensible interop grey area, but keep provenance clean.
+- **Format reverse-engineering — will likely use vendor-provided sample files.** The
+  `.gsz` structure is easiest to learn from the example problems shipped with GeoStudio.
+  A.2.5(a) prohibits reverse-engineering the *Product* (the software); the `.gsz` *file
+  format* is a defensible interop grey area, but RE'ing from license-provided files is
+  more exposed than the public-samples-only path (PyGeoStudio's open samples remain a
+  fallback). This is exactly what the written-consent email below asks them to bless.
 - **Never redistribute vendor files.** Sample `.gsz`/tutorials are "Materials" (Section
   C.2.1) — personal, non-commercial, no redistribution. Already handled via the private
   `xslope_private_tests` repo; the public repo gets only the derived validation table
   (our own measured numbers, not their files).
-- **When in doubt, get written consent.** The terms repeatedly gate on "prior written
-  consent" — a short note to legal@seequent.com / sales asking whether an open-source
-  `.gsz` importer + public validation table is OK converts grey to black-and-white
+- **Open source ≠ automatically "academic use."** These are orthogonal: "open source"
+  governs *our* code's redistribution; "academic license" restricts *who* uses GeoStudio
+  and *for what purpose* (typically teaching/research by the licensee). Some academic
+  EULAs permit personal coursework/research but **not producing a tool for general public
+  distribution** — a scope question independent of the fact that XSlope is free. This is
+  the **open item to resolve in writing** before public release.
+- **When in doubt, get written consent (action item).** The terms repeatedly gate on
+  "prior written consent." Send the email below to legal@seequent.com (cc sales rep)
+  asking whether an academic license permits building + open-sourcing a `.gsz` importer
+  and publishing a validation table. A written yes converts grey to black-and-white
   (vendors often approve, since an importer drives format adoption).
+
+  > **Subject:** Academic license — studying GeoStudio and building a SLOPE/W `.gsz` importer
+  >
+  > Hello Seequent Legal team,
+  >
+  > I'm a university faculty member and would like an academic GeoStudio license, primarily
+  > to study the software's capabilities to inform my teaching in geotechnical/slope-
+  > stability courses.
+  >
+  > I also develop **XSlope**, a free, open-source Python package for slope-stability
+  > analysis. I originally built it for my own course, and I'm now preparing to release it
+  > more broadly. I'd like to add an importer that reads the SLOPE/W `.gsz` format so
+  > students can bring GeoStudio models into XSlope, and I would likely reverse-engineer
+  > the `.gsz` format from the sample files and example problems provided with GeoStudio.
+  > The importer would be my own code and contain no GeoStudio source or IP, and I would
+  > not redistribute any GeoStudio files or materials.
+  >
+  > Before this broader release, I'd like to confirm the importer is acceptable under an
+  > academic license. Could you let me know whether it's permitted and any conditions that
+  > would apply?
+  >
+  > Thank you,
+  > [Name, title, institution]
 
 ## 5. Findings from an initial scout (2026-06-27)
 

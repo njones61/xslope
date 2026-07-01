@@ -625,9 +625,16 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if vectors:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0, marker=r"$\rightarrow$",
                                       markersize=10, label="Velocity"))
-    # No tight_layout / engine juggling here — the figure has no layout engine, so
-    # _legend_below sets the margins (top for the title, bottom for the legend)
-    # directly, as on every other plot.
+    # Tighten the left/right margins so the (wide-thin) domain fills the width like
+    # the data/inputs plots. Safe now that the colorbar is deferred to after the
+    # legend: tight_layout sees no gridspec colorbar to choke on. Reserve right-side
+    # room only when a colorbar will actually be drawn.
+    try:
+        fig.tight_layout()
+        if fill_contours:
+            fig.subplots_adjust(right=min(fig.subplotpars.right, 0.90))
+    except Exception:
+        pass
     _legend_below(ax, fig, handles=leg_handles, legend_ncol=legend_ncol, frameon=legend_frame)
 
     # Colorbar last: a manual axes to the right of the (now laid-out) plot, its

@@ -448,7 +448,7 @@ class FemResultsDisplayPanel(QWidget):
 
         self.cmap = _make_cmap_combo("coolwarm")
         self.cmap.setToolTip("Color ramp for the shear-strain contours.")
-        self.cbar_size = _dspin(0.1, 1.0, 0.8, 0.05)
+        self.cbar_size = _dspin(0.1, 1.0, 1.0, 0.05)
         self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
                                   "a fraction of the plot height.")
 

@@ -200,7 +200,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
             legend_handles.append(h2)
 
     from .plot import _legend_below
-    ax.set_aspect("equal")
+    ax.set_aspect("equal", adjustable="datalim")  # fill the axes; uniform legend gap
 
     # Add a bit of headroom so the mesh/BC markers don't touch the top border
     y0, y1 = ax.get_ylim()

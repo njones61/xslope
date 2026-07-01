@@ -282,7 +282,7 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
     
     ax.set_xlim(x_min - x_padding, x_max + x_padding)
     ax.set_ylim(y_min - y_padding_bottom, y_max + y_padding)
-    ax.set_aspect("equal")
+    ax.set_aspect("equal", adjustable="datalim")  # fill the axes; uniform legend gap
     
     # Count element types for title
     num_tri = np.sum((element_types == 3) | (element_types == 6))

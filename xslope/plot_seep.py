@@ -200,7 +200,9 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
             legend_handles.append(h2)
 
     from .plot import _legend_below
-    ax.set_aspect("equal", adjustable="datalim")  # fill the axes; uniform legend gap
+    # Box-adjust (not datalim): seepage domains are typically wide and thin, so
+    # filling the figure via datalim would squish the mesh into a tiny band.
+    ax.set_aspect("equal")
 
     # Add a bit of headroom so the mesh/BC markers don't touch the top border
     y0, y1 = ax.get_ylim()
@@ -332,14 +334,17 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     plot_flowlines = (variable == "head" and flowlines)
 
 
-    # Use constrained_layout for best layout
+    # No layout engine: the colorbar goes in an explicit divider axes (below), so
+    # _legend_below can set manual margins like every other plot. (A constrained-
+    # layout colorbar is incompatible with those margins — switching engines once
+    # a gridspec colorbar exists raises RuntimeError.)
     own_fig = fig is None
     if own_fig:
-        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+        fig, ax = plt.subplots(figsize=figsize)
     else:
         fig.clear()
         try:
-            fig.set_layout_engine("constrained")
+            fig.set_layout_engine("none")
         except Exception:
             pass
         ax = fig.add_subplot(111)
@@ -464,7 +469,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if fill_contours:
         contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap=cmap, vmin=vmin, vmax=vmax, alpha=0.5)
         contourf.set_gid('CONTOUR_FILL')
-        cbar = ax.figure.colorbar(contourf, ax=ax, label=variable_label, shrink=cbar_shrink, pad=0.02)
+        # Colorbar in an explicit divider axes (no layout engine needed): it tracks
+        # the plot's height and moves with it when _legend_below sets margins.
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        cax = make_axes_locatable(ax).append_axes("right", size="2.5%", pad=0.15)
+        cbar = fig.colorbar(contourf, cax=cax, label=variable_label)
         cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
         cbar.update_ticks()
 
@@ -592,10 +601,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         title = f"{variable_label} Contours"
     ax.set_title(title)
 
-    # Equal aspect (1:1) so the flow net reads as curvilinear squares; datalim
-    # fills the axes and keeps the legend-to-axis gap uniform with the other plots
-    # (datalim preserves the 1:1 scaling — it only expands limits, not the aspect).
-    ax.set_aspect("equal", adjustable="datalim")
+    # Equal aspect (1:1) so the flow net reads as curvilinear squares. Box-adjust
+    # (not datalim) because seepage domains are characteristically wide and thin
+    # (blankets, dams) — datalim would expand the y-limits to fill the figure and
+    # squish the data into a tiny band; box-adjust fits it snugly as a wide strip.
+    ax.set_aspect("equal")
 
     # Legend (below the axes, frameless by default) for the flow-net features that
     # were actually drawn — material zones plus phreatic / contour / flow lines —
@@ -616,11 +626,9 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if vectors:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0, marker=r"$\rightarrow$",
                                       markersize=10, label="Velocity"))
-    try:
-        fig.set_constrained_layout(False)
-    except Exception:
-        pass
-    fig.tight_layout()
+    # No tight_layout / engine juggling here — the figure has no layout engine and
+    # the colorbar is a divider axes, so _legend_below sets the margins (top for the
+    # title, bottom for the legend) directly, as on every other plot.
     _legend_below(ax, fig, handles=leg_handles, legend_ncol=legend_ncol, frameon=legend_frame)
 
 

@@ -348,12 +348,12 @@ class SeepDisplayPanel(QWidget):
                                  "(base permeability / number of flow channels).")
 
         self.levels = _ispin(2, 100, 20, step=5)
-        self.alpha = _dspin(0.0, 1.0, 0.0, 0.05)   # filled contours transparent by default
+        self.alpha = _dspin(0.0, 1.0, 0.85, 0.05)   # contour-fill wash opacity
         self.vector_scale = _dspin(0.001, 10.0, 0.05, 0.01, decimals=3)
         self.pad_frac = _dspin(0.0, 1.0, 0.05, 0.01)
         self.cmap = _make_cmap_combo("Spectral_r")
         self.cmap.setToolTip("Color ramp for the filled contours.")
-        self.cbar_size = _dspin(0.1, 1.0, 0.8, 0.05)
+        self.cbar_size = _dspin(0.1, 1.0, 1.0, 0.05)
         self.cbar_size.setToolTip("Length of the color-ramp legend (colorbar) as "
                                   "a fraction of the plot height.")
 

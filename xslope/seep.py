@@ -2898,10 +2898,10 @@ def quad9_stiffness_matrix_kr(nodes_elem, Kmat, p_elem_nodes, kr0, h0, mode='hea
     return factor * ke
 
 
-def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
+def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     """
     Standalone function to run seep analysis.
-    
+
     Args:
         seep_data: Dictionary containing all the seep data
         tol: relative head-change tolerance (scaled by domain height)
@@ -2909,6 +2909,8 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
             iteration continues until |net inflow - net outflow| / inflow is
             below this, so the reported flowrate balances regardless of how
             the head tolerance maps to mass balance on a given problem
+        max_iter: iteration cap for the unconfined (exit-face) solver; raise it
+            when a hard problem reports non-convergence near the cap
     
     Returns:
         Dictionary containing solution results with the following keys:
@@ -2996,6 +2998,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3):
             angles=angle,
             element_types=element_types,
             tol=tol,
+            max_iter=max_iter,
             closure_tol=closure_tol,
             vg_a=vg_a_per_element,
             vg_n=vg_n_per_element,

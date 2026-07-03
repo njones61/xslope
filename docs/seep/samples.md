@@ -55,7 +55,7 @@ The following diagram illustrates a simple earth dam with a clay core and a gran
 ![earth_dam1.png](images/earth_dam1.png)
 
 This problem requires an upstream head BC, a small downstream head BC, and a downstream exit face BC from the crest 
-of the dam down to the tailwater. To build the input file, the following list of coordinates can be used:
+of the dam down to the tailwater. The conductivities used in the input file are: shell k1 = 56, k2 = 18; core k1 = 4.5, k2 = 1.8 (ft/yr — the sketch's "46 m/yr" shell label is superseded by these values). To build the input file, the following list of coordinates can be used:
 
 ![earth_dam1_pts.png](images/earth_dam1_pts.png)
 
@@ -152,7 +152,9 @@ The material properties of the soil layers are as follows:
 | Grout Curtain |    0.2     |    0.2     |    0       |   0.001 | -1 |
 |  Foundation   |     2      |     1      |    0       |   0.001 | -1 |
 
-The coordinate geometry is shown here:
+The coordinate geometry is shown here (the foundation spans elevations 0 to 10, and the
+grout curtain extends the full foundation depth — the coordinates labeled along the bottom
+edge are at elevation 0):
 
 ![levee_coords.png](images/levee_coords.png)
 

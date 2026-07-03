@@ -230,6 +230,10 @@ depth) is 10 ft below the top of the bottom material.
 
 ![eight_layers.png](sample_images/eight_layers.png){width=900}
 
+In the input file, the slope face rises 20 ft over a 45-ft run (2.25H:1V), and the water
+table / piezometric line is horizontal at 2 ft below the toe-level ground surface
+(elevation −2, inside the top foundation layer).
+
 To find the critical surface and the global minimum factor of safety, we must use a circle starting at the base of 
 each layer. The following Excel input file illustrates the problem.
 
@@ -385,8 +389,8 @@ at Austin.
 
 ![reinforce.png](sample_images/reinforce.png){width=900}
 
-A 240 psf surcharge is applied along the slope crest. For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds
-to (0, 0) and the top of the slope corresponds to (30, 24). 
+A 240 psf surcharge is applied along the slope crest from x = 30 to x = 100. For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds
+to (0, 0) and the top of the slope corresponds to (30, 24). The six reinforcement lines are horizontal at elevations y = 0, 4, 8, 12, 16, and 20 ft (the lowest at the toe elevation); each starts on the slope face and is 20 ft long. 
 
 The following Excel input file illustrates the problem. The soil reinforcement is entered in the "reinforce" sheet.
 

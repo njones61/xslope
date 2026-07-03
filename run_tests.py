@@ -46,6 +46,10 @@ matplotlib.use('Agg')  # non-interactive backend — no plot windows
 # second piezo line, reliability sigmas, and seepage BCs (both sets).
 ROUNDTRIP_TEMPLATE = 'docs/inputs/input_template.xlsx'   # editable master (docs link)
 BUNDLED_TEMPLATE = 'xslope/resources/input_template.xlsx'  # copy shipped in the wheel
+# The /xslope skill body: docs master + the copy shipped in the wheel (used by the
+# Studio assistant on pip installs, where docs/ is absent). Must stay byte-identical.
+SKILL_MASTER = 'docs/usage/claude/xslope.md'
+BUNDLED_SKILL = 'xslope/resources/xslope_skill.md'
 ROUNDTRIP_FILES = [
     'docs/inputs/slope/xslope_simple1.xlsx',
     'docs/inputs/slope/xslope_dam.xlsx',
@@ -419,20 +423,22 @@ def run_roundtrip_test(test):
 
 
 def run_template_sync_test(test):
-    """Verify the template copy shipped in the wheel (xslope/resources) is
-    byte-identical to the editable docs master, so the two can't silently drift
-    when the master is tweaked.
+    """Verify a copy shipped in the wheel (xslope/resources) is byte-identical to
+    its editable docs master, so the two can't silently drift when the master is
+    tweaked. test['master']/test['copy'] name the pair (defaults: input template).
 
     Returns (0.0, None) if identical, else (None, message).
     """
     import filecmp
-    if not os.path.exists(ROUNDTRIP_TEMPLATE):
-        return None, f"master template missing: {ROUNDTRIP_TEMPLATE}"
-    if not os.path.exists(BUNDLED_TEMPLATE):
-        return None, f"packaged template missing: {BUNDLED_TEMPLATE}"
-    if not filecmp.cmp(ROUNDTRIP_TEMPLATE, BUNDLED_TEMPLATE, shallow=False):
-        return None, (f"packaged template differs from master — run: "
-                      f"cp {ROUNDTRIP_TEMPLATE} {BUNDLED_TEMPLATE}")
+    master = test.get('master', ROUNDTRIP_TEMPLATE)
+    copy = test.get('copy', BUNDLED_TEMPLATE)
+    if not os.path.exists(master):
+        return None, f"master file missing: {master}"
+    if not os.path.exists(copy):
+        return None, f"packaged copy missing: {copy}"
+    if not filecmp.cmp(master, copy, shallow=False):
+        return None, (f"packaged copy differs from master — run: "
+                      f"cp {master} {copy}")
     return 0.0, None
 
 
@@ -743,10 +749,13 @@ def main():
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.
     if run_roundtrip:
-        # Guard that the packaged template (shipped in the wheel) hasn't drifted
-        # from the editable docs master.
+        # Guard that the packaged copies (shipped in the wheel) haven't drifted
+        # from their editable docs masters.
         tests.append({'type': 'template_sync', 'file': BUNDLED_TEMPLATE,
                       'method': '-', 'source': 'template'})
+        tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
+                      'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
+                      'method': '-', 'source': 'skill'})
         if Path(ROUNDTRIP_TEMPLATE).exists():
             n_rt = 0
             for fp in ROUNDTRIP_FILES:

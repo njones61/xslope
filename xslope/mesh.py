@@ -1057,6 +1057,17 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             print(f"Converting linear {base_element_type} mesh to quadratic {element_type}")
         mesh = convert_linear_to_quadratic_mesh(mesh, element_type, debug=debug)
 
+    # An empty mesh means gmsh failed to recover the geometry (e.g. a constraint
+    # line without matching polygon vertices). Fail loudly here — downstream the
+    # symptom is a cryptic singular-matrix error in the solver.
+    if len(mesh.get("elements", [])) == 0:
+        raise ValueError(
+            "Mesh generation produced 0 elements — gmsh could not recover the "
+            "geometry. Check that material zones tile the section without gaps "
+            "and that reinforcement/pile lines have their intersection points "
+            "inserted into the zone boundaries (get_material_polygons(slope_data, "
+            "reinf_lines=...) does this automatically).")
+
     return mesh
 
 
@@ -1924,6 +1935,11 @@ def get_material_polygons(slope_data, reinf_lines=None):
             {'coords': list(p['polygon'].exterior.coords), 'mat_id': p['mat_id']}
             for p in (slope_data.get('polygons') or [])
         ]
+        # Polygon-sheet input skips build_polygons, so the reinforcement/pile
+        # vertex integration must happen here too — otherwise gmsh cannot recover
+        # the constraint-line edges and silently produces an empty mesh.
+        if reinf_lines:
+            polygons = add_intersection_points_to_polygons(polygons, reinf_lines)
     return add_dload_points_to_polygons(polygons, slope_data)
 
 

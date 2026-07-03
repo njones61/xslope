@@ -235,6 +235,34 @@ def _parse_polygon_sheet(xls, materials):
     return polygons
 
 
+def _validate_polygons_no_overlap(polygons):
+    """Material zones must tile the section without overlapping — adjacent zones
+    share matching edges; a zone is never drawn on top of another. Overlapping
+    zones mesh incorrectly (a high-conductivity zone bridges over a low-
+    conductivity barrier and can inflate the seepage flowrate several-fold), so
+    reject them at load time instead of silently producing wrong results.
+
+    Touching at shared edges/vertices is fine (zero overlap area); only a positive
+    intersection area is an error.
+    """
+    tol = 1e-6
+    for i in range(len(polygons)):
+        pi = polygons[i]['polygon']
+        for j in range(i + 1, len(polygons)):
+            area = pi.intersection(polygons[j]['polygon']).area
+            if area > tol:
+                mi, mj = polygons[i].get('mat_id'), polygons[j].get('mat_id')
+                m1 = mi + 1 if mi is not None else '?'
+                m2 = mj + 1 if mj is not None else '?'
+                raise ValueError(
+                    f"Material zones overlap: polygon #{i + 1} (Mat ID {m1}) and "
+                    f"polygon #{j + 1} (Mat ID {m2}) overlap by {area:.4g} sq units. "
+                    f"Material zones must tile the section without overlapping — adjacent "
+                    f"zones share matching edges, and a zone that sits inside or cuts "
+                    f"through another (a lens, or a dam core) must be carved out of its "
+                    f"neighbor (e.g. a shell around a core is one concave polygon with a "
+                    f"notch), not drawn on top of it.")
+
 
 def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area):
     """Build the LEM tension-distribution point list for ONE reinforcement line
@@ -539,6 +567,7 @@ def load_slope_data(filepath):
             raise ValueError(
                 "Both the 'profile' and 'polygon' sheets contain data. Use one "
                 "geometry method, not both.")
+        _validate_polygons_no_overlap(polygons_from_sheet)
         polygons = polygons_from_sheet
         # max_depth is a profile-sheet concept; it has no meaning for polygon input.
         max_depth = None

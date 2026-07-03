@@ -92,21 +92,23 @@ skill has the full detail.
 # cheap. Local/other models get the compact prompt above and introspect at
 # runtime (sending ~13k tokens of skill every turn makes a local model crawl).
 _SKILL_HEADER = ("\n\n---\n\nReference — the `slope_data` schema and engine API "
-                 "(ground truth for keys and signatures; it was written for a "
-                 "file-based workflow, so favor the in-memory document over its "
-                 ".xlsx-writing patterns):\n\n")
+                 "(ground truth for keys and signatures; it builds the same "
+                 "in-memory `slope_data` dict you edit here, so reuse its schema "
+                 "and geometry knowledge — only skip its final file-save step):\n\n")
 
 # Appended AFTER the skill body so it is the last thing the model reads. The
-# standalone skill is written end-to-end around authoring an .xlsx input file;
-# without this override the model parrots its "build the input file" workflow
-# (creating/writing a spreadsheet) instead of editing the live document.
+# standalone skill builds the in-memory `slope_data` dict (exactly what we want)
+# and then persists it with save_slope_data_to_xlsx. Inside Studio the project is
+# already open and the user saves via Save As, so we override only that final
+# file-save — the dict-building core carries over unchanged.
 _SKILL_TRAILER = """\
 
 ---
 
 CRITICAL — you are inside XSlope Studio, NOT the standalone file-based skill. The \
-reference above describes a workflow that creates and writes an .xlsx input file. \
-That workflow does NOT apply here. Override it:
+reference above builds the in-memory `slope_data` dict (which is exactly right) and \
+then SAVES it to an .xlsx. Reuse everything about constructing the dict; override \
+only the save:
 - There is ALREADY an open project. Build and edit it by mutating the in-memory \
 `slope_data` dict in `run_python`. The canvas re-renders automatically.
 - NEVER create, open, write, or save an .xlsx (or any) file. Do not call \
@@ -206,6 +208,17 @@ Modeling rules (slope-stability physics):
   for total-stress phi=0 (`u='none'`); never skip it. A water table is the inverted-
   triangle (▽) symbol (may sit above the crest = submerged); ask if its level/extent
   is unclear rather than guessing.
+- Reading sketches: attribute every dimension arrow to the right feature — a dimension
+  near a water-table line usually measures the LAYER thickness, not the WT depth
+  (cross-check that thicknesses sum to the section depth); if the WT elevation stays
+  ambiguous, ask. Reinforcement drawn as "N layers spaced s vertically" means bottom
+  layer AT the toe/base elevation (y = 0, s, ..., (N-1)s), each line starting ON the
+  slope face with length = the labeled dimension from the face; ask if unclear.
+- Method expectations: for phi=0 soils, OMS = Bishop ~= Spencer (identical FS is
+  normal, not a bug). OMS is unreliable on submerged/high-pore-pressure slopes and
+  most prone to a different search minimum — trust Spencer/Bishop there.
+- FEM/SSRM domains follow the same extent rule as LEM (flats >= ~2x slope height,
+  plus foundation depth below the toe); a domain cropped at the toe inflates FS.
 """
 
 
@@ -345,14 +358,22 @@ def _assistant_edit_label(changed_keys):
 
 
 def _load_skill_text():
-    """The /xslope skill body (schema + API knowledge), best-effort. Repo-bound
-    for now; packaging it travels with §14.5."""
+    """The /xslope skill body (schema + API knowledge), best-effort. The docs file
+    is the editable master (fresh in a repo checkout); the copy shipped as package
+    data (xslope/resources/xslope_skill.md) covers pip installs where docs/ is
+    absent. A run_tests.py sync check keeps the two identical."""
     import os
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     path = os.path.join(here, "docs", "usage", "claude", "xslope.md")
     try:
         with open(path, encoding="utf-8") as f:
             return f.read()
+    except Exception:
+        pass
+    try:
+        from importlib import resources
+        return (resources.files("xslope") / "resources" / "xslope_skill.md").read_text(
+            encoding="utf-8")
     except Exception:
         return ""
 

@@ -1270,9 +1270,11 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     filepath : str
         Destination ``.xlsx`` path.
     template : str, optional
-        Path to a blank XSLOPE template. If given, it is copied to ``filepath``
-        first — use this for "New" or "Save As" from the standard template. If
-        ``None``, ``filepath`` must already exist and is edited in place ("Save").
+        Path to a blank XSLOPE template to copy before writing (e.g. "Save As" from
+        a chosen file). If ``None`` (the default, and the normal "Save"), the current
+        standard template from :func:`default_template_path` is used. Either way the
+        destination is written from a fresh, data-free template, so ``filepath`` need
+        not exist and no stale rows can survive from a previous version of the file.
 
     Returns
     -------
@@ -1294,23 +1296,18 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     ``theta`` (``qp``) column is left blank because the loader auto-derives it
     from the pile endpoints.
     """
-    # In-place save onto an older-format file that lacks a column this model needs
-    # (e.g. a pre-v11 file with a van Genuchten material) would silently drop the
-    # data. Upgrade the file through the current template instead — save rebuilds
-    # every input category from slope_data, so the result is faithful and current.
-    if template is None and os.path.exists(filepath) and \
-            _inplace_save_would_drop(filepath, slope_data.get('materials', [])):
+    # Always write into a FRESH copy of the standard template rather than editing the
+    # destination in place. The template carries no data — only structural helpers the
+    # loader ignores (index numbers in column A, dropdown reference lists) — so every
+    # save rebuilds each input category from slope_data on a clean sheet. This is
+    # robust by construction: a shortened list (a deleted reinforcement line, profile
+    # point, material, …) leaves no stale/orphaned rows behind, and it also auto-
+    # upgrades older files to the current template format. The trade-off is that
+    # user-added custom formulas/formatting in the destination are not preserved.
+    # Callers may pass an explicit `template` (e.g. Save As from a chosen file).
+    if template is None:
         template = default_template_path()
-        print(f"Note: upgrading '{os.path.basename(filepath)}' to the current input-"
-              f"template format (it lacked columns needed by this model, e.g. van "
-              f"Genuchten unsaturated parameters).")
-
-    if template is not None:
-        shutil.copy(template, filepath)
-    elif not os.path.exists(filepath):
-        raise ValueError(
-            "save_slope_data_to_xlsx: 'filepath' does not exist and no 'template' "
-            "was provided. Pass template=<blank template path> to create a new file.")
+    shutil.copy(template, filepath)
 
     def _f(v):
         return float(v)
@@ -1636,11 +1633,11 @@ def _modify_existing_cell(cell_xml, value):
     if not open_match:
         return cell_xml
     open_tag_attrs = re.sub(r'\s+t="[^"]*"', '', open_match.group(1))
+    # Blank the cell for None / NaN / inf. A numeric cell holding "nan" in particular
+    # makes openpyxl's reader raise int('nan') on the next load (silent corruption).
+    if value is None or (isinstance(value, float) and not np.isfinite(value)):
+        return f'{open_tag_attrs}/>'
     if isinstance(value, float):
-        # NaN / inf must be written as an EMPTY cell (keeping ref + style): a numeric
-        # cell holding "nan" makes openpyxl's reader raise int('nan') on the next load.
-        if not np.isfinite(value):
-            return f'{open_tag_attrs}/>'
         value = round(value, 10)
     if isinstance(value, str):
         return f'{open_tag_attrs} t="inlineStr"><is><t>{value}</t></is></c>'
@@ -1649,9 +1646,9 @@ def _modify_existing_cell(cell_xml, value):
 
 
 def _build_new_cell(ref, value):
+    if value is None or (isinstance(value, float) and not np.isfinite(value)):
+        return f'<c r="{ref}"/>'          # blank cell (None / NaN / inf)
     if isinstance(value, float):
-        if not np.isfinite(value):        # NaN / inf -> blank cell (see above)
-            return f'<c r="{ref}"/>'
         value = round(value, 10)
     if isinstance(value, str):
         return f'<c r="{ref}" t="inlineStr"><is><t>{value}</t></is></c>'

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import traceback
 
@@ -48,6 +49,16 @@ TEMPLATE = default_template_path()
 CATEGORY_ROLE = Qt.UserRole + 1
 
 
+# Color-emoji markers (🔁 ✅ ❌ ⚠️ …) render as tall glyphs that stretch the line
+# height of the QPlainTextEdit log — QPlainTextEdit sizes each line to its tallest
+# glyph — so every emoji line looks over-spaced next to plain text. Strip them (plus
+# a trailing space) from the LOG PANE only; the console keeps the emoji. The ranges
+# stay above box-drawing (U+2500–257F), Greek, ±, and Δ so tables/symbols are safe.
+_LOG_EMOJI_RE = re.compile(
+    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF"
+    "\U0000FE00-\U0000FE0F] ?")
+
+
 class _LogStream(QObject):
     """stdout/stderr tee: forwards to the original stream and the log pane.
 
@@ -67,12 +78,12 @@ class _LogStream(QObject):
     def write(self, text):
         if self._original is not None:
             try:
-                self._original.write(text)
+                self._original.write(text)   # console: keep emoji
             except Exception:
                 pass
         text = text.rstrip("\n")
         if text:
-            self._emitted.emit(text)
+            self._emitted.emit(_LOG_EMOJI_RE.sub("", text))   # log pane: strip emoji
 
     def flush(self):
         if self._original is not None:

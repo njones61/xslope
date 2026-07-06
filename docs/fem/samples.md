@@ -238,10 +238,10 @@ gives:
 
 | $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ |
 |----------:|-----------:|--------:|-------------:|----------------:|------:|
-| 1.142     | 0.121      | 0.106   | 1.20         | **88.5%**       | 11.5% |
+| 1.143     | 0.122      | 0.107   | 1.196        | **88.4%**       | 11.6% |
 
 The most-likely factor of safety is only 1.14, so despite the moderate parameter
-scatter the probability of failure is a non-trivial **≈11.5%** — a reminder that a
+scatter the probability of failure is a non-trivial **≈11.6%** — a reminder that a
 factor of safety comfortably above 1.0 does not by itself imply a low failure
 probability.
 
@@ -249,12 +249,12 @@ The per-parameter ΔF table also shows *which* uncertainties matter:
 
 | Parameter        | MLV | σ    | $F^+$ | $F^-$ | ΔF    |
 |------------------|----:|-----:|------:|------:|------:|
-| Embankment $\phi$ |  20 | 2    | 1.234 | 1.053 | 0.181 |
-| Embankment $c$    |  70 | 18   | 1.219 | 1.060 | 0.159 |
-| Embankment $\gamma$ | 130 | 6.5 | 1.128 | 1.158 | 0.030 |
-| Foundation $\phi$ |  20 | 2    | 1.142 | 1.142 | 0.000 |
-| Foundation $c$    | 140 | 35   | 1.142 | 1.142 | 0.000 |
-| Foundation $\gamma$ | 135 | 6.75 | 1.142 | 1.142 | 0.000 |
+| Embankment $\phi$ |  20 | 2    | 1.235 | 1.052 | 0.182 |
+| Embankment $c$    |  70 | 18   | 1.220 | 1.059 | 0.160 |
+| Embankment $\gamma$ | 130 | 6.5 | 1.127 | 1.159 | 0.031 |
+| Foundation $\phi$ |  20 | 2    | 1.143 | 1.143 | 0.000 |
+| Foundation $c$    | 140 | 35   | 1.143 | 1.143 | 0.000 |
+| Foundation $\gamma$ | 135 | 6.75 | 1.143 | 1.143 | 0.000 |
 
 The **foundation's properties have ΔF = 0**: the critical failure mechanism is
 confined to the weaker embankment and never reaches the stronger foundation, so
@@ -263,17 +263,18 @@ embankment's friction angle and cohesion dominate the reliability. This is a
 useful by-product of the Taylor Series method — it exposes each parameter's
 contribution directly.
 
-!!! note "The result depends on the mesh"
+!!! note "The result depends on the mesh — but not on the bracket"
     These numbers are for the tri6 mesh above. A finer or different-element mesh
     gives a slightly different factor of safety and hence reliability — the FEM
     factor of safety converges *downward* toward the LEM value as the mesh refines
-    (this slope: quad8 at target_size 2 → FS ≈ 1.25, matching LEM's 1.244). The
-    reliability index is also sensitive to $F_{MLV}$ at low $COV$, so `reliability_fem`
-    uses a tight bisection tolerance to keep the result stable and reproducible for
-    a given mesh — see [Numerical precision](reliability.md#numerical-precision-and-reproducibility).
+    (this slope: quad8 at target_size 2 → FS ≈ 1.25, matching LEM's 1.244). For a
+    **fixed mesh**, though, the reliability is fully reproducible: `reliability_fem`
+    runs each SSRM on a fixed global grid, so the result is identical to every
+    decimal regardless of the `F_min`/`F_max` bracket — see
+    [Numerical precision](reliability.md#numerical-precision-and-reproducibility).
 
 <!-- FEM reliability regression (marginally-stable two-layer slope). Slow (13 SSRM solves), so benchmark-gated. -->
-<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.2, tolerance=0.1, element_type=tri6, target_size=2.4, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.196, tolerance=0.1, element_type=tri6, target_size=2.4, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 
 ---

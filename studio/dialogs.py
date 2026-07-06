@@ -39,7 +39,7 @@ MESH_ELEMENT_TYPES = [
 
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)"),
-                      ("reliability", "Reliability (SSRM)")]
+                      ("reliability", "Reliability")]
 FEM_FAILURE_CRITERIA = [
     ("non_convergence", "Non-convergence"),
     ("displacement_limit", "Displacement limit"),

@@ -1106,7 +1106,8 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
         self._show_mesh(mesh)
         self._render()                       # mesh now appears in the Inputs view
-        n1d = len(mesh.get("elements_1d", []) or [])
+        e1d = mesh.get("elements_1d")            # a numpy array when present;
+        n1d = len(e1d) if e1d is not None else 0  # `array or []` raises (ambiguous truth)
         self.statusBar().showMessage(
             f"Mesh built — {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements"
             + (f", {n1d} 1D elements." if n1d else "."))

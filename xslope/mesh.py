@@ -16,6 +16,64 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 
+
+class MeshInputError(ValueError):
+    """Raised for mesh inputs gmsh cannot handle — e.g. a reinforcement/constraint
+    line lying on the domain boundary — so callers can report a clear message
+    instead of a raw gmsh 'Unable to recover edge' crash."""
+    pass
+
+
+def _validate_constraint_lines(lines, polygon_coords):
+    """Reject constraint/reinforcement lines gmsh cannot embed, BEFORE meshing.
+
+    gmsh fails ('Unable to recover the edge …') when an embedded 1D line coincides
+    with a domain boundary edge — e.g. a reinforcement line placed on the base at
+    ``max_depth`` or along the ground surface. Endpoints *touching* the boundary are
+    fine (reinforcement usually starts at the slope face); the line must not *run
+    along* it, and must lie inside the domain. Raises MeshInputError on violation.
+    """
+    if not lines:
+        return
+    from shapely.geometry import Polygon as _Poly, LineString as _LS
+    from shapely.ops import unary_union
+
+    polys = []
+    for coords in polygon_coords:
+        if coords and len(coords) >= 3:
+            try:
+                p = _Poly(coords)
+                if not p.is_valid:
+                    p = p.buffer(0)
+                if not p.is_empty:
+                    polys.append(p)
+            except Exception:
+                pass
+    if not polys:
+        return
+    domain = unary_union(polys)
+    boundary = domain.boundary
+    minx, miny, maxx, maxy = domain.bounds
+    tol = max(maxx - minx, maxy - miny) * 1e-6 + 1e-9
+
+    for idx, line in enumerate(lines):
+        if not line or len(line) < 2:
+            continue
+        ls = _LS(line)
+        if not ls.within(domain.buffer(tol)):
+            raise MeshInputError(
+                f"Reinforcement/constraint line {idx + 1} extends outside the mesh "
+                f"domain. Constraint lines must lie inside the slope cross-section.")
+        overlap = ls.intersection(boundary)
+        if getattr(overlap, "length", 0.0) > tol:
+            raise MeshInputError(
+                f"Reinforcement/constraint line {idx + 1} runs along the domain "
+                f"boundary (e.g. the base at max_depth or the ground surface). "
+                f"Reinforcement lines must be in the INTERIOR of the section — move "
+                f"it just inside the boundary. gmsh cannot embed a 1D line that "
+                f"coincides with a domain boundary edge.")
+
+
 # Lazy import gmsh - only needed for mesh generation functions
 _gmsh = None
 def _get_gmsh():
@@ -225,6 +283,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     # Make adjacent zones conforming: split any edge at a neighbour's vertex that
     # lies in its interior (a T-junction), so shared interfaces mesh without slits.
     make_polygons_conforming(polygon_coords, debug=debug)
+
+    # Reject constraint/reinforcement lines gmsh can't embed (on the boundary /
+    # outside the domain) up front, with a clear message instead of a gmsh crash.
+    if lines:
+        _validate_constraint_lines(lines, polygon_coords)
 
     # Build a list of region ids (list of material IDs - one per polygon)
     if any(mat_id is not None for mat_id in polygon_mat_ids):

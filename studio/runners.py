@@ -31,7 +31,7 @@ class MeshWorker(QObject):
 
     def build(self, slope_data, options):
         from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                                 extract_constraint_line_geometry)
+                                 extract_constraint_line_geometry, MeshInputError)
         try:
             sd = slope_data
             element_type = options["element_type"]
@@ -54,6 +54,9 @@ class MeshWorker(QObject):
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "
                   f"elements" + (f", {n1d} 1D elements" if n1d else "") + ".")
             self.succeeded.emit(mesh)
+        except MeshInputError as e:
+            print(f"Mesh input error: {e}")
+            self.failed.emit(str(e))
         except Exception:
             traceback.print_exc()
             self.failed.emit("Mesh build failed — see the Log pane for details.")

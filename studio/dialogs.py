@@ -38,7 +38,8 @@ MESH_ELEMENT_TYPES = [
 ]
 
 
-FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
+FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)"),
+                      ("reliability", "Reliability (SSRM)")]
 FEM_FAILURE_CRITERIA = [
     ("non_convergence", "Non-convergence"),
     ("displacement_limit", "Displacement limit"),
@@ -100,8 +101,10 @@ class RunFemDialog(QDialog):
         form.addRow("Failure criterion", self.failure_criterion)
 
         layout.addLayout(form)
-        note = QLabel("Plot type and deformation scale are set on the FEM Results "
-                      "view after solving.")
+        note = QLabel("Reliability uses the SSRM bracket above and the material "
+                      "standard deviations (sigma columns) from the mat sheet; it "
+                      "runs 1+2N SSRM solves. Plot type and deformation scale are "
+                      "set on the FEM Results view after solving.")
         note.setWordWrap(True)
         layout.addWidget(note)
 

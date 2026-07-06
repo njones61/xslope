@@ -1163,7 +1163,8 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_fem_opts = opts
-        is_ssrm = opts["analysis"] == "ssrm"
+        # SSRM and reliability (a series of SSRM solves) both support cooperative cancel.
+        supports_cancel = opts["analysis"] in ("ssrm", "reliability")
         self.statusBar().showMessage("Running FEM …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -1173,7 +1174,7 @@ class MainWindow(QMainWindow):
         self._fem_runner.cancelled.connect(self._on_fem_cancelled)
         self._fem_runner.progress.connect(self._on_run_progress)
         self._fem_runner.finished.connect(self._on_fem_finished)
-        if is_ssrm:                     # only SSRM supports cooperative cancel
+        if supports_cancel:
             self.cancel_btn.setEnabled(True)
             self.cancel_btn.setVisible(True)
         self._update_run_actions()
@@ -1197,7 +1198,23 @@ class MainWindow(QMainWindow):
         self._show_fem_results()
         if self.fem_results_canvas is not None:
             self.view_tabs.setCurrentWidget(self.fem_results_canvas)
-        if bundle.get("FS") is not None:
+        if bundle.get("analysis") == "reliability" and bundle.get("reliability"):
+            r = bundle["reliability"]
+            self.statusBar().showMessage(
+                f"FEM reliability done — F_MLV = {r['F_MLV']:.3f}, "
+                f"reliability = {r['reliability'] * 100:.2f}%, "
+                f"Pf = {r['prob_failure'] * 100:.2f}%")
+            QMessageBox.information(
+                self, "FEM Reliability",
+                f"F_MLV = {r['F_MLV']:.3f}\n"
+                f"σ_F = {r['sigma_F']:.3f}\n"
+                f"COV_F = {r['COV_F']:.3f}\n"
+                f"β (lognormal) = {r['beta_ln']:.3f}\n"
+                f"Reliability = {r['reliability'] * 100:.2f}%\n"
+                f"Probability of failure = {r['prob_failure'] * 100:.2f}%\n\n"
+                "The per-parameter ΔF table is in the Log pane; the FEM Results "
+                "view shows the deformation at the most-likely values.")
+        elif bundle.get("FS") is not None:
             self.statusBar().showMessage(f"FEM done — SSRM FS = {bundle['FS']:.3f}")
         else:
             conv = bundle["solution"].get("converged")

@@ -85,6 +85,15 @@ the analysis stops with an error).
 
 ## Usage
 
+In **XSLOPE Studio**, build a mesh, then choose **Run FEM → Analysis: Reliability
+(SSRM)**. It uses the same SSRM bracket (`F min`/`F max`, auto-expanding) and the
+material standard deviations from the mat sheet. The FEM Results view shows the
+deformation at the most-likely values, the reliability summary appears in a
+dialog and the status bar, and the full per-parameter ΔF table is written to the
+Log pane.
+
+From Python:
+
 ```python
 from xslope.fileio import load_slope_data
 from xslope.advanced import reliability_fem

@@ -49,14 +49,14 @@ TEMPLATE = default_template_path()
 CATEGORY_ROLE = Qt.UserRole + 1
 
 
-# Color-emoji markers (🔁 ✅ ❌ ⚠️ …) render as tall glyphs that stretch the line
-# height of the QPlainTextEdit log — QPlainTextEdit sizes each line to its tallest
-# glyph — so every emoji line looks over-spaced next to plain text. Strip them (plus
-# a trailing space) from the LOG PANE only; the console keeps the emoji. The ranges
-# stay above box-drawing (U+2500–257F), Greek, ±, and Δ so tables/symbols are safe.
+# Runs of color-emoji (🔁 ✅ ❌ ⚠️ …). QPlainTextEdit sizes each line to its tallest
+# glyph, and Apple Color Emoji is taller than the monospace text, so an emoji line
+# gets stretched. We keep the emoji but render them a bit SMALLER in the log so they
+# fit the text line height (see _append_log_line). The ranges stay above box-drawing
+# (U+2500–257F), Greek, ±, and Δ so the reliability table and math symbols are safe.
 _LOG_EMOJI_RE = re.compile(
     "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF"
-    "\U0000FE00-\U0000FE0F] ?")
+    "\U0000FE00-\U0000FE0F]+")
 
 
 class _LogStream(QObject):
@@ -69,21 +69,21 @@ class _LogStream(QObject):
 
     _emitted = Signal(str)
 
-    def __init__(self, widget, original):
+    def __init__(self, append_slot, original):
         super().__init__()
         self._original = original
-        # Queued so a worker-thread write() appends on the widget's (GUI) thread.
-        self._emitted.connect(widget.appendPlainText, Qt.QueuedConnection)
+        # Queued so a worker-thread write() appends on the slot's (GUI) thread.
+        self._emitted.connect(append_slot, Qt.QueuedConnection)
 
     def write(self, text):
         if self._original is not None:
             try:
-                self._original.write(text)   # console: keep emoji
+                self._original.write(text)
             except Exception:
                 pass
         text = text.rstrip("\n")
         if text:
-            self._emitted.emit(_LOG_EMOJI_RE.sub("", text))   # log pane: strip emoji
+            self._emitted.emit(text)
 
     def flush(self):
         if self._original is not None:
@@ -349,8 +349,35 @@ class MainWindow(QMainWindow):
         self._populate_inputs_tree()
 
     def _install_log_capture(self):
-        sys.stdout = _LogStream(self.log, sys.__stdout__)
-        sys.stderr = _LogStream(self.log, sys.__stderr__)
+        sys.stdout = _LogStream(self._append_log_line, sys.__stdout__)
+        sys.stderr = _LogStream(self._append_log_line, sys.__stderr__)
+
+    def _append_log_line(self, text):
+        """Append one line to the Log pane, rendering any color-emoji markers a bit
+        smaller than the text so their tall glyphs don't stretch the line height
+        (QPlainTextEdit sizes each line to its tallest glyph). Plain lines (no emoji)
+        are a single normal-size insert. Autoscrolls only when already at the bottom.
+        """
+        from PySide6.QtGui import QTextCursor, QTextCharFormat
+        log = self.log
+        sb = log.verticalScrollBar()
+        at_bottom = sb.value() >= sb.maximum() - 4
+        base_pt = self._log_font.pointSize()
+        normal = QTextCharFormat(); normal.setFontPointSize(base_pt)
+        small = QTextCharFormat(); small.setFontPointSize(max(1, round(base_pt * 0.8)))
+        cur = log.textCursor()
+        cur.movePosition(QTextCursor.End)
+        if cur.position() > 0:                      # new line unless the doc is empty
+            cur.insertBlock()
+        pos = 0
+        for m in _LOG_EMOJI_RE.finditer(text):
+            if m.start() > pos:
+                cur.insertText(text[pos:m.start()], normal)
+            cur.insertText(m.group(), small)        # emoji: shrunk to fit the line
+            pos = m.end()
+        cur.insertText(text[pos:], normal)
+        if at_bottom:
+            sb.setValue(sb.maximum())
 
     # --- actions / menus -------------------------------------------------
     def _make_actions(self):

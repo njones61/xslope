@@ -648,15 +648,38 @@ class MainWindow(QMainWindow):
             f"Click an underlined input to edit it.")
 
     def _default_mode(self):
-        """Pick the mode that fits the loaded file: FEM if a mesh and a restored
-        FEM solution are present; Seep if the materials carry only seepage
-        properties (conductivity, no strength); otherwise LEM."""
+        """Pick the mode that fits the loaded file. In priority order: FEM if a mesh
+        and a restored FEM solution are present; Seep if the materials carry only
+        seepage properties (conductivity, no strength); FEM if a mesh is present and
+        the materials define the elastic properties FEM needs (E, nu) — the mesh is
+        there for a stress analysis, not for seepage pore pressures; otherwise LEM."""
         sd = self.doc.slope_data
-        if sd.get("mesh") is not None and "fem_solution" in self.doc.results:
+        has_mesh = sd.get("mesh") is not None
+        materials = sd.get("materials", [])
+        if has_mesh and "fem_solution" in self.doc.results:
             return "fem"
-        if self._materials_seep_only(sd.get("materials", [])):
+        if self._materials_seep_only(materials):
             return "seep"
+        if has_mesh and self._materials_fem_ready(materials):
+            return "fem"
         return "lem"
+
+    @staticmethod
+    def _materials_fem_ready(materials):
+        """True when every material carries the elastic properties an FEM stress
+        analysis needs — Young's modulus E > 0 (fileio defaults E to 0 when blank,
+        so a non-zero E on all materials means FEM was deliberately set up). This is
+        the same precondition build_fem_data enforces, so it flags a file that is
+        ready to run FEM rather than one that merely has a mesh for seepage."""
+        def num(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return 0.0
+
+        if not materials:
+            return False
+        return all(num(m.get("E")) > 0 for m in materials)
 
     @staticmethod
     def _materials_seep_only(materials):

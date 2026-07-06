@@ -33,6 +33,25 @@ The [auto-expanding SSRM bracket](overview.md) is what makes this practical:
 each perturbation shifts the factor of safety, and the bracket adjusts itself so a
 fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 
+### Numerical precision and reproducibility
+
+Each SSRM factor of safety is the midpoint of the final bisection band, so it
+carries a $\pm\text{tolerance}/2$ imprecision. The reliability index amplifies
+this: $\dfrac{d\beta}{dF} = \dfrac{1}{F\sqrt{\ln(1+COV_F^2)}}$, which is $\approx 9$
+at $COV_F = 0.1$ — so a small change in $F_{MLV}$ produces a proportionally larger
+change in $\beta$ and the reliability. Because TSPM combines $1+2N$ of these
+factors of safety, `reliability_fem` runs a **tighter bisection tolerance by
+default (0.002)** than a single SSRM solve (0.01), and centres the perturbation
+brackets narrowly on $F_{MLV}$, so each factor of safety converges and the
+reported reliability is stable and reproducible (independent of the starting
+`F_min`/`F_max`).
+
+Two things still legitimately change the result and are **not** numerical noise:
+the **mesh** (a finer or different-element mesh gives a slightly different factor
+of safety, as with any FE analysis — use a converged mesh and report which one),
+and genuinely larger parameter uncertainty (a higher $COV_F$ both lowers the
+reliability and *reduces* the $\beta$ sensitivity above).
+
 ## Which parameters are perturbed
 
 The FEM reliability perturbs the **same strength parameters as the LEM
@@ -86,11 +105,13 @@ the analysis stops with an error).
 ## Usage
 
 In **XSLOPE Studio**, build a mesh, then choose **Run FEM → Analysis: Reliability
-(SSRM)**. It uses the same SSRM bracket (`F min`/`F max`, auto-expanding) and the
-material standard deviations from the mat sheet. The FEM Results view shows the
-deformation at the most-likely values, the reliability summary appears in a
-dialog and the status bar, and the full per-parameter ΔF table is written to the
-Log pane.
+(SSRM)**. It uses the `F min`/`F max` bracket from the dialog (auto-expanding) and
+the material standard deviations from the mat sheet; the bisection tolerance,
+however, is set internally to the tight reliability default (not the dialog's
+single-run *Tolerance* field — see [Numerical precision](#numerical-precision-and-reproducibility)).
+The FEM Results view shows the deformation at the most-likely values, the
+reliability summary appears in a dialog and the status bar, and the full
+per-parameter ΔF table is written to the Log pane.
 
 From Python:
 
@@ -104,12 +125,10 @@ success, result = reliability_fem(
     element_type="quad8",   # quadratic elements (tri6/quad8/quad9); see Overview
     target_size=3.5,        # omit to auto-size from the domain width
     F_min=1.0, F_max=2.0,   # starting bracket; auto-expands if the guess is off
+    # tolerance defaults to a tight 0.002 here (see Numerical precision above)
 )
-if success:
-    print(f"F_MLV = {result['F_MLV']:.3f}")
-    print(f"COV_F = {result['COV_F']:.3f}")
-    print(f"Reliability = {result['reliability']*100:.2f}%")
-    print(f"Probability of failure = {result['prob_failure']*100:.2f}%")
+# reliability_fem already prints the per-parameter ΔF table and the summary
+# (F_MLV, COV_F, beta, reliability, Pf); all of these are also in `result`.
 ```
 
 `reliability_fem` returns the same reliability keys as the LEM `reliability`
@@ -118,4 +137,6 @@ function (`F_MLV`, `sigma_F`, `COV_F`, `beta_ln`, `reliability`, `prob_failure`,
 the `mesh` used for every trial. Building the mesh is the same as for a single
 SSRM run: it is built here from the geometry (or an attached `slope_data['mesh']`
 / a `mesh=` argument is reused), and all $1 + 2N$ trials share it so the only
-thing that changes between trials is the perturbed material property.
+thing that changes between trials is the perturbed material property. Because the
+factor of safety — and hence the reliability — depends on the mesh, report the
+element type and size used for a given result.

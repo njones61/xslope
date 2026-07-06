@@ -150,9 +150,12 @@ class FemRunner(QThread):
 
                 print(f"Running FEM reliability (SSRM, F in "
                       f"[{opts.get('F_min', 1.0):g}, {opts.get('F_max', 2.0):g}])…")
+                # Reliability uses its own tight bisection tolerance (not the
+                # dialog's single-run tolerance): TSPM amplifies FS imprecision, so
+                # a coarse band would make beta/reliability jitter between runs.
                 success, result = reliability_fem(
                     sd, mesh=mesh, F_min=opts.get("F_min", 1.0),
-                    F_max=opts.get("F_max", 2.0), tolerance=opts.get("tolerance", 0.01),
+                    F_max=opts.get("F_max", 2.0),
                     failure_criterion=opts.get("failure_criterion", "non_convergence"),
                     debug_level=1, cancel_check=self._cancel.is_set,
                     progress_callback=rel_cb)

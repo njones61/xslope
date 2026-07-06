@@ -650,7 +650,7 @@ def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug
 
 
 def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='tri6',
-                    target_size=None, tolerance=0.01, failure_criterion='non_convergence',
+                    target_size=None, tolerance=0.002, failure_criterion='non_convergence',
                     max_iterations=3000, debug_level=0, progress_callback=None,
                     cancel_check=None):
     """Reliability analysis (Taylor Series Probability Method) using the FEM SSRM
@@ -660,6 +660,15 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
     then F+/F- for each uncertain strength parameter (± its standard deviation) —
     but each F comes from ``solve_ssrm``. The bracket auto-expands, so the shifted
     perturbation runs bracket robustly without hand-tuned F_min/F_max.
+
+    ``tolerance`` (the SSRM bisection tolerance) defaults TIGHTER here than for a
+    single solve (0.002 vs 0.01). TSPM combines ~1+2N factors of safety, and the
+    reliability index is sensitive to F_MLV when COV_F is small (dβ/dF ≈
+    1/(F·√(ln(1+COV²))), ≈ 9 at COV 0.1). A coarse bisection band (±tolerance/2)
+    would then jitter β/reliability by a couple of percent between runs/brackets;
+    the tight tolerance converges each FS so the result is stable and reproducible.
+    The perturbation solves also use a narrow bracket centred on F_MLV (fast and
+    consistent). Results still depend on the mesh, as with any FE analysis.
 
     Perturbs the same strength parameters as the LEM path (c, phi for mc; c, cp for
     cp; gamma for both). E and nu are NOT perturbed: a sensitivity check shows E has
@@ -726,8 +735,12 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
         print(f"F_MLV = {F_MLV:.4f}")
     _progress(1, total_steps, f"F_MLV = {F_MLV:.3f}")
 
-    # Centre the perturbation brackets on F_MLV to keep the bisection short; the
-    # auto-expansion catches any parameter whose F+/F- lands outside the window.
+    # Centre the perturbation brackets on F_MLV so every bisection stays short. The
+    # window must hold the LARGEST single-parameter F+/F- shift (a dominant, high-COV
+    # parameter can move the FS by ~COV·F ≈ 0.3-0.5), so keep it generous: with the
+    # tight tolerance the width costs only ~1 log2 step either way, but a too-narrow
+    # window would trip the auto-expansion. The expansion is still a safety net for
+    # anything beyond this.
     fmin_p = max(0.1, F_MLV - 0.5)
     fmax_p = F_MLV + 0.5
 

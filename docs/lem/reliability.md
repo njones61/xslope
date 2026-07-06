@@ -10,6 +10,13 @@ where:
 > $P_f$ = the probability of failure
 
 
+!!! note "FEM-based reliability"
+    The same method is also available with the finite-element SSRM solver, which
+    computes each factor of safety by strength reduction instead of a limit-
+    equilibrium search — see [Reliability Analysis (FEM)](../fem/reliability.md).
+    The theory below (parameter uncertainty, the Taylor Series method, and the
+    reliability equations) applies to both.
+
 In reliability analysis, we consider the uncertainties in the parameters that affect the stability of the slope. These uncertainties can arise from various sources, such as variations in soil properties, loading conditions, and environmental factors. By incorporating these uncertainties into our analysis, we can obtain a more comprehensive understanding of the slope's stability. The **xslope** package provides a function to calculate the reliability of a slope using the limit equilibrium method. This function takes into account the uncertainties in the soil properties ($\gamma$, $c$, $\phi$, etc.) and provides a probability of failure (Pf) and reliability (R) for the slope. It can be used with any of the limit equilibrium methods implemented in the package, such as Bishop's method, Janbu's method, or Spencer's method. It can also be combined with a rapid drawdown analysis.
 
 ## Parameter Uncertainty

@@ -564,3 +564,198 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
     print(f"\nReliability analysis completed in {elapsed:.2f} seconds.")
 
     return True, result
+
+
+def _reliability_param_info(materials):
+    """Build the list of uncertain strength parameters to perturb for TSPM, shared
+    by the LEM and FEM reliability paths. Perturbs only the parameters a material's
+    strength model uses: 'cp' (undrained Su = c + cp·depth) uses c and cp; 'mc'
+    (Mohr-Coulomb) uses c and phi; gamma applies to both. Returns (param_info,
+    error) — error is a message string if no sigmas are set or a mean-minus-sigma
+    would go negative (non-physical), else None."""
+    has_std = any(
+        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
+        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
+        for m in materials)
+    if not has_std:
+        return None, ("Reliability analysis requires standard deviations for at least one "
+                      "material property (columns L-Q in the mat sheet). None were provided.")
+
+    param_info = []
+    for i, material in enumerate(materials):
+        mat_name = material.get('name', f'Material_{i+1}')
+        if material.get('option') == 'cp':
+            param_mappings = {'gamma': 'sigma_gamma', 'c': 'sigma_c', 'cp': 'sigma_cp'}
+        else:
+            param_mappings = {'gamma': 'sigma_gamma', 'c': 'sigma_c', 'phi': 'sigma_phi'}
+        for param, std_key in param_mappings.items():
+            if std_key in material and material[std_key] > 0:
+                param_info.append({
+                    'material_id': i + 1, 'material_name': mat_name, 'param': param,
+                    'mlv': material[param], 'std': material[std_key]})
+
+    invalid = [p for p in param_info if (p['mlv'] - p['std']) < 0]
+    if invalid:
+        details = "; ".join(
+            f"material {p['material_id']} {p['param']} (mean={p['mlv']:.3g}, sigma={p['std']:.3g})"
+            for p in invalid)
+        return None, ("Reliability: the standard deviation exceeds the mean (COV > 100%) for "
+                      f"{details}. mean - sigma is negative, which is non-physical. Reduce the "
+                      "standard deviation(s) so mean - sigma >= 0.")
+    return param_info, None
+
+
+def _perturbed_slope_data(slope_data, materials, param, sign):
+    """A shallow copy of slope_data whose materials are copied and the one target
+    parameter shifted by ``sign * std`` (sign +1 -> MLV+sigma, -1 -> MLV-sigma)."""
+    sd = slope_data.copy()
+    sd['materials'] = [m.copy() for m in materials]
+    idx = param['material_id'] - 1
+    if idx < len(sd['materials']):
+        sd['materials'][idx][param['param']] = param['mlv'] + sign * param['std']
+    return sd
+
+
+def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug_level=0):
+    """TSPM combination shared by the LEM and FEM paths: sigma_F from the parameter
+    delta_Fs, COV_F, lognormal beta, reliability and probability of failure, plus a
+    printed summary table. Returns a result dict, or an error string."""
+    sigma_F = np.sqrt(sum((df / 2) ** 2 for df in delta_F_values))
+    COV_F = sigma_F / F_MLV if F_MLV else 0.0
+    if COV_F == 0:
+        return "COV_F is zero - no parameter variability"
+    beta_ln = np.log(F_MLV / np.sqrt(1 + COV_F ** 2)) / np.sqrt(np.log(1 + COV_F ** 2))
+    reliability = float(norm.cdf(beta_ln))
+    prob_failure = 1 - reliability
+
+    if debug_level >= 0:
+        print("\n=== RELIABILITY ANALYSIS RESULTS ===")
+        table_data = [[
+            f"Mat {p['material_id']} {p['param']}", f"{p['mlv']:.3f}", f"{p['std']:.3f}",
+            f"{p['mlv'] + p['std']:.3f}", f"{p['mlv'] - p['std']:.3f}",
+            f"{p['F_plus']:.3f}", f"{p['F_minus']:.3f}", f"{p['delta_F']:.3f}"]
+            for p in param_info]
+        headers = ["Parameter", "MLV", "σ", "MLV+σ", "MLV-σ", "F+", "F-", "ΔF"]
+        print(tabulate(table_data, headers=headers, tablefmt="grid",
+                       colalign=["left"] + ["center"] * 7))
+        print(f"\nF_MLV: {F_MLV:.3f}\nσ_F: {sigma_F:.3f}\nCOV_F: {COV_F:.3f}\n"
+              f"β_ln: {beta_ln:.3f}\nReliability: {reliability*100:.2f}%\n"
+              f"Probability of failure: {prob_failure*100:.2f}%")
+
+    return {
+        'method': method_label, 'F_MLV': F_MLV, 'sigma_F': sigma_F, 'COV_F': COV_F,
+        'beta_ln': beta_ln, 'reliability': reliability, 'prob_failure': prob_failure,
+        'param_info': param_info,
+    }
+
+
+def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='tri6',
+                    target_size=None, tolerance=0.01, failure_criterion='non_convergence',
+                    max_iterations=3000, debug_level=0, progress_callback=None,
+                    cancel_check=None):
+    """Reliability analysis (Taylor Series Probability Method) using the FEM SSRM
+    solver for the factor of safety instead of a limit-equilibrium search.
+
+    Same method and math as ``reliability()`` — F_MLV at the most-likely values,
+    then F+/F- for each uncertain strength parameter (± its standard deviation) —
+    but each F comes from ``solve_ssrm``. The bracket auto-expands, so the shifted
+    perturbation runs bracket robustly without hand-tuned F_min/F_max.
+
+    Perturbs the same strength parameters as the LEM path (c, phi for mc; c, cp for
+    cp; gamma for both). E and nu are NOT perturbed: a sensitivity check shows E has
+    no effect on the FS (halving and doubling give an identical FS) and nu only
+    ~1% over its full plausible range (negligible at a realistic sigma).
+
+    All ``1 + 2N`` trials share ONE mesh (built here if not supplied), rebuilding
+    only the material→element mapping per perturbation.
+
+    Returns (success, result) with the same reliability keys as ``reliability()``
+    plus ``mlv_solution`` (the SSRM result at the most-likely values) and ``mesh``.
+    """
+    from .fem import build_fem_data, solve_ssrm
+    from .mesh import (get_material_polygons, build_mesh_from_polygons,
+                       extract_constraint_line_geometry)
+    from .search import _check_cancel
+
+    def _progress(done, total, label):
+        if progress_callback is not None:
+            try:
+                progress_callback(done, total, label)
+            except Exception:
+                pass
+
+    start_time = time.time()
+    materials = slope_data['materials']
+
+    param_info, err = _reliability_param_info(materials)
+    if err:
+        return False, err
+
+    # One mesh for every trial (reuse an attached mesh, else build from geometry
+    # like the FEM solve path). Perturbations rebuild only build_fem_data.
+    if mesh is None:
+        mesh = slope_data.get('mesh')
+    if mesh is None:
+        if target_size is None:
+            xs = [x for x, _ in slope_data['ground_surface'].coords]
+            target_size = (max(xs) - min(xs)) / 100
+        constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+        polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+        mesh = build_mesh_from_polygons(polygons, target_size=target_size,
+                                        element_type=element_type, lines=constraint_lines)
+
+    ssrm_kw = dict(tolerance=tolerance, failure_criterion=failure_criterion,
+                   max_iterations=max_iterations, debug_level=max(0, debug_level - 1))
+
+    def _fs(sd, fmin, fmax):
+        res = solve_ssrm(build_fem_data(sd, mesh), F_min=fmin, F_max=fmax,
+                         cancel_check=cancel_check, **ssrm_kw)
+        if not res.get('converged'):
+            return None, None, res.get('error', 'SSRM did not converge')
+        return res['FS'], res, None
+
+    if debug_level >= 1:
+        print("=== RELIABILITY ANALYSIS (FEM / SSRM) ===")
+
+    total_steps = 1 + 2 * len(param_info)
+    _progress(0, total_steps, "Solving SSRM at most-likely values…")
+    F_MLV, mlv_solution, err = _fs(slope_data, F_min, F_max)
+    if err:
+        return False, f"Reliability (FEM): the most-likely-values solve failed — {err}"
+    if debug_level >= 1:
+        print(f"F_MLV = {F_MLV:.4f}")
+    _progress(1, total_steps, f"F_MLV = {F_MLV:.3f}")
+
+    # Centre the perturbation brackets on F_MLV to keep the bisection short; the
+    # auto-expansion catches any parameter whose F+/F- lands outside the window.
+    fmin_p = max(0.1, F_MLV - 0.5)
+    fmax_p = F_MLV + 0.5
+
+    delta_F_values = []
+    for i, param in enumerate(param_info):
+        _check_cancel(cancel_check)
+        if debug_level >= 1:
+            print(f"\nParameter {i+1}/{len(param_info)}: "
+                  f"material {param['material_id']} {param['param']}")
+        F_plus, _sp, e1 = _fs(_perturbed_slope_data(slope_data, materials, param, +1), fmin_p, fmax_p)
+        F_minus, _sm, e2 = _fs(_perturbed_slope_data(slope_data, materials, param, -1), fmin_p, fmax_p)
+        if e1 or e2:
+            return False, (f"Reliability (FEM): perturbation solve failed for material "
+                           f"{param['material_id']} {param['param']} — {e1 or e2}")
+        delta_F = abs(F_plus - F_minus)
+        delta_F_values.append(delta_F)
+        param.update(F_plus=F_plus, F_minus=F_minus, delta_F=delta_F)
+        if debug_level >= 1:
+            print(f"  F+ = {F_plus:.4f}, F- = {F_minus:.4f}, ΔF = {delta_F:.4f}")
+        _progress(1 + 2 * (i + 1), total_steps,
+                  f"Parameter {i+1}/{len(param_info)}: mat {param['material_id']} {param['param']}")
+
+    result = _finalize_reliability(F_MLV, param_info, delta_F_values,
+                                   method_label='fem_reliability', debug_level=debug_level)
+    if isinstance(result, str):
+        return False, result
+    result['mlv_solution'] = mlv_solution
+    result['mesh'] = mesh
+
+    print(f"\nReliability (FEM) analysis completed in {time.time() - start_time:.2f} seconds.")
+    return True, result

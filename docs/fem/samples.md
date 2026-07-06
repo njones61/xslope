@@ -218,6 +218,8 @@ but with each factor of safety computed by SSRM. See
 
 Excel input file: [xslope_simple_mult_layers_fem.xlsx](files/xslope_simple_mult_layers_fem.xlsx)
 
+![two_layer_slope.png](images/two_layer_slope.png){width=900}
+
 It reuses the geometry of the LEM
 [Simple Slope with Multiple Layers](../lem/samples.md) example — an embankment
 over a foundation layer — with the elastic properties ($E$, $\nu$) added for the

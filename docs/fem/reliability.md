@@ -43,16 +43,22 @@ fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 
 ### Numerical precision and reproducibility
 
-Each SSRM factor of safety is the midpoint of the final bisection band, so it
-carries a $\pm\text{tolerance}/2$ imprecision. The reliability index amplifies
-this: $\dfrac{d\beta}{dF} = \dfrac{1}{F\sqrt{\ln(1+COV_F^2)}}$, which is $\approx 9$
-at $COV_F = 0.1$ — so a small change in $F_{MLV}$ produces a proportionally larger
-change in $\beta$ and the reliability. Because TSPM combines $1+2N$ of these
-factors of safety, `reliability_fem` runs a **tighter bisection tolerance by
-default (0.001)** than a single SSRM solve (0.01), and centres the perturbation
-brackets narrowly on $F_{MLV}$, so each factor of safety converges and the
-reported reliability is stable and reproducible (independent of the starting
-`F_min`/`F_max`).
+A plain SSRM factor of safety is the midpoint of the final bisection band, so it
+carries a $\pm\text{tolerance}/2$ imprecision *whose exact value depends on the
+starting `F_min`/`F_max`* (different brackets subdivide the axis on different
+grids). The reliability index amplifies this:
+$\dfrac{d\beta}{dF} = \dfrac{1}{F\sqrt{\ln(1+COV_F^2)}}$, which is $\approx 9$ at
+$COV_F = 0.1$ — so a small bracket-dependent change in $F_{MLV}$ produces a
+proportionally larger change in $\beta$, enough to flip the last shown digit of the
+reliability between two bracket choices.
+
+To remove that entirely, `reliability_fem` runs each SSRM on a **fixed global grid**
+(`grid = tolerance`, default 0.001; see [`solve_ssrm`](overview.md)). Instead of
+halving your bracket, it locates the single global grid cell that straddles the
+failure threshold — a fact of the slope and mesh, not of the bracket — so *every*
+starting bracket lands in the same cell. The result is **identical to every decimal
+regardless of `F_min`/`F_max`**, at the same cost (~log₂ solves) and precision
+(the grid step) as ordinary bisection.
 
 Two things still legitimately change the result and are **not** numerical noise:
 the **mesh** (a finer or different-element mesh gives a slightly different factor

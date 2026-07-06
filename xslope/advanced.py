@@ -661,14 +661,15 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
     but each F comes from ``solve_ssrm``. The bracket auto-expands, so the shifted
     perturbation runs bracket robustly without hand-tuned F_min/F_max.
 
-    ``tolerance`` (the SSRM bisection tolerance) defaults TIGHTER here than for a
-    single solve (0.002 vs 0.01). TSPM combines ~1+2N factors of safety, and the
-    reliability index is sensitive to F_MLV when COV_F is small (dβ/dF ≈
-    1/(F·√(ln(1+COV²))), ≈ 9 at COV 0.1). A coarse bisection band (±tolerance/2)
-    would then jitter β/reliability by a couple of percent between runs/brackets;
-    the tight tolerance converges each FS so the result is stable and reproducible.
-    The perturbation solves also use a narrow bracket centred on F_MLV (fast and
-    consistent). Results still depend on the mesh, as with any FE analysis.
+    ``tolerance`` (the SSRM grid/precision) defaults TIGHTER here than for a single
+    solve (0.001 vs 0.01). TSPM combines ~1+2N factors of safety, and the reliability
+    index is sensitive to F_MLV when COV_F is small (dβ/dF ≈ 1/(F·√(ln(1+COV²))), ≈ 9
+    at COV 0.1), so an imprecise FS would visibly move β/reliability. Each SSRM here
+    runs on a FIXED global grid (``grid=tolerance``; see ``solve_ssrm(grid=...)``):
+    every F_MLV and perturbation lands on the same grid cell regardless of the
+    F_min/F_max bracket, so the reliability is reproducible to every decimal for a
+    given mesh — not just to ±tolerance/2. Results still depend on the mesh, as with
+    any FE analysis.
 
     Perturbs the same strength parameters as the LEM path (c, phi for mc; c, cp for
     cp; gamma for both). E and nu are NOT perturbed: a sensitivity check shows E has
@@ -713,7 +714,12 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
         mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                         element_type=element_type, lines=constraint_lines)
 
-    ssrm_kw = dict(tolerance=tolerance, failure_criterion=failure_criterion,
+    # grid=tolerance: bisect each SSRM on a fixed global grid so every factor of
+    # safety (F_MLV and all perturbations) is independent of the F_min/F_max bracket
+    # — the reliability is then reproducible to every decimal for a given mesh, not
+    # just to +/- tolerance/2. See solve_ssrm(grid=...).
+    ssrm_kw = dict(tolerance=tolerance, grid=tolerance,
+                   failure_criterion=failure_criterion,
                    max_iterations=max_iterations, debug_level=max(0, debug_level - 1))
 
     def _fs(sd, fmin, fmax):

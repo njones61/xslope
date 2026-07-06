@@ -2667,7 +2667,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                staged=False, tension_cutoff=False, char_point=None,
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
-               f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20):
+               f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
+               grid=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2693,6 +2694,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
         tolerance (float): Bisection stops when F_right - F_left < tolerance. Default 0.01.
             The reported FS is the midpoint of the final bracket (+/- tolerance/2);
             the bracket itself is returned in 'final_interval'.
+        grid (float or None): If set, bisect over a FIXED global grid of step ``grid``
+            (F = i*grid) instead of halving the supplied bracket. Every starting
+            bracket then converges to the same global cell straddling the failure
+            threshold, so the reported FS is INDEPENDENT of F_min/F_max (identical to
+            every decimal, not just +/- tolerance/2). ``grid`` becomes the precision
+            (cell width). Default None = continuous bisection (bracket-dependent to
+            +/- tolerance/2). Used by ``reliability_fem`` for reproducible results.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Max viscoplastic iterations passed to solve_fem
         convergence_tol (float): Convergence tolerance passed to solve_fem
@@ -2752,7 +2760,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand)
+            max_expand=max_expand, grid=grid)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
@@ -2761,7 +2769,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand)
+            max_expand=max_expand, grid=grid)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
@@ -2792,7 +2800,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
-                 f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20):
+                 f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
+                 grid=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -2913,39 +2922,73 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
 
     last_converged_solution = solution_min
     iteration = 0
+    from .search import _check_cancel
 
-    while (F_right - F_left) > tolerance and iteration < 50:
-        from .search import _check_cancel
-        _check_cancel(cancel_check)
-        F_mid = (F_left + F_right) / 2.0
-
-        step = min(prog["n_bracket"] + iteration, _total() - 1)
-        _ssrm_progress(progress_callback, step * SUBDIV, _total() * SUBDIV,
-                       f"F={F_mid:.3f} in [{F_left:.3f}, {F_right:.3f}]")
-        if debug_level >= 1:
-            print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
-
-        solution = solve_fem(fem_data, F=F_mid, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
-                             max_iterations=max_iterations, tolerance=convergence_tol,
-                             max_disp_factor=max_disp_factor, staged=staged,
-                             tension_cutoff=tension_cutoff,
-                             early_exit=(max_disp_factor is None),
-                             progress_callback=_fem_progress(
-                                 step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]"))
-
-        if solution["converged"]:
-            F_left = F_mid
-            last_converged_solution = solution
+    if grid is not None and grid > 0:
+        # === Grid bisection (bracket-independent) ===
+        # Bisect over integer indices on a FIXED global grid (F = i*grid) instead of
+        # halving the supplied bracket. The failure threshold sits between two global
+        # grid points (k*·grid converges, (k*+1)·grid does not) — a fact of the
+        # slope+mesh, not of the bracket — so EVERY starting bracket narrows to that
+        # same cell and the reported FS is identical to every decimal. Snap the
+        # bracket outward (floor lo / ceil hi) so the grid endpoints keep the
+        # "lo converges, hi doesn't" invariant by monotonicity (no extra solves).
+        import math
+        i_lo = int(math.floor(F_left / grid + 1e-9))
+        i_hi = int(math.ceil(F_right / grid - 1e-9))
+        if i_hi <= i_lo:
+            i_hi = i_lo + 1
+        prog["n_steps"] = max(1, _ssrm_bisect_steps((i_hi - i_lo) * grid, grid))
+        while (i_hi - i_lo) > 1 and iteration < 60:
+            _check_cancel(cancel_check)
+            i_mid = (i_lo + i_hi) // 2
+            F_mid = i_mid * grid
+            step = min(prog["n_bracket"] + iteration, _total() - 1)
+            lo_f, hi_f = i_lo * grid, i_hi * grid
+            _ssrm_progress(progress_callback, step * SUBDIV, _total() * SUBDIV,
+                           f"F={F_mid:.3f} in [{lo_f:.3f}, {hi_f:.3f}]")
             if debug_level >= 1:
-                print(f"    -> Converged in {solution['iterations']} iters")
-        else:
-            F_right = F_mid
+                print(f"\n  SSRM step {iteration+1} (grid {grid:g}): "
+                      f"F = {F_mid:.4f}  [{lo_f:.4f}, {hi_f:.4f}]")
+            solution = _solve_at(F_mid, step, f"F={F_mid:.3f} [{lo_f:.3f}, {hi_f:.3f}]")
+            if solution["converged"]:
+                i_lo = i_mid
+                last_converged_solution = solution
+                if debug_level >= 1:
+                    print(f"    -> Converged in {solution['iterations']} iters")
+            else:
+                i_hi = i_mid
+                if debug_level >= 1:
+                    print(f"    -> Did NOT converge ({solution['iterations']} iters)")
+            iteration += 1
+        F_left, F_right = i_lo * grid, i_hi * grid
+    else:
+        while (F_right - F_left) > tolerance and iteration < 50:
+            _check_cancel(cancel_check)
+            F_mid = (F_left + F_right) / 2.0
+
+            step = min(prog["n_bracket"] + iteration, _total() - 1)
+            _ssrm_progress(progress_callback, step * SUBDIV, _total() * SUBDIV,
+                           f"F={F_mid:.3f} in [{F_left:.3f}, {F_right:.3f}]")
             if debug_level >= 1:
-                print(f"    -> Did NOT converge ({solution['iterations']} iters)")
+                print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
 
-        iteration += 1
+            solution = _solve_at(F_mid, step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]")
 
-    # Report the midpoint of the final bracket (unbiased, +/- tolerance/2);
+            if solution["converged"]:
+                F_left = F_mid
+                last_converged_solution = solution
+                if debug_level >= 1:
+                    print(f"    -> Converged in {solution['iterations']} iters")
+            else:
+                F_right = F_mid
+                if debug_level >= 1:
+                    print(f"    -> Did NOT converge ({solution['iterations']} iters)")
+
+            iteration += 1
+
+    # Report the midpoint of the final bracket (unbiased, +/- tolerance/2, or exactly
+    # the grid-cell centre when grid bisection is used);
     # the full bracket is returned in 'final_interval'.
     critical_FS = 0.5 * (F_left + F_right)
 

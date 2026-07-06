@@ -2666,7 +2666,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
                failure_criterion="non_convergence", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
-               progress_callback=None):
+               progress_callback=None,
+               f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -2675,8 +2676,20 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
 
     Parameters:
         fem_data (dict): FEM data from build_fem_data
-        F_min (float): Lower bound for F (must converge). Default 1.0.
-        F_max (float): Upper bound for F (should not converge). Default 2.0.
+        F_min (float): Lower bound for F (must converge). Default 1.0. If it does
+            NOT converge, the bracket auto-expands downward (see f_adjust).
+        F_max (float): Upper bound for F (should not converge). Default 2.0. If it
+            DOES converge, the bracket auto-expands upward (see f_adjust).
+        f_adjust (float): Step by which the bracket is widened when the guess is
+            off — F_min lowered / F_max raised by f_adjust and re-checked, so a
+            wrong [F_min, F_max] still finds the FS instead of aborting. A good
+            guess brackets on the first try and skips this. Default 0.25.
+        f_min_floor (float): F_min is never lowered below this (F stays positive).
+            Default 0.1; failing to converge even here means FS < f_min_floor.
+        f_max_ceiling (float): F_max is never raised above this. Default 10.0;
+            still converging here means FS exceeds the ceiling (or the slope
+            deforms ductilely without a displacement catastrophe).
+        max_expand (int): Cap on expansion steps in each direction. Default 20.
         tolerance (float): Bisection stops when F_right - F_left < tolerance. Default 0.01.
             The reported FS is the midpoint of the final bracket (+/- tolerance/2);
             the bracket itself is returned in 'final_interval'.
@@ -2737,14 +2750,18 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check, progress_callback=progress_callback)
+            cancel_check=cancel_check, progress_callback=progress_callback,
+            f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
+            max_expand=max_expand)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check, progress_callback=progress_callback)
+            cancel_check=cancel_check, progress_callback=progress_callback,
+            f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
+            max_expand=max_expand)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
@@ -2774,8 +2791,15 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
-                 dt_scale=1.0, cancel_check=None, progress_callback=None):
-    """SSRM using fixed VP displacement limit as failure criterion."""
+                 dt_scale=1.0, cancel_check=None, progress_callback=None,
+                 f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20):
+    """SSRM using fixed VP displacement limit as failure criterion.
+
+    The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
+    doesn't converge it is lowered by f_adjust (down to f_min_floor, keeping F
+    positive); if F_max converges it is raised by f_adjust (up to f_max_ceiling).
+    So a wrong bracket still finds the FS instead of aborting, while a good bracket
+    skips the expansion and bisects immediately."""
 
     if debug_level >= 1:
         label = "Non-Convergence" if max_disp_factor is None else "Displacement Limit"
@@ -2784,78 +2808,108 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         if max_disp_factor is not None:
             print(f"  Displacement limit: {max_disp_factor:.0%} of mesh height")
 
-    # Progress reported as: 2 bound checks + the (deterministic) bisection steps.
-    # Each step is a full solve_fem, so we subdivide it (SUBDIV) and let solve_fem's
-    # intra-solve progress fill its slice — the bar advances *within* each trial.
-    n_steps = _ssrm_bisect_steps(F_max - F_min, tolerance)
-    total = 2 + n_steps
+    # Progress reported as: the bracket-establishment solves (>=2) + the
+    # (deterministic) bisection steps. Each solve_fem is subdivided (SUBDIV) and its
+    # intra-solve progress fills its slice — the bar advances *within* each trial.
+    # n_bracket / n_steps live in ``prog`` because auto-expansion (below) can add
+    # bracket solves and widen the range, so the total is recomputed on the fly.
     SUBDIV = 100
-    total_fine = total * SUBDIV
+    prog = {"n_bracket": 2, "n_steps": _ssrm_bisect_steps(F_max - F_min, tolerance)}
+
+    def _total():
+        return prog["n_bracket"] + prog["n_steps"]
 
     def _fem_progress(step, prefix):
-        """Build a solve_fem progress_callback that maps its inner [0, 1] fraction
-        into ``step``'s slice of the overall SSRM bar."""
+        """A solve_fem progress_callback mapping its inner [0, 1] fraction into
+        ``step``'s slice of the overall SSRM bar (total recomputed live)."""
         if progress_callback is None:
             return None
-        step = min(step, total - 1)
 
         def _cb(frac, info):
-            pos = (step + max(0.0, min(1.0, frac))) * SUBDIV
+            total_fine = _total() * SUBDIV
+            s = min(step, _total() - 1)
+            pos = (s + max(0.0, min(1.0, frac))) * SUBDIV
             _ssrm_progress(progress_callback, min(int(pos), total_fine - 1),
                            total_fine, f"{prefix} · {info}")
         return _cb
 
+    def _solve_at(F, step, prefix):
+        return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1),
+                         dt_scale=dt_scale, pp_formulation=pp_formulation,
+                         max_iterations=max_iterations, tolerance=convergence_tol,
+                         max_disp_factor=max_disp_factor, staged=staged,
+                         tension_cutoff=tension_cutoff,
+                         early_exit=(max_disp_factor is None),
+                         progress_callback=_fem_progress(step, prefix))
+
     F_left = F_min
     F_right = F_max
+    bracket_step = 0                       # running index into the progress bar
 
-    # Verify lower bound converges
-    _ssrm_progress(progress_callback, 0, total_fine, f"Checking lower bound F={F_min:.3f}")
-    if debug_level >= 1:
-        print(f"  Verifying lower bound F={F_min:.2f} converges...")
-    solution_min = solve_fem(fem_data, F=F_min, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
-                             max_iterations=max_iterations, tolerance=convergence_tol,
-                             max_disp_factor=max_disp_factor, staged=staged,
-                             tension_cutoff=tension_cutoff,
-                             early_exit=(max_disp_factor is None),
-                             progress_callback=_fem_progress(0, f"Lower bound F={F_min:.3f}"))
-    if not solution_min["converged"]:
-        msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_min:.2f} — it is "
-               f"unstable at or below this strength-reduction factor (FS < {F_min:.2f}). "
-               "Lower F_min to bracket the factor of safety.")
-        print(f"\n{msg}")
-        return {
-            "converged": False,
-            "error": msg,
-            "FS": None
-        }
-    if debug_level >= 1:
-        print(f"    -> Converged in {solution_min['iterations']} iters")
+    def _bump_bracket():
+        nonlocal bracket_step
+        bracket_step += 1
+        prog["n_bracket"] = max(prog["n_bracket"], bracket_step + 1)
 
-    # Verify upper bound does not converge
-    _ssrm_progress(progress_callback, SUBDIV, total_fine, f"Checking upper bound F={F_max:.3f}")
+    # === Establish a valid bracket, auto-expanding a wrong guess ===
+    # The lower bound must converge and the upper must not. If the guess is off,
+    # step F_left DOWN / F_right UP by f_adjust until the bracket is valid, bounded
+    # by a positive floor (F stays > 0) and a ceiling (F can't grow forever). A
+    # good guess brackets on the first try and skips the expansion entirely.
+
+    # -- Lower bound: lower F_left until it converges --
+    _ssrm_progress(progress_callback, 0, _total() * SUBDIV, f"Checking lower bound F={F_left:.3f}")
     if debug_level >= 1:
-        print(f"  Verifying upper bound F={F_max:.2f} does not converge...")
-    solution_max = solve_fem(fem_data, F=F_max, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
-                             max_iterations=max_iterations, tolerance=convergence_tol,
-                             max_disp_factor=max_disp_factor, staged=staged,
-                             tension_cutoff=tension_cutoff,
-                             early_exit=(max_disp_factor is None),
-                             progress_callback=_fem_progress(1, f"Upper bound F={F_max:.3f}"))
-    if solution_max["converged"]:
-        msg = (f"SSRM: the slope still reaches equilibrium at F = {F_max:.2f}, so the factor "
-               f"of safety exceeds the search ceiling (FS > {F_max:.2f}). No failure was found "
-               f"in [{F_min:.2f}, {F_max:.2f}] — increase F_max to bracket it. This is expected "
-               "for a heavily reinforced or very stable slope that deforms ductilely without a "
-               "displacement catastrophe.")
-        print(f"\n{msg}")
-        return {
-            "converged": False,
-            "FS": None,
-            "last_solution": solution_max,
-            "error": msg
-        }
+        print(f"  Verifying lower bound F={F_left:.2f} converges...")
+    solution_min = _solve_at(F_left, bracket_step, f"Lower bound F={F_left:.3f}")
+    n_expand = 0
+    while not solution_min["converged"]:
+        if F_left <= f_min_floor + 1e-9 or n_expand >= max_expand:
+            msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_left:.2f} "
+                   f"(lowered to the floor while auto-bracketing) — it is unstable at or "
+                   f"below this strength-reduction factor (FS < {F_left:.2f}).")
+            print(f"\n{msg}")
+            return {"converged": False, "error": msg, "FS": None}
+        F_new = max(f_min_floor, F_left - f_adjust)
+        if debug_level >= 1:
+            print(f"    -> F={F_left:.2f} did not converge; lowering F_min to {F_new:.2f}")
+        F_left = F_new
+        n_expand += 1
+        _bump_bracket()
+        solution_min = _solve_at(F_left, bracket_step, f"Lower bound F={F_left:.3f}")
+    F_min = F_left
     if debug_level >= 1:
-        print(f"    -> Did NOT converge ({solution_max['iterations']} iters)")
+        print(f"    -> Converged in {solution_min['iterations']} iters (F_min={F_min:.2f})")
+
+    # -- Upper bound: raise F_right until it does NOT converge --
+    _bump_bracket()
+    _ssrm_progress(progress_callback, bracket_step * SUBDIV, _total() * SUBDIV,
+                   f"Checking upper bound F={F_right:.3f}")
+    if debug_level >= 1:
+        print(f"  Verifying upper bound F={F_right:.2f} does not converge...")
+    solution_max = _solve_at(F_right, bracket_step, f"Upper bound F={F_right:.3f}")
+    n_expand = 0
+    while solution_max["converged"]:
+        if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
+            msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f} "
+                   f"(raised to the ceiling while auto-bracketing), so the factor of safety "
+                   f"exceeds this. Raise F_max / f_max_ceiling, or the slope may deform "
+                   f"ductilely without a displacement catastrophe.")
+            print(f"\n{msg}")
+            return {"converged": False, "FS": None, "last_solution": solution_max, "error": msg}
+        F_new = min(f_max_ceiling, F_right + f_adjust)
+        if debug_level >= 1:
+            print(f"    -> F={F_right:.2f} converged; raising F_max to {F_new:.2f}")
+        F_right = F_new
+        n_expand += 1
+        _bump_bracket()
+        solution_max = _solve_at(F_right, bracket_step, f"Upper bound F={F_right:.3f}")
+    F_max = F_right
+    if debug_level >= 1:
+        print(f"    -> Did NOT converge ({solution_max['iterations']} iters, F_max={F_max:.2f})")
+
+    # Recompute the bisection step budget for the (possibly widened) bracket.
+    prog["n_steps"] = _ssrm_bisect_steps(F_right - F_left, tolerance)
 
     last_converged_solution = solution_min
     iteration = 0
@@ -2865,8 +2919,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         _check_cancel(cancel_check)
         F_mid = (F_left + F_right) / 2.0
 
-        step = min(2 + iteration, total - 1)
-        _ssrm_progress(progress_callback, step * SUBDIV, total_fine,
+        step = min(prog["n_bracket"] + iteration, _total() - 1)
+        _ssrm_progress(progress_callback, step * SUBDIV, _total() * SUBDIV,
                        f"F={F_mid:.3f} in [{F_left:.3f}, {F_right:.3f}]")
         if debug_level >= 1:
             print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
@@ -2895,7 +2949,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     # the full bracket is returned in 'final_interval'.
     critical_FS = 0.5 * (F_left + F_right)
 
-    _ssrm_progress(progress_callback, total_fine, total_fine, f"FS = {critical_FS:.3f}")
+    _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
         print(f"\n  SSRM result: FS = {critical_FS:.4f}")
         print(f"  Final interval: [{F_left:.4f}, {F_right:.4f}]")

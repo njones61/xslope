@@ -495,8 +495,9 @@ else:
 
 The key parameters of `solve_ssrm()` are:
 
->- **`F_min`** (default 1.0): Lower bound for the bisection search. The slope must be stable (converge) at this reduction factor.<br>
->- **`F_max`** (default 2.0): Upper bound for the bisection search. The slope should be unstable (not converge) at this reduction factor.<br>
+>- **`F_min`** (default 1.0): Lower bound for the bisection search. The slope must be stable (converge) at this reduction factor. If it does not, the bracket **auto-expands downward** (see `f_adjust`), so a low guess is not required.<br>
+>- **`F_max`** (default 2.0): Upper bound for the bisection search. The slope should be unstable (not converge) at this reduction factor. If it still converges, the bracket **auto-expands upward**, so a high guess is not required.<br>
+>- **`f_adjust`** (default 0.25): Step by which the bracket is widened when the guess is off — `F_min` is lowered / `F_max` is raised by `f_adjust` and re-checked until the bracket is valid. So a wrong `[F_min, F_max]` still finds the factor of safety instead of aborting; a good guess brackets on the first try and skips the expansion (and a tight, correct guess speeds the bisection up). Expansion is bounded by **`f_min_floor`** (default 0.1 — `F` stays positive; failing even here means FS < `f_min_floor`), **`f_max_ceiling`** (default 10.0 — still converging here means FS exceeds it, or the slope deforms ductilely without a catastrophe), and **`max_expand`** (default 20 steps each way).<br>
 >- **`tolerance`** (default 0.01): Bisection stops when $F_{right} - F_{left} <$ tolerance. The reported FS is the midpoint of the final bracket (± tolerance/2); the bracket is returned in `final_interval`.<br>
 >- **`failure_criterion`** (default `"non_convergence"`): Selects the failure criterion — `"non_convergence"` or `"displacement_increase"` as described above (see *Choosing a Failure Criterion*).<br>
 >- **`pp_formulation`** (default `"effective"`): How pore pressures enter the analysis — `"effective"` moves $u$ into the load vector so the computed stresses are effective stresses directly (recommended); `"total"` is the legacy subtract-at-Gauss-point recipe (see *Pore Pressure at Gauss Points*).<br>

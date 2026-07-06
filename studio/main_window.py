@@ -228,9 +228,13 @@ class MainWindow(QMainWindow):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(5000)
         # Fixed-width font so ASCII/tabulate grid tables (e.g. the reliability
-        # results table) line up — a proportional font misaligns the columns.
+        # results table) line up — a proportional font misaligns the columns. The
+        # platform fixed font can render small, so start at a readable point size
+        # (adjustable via the spinner in the Log title bar).
         from PySide6.QtGui import QFontDatabase
-        self.log.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self._log_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        self._log_font.setPointSize(max(12, self._log_font.pointSize()))
+        self.log.setFont(self._log_font)
         self.log.setLineWrapMode(QPlainTextEdit.NoWrap)
         dock = QDockWidget("Log", self)
         dock.setObjectName("log_dock")
@@ -243,6 +247,15 @@ class MainWindow(QMainWindow):
         row.setContentsMargins(6, 2, 4, 2)
         row.addWidget(QLabel("Log"))
         row.addStretch(1)
+        # Font-size control, just left of Clear.
+        from PySide6.QtWidgets import QSpinBox
+        font_spin = QSpinBox()
+        font_spin.setRange(6, 28)
+        font_spin.setValue(self._log_font.pointSize())
+        font_spin.setSuffix(" pt")
+        font_spin.setToolTip("Log font size")
+        font_spin.valueChanged.connect(self._set_log_font_size)
+        row.addWidget(font_spin)
         clear_btn = QToolButton()
         clear_btn.setText("Clear")
         clear_btn.setAutoRaise(True)
@@ -252,6 +265,11 @@ class MainWindow(QMainWindow):
         dock.setTitleBarWidget(title)
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
         self.log_dock = dock
+
+    def _set_log_font_size(self, pt):
+        """Resize the Log pane's (fixed-width) font from the title-bar spinner."""
+        self._log_font.setPointSize(int(pt))
+        self.log.setFont(self._log_font)
 
     def _arrange_docks(self):
         # A QTreeWidget gives the dock almost no width hint, so without an explicit

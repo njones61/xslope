@@ -108,6 +108,36 @@ def _legend_frame_option(panel):
     return panel._legend_frame.isChecked()
 
 
+def _add_view_toggles(panel, form, with_legend=True):
+    """Prepend the shared 'Show title' + 'Show legend' checkboxes (both on) to a
+    panel's form and wire them to ``panel._emit``. Every plot type gets them so the
+    title and legend can be hidden per view. Read via ``_show_title_option`` /
+    ``_show_legend_option`` (folded into the panel's options()). with_legend=False
+    omits the legend toggle for plots that draw no legend."""
+    title = QCheckBox("Show title")
+    title.setChecked(True)
+    form.addRow("", title)
+    title.toggled.connect(panel._emit)
+    panel._show_title = title
+    panel._show_legend = None
+    if with_legend:
+        legend = QCheckBox("Show legend")
+        legend.setChecked(True)
+        form.addRow("", legend)
+        legend.toggled.connect(panel._emit)
+        panel._show_legend = legend
+
+
+def _show_title_option(panel):
+    """Whether the title is shown (panels built with _add_view_toggles)."""
+    return panel._show_title.isChecked()
+
+
+def _show_legend_option(panel):
+    """Whether the legend is shown (True when the panel has no legend toggle)."""
+    return panel._show_legend is None or panel._show_legend.isChecked()
+
+
 def _cmap_icon(name):
     """A horizontal gradient swatch of colormap ``name`` as a QIcon, so the
     selector previews each ramp the way the screenshot does."""
@@ -147,6 +177,7 @@ class _CheckboxPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        _add_view_toggles(self, form)
         self._boxes = {}
         for key, label, default in self._FIELDS:
             box = QCheckBox(label)
@@ -162,6 +193,8 @@ class _CheckboxPanel(QWidget):
 
     def options(self):
         d = {key: box.isChecked() for key, box in self._boxes.items()}
+        d["show_title"] = _show_title_option(self)
+        d["show_legend"] = _show_legend_option(self)
         if self._WITH_LEGEND:
             d["legend_ncol"] = _legend_option(self)
             d["legend_frame"] = _legend_frame_option(self)
@@ -198,6 +231,7 @@ class InputsDisplayPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        _add_view_toggles(self, form)
 
         self.mat_table = QCheckBox("Material property table")
         self.tab_loc = QComboBox()
@@ -239,6 +273,8 @@ class InputsDisplayPanel(QWidget):
             "legend_ncol": ("auto" if self.legend_auto.isChecked()
                             else self.legend_ncol.value()),
             "legend_frame": self.legend_frame.isChecked(),
+            "show_title": _show_title_option(self),
+            "show_legend": _show_legend_option(self),
         }
 
 
@@ -250,6 +286,7 @@ class MeshDisplayPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        _add_view_toggles(self, form)
         self.show_nodes = QCheckBox("Show nodes")
         self.show_nodes.setChecked(True)
         self.label_elements = QCheckBox("Element numbers")
@@ -274,6 +311,8 @@ class MeshDisplayPanel(QWidget):
             "pad_frac": self.pad_frac.value(),
             "legend_ncol": _legend_option(self),
             "legend_frame": _legend_frame_option(self),
+            "show_title": _show_title_option(self),
+            "show_legend": _show_legend_option(self),
         }
 
 
@@ -287,6 +326,7 @@ class FeDataDisplayPanel(QWidget):
     def __init__(self, include_bc_symbol=False, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        _add_view_toggles(self, form)
         self.show_bc = QCheckBox("Boundary conditions")
         self.show_bc.setChecked(True)
         self.show_nodes = QCheckBox("Show nodes")
@@ -320,6 +360,8 @@ class FeDataDisplayPanel(QWidget):
             "alpha": self.alpha.value(),
             "legend_ncol": _legend_option(self),
             "legend_frame": _legend_frame_option(self),
+            "show_title": _show_title_option(self),
+            "show_legend": _show_legend_option(self),
         }
         if self.bc_symbol_size is not None:
             d["bc_symbol_size"] = self.bc_symbol_size.value()
@@ -334,6 +376,7 @@ class SeepDisplayPanel(QWidget):
     def __init__(self, materials, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        _add_view_toggles(self, form)
 
         self.variable = QComboBox()
         for key, label in SEEP_VARIABLES:
@@ -424,6 +467,8 @@ class SeepDisplayPanel(QWidget):
             "cbar_shrink": self.cbar_size.value(),
             "legend_ncol": _legend_option(self),
             "legend_frame": _legend_frame_option(self),
+            "show_title": _show_title_option(self),
+            "show_legend": _show_legend_option(self),
         }
 
 
@@ -440,6 +485,7 @@ class FemResultsDisplayPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        _add_view_toggles(self, form)
 
         self.plot_type = QComboBox()
         for key, label in FEM_PLOT_TYPES:
@@ -552,4 +598,6 @@ class FemResultsDisplayPanel(QWidget):
             "plot_nodes": self.plot_nodes.isChecked(),
             "scale_vectors": self.scale_vectors.isChecked(),
             "displacement_tolerance": self.displacement_tolerance.value(),
+            "show_title": _show_title_option(self),
+            "show_legend": _show_legend_option(self),
         }

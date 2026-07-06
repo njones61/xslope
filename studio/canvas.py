@@ -198,7 +198,7 @@ class MplCanvas(QWidget):
             slope_data, fig=fig, mode=mode,
             mat_table=opts.get("mat_table", False),
             tab_loc=opts.get("tab_loc", "top"),
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), style=style))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), style=style))
 
     def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None, style=None):
         opts = opts or {}
@@ -206,7 +206,7 @@ class MplCanvas(QWidget):
             slope_data, slice_df, failure_surface, results,
             slice_numbers=opts.get("slice_numbers", False),
             seep_contours=opts.get("seep_contours", True),
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
     def render_search(self, slope_data, search, opts=None, style=None):
         """Render auto-search results (all trial surfaces + critical + search path)."""
@@ -217,17 +217,17 @@ class MplCanvas(QWidget):
             self._draw(lambda fig: plot_circular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
                 circle_cache=search["circle_cache"], highlight_fs=highlight,
-                legend_ncol=ncol, legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+                legend_ncol=ncol, legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
         else:
             self._draw(lambda fig: plot_noncircular_search_results(
                 slope_data, search["fs_cache"], search["search_path"],
-                highlight_fs=highlight, legend_ncol=ncol, legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+                highlight_fs=highlight, legend_ncol=ncol, legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
     def render_reliability(self, slope_data, reliability_data, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_reliability_results(
             slope_data, reliability_data,
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
     def render_mesh(self, mesh, materials=None, opts=None, style=None):
         opts = opts or {}
@@ -236,7 +236,7 @@ class MplCanvas(QWidget):
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
             pad_frac=opts.get("pad_frac", 0.05),
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
     def render_seep_data(self, seep_data, opts=None, style=None):
         opts = opts or {}
@@ -246,7 +246,7 @@ class MplCanvas(QWidget):
             label_elements=opts.get("label_elements", False),
             label_nodes=opts.get("label_nodes", False),
             alpha=opts.get("alpha", 0.6),
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
     def render_seep_solution(self, seep_data, solution, opts, style=None):
         opts = opts or {}
@@ -263,7 +263,7 @@ class MplCanvas(QWidget):
             cmap=opts.get("cmap", "Spectral_r"),
             cbar_shrink=opts.get("cbar_shrink", 0.8),
             legend_ncol=opts.get("legend_ncol", "auto"),
-            legend_frame=opts.get("legend_frame", False), mesh=False, fig=fig, style=style))
+            legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), mesh=False, fig=fig, style=style))
 
     def render_fem_data(self, fem_data, opts=None, style=None):
         opts = opts or {}
@@ -274,7 +274,7 @@ class MplCanvas(QWidget):
             label_nodes=opts.get("label_nodes", False),
             alpha=opts.get("alpha", 0.6),
             bc_symbol_size=opts.get("bc_symbol_size", 0.03),
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), fig=fig, style=style))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
     def render_fem_results(self, fem_data, solution, opts):
         opts = opts or {}
@@ -292,7 +292,7 @@ class MplCanvas(QWidget):
             plot_elements=opts.get("plot_elements", False),
             scale_vectors=opts.get("scale_vectors", True),
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
-            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), fig=fig))
+            legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig))
 
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):

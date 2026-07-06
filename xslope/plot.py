@@ -1681,12 +1681,36 @@ def _fit_legend_ncol(ax, fig, handles, labels, anchor):
 
 
 def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
-                  legend_ncol="auto", **kw):
+                  legend_ncol="auto", show_legend=True, **kw):
     """Draw a horizontal legend below the axes. With legend_ncol="auto" the column
     count is auto-fit — as wide as fits the axes width, with the fewest, neatly-
     balanced rows (see _fit_legend_ncol); pass an int to force a column count.
     Pass explicit handles/labels, else they come from the axes. Extra kwargs
-    (e.g. frameon) pass through to ax.legend."""
+    (e.g. frameon) pass through to ax.legend. show_legend=False skips the legend
+    itself but still styles the title/ticks and reclaims its reserved bottom room."""
+    # Title + tick sizes are set here (the one call every geometry plot ends with)
+    # whether or not the legend is drawn.
+    ax.tick_params(labelsize=_TICK_FONTSIZE)
+    if ax.get_title():
+        ax.title.set_fontsize(_TITLE_FONTSIZE)
+    if not show_legend:
+        try:
+            fig.set_layout_engine("none")
+        except Exception:
+            try:
+                fig.set_tight_layout(False)
+            except Exception:
+                pass
+        top = 0.94
+        if ax.get_title():                   # title-aware top; modest bottom for ticks
+            try:
+                fig.canvas.draw()
+                th = ax.title.get_window_extent(fig.canvas.get_renderer()).height / fig.bbox.height
+                top = max(0.80, min(0.94, 1.0 - th - 0.03))
+            except Exception:
+                pass
+        fig.subplots_adjust(top=top, bottom=0.11)
+        return None
     if handles is None:
         handles, labels = ax.get_legend_handles_labels()
     if labels is None:                       # handles given without explicit labels
@@ -1706,12 +1730,6 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     kw.setdefault("fontsize", _LEGEND_FONTSIZE)
     for k, v in _LEGEND_PACK.items():        # tight packing; must match _fit_legend_ncol
         kw.setdefault(k, v)
-    # Consistent, compact text across every plot (titles/ticks/legend looked
-    # oversized): set the title and tick sizes here — _legend_below is the one
-    # call every geometry plot ends with.
-    ax.tick_params(labelsize=_TICK_FONTSIZE)
-    if ax.get_title():
-        ax.title.set_fontsize(_TITLE_FONTSIZE)
     if legend_ncol == "auto":
         ncol = _fit_legend_ncol(ax, fig, handles, labels, anchor)
     else:
@@ -1806,6 +1824,8 @@ def plot_inputs(
     tab_loc="top",
     legend_ncol="auto",
     legend_frame=False,
+    show_title=True,
+    show_legend=True,
     fig=None,
     style=None,
 ):
@@ -2057,12 +2077,13 @@ def plot_inputs(
         handles.append(dummy_line)
         labels.append('Distributed Load')
 
-    ax.set_title(title)
+    if show_title:
+        ax.set_title(title)
     fig.tight_layout()
     # Single shared legend recipe: below the axes, auto-columns, frameless by
     # default (frame toggled per-view via legend_frame). Reserves bottom margin.
     _legend_below(ax, fig, handles=handles, labels=labels,
-                  legend_ncol=legend_ncol, frameon=legend_frame)
+                  legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:
@@ -2077,7 +2098,7 @@ def plot_inputs(
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -2219,7 +2240,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
                  f"FS = {fs:.3f}, λ = {results['lambda']:.3f}")
     else:
         title = f'{method}: FS = {fs:.3f}'
-    ax.set_title(title)
+    if show_title:
+        ax.set_title(title)
 
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
@@ -2227,7 +2249,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
 
     fig.tight_layout()
     _legend_below(ax, fig, handles=handles, labels=labels,
-                  legend_ncol=legend_ncol, frameon=legend_frame)
+                  legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg')
     if save_png:
@@ -2300,7 +2322,7 @@ def plot_search_path(ax, search_path):
                  head_width=1, head_length=2, fc='green', ec='green', length_includes_head=True,
                  gid='SEARCH_PATH')
 
-def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_cache=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Creates a plot showing the results of a circular failure surface search.
 
@@ -2361,12 +2383,12 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
 
     ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
-    if highlight_fs and fs_cache:
+    if show_title and highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     fig.tight_layout()
-    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     if save_png:
         fig.savefig('plot_circular_search_results.png', dpi=dpi, bbox_inches='tight')
@@ -2378,7 +2400,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         plt.show()
     return fig
 
-def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, highlight_fs=True, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Creates a plot showing the results of a non-circular failure surface search.
 
@@ -2445,12 +2467,12 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
 
     ax.set_aspect('equal', adjustable='datalim')
     ax.grid(False)
-    if highlight_fs and fs_cache:
+    if show_title and highlight_fs and fs_cache:
         critical_fs = fs_cache[0]['FS']
         ax.set_title(f"Critical Factor of Safety = {critical_fs:.3f}")
 
     fig.tight_layout()
-    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     if save_png:
         fig.savefig('plot_noncircular_search_results.png', dpi=dpi, bbox_inches='tight')
@@ -2462,7 +2484,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
         plt.show()
     return fig
 
-def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Creates a plot showing the results of reliability analysis.
 
@@ -2545,13 +2567,14 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
     reliability = reliability_data['reliability']
     prob_failure = reliability_data['prob_failure']
 
-    ax.set_title(f"Reliability Analysis Results\n"
-                f"$F_{{MLV}}$ = {F_MLV:.3f}, $\\sigma_F$ = {sigma_F:.3f}, "
-                f"$COV_F$ = {COV_F:.3f}\n"
-                f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
+    if show_title:
+        ax.set_title(f"Reliability Analysis Results\n"
+                    f"$F_{{MLV}}$ = {F_MLV:.3f}, $\\sigma_F$ = {sigma_F:.3f}, "
+                    f"$COV_F$ = {COV_F:.3f}\n"
+                    f"Reliability = {reliability*100:.2f}%, $P_f$ = {prob_failure*100:.2f}%")
 
     fig.tight_layout()
-    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     if save_png:
         filename = 'plot_reliability_results.png'
@@ -2565,7 +2588,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         plt.show()
     return fig
 
-def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Plot the finite element mesh with material regions.
 
@@ -2750,7 +2773,8 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
                     ha='left', va='bottom', zorder=14)
     
     ax.set_aspect('equal', adjustable='datalim')
-    ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
+    if show_title:
+        ax.set_title("Finite Element Mesh with Material Regions (Triangles and Quads)")
 
     # Add cushion
     x_min, x_max = nodes[:, 0].min(), nodes[:, 0].max()
@@ -2765,7 +2789,7 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
     # margin isn't clobbered)
     if legend_elements:
         _legend_below(ax, fig, handles=legend_elements,
-                      legend_ncol=legend_ncol, frameon=legend_frame)
+                      legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     if save_png:
         fig.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')

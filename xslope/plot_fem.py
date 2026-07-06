@@ -38,7 +38,7 @@ def _extract_uv(disp, fem_data):
 
 
 def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
-                  label_elements=False, label_nodes=False, alpha=0.6, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None, style=None):
+                  label_elements=False, label_nodes=False, alpha=0.6, bc_symbol_size=0.03, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Plots a FEM mesh colored by material zone with boundary conditions displayed.
 
@@ -304,12 +304,13 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
         parts.append(f"{n_pile_plotted} pile")
     title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
     
-    ax.set_title(title)
+    if show_title:
+        ax.set_title(title)
     fig.tight_layout()
     # Combined legend below the plot, after tight_layout so its reserved bottom
     # margin (for multi-row legends) isn't clobbered.
     _legend_below(ax, fig, handles=legend_handles,
-                  legend_ncol=legend_ncol, frameon=legend_frame)
+                  legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('(', '').replace(')', '')
     if save_png:
@@ -436,7 +437,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, fig=None):
+                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None):
     """
     Plot FEM results with various visualization options.
 
@@ -634,6 +635,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
         ax.set_ylim(y_min - y_margin, y_max + y_margin)
         ax.set_aspect('equal')
+        if not show_title:
+            ax.set_title("")
 
     # Single-panel layout (the Studio case: one result shown at a time). When
     # there's a colorbar, attach it with make_axes_locatable so it tracks the
@@ -653,7 +656,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             pass
 
     # Place deformation legend in the dedicated legend row
-    if has_deform_legend and legend_ax is not None:
+    if has_deform_legend and legend_ax is not None and show_legend:
         handles, labels = axes[0].get_legend_handles_labels()
         if handles:
             from .plot import _fit_legend_ncol

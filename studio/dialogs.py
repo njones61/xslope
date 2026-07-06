@@ -100,7 +100,7 @@ class RunFemDialog(QDialog):
             "Bisection tolerance for the reliability SSRM solves — tighter than a "
             "single run (default 0.001). TSPM amplifies factor-of-safety "
             "imprecision, so a tight tolerance keeps the reliability index stable.")
-        form.addRow("Reliability tol", self.reliability_tol)
+        form.addRow("Tolerance (Reliability)", self.reliability_tol)
 
         self.failure_criterion = QComboBox()
         for key, label in FEM_FAILURE_CRITERIA:
@@ -112,14 +112,14 @@ class RunFemDialog(QDialog):
         form.addRow("Failure criterion", self.failure_criterion)
 
         layout.addLayout(form)
-        note = QLabel("Reliability uses the bracket above only to find the "
-                      "most-likely-value factor of safety; the ±σ perturbations "
-                      "then auto-bracket around it. It uses the material standard "
-                      "deviations (sigma columns) and runs 1+2N SSRM solves at the "
-                      "Reliability tol. Plot type and deformation scale are set on "
-                      "the FEM Results view after solving.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
+        self._rel_note = QLabel(
+            "Reliability uses the bracket above only to find the most-likely-value "
+            "factor of safety; the ±σ perturbations then auto-bracket around it. It "
+            "uses the material standard deviations (sigma columns) and runs 1+2N "
+            "SSRM solves at Tolerance (Reliability). Plot type and deformation scale "
+            "are set on the FEM Results view after solving.")
+        self._rel_note.setWordWrap(True)
+        layout.addWidget(self._rel_note)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText("Run")
@@ -142,6 +142,7 @@ class RunFemDialog(QDialog):
         self.failure_criterion.setEnabled(not single)
         self.tolerance.setEnabled(a == "ssrm")
         self.reliability_tol.setEnabled(a == "reliability")
+        self._rel_note.setVisible(a == "reliability")   # note only applies to reliability
 
     def options(self):
         return {

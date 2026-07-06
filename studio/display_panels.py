@@ -70,28 +70,37 @@ def _ispin(lo, hi, val, suffix="", step=1):
 
 
 def _add_legend_controls(panel, form):
-    """Append the shared 'Auto legend columns' + 'Legend columns' controls to a
-    panel's form and wire them to ``panel._emit``. Auto lays the legend out as
-    wide as fits the axes with the fewest neatly-balanced rows; unchecking it
-    enables an explicit column count. Stashes the widgets on the panel and exposes
-    the value via ``_legend_option(panel)`` (folded into the panel's options())."""
+    """Append the shared legend controls to a panel's form, grouped: a 'Legend'
+    on/off toggle first, then 'Auto legend columns' + an explicit 'Legend columns'
+    count + a 'Legend frame' toggle. All wired to ``panel._emit``. When Legend is
+    off the layout controls disable. Stashes the widgets and exposes the values via
+    ``_legend_option`` / ``_legend_frame_option`` / ``_show_legend_option``."""
+    legend = QCheckBox("Legend")                 # on/off; heads the legend group
+    legend.setChecked(True)
     auto = QCheckBox("Auto legend columns")
     auto.setChecked(True)
     ncol = _ispin(1, 12, 3)
     frame = QCheckBox("Legend frame")            # frameless by default
     frame.setChecked(False)
+    form.addRow("", legend)
     form.addRow("", auto)
     form.addRow("Legend columns", ncol)
     form.addRow("", frame)
 
     def sync(*_):
-        ncol.setEnabled(not auto.isChecked())
+        on = legend.isChecked()
+        auto.setEnabled(on)
+        frame.setEnabled(on)
+        ncol.setEnabled(on and not auto.isChecked())
 
+    legend.toggled.connect(sync)
+    legend.toggled.connect(panel._emit)
     auto.toggled.connect(sync)
     auto.toggled.connect(panel._emit)
     ncol.valueChanged.connect(panel._emit)
     frame.toggled.connect(panel._emit)
     sync()
+    panel._show_legend = legend
     panel._legend_auto = auto
     panel._legend_ncol = ncol
     panel._legend_frame = frame
@@ -108,34 +117,29 @@ def _legend_frame_option(panel):
     return panel._legend_frame.isChecked()
 
 
-def _add_view_toggles(panel, form, with_legend=True):
-    """Prepend the shared 'Show title' + 'Show legend' checkboxes (both on) to a
-    panel's form and wire them to ``panel._emit``. Every plot type gets them so the
-    title and legend can be hidden per view. Read via ``_show_title_option`` /
-    ``_show_legend_option`` (folded into the panel's options()). with_legend=False
-    omits the legend toggle for plots that draw no legend."""
-    title = QCheckBox("Show title")
+def _add_title_toggle(panel, form):
+    """Prepend a 'Title' on/off checkbox (on) to a panel's form, wired to
+    ``panel._emit`` — every plot type can hide its title. Read via
+    ``_show_title_option``. Also initializes ``panel._show_legend = None``; panels
+    that draw a legend add their own 'Legend' toggle grouped with the legend
+    controls (via ``_add_legend_controls`` or inline)."""
+    title = QCheckBox("Title")
     title.setChecked(True)
     form.addRow("", title)
     title.toggled.connect(panel._emit)
     panel._show_title = title
     panel._show_legend = None
-    if with_legend:
-        legend = QCheckBox("Show legend")
-        legend.setChecked(True)
-        form.addRow("", legend)
-        legend.toggled.connect(panel._emit)
-        panel._show_legend = legend
 
 
 def _show_title_option(panel):
-    """Whether the title is shown (panels built with _add_view_toggles)."""
+    """Whether the title is shown (panels built with _add_title_toggle)."""
     return panel._show_title.isChecked()
 
 
 def _show_legend_option(panel):
     """Whether the legend is shown (True when the panel has no legend toggle)."""
-    return panel._show_legend is None or panel._show_legend.isChecked()
+    lg = getattr(panel, "_show_legend", None)
+    return lg is None or lg.isChecked()
 
 
 def _cmap_icon(name):
@@ -177,7 +181,7 @@ class _CheckboxPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
-        _add_view_toggles(self, form)
+        _add_title_toggle(self, form)
         self._boxes = {}
         for key, label, default in self._FIELDS:
             box = QCheckBox(label)
@@ -231,37 +235,22 @@ class InputsDisplayPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
-        _add_view_toggles(self, form)
+        _add_title_toggle(self, form)
 
         self.mat_table = QCheckBox("Material property table")
         self.tab_loc = QComboBox()
         self.tab_loc.addItems(TAB_LOCATIONS)
-        # Auto = lay the legend out automatically (as wide as fits the axes, with
-        # the fewest neatly-balanced rows). Uncheck to force an exact column count.
-        self.legend_auto = QCheckBox("Auto legend columns")
-        self.legend_auto.setChecked(True)
-        self.legend_ncol = _ispin(1, 12, 3)
-        self.legend_frame = QCheckBox("Legend frame")     # frameless by default
-        self.legend_frame.setChecked(False)
-
         form.addRow("", self.mat_table)
         form.addRow("Table position", self.tab_loc)
-        form.addRow("", self.legend_auto)
-        form.addRow("Legend columns", self.legend_ncol)
-        form.addRow("", self.legend_frame)
+        _add_legend_controls(self, form)         # 'Legend' toggle + column layout
 
         self.mat_table.toggled.connect(self._sync)
-        self.legend_auto.toggled.connect(self._sync)
-        for w in (self.mat_table, self.legend_auto, self.legend_frame):
-            w.toggled.connect(self._emit)
+        self.mat_table.toggled.connect(self._emit)
         self.tab_loc.currentIndexChanged.connect(self._emit)
-        self.legend_ncol.valueChanged.connect(self._emit)
         self._sync()
 
     def _sync(self, *_):
         self.tab_loc.setEnabled(self.mat_table.isChecked())
-        # The explicit column count applies only when auto is off.
-        self.legend_ncol.setEnabled(not self.legend_auto.isChecked())
 
     def _emit(self, *_):
         self.changed.emit()
@@ -270,9 +259,8 @@ class InputsDisplayPanel(QWidget):
         return {
             "mat_table": self.mat_table.isChecked(),
             "tab_loc": self.tab_loc.currentText(),
-            "legend_ncol": ("auto" if self.legend_auto.isChecked()
-                            else self.legend_ncol.value()),
-            "legend_frame": self.legend_frame.isChecked(),
+            "legend_ncol": _legend_option(self),
+            "legend_frame": _legend_frame_option(self),
             "show_title": _show_title_option(self),
             "show_legend": _show_legend_option(self),
         }
@@ -286,7 +274,7 @@ class MeshDisplayPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
-        _add_view_toggles(self, form)
+        _add_title_toggle(self, form)
         self.show_nodes = QCheckBox("Show nodes")
         self.show_nodes.setChecked(True)
         self.label_elements = QCheckBox("Element numbers")
@@ -326,7 +314,7 @@ class FeDataDisplayPanel(QWidget):
     def __init__(self, include_bc_symbol=False, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
-        _add_view_toggles(self, form)
+        _add_title_toggle(self, form)
         self.show_bc = QCheckBox("Boundary conditions")
         self.show_bc.setChecked(True)
         self.show_nodes = QCheckBox("Show nodes")
@@ -376,7 +364,7 @@ class SeepDisplayPanel(QWidget):
     def __init__(self, materials, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
-        _add_view_toggles(self, form)
+        _add_title_toggle(self, form)
 
         self.variable = QComboBox()
         for key, label in SEEP_VARIABLES:
@@ -485,7 +473,7 @@ class FemResultsDisplayPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
-        _add_view_toggles(self, form)
+        _add_title_toggle(self, form)
 
         self.plot_type = QComboBox()
         for key, label in FEM_PLOT_TYPES:

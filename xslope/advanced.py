@@ -650,7 +650,7 @@ def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug
 
 
 def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='tri6',
-                    target_size=None, tolerance=0.002, failure_criterion='non_convergence',
+                    target_size=None, tolerance=0.001, failure_criterion='non_convergence',
                     max_iterations=3000, debug_level=0, progress_callback=None,
                     cancel_check=None):
     """Reliability analysis (Taylor Series Probability Method) using the FEM SSRM

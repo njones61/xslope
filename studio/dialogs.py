@@ -91,6 +91,17 @@ class RunFemDialog(QDialog):
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
         form.addRow("Tolerance (SSRM)", self.tolerance)
 
+        self.reliability_tol = QDoubleSpinBox()
+        self.reliability_tol.setDecimals(4)
+        self.reliability_tol.setRange(0.0001, 0.1)
+        self.reliability_tol.setSingleStep(0.0005)
+        self.reliability_tol.setValue(float(defaults.get("reliability_tol", 0.001)))
+        self.reliability_tol.setToolTip(
+            "Bisection tolerance for the reliability SSRM solves — tighter than a "
+            "single run (default 0.001). TSPM amplifies factor-of-safety "
+            "imprecision, so a tight tolerance keeps the reliability index stable.")
+        form.addRow("Reliability tol", self.reliability_tol)
+
         self.failure_criterion = QComboBox()
         for key, label in FEM_FAILURE_CRITERIA:
             self.failure_criterion.addItem(label, key)
@@ -101,10 +112,12 @@ class RunFemDialog(QDialog):
         form.addRow("Failure criterion", self.failure_criterion)
 
         layout.addLayout(form)
-        note = QLabel("Reliability uses the SSRM bracket above and the material "
-                      "standard deviations (sigma columns) from the mat sheet; it "
-                      "runs 1+2N SSRM solves. Plot type and deformation scale are "
-                      "set on the FEM Results view after solving.")
+        note = QLabel("Reliability uses the bracket above only to find the "
+                      "most-likely-value factor of safety; the ±σ perturbations "
+                      "then auto-bracket around it. It uses the material standard "
+                      "deviations (sigma columns) and runs 1+2N SSRM solves at the "
+                      "Reliability tol. Plot type and deformation scale are set on "
+                      "the FEM Results view after solving.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -118,10 +131,17 @@ class RunFemDialog(QDialog):
         self._sync_enabled()
 
     def _sync_enabled(self):
-        single = self.analysis.currentData() == "single"
+        a = self.analysis.currentData()
+        single = a == "single"
+        # Single: only F. SSRM: F_min/F_max + the single-run tolerance. Reliability:
+        # the bracket (used ONLY to find F_MLV — the perturbations auto-centre on it)
+        # plus its own tighter tolerance; the single-run Tolerance does not apply.
         self.F.setEnabled(single)
-        for w in (self.F_min, self.F_max, self.tolerance, self.failure_criterion):
-            w.setEnabled(not single)
+        self.F_min.setEnabled(not single)
+        self.F_max.setEnabled(not single)
+        self.failure_criterion.setEnabled(not single)
+        self.tolerance.setEnabled(a == "ssrm")
+        self.reliability_tol.setEnabled(a == "reliability")
 
     def options(self):
         return {
@@ -130,6 +150,7 @@ class RunFemDialog(QDialog):
             "F_min": self.F_min.value(),
             "F_max": self.F_max.value(),
             "tolerance": self.tolerance.value(),
+            "reliability_tol": self.reliability_tol.value(),
             "failure_criterion": self.failure_criterion.currentData(),
         }
 

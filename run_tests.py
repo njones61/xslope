@@ -513,7 +513,7 @@ def run_fem_reliability_test(test):
     with contextlib.redirect_stdout(io.StringIO()):
         success, result = reliability_fem(
             slope_data, mesh=mesh, F_min=test.get('f_min', 0.5),
-            F_max=test.get('f_max', 3.0), tolerance=float(test.get('ssrm_tol', 0.02)),
+            F_max=test.get('f_max', 3.0), tolerance=float(test.get('ssrm_tol', 0.001)),
             failure_criterion=test.get('criterion', 'non_convergence'))
     if not success:
         return None, f"reliability_fem failed: {result}"

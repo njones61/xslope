@@ -33,6 +33,14 @@ The [auto-expanding SSRM bracket](overview.md) is what makes this practical:
 each perturbation shifts the factor of safety, and the bracket adjusts itself so a
 fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 
+!!! note "The `F_min`/`F_max` bracket is only used to find $F_{MLV}$"
+    The bracket you supply is used **only for the initial most-likely-values
+    solve**. Every subsequent perturbation solve brackets *automatically* — a
+    window centred on $F_{MLV}$ (auto-expanding if a perturbation lands outside
+    it) — so you do not size the bracket for the perturbed cases. This also means
+    the bracket has essentially no effect on the reported reliability once the
+    bisection tolerance is tight (see below).
+
 ### Numerical precision and reproducibility
 
 Each SSRM factor of safety is the midpoint of the final bisection band, so it
@@ -41,7 +49,7 @@ this: $\dfrac{d\beta}{dF} = \dfrac{1}{F\sqrt{\ln(1+COV_F^2)}}$, which is $\appro
 at $COV_F = 0.1$ — so a small change in $F_{MLV}$ produces a proportionally larger
 change in $\beta$ and the reliability. Because TSPM combines $1+2N$ of these
 factors of safety, `reliability_fem` runs a **tighter bisection tolerance by
-default (0.002)** than a single SSRM solve (0.01), and centres the perturbation
+default (0.001)** than a single SSRM solve (0.01), and centres the perturbation
 brackets narrowly on $F_{MLV}$, so each factor of safety converges and the
 reported reliability is stable and reproducible (independent of the starting
 `F_min`/`F_max`).
@@ -125,7 +133,7 @@ success, result = reliability_fem(
     element_type="quad8",   # quadratic elements (tri6/quad8/quad9); see Overview
     target_size=3.5,        # omit to auto-size from the domain width
     F_min=1.0, F_max=2.0,   # starting bracket; auto-expands if the guess is off
-    # tolerance defaults to a tight 0.002 here (see Numerical precision above)
+    # tolerance defaults to a tight 0.001 here (see Numerical precision above)
 )
 # reliability_fem already prints the per-parameter ΔF table and the summary
 # (F_MLV, COV_F, beta, reliability, Pf); all of these are also in `result`.

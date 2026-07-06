@@ -724,7 +724,15 @@ class MainWindow(QMainWindow):
         try:
             from xslope.fem import build_fem_data, import_fem_solution, import_fem_meta
             fem_data = build_fem_data(self.doc.slope_data, mesh)
-            solution = import_fem_solution(fem_data, stem)
+            try:
+                solution = import_fem_solution(fem_data, stem)
+            except ValueError as exc:
+                # Stale sidecar: saved against a different mesh than the one now on
+                # disk (e.g. the mesh was rebuilt in an older build that left the
+                # sidecar behind). Skip it quietly — no traceback — rather than
+                # failing the load; a fresh solve + Save re-syncs it.
+                print(f"Skipping stale FEM solution sidecar: {exc}")
+                return
             meta = import_fem_meta(stem) or {}
             # Restore the strength-reduction factor the result plots show in their
             # subplot titles (solution["F"]); fall back to the SSRM FS.
@@ -1027,12 +1035,22 @@ class MainWindow(QMainWindow):
     def _on_mesh_succeeded(self, mesh):
         self.doc.slope_data["mesh"] = mesh   # used by Inputs render, Seep and FEM
         self.doc.results["mesh"] = mesh
-        # Persist alongside the .xlsx using the {stem}_mesh.json convention.
+        # A new mesh invalidates any previously computed seep/FEM solution (and the
+        # LEM solution, whose pore pressures come from seepage): they were built on
+        # the old node/element set. Drop the stale in-memory results and their tabs
+        # so they can't be re-shown or re-saved against the new mesh.
+        self.invalidate_results()
+        # Persist the mesh alongside the .xlsx ({stem}_mesh.json) — this write is
+        # eager (before Save), so the on-disk solution sidecars, which are stale vs
+        # the new mesh, must be removed now too. Otherwise the next load pairs the
+        # new mesh with an old {stem}_fem_nodes.csv and import_fem_solution raises a
+        # node-count mismatch.
         if self.doc.path:
             try:
                 from xslope.mesh import export_mesh_to_json
                 stem = os.path.splitext(self.doc.path)[0]
                 export_mesh_to_json(mesh, f"{stem}_mesh.json")
+                self._remove_solution_sidecars(stem)
             except Exception:
                 traceback.print_exc()
         self._show_mesh(mesh)
@@ -1047,6 +1065,20 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Build mesh failed", message)
         self.statusBar().showMessage("Build mesh failed.")
         self._mesh_done()
+
+    @staticmethod
+    def _remove_solution_sidecars(stem):
+        """Delete the on-disk seep/FEM solution sidecars for ``stem``. Called when
+        the mesh is rebuilt (they no longer match the new node/element set) so the
+        persisted files stay self-consistent; a fresh solve re-writes them on Save."""
+        for name in ("_seep.csv", "_seep2.csv", "_fem_nodes.csv",
+                     "_fem_elements.csv", "_fem_meta.json"):
+            path = f"{stem}{name}"
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                traceback.print_exc()
 
     def _mesh_done(self):
         self._mesh_busy = False

@@ -268,6 +268,8 @@ This benchmark also appears on the
 [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
 
 <!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-1 -->
+<!-- Element-type coverage: SSRM on each quadratic type (tri6, quad8, quad9). Slower (SSRM x3), so benchmark-gated. -->
+<!-- test: file=files/xslope_griffiths1.xlsx, type=fem_elements, expected_fs=1.36, tolerance=0.04, target_size=3.5, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
 
 ### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 

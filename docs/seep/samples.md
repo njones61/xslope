@@ -24,6 +24,8 @@ The solution should look something like this:
 ![clay_blanket_solution.png](images/clay_blanket_solution.png){width=1200px}
 
 <!-- test: file=files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
+<!-- Element-type coverage (saturated/confined): solve with tri3, tri6, quad4, quad8, quad9. -->
+<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep_elements, expected_flowrate=40.062, tolerance=0.05, target_size=1.5 -->
 
 ### 2. Sea Trench
 
@@ -69,6 +71,8 @@ The solution should look something like this:
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
 <!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.44, tolerance=0.05 -->
+<!-- Element-type coverage (unsaturated/unconfined, linear-front): tri3, tri6, quad4, quad8, quad9. -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep_elements, expected_flowrate=42.44, tolerance=0.05, target_size=2.0 -->
 
 ### 4. Earth Dam with Core — van Genuchten Unsaturated Model
 

@@ -9,6 +9,14 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
+    <!-- test: file=files/foo.xlsx, type=seep_elements, expected_flowrate=40.062, target_size=1.5, tolerance=0.05 -->
+    <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
+
+The seep_elements / fem_elements types solve ONE problem with every supported
+element type (seep: tri3/tri6/quad4/quad8/quad9; FEM: the quadratic tri6/quad8/
+quad9) and check each converges and matches the expected flowrate/FS within
+tolerance — coverage that a solver/mesh change hasn't broken an element type.
+element_types= overrides the default set.
 
 An optional benchmark=<ID> key (e.g. benchmark=SSRM-2) marks a verification
 benchmark; these can be excluded with --skip-benchmarks for quicker routine
@@ -365,6 +373,104 @@ def run_seep_test(test):
     return solution['flowrate'], None
 
 
+def run_seep_elements_test(test):
+    """Element-type coverage: solve ONE seepage problem with every supported
+    element type (tri3, tri6, quad4, quad8, quad9) and check each converges and
+    reproduces the expected flowrate within tolerance. The same physical problem
+    must give the same flowrate on every element type, so a single expected value
+    covers all — a change to the seepage solver or mesh that breaks (or shifts) an
+    element type is caught. Returns (0.0, None) if all pass, else (None, message
+    naming the failing types). element_types= overrides the default set."""
+    import io
+    import contextlib
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    slope_data = load_slope_data(test['file'])
+    polygons = get_material_polygons(slope_data)
+    element_types = [s.strip() for s in
+                     test.get('element_types', 'tri3,tri6,quad4,quad8,quad9').split(',')]
+    target_size = test.get('target_size')
+    if target_size is None:
+        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(x_coords) - min(x_coords)) / 120
+    expected = test['expected_flowrate']
+    tol = test.get('tolerance', 0.05) * abs(expected)
+
+    problems = []
+    for et in element_types:
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mesh = build_mesh_from_polygons(polygons, target_size, et)
+                seep_data = build_seep_data(mesh, slope_data)
+                solution = run_seepage_analysis(seep_data, tol=1e-4)
+        except Exception as e:
+            problems.append(f"{et}: {type(e).__name__}: {e}")
+            continue
+        if not solution.get('converged', True):
+            problems.append(f"{et}: did not converge")
+        elif abs(solution['flowrate'] - expected) > tol:
+            problems.append(f"{et}: flowrate {solution['flowrate']:.3f} vs {expected:.3f}")
+    if problems:
+        return None, "; ".join(problems)
+    return 0.0, None
+
+
+def run_fem_elements_test(test):
+    """Element-type coverage: solve ONE FEM (SSRM) problem with every QUADRATIC
+    element type (tri6, quad8, quad9) and check each converges to the expected
+    factor of safety within tolerance. FEM uses quadratic elements only (linear
+    tri3/quad4 lock and overestimate FS). Returns (0.0, None) if all pass, else
+    (None, message naming the failing types). element_types= overrides the set."""
+    import io
+    import contextlib
+    from xslope.fileio import load_slope_data
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry)
+
+    slope_data = load_slope_data(test['file'])
+    element_types = [s.strip() for s in
+                     test.get('element_types', 'tri6,quad8,quad9').split(',')]
+    target_size = test.get('target_size')
+    if target_size is None:
+        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(x_coords) - min(x_coords)) / 100
+    expected = test['expected_fs']
+    tol = test.get('tolerance', 0.03)
+    kwargs = {}
+    if 'max_iter' in test:
+        kwargs['max_iterations'] = int(test['max_iter'])
+    # ssrm_tol is the bisection precision (how tightly FS is bracketed); keep it
+    # well below the cross-element comparison tolerance.
+    ssrm_tol = float(test.get('ssrm_tol', 0.01))
+
+    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+    problems = []
+    for et in element_types:
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mesh = build_mesh_from_polygons(
+                    polygons, target_size=target_size, element_type=et,
+                    lines=constraint_lines)
+                fem_data = build_fem_data(slope_data, mesh)
+                result = solve_ssrm(fem_data, F_min=test.get('f_min', 0.5),
+                                    F_max=test.get('f_max', 3.0), tolerance=ssrm_tol,
+                                    debug_level=0, **kwargs)
+        except Exception as e:
+            problems.append(f"{et}: {type(e).__name__}: {e}")
+            continue
+        if not result.get('converged', False):
+            problems.append(f"{et}: SSRM failed ({result.get('error', '?')})")
+        elif abs(result['FS'] - expected) > tol:
+            problems.append(f"{et}: FS {result['FS']:.3f} vs {expected:.3f}")
+    if problems:
+        return None, "; ".join(problems)
+    return 0.0, None
+
+
 def run_reliability_test(test):
     """Run a single reliability analysis, returning the lognormal reliability index beta."""
     from xslope.fileio import load_slope_data
@@ -637,6 +743,10 @@ def run_test(test):
         return run_template_sync_test(test)
     if test_type == 'fem_ssrm':
         return run_fem_test(test)
+    if test_type == 'seep_elements':
+        return run_seep_elements_test(test)
+    if test_type == 'fem_elements':
+        return run_fem_elements_test(test)
     elif test_type == 'seep':
         return run_seep_test(test)
     elif test_type == 'reliability':
@@ -836,8 +946,9 @@ def main():
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'
-        elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr', 'mesh_conform'):
-            expected = 0.0          # these return 0.0 on success
+        elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
+                            'mesh_conform', 'seep_elements', 'fem_elements'):
+            expected = 0.0          # these return 0.0 on success (pass/fail tests)
             tol = 0.0
             label = 'mismatch'
         else:

@@ -227,6 +227,11 @@ class MainWindow(QMainWindow):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(5000)
+        # Fixed-width font so ASCII/tabulate grid tables (e.g. the reliability
+        # results table) line up — a proportional font misaligns the columns.
+        from PySide6.QtGui import QFontDatabase
+        self.log.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.log.setLineWrapMode(QPlainTextEdit.NoWrap)
         dock = QDockWidget("Log", self)
         dock.setObjectName("log_dock")
         dock.setWidget(self.log)

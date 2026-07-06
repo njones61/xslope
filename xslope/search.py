@@ -72,7 +72,7 @@ def _check_cancel(cancel_check):
 
 
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
-                    shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.01, depth_tol_frac=0.03,
+                    shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None):
     """
     Global 9-point circular search with adaptive grid refinement.
@@ -81,11 +81,15 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     center grid keeps refining until the best FS stops improving — specifically
     until two successive refinement levels each gain less than ``fs_tol`` (so the
     reported FS is stable to ~3 decimal places). FS convergence is only accepted
-    once the center grid has refined below ``min_grid_frac`` of the slope height,
-    so a coarse-grid FS plateau cannot be mistaken for the true minimum. ``tol``
-    is a geometric backstop on the grid spacing and ``max_iter`` caps the count.
-    Keying the stop on FS (not an absolute length like ``grid < 0.01``, which
-    means different things on a 20 ft vs a 500 ft slope) makes it scale-invariant.
+    once the center grid has refined below ``min_grid_frac`` of the domain height,
+    so a coarse-grid FS plateau cannot be mistaken for the true minimum. This grid
+    gate is deliberately loose (3% of the domain height): near the critical circle
+    the FS surface is flat, so once the FS has plateaued the center is already
+    located well enough — tightening the gate only spends extra refinement levels
+    that don't move the reported FS. ``tol`` is a geometric backstop on the grid
+    spacing and ``max_iter`` caps the count. Keying the stop on FS (not an absolute
+    length like ``grid < 0.01``, which means different things on a 20 ft vs a
+    500 ft slope) makes it scale-invariant.
 
     Returns:
         list of dict: sorted fs_cache by FS

@@ -487,6 +487,39 @@ def run_reliability_test(test):
     return result['beta_ln'], None
 
 
+def run_fem_reliability_test(test):
+    """FEM reliability regression: run reliability_fem on a mesh and return the
+    lognormal reliability index beta_ln (compared to expected_beta). Guards the
+    whole TSPM-over-SSRM pipeline — F_MLV, the F+/F- perturbation solves, and the
+    beta combination — on a coarse mesh so it stays affordable. ssrm_tol sets the
+    bisection precision; the tag's `tolerance` is the beta comparison tolerance."""
+    import io
+    import contextlib
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry)
+    from xslope.advanced import reliability_fem
+
+    slope_data = load_slope_data(test['file'])
+    element_type = test.get('element_type', 'tri6')
+    target_size = test.get('target_size')
+    if target_size is None:
+        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(x_coords) - min(x_coords)) / 100
+    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+    mesh = build_mesh_from_polygons(polygons, target_size=target_size,
+                                    element_type=element_type, lines=constraint_lines)
+    with contextlib.redirect_stdout(io.StringIO()):
+        success, result = reliability_fem(
+            slope_data, mesh=mesh, F_min=test.get('f_min', 0.5),
+            F_max=test.get('f_max', 3.0), tolerance=float(test.get('ssrm_tol', 0.02)),
+            failure_criterion=test.get('criterion', 'non_convergence'))
+    if not success:
+        return None, f"reliability_fem failed: {result}"
+    return result['beta_ln'], None
+
+
 def run_roundtrip_test(test):
     """Verify save_slope_data_to_xlsx round-trips a file: load -> save into a
     blank template -> reload must reproduce every input category.
@@ -747,6 +780,8 @@ def run_test(test):
         return run_seep_elements_test(test)
     if test_type == 'fem_elements':
         return run_fem_elements_test(test)
+    if test_type == 'fem_reliability':
+        return run_fem_reliability_test(test)
     elif test_type == 'seep':
         return run_seep_test(test)
     elif test_type == 'reliability':
@@ -942,7 +977,7 @@ def main():
             expected = test.get('expected_flowrate')
             tol = test.get('tolerance', 0.05) * abs(expected) if expected else 0
             label = 'flowrate'
-        elif test_type == 'reliability':
+        elif test_type in ('reliability', 'fem_reliability'):
             expected = test.get('expected_beta')
             tol = test.get('tolerance', 0.02)
             label = 'beta'

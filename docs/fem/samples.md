@@ -209,6 +209,59 @@ more sharply the band through the 2-ft layer is resolved.
      1.672 — mild thin-band localization sensitivity) -->
 <!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.68, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
 
+### 4. Reliability Analysis: Two-Layer c–φ Slope
+
+This example demonstrates a **finite-element reliability analysis** — the same
+Taylor Series Probability Method as the [LEM reliability analysis](../lem/reliability.md),
+but with each factor of safety computed by SSRM. See
+[Reliability Analysis (FEM)](reliability.md) for the method.
+
+Excel input file: [xslope_simple_mult_layers_fem.xlsx](files/xslope_simple_mult_layers_fem.xlsx)
+
+It reuses the geometry of the LEM
+[Simple Slope with Multiple Layers](../lem/samples.md) example — an embankment
+over a foundation layer — with the elastic properties ($E$, $\nu$) added for the
+finite-element solve and the strength retuned to a **marginally stable c–φ slope**
+so the reliability is interesting rather than near-certain:
+
+| Material   | $c$ | $\phi$ | $\gamma$ | $E$     | $\nu$ | $\sigma_c$ (COV) | $\sigma_\phi$ (COV) | $\sigma_\gamma$ (COV) |
+|------------|----:|-------:|---------:|--------:|------:|-----------------:|--------------------:|----------------------:|
+| Embankment |  70 |    20° |      130 | 500,000 | 0.35  |  18 (26%)        |  2 (10%)            |  6.5 (5%)             |
+| Foundation | 140 |    20° |      135 | 500,000 | 0.35  |  35 (25%)        |  2 (10%)            |  6.75 (5%)            |
+
+Running the analysis (`reliability_fem`, or **Studio → Run FEM → Reliability**)
+on a converged quad8 mesh gives:
+
+| $F_{MLV}$ | $\sigma_F$ | $COV_F$ | $\beta_{LN}$ | Reliability $R$ | $P_f$ |
+|----------:|-----------:|--------:|-------------:|----------------:|------:|
+| 1.132     | 0.123      | 0.109   | 1.09         | **86.3%**       | 13.7% |
+
+The most-likely factor of safety is only 1.13, so despite the moderate parameter
+scatter the probability of failure is a non-trivial **≈14%** — a reminder that a
+factor of safety comfortably above 1.0 does not by itself imply a low failure
+probability.
+
+The per-parameter ΔF table also shows *which* uncertainties matter:
+
+| Parameter        | MLV | σ    | $F^+$ | $F^-$ | ΔF    |
+|------------------|----:|-----:|------:|------:|------:|
+| Embankment $\phi$ |  20 | 2    | 1.230 | 1.043 | 0.188 |
+| Embankment $c$    |  70 | 18   | 1.207 | 1.050 | 0.156 |
+| Embankment $\gamma$ | 130 | 6.5 | 1.121 | 1.152 | 0.031 |
+| Foundation $\phi$ |  20 | 2    | 1.136 | 1.136 | 0.000 |
+| Foundation $c$    | 140 | 35   | 1.136 | 1.136 | 0.000 |
+| Foundation $\gamma$ | 135 | 6.75 | 1.136 | 1.136 | 0.000 |
+
+The **foundation's properties have ΔF = 0**: the critical failure mechanism is
+confined to the weaker embankment and never reaches the stronger foundation, so
+its strength and its uncertainty have no effect on the factor of safety. The
+embankment's friction angle and cohesion dominate the reliability. This is a
+useful by-product of the Taylor Series method — it exposes each parameter's
+contribution directly.
+
+<!-- FEM reliability regression (marginally-stable two-layer slope). Slow (13 SSRM solves), so benchmark-gated. -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.09, tolerance=0.1, element_type=quad8, target_size=3, f_min=0.7, f_max=1.6, ssrm_tol=0.01, benchmark=REL-FEM -->
+
 
 ---
 
@@ -217,7 +270,7 @@ analytically-anchored cases used to validate the FEM-SSRM implementation.
 Each is locked into the automated regression suite. See also the
 [Verification](../verification.md) page.
 
-### 4. Verification: Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
+### 5. Verification: Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
 
 This is the benchmark problem from Griffiths & Lane (1999), "Slope stability analysis by finite elements,"
 *Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
@@ -274,7 +327,7 @@ This benchmark also appears on the
 <!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=1.9, max_iter=4000 -->
 <!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.5, f_max=0.9, max_iter=4000 -->
 
-### 5. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
+### 6. Verification: Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
 The second SSRM verification benchmark, from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387), *Géotechnique* 49(3),
 Example 6: an actual earth dam cross-section (Torres & Coffman, 1997) with

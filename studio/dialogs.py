@@ -120,9 +120,11 @@ class RunFemDialog(QDialog):
             "Reliability uses the bracket above only to find the most-likely-value "
             "factor of safety; the ±σ perturbations then auto-bracket around it. It "
             "uses the material standard deviations (sigma columns) and runs 1+2N "
-            "SSRM solves at Tolerance (Reliability). Plot type and deformation scale "
-            "are set on the FEM Results view after solving.")
+            "SSRM solves at Tolerance (Reliability).")
         self._rel_note.setWordWrap(True)
+        # Cap the note to the form's width so it wraps (grows taller) instead of
+        # widening the whole dialog under the SetFixedSize constraint.
+        self._rel_note.setMaximumWidth(form.sizeHint().width())
         layout.addWidget(self._rel_note)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)

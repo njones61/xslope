@@ -57,7 +57,7 @@ When you provide a technical diagram of a slope, the skill:
    reinforcement, and piles
 2. **Checks for missing information** — if anything required is not visible in the diagram (unit weights, strength
    parameters, units, etc.), it will ask you before proceeding
-3. **Copies the blank template** (`input_template_v10.xlsx`) and populates each sheet using openpyxl
+3. **Copies the blank template** (`input_template.xlsx`) and populates each sheet using openpyxl
 4. **Validates** the file by loading it with `load_slope_data()` and plotting the inputs
 5. **Shows a summary** of everything that was populated (materials table, geometry, BCs, etc.) along with a download
    link and the validation plot
@@ -109,7 +109,7 @@ cp ~/Downloads/xslope.md .claude/commands/xslope.md
 ```
 
 3. Copy the blank input template from the xslope repository. The skill expects it at
-`docs/inputs/input_template_v10.xlsx`.
+`docs/inputs/input_template.xlsx`.
 
 ## Usage
 

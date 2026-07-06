@@ -254,6 +254,10 @@ class MainWindow(QMainWindow):
         font_spin.setValue(self._log_font.pointSize())
         font_spin.setSuffix(" pt")
         font_spin.setToolTip("Log font size")
+        # Slightly smaller widget font so the "11 pt" reading isn't oversized.
+        _sf = font_spin.font()
+        _sf.setPointSize(11)
+        font_spin.setFont(_sf)
         font_spin.valueChanged.connect(self._set_log_font_size)
         clear_btn = QToolButton()
         clear_btn.setText("Clear")

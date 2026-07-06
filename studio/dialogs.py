@@ -57,6 +57,10 @@ class RunFemDialog(QDialog):
         defaults = defaults or {}
 
         layout = QVBoxLayout(self)
+        # Fit the dialog to its content so showing/hiding the reliability note
+        # resizes the window instead of squeezing the fields.
+        from PySide6.QtWidgets import QLayout
+        layout.setSizeConstraint(QLayout.SetFixedSize)
         form = QFormLayout()
 
         self.analysis = QComboBox()

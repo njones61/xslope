@@ -255,13 +255,18 @@ class MainWindow(QMainWindow):
         font_spin.setSuffix(" pt")
         font_spin.setToolTip("Log font size")
         font_spin.valueChanged.connect(self._set_log_font_size)
-        row.addWidget(font_spin)
         clear_btn = QToolButton()
         clear_btn.setText("Clear")
         clear_btn.setAutoRaise(True)
         clear_btn.setToolTip("Clear the log output")
         clear_btn.clicked.connect(self.log.clear)
-        row.addWidget(clear_btn)
+        # Give both the same height (the taller of the two) so the spinner's native
+        # up/down arrows sit centred next to the button, and vertically centre them.
+        _h = max(font_spin.sizeHint().height(), clear_btn.sizeHint().height())
+        font_spin.setFixedHeight(_h)
+        clear_btn.setFixedHeight(_h)
+        row.addWidget(font_spin, 0, Qt.AlignVCenter)
+        row.addWidget(clear_btn, 0, Qt.AlignVCenter)
         dock.setTitleBarWidget(title)
         self.addDockWidget(Qt.BottomDockWidgetArea, dock)
         self.log_dock = dock

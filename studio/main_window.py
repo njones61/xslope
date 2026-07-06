@@ -228,12 +228,17 @@ class MainWindow(QMainWindow):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(5000)
         # Fixed-width font so ASCII/tabulate grid tables (e.g. the reliability
-        # results table) line up — a proportional font misaligns the columns. The
-        # platform fixed font can render small, so start at a readable point size
-        # (adjustable via the spinner in the Log title bar).
-        from PySide6.QtGui import QFontDatabase
-        self._log_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
-        self._log_font.setPointSize(max(12, self._log_font.pointSize()))
+        # results table) line up — a proportional font misaligns the columns.
+        # Prefer an explicit terminal-style monospace (Menlo / SF Mono on macOS) so
+        # the log's line spacing matches the console; the generic system fixed font
+        # can render looser. Size is adjustable via the spinner in the title bar.
+        from PySide6.QtGui import QFont
+        self._log_font = QFont()
+        self._log_font.setFamilies(["Menlo", "SF Mono", "Monaco", "DejaVu Sans Mono",
+                                    "Consolas", "Courier New", "monospace"])
+        self._log_font.setStyleHint(QFont.Monospace)
+        self._log_font.setFixedPitch(True)
+        self._log_font.setPointSize(12)
         self.log.setFont(self._log_font)
         self.log.setLineWrapMode(QPlainTextEdit.NoWrap)
         dock = QDockWidget("Log", self)

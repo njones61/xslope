@@ -1632,13 +1632,16 @@ def _parse_cell_ref(ref):
 
 
 def _modify_existing_cell(cell_xml, value):
-    if isinstance(value, float):
-        value = round(value, 10)
     open_match = re.match(r'(<c\s[^>]*?)(/?>)', cell_xml)
     if not open_match:
         return cell_xml
-    open_tag_attrs = open_match.group(1)
-    open_tag_attrs = re.sub(r'\s+t="[^"]*"', '', open_tag_attrs)
+    open_tag_attrs = re.sub(r'\s+t="[^"]*"', '', open_match.group(1))
+    if isinstance(value, float):
+        # NaN / inf must be written as an EMPTY cell (keeping ref + style): a numeric
+        # cell holding "nan" makes openpyxl's reader raise int('nan') on the next load.
+        if not np.isfinite(value):
+            return f'{open_tag_attrs}/>'
+        value = round(value, 10)
     if isinstance(value, str):
         return f'{open_tag_attrs} t="inlineStr"><is><t>{value}</t></is></c>'
     else:
@@ -1647,6 +1650,8 @@ def _modify_existing_cell(cell_xml, value):
 
 def _build_new_cell(ref, value):
     if isinstance(value, float):
+        if not np.isfinite(value):        # NaN / inf -> blank cell (see above)
+            return f'<c r="{ref}"/>'
         value = round(value, 10)
     if isinstance(value, str):
         return f'<c r="{ref}" t="inlineStr"><is><t>{value}</t></is></c>'

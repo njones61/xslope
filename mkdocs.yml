@@ -26,6 +26,8 @@ plugins:
           options:
             docstring_style: google
             show_signature_annotations: false
+hooks:
+  - docs/hooks.py
 nav:
   - Home: index.md
   - Usage Guide:

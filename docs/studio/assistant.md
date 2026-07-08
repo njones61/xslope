@@ -14,12 +14,20 @@ Examples of what you can ask:
 - *"Why did the SSRM not converge?"*
 - *"Build this slope from the attached sketch."* (with an image)
 
-![The Assistant dock](images/assistant_dock.png){width="380"}
+![The Assistant dock](images/assistant_dock.png)
 
-!!! note "Requires the `ai` extra"
-    The assistant needs the provider library, installed with the `ai` extra
-    (`pip install "xslope[gui,ai]"`). Without it the dock loads but reports that
-    the dependency is missing. See [Installation](index.md#installation).
+!!! note "Getting the assistant"
+    The assistant needs the provider library, which ships in the `ai` extra. How you
+    get it depends on how you installed Studio:
+
+    - **Packaged app** (`.dmg` / `.msi`) — included. The provider library is bundled
+      in the installer, so the assistant works out of the box; there is nothing to add.
+    - **From Python / pip** — add the `ai` extra:
+      `pip install "xslope[gui,ai]"`.
+
+    Either way you still choose a provider and enter credentials in **Settings…**
+    (below). Without the library, Studio runs normally but the dock reports that the
+    dependency is missing. See [Installation](index.md#installation).
 
 ---
 
@@ -58,7 +66,7 @@ a dialog to pick the provider and model and store credentials:
 | **DeepSeek** | Tool use; vision per model. |
 | **Z.ai (GLM)** | Tool use; vision per model. |
 
-![Assistant Settings dialog](images/assistant_settings.png){width="560"}
+![Assistant Settings dialog](images/assistant_settings.png)
 
 API keys are stored in the **OS keychain** (not in plaintext), and the Ollama base
 URL is configurable for local models. The dock shows the active provider · model,
@@ -76,7 +84,7 @@ an **autonomy mode**, switchable in the dock:
 - **Confirm** (default) — you review and approve each code run before it executes.
 - **Auto** — the assistant runs code without prompting.
 
-![Confirm-before-run](images/assistant_confirm.png){width="560"}
+![Confirm-before-run](images/assistant_confirm.png)
 
 Every action is visible in the transcript as a collapsible "ran code" block, and a
 **Stop** button halts the agent at any time. Because the kernel runs in Studio's own
@@ -92,7 +100,7 @@ your guardrails.
 
 ## Vision and chat UX
 
-![Building from a sketch (vision)](images/assistant_vision.png){width="1100"}
+![Building from a sketch (vision)](images/assistant_vision.png)
 
 - **Images** — paste or drop an image into the chat (e.g. a hand sketch or a screen
   capture) for models that support vision.

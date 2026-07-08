@@ -627,7 +627,7 @@ scout findings, and the feasibility-spike next step).
 
 **Phase 7 — Packaging & distribution** 🚧 **PARTIAL**
 - ✅ **Custom app icon** — branded "X" app icon for Dock / taskbar.
-- ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM; CI build matrix.
+- ⬜ PyInstaller or Briefcase native installers (`.dmg`/`.msi`); macOS code-signing/notarization; bundle gmsh for FEM **and the AI deps (`litellm` + `keyring`) so the assistant works out of the box** (§13.8 — packaged users can't `pip install`); CI build matrix.
 
 **Phase 8 — Documentation** 🚧 **PARTIAL** (first pass written; screenshots + installer section pending)
 - ✅ User documentation for XSlope Studio in the mkdocs site — a new **XSlope Studio** nav section (`docs/studio/`): **Overview** (install via the `gui`/`fem`/`ai` extras + launch), **The Interface** (window layout, canvas zoom/pan, view tabs, mode selector, Display + Log docks), **Editing Inputs** (editors, double-click-to-edit, labeled undo/redo, styles, file lifecycle), **Running Analyses** (meshing + LEM/Seep/FEM, result views, Display options, image/DXF export + import wizard), and **AI Assistant** (providers, autonomy modes, vision). Builds clean (no broken links).

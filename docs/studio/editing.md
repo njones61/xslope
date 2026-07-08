@@ -12,7 +12,7 @@ lifecycle.
 The **Inputs tree** (left dock) lists every input category. Click a category to
 open its editor:
 
-![Inputs tree](images/editing_inputs_tree.png){width="360"}
+![Inputs tree](images/editing_inputs_tree.png)
 
 | Category | What you edit |
 | --- | --- |
@@ -30,9 +30,9 @@ open its editor:
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows.
 
-![Materials table editor](images/editing_materials_table.png){width="760"}
+![Materials table editor](images/editing_materials_table.png)
 
-![Global parameters form](images/editing_global_form.png){width="520"}
+![Global parameters form](images/editing_global_form.png)
 
 Edits are validated, applied to the model, mark the document **dirty** (an asterisk
 in the title bar), and re-render the affected layers. Records preserve fields that
@@ -41,7 +41,7 @@ aren't shown in a given editor, so editing one column never drops the others.
 The geometry editors (profile lines and polygons) use a master/detail layout — pick
 a line on the left, edit its vertices on the right:
 
-![Geometry master-detail editor](images/editing_geometry_dialog.png){width="760"}
+![Geometry master-detail editor](images/editing_geometry_dialog.png)
 
 !!! note "Profile-based vs. polygon-based models"
     A model defines its geometry either through **profile lines** (stacked
@@ -57,7 +57,7 @@ a line on the left, edit its vertices on the right:
 On the **Inputs** view, double-clicking a feature on the canvas opens the right
 editor with the picked item pre-selected — no need to find it in the tree first.
 
-![Double-click to edit a feature](images/editing_double_click.png){width="1100"}
+![Double-click to edit a feature](images/editing_double_click.png)
 
 Studio maps the click to the drawing's coordinates and hit-tests the geometry, so
 this works on:
@@ -85,7 +85,7 @@ while the **dropdown arrow** shows the labeled history — *"Edit Materials"*,
 *"Edit Profile Lines"*, *"Assistant: materials, dloads"* — and selecting an entry
 jumps straight to that point in one action (an Office/Photoshop-style history).
 
-![Undo history dropdown](images/editing_undo_history.png){width="520"}
+![Undo history dropdown](images/editing_undo_history.png)
 
 A few behaviors worth knowing:
 
@@ -122,7 +122,7 @@ piezo lines, circles, and reinforcement. Open the **Styles…** button at the bo
 of the [Display dock](interface.md#the-display-dock) to edit them, with a live
 preview.
 
-![Styles dialog](images/editing_styles_dialog.png){width="760"}
+![Styles dialog](images/editing_styles_dialog.png)
 
 - **Materials** are styled by their `mat_id`: a fill color from an earth-tone
   palette, a soil-ish hatch, and an opacity.

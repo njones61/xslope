@@ -83,7 +83,7 @@ This opens the Studio window. From there, use **File → Open** to load an Excel
 problem, or **File → New** to start an empty project and build it up with the
 editors (or the assistant).
 
-![The File menu](images/overview_file_menu.png){width="380"}
+![The File menu](images/overview_file_menu.png)
 
 ---
 

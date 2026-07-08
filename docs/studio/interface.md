@@ -58,7 +58,7 @@ level rather than scaled as pixels.
 
 A **Mode** selector in the toolbar switches between the three analysis types:
 
-![Mode selector](images/interface_mode_selector.png){width="600"}
+![Mode selector](images/interface_mode_selector.png)
 
 - **LEM** — limit-equilibrium slope stability.
 - **Seepage** — finite-element groundwater flow.
@@ -80,7 +80,7 @@ The mode controls two things:
 The central area is a tab strip. The **Inputs** tab is always first; running an
 analysis adds the relevant result tab(s) and switches to them:
 
-![View tabs](images/interface_view_tabs.png){width="900"}
+![View tabs](images/interface_view_tabs.png)
 
 | Tab | Shown after | Content |
 | --- | --- | --- |
@@ -113,7 +113,7 @@ flowlines/vectors on the Seep · Solution view; plot type and deformation scale 
 FEM · Results. Changing an option re-renders the cached result immediately — no
 re-solve.
 
-![Display dock](images/interface_display_dock.png){width="360"}
+![Display dock](images/interface_display_dock.png)
 
 At the bottom of the dock, the **Styles…** button opens the project-wide
 [Styles dialog](editing.md#styles) for per-feature colors, hatches, and line
@@ -133,4 +133,4 @@ iteration counts, search refinement steps, seepage convergence traces, SSRM fact
 brackets. A progress bar and a **Cancel** button appear at the right of the status
 bar during a run; cancelling aborts cleanly and leaves no partial result tab.
 
-![Log pane during a run](images/interface_log_pane.png){width="1200"}
+![Log pane during a run](images/interface_log_pane.png)

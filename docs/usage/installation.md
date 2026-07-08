@@ -48,9 +48,16 @@ conda install -c conda-forge xslope
 ```
 
 Unlike the PyPI package, the conda-forge build always includes **gmsh**, so there is no
-separate `fem` extra to request. conda installs every required dependency — including the
-ones needed for seepage and finite element analysis, and gmsh's system libraries — so the
-extra Linux OpenGL step above is not needed when installing this way.
+separate `fem` extra to request. conda installs every required dependency for the
+**analysis library** — including the ones needed for seepage and finite element analysis,
+and gmsh's system libraries — so the extra Linux OpenGL step above is not needed when
+installing this way.
+
+!!! note "Studio and the AI assistant are not in the conda package"
+    The conda-forge build provides the xslope **analysis library** (for scripts and
+    notebooks). It does **not** include [XSlope Studio](../studio/index.md) (the desktop
+    GUI) or its [AI assistant](../studio/assistant.md). For those, use the native
+    installer or `pip install "xslope[gui,ai]"`.
 
 ## Accessing the functions
 

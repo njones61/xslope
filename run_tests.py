@@ -593,7 +593,8 @@ def run_mp_spencer_test(test):
     otherwise only exercised implicitly, and a stale docstring once claimed the
     facing was unsupported when it had in fact been implemented.
 
-    Returns (max_abs_diff, None) on success, else (None, message).
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test, like
+    the round-trip checks.
     """
     from xslope.fileio import load_slope_data
     from xslope.slice import generate_slices
@@ -630,7 +631,7 @@ def run_mp_spencer_test(test):
     if diff > tol:
         return None, (f"{facing}-facing: mprice(f=1) FS={res_m['FS']:.8f} != "
                       f"spencer FS={res_s['FS']:.8f} (diff {diff:.2e} > {tol:.0e})")
-    return diff, None
+    return 0.0, None
 
 
 def _default_dxf_mapping(layers):
@@ -935,14 +936,21 @@ def main():
     private_path = Path(private_dir or '')
     if private_path.is_dir():
         n_priv = 0
-        # Recursive: fixtures live under tests/. Skip ref_docs/, which holds
-        # third-party reference material rather than test pages.
-        for md in sorted(private_path.rglob('*.md')):
+        # Fixtures live under tests/. Scope the walk there rather than over the whole
+        # repo: sibling trees (plans/, ref_docs/) hold prose that quotes the
+        # `<!-- test: ... -->` syntax as documentation, and parsing those yields
+        # garbage entries with no 'file' key.
+        scan_root = private_path / 'tests'
+        if not scan_root.is_dir():
+            scan_root = private_path
+        for md in sorted(scan_root.rglob('*.md')):
             if md.name.lower() == 'readme.md':
                 continue
             if 'ref_docs' in md.relative_to(private_path).parts:
                 continue
             for t in parse_test_tags(md):
+                if not t.get('file'):
+                    continue    # a prose example of the tag syntax, not a fixture
                 ttype = t.get('type', '')
                 if ttype == 'fem_ssrm':
                     if run_fem:
@@ -1055,7 +1063,8 @@ def main():
             tol = test.get('tolerance', 0.02)
             label = 'beta'
         elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
-                            'mesh_conform', 'seep_elements', 'fem_elements'):
+                            'mesh_conform', 'seep_elements', 'fem_elements',
+                            'mp_spencer'):
             expected = 0.0          # these return 0.0 on success (pass/fail tests)
             tol = 0.0
             label = 'mismatch'

@@ -480,12 +480,17 @@ def import_dxf(dxf_path, template, out_path, material_map=None, arc_sag=0.05,
         poly_cells[cell_ref(5, y_col)] = ''
     updates['polygon'] = poly_cells
 
-    # mat sheet: seed material names (row 9 = mat 1; name in column 2).
+    # mat sheet: seed material names. Header row and the 'name' column are both located
+    # by name in the destination file, never assumed -- see fileio.mat_header_cols.
     if seed_materials:
-        mat_cells = {}
-        for lyr, mat_id in sorted(layer_to_mat.items(), key=lambda kv: kv[1]):
-            mat_cells[cell_ref(9 + (mat_id - 1), 2)] = lyr
-        updates['mat'] = mat_cells
+        from .fileio import mat_header_cols
+        mat_hdr, mat_cols = mat_header_cols(out_path)
+        name_col = mat_cols.get('name')
+        if name_col is not None:
+            mat_cells = {}
+            for lyr, mat_id in sorted(layer_to_mat.items(), key=lambda kv: kv[1]):
+                mat_cells[cell_ref(mat_hdr + mat_id, name_col)] = lyr
+            updates['mat'] = mat_cells
 
     write_cells_to_xlsx(out_path, updates)
     return {'polygons': polygons, 'layer_to_mat': layer_to_mat,

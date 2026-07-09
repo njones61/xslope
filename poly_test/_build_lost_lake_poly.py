@@ -1,10 +1,10 @@
-"""Build poly_test/xslope_lost_lake_poly.xlsx by copying the v10 template and
+"""Build poly_test/xslope_lost_lake_poly.xlsx by copying the current template and
 populating it with the Lost Lake inputs, using the polygon sheet (derived from
 the profile-line geometry via build_polygons) instead of the profile sheet."""
 import os
 import shutil
 
-from xslope.fileio import load_slope_data, write_cells_to_xlsx, cell_ref
+from xslope.fileio import load_slope_data, write_cells_to_xlsx, cell_ref, mat_header_cols
 from xslope.mesh import build_polygons
 
 # The surgical xlsx writer now lives in xslope.fileio
@@ -45,15 +45,18 @@ seep_props = [
     ("Grouted Bedrock", 250,  250,    0,     0.0001, -1),
     ("Bedrock",       2000,   1000,   0,     0.0001, -1),
 ]
+# Locate the mat header row and its columns BY NAME in the destination file. Writing by
+# hardcoded column number silently shifts when a column is inserted -- v11 added 'unsat'
+# at column 21, which would have sent kr0 into it and h0 into kr0.
+mat_hdr, mat_cols = mat_header_cols(dst)
 updates['mat'] = {}
 for i, (name, k1, k2, alpha, kr0, h0) in enumerate(seep_props):
-    row = 9 + i
-    updates['mat'][cell_ref(row, 2)] = name
-    updates['mat'][cell_ref(row, 18)] = k1
-    updates['mat'][cell_ref(row, 19)] = k2
-    updates['mat'][cell_ref(row, 20)] = alpha
-    updates['mat'][cell_ref(row, 21)] = kr0
-    updates['mat'][cell_ref(row, 22)] = h0
+    row = mat_hdr + 1 + i
+    for header, val in (('name', name), ('k1', k1), ('k2', k2),
+                        ('alpha', alpha), ('kr0', kr0), ('h0', h0)):
+        col = mat_cols.get(header)
+        if col is not None:
+            updates['mat'][cell_ref(row, col)] = val
 
 # --- polygon sheet ---
 # Block layout: polygon p (1-based) -> x_col = 1 + 3*(p-1), y_col = x_col + 1.

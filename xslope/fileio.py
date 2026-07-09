@@ -484,7 +484,14 @@ def load_slope_data(filepath):
     # unified polygon representation after materials are parsed — see below.
 
     # === MATERIALS (Optimized Parsing) ===
-    mat_df = xls.parse('mat', header=7)  # header=7 because the header row is row 8 in Excel (0-indexed row 7)
+    # Locate the header row rather than assuming row 8 -- it has moved before (pre-v8
+    # templates put it on row 3) and a legend row above the table moves it again.
+    _mat_raw = xls.parse('mat', header=None)
+    _mat_hdr = _find_mat_header_row(
+        lambda r, c: (_mat_raw.iloc[r - 1, c - 1]
+                      if r <= _mat_raw.shape[0] and c <= _mat_raw.shape[1] else None))
+    mat_df = _mat_raw.iloc[_mat_hdr:].reset_index(drop=True)
+    mat_df.columns = [('' if pd.isna(v) else str(v).strip()) for v in _mat_raw.iloc[_mat_hdr - 1]]
     materials = []
 
     def _num(x):
@@ -516,8 +523,8 @@ def load_slope_data(filepath):
         end_col = min(mat_df.shape[1], 24)  # X is column 24 (1-based) -> index 23, so slice end is 24
         c_to_x_empty = True if start_col >= end_col else row.iloc[start_col:end_col].isna().all()
         if c_to_x_empty:
-            # Excel row number: header is on row 8, first data row is row 9
-            excel_row = i + 9
+            # Excel row number: first data row sits just below the located header
+            excel_row = _mat_hdr + 1 + i
             raise ValueError(
                 "CRITICAL ERROR: Material row has empty property fields. "
                 f"Material '{material_name}' (Excel row {excel_row}) is blank in columns C:X."
@@ -534,8 +541,8 @@ def load_slope_data(filepath):
         if unsat_val not in ('lf', 'vg'):
             unsat_val = 'lf'
 
-        # Excel row number: header is on row 8, first data row is row 9
-        excel_row = i + 9
+        # Excel row number: first data row sits just below the located header
+        excel_row = _mat_hdr + 1 + i
 
         # Pore pressure option. An unrecognized value used to fall through to
         # u = 0 in slice.py, silently deleting pore pressure and inflating FS.
@@ -1224,25 +1231,84 @@ def default_template_path():
                         "resources", "input_template.xlsx")
 
 
+# in-memory material key -> 'mat' sheet header text. Shared by the writer and by the
+# input-building scripts, so a new column is declared in exactly one place.
+MAT_NUM_HEADERS = [
+    ('gamma', 'g'), ('c', 'c'), ('phi', 'f'), ('cp', 'c/p'), ('r_elev', 'r-elev'),
+    ('d', 'd'), ('psi', 'psi'),
+    ('sigma_gamma', 's(g)'), ('sigma_c', 's(c)'), ('sigma_phi', 's(f)'),
+    ('sigma_cp', 's(c/p)'), ('sigma_d', 's(d)'), ('sigma_psi', 's(psi)'),
+    ('k1', 'k1'), ('k2', 'k2'), ('alpha', 'alpha'),
+    ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vg_a'), ('vg_n', 'vg_n'),
+    ('E', 'E'), ('nu', 'n'),
+]
+MAT_STR_HEADERS = [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]
+
+# The 'mat' header row is located by scanning for its sentinel cells rather than
+# assumed to be row 8: the header has moved before (pre-v8 templates put it on row 3,
+# and none of those load today), and a legend row inserted above the table moves it
+# again. Bounded scan -- the legend above the table is short.
+_MAT_HEADER_SCAN_ROWS = 20
+
+
+def _find_mat_header_row(cell):
+    """Row index (1-based) of the 'mat' sheet header, found by its sentinel cells:
+    column A == 'mat' and column B == 'name'.
+
+    ``cell(row, col) -> value`` is a lookup callable, so this works against either an
+    openpyxl worksheet or a header-less DataFrame.
+
+    The row analogue of :data:`MAT_NUM_HEADERS`' by-name column lookup: neither the
+    header's row nor its columns may be hardcoded, so inserting a legend row or a new
+    property column cannot silently shift what gets read or written.
+
+    Raises:
+        ValueError: if no header row is found in the first 20 rows.
+    """
+    def _s(v):
+        return '' if v is None else str(v).strip().lower()
+
+    for r in range(1, _MAT_HEADER_SCAN_ROWS + 1):
+        if _s(cell(r, 1)) == 'mat' and _s(cell(r, 2)) == 'name':
+            return r
+    raise ValueError(
+        "The 'mat' sheet has no header row: expected a row whose first two cells are "
+        f"'mat' and 'name' within the first {_MAT_HEADER_SCAN_ROWS} rows."
+    )
+
+
 def _read_mat_header_cols(filepath):
-    """Map each 'mat' sheet header (Excel row 8) to its 1-based column index, read
-    from the destination workbook. This lets :func:`save_slope_data_to_xlsx` locate
-    material columns BY NAME rather than hardcoded positions, so the writer adapts
-    to the template version automatically (e.g. v11 inserted ``unsat`` and
-    ``vg_a``/``vg_n``, shifting ``kr0``/``h0``/``E``/``nu``). Headers absent in an
-    older template are simply skipped by the caller."""
+    """(header_row, cols) for the 'mat' sheet, read from the destination workbook.
+
+    ``cols`` maps each header's text to its 1-based column index, so
+    :func:`save_slope_data_to_xlsx` locates material columns BY NAME rather than by
+    hardcoded position and adapts to the template version automatically (v11 inserted
+    ``unsat`` and ``vg_a``/``vg_n``, shifting ``kr0``/``h0``/``E``/``nu``). Headers
+    absent in an older template are simply skipped by the caller. ``header_row`` is
+    found the same way -- see :func:`_find_mat_header_row`.
+    """
     import openpyxl
     wb = openpyxl.load_workbook(filepath, read_only=True, data_only=False)
     try:
         ws = wb['mat']
+        header_row = _find_mat_header_row(lambda r, c: ws.cell(row=r, column=c).value)
         cols = {}
         for c in range(1, ws.max_column + 1):
-            v = ws.cell(row=8, column=c).value
+            v = ws.cell(row=header_row, column=c).value
             if v is not None and str(v).strip() != '':
                 cols[str(v).strip()] = c
-        return cols
+        return header_row, cols
     finally:
         wb.close()
+
+
+def mat_header_cols(filepath):
+    """Public accessor for the 'mat' sheet's ``(header_row, {header: column})`` map.
+
+    Input-building scripts must write material cells through this rather than by
+    hardcoded column number, or a future column insert shifts them silently.
+    """
+    return _read_mat_header_cols(filepath)
 
 
 def _inplace_save_would_drop(filepath, materials):
@@ -1353,38 +1419,29 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         'D11': _f(slope_data['k_seismic']),
     }
 
-    # === mat ===  (header row 8, data rows 9+). Columns are located BY HEADER NAME
-    # read from the destination file, not hardcoded positions, so the writer adapts
-    # to the template version automatically (v11 inserted 'unsat' and 'vg_a'/'vg_n',
-    # shifting kr0/h0/E/nu). A header absent in an older template is skipped.
-    mat_cols = _read_mat_header_cols(filepath)
-    # in-memory key -> mat-sheet header text (numeric fields)
-    mat_num_headers = [
-        ('gamma', 'g'), ('c', 'c'), ('phi', 'f'), ('cp', 'c/p'), ('r_elev', 'r-elev'),
-        ('d', 'd'), ('psi', 'psi'),
-        ('sigma_gamma', 's(g)'), ('sigma_c', 's(c)'), ('sigma_phi', 's(f)'),
-        ('sigma_cp', 's(c/p)'), ('sigma_d', 's(d)'), ('sigma_psi', 's(psi)'),
-        ('k1', 'k1'), ('k2', 'k2'), ('alpha', 'alpha'),
-        ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vg_a'), ('vg_n', 'vg_n'),
-        ('E', 'E'), ('nu', 'n'),
-    ]
+    # === mat ===  Both the header ROW and its COLUMNS are located by name in the
+    # destination file, never hardcoded, so the writer adapts to the template version
+    # automatically (v11 inserted 'unsat' and 'vg_a'/'vg_n', shifting kr0/h0/E/nu; a
+    # legend row above the table would shift the header row). A header absent in an
+    # older template is skipped.
+    mat_header_row, mat_cols = _read_mat_header_cols(filepath)
     mat = {}
     for idx, material in enumerate(slope_data.get('materials', [])):
-        row = 9 + idx
+        row = mat_header_row + 1 + idx
         if 'mat' in mat_cols:
             mat[cell_ref(row, mat_cols['mat'])] = idx + 1     # 1-based mat number
         if 'name' in mat_cols:
             mat[cell_ref(row, mat_cols['name'])] = str(material.get('name', ''))
         # option / u / unsat are strings; leave the cell blank when unset (the loader
         # reads an empty cell back as a default, so writing literal text is noise).
-        for key, header in [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]:
+        for key, header in MAT_STR_HEADERS:
             col = mat_cols.get(header)
             if col is None:
                 continue
             val = material.get(key)
             if val is not None and str(val).strip().lower() not in ('', 'nan'):
                 mat[cell_ref(row, col)] = str(val)
-        for key, header in mat_num_headers:
+        for key, header in MAT_NUM_HEADERS:
             col = mat_cols.get(header)
             if col is None:
                 continue

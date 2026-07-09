@@ -13,7 +13,8 @@ Run from the repo root:  PYTHONPATH=. python3 poly_test/_build_seep_polys.py
 import os
 import shutil
 
-from xslope.fileio import load_slope_data, write_cells_to_xlsx, cell_ref
+from xslope.fileio import (load_slope_data, write_cells_to_xlsx, cell_ref,
+                           mat_header_cols, MAT_NUM_HEADERS, MAT_STR_HEADERS)
 from xslope.mesh import build_polygons
 
 # The surgical xlsx writer now lives in xslope.fileio
@@ -61,25 +62,22 @@ def build_polygon_version(src, dst, template="docs/inputs/input_template.xlsx"):
     }
 
     # --- mat: copy every populated field from the source materials ---
-    # Column map (1-based): name=2, gamma=3, option=4, c=5, phi=6, cp=7,
-    # r_elev=8, d=9, psi=10, u=11, sigmas s(g..psi)=12..17,
-    # k1=18, k2=19, alpha=20, kr0=21, h0=22, E=23, nu=24
-    num_cols = {
-        'gamma': 3, 'c': 5, 'phi': 6, 'cp': 7, 'r_elev': 8, 'd': 9, 'psi': 10,
-        'sigma_gamma': 12, 'sigma_c': 13, 'sigma_phi': 14, 'sigma_cp': 15,
-        'sigma_d': 16, 'sigma_psi': 17, 'k1': 18, 'k2': 19, 'alpha': 20,
-        'kr0': 21, 'h0': 22, 'E': 23, 'nu': 24,
-    }
+    # Header row and columns are located BY NAME in the destination file. The previous
+    # hardcoded v10 map (kr0=21, h0=22, E=23, nu=24) silently shifted when v11 inserted
+    # 'unsat' at column 21.
+    mat_hdr, mat_cols = mat_header_cols(dst)
     updates['mat'] = {}
     for i, mat in enumerate(data['materials']):
-        row = 9 + i
-        for key, col in (('name', 2), ('option', 4), ('u', 11)):
+        row = mat_hdr + 1 + i
+        for key, header in [('name', 'name')] + MAT_STR_HEADERS:
+            col = mat_cols.get(header)
             s = _clean_str(mat.get(key))
-            if s is not None:
+            if col is not None and s is not None:
                 updates['mat'][cell_ref(row, col)] = s
-        for key, col in num_cols.items():
+        for key, header in MAT_NUM_HEADERS:
+            col = mat_cols.get(header)
             v = mat.get(key)
-            if _is_num(v):
+            if col is not None and _is_num(v):
                 updates['mat'][cell_ref(row, col)] = float(v)
 
     # --- polygon sheet ---

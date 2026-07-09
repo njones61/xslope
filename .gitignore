@@ -36,12 +36,9 @@ site/
 .mypy_cache/
 .ruff_cache/
 
-# Reference PDFs must never be committed to this public repo. Journal articles and
-# vendor manuals are third-party copyrighted works; republishing them here is not ours
-# to do. They live in the private sibling repo instead:
-#   ../xslope_private/ref_docs/
-# Only source code stays under ref_docs/ here (seep2d_fortran, pfem_code) because
-# benchmarks/run_seep2d_compare.py depends on it.
+# Reference material lives in the private sibling repo, ../xslope_private/ref_docs/,
+# not here. Journal articles and vendor manuals are third-party copyrighted works, and
+# republishing them from a public repo is not ours to do.
+# This guard stops a ref_docs/ tree from reappearing here by accident.
 # See plans/plan_import.md §7 and plans/plan_refdocs_history_purge.md.
-ref_docs/**/*.pdf
-ref_docs/ref_docs_rocscience/
+ref_docs/

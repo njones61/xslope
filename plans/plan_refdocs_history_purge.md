@@ -60,6 +60,11 @@ public agency releases and carry little or no restriction:
 Purging all 34 is simpler than curating, costs nothing extra, and the low-concern documents are
 freely re-downloadable from their agencies anyway. **Recommend: purge all PDFs.**
 
+Note the rewrite targets **PDFs only**, not the `ref_docs/` tree wholesale. The Fortran sources
+that also lived there (`seep2d_fortran`, and the `pfem_code` gitlink) have since moved to the
+private repo, but they are small, and there is no copyright reason to scrub them from history.
+Keeping the callback narrow reduces the chance of collateral damage.
+
 ## 4. Procedure
 
 Run from a scratch directory. **Do not run this in the working repo.**
@@ -89,9 +94,12 @@ git filter-repo --force --filename-callback '
 git log --all --pretty=format: --name-only | grep -i '\.pdf$' | sort -u   # -> empty
 du -sh .
 
-# 5. Confirm the code that must survive is still there.
-git log --all --oneline -- ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f | tail -1
+# 5. Sanity: the rewrite must not have touched non-PDF blobs.
+git log --all --oneline -- xslope/ | tail -1     # package history intact
 ```
+
+Nothing under `ref_docs/` needs to survive in the public repo — the whole tree, including
+`seep2d_fortran` and the orphaned `pfem_code` gitlink, now lives in `../xslope_private/`.
 
 Only once every check passes:
 

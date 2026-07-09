@@ -24,7 +24,7 @@ The effect is worse on coarse meshes where elements are larger relative to the p
 
 ## SEEP2D Approach
 
-The SEEP2D Fortran code (`ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f`, subroutine `qdflow`) evaluates `kr` at each **Gauss point** individually during stiffness assembly:
+The SEEP2D Fortran code (`../xslope_private/ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f`, subroutine `qdflow`) evaluates `kr` at each **Gauss point** individually during stiffness assembly:
 
 ```fortran
 c     Compute pressure heads at the integration points (lines 1548-1564)
@@ -93,4 +93,4 @@ Ensure both the head and stream function solves use identical `kr` evaluation. F
 
 ## References
 
-- `ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f` — subroutine `qdflow` (line 1458), function `fkrel` (line 2562)
+- `../xslope_private/ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f` — subroutine `qdflow` (line 1458), function `fkrel` (line 2562)

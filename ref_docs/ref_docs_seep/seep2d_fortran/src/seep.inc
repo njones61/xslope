@@ -1,7 +1,0 @@
-c   Version date 4 May 2005
-c
-C Parameters for SEEP2D
-      PARAMETER (MXNODS=1000000)
-      PARAMETER (MXELES=1000000)
-      PARAMETER (MXBNDW=700)
-      PARAMETER (MXMATS=100)

@@ -6,7 +6,7 @@ conditions, same material parameters — runs the original USACE/WES SEEP2D
 Fortran program on it, and compares nodal heads and total discharge against
 xslope's seepage solution on the very same arrays.
 
-SEEP2D binary: compiled from ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f
+SEEP2D binary: compiled from ../xslope_private/ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f
 with gfortran (-std=legacy), after three mechanical patches for gfortran:
   - comment out `use DFPORT` / `use DFLIB` (DEC/Intel portability modules;
     getarg/iargc are gfortran intrinsics)

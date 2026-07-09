@@ -283,10 +283,11 @@ delivered through the Bentley Education Program:
 - **Bentley Education** — https://www.bentley.com/education/ ·
   sign-up https://www.bentley.com/edu-sign-up/ — free learning licenses to students *and*
   educators; catalog explicitly lists **GeoStudio 2D/3D** and PLAXIS.
-- 💡 **The free tier needs no quote and no sales reply.** Bentley Education is a self-serve
-  eligibility sign-up, not a quoted sale — so it is not blocked on the pending quote
-  requests and could put GeoStudio on the machine this week. Weigh that against the
-  restriction below before accepting it.
+- **Not pursued: the free tier.** Recorded only for completeness. Bentley Education is a
+  self-serve eligibility sign-up rather than a quoted sale, so it is the one route not
+  blocked on a sales reply — but see the restriction immediately below, which makes it a
+  poor fit for this work. The quote requests target a **paid** academic license, which is
+  the right instrument.
 - ⚠️ **The free tier's restriction may be the tightest of all:** "for educational purposes
   only, not for school operations or **commercially-funded research**." Building a
   generally-distributed importer is plausibly outside "educational purposes." The paid

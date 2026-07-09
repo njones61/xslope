@@ -36,9 +36,10 @@ site/
 .mypy_cache/
 .ruff_cache/
 
-# Reference material lives in the private sibling repo, ../xslope_private/ref_docs/,
-# not here. Journal articles and vendor manuals are third-party copyrighted works, and
-# republishing them from a public repo is not ours to do.
-# This guard stops a ref_docs/ tree from reappearing here by accident.
-# See plans/plan_import.md §7 and plans/plan_refdocs_history_purge.md.
+# Third-party reference material is not redistributed from this repo. It lives in the
+# private sibling repo, ../xslope_private/ref_docs/. This guard stops a ref_docs/ tree
+# from reappearing here by accident.
 ref_docs/
+
+# Design and planning notes live in the private sibling repo, ../xslope_private/plans/.
+plans/

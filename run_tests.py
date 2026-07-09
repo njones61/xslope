@@ -865,9 +865,9 @@ def main():
             elif run_lem:
                 tests.append(t)
 
-    # Private test problems (CE 544 homework/exam keys) live in a separate
-    # repo kept out of the public xslope tree. Look for it as a sibling
-    # directory or at $XSLOPE_PRIVATE_TESTS; scan every markdown file there for
+    # Private test problems (CE 544 homework/exam keys, plus synthetic variants)
+    # live in a separate repo kept out of the public xslope tree. Look for it as a
+    # sibling directory or at $XSLOPE_PRIVATE_TESTS; scan its markdown files for
     # test tags and route by type. Silently skipped when the repo is absent
     # (public CI, other clones), so the public suite is unaffected.
     private_dir = os.environ.get('XSLOPE_PRIVATE_TESTS')
@@ -881,8 +881,12 @@ def main():
     private_path = Path(private_dir or '')
     if private_path.is_dir():
         n_priv = 0
-        for md in sorted(private_path.glob('*.md')):
+        # Recursive: fixtures live under tests/. Skip ref_docs/, which holds
+        # third-party reference material rather than test pages.
+        for md in sorted(private_path.rglob('*.md')):
             if md.name.lower() == 'readme.md':
+                continue
+            if 'ref_docs' in md.relative_to(private_path).parts:
                 continue
             for t in parse_test_tags(md):
                 ttype = t.get('type', '')

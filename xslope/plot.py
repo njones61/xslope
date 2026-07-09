@@ -2195,8 +2195,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     alpha = 0.3
     if results['method'] in ('spencer', 'mprice'):
         # M-P draws the thrust line too once it is computed; plot_thrust_line_from_df
-        # skips gracefully while 'yt_l'/'yt_r' are absent (M-P thrust line is a
-        # deferred post-process diagnostic — see plans/mprice_plan.md §4 option b).
+        # skips gracefully while 'yt_l'/'yt_r' are absent (the M-P thrust line is a
+        # deferred post-process diagnostic).
         plot_thrust_line_from_df(ax, slice_df)
 
     plot_base_stresses(ax, slice_df, alpha=alpha)

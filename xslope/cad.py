@@ -14,7 +14,7 @@
 
 """CAD (DXF) import/export for xslope geometry.
 
-Converts between DXF files and xslope input templates (see plans/plan_io.md §3):
+Converts between DXF files and xslope input templates:
 
   - export_dxf(slope_data, path): write a complete model to a layered DXF —
     material-zone polygons on per-material layers, plus profile lines, search
@@ -674,7 +674,7 @@ def axes_to_dxf(ax, dxf_path, version=_DEFAULT_VERSION):
 
 
 def export_dxf(slope_data, dxf_path, version=_DEFAULT_VERSION):
-    """Write an xslope model to a layered DXF (see plans/plan_io.md §3.3).
+    """Write an xslope model to a layered DXF.
 
     Material-zone polygons go on per-material layers (named after the material);
     profile lines, search circles, reinforcement, distributed loads, and piezo

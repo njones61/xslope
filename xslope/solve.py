@@ -874,8 +874,7 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     # genuinely-low-FS surfaces where the single-guess secant diverges, but it
     # resurrects non-physical over-strength roots near FS->0 on surfaces where the
     # secant correctly fails, which the admissibility check below does not reliably
-    # separate from legitimate low-FS solutions. Deferred — see SEARCH/F6 item in
-    # plans/plan_comprehensive_audit.md.)
+    # separate from legitimate low-FS solutions. Deferred.)
     try:
         FS_opt = newton(residual, fs_guess, tol=tol, maxiter=max_iter)
     except Exception as e:
@@ -894,8 +893,7 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     # pervasive interslice tension) and report a spurious low FS. Reject those by
     # EXTENT only — a few negative base normals or a non-monotonic thrust line occur
     # in valid solutions and are NOT rejected (valid benchmark criticals run ~0-4%
-    # negative normals, <=20% interslice tension). See the SEARCH/F6 item in
-    # plans/plan_comprehensive_audit.md.
+    # negative normals, <=20% interslice tension).
     frac_N_neg = float(np.mean(N < 0)) if n else 0.0
     # Interslice "tension" sign is convention-dependent: on right-facing slopes the
     # caller negates theta_list, which flips the sign of Z, so there tension is Z>0.

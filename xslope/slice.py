@@ -570,9 +570,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         return False, "All materials have empty strength properties (c, phi, gamma). Check your input template."
 
     # Unpack data
-    # Geometry is represented internally as material-zone polygons (see
-    # plans/plan_polygons.md §5.1). Slice weights, base material, layer heights,
-    # and slice-boundary breakpoints are all computed from these polygons.
+    # Geometry is represented internally as material-zone polygons. Slice weights,
+    # base material, layer heights, and slice-boundary breakpoints are all computed
+    # from these polygons.
     polygons = slope_data["polygons"]
     poly_edges = _build_polygon_edges(polygons)
     ground_surface = slope_data["ground_surface"]

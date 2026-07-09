@@ -110,7 +110,7 @@ def build_ground_surface_from_polygons(polygons):
 
     The domain polygon is the union of all input polygons (the total extent of the
     model). The ground surface is the upper boundary of that union, traced from the
-    top-left corner to the top-right corner (see plans/plan_polygons.md §4).
+    top-left corner to the top-right corner.
 
     Parameters:
         polygons (list of dict): each dict has a 'polygon' key (shapely Polygon).
@@ -556,10 +556,10 @@ def load_slope_data(filepath):
         })
 
     # === UNIFIED POLYGON REPRESENTATION ===
-    # Geometry is always represented internally as material-zone polygons (see
-    # plans/plan_polygons.md §5.1, §9.2). If the 'polygon' sheet is populated it is
-    # used directly; otherwise the profile lines are converted to polygons via
-    # build_polygons(). All downstream code (slicing, search) works from polygons.
+    # Geometry is always represented internally as material-zone polygons. If the
+    # 'polygon' sheet is populated it is used directly; otherwise the profile lines
+    # are converted to polygons via build_polygons(). All downstream code (slicing,
+    # search) works from polygons.
     polygons_from_sheet = _parse_polygon_sheet(xls, materials)
 
     if polygons_from_sheet:
@@ -1587,7 +1587,7 @@ def print_dictionary(dictionary):
 # sheet XML in place, rather than re-saving the whole workbook (which would
 # discard formulas, formatting, and named ranges). Used to populate templates
 # programmatically — e.g. from the polygon-sheet builders and the planned CAD
-# importer (see plans/plan_io.md).
+# importer.
 #
 # Two pitfalls this handles (do not "simplify" them away):
 #   * Writing a value into a cell that some formula depends on invalidates the

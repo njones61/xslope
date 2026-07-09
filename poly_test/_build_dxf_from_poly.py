@@ -1,7 +1,7 @@
 """Generate sample DXF cross-section files from the polygon-sheet xlsx inputs.
 
-This produces realistic CAD test fixtures for the planned DXF import utility
-(see plans/plan_polygons.md, section 7). Each material zone is written as a
+This produces realistic CAD test fixtures for the planned DXF import utility.
+Each material zone is written as a
 *closed* LWPOLYLINE, and polygons are organized onto DXF layers named after
 their material -- exactly the convention the importer expects ("all polylines
 on the CLAY layer are clay", etc.). This mirrors how commercial packages ask

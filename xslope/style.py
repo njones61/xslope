@@ -1,4 +1,4 @@
-"""Feature styles for the plot functions (plans/plan_studio.md §8a).
+"""Feature styles for the plot functions.
 
 A *style* is the persistent per-feature visual identity — color, line style, line
 width, fill hatch, alpha. ``default_style_sheet()`` holds the baked-in defaults

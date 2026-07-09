@@ -1,5 +1,5 @@
 """Generate deliberately "messy" DXF variants to exercise the importer's
-validation and error-handling paths (plans/plan_polygons.md, section 7).
+validation and error-handling paths.
 
 The clean fixtures (_build_dxf_from_poly.py) are ideal CAD: one closed
 LWPOLYLINE per zone, one layer per material. Real-world exports are not.

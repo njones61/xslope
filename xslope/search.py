@@ -325,8 +325,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     points into a near-vertical base running up to the toe, which the rigorous
     methods (Spencer especially) score as a spurious low minimum. Capping the base
     inclination keeps the search on physically realistic surfaces. (The convergence
-    criterion itself is kept absolute — see the SEARCH-2 item in
-    plans/plan_comprehensive_audit.md — but the guard removes the degeneracy that
+    criterion itself is kept absolute, but the guard removes the degeneracy that
     blocked refining it.)
 
     Parameters:

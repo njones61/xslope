@@ -97,9 +97,9 @@ def intersect_pile_with_materials(pile_x, y_ground, y_failure, polygons, materia
     """
     Find soil layers along the pile between the ground surface and failure surface.
 
-    Uses the unified material-zone polygon representation (see
-    plans/plan_polygons.md): each polygon's vertical extent at the pile location
-    gives a layer band, the same way slice weights are computed.
+    Uses the unified material-zone polygon representation: each polygon's vertical
+    extent at the pile location gives a layer band, the same way slice weights are
+    computed.
 
     Parameters
     ----------

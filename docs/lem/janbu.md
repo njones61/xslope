@@ -86,11 +86,13 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 The total base normal is $N = N' + u\,\Delta\ell$, and the mobilized base shear capacity is $c\,\Delta\ell + N'\tan\phi$.
 
-**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces: the seismic force $kW$ (horizontal), the distributed-load horizontal component $D\sin\beta$, and the tension-crack water force $T$ are driving; the reinforcement $P$ and the pile horizontal component $H\cos\theta_p$ are resisting. The reinforcement and pile forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator:
+**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces: the seismic force $kW$ (horizontal), the distributed-load horizontal component $D\sin\beta$, and the tension-crack water force $T$ are driving; the reinforcement horizontal component $P\cos\alpha$ and the pile horizontal component $H\cos\theta_p$ are resisting. The reinforcement and pile forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator:
 
->>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum D\sin\beta + \sum T - \sum P - \sum H\cos\theta_p}   \qquad (7)$
+>>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum D\sin\beta + \sum T - \sum P\cos\alpha - \sum H\cos\theta_p}   \qquad (7)$
 
 with $N = N' + u\,\Delta\ell$. As in the basic case, equations (6) and (7) are solved together by iteration on $F$. Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
+
+XSLOPE treats reinforcement as **flexible**, so $P$ acts parallel to the base of the slice. Its two components therefore appear consistently: $P\sin\alpha$ in the vertical equilibrium of equation (6), and $P\cos\alpha$ in the horizontal equilibrium of equation (7). This is why the reinforcement enters equation (7) with a $\cos\alpha$ factor, whereas in the [OMS](oms.md) and [Bishop](bishop.md) methods it enters the moment equation as a bare $\sum P$: those methods sum moments about the center of a circular surface, and a force acting tangent to that circle has a moment arm of exactly $R$, so the $R$ cancels.
 
 Once again, the correction factor $f_o$ is applied to account for the neglect of inter-slice shear as shown in equation (5) above.
 

@@ -483,8 +483,14 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     # External horizontal driving forces (independent of F): seismic (driving),
     # distributed-load horizontal component (driving), tension-crack water
     # (driving), reinforcement and pile horizontal components (resisting).
+    #
+    # Reinforcement is applied parallel to the slice base (the flexible assumption,
+    # psi = alpha), so its HORIZONTAL component is P*cos(alpha) -- matching the
+    # P*sin(alpha) vertical component already used in num_N below, and matching
+    # spencer's `R * cos_psi` with psi = alpha. Summing the bare magnitude here
+    # over-credited the reinforcement and raised FS non-conservatively.
     horiz_ext = (np.sum(kw) + np.sum(D * sin_beta) + np.sum(T)
-                 - np.sum(P) - np.sum(H_cos_tp))
+                 - np.sum(P * cos_alpha) - np.sum(H_cos_tp))
 
     # Iterate F: the base normal depends on F through m_alpha, exactly as Bishop.
     F = 1.0

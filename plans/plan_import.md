@@ -194,31 +194,38 @@ Seequent User Terms v2.1:
   legal@seequent.com. Do not treat vendor silence on (a) as any signal about (b).
 
   Revised draft (narrowed per A.9.1 — a permission request, not a design disclosure;
-  addressed to the academic-program contact, cc legal@seequent.com):
+  addressed to the academic-program contact, cc legal@seequent.com). Now anchored on the
+  specific clause found in §8, which makes it a far easier question for them to answer:
 
-  > **Subject:** Academic license — permitted scope for file reading and published benchmarks
+  > **Subject:** Academic licence — scope of Product Terms F.2.1(a) for open-source output
   >
   > Hello,
   >
-  > I'm a university faculty member applying for an academic GeoStudio license, primarily to
+  > I'm a university faculty member applying for an academic GeoStudio licence, primarily to
   > study the software's capabilities to inform my teaching in geotechnical/slope-stability
   > courses.
   >
+  > Before accepting a quote, could you please send me the **Academic Licence Key Terms**
+  > referred to in Section F of the Product Terms? I'd like to read them alongside the
+  > Product Terms.
+  >
   > I also maintain XSlope, a free, open-source Python package for slope-stability and
-  > seepage analysis that I originally built for my own course. Before I rely on an academic
-  > license for any of that work, I'd like written confirmation on two points of scope:
+  > seepage analysis, released under the Apache 2.0 licence. I have one question about scope.
+  > Product Terms F.2.1(a) provides that "any materials or products resulting from or
+  > developed by the Academic Customer ... directly or indirectly using the Products, must not
+  > be used for Commercial Purposes."
   >
-  > 1. Whether an academic license permits me to **read GeoStudio's saved model files** in my
-  >    own separately-written software, and to release that software under an open-source
-  >    license. It would contain no GeoStudio source or other Seequent IP, and I would not
-  >    redistribute any GeoStudio files or materials.
-  > 2. Whether I may **publish a comparison table** of results — for each benchmark problem,
-  >    the factor of safety reported in your published Slope Stability Verification Manual,
-  >    the value my software computes, and the difference — with appropriate citation to that
-  >    manual. I would publish only my own code and my own measured numbers.
+  > 1. Would software I write myself — containing no GeoStudio source or Seequent IP, and
+  >    redistributing no GeoStudio files — fall within F.2.1(a) merely because I used
+  >    GeoStudio while developing it? And if so, does the restriction limit **my** use of that
+  >    software, or does it extend to downstream recipients, such that an Apache 2.0 release
+  >    would be inconsistent with the clause?
+  > 2. Separately: may I publish a comparison table giving, for each benchmark problem, the
+  >    factor of safety reported in your published Slope Stability Verification Manual, the
+  >    value my software computes, and the difference — citing that manual? I would publish
+  >    only my own code and my own measured numbers.
   >
-  > Could you let me know whether these are permitted and any conditions that would apply, or
-  > route this to whoever is best placed to answer?
+  > Could you let me know, or route this to whoever is best placed to answer?
   >
   > Thank you,
   > [Name, title, institution]
@@ -294,13 +301,14 @@ delivered through the Bentley Education Program:
   blocked on a sales reply — but see the restriction immediately below, which makes it a
   poor fit for this work. The quote requests target a **paid** academic license, which is
   the right instrument.
-- ⚠️ **The free tier's restriction may be the tightest of all:** "for educational purposes
-  only, not for school operations or **commercially-funded research**." Building a
-  generally-distributed importer is plausibly outside "educational purposes." The paid
-  **Research** tier's terms (non-commercial, institutional email, findings must be
-  published, Seequent acknowledged in publications) read as a *better* fit for this work
-  than the free tier. Do not assume the free tier is the safe choice merely because it is
-  the most restricted.
+- ⚠️ **The free tier's restriction is narrow:** "for educational purposes only, not for
+  school operations or **commercially-funded research**." Building a generally-distributed
+  importer is plausibly outside "educational purposes."
+- ⚠️ **Superseded by §8 — do not rely on the following.** This section originally argued
+  that the paid **Research** tier "reads as a *better* fit for this work than the free
+  tier." That was written before anyone read Product Terms Section F. **F.2.1(a) encumbers
+  materials and products *derived from* using the Products, and the Bentley EULA free tier
+  has no equivalent clause.** Neither tier dominates; see the comparison table in §8.
 
 **Access routes (Slide2).** No free faculty or student tier exists. The route is the
 **Academic Bundle** — https://www.rocscience.com/plans-pricing/academic-bundle — **$1,250/yr**
@@ -387,7 +395,102 @@ implicates none of the clauses above. So:
   GeoStudio remains the interchange hub, which is one more reason `.gsz` is the right and
   sufficient native target.
 
-## 8. Connections to other work
+## 8. GeoStudio academic license: read the actual terms (scout, 2026-07-09)
+
+Read verbatim: **Seequent Product Terms V4** (28 Apr 2023,
+`files.seequent.com/PDFs/Version%204%20-%20Product%20Terms%20-%2028%20April%202023.pdf`;
+live page shows a V5, June 2025, materially identical on these points) and **User Terms
+V2.1**. Also the **Bentley EULA** (2023-10-16, bentley.com/legal/eula). *Not legal advice.*
+
+**Which contract governs which license:**
+- **Paid/discounted Seequent academic license** → Seequent **Product Terms, Section F
+  "Academic Licences"** (+ User Terms for the individual). GeoStudio is expressly a Seequent
+  product (A.14.1 names its reinforcement libraries).
+- **Free tier via Bentley Education** → **Bentley EULA, §11 "Academic Software"**, limited to
+  §1.1 "Academic Related Use."
+
+**✅ The two clauses that would have killed it are absent.**
+- **No competing-product / competitive-analysis clause anywhere** in the Product Terms
+  (A.2.3 restricts only: adapt/circumvent, unauthorised access, combine-with-other-software,
+  reverse-engineer), the User Terms, or the Bentley EULA. Unlike Rocscience §2.3(i). The
+  phrase appears only in Seequent's *Developer* ToS, governing Tech Preview API services —
+  not the GeoStudio product license. **The Rocscience objection does not transfer.**
+- **No benchmarking / performance-publication restriction** in any of the three documents.
+  The validation table is not prohibited. (Caveat: F.3.1 delegates "Publication Rights" to
+  the unpublished Key Terms — read them.)
+
+**⚠️ The clause that actually bites — F.2.1(a):**
+
+> "the Products, the Academic Deliverables, and **any materials or products resulting from or
+> developed by the Academic Customer (including any faculty member or student of the Academic
+> Customer) directly or indirectly using the Products, must not be used for Commercial
+> Purposes**"
+
+with **"Commercial Purposes"** defined as "a purpose intended for or directed toward
+commercial advantage or monetary compensation."
+
+**XSlope is Apache-2.0**, which grants every downstream recipient an irrevocable right to use
+the work commercially. A `.gsz` importer developed by authoring test models in an academic
+GeoStudio is, on its face, a "product ... developed ... directly or indirectly using the
+Products" — and so is the authored `.gsz` corpus itself. **Releasing either under Apache-2.0
+arguably permits precisely what F.2.1(a) forbids.** This is the plan's long-standing "open
+item," now with a clause number.
+
+The clause is genuinely ambiguous: "must not be used" may bind only the *Academic Customer's*
+own use (narrow reading — an Apache-2.0 release is then fine, since the author isn't using it
+commercially), or may encumber the artifact in anyone's hands (broad reading — incompatible
+with Apache-2.0). **Do not guess. This is the specific question to put in writing**, quoting
+F.2.1(a) and naming Apache-2.0.
+
+**⚠️ Never sign what you haven't read.** F.2.1(b)-(c) and F.3.1 delegate the permitted
+*purpose*, the *authorised users*, and the **Publication Rights / Attribution Rights /
+Reporting Obligations** to a separate **"Academic Licence Key Terms"** document that is **not
+published anywhere** — it's issued with the Quote. **Demand it before accepting any quote.**
+Most of what actually constrains this project may live in a document we have never seen.
+
+**Free tier vs. paid tier — earlier guidance in §6 was wrong.** §6 argued the paid Research
+tier fits this work better than the free tier. That was reasoned before reading Section F,
+and F.2.1(a) reverses it in one respect: the **Bentley EULA's** free-tier restriction limits
+the *use of the Software* ("Academic Related Use" = object-code use for internal classroom
+instruction or research) but contains **no "materials or products resulting from" contamination
+clause**. So neither tier dominates:
+
+| | Permitted purpose | Reach over derived work |
+|---|---|---|
+| **Free (Bentley EULA §11)** | Narrow — classroom instruction / research only | **None found** — no derived-products clause |
+| **Paid (Product Terms §F)** | Broader — per Key Terms; research & teaching | **Broad** — F.2.1(a) sweeps in derived materials/products |
+
+Both forbid commercial use. Neither expressly forbids non-commercial public distribution of
+software. Pick deliberately, and only after reading the Key Terms.
+
+**Supporting findings.**
+- **Your model files are yours.** A.12.1: "Ownership of the Customer Data shall remain with
+  the Customer" (Customer Data = "the data inputted into Products by the Customer"). A.8.1
+  scopes Bentley's IP claim to "the Products and the Documents" only. **Nothing claims rights
+  over the file format or over files the software saves.** This validates the §4
+  "author your own corpus" strategy — subject to F.2.1(a) above, which reaches those files.
+- **RE carve-out, and an odd asymmetry.** Product Terms A.2.3(d) bars reverse-engineering
+  "except to the extent expressly permitted by law"; the Bentley EULA §7 likewise. But
+  User Terms A.2.5(a) — the document the *individual* accepts — has **no such carve-out**.
+  No explicit interoperability carve-out in any of them. (US law recognizes intermediate
+  copying for interoperability as fair use — *Sega v. Accolade*, *Sony v. Connectix* — which
+  the "permitted by law" language would preserve. Governing law is Pennsylvania; see below.
+  Moot if we only ever parse files we authored, which is the plan.)
+- **Governing law / forum, US resident.** Product Terms A.18.1(c): **Pennsylvania** law.
+  A.19.2(c): binding **AAA arbitration in Philadelphia**. Entity: **Bentley Systems,
+  Incorporated** (Delaware corp., Exton PA). Note a divergence — the **Bentley EULA §33**
+  instead gives Philadelphia **federal courts** exclusive jurisdiction. So the free
+  (EULA) and paid (Product Terms) routes differ in forum: courts vs. arbitration.
+
+**Action items, in order.**
+1. Request the **Academic Licence Key Terms** from the Seequent academic contact. Read before
+   accepting anything.
+2. Put **F.2.1(a) vs. Apache-2.0** to them in writing (revised email draft, §4). This is now a
+   precise question about one clause, not a vague permission request — far more likely to get
+   a straight answer.
+3. Only then decide free tier vs. paid tier.
+
+## 9. Connections to other work
 
 - **van Genuchten support** ([`plan_vg.md`](plan_vg.md)) — native vG makes a `.gsz`/Slide
   importer **lossless** for hydraulic functions (their unsaturated curves are vG/Fredlund),

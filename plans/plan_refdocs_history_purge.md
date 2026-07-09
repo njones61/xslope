@@ -33,10 +33,15 @@ republishing one vendor's manuals while a stack of paywalled journal PDFs sits i
 - **1 tag** (`v0.1.51`) with a GitHub release. The tag will be rewritten and must be re-pushed.
 - ✅ **PyPI is clean.** `MANIFEST.in` includes only `LICENSE` and `README.md`, and
   `packages = ["xslope", "studio"]`. No sdist or wheel ever carried a PDF. Nothing to do there.
-- ⚠️ **Read the Docs is an open question.** `mkdocs.yml` sets
-  `site_url: https://xslope.readthedocs.io/en/latest/`, and the PDFs sat *inside* `docs/`
-  before `cf8cdbf`. If MkDocs copied them into the built site, they were published there too.
-  **Check RTD's older builds/versions before declaring this done.**
+- ✅ **Read the Docs: was exposed, is now clean. Nothing to do.** Verified 2026-07-09.
+  The PDFs lived under `docs/` — the MkDocs `docs_dir` — from `69f0f5e` (2025-05-02) until
+  `cf8cdbf` (2026-01-03), and `readthedocs.yml` (no leading dot) has configured an RTD MkDocs
+  build since `01f8078` (2025-04-18). MkDocs copies every non-Markdown file in `docs_dir`
+  verbatim into the built site and no `exclude_docs` was set, so for roughly eight months RTD
+  almost certainly served them. **However**, RTD currently hosts only two active versions —
+  `latest` and `stable` — both built from commits *after* `cf8cdbf`, and probing the live site
+  (now on the custom domain `xslope.org`) returns 404 for every PDF path on both. RTD did not
+  retain a build from the exposure window. No remediation needed there.
 - `git-filter-repo` is **not installed** (`pip install git-filter-repo`).
 
 ## 3. Not everything here is equally exposed
@@ -108,8 +113,7 @@ Then re-clone fresh locally; **do not** keep working in the pre-rewrite clone.
 - **Caches and archives.** GitHub's `codeload` archives, Software Heritage, and the Wayback
   Machine may hold copies. Software Heritage archives public repos wholesale and honors
   takedown requests; check `archive.softwareheritage.org` for `njones61/xslope`.
-- **Read the Docs.** See §2. If the PDFs were published there, purge the affected builds and
-  versions in the RTD admin.
+- **Read the Docs.** Already clean — see §2. No action.
 - **Collaborators.** The tag `v0.1.51` and every commit SHA change. Anyone with a clone must
   re-clone. In practice this is just the author.
 
@@ -118,7 +122,7 @@ Then re-clone fresh locally; **do not** keep working in the pre-rewrite clone.
 The rewrite is cheap to plan and expensive to undo. Before running §4:
 
 1. Confirm the 3 forks are yours or dormant, and decide whether to ask their owners to delete.
-2. Check Read the Docs for published copies.
+2. ~~Check Read the Docs for published copies.~~ Done — clean (§2).
 3. Decide whether the release `v0.1.51` needs recreating after the tag is rewritten.
 4. Take the mirror backup and keep it somewhere durable and **private** — it still contains
    every PDF.

@@ -1662,8 +1662,8 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         (True, {'method','FS','lambda','f_type','theta'(deg, per boundary, n+1)})
         or (False, message).
 
-    NOTE: right-facing slopes are not yet handled (S3b); they return a clear
-    message rather than a wrong number.
+    Right-facing slopes are handled: `_mp_extract` mirrors the per-slice arrays, and
+    ``f ≡ 1`` reproduces `spencer()` to machine precision on both facings.
     """
     from scipy.optimize import brentq
 

@@ -58,6 +58,9 @@ BUNDLED_TEMPLATE = 'xslope/resources/input_template.xlsx'  # copy shipped in the
 # Studio assistant on pip installs, where docs/ is absent). Must stay byte-identical.
 SKILL_MASTER = 'docs/usage/claude/xslope.md'
 BUNDLED_SKILL = 'xslope/resources/xslope_skill.md'
+# M-P with f(x)==1 must reproduce Spencer exactly, on both slope facings (the S3b gate).
+MP_SPENCER_LEFT = 'docs/inputs/slope/xslope_simple1.xlsx'
+MP_SPENCER_RIGHT = 'docs/inputs/slope/xslope_rface.xlsx'
 ROUNDTRIP_FILES = [
     'docs/inputs/slope/xslope_simple1.xlsx',
     'docs/inputs/slope/xslope_dam.xlsx',
@@ -581,6 +584,55 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
+def run_mp_spencer_test(test):
+    """Morgenstern-Price with f(x) == 1 must reproduce Spencer exactly, on BOTH
+    slope facings. Spencer is the f == 1 special case of M-P, so any divergence
+    means the M-P march (or its right-facing mirror in `_mp_extract`) is wrong.
+
+    This is the S3b gate. It is asserted here because the right-facing mirror is
+    otherwise only exercised implicitly, and a stale docstring once claimed the
+    facing was unsupported when it had in fact been implemented.
+
+    Returns (max_abs_diff, None) on success, else (None, message).
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope import solve
+
+    path = test['file']
+    if not os.path.exists(path):
+        return None, f"input missing: {path}"
+
+    data = load_slope_data(path)
+    if not data.get('circles'):
+        return None, f"{path} has no circle to analyze"
+
+    ok, payload = generate_slices(data, circle=data['circles'][0],
+                                  num_slices=test.get('num_slices', 40), debug=False)
+    if not ok:
+        return None, f"slice generation failed: {payload}"
+    slice_df = payload[0]
+
+    facing = 'right' if slice_df['y_ct'].values[0] > slice_df['y_ct'].values[-1] else 'left'
+    expected = test.get('facing')
+    if expected and expected != facing:
+        return None, f"{path} is {facing}-facing, expected {expected}-facing"
+
+    ok_s, res_s = solve.spencer(slice_df)
+    if not ok_s:
+        return None, f"spencer failed on {facing}-facing: {res_s}"
+    ok_m, res_m = solve.mprice(slice_df, f_type='constant')
+    if not ok_m:
+        return None, f"mprice(f=constant) failed on {facing}-facing: {res_m}"
+
+    diff = abs(res_s['FS'] - res_m['FS'])
+    tol = test.get('tolerance', 1e-8)
+    if diff > tol:
+        return None, (f"{facing}-facing: mprice(f=1) FS={res_m['FS']:.8f} != "
+                      f"spencer FS={res_s['FS']:.8f} (diff {diff:.2e} > {tol:.0e})")
+    return diff, None
+
+
 def _default_dxf_mapping(layers):
     """The per-layer mapping the import wizard seeds by default: target from
     ``suggest_dxf_target`` (xslope's own export layer names + geometry kind), and
@@ -774,6 +826,8 @@ def run_test(test):
         return run_dxf_roundtrip_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
+    if test_type == 'mp_spencer':
+        return run_mp_spencer_test(test)
     if test_type == 'fem_ssrm':
         return run_fem_test(test)
     if test_type == 'seep_elements':
@@ -900,6 +954,15 @@ def main():
                     tests.append(t); n_priv += 1
         if n_priv:
             print(f"Including {n_priv} private tests from {private_path.name}/")
+
+    # Spencer is the f(x) == 1 special case of Morgenstern-Price, so the two must
+    # agree to machine precision. Asserted on BOTH facings: the right-facing mirror
+    # in _mp_extract is otherwise only exercised implicitly.
+    if run_lem:
+        for _fp, _facing in ((MP_SPENCER_LEFT, 'left'), (MP_SPENCER_RIGHT, 'right')):
+            if Path(_fp).exists():
+                tests.append({'type': 'mp_spencer', 'file': _fp, 'facing': _facing,
+                              'method': 'mprice=spencer', 'source': f'{_facing}-facing'})
 
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.

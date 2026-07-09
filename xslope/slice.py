@@ -1186,8 +1186,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             else:
                 u2 = 0
         else:
-            u = 0
-            u2 = 0
+            # Unreachable: load_slope_data validates u against this same set. A bare
+            # `u = 0` here silently deleted pore pressure whenever the two lists drifted.
+            raise ValueError(
+                f"Material '{materials[base_material_idx]['name']}' has an unrecognized "
+                f"pore pressure option u='{mat_u}'. Expected one of: none, piezo, seep."
+            )
 
         # Calculate alpha (slope angle of the failure surface) more efficiently
         delta = 0.01
@@ -1226,7 +1230,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             d = 0       # not used in rapid drawdown, but must be defined
             psi = 0     # not used in rapid drawdown, but must be defined
         else:
-            if materials[base_material_idx]['option'] == 'mc':
+            mat_option = materials[base_material_idx]['option']
+            if mat_option not in ('mc', 'cp'):
+                # Was silently treated as 'cp'. A blank option is legal on seep-only
+                # material rows, but not on one a failure surface passes through.
+                raise ValueError(
+                    f"Material '{materials[base_material_idx]['name']}' lies on the failure "
+                    f"surface but has no valid strength option (option='{mat_option}'). "
+                    "Expected one of: mc, cp."
+                )
+            if mat_option == 'mc':
                 c = materials[base_material_idx]['c']
                 phi = materials[base_material_idx]['phi']
                 c1 = c       # make a copy for use in rapid drawdown

@@ -491,6 +491,14 @@ def load_slope_data(filepath):
         v = pd.to_numeric(x, errors="coerce")
         return float(v) if pd.notna(v) else 0.0
 
+    def _choice(x, default):
+        """Normalize a free-text option cell. An empty cell reaches here as the
+        float NaN, which ``str()`` renders as 'nan' -- treat both as unset."""
+        if x is None or (isinstance(x, float) and pd.isna(x)):
+            return default
+        s = str(x).strip().lower()
+        return default if s in ('', 'nan') else s
+
     # Read materials row by row until we encounter an empty material name (Column B)
     # Data starts at Excel row 9 (0-indexed row 0 after header=7)
     for i in range(len(mat_df)):
@@ -526,17 +534,40 @@ def load_slope_data(filepath):
         if unsat_val not in ('lf', 'vg'):
             unsat_val = 'lf'
 
+        # Excel row number: header is on row 8, first data row is row 9
+        excel_row = i + 9
+
+        # Pore pressure option. An unrecognized value used to fall through to
+        # u = 0 in slice.py, silently deleting pore pressure and inflating FS.
+        u_val = _choice(row.get('u'), 'none')
+        if u_val not in ('none', 'piezo', 'seep'):
+            raise ValueError(
+                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
+                f"unrecognized pore pressure option u='{u_val}'. "
+                "Expected one of: none, piezo, seep (or leave blank for none)."
+            )
+
+        # Strength model. Blank is allowed -- seep-only material rows carry no
+        # strength -- but slice.py raises if a blank one reaches a failure surface.
+        option_val = _choice(row.get('option'), '')
+        if option_val not in ('', 'mc', 'cp'):
+            raise ValueError(
+                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
+                f"unrecognized strength option option='{option_val}'. "
+                "Expected one of: mc, cp."
+            )
+
         materials.append({
             "name": str(material_name).strip(),
             "gamma": _num(row.get("g", 0)),
-            "option": str(row.get('option', '')).strip().lower(),
+            "option": option_val,
             "c": _num(row.get('c', 0)),
             "phi": _num(row.get('f', 0)),
             "cp": _num(row.get('c/p', 0)),
             "r_elev": _num(row.get('r-elev', 0)),
             "d": _num(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
             "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
-            "u": str(row.get('u', 'none')).strip().lower(),
+            "u": u_val,
             "sigma_gamma": _num(row.get('s(g)', 0)),
             "sigma_c": _num(row.get('s(c)', 0)),
             "sigma_phi": _num(row.get('s(f)', 0)),

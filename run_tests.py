@@ -870,9 +870,15 @@ def main():
     # directory or at $XSLOPE_PRIVATE_TESTS; scan every markdown file there for
     # test tags and route by type. Silently skipped when the repo is absent
     # (public CI, other clones), so the public suite is unaffected.
-    private_dir = os.environ.get('XSLOPE_PRIVATE_TESTS') or str(
-        Path(__file__).resolve().parent.parent / 'xslope_private_tests')
-    private_path = Path(private_dir)
+    private_dir = os.environ.get('XSLOPE_PRIVATE_TESTS')
+    if not private_dir:
+        siblings = Path(__file__).resolve().parent.parent
+        # 'xslope_private_tests' is the pre-rename name, still used by old clones.
+        for name in ('xslope_private', 'xslope_private_tests'):
+            if (siblings / name).is_dir():
+                private_dir = str(siblings / name)
+                break
+    private_path = Path(private_dir or '')
     if private_path.is_dir():
         n_priv = 0
         for md in sorted(private_path.glob('*.md')):

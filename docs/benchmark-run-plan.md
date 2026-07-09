@@ -255,7 +255,7 @@ vs the strength-reduction factor F (G&L Figs 2/18).
 
 ### SSRM-1 — Griffiths & Lane (1999) Example 1 (homogeneous)  [DONE]
 - **Source:** Griffiths & Lane (1999), Geotechnique 49(3):387-403, Example 1
-  (paper in `ref_docs/ref_docs_fem/`); Rocscience re-run:
+  (paper in `../xslope_private/ref_docs/ref_docs_fem/`); Rocscience re-run:
   https://www.rocscience.com/assets/resources/learning/papers/Application-of-the-Finite-Element-Method-to-Slope-Stability.pdf
 - **Geometry/materials:** homogeneous 2:1 slope (26.57 deg), D = 1 (no
   foundation), crest width 1.2H, slope run 2H; phi' = 20 deg, c'/(gamma*H) =

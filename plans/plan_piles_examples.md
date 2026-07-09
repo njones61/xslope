@@ -17,7 +17,7 @@ examples that:
 ### 1a. Ausilio — Hassiotis Slope (deep pile, low phi)
 
 **Source**: Ausilio, Conte & Dente (2001), "Stability analysis of slopes reinforced with piles",
-Computers and Geotechnics, 28: 591-611. Paper in ref_docs/ref_docs_lim_eq/.
+Computers and Geotechnics, 28: 591-611. Paper in `../xslope_private/ref_docs/ref_docs_lim_eq/`.
 
 **Slope geometry**:
 - H = 13.7 m, slope angle β = 30° from horizontal (1.73H:1V)
@@ -127,7 +127,7 @@ Design a problem specifically to demonstrate LEM-FEM convergence:
 
 1. **Ausilio — Hassiotis slope (1a)** — highest priority. Deep pile (h=12.7 m) directly
    tests the LEM-FEM convergence claim. Published FS from 3 methods and F=515 kN/m
-   for independent verification. Paper is available in ref_docs.
+   for independent verification. Paper is available in `../xslope_private/ref_docs/`.
 2. **Ausilio — Parametric slope (1b)** — exercises higher phi range and pile position effects
 3. **Slide2 Tutorial 21** — useful for multi-layer and comparison with commercial software
 4. **Custom deep-pile problem** — fallback if the Ausilio examples don't adequately

@@ -36,9 +36,12 @@ site/
 .mypy_cache/
 .ruff_cache/
 
-# Vendor reference manuals must never be committed to this public repo.
-# The Rocscience Slide2 verification manuals now live in the private sibling repo:
-#   ../xslope_private_tests/ref_docs_rocscience/
-# This guard stays so a re-download into ref_docs/ can't be committed by accident.
-# See plans/plan_import.md §7.
+# Reference PDFs must never be committed to this public repo. Journal articles and
+# vendor manuals are third-party copyrighted works; republishing them here is not ours
+# to do. They live in the private sibling repo instead:
+#   ../xslope_private/ref_docs/
+# Only source code stays under ref_docs/ here (seep2d_fortran, pfem_code) because
+# benchmarks/run_seep2d_compare.py depends on it.
+# See plans/plan_import.md §7 and plans/plan_refdocs_history_purge.md.
+ref_docs/**/*.pdf
 ref_docs/ref_docs_rocscience/

@@ -179,11 +179,13 @@ Seequent User Terms v2.1:
   "prior written consent." Ask whether an academic license permits building +
   open-sourcing a `.gsz` importer and publishing a validation table. A written yes
   converts grey to black-and-white (vendors often approve, since an importer drives format
-  adoption). ⚠️ A cold email to legal@seequent.com went unanswered for a week
-  (2026-07-02 → 2026-07-09); a vendor legal inbox is the wrong first door. **Escalate via
-  the academic-program routes in §6 instead** — apply through the Seequent Academic Program
-  form, which produces a named human, then put the permission question to that person and
-  ask them to route it to legal. Keep legal@ as a cc, not the primary.
+  adoption). ⚠️ **Status: this question has not actually been asked yet.** What was
+  submitted (~2026-07-02, both vendors) was an academic-license **quote request** through
+  the web forms — a sales enquiry, silent after a week. Sales cannot answer a scope
+  question, and the email below has never been sent. Two separate threads to run:
+  **(a)** follow up the quote requests to get a named rep; **(b)** once that rep exists,
+  put the permission question to them and ask them to route it to legal, cc
+  legal@seequent.com. Do not treat vendor silence on (a) as any signal about (b).
 
   Revised draft (narrowed per A.9.1 — a permission request, not a design disclosure;
   addressed to the academic-program contact, cc legal@seequent.com):
@@ -244,8 +246,9 @@ Seequent User Terms v2.1:
 
 ## 6. Access routes & the license-free benchmark corpus (scout, 2026-07-09)
 
-Prompted by a week of silence from both vendors' legal/sales inboxes, and by a close read
-of the Seequent User Terms v2.1 (findings folded into §4 above).
+Prompted by a week of silence on the academic-license quote requests submitted to both
+vendors' web forms (~2026-07-02), and by a close read of the Seequent User Terms v2.1
+(findings folded into §4 above). A Seequent/Bentley account now exists; no license yet.
 
 **⭐ The reference answers are free and public — from both vendors.** This is the finding
 that unblocks Phase B1. Neither manual requires a login; both carry per-problem reference
@@ -280,6 +283,10 @@ delivered through the Bentley Education Program:
 - **Bentley Education** — https://www.bentley.com/education/ ·
   sign-up https://www.bentley.com/edu-sign-up/ — free learning licenses to students *and*
   educators; catalog explicitly lists **GeoStudio 2D/3D** and PLAXIS.
+- 💡 **The free tier needs no quote and no sales reply.** Bentley Education is a self-serve
+  eligibility sign-up, not a quoted sale — so it is not blocked on the pending quote
+  requests and could put GeoStudio on the machine this week. Weigh that against the
+  restriction below before accepting it.
 - ⚠️ **The free tier's restriction may be the tightest of all:** "for educational purposes
   only, not for school operations or **commercially-funded research**." Building a
   generally-distributed importer is plausibly outside "educational purposes." The paid

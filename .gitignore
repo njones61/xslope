@@ -36,5 +36,9 @@ site/
 .mypy_cache/
 .ruff_cache/
 
-# Vendor reference manuals — downloaded locally, never redistributed (see plans/plan_import.md)
+# Vendor reference manuals must never be committed to this public repo.
+# The Rocscience Slide2 verification manuals now live in the private sibling repo:
+#   ../xslope_private_tests/ref_docs_rocscience/
+# This guard stays so a re-download into ref_docs/ can't be committed by accident.
+# See plans/plan_import.md §7.
 ref_docs/ref_docs_rocscience/

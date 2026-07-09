@@ -61,6 +61,8 @@ BUNDLED_SKILL = 'xslope/resources/xslope_skill.md'
 # M-P with f(x)==1 must reproduce Spencer exactly, on both slope facings (the S3b gate).
 MP_SPENCER_LEFT = 'docs/inputs/slope/xslope_simple1.xlsx'
 MP_SPENCER_RIGHT = 'docs/inputs/slope/xslope_rface.xlsx'
+# Stage-1 FS 1.91 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
+DRAWDOWN_GUARD_FILE = 'docs/inputs/slope/xslope_rapid.xlsx'
 ROUNDTRIP_FILES = [
     'docs/inputs/slope/xslope_simple1.xlsx',
     'docs/inputs/slope/xslope_dam.xlsx',
@@ -584,6 +586,171 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
+def run_drawdown_tauff_test(test):
+    """The Stage-2 undrained strength pipeline, checked against the worked example in
+    Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
+
+    An infinite slope, so the whole tau_ff chain -- eqs (4) K1, (5) interpolation,
+    (6) Kf, (7)/(8) negative-stress fallback -- is exercised with hand-computable
+    inputs and no slice machinery at all.
+
+    gamma = 125 pcf, c' = 0, phi' = 40 deg, d = 2000 psf, psi = 20 deg, beta = 18.4 deg,
+    fully submerged under 100 ft of water before a complete drawdown.
+
+    The book carries K1 = 2.0 where the exact value is 2.0304, so its tau_ff (1585 psf
+    at z = 5 ft) is a rounded figure. We assert against the exact recomputation and
+    record the book's rounded values alongside; substituting K1 = 2.0 and Kf = 4.6
+    reproduces 1585 to the digit.
+
+    Also asserts the invariant that motivated the Stage-1 FS >= 1 guard: K1 rises
+    monotonically as FS1 falls and equals Kf exactly at FS1 = 1, so K1 <= Kf there and
+    eq (5) interpolates rather than extrapolating.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import numpy as np
+
+    gamma, gamma_w = 125.0, 62.4
+    c1, phi1, d_val, psi_val = 0.0, 40.0, 2000.0, 20.0
+    # The 3H:1V slope is arctan(1/3) = 18.4349 deg, but the book carries 18.4 deg through
+    # eqs (9.19)-(9.42). Use its rounded angle so the printed values are reproducible.
+    beta = 18.4
+    pr = np.radians(phi1)
+    cos_phi, sin_phi = np.cos(pr), np.sin(pr)
+
+    def tau_ff_of(sigma_fc, tau_fc):
+        """Mirror of advanced.rapid_drawdown's Stage-2 strength block."""
+        t_k1 = d_val + sigma_fc * np.tan(np.radians(psi_val))          # eq (9.26)
+        t_kf = c1 + sigma_fc * np.tan(pr)                              # eq (9.28)
+        kf_first = sigma_fc - c1 * cos_phi
+        if abs(cos_phi) < 1e-12 or abs(kf_first) < 1e-12:
+            return t_k1, t_kf, None, None, min(t_k1, t_kf)
+        s3_k1 = sigma_fc + tau_fc * (sin_phi - 1) / cos_phi            # eq (9.14)
+        s3_kf = kf_first * (1 - sin_phi) / (cos_phi ** 2)              # eq (9.15)
+        if s3_k1 <= 0 or s3_kf <= 0:
+            return t_k1, t_kf, None, None, min(t_k1, t_kf)
+        K1 = (sigma_fc + tau_fc * (sin_phi + 1) / cos_phi) / s3_k1     # eq (9.10)
+        Kf = ((sigma_fc + c1 * cos_phi) * (1 + sin_phi)) / (kf_first * (1 - sin_phi))  # eq (9.13)
+        t_ff = ((Kf - K1) * t_k1 + (K1 - 1) * t_kf) / (Kf - 1)         # eq (9.11)
+        return t_k1, t_kf, K1, Kf, t_ff
+
+    problems = []
+    br = np.radians(beta)
+
+    # Book Table 9.2, per depth: sigma'_fc, tau_fc, tau_ff(Kc=1), tau_ff(Kc=Kf), drained
+    book = {5: (282.0, 94.0, 2103.0, 237.0, 472.0),
+            30: (1691.0, 562.0, 2615.0, 1419.0, 2833.0)}
+
+    for z, (b_sfc, b_tfc, b_k1, b_kf, b_drained) in book.items():
+        # Stage 1: submerged infinite slope. With no flow, sigma'_fc = gamma' z cos^2(beta)
+        # (eq 9.23) and tau_fc = (gamma - gamma_w) z sin(beta) cos(beta) (eq 9.24).
+        sigma_fc = (gamma - gamma_w) * z * np.cos(br) ** 2
+        tau_fc = (gamma - gamma_w) * z * np.sin(br) * np.cos(br)
+        if abs(sigma_fc - b_sfc) > 1.0:
+            problems.append(f"z={z}: sigma'_fc {sigma_fc:.1f} vs book {b_sfc}")
+        if abs(tau_fc - b_tfc) > 1.0:
+            problems.append(f"z={z}: tau_fc {tau_fc:.1f} vs book {b_tfc}")
+
+        t_k1, t_kf, K1, Kf, t_ff = tau_ff_of(sigma_fc, tau_fc)
+        if abs(t_k1 - b_k1) > 1.0:
+            problems.append(f"z={z}: tau_ff(Kc=1) {t_k1:.1f} vs book {b_k1}")
+        if abs(t_kf - b_kf) > 1.0:
+            problems.append(f"z={z}: tau_ff(Kc=Kf) {t_kf:.1f} vs book {b_kf}")
+        if K1 is None or not (1.0 <= K1 <= Kf):
+            problems.append(f"z={z}: K1={K1} outside [1, Kf={Kf}] — eq (5) would extrapolate")
+
+        # Book's rounded K1=2.0, Kf=4.6 must reproduce its printed tau_ff exactly.
+        rounded = ((4.6 - 2.0) * t_k1 + (2.0 - 1) * t_kf) / (4.6 - 1)
+        book_tff = {5: 1585.0, 30: 2283.0}[z]
+        if abs(rounded - book_tff) > 1.0:
+            problems.append(f"z={z}: tau_ff at book's rounded K1/Kf {rounded:.1f} "
+                            f"vs book {book_tff}")
+
+        # Stage 3: total drawdown, zero pore pressure -> sigma' = gamma z cos^2(beta).
+        drained = c1 + gamma * z * np.cos(br) ** 2 * np.tan(pr)        # eqs (9.37), (9.39)
+        if abs(drained - b_drained) > 1.0:
+            problems.append(f"z={z}: drained strength {drained:.1f} vs book {b_drained}")
+
+    # K1 == Kf exactly at Stage-1 FS == 1, and K1 > Kf below it. This is why
+    # advanced.rapid_drawdown refuses a Stage-1 FS < 1 rather than extrapolating.
+    sigma_fc = 282.0
+    tau_fail = c1 + sigma_fc * np.tan(pr)          # tau_fc when FS1 == 1
+    prev_K1 = None
+    for FS1 in (3.0, 2.0, 1.5, 1.0, 0.95, 0.9):
+        _, _, K1, Kf, _ = tau_ff_of(sigma_fc, tau_fail / FS1)
+        if K1 is None:
+            continue
+        if prev_K1 is not None and not K1 > prev_K1:
+            problems.append(f"K1 not monotonically increasing as FS1 falls (FS1={FS1})")
+        prev_K1 = K1
+        if abs(FS1 - 1.0) < 1e-12 and abs(K1 - Kf) > 1e-6:
+            problems.append(f"K1={K1:.6f} != Kf={Kf:.6f} at FS1 = 1")
+        if FS1 < 1.0 and not K1 > Kf:
+            problems.append(f"FS1={FS1} < 1 but K1={K1:.4f} <= Kf={Kf:.4f}")
+        if FS1 > 1.0 and not K1 < Kf:
+            problems.append(f"FS1={FS1} > 1 but K1={K1:.4f} >= Kf={Kf:.4f}")
+
+    if problems:
+        return None, "Duncan/Wright/Brandon Table 9.2: " + "; ".join(problems)
+    return 0.0, None
+
+
+def run_drawdown_guard_test(test):
+    """`rapid_drawdown` must REFUSE a slope whose Stage-1 (full pool) FS < 1 rather
+    than silently extrapolating eq (5) past the Kc=Kf envelope.
+
+    Below FS1 = 1 the mobilized shear tau_fc exceeds the failure envelope, so K1 > Kf
+    on every low-K slice and tau_ff falls below the physical floor -- eventually
+    negative, where `max(0, tau_ff)` laundered it into a zero-strength slice. A search
+    would then rank that trial surface as catastrophic on a fictitious FS ~ 0. The
+    negative-stress fallback does not catch it: sigma'_3c stays positive.
+
+    Returns (0.0, None) on success, else (None, message).
+    """
+    import copy
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.advanced import rapid_drawdown
+
+    path = test['file']
+    if not Path(path).exists():
+        return None, f"missing fixture {path}"
+    base = load_slope_data(path)
+    problems = []
+
+    def run(scale):
+        data = copy.deepcopy(base)
+        for m in data['materials']:
+            for key in ('c', 'phi', 'd', 'psi'):
+                m[key] = m.get(key, 0) * scale
+        ok, payload = generate_slices(data, circle=data['circles'][0],
+                                      num_slices=40, debug=False)
+        if not ok:
+            return None
+        return rapid_drawdown(payload[0], 'bishop', debug_level=0)
+
+    # Unweakened: Stage 1 is stable, analysis proceeds.
+    got = run(1.0)
+    if got is None or not got[0]:
+        problems.append(f"unweakened model should succeed, got {got}")
+    elif got[1]['stage1_FS'] < 1.0:
+        problems.append("fixture no longer has Stage-1 FS >= 1; pick another")
+
+    # Weakened until Stage 1 fails: must be refused, not answered.
+    got = run(0.5)
+    if got is None:
+        problems.append("weakened model failed to generate slices")
+    elif got[0]:
+        problems.append(f"weakened model (Stage-1 FS < 1) returned FS={got[1]['FS']:.4f} "
+                        "instead of being refused")
+    elif 'stable before drawdown' not in str(got[1]):
+        problems.append(f"refused, but with an unexpected message: {got[1]}")
+
+    if problems:
+        return None, "; ".join(problems)
+    return 0.0, None
+
+
 def run_mp_spencer_test(test):
     """Morgenstern-Price with f(x) == 1 must reproduce Spencer exactly, on BOTH
     slope facings. Spencer is the f == 1 special case of M-P, so any divergence
@@ -829,6 +996,10 @@ def run_test(test):
         return run_template_sync_test(test)
     if test_type == 'mp_spencer':
         return run_mp_spencer_test(test)
+    if test_type == 'drawdown_tauff':
+        return run_drawdown_tauff_test(test)
+    if test_type == 'drawdown_guard':
+        return run_drawdown_guard_test(test)
     if test_type == 'fem_ssrm':
         return run_fem_test(test)
     if test_type == 'seep_elements':
@@ -972,6 +1143,15 @@ def main():
                 tests.append({'type': 'mp_spencer', 'file': _fp, 'facing': _facing,
                               'method': 'mprice=spencer', 'source': f'{_facing}-facing'})
 
+        # Rapid-drawdown Stage-2 strength pipeline, against the worked example in
+        # Duncan/Wright/Brandon Table 9.2. File-less: an infinite slope, hand-computable.
+        tests.append({'type': 'drawdown_tauff', 'file': 'DWB Table 9.2 (unit)',
+                      'method': 'tau_ff', 'source': 'drawdown_tauff'})
+        # And the guard that stops eq (5) extrapolating past Kc=Kf when Stage-1 FS < 1.
+        if Path(DRAWDOWN_GUARD_FILE).exists():
+            tests.append({'type': 'drawdown_guard', 'file': DRAWDOWN_GUARD_FILE,
+                          'method': 'stage1 FS>=1', 'source': 'drawdown_guard'})
+
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.
     if run_roundtrip:
@@ -1064,7 +1244,7 @@ def main():
             label = 'beta'
         elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
                             'mesh_conform', 'seep_elements', 'fem_elements',
-                            'mp_spencer'):
+                            'mp_spencer', 'drawdown_tauff', 'drawdown_guard'):
             expected = 0.0          # these return 0.0 on success (pass/fail tests)
             tol = 0.0
             label = 'mismatch'

@@ -60,7 +60,7 @@ In xslope, we use the three-stage analysis method developed by Duncan, Wright, a
 2) Compute FS for post-drawdown conditions using total stress analysis. Undrained strength is a function of effective stress from stage 1.<br>
 3) Compute FS for post-drawdown conditions using drained strengths
 
-The lower FS from stages 2 and 3 is the final FS for rapid drawdown conditions.
+Stage 3 only ever *lowers* a slice's strength — it swaps in the drained strength where that is smaller than the undrained one — so its FS can never exceed the Stage 2 FS. The final FS for rapid drawdown is therefore the Stage 3 value when Stage 3 runs, and the Stage 2 value when it is not needed. Equivalently, and how xslope computes it: the lower of the two.
 
 ### Stage 1: Pre-Drawdown Conditions
 
@@ -128,7 +128,7 @@ The two $\tau_{ff}$ values are found by evaluating the two envelopes using the $
 
 ### Negative Stresses
 
-If significant cohesion exists, the $\sigma'_3$ values can become negative, leading to a negative (and meaningless) $K$ value.
+The $\sigma'_3$ values can become negative, leading to a negative (and meaningless) $K$ value.
 
 ![k_interp_neg.png](rapid_images/k_interp_neg.png)
 
@@ -138,7 +138,26 @@ In this case, we use the lower of the $K_c = 1$  and $K_c = K_f$  curves. Negati
 
 >>$\sigma'_{3c} = (\sigma'_{fc} - c' \cos \phi') \dfrac{1 - \sin \phi'}{\cos^2 \phi'}  \qquad (8)$ (for the $K_c = K_f$ envelope)  
 
-If either is negative, no interpolation is required and we use the lower of the two strength values coming from the two curves.
+If either is negative **or zero**, no interpolation is required and we use the lower of the two strength values coming from the two curves. Zero must be excluded as well as negatives, because $\sigma'_{3c}$ from equation (7) is precisely the *denominator* of $K_1$ in equation (4).
+
+These two equations go negative for different reasons, and only one of them involves cohesion:
+
+- Equation (8) carries the $c' \cos \phi'$ term, so a **significant cohesion** drives it negative. This is the case illustrated above.
+- Equation (7) has **no cohesion term at all**. It goes negative when $\tau_{fc}$ is large — and since $\tau_{fc} = \frac{1}{F}(c' + \sigma'_{fc} \tan \phi')$, that means a **low Stage 1 factor of safety**.
+
+### The Stage 1 slope must be stable
+
+Equation (5) *interpolates* between the $K_c = 1$ and $K_c = K_f$ envelopes, which bound the physically possible consolidation states. So $K_1$ must satisfy
+
+>> $1 \le K_1 \le K_f$
+
+$K_1$ increases monotonically with $\tau_{fc}$, and $\tau_{fc} \propto 1/F$. Substituting the failure value $\tau_{fc} = c' + \sigma'_{fc} \tan \phi'$ into equation (4) gives $K_1 = K_f$ exactly. Therefore
+
+>> $K_1 > K_f \iff F < 1$ in Stage 1
+
+which is to say: **the full-pool slope is already failing.** Its mobilized shear stress lies above the failure envelope, so there is no equilibrium consolidation stress state for Stage 2 to use, and equation (5) would extrapolate beyond $K_c = K_f$ rather than interpolate. Note this condition is not caught by the negative-stress check above — $\sigma'_{3c}$ from equation (7) remains positive well below $F = 1$.
+
+Because $F$ is a single global value, $K_1 > K_f$ holds for every slice at once. xslope therefore checks the Stage 1 factor of safety directly, and `rapid_drawdown` returns an error rather than a factor of safety when $F < 1$. Rapid drawdown presupposes a slope that is stable before the pool is lowered.
 
 ### FS Calculations
 
@@ -154,7 +173,7 @@ For Stage 3, undrained strengths used for slices in low K zones are compared wit
 
 Where $N'$ is the effective normal force found in Stage 2 using post-drawdown conditions.
 
-If Stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If Stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. 
+If Stage 3 calculations are required (drained less than undrained in at least one slice), then the FS from Stage 3 = the rapid drawdown FS. If Stage 3 calculations are not required, the FS from Stage 2 = the rapid drawdown FS. Since Stage 3 only substitutes *lower* strengths, its FS never exceeds the Stage 2 FS, so this is the same as taking the lower of the two.
 
 ## Inputs and Calculations
 
@@ -170,7 +189,7 @@ In summary, the calculations are done in the following process:
 
 **Stage 1**
 
-1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factor of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice.<br>
+1. Using the drained strength ($c'$ and $\phi'$) strength properties for all materials and using the piezometric line and distributed loads for the full pool condition, calculate the factor of safety using the selected solver. This will return a factor of safety (FS) and a set of effective normal forces ($N'$) on the base of the slice. If this Stage 1 FS is less than 1, the slope is already failing at full pool and the analysis is halted — see [The Stage 1 slope must be stable](#the-stage-1-slope-must-be-stable).<br>
 
 2.  Calculate $\sigma'_{fc}$ and $\tau_{fc}$ using equations (2) and (3).<br>
 

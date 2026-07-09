@@ -102,7 +102,27 @@ def rapid_drawdown(df, method_name, debug_level=1):
     stage1_FS = result_stage1['FS']
     if debug_level >= 1:
         print(f"Stage 1 FS = {stage1_FS:.4f}")
-    
+
+    # The three-stage procedure presumes the slope is stable BEFORE drawdown: stage 1
+    # exists only to supply consolidation stresses. If FS < 1 the mobilized shear
+    # tau_fc = (1/FS)(c' + sigma'_fc tan phi') exceeds the failure envelope, so the
+    # consolidation stress state lies above it and K1 > Kf. Since K1 rises
+    # monotonically with tau_fc (hence with 1/FS) and equals Kf exactly at FS = 1,
+    # `stage1_FS < 1` is precisely the condition `K1 > Kf`, uniformly over slices.
+    #
+    # Eq (5) then EXTRAPOLATES beyond the Kc=Kf envelope -- which the source defines as
+    # the physical extreme -- driving tau_ff below it and eventually negative, where the
+    # max(0, tau_ff) clamp below turns it into a silent zero-strength slice. A search
+    # calling this on trial surfaces would let such a surface win on a fictitious FS~0.
+    # The negative-stress fallback does NOT catch this: sigma'_3c stays positive.
+    if stage1_FS < 1.0:
+        return False, (
+            f"Rapid drawdown requires a slope that is stable before drawdown, but the "
+            f"Stage 1 (full pool) factor of safety is {stage1_FS:.4f} < 1. The "
+            f"consolidation stresses are undefined because the stress state lies above "
+            f"the failure envelope (K1 > Kf)."
+        )
+
     # Calculate consolidation stresses for each slice
     # N_eff should be available from the method function
     if 'n_eff' not in df.columns:
@@ -154,15 +174,20 @@ def rapid_drawdown(df, method_name, debug_level=1):
 
             # Fall back to the lower of the two curves (the doc's negative-stress rule)
             # whenever the K1/Kf interpolation is ill-conditioned: cos(phi) ~ 0, the Kf
-            # denominator factor ~ 0, or a negative minor principal stress sigma'_3c on
-            # either envelope (eqs 7, 8). Previously these cases hit `continue` and the
+            # denominator factor ~ 0, or a non-positive minor principal stress sigma'_3c
+            # on either envelope (eqs 7, 8). Previously these cases hit `continue` and the
             # slice silently kept its drained strength in the undrained Stage-2 solve.
+            #
+            # sigma'_3c (eq 7) is also the DENOMINATOR of K1 (eq 4), so the test must
+            # exclude zero, not just negatives -- the source says "negative (or zero)".
+            # At exactly zero K1 is +inf and tau_ff is NaN, which max(0.0, NaN) would
+            # silently return as 0.0.
             kf_first = sigma_fc_i - c_val * cos_phi   # Kf denominator factor (eq 6)
             use_fallback = abs(cos_phi) < 1e-12 or abs(kf_first) < 1e-12
             if not use_fallback:
                 sigma3_k1 = sigma_fc_i + tau_fc_i * (sin_phi - 1) / cos_phi          # eq (7)
                 sigma3_kf = kf_first * (1 - sin_phi) / (cos_phi ** 2)                # eq (8)
-                use_fallback = sigma3_k1 < 0 or sigma3_kf < 0
+                use_fallback = sigma3_k1 <= 0 or sigma3_kf <= 0
 
             if use_fallback:
                 tau_ff = min(tau_ff_k1, tau_ff_kf)
@@ -175,6 +200,17 @@ def rapid_drawdown(df, method_name, debug_level=1):
                     tau_ff = tau_ff_k1
                 else:
                     tau_ff = ((Kf - K1) * tau_ff_k1 + (K1 - 1) * tau_ff_kf) / (Kf - 1)  # eq (5)
+
+            # The Kc=1 and Kc=Kf envelopes bound the physically possible states, so
+            # eq (5) interpolates and never extrapolates. The Stage-1 FS >= 1 guard above
+            # already assures K1 <= Kf; a non-finite tau_ff would mean that reasoning
+            # failed, and must not be laundered into 0.0 by the clamp below.
+            if not np.isfinite(tau_ff):
+                return False, (
+                    f"Rapid drawdown: undrained strength is not finite for slice {i+1} "
+                    f"(sigma'_fc={sigma_fc_i:.4g}, tau_fc={tau_fc_i:.4g}). The K1/Kf "
+                    "interpolation is degenerate."
+                )
 
             tau_ff = max(0.0, tau_ff)   # undrained shear strength cannot be negative
 

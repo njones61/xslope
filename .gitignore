@@ -35,3 +35,6 @@ site/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Vendor reference manuals — downloaded locally, never redistributed (see plans/plan_import.md)
+ref_docs/ref_docs_rocscience/

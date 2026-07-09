@@ -32,10 +32,15 @@ Surfaced in Studio as **File → Import → <format>**, mirroring the DXF import
 
 ## 2. Target formats
 
-- **GeoStudio SLOPE/W (`.gsz`)** — the first target (zipped XML; see findings below).
-  Also the de-facto interchange format (Slide2 itself imports `.gsz`).
-- **Rocscience Slide2 (`.slmd`)** — harder; undocumented/proprietary, samples not freely
-  downloadable.
+- **GeoStudio SLOPE/W (`.gsz`)** — the first and, realistically, the *only* native format
+  target (zipped XML; see §5). Also the de-facto interchange format — Slide2 imports
+  `.gsz`.
+- **Rocscience Slide2 (`.slmd`)** — ❌ **abandoned as a parse target (2026-07-09, §7).**
+  Not merely hard: their EULA expressly bars reverse-engineering *and* "competitive
+  analysis … the development of a competing software product." No public samples exist, no
+  Slide2 API exists, and the inner payload schema is undocumented. **Slide2 users reach
+  xslope through Slide2's own DXF/CSV export instead** — which needs no new format work,
+  only the DXF importer already planned.
 - Others (PLAXIS, Geostudio SEEP/W for seepage, etc.) — later, demand-driven.
 
 ## 3. Unknowns to resolve first
@@ -59,9 +64,10 @@ With licensed access to the source software and its tutorial corpus, the work pr
 in three phases (per format, easiest format — `.gsz` — first):
 
 - **Phase A — Reverse-engineer the format.** Acquire a license, and map the on-disk
-  structure to `slope_data`. `.gsz` is zipped XML (tractable — see §5); `.slmd` is
-  proprietary/binary (harder — may lean on Slide2's own `.gsz` export as a bridge, or
-  reverse-engineer the binary). Prefer learning the schema from **`.gsz` files the author
+  structure to `slope_data`. Scope is **`.gsz` only** — zipped XML, tractable (see §5).
+  `.slmd` is closed out (§7): its EULA bars the work, no samples exist, and Slide2 does
+  **not** export `.gsz` (its GeoStudio import is one-way), so the "bridge via `.gsz`" idea
+  once floated here is a dead end. Prefer learning the schema from **`.gsz` files the author
   authored himself** in a licensed GeoStudio rather than from vendor sample files — see
   §6 "Author your own corpus." Output: a per-format engine-side parser returning a
   populated `slope_data` + a list of caveats (mirroring the DXF path).
@@ -299,8 +305,9 @@ delivered through the Bentley Education Program:
 **Access routes (Slide2).** No free faculty or student tier exists. The route is the
 **Academic Bundle** — https://www.rocscience.com/plans-pricing/academic-bundle — **$1,250/yr**
 (or $5,000/5 yr), 20 Rocscience programs incl. Slide2, unlimited users per institution,
-educational-use-only. Given that Slide2's verification manual is free and `.slmd` remains
-proprietary and low-priority, **there is no near-term reason to buy this.**
+educational-use-only. ❌ **Do not buy it** — and see §7: accepting Rocscience's terms would
+newly bind XSlope's author to a *competitive-analysis / competing-product* clause while
+buying nothing we need. The verification manuals are already public; `.slmd` is closed out.
 
 **Author your own corpus (the unlock).** See §4. Models authored by us in a licensed
 GeoStudio are our content under A.5.3, not vendor "Materials" — making them both the
@@ -316,7 +323,71 @@ appear to be adapted from Seequent's own examples, so their presence in a third-
 launders nothing. **Study the parser for schema understanding; do not vendor its code or
 redistribute its samples.**
 
-## 7. Connections to other work
+## 7. Slide2 / `.slmd`: closed out (scout, 2026-07-09)
+
+Investigated whether a Rocscience importer is feasible. **Conclusion: do not build a
+`.slmd` parser.** Three independent blockers, any one of which is sufficient.
+
+**The EULA forbids it — and forbids more than reverse-engineering.** Rocscience Product
+Terms (Last Updated Dec 2025), Part A §2.3(d)–(f): must not "disassemble, decompile,
+reverse-engineer or create derivative works based on the whole or any part of any Product
+… except to the extent expressly permitted by law"; §9.1: "no right to access the Products
+in source code form." The 2019 SafeNet EULA §3 is blunter still: "You may not reverse
+engineer, decompile, disassemble, **or otherwise analyze** the Software." And §2.3(i)
+separately bars use "for purposes of competitive analysis … the development of a competing
+software product."
+
+> ⚠️ **§2.3(i) is the one to think about.** XSlope is, on any plain reading, a competing
+> slope-stability product — free and open-source, but competing. That clause restricts what
+> you may do **with the Product**, i.e. once you accept the license.
+>
+> **Therefore: do not buy the Rocscience Academic Bundle for this work.** Right now we owe
+> Rocscience nothing — no license, no acceptance, no clause. Signing the academic license
+> ($1,250/yr, Part D: non-commercial, research/teaching only, mandatory citation) would
+> *newly* bind us to §2.3(i) while we develop XSlope, and buy us nothing we need: their
+> verification manuals are already public, and the `.slmd` route is dead regardless.
+> **Not holding the license is the stronger position.** ⚠️ There is a pending academic-license
+> quote request with Rocscience (~2026-07-02) that should be **withdrawn or left to lapse**
+> unless a reason to hold the license emerges that outweighs this.
+>
+> *(Not legal advice. Also: the researcher could not cleanly isolate the canonical public URL
+> for the 2025 Product Terms — verify at https://www.rocscience.com/support/licenses before
+> relying on the quotes.)*
+
+**There is no corpus.** Zero public `.slmd`/`.sli` files anywhere — GitHub code search
+returns nothing against a working positive control; no course pages, no repos. Examples
+ship only inside the installer (`C:\Users\Public\Documents\Rocscience\Slide2 Examples`).
+You cannot reverse-engineer a format with no sample files, and obtaining samples requires
+the very license that forbids analyzing them.
+
+**There is no API.** Slide2 exposes no scripting interface — only a batch-compute
+executable (`ASlide2W.EXE`). Rocscience *does* ship an official, MIT-licensed Python API,
+but for **RS2** (`pip install RS2Scripting`), a different, FEA product; it drives the
+licensed app over localhost sockets rather than reading files, so it is no help here.
+
+**The format, for the record.** `.slmd` is a **ZIP container** (multi-scenario, Slide2
+7.0+) wrapping one inner model file per scenario — structurally analogous to `.gsz`. The
+family: `.sli` (uncompressed, single scenario), `.slim` (compressed), `.slmd` (compressed
+multi-scenario). The outer ZIP opens trivially; the **inner payload schema is undocumented
+and has never been publicly reverse-engineered** — text vs. binary vs. XML is unknown.
+
+**✅ The clean route: Slide2's own export.** Slide2 exports **DXF** (2D geometry, XY plane,
+WCS) and **comma-delimited CSV** (boundary coordinate tables, groundwater/FE nodal values,
+raw slice/analysis data). Both are open formats, and reading a file a user chose to export
+implicates none of the clauses above. So:
+
+- **Slide2 support costs no new format work** — it collapses into the **DXF importer**
+  already planned (`plan_studio.md` Phase 6). Workflow: user does File → Export → DXF in
+  their own licensed Slide2, then File → Import → DXF in XSlope.
+- **Caveat:** DXF/CSV carry geometry and coordinates, **not** the full material / loading /
+  analysis model. An import via this route recovers the geometry; materials and water
+  conditions get re-entered (or supplied from Slide2's separate CSV exports). Document this
+  as a known, inherent limitation rather than a defect.
+- Note the asymmetry worth exploiting: **Slide2 imports `.gsz` but does not export it.**
+  GeoStudio remains the interchange hub, which is one more reason `.gsz` is the right and
+  sufficient native target.
+
+## 8. Connections to other work
 
 - **van Genuchten support** ([`plan_vg.md`](plan_vg.md)) — native vG makes a `.gsz`/Slide
   importer **lossless** for hydraulic functions (their unsaturated curves are vG/Fredlund),

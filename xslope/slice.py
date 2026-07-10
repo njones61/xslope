@@ -1437,18 +1437,30 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             phi1 = 0    # not used in rapid drawdown, but must be defined
             d = 0       # not used in rapid drawdown, but must be defined
             psi = 0     # not used in rapid drawdown, but must be defined
+            pow_flag = False
         else:
+            pow_flag = False
             mat_option = materials[base_material_idx]['option']
             if mat_option == 'pow':
-                # Template v12 defines the power-curve envelope, but the solver
-                # coupling (strength depends on sigma'_n, which depends on FS) is
-                # not implemented yet. Refuse loudly rather than mis-solve.
-                raise NotImplementedError(
-                    f"Material '{materials[base_material_idx]['name']}' uses the power-curve "
-                    "strength option (option='pow'), which is defined in the v12 template "
-                    "but not yet supported by the solvers."
-                )
-            if mat_option not in ('mc', 'cp'):
+                # Power-curve envelope tau = a*(sigma'_n + d)^b + c_p. Strength
+                # depends on the base normal stress, which depends on FS, so the
+                # solvers iterate: each method carries an outer loop (see
+                # solve._with_nonlinear_strength) that re-linearizes the curve at
+                # the current sigma'_n into an instantaneous-tangent (c_i, phi_i).
+                # Here we seed that iteration with a no-FS estimate of the normal
+                # stress (infinite-slope form on the soil column).
+                mat = materials[base_material_idx]
+                pw_a, pw_b = mat['pow_a'], mat['pow_b']
+                pw_c, pw_d = mat['pow_c'], mat['pow_d']
+                sigma0 = max(0.0, sum_gam_h - u)
+                s_eff0 = max(sigma0 + pw_d, 1e-4 * max(1.0, sigma0))
+                slope0 = pw_a * pw_b * s_eff0 ** (pw_b - 1.0)
+                tau0 = pw_a * s_eff0 ** pw_b + pw_c
+                c = tau0 - sigma0 * slope0
+                phi = degrees(atan(slope0))
+                c1 = 0; phi1 = 0; d = 0; psi = 0
+                pow_flag = True
+            elif mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.
                 raise ValueError(
@@ -1456,7 +1468,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     f"surface but has no valid strength option (option='{mat_option}'). "
                     "Expected one of: mc, cp."
                 )
-            if mat_option == 'mc':
+            elif mat_option == 'mc':
                 c = materials[base_material_idx]['c']
                 phi = materials[base_material_idx]['phi']
                 c1 = c       # make a copy for use in rapid drawdown
@@ -1537,7 +1549,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'u2': u2,   # pore pressure at x_c for second piezometric line (rapid drawdown)
             'mat': base_material_idx + 1 if base_material_idx is not None else None,  # index of the base material (1-indexed)
             'c': c,      # cohesion of the base material
-            'phi': phi,  # friction angle of the base material in degrees
+            'phi': phi,
+            'pow_flag': pow_flag,  # power-curve strength: iterate tangent (c,phi) on sigma'_n
+            'pow_a': (materials[base_material_idx]['pow_a'] if pow_flag else 0.0),
+            'pow_b': (materials[base_material_idx]['pow_b'] if pow_flag else 0.0),
+            'pow_c': (materials[base_material_idx]['pow_c'] if pow_flag else 0.0),
+            'pow_d': (materials[base_material_idx]['pow_d'] if pow_flag else 0.0),  # friction angle of the base material in degrees
             'c1': c1,    # cohesion of the base material for rapid drawdown
             'phi1': phi1,  # friction angle of the base material for rapid drawdown
             'd': d,       # d cohesion of the base material for rapid drawdown

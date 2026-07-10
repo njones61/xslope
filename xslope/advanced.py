@@ -69,7 +69,12 @@ def rapid_drawdown(df, method_name, debug_level=1):
     Returns:
         Tuple(bool, dict): (True, result_dict) or (False, error_message)
     """
-    
+    # Power-curve materials are incompatible with the staged strength overrides
+    # of the drawdown procedure (both mutate per-slice c/phi); refuse clearly.
+    if 'pow_flag' in df.columns and bool(df['pow_flag'].any()):
+        return False, ("One or more slices use the power-curve strength option "
+                       "(option='pow'), which is not supported in rapid drawdown analysis.")
+
     # Import solve module and get the method function
     from . import solve
     method_func = getattr(solve, method_name)

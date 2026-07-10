@@ -40,6 +40,21 @@ where:
 > $\Delta \ell$ = length of the base of the slice<br>
 > $\Delta x$ = width of the slice<br>
 
+!!! note "Passive support in the Newton system"
+    Passive support forces mobilize with the soil and carry a factor $1/F$, which makes the force sums
+    $F$-dependent: $F_h(F) = F_h + F_{h,p}/F$, $F_v(F) = F_v + F_{v,p}/F$, and $M_o(F) = M_o + M_{o,p}/F$,
+    where the $p$-subscripted terms collect the passive components. The constants in the $Q$ expression then
+    become $C_1(F) = C_{1,0} + C_{1,p}/F$ and $C_2(F) = C_{2,0} + C_{2,p}/F$ with
+    $C_{1,p} = -F_{v,p}\sin\alpha - F_{h,p}\cos\alpha$ and $C_{2,p} = (F_{v,p}\cos\alpha - F_{h,p}\sin\alpha)\tan\phi$,
+    and the Newton derivatives generalize to
+
+    $$\dfrac{\partial Q}{\partial F} = \dfrac{1}{D^2}\left[\dfrac{dN}{dF}D + N\dfrac{C_4}{F^2}\right],
+    \qquad \dfrac{dN}{dF} = -\dfrac{C_{1,p} + C_2 + C_{2,p}/F}{F^2}$$
+
+    with $N = C_1 + C_2/F$ and $D = C_3 + C_4/F$, plus a $-M_{o,p}/F^2$ term in $\partial y_Q/\partial F$.
+    With no passive elements ($C_{1,p} = C_{2,p} = M_{o,p} = 0$) every expression reduces exactly to the
+    classical closed forms below.
+
 **Note**: In the current implementation of Spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. The reinforcement force $R$ acts at the point $r$ where the line crosses the base, at angle $\psi$: for Dir = Tangent (flexible, the default) $\psi = \alpha$ and $r$ is taken at the base center $(x_b, y_b)$; for Dir = Axial (rigid) $\psi$ is the line's own inclination and $r$ is the actual crossing point. When Appl = Active (default) $R$ is not divided by $F$; when Passive it is. All of the other forces are included.
 
 This page follows the UTEXAS symbol convention, in which $P$ is the distributed-load resultant on the top of the slice and $R$ is the reinforcement force. On the [OMS](oms.md), Bishop, Janbu, and [force-equilibrium](force_eq.md) pages these same two forces are written $D$ (distributed load) and $P$ (reinforcement), respectively.

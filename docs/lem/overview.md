@@ -29,7 +29,23 @@ where $c'$ is the effective cohesion, $\sigma'$ is the effective normal stress, 
 
 > $s = c' + (\sigma - u) \tan \phi'$
 
-where $u$ is the pore pressure. In XSLOPE, pore pressures are defined by entering the geometry of a piezometric line and then for any point below the line, the pore pressure is calculated as:
+where $u$ is the pore pressure.
+
+**Nonlinear (power-curve) strength.** In addition to the linear Mohr-Coulomb envelope, a material may use the
+curved power-curve envelope (option `pow` in the input template):
+
+> $s = pow_a\,(\sigma'_n + pow_d)^{pow_b} + pow_c$
+
+which collapses to Mohr-Coulomb when $pow_b = 1$. Because the strength now depends on the effective normal
+stress on the failure surface — which itself depends on the factor of safety — every solution method carries an
+outer iteration: the curve is linearized at the current normal stress into an *instantaneous tangent*
+($\tan\phi_i$ = the curve's slope at $\sigma'_n$, $c_i$ = its intercept), the method is solved with those
+equivalent Mohr-Coulomb parameters, the normal stresses are updated from the solution, and the tangent is
+recomputed until the factor of safety is stationary. The linearization is exact at convergence — the mobilized
+strength on every slice lies on the curve at that slice's normal stress. Power-curve materials are not supported
+in rapid drawdown analysis (both procedures override the per-slice strengths).
+
+In XSLOPE, pore pressures are defined by entering the geometry of a piezometric line and then for any point below the line, the pore pressure is calculated as:
 
 > $u = \Delta y * \gamma_w$
 

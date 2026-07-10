@@ -454,7 +454,7 @@ slope_data['reinforcement_lines'] = [
      'label': 'Line 1',
      'type': '',            # '', 'geosynthetic', 'nail', 'tieback', 'anchor' (preset over dir/appl)
      'dir': 'tangent',      # 'tangent' (flexible, force along slip surface) | 'axial' (rigid, along the line)
-     'appl': 'active',      # 'active' (allowable force, not /FS) | 'passive' (ultimate, /FS; not in spencer yet)
+     'appl': 'active',      # 'active' (allowable force, not /FS) | 'passive' (ultimate, /FS)
      'tend1': 0.0, 'tend2': 0.0,  # end anchorage/plate/connection capacity (per unit width)
      'spacing': 1.0},       # out-of-plane spacing already divided out at load time
 ]

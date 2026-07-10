@@ -2114,3 +2114,76 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     }
 
 
+# =====================================================================
+# Power-curve (nonlinear) strength coupling — template v12 option 'pow'
+# =====================================================================
+
+def _pow_update_strength(slice_df, sigma_n):
+    """Re-linearize the power-curve envelope tau = a*(sigma'_n + d)^b + c_p at
+    the current base normal stress into an instantaneous-tangent (c_i, phi_i)
+    for every pow-flagged slice: phi_i = arctan(a*b*(sigma+d)^(b-1)) and c_i =
+    tau(sigma) - sigma*tan(phi_i). sigma is clamped at zero (no tensile normal
+    stress) and (sigma + d) is floored at a small fraction of the mean stress so
+    b < 1 curves cannot produce an unbounded tangent slope at the origin."""
+    m = slice_df['pow_flag'].values.astype(bool)
+    if not m.any():
+        return
+    a = slice_df['pow_a'].values[m]
+    b = slice_df['pow_b'].values[m]
+    cp = slice_df['pow_c'].values[m]
+    d = slice_df['pow_d'].values[m]
+    s = np.maximum(np.asarray(sigma_n, dtype=float)[m], 0.0)
+    ref = max(1.0, float(np.mean(s)) if len(s) else 1.0)
+    s_eff = np.maximum(s + d, 1e-4 * ref)
+    slope = a * b * np.power(s_eff, b - 1.0)
+    tau = a * np.power(s_eff, b) + cp
+    c_vals = slice_df['c'].values.copy()
+    phi_vals = slice_df['phi'].values.copy()
+    c_vals[m] = tau - s * slope
+    phi_vals[m] = np.degrees(np.arctan(slope))
+    slice_df['c'] = c_vals
+    slice_df['phi'] = phi_vals
+
+
+def _with_nonlinear_strength(method):
+    """Outer fixed-point wrapper giving every solution method power-curve
+    support: solve with the current tangent strengths, update sigma'_n from the
+    method's n_eff, re-tangent, repeat until FS is stationary. slice_df arrives
+    seeded with tangent strengths at a no-FS normal-stress estimate (slice.py),
+    so the first inner solve is already close. Damped (50%) sigma updates
+    prevent oscillation on strongly curved envelopes."""
+    import functools
+
+    @functools.wraps(method)
+    def wrapped(slice_df, *args, **kwargs):
+        if 'pow_flag' not in slice_df.columns or not slice_df['pow_flag'].any():
+            return method(slice_df, *args, **kwargs)
+        dl = slice_df['dl'].values.astype(float)
+        sigma = None
+        fs_prev = None
+        for _ in range(40):
+            ok, res = method(slice_df, *args, **kwargs)
+            if not ok:
+                return ok, res
+            n_eff = slice_df['n_eff'].values.astype(float)
+            sigma_new = np.where(dl > 0, n_eff / np.where(dl > 0, dl, 1.0), 0.0)
+            sigma = sigma_new if sigma is None else 0.5 * sigma + 0.5 * sigma_new
+            _pow_update_strength(slice_df, sigma)
+            if fs_prev is not None and abs(res['FS'] - fs_prev) < 1e-4:
+                return ok, res
+            fs_prev = res['FS']
+        return False, ("Power-curve strength iteration did not converge in 40 "
+                       "outer iterations (envelope tangent vs normal stress).")
+    return wrapped
+
+
+# Rebind the public solution methods with the nonlinear-strength outer loop.
+# Import-time rebinding covers both `solve.oms(...)` attribute lookups and
+# `from xslope.solve import oms` (imports resolve after module execution).
+oms = _with_nonlinear_strength(oms)
+bishop = _with_nonlinear_strength(bishop)
+janbu = _with_nonlinear_strength(janbu)
+spencer = _with_nonlinear_strength(spencer)
+corps = _with_nonlinear_strength(corps)
+lowe = _with_nonlinear_strength(lowe)
+mprice = _with_nonlinear_strength(mprice)

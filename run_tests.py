@@ -537,7 +537,7 @@ def run_roundtrip_test(test):
     d1 = load_slope_data(test['file'])
     tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
     try:
-        save_slope_data_to_xlsx(d1, tmp, template=test['template'])
+        save_slope_data_to_xlsx(d1, tmp, template=test.get('template', ROUNDTRIP_TEMPLATE))
         d2 = load_slope_data(tmp)
     finally:
         if os.path.exists(tmp):

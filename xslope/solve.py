@@ -1764,8 +1764,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     # Store theta in df
     slice_df['theta'] = theta_opt
 
-    # --- Compute N_eff using Equation (18) ---
-    N_eff = - Fv * cos_a + Fh * sin_a + Q * np.sin(alpha - theta_rad) - u * dl
+    # --- Compute N_eff using Equation (18), with passive components at 1/F ---
+    Fv_fin = Fv + Fv_pas / F
+    Fh_fin = Fh + Fh_pas / F
+    Mo_fin = Mo + Mo_pas / F
+    N_eff = - Fv_fin * cos_a + Fh_fin * sin_a + Q * np.sin(alpha - theta_rad) - u * dl
     slice_df['n_eff'] = N_eff
 
     # --- Compute interslice forces Z using Equation (67) ---
@@ -1786,7 +1789,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         if i == n - 1:
             yt_r[i] = y_rb[i]
         else:
-            yt_r[i] = y_b[i] - ((Mo[i] - Z[i] * sin_theta * dx[i] / 2 - Z[i+1] * sin_theta * dx[i] / 2 - Z[i] * cos_theta * (yt_l[i] - y_b[i])) / (Z[i+1] * cos_theta))
+            yt_r[i] = y_b[i] - ((Mo_fin[i] - Z[i] * sin_theta * dx[i] / 2 - Z[i+1] * sin_theta * dx[i] / 2 - Z[i] * cos_theta * (yt_l[i] - y_b[i])) / (Z[i+1] * cos_theta))
             yt_l[i+1] = yt_r[i]
     slice_df['yt_l'] = yt_l
     slice_df['yt_r'] = yt_r
@@ -1826,7 +1829,7 @@ def _mp_f_vals(slice_df, f_type):
         raise ValueError(f"unknown f_type {f_type!r} (use 'constant' or 'half_sine')")
 
 
-def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing):
+def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing, FS=1.0):
     """Line of thrust for Morgenstern-Price (post-process diagnostic; plan §4 opt b).
 
     Generalizes Spencer's per-slice moment recurrence (its eqs 68-69) to a
@@ -1859,20 +1862,48 @@ def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing):
     y_pile = slice_df['y_pile'].values if 'y_pile' in slice_df.columns else np.zeros(n)
     psi = alpha; y_r = y_b; x_r = x_b           # reinforcement ∥ base, acts at base center
 
+    # v12 support/load terms (zeros when the columns are absent)
+    def _c12(name):
+        return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n)
+    P_pt  = _c12('p_pt')
+    pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
+    pa_mx = _c12('pa_mx'); pa_my = _c12('pa_my')
+    pp_cx = _c12('pp_cx'); pp_cy = _c12('pp_cy')
+    pp_mx = _c12('pp_mx'); pp_my = _c12('pp_my')
+    H_pas = _c12('h_pile_pas')
+    LL    = _c12('lload')
+    ll_b  = np.radians(_c12('ll_beta'))
+    ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
+
     if right_facing:                            # same reflection as spencer()/_mp_march
         beta = -beta; psi = -psi; R = -R; kw = -kw; V = -V
+        pa_cx = -pa_cx; pa_my = -pa_my          # axial: horizontal component flips
+        pp_cx = -pp_cx; pp_my = -pp_my
+        P_pt = -P_pt                            # tangent passive mirrors R
+        ll_b = -ll_b                            # line loads mirror beta
     sin_b, cos_b = np.sin(beta), np.cos(beta)
     sin_psi, cos_psi = np.sin(psi), np.cos(psi)
+    frac_pas = np.divide(H_pas, H_pile, out=np.zeros_like(H_pas), where=H_pile != 0)
     H_cos_tp = H_pile * np.cos(theta_pile)
     H_sin_tp = H_pile * np.sin(theta_pile)
     if right_facing:
         H_cos_tp = -H_cos_tp                    # horizontal pile component flips, vertical not
+    H_cos_pas = H_cos_tp * frac_pas
+    H_sin_pas = H_sin_tp * frac_pas
+    H_cos_tp = H_cos_tp - H_cos_pas
+    H_sin_tp = H_sin_tp - H_sin_pas
 
-    # Mo: moment of the external loads about the base center (Spencer eq 3 + pile).
+    # Mo: moment of the external loads about the base center (Spencer eq 3 + pile
+    # + v12 axial reinforcement, passive support factored by FS, and line loads).
     Mo = (- P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b)
           + kw * (y_k - y_b) + V * (y_v - y_b)
           - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b)
-          - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b))
+          - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b)
+          - (pa_my - y_b * pa_cx) + (pa_mx - x_b * pa_cy)
+          + (- (pp_my - y_b * pp_cx) + (pp_mx - x_b * pp_cy)
+             - P_pt * cos_psi * (y_r - y_b) + P_pt * sin_psi * (x_r - x_b)
+             - H_cos_pas * (y_pile - y_b) + H_sin_pas * (x_pile - x_b)) / FS
+          - LL * np.sin(ll_b) * (ll_y - y_b) - LL * np.cos(ll_b) * (ll_x - x_b))
 
     st, ct = np.sin(theta_rad), np.cos(theta_rad)   # per boundary (length n+1)
     yt_l = np.zeros(n)
@@ -2068,7 +2099,7 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     slice_df['n_eff'] = N
     slice_df['z'] = Z[:-1]
     slice_df['theta'] = theta_deg[1:]   # right-boundary interslice angle per slice
-    _mp_line_of_thrust(slice_df, Z, np.arctan(lam_star * f_vals), right_facing)
+    _mp_line_of_thrust(slice_df, Z, np.arctan(lam_star * f_vals), right_facing, FS=FS)
 
     if debug_level >= 1:
         print(f"Morgenstern-Price ({f_type}): FS = {FS:.5f}, λ = {lam_star:.5f}, "

@@ -1594,6 +1594,48 @@ def plot_reinforcement_lines(ax, slope_data, style=None):
                 tension_points_plotted = True
 
 
+def plot_line_loads(ax, slope_data, style=None):
+    """
+    Plots line loads (v12 'lloads') as arrows at their points of application on
+    the ground surface. The arrow points IN the direction the force acts (a
+    straight-down load draws as a downward arrow ending at the point).
+
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: Dictionary containing slope data with 'line_loads' key
+        style: optional style sheet (see xslope.style); None -> defaults.
+    """
+    import numpy as np
+    loads = slope_data.get('line_loads') or []
+    if not loads:
+        return
+
+    # Arrow length scaled to the model size, not the load magnitude (a single
+    # concentrated force; magnitude shown as an annotation).
+    gs = slope_data.get('ground_surface')
+    if gs is not None and not gs.is_empty:
+        xs = [p[0] for p in gs.coords]
+        span = max(xs) - min(xs)
+    else:
+        span = 100.0
+    alen = 0.06 * span
+
+    for i, ll in enumerate(loads):
+        ang = np.radians(ll.get('angle', -90.0))
+        dxa = np.cos(ang) * alen
+        dya = np.sin(ang) * alen
+        # tail offset opposite the force direction so the head lands on the point
+        ax.annotate('', xy=(ll['x'], ll['y']),
+                    xytext=(ll['x'] - dxa, ll['y'] - dya),
+                    arrowprops=dict(arrowstyle='-|>', color='purple', lw=2),
+                    annotation_clip=False)
+        ax.annotate(f"L={ll['P']:.0f}", (ll['x'] - dxa, ll['y'] - dya),
+                    textcoords="offset points", xytext=(4, 4),
+                    fontsize=8, color='purple', fontweight='bold')
+        if i == 0:
+            ax.plot([], [], color='purple', lw=2, label='Line Load')
+
+
 def plot_piles(ax, slope_data, slice_df=None, style=None):
     """
     Plots pile lines from slope_data and optionally marks failure surface intersections.
@@ -1917,6 +1959,7 @@ def plot_inputs(
     plot_tcrack_surface(ax, slope_data, style=style)
     plot_reinforcement_lines(ax, slope_data, style=style)
     plot_piles(ax, slope_data, style=style)
+    plot_line_loads(ax, slope_data, style=style)
 
     if mode == "lem":
         if slope_data['circular']:
@@ -2188,6 +2231,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_tcrack_water_force(ax, slice_df, slope_data)
     plot_reinforcement_lines(ax, slope_data, style=style)
     plot_piles(ax, slope_data, slice_df=slice_df, style=style)
+    plot_line_loads(ax, slope_data, style=style)
     if slice_numbers:
         plot_slice_numbers(ax, slice_df)
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend

@@ -679,7 +679,37 @@ def vp050():
     return 'vp050.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp085a, vp085b]
+def vp086():
+    """Slide #86: Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill
+    on a strong rock foundation: 5 geogrids (800 lb/ft, 20 ft long, every
+    4 ft). Slide2 circular: Bishop 1.629, Spencer 1.620, GLE 1.622;
+    D&W reference 1.61."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='fill', c=0.0, phi=37.0, gamma=130.0, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (30.0, 24.0), (75.0, 24.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circles'] = [{'Xo': 20.0, 'Yo': 35.0, 'Depth': 2.0, 'R': 33.0}]
+    lines = []
+    for y in (4.0, 8.0, 12.0, 16.0, 20.0):
+        xf = 1.25 * y
+        lines.append({
+            'x1': xf, 'y1': y, 'x2': xf + 20.0, 'y2': y,
+            't_max': 800.0, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+            'E': float('nan'), 'area': float('nan'), 'label': f'geogrid y={y:g}',
+            'type': 'geosynthetic', 'dir': 'axial', 'appl': 'active',
+            'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0,
+        })
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp086.xlsx'))
+    return 'vp086.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp085a, vp085b, vp086]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

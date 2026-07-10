@@ -254,30 +254,44 @@ geometry exists only as an unlabeled figure, the original source publication is 
 problem is marked *built* — no digitized guesses are used for benchmark inputs.
 
 <!-- test: file=files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.495, fs_mprice=1.586, benchmark=VP2 -->
+<!-- test: file=files/rocscience/vp003.xlsx, type=circular_search, num_slices=40, fs_bishop=1.403, fs_spencer=1.372, fs_janbu=1.354, fs_mprice=1.371, benchmark=VP3 -->
+<!-- test: file=files/rocscience/vp004.xlsx, type=circular_search, num_slices=40, fs_bishop=1.013, fs_spencer=0.989, fs_janbu=0.963, fs_mprice=0.987, benchmark=VP4 -->
+<!-- test: file=files/rocscience/vp005.xlsx, type=single_circle, num_slices=60, fs_bishop=1.955, fs_spencer=1.955, fs_janbu=1.965, fs_mprice=1.955, benchmark=VP5 -->
+<!-- test: file=files/rocscience/vp006.xlsx, type=single_circle, num_slices=60, fs_bishop=2.206, fs_spencer=2.290, fs_janbu=2.073, fs_mprice=2.299, benchmark=VP6 -->
+<!-- test: file=files/rocscience/vp008.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.276, fs_janbu=1.294, fs_mprice=1.260, benchmark=VP8 -->
+<!-- test: file=files/rocscience/vp009.xlsx, type=noncircular_search, num_slices=50, fs_spencer=0.724, fs_mprice=0.707, benchmark=VP9 -->
+<!-- test: file=files/rocscience/vp015.xlsx, type=circular_search, num_slices=40, fs_bishop=0.419, fs_spencer=0.422, fs_janbu=0.436, fs_mprice=0.420, benchmark=VP15 -->
+<!-- test: file=files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.122, fs_mprice=1.111, benchmark=VP16 -->
+<!-- test: file=files/rocscience/vp018.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.033, fs_mprice=1.024, benchmark=VP18 -->
+<!-- test: file=files/rocscience/vp019.xlsx, type=circular_search, num_slices=50, fs_bishop=1.448, fs_spencer=1.429, benchmark=VP19 -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=circular_search, num_slices=50, fs_bishop=1.086, fs_spencer=1.091, benchmark=VP20-circ -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
+<!-- test: file=files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
+<!-- test: file=files/rocscience/vp021b.xlsx, type=single_circle, num_slices=60, fs_oms=1.606, fs_bishop=1.759, fs_spencer=1.757, fs_mprice=1.756, benchmark=VP21-ru -->
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
 | 1 | Slope, homogenous | covered | [LEM sample 12](lem/samples.md#verification-acads-simple) (`xslope_acads_simple.xlsx`); ACADS table above. Bishop 0.985 vs Slide 0.987. |
 | 2 | Slope, homogenous, tension crack | **built** | [vp002.xlsx](files/rocscience/vp002.xlsx). Bishop 1.589 / Spencer 1.585 / Janbu(corr) 1.495 / M-P 1.586 vs Slide 1.596 / 1.592 / 1.489 / 1.592 (±0.4%); Giam reference 1.65. |
-| 3 | Slope, (3) materials | blocked | layer-interface coordinates are unlabeled in Fig 3.1 — needs ACADS 1(c) source data |
-| 4 | Slope, (3) materials, seismic | planned |  |
-| 5 | Dam, (4) materials | planned |  |
-| 6 | Dam, (4) materials, predefined slip surface | planned |  |
-| 7 | Slope, (2) materials, weak layer | planned |  |
-| 8 | Slope, (2) materials, weak layer, predefined slip surface | planned |  |
-| 9 | Slope, (2) materials, weak layer, water table, distributed load | planned |  |
+| 3 | Slope, (3) materials | **built** | [vp003.xlsx](files/rocscience/vp003.xlsx). Bishop 1.403 / Spencer 1.372 / Janbu(corr) 1.354 / M-P 1.371 vs Slide 1.405 / 1.375 / 1.357 / 1.374 (±0.3%); ACADS reference 1.39. Interface coordinates read from the labeled GeoStudio verification-manual figure of the same ACADS 1(c) problem. |
+| 4 | Slope, (3) materials, seismic | **built** | [vp004.xlsx](files/rocscience/vp004.xlsx). Problem #3 + k=0.15g. Bishop 1.013 / Spencer 0.989 / Janbu(corr) 0.963 / M-P 0.987 vs Slide 1.016 / 0.991 / 0.965 / 0.989 (±0.3%); ACADS reference 1.00. |
+| 5 | Dam, (4) materials | **built** | [vp005.xlsx](files/rocscience/vp005.xlsx). Talbingo Dam, end of construction (polygon-zone geometry). Critical mechanism is the infinite-slope limit on the upstream face: stored shallow circle gives 1.955 (all methods) vs Slide 1.948-1.949 and the tan φ/tan β limit 1.9475. |
+| 6 | Dam, (4) materials, predefined slip surface | **built** | [vp006.xlsx](files/rocscience/vp006.xlsx). Specified circle (100.3, 291, R=278.8) through the inclined core. Bishop 2.206 / Spencer 2.290 / Janbu(corr) 2.073 / M-P 2.299 vs Slide 2.208 / 2.292 / 2.073 / 2.301 (±0.1%); ACADS reference 2.29. This problem exposed (and now guards) the folded-zone slice-weight bug fixed in `slice.py`. |
+| 7 | Slope, (2) materials, weak layer | covered | [LEM sample 13](lem/samples.md#verification-acads-weak-layer) (`xslope_acads_weak_layer.xlsx`) is this exact problem (ACADS 3(a)). Non-circular search: Spencer 1.258 / M-P 1.248 vs Slide 1.246 / 1.275; Giam reference 1.24-1.27. |
+| 8 | Slope, (2) materials, weak layer, predefined slip surface | **built** | [vp008.xlsx](files/rocscience/vp008.xlsx). Specified 4-point surface (Table 8.2). Spencer 1.276 / Janbu(corr) 1.294 / M-P 1.260 vs Slide 1.277 / 1.294 / 1.262 (exact to ±0.002); SLOPE/W M-P 1.261; Giam reference 1.34. |
+| 9 | Slope, (2) materials, weak layer, water table, distributed load | **built** | [vp009.xlsx](files/rocscience/vp009.xlsx). ACADS 4: inclined 0.6 m seam (geometry from the labeled GeoStudio figure), 8-point piezometric line, two surcharge strips. Non-circular search: Spencer 0.724 / M-P 0.707 / Janbu(corr) 0.718 vs Slide 0.760/0.720/0.734 (block search) and 0.707/0.683/0.699 (optimized); SLOPE/W 0.699-0.689; ACADS references 0.78 [Giam], 0.6878 [Slope 2000], 20-program mean 0.808. Published spread is wide; XSLOPE sits mid-band. |
 | 10 | Slope, homogenous, pore pressure grid, ponded water | planned | Tier A via u='seep' per plan (ACADS consensus 1.53), not the pore-pressure grid |
 | 11 | Embankment, (2) materials, pore pressure grid | planned |  |
 | 12 | Embankment, (4) materials, tension crack, pore pressure grid | planned |  |
 | 13 | Embankment, (3) materials, pore pressure grid | planned |  |
 | 14 | Slope, homogenous | covered | Arai & Tagyo (1985) ex. 1 — [LEM sample 14](lem/samples.md#verification-arai-tagyo) (`xslope_arai_tagyo.xlsx`); Bishop ref 1.451, Janbu 1.265 |
-| 15 | Slope, (3) materials, weak layer | planned |  |
-| 16 | Slope, homogenous, water table | planned |  |
+| 15 | Slope, (3) materials, weak layer | **built** | [vp015.xlsx](files/rocscience/vp015.xlsx). Arai & Tagyo (1985) ex. 2, weak middle band. Circular search: Bishop 0.419 / Spencer 0.422 / Janbu(corr) 0.436 / M-P 0.420 vs Slide 0.420 / 0.409 / 0.423 / (GLE) 0.437; A&T Bishop 0.417; Kim et al. 0.43. |
+| 16 | Slope, homogenous, water table | **built** | [vp016.xlsx](files/rocscience/vp016.xlsx). Arai & Tagyo (1985) ex. 3, piezometric line. Circular search: Bishop 1.112 / Spencer 1.113 / Janbu(corr) 1.122 / M-P 1.111 vs Slide 1.118 / 1.118 / 1.131; A&T Bishop 1.138. |
 | 17 | Slope, homogenous | planned |  |
-| 18 | Slope, homogenous slope, ru pore pressure | planned |  |
-| 19 | Slope, (4) materials | planned |  |
-| 20 | Slope, (4) materials, weak layer, water table | planned |  |
-| 21 | Slope, homogenous, ru pore pressure | planned |  |
+| 18 | Slope, homogenous slope, ru pore pressure | **built** | [vp018.xlsx](files/rocscience/vp018.xlsx). Spencer (1969)/Baker (1980) slope, ru=0.5, non-circular search (right-facing). Spencer 1.033 / M-P 1.024 vs Slide 1.010 (random search + Monte-Carlo optimization), Baker 1.02, Spencer (1969) 1.08. |
+| 19 | Slope, (4) materials | **built** | [vp019.xlsx](files/rocscience/vp019.xlsx). Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope. Circular search: Spencer 1.429 / Bishop 1.448 vs published Spencer 1.40-1.42. Non-circular: XSLOPE's local search plateaus at ~1.45 from the stored seed while Slide's Monte-Carlo optimization reaches 1.398 — a search-power gap (noted for future search work), not a model difference. |
+| 20 | Slope, (4) materials, weak layer, water table | **built** | [vp020.xlsx](files/rocscience/vp020.xlsx). Greco (1996) ex. 5 / Chen & Shao (1988): 0.5 m weak seam along the inclined base (polygon zones), water table. Circular: Bishop 1.086 / Spencer 1.091 vs Slide 1.087 / 1.093 (exact). Non-circular seam block: local search 1.082 vs Slide Monte-Carlo 1.010, Chen & Shao 1.01-1.03, Greco 0.973-1.1 — same search-power gap as #19. |
+| 21 | Slope, homogenous, ru pore pressure | partial | [vp021a.xlsx](files/rocscience/vp021a.xlsx) (dry), [vp021b.xlsx](files/rocscience/vp021b.xlsx) (ru=0.25) — Fredlund & Krahn (1977) classic, fixed circle (120,90,R=80), imperial units. Dry: OMS 1.927 / Bishop 2.075 / Spencer 2.071 / M-P 2.071 vs F&K 1.928 / 2.080 / 2.073 / 2.076. ru: OMS 1.606 / Bishop 1.759 / Spencer 1.757 / M-P 1.756 vs F&K 1.607 / 1.766 / 1.761 / 1.764 (XSLOPE matches the F&K OMS-ru value exactly; Slide reports 1.687 there). Case 3 (water table) pending the phreatic-line coordinates. |
 | 22 | Slope, (2) materials, weak layer, ru pore pressure | planned |  |
 | 23 | Slope, (3) materials | planned |  |
 | 24 | Slope, (3) materials | planned |  |

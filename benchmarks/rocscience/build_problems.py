@@ -45,7 +45,354 @@ def vp002():
     return 'vp002.xlsx'
 
 
-BUILDERS = [vp002]
+
+
+LEVEE_POLY = os.path.join(os.path.dirname(__file__), '..', '..',
+                          'docs', 'seep', 'files', 'xslope_levee_poly.xlsx')
+
+# Talbingo Dam (ACADS 2(a)/2(b)) — Table 5.2 point coordinates, connectivity
+# read from Figures 5.1/5.2 (upstream shell | transition | core | filter seam |
+# downstream transition | downstream shell).
+_T = {1: (0, 0), 2: (315.5, 162), 3: (319.5, 162), 4: (321.6, 162), 5: (327.6, 162),
+      6: (386.9, 130.6), 7: (394.1, 130.6), 8: (453.4, 97.9), 9: (460.6, 97.9),
+      10: (515, 65.3), 11: (521.1, 65.3), 12: (577.9, 31.4), 13: (585.1, 31.4),
+      14: (648, 0), 15: (168.1, 0), 16: (302.2, 130.6), 17: (200.7, 0),
+      18: (311.9, 130.6), 19: (307.1, 0), 20: (331.3, 130.6), 21: (328.8, 146.1),
+      22: (310.7, 0), 23: (333.7, 130.6), 24: (331.3, 146.1), 25: (372.4, 0),
+      26: (347, 130.6)}
+
+_TALBINGO_ZONES = [  # (mat_id, point numbers, ccw or cw — shapely doesn't care)
+    (0, [1, 2, 16, 15]),                          # upstream rockfill shell
+    (1, [2, 3, 18, 17, 15, 16]),                  # upstream transition
+    (3, [3, 4, 21, 20, 19, 17, 18]),              # core (inclined)
+    (2, [4, 5, 24, 23, 22, 19, 20, 21]),          # filter (very thin seam)
+    (1, [5, 26, 25, 22, 23, 24]),                 # downstream transition
+    (0, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 25, 26]),  # downstream rockfill shell
+]
+
+
+def _talbingo_slope_data():
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)   # polygon-mode base
+    base_mat = dict(sd['materials'][0])
+    props = [('Rockfill', 0.0, 45.0, 20.4), ('Transitions', 0.0, 45.0, 20.4),
+             ('Filter', 0.0, 45.0, 20.4), ('Core', 85.0, 23.0, 18.1)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base_mat)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='none')
+        sd['materials'].append(m)
+    sd['polygons'] = [{'polygon': Polygon([_T[i] for i in pts]), 'mat_id': mid}
+                      for mid, pts in _TALBINGO_ZONES]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['circular'] = True
+    return sd
+
+
+def vp005():
+    """ACADS 2(a) (Giam & Donald 1989): Talbingo Dam at end of construction,
+    4 zones, critical circular surface. Slide2: Bishop 1.948, Spencer 1.948,
+    GLE 1.948, Janbu corrected 1.949; Giam reference 1.95. The minimum is a
+    shallow slide parallel to the (steeper) upstream face."""
+    sd = _talbingo_slope_data()
+    sd['circles'] = [{'Xo': 100.0, 'Yo': 290.0, 'Depth': 12.0, 'R': 278.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp005.xlsx'))
+    return 'vp005.xlsx'
+
+
+def vp006():
+    """ACADS 2(b): Talbingo Dam, single specified circle Xc=100.3, Yc=291.0,
+    R=278.8 (Table 6.1). Slide2: Bishop 2.208, Spencer 2.292, GLE 2.301,
+    Janbu corrected 2.073; Giam reference 2.29."""
+    sd = _talbingo_slope_data()
+    sd['circles'] = [{'Xo': 100.3, 'Yo': 291.0, 'Depth': 291.0 - 278.8, 'R': 278.8}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp006.xlsx'))
+    return 'vp006.xlsx'
+
+
+def _acads_nonhom_slope_data(k_seismic=0.0):
+    """ACADS 1(c)/1(d) three-layer slope. Geometry from the GeoStudio
+    verification manual Figure 7 (fully coordinate-labeled); identical problem
+    in the Slide2 manual (#3/#4) whose figure has unlabeled interface nodes.
+    Domain extended to x=0..90 (interfaces flat beyond their last point) to
+    give the circular search room, matching the ACADS 1(a) sample extents."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Soil #1', 0.0, 38.0), ('Soil #2', 5.3, 23.0), ('Soil #3', 7.2, 20.0)]
+    sd['materials'] = []
+    for name, c, phi in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=19.5, option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 25.0), (30.0, 25.0), (50.0, 35.0), (90.0, 35.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 25.0), (30.0, 25.0), (50.0, 29.0), (54.0, 31.0), (90.0, 31.0)]},
+        # Soil 3's surface coincides with soil 1's base from x=30 to the (40,27)
+        # hump (soil 2 pinches out there), then drops to (52,24) — see the Slide
+        # manual Figure 3.1 axes and the GeoStudio Figure 7 labels.
+        {'mat_id': 2, 'coords': [(0.0, 25.0), (30.0, 25.0), (40.0, 27.0), (52.0, 24.0), (90.0, 24.0)]},
+    ]
+    sd['max_depth'] = 20.0
+    sd['k_seismic'] = k_seismic
+    return sd
+
+
+def vp003():
+    """ACADS 1(c): non-homogeneous three-layer slope, critical circle.
+    Slide2: Bishop 1.405, Spencer 1.375, GLE 1.374, Janbu corrected 1.357;
+    SLOPE/W: Bishop 1.414, M-P 1.382; ACADS reference 1.39."""
+    sd = _acads_nonhom_slope_data()
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp003.xlsx'))
+    return 'vp003.xlsx'
+
+
+def vp004():
+    """ACADS 1(d): problem #3 plus horizontal seismic coefficient 0.15.
+    Slide2: Bishop 1.016, Spencer 0.991, GLE 0.989, Janbu corrected 0.965;
+    SLOPE/W: Bishop 1.02, M-P 0.989; ACADS reference 1.00."""
+    sd = _acads_nonhom_slope_data(k_seismic=0.15)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp004.xlsx'))
+    return 'vp004.xlsx'
+
+
+WEAK_LAYER = os.path.join(os.path.dirname(__file__), '..', '..',
+                          'docs', 'lem', 'files', 'xslope_acads_weak_layer.xlsx')
+
+
+def vp008():
+    """ACADS 3(b): the weak-layer slope (= LEM sample 13 / Slide #7) with the
+    fully specified non-circular surface of Table 8.2. Slide2: Spencer 1.277,
+    GLE 1.262, Janbu corrected 1.294; SLOPE/W: Bishop 1.259, M-P 1.261;
+    Giam reference 1.34."""
+    sd = load_slope_data(WEAK_LAYER)
+    pts = [(41.85, 27.75, 'Free'), (44.0, 26.5, 'Horiz'),
+           (63.5, 27.0, 'Horiz'), (73.31, 40.0, 'Free')]
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': m} for x, y, m in pts]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp008.xlsx'))
+    return 'vp008.xlsx'
+
+
+def vp009():
+    """ACADS 4 (Slide #9): weak-layer slope + piezometric surface (Table 9.3)
+    + two surcharge strips (Table 9.2: 20 kPa on the lower bench x=23-43,
+    20->40 kPa ramp on the crest x=70-80). Non-circular search. Slide2 (block
+    search, no optimization): Spencer 0.760, GLE 0.720, Janbu corrected 0.734;
+    with optimization 0.683-0.707; SLOPE/W: Bishop 0.699, M-P 0.689; Giam
+    reference 0.78; Slope 2000 GLE reference 0.6878. The published spread is
+    wide - this is a search-difficulty benchmark."""
+    sd = load_slope_data(WEAK_LAYER)
+    # ACADS 4's weak layer is NOT problem 3's horizontal seam: it is a 0.6 m
+    # band inclined roughly parallel to the face, (20,18.28-18.88) up to
+    # (84,36.2-36.8) - read from the labeled GeoStudio Figure 25 (the Slide
+    # figure shows the same diagonal seam). The bedrock floor drops to y=15.
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(20.0, 27.75), (43.0, 27.75), (67.5, 40.0), (84.0, 40.0)]},
+        {'mat_id': 1, 'coords': [(20.0, 18.88), (84.0, 36.8)]},
+        {'mat_id': 0, 'coords': [(20.0, 18.28), (84.0, 36.2)]},
+    ]
+    sd['max_depth'] = 15.0
+    sd['piezo_line'] = [(20.0, 27.75), (43.0, 27.75), (49.0, 29.8), (60.0, 34.0),
+                        (66.0, 35.8), (74.0, 37.6), (80.0, 38.4), (84.0, 38.4)]
+    sd['dloads'] = [
+        [{'X': 23.0, 'Y': 27.75, 'Normal': 20.0}, {'X': 43.0, 'Y': 27.75, 'Normal': 20.0}],
+        [{'X': 70.0, 'Y': 40.0, 'Normal': 20.0}, {'X': 80.0, 'Y': 40.0, 'Normal': 40.0}],
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp009.xlsx'))
+    return 'vp009.xlsx'
+
+
+def _fk_slope_data():
+    """Fredlund & Krahn (1977) homogeneous slope (Slide #21), imperial units:
+    ground (0,60)-(60,60)-(140,20)-(180,20), bedrock at y=0, c'=600 psf,
+    phi'=20, gamma=120 pcf, specified circle xc=120, yc=90, R=80."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='F&K soil', c=600.0, phi=20.0, gamma=120.0, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 60.0), (60.0, 60.0), (140.0, 20.0), (180.0, 20.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circles'] = [{'Xo': 120.0, 'Yo': 90.0, 'Depth': 10.0, 'R': 80.0}]
+    return sd
+
+
+def vp021a():
+    """Slide #21 case 1 (dry). F&K: OMS 1.928, Bishop 2.080, Spencer 2.073,
+    M-P 2.076; Slide: 1.931 / 2.079 / 2.075 / 2.075."""
+    sd = _fk_slope_data()
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp021a.xlsx'))
+    return 'vp021a.xlsx'
+
+
+def vp021b():
+    """Slide #21 case 2 (ru = 0.25). F&K: OMS 1.607, Bishop 1.766, Spencer
+    1.761, M-P 1.764; Slide: 1.687 / 1.763 / 1.760 / 1.760. Exercises the
+    template v12 ru pore-pressure option."""
+    sd = _fk_slope_data()
+    sd['materials'][0].update(u='ru', ru=0.25)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp021b.xlsx'))
+    return 'vp021b.xlsx'
+
+
+def vp018():
+    """Slide #18: Spencer (1969) / Baker (1980) homogeneous slope with ru=0.5,
+    non-circular critical surface. The slope descends left-to-right (a
+    right-facing case). Slide2 (random search + Monte Carlo optimization):
+    Spencer 1.010; Baker reference 1.02; Spencer (1969) 1.08."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Spencer 1969 soil', c=10.8, phi=40.0, gamma=18.0,
+             option='mc', u='ru', ru=0.5)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 40.0), (10.0, 40.0), (70.0, 10.0), (80.0, 10.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = []
+    sd['circular'] = False
+    sd['non_circ'] = [
+        {'X': 12.0, 'Y': 39.0, 'Movement': 'Free'},
+        {'X': 25.0, 'Y': 24.0, 'Movement': 'Horiz'},
+        {'X': 45.0, 'Y': 13.0, 'Movement': 'Horiz'},
+        {'X': 60.0, 'Y': 10.5, 'Movement': 'Horiz'},
+        {'X': 70.0, 'Y': 10.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp018.xlsx'))
+    return 'vp018.xlsx'
+
+
+def vp015():
+    """Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak
+    (c=9.8, phi=5) middle band, no water. Circular search. Slide2 (auto
+    refine): Bishop 0.420, Spencer 0.409, GLE 0.437, Janbu corrected 0.423;
+    A&T Bishop 0.417; Kim et al. 0.43."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Upper Layer', 29.4, 12.0), ('Middle Layer', 9.8, 5.0),
+             ('Lower Layer', 294.0, 40.0)]
+    sd['materials'] = []
+    for name, c, phi in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=18.82, option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 15.0), (18.0, 15.0), (48.0, 35.0), (96.0, 35.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 15.0), (18.0, 15.0), (24.0, 19.0), (72.0, 35.0), (96.0, 35.0)]},
+        {'mat_id': 2, 'coords': [(0.0, 3.0), (96.0, 35.0)]},
+    ]
+    sd['max_depth'] = 3.0
+    sd['circles'] = [{'Xo': 30.0, 'Yo': 40.0, 'Depth': 12.0, 'R': 28.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp015.xlsx'))
+    return 'vp015.xlsx'
+
+
+def vp016():
+    """Slide #16: Arai & Tagyo (1985) example 3 - homogeneous slope with a
+    water table. Circular search. Slide2 (auto refine): Bishop 1.118,
+    Janbu simplified 1.046, Janbu corrected 1.131, Spencer 1.118;
+    A&T Bishop 1.138."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='A&T ex3 soil', c=41.65, phi=15.0, gamma=18.82,
+             option='mc', u='piezo')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 15.0), (18.0, 15.0), (48.0, 35.0), (66.0, 35.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['piezo_line'] = [(0.0, 15.0), (18.0, 15.0), (30.0, 23.0), (48.0, 29.0), (66.0, 32.0)]
+    sd['circles'] = [{'Xo': 30.0, 'Yo': 45.0, 'Depth': 10.0, 'R': 35.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp016.xlsx'))
+    return 'vp016.xlsx'
+
+
+def vp019():
+    """Slide #19: Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer
+    slope, no water, non-circular critical surface. Slide2 (random search +
+    Monte-Carlo optimization, convex): Spencer 1.398; Greco and Yamagami &
+    Ueta references 1.40-1.42."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Upper Layer', 49.0, 29.0, 20.38), ('Layer 2', 0.0, 30.0, 17.64),
+             ('Layer 3', 7.84, 20.0, 20.38), ('Bottom Layer', 0.0, 30.0, 17.64)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 40.0), (60.0, 40.0), (180.0, 100.0), (200.0, 100.0), (260.0, 70.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 40.0), (260.0, 40.0)]},
+        {'mat_id': 2, 'coords': [(0.0, 35.0), (260.0, 35.0)]},
+        {'mat_id': 3, 'coords': [(0.0, 26.0), (260.0, 26.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    # Both search families are stored: the circular minimum (Spencer 1.429)
+    # lands within the published 1.40-1.42 range; the local non-circular
+    # search plateaus ~1.45 from this seed, above Slide's Monte-Carlo 1.398 -
+    # a search-power difference, not a model difference.
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 86.0, 'Yo': 134.0, 'Depth': 30.0, 'R': 104.0}]
+    sd['non_circ'] = [
+        {'X': 40.0, 'Y': 40.0, 'Movement': 'Free'},
+        {'X': 70.0, 'Y': 28.0, 'Movement': 'Horiz'},
+        {'X': 100.0, 'Y': 28.0, 'Movement': 'Horiz'},
+        {'X': 130.0, 'Y': 28.0, 'Movement': 'Horiz'},
+        {'X': 160.0, 'Y': 45.0, 'Movement': 'Horiz'},
+        {'X': 180.0, 'Y': 75.0, 'Movement': 'Horiz'},
+        {'X': 196.0, 'Y': 100.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp019.xlsx'))
+    return 'vp019.xlsx'
+
+
+def vp020():
+    """Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a
+    0.5 m weak seam along the inclined model base, water table. Polygon-zone
+    geometry (the base is not horizontal). Slide2: circular (toe focus grid)
+    Bishop 1.087, Spencer 1.093; non-circular (block search in seam + MC
+    optimization) Spencer 1.010; Chen & Shao 1.01-1.03; Greco 0.973-1.1."""
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)   # polygon-mode base
+    base_mat = dict(sd['materials'][0])
+    props = [('Layer 1', 9.8, 35.0, 20.0), ('Layer 2', 58.8, 25.0, 19.0),
+             ('Layer 3', 19.8, 30.0, 21.5), ('Layer 4 (seam)', 9.8, 16.0, 21.5)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base_mat)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo')
+        sd['materials'].append(m)
+    zones = [
+        (0, [(100,40),(145,70),(240,70),(240,55),(190,55)]),
+        (1, [(75,30),(95,40),(100,40),(190,55),(240,55),(240,30)]),
+        (2, [(0,20),(55,20),(75,30),(240,30),(240,16.5),(150,15.5),(0,0.5)]),
+        (3, [(0,0.5),(150,15.5),(240,16.5),(240,16),(150,15),(0,0)]),
+    ]
+    sd['polygons'] = [{'polygon': Polygon(pts), 'mat_id': mid} for mid, pts in zones]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['piezo_line'] = [(0.0,20.0),(55.0,20.0),(75.0,30.0),(95.0,40.0),(100.0,40.0),(190.0,55.0),(240.0,55.0)]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 90.0, 'Yo': 60.0, 'Depth': 15.0, 'R': 45.0}]
+    # Non-circular seed for the seam-block mechanism: the local search reaches
+    # ~1.08 from here (below the circular minimum); Slide's Monte-Carlo block
+    # optimization reaches 1.010 - same search-power gap noted on #19.
+    sd['non_circ'] = [
+        {'X': 60.0, 'Y': 22.5, 'Movement': 'Free'},
+        {'X': 75.0, 'Y': 8.1, 'Movement': 'Horiz'},
+        {'X': 140.0, 'Y': 14.7, 'Movement': 'Horiz'},
+        {'X': 190.0, 'Y': 55.0, 'Movement': 'Horiz'},
+        {'X': 210.0, 'Y': 70.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp020.xlsx'))
+    return 'vp020.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp018, vp019, vp020, vp021a, vp021b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

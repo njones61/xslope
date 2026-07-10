@@ -462,7 +462,52 @@ def vp023():
     return 'vp023.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024]
+def _dw634_slope_data(appl):
+    """Duncan & Wright (2005) Fig. 6.34 (Slide #85): 20-ft undrained clay
+    slope (c=350 psf, phi=0, gamma=98 pcf), one horizontal 9,000 lb/ft
+    tieback at mid-height, fully anchored (Lp=0 -> constant capacity)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='saturated clay', c=350.0, phi=0.0, gamma=98.0, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(15.0, 10.0), (25.0, 30.0), (57.0, 30.0)]},
+    ]
+    sd['max_depth'] = 10.0
+    sd['gamma_water'] = 62.4
+    # Slide's printed critical circles (GLE fig 85.2 for active, Bishop
+    # fig 85.3 for passive) are stored by the vp085* builders below so the
+    # regression tags evaluate a deterministic surface.
+    sd['circles'] = [{'Xo': 30.0, 'Yo': 40.0, 'Depth': 12.0, 'R': 28.0}]
+    sd['reinforcement_lines'] = [{
+        'x1': 20.0, 'y1': 20.0, 'x2': 57.0, 'y2': 20.0,
+        't_max': 9000.0, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+        'E': float('nan'), 'area': float('nan'), 'label': 'Tieback',
+        'type': 'anchor', 'dir': 'axial', 'appl': appl,
+        'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0,
+    }]
+    sd['reinforce_lines'] = sd['reinforcement_lines']
+    return sd
+
+
+def vp085a():
+    """Slide #85 case 1 (active). D&W reference 1.51; Slide circular Bishop
+    1.531."""
+    sd = _dw634_slope_data('active')
+    sd['circles'] = [{'Xo': 15.446, 'Yo': 37.624, 'Depth': 37.624 - 27.594, 'R': 27.594}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp085a.xlsx'))
+    return 'vp085a.xlsx'
+
+
+def vp085b():
+    """Slide #85 case 2 (passive). D&W reference 1.32; Slide circular Bishop
+    1.324."""
+    sd = _dw634_slope_data('passive')
+    sd['circles'] = [{'Xo': 17.169, 'Yo': 34.480, 'Depth': 34.480 - 24.465, 'R': 24.465}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp085b.xlsx'))
+    return 'vp085b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp085a, vp085b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

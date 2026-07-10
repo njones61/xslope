@@ -269,6 +269,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
 <!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
+<!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
+<!-- test: file=files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
 <!-- test: file=files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
 <!-- test: file=files/rocscience/vp021b.xlsx, type=single_circle, num_slices=60, fs_oms=1.606, fs_bishop=1.759, fs_spencer=1.757, fs_mprice=1.756, benchmark=VP21-ru -->
 
@@ -358,7 +360,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 82 | Embankment, (2) materials, water table | planned |  |
 | 83 | Embankment, (2) materials | planned |  |
 | 84 | Embankment, (2) materials | planned |  |
-| 85 | Reinforced slope, homogenous, grouted tieback | planned | active/passive tieback acceptance pair (D&W 1.51/1.32); geometry from Fig 85.1 |
+| 85 | Reinforced slope, homogenous, grouted tieback | **built** | [vp085a.xlsx](files/rocscience/vp085a.xlsx) (active), [vp085b.xlsx](files/rocscience/vp085b.xlsx) (passive). Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope — the reinforcement acceptance benchmark from the design plan. On Slide's printed critical circles: active 1.567 vs Slide GLE 1.575 (D&W 1.51); passive Bishop 1.319 vs Slide 1.324 (D&W 1.32). Slide's own method table scatters 1.42-2.05 here (concentrated force strains interslice assumptions), so per-circle comparison is the meaningful one. |
 | 86 | Reinforced slope, homogenous, grouted tieback | planned |  |
 | 87 | Retaining wall, (3) materials, geotextile | planned |  |
 | 88 | Retaining wall, (3) materials, geotextile | planned |  |

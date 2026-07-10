@@ -620,7 +620,66 @@ def vp036():
     return 'vp036.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp054a, vp054b, vp085a, vp085b]
+def vp050():
+    """Slide #50 (SNAILZ reference manual): nail-reinforced wall, 14
+    horizontal rows with per-row length/capacity/bond strength, evaluated on
+    the printed deep wedge (-15.813,0)-(0,-5)-(41.722,25). Slide Janbu
+    corrected 1.417; SNAILZ 1.46. Plate strength equals tensile strength, so
+    the wall end is fully anchored (lp1=0); the embedded end tapers at the
+    bond strength (lp2 = T/bond). Active application, imperial units."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    m = dict(base); m.update(name='Layer 1', c=0.0, phi=32.0, gamma=125.0, option='mc', u='none')
+    sd['materials'].append(m)
+    m = dict(base); m.update(name='Layer 2', c=500.0, phi=35.0, gamma=128.0, option='mc', u='none')
+    sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-25.0, 0.0), (0.0, 0.0), (14.0, 25.0), (100.0, 25.0)]},
+        {'mat_id': 1, 'coords': [(-25.0, -5.0), (100.0, -5.0)]},
+    ]
+    sd['max_depth'] = -10.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [
+        {'X': -15.813, 'Y': 0.0, 'Movement': 'Free'},
+        {'X': 0.0, 'Y': -5.0, 'Movement': 'Horiz'},
+        {'X': 41.722, 'Y': 25.0, 'Movement': 'Free'},
+    ]
+    # rows 1..13 at 1.8 ft below the previous (row 1 = 1.8 below the crest),
+    # row 14 a further 1.6 ft down (at the toe level).
+    row_y = [25.0 - 1.8 * k for k in range(1, 14)] + [0.0]
+    lengths = {1: 4, 3: 4, 5: 4, 7: 4, 9: 4, 11: 4, 12: 20, 13: 20, 14: 20,
+               8: 19, 6: 21, 4: 23, 2: 25, 10: 19}
+    tmax = {r: (2212.0 if r >= 12 else 1103.0) for r in range(1, 15)}
+    bond = {1: 1206.37, 3: 1206.37, 5: 1206.37, 7: 1206.37, 9: 1206.37, 11: 1206.37,
+            12: 1206.37, 13: 1206.37, 14: 1206.37, 8: 965.096, 6: 732.822,
+            4: 482.548, 2: 241.274, 10: 1206.31}
+    lines = []
+    for r in range(1, 15):
+        y = row_y[r - 1]
+        x_face = 14.0 * y / 25.0
+        lines.append({
+            'x1': x_face, 'y1': y, 'x2': x_face + lengths[r], 'y2': y,
+            't_max': tmax[r], 't_res': 0.0,
+            'lp1': 0.0,                              # plate = tensile -> anchored
+            'lp2': tmax[r] / bond[r],
+            'E': float('nan'), 'area': float('nan'), 'label': f'Row {r}',
+            # Slide's soil-nail default orientation is tangent-to-surface and
+            # SNAILZ factors the nail force by FS; tangent+passive reproduces
+            # the published values (janbu 1.448 vs SNAILZ 1.46 / Slide 1.417).
+            # axial+active gives 1.675 - orientation/application dominate here.
+            'type': 'nail', 'dir': 'tangent', 'appl': 'passive',
+            'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0,
+        })
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp050.xlsx'))
+    return 'vp050.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp085a, vp085b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

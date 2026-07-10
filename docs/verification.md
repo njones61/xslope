@@ -274,6 +274,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
 <!-- test: file=files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
+<!-- test: file=files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
@@ -332,7 +333,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 47 | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | planned |  |
 | 48 | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | planned |  |
 | 49 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | planned |  |
-| 50 | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | planned |  |
+| 50 | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 rows with per-row length/tensile/bond values, evaluated on the printed deep wedge (-15.8,0)-(0,-5)-(41.7,25). With Slide's nail defaults (tangent orientation, force factored by FS): Janbu(corr) 1.448 vs SNAILZ 1.46 and Slide 1.417. The capacity envelope reproduces the hand-computed available tension at every crossing (Σ 10.6 kip). The shallow (0,0) surface's kink is not printed — only the deep case is tagged. |
 | 51 | Slope, (4) materials, water table, tension crack, seismic | partial | geometry + circle (18.058, 66.744, R=86) read from figures; blocked on Layer 4 properties and water-table coordinates (Zhu 2003 paper) |
 | 52 | Slope, (4) materials, water table, tension crack | planned |  |
 | 53 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | planned |  |

@@ -234,3 +234,137 @@ matches the paper (wet/dry = 0.78 vs 0.79).
 - Sun, et al. (2021). Displacement-catastrophe criterion for strength-reduction
   finite-element slope stability.
 - Tracy, F.T. *SEEP2D* (USACE Waterways Experiment Station).
+
+
+---
+
+## Rocscience Slide2 Verification Corpus
+
+The [Rocscience Slide2 verification manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
+contains 111 slope stability problems drawn from the published literature, each with Slide2's computed
+factors of safety and (in most cases) independent reference values from the original authors. XSLOPE is
+being verified against this corpus problem by problem: each **built** entry links an XSLOPE input file
+reproducing the problem, reports the comparison, and is locked into the automated regression suite via a
+test tag. Status values: **built** (input file + verified results below), *covered* (equivalent to an
+existing XSLOPE sample), *partial* (some data extracted, some still needed), *blocked* (source data not
+yet available), *planned*.
+
+Problems are built from the manual's tabulated data and coordinate-labeled figures; where a problem's
+geometry exists only as an unlabeled figure, the original source publication is consulted before the
+problem is marked *built* — no digitized guesses are used for benchmark inputs.
+
+<!-- test: file=files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.495, fs_mprice=1.586, benchmark=VP2 -->
+
+| # | Problem | Status | XSLOPE file / results |
+|---:|---|---|---|
+| 1 | Slope, homogenous | covered | [LEM sample 12](lem/samples.md#verification-acads-simple) (`xslope_acads_simple.xlsx`); ACADS table above. Bishop 0.985 vs Slide 0.987. |
+| 2 | Slope, homogenous, tension crack | **built** | [vp002.xlsx](files/rocscience/vp002.xlsx). Bishop 1.589 / Spencer 1.585 / Janbu(corr) 1.495 / M-P 1.586 vs Slide 1.596 / 1.592 / 1.489 / 1.592 (±0.4%); Giam reference 1.65. |
+| 3 | Slope, (3) materials | blocked | layer-interface coordinates are unlabeled in Fig 3.1 — needs ACADS 1(c) source data |
+| 4 | Slope, (3) materials, seismic | planned |  |
+| 5 | Dam, (4) materials | planned |  |
+| 6 | Dam, (4) materials, predefined slip surface | planned |  |
+| 7 | Slope, (2) materials, weak layer | planned |  |
+| 8 | Slope, (2) materials, weak layer, predefined slip surface | planned |  |
+| 9 | Slope, (2) materials, weak layer, water table, distributed load | planned |  |
+| 10 | Slope, homogenous, pore pressure grid, ponded water | planned | Tier A via u='seep' per plan (ACADS consensus 1.53), not the pore-pressure grid |
+| 11 | Embankment, (2) materials, pore pressure grid | planned |  |
+| 12 | Embankment, (4) materials, tension crack, pore pressure grid | planned |  |
+| 13 | Embankment, (3) materials, pore pressure grid | planned |  |
+| 14 | Slope, homogenous | covered | Arai & Tagyo (1985) ex. 1 — [LEM sample 14](lem/samples.md#verification-arai-tagyo) (`xslope_arai_tagyo.xlsx`); Bishop ref 1.451, Janbu 1.265 |
+| 15 | Slope, (3) materials, weak layer | planned |  |
+| 16 | Slope, homogenous, water table | planned |  |
+| 17 | Slope, homogenous | planned |  |
+| 18 | Slope, homogenous slope, ru pore pressure | planned |  |
+| 19 | Slope, (4) materials | planned |  |
+| 20 | Slope, (4) materials, weak layer, water table | planned |  |
+| 21 | Slope, homogenous, ru pore pressure | planned |  |
+| 22 | Slope, (2) materials, weak layer, ru pore pressure | planned |  |
+| 23 | Slope, (3) materials | planned |  |
+| 24 | Slope, (3) materials | planned |  |
+| 25 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | planned |  |
+| 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | planned |  |
+| 27 | Slope, (2) materials, tension crack, water table (auto Hu) | planned |  |
+| 28 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | planned |  |
+| 29 | Submerged slope, homogenous, probabilistic analysis, water table | planned |  |
+| 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | planned |  |
+| 31 | Reinforced embankment, (5) materials, geosynthetic | planned |  |
+| 32 | Reinforced embankment, (7) materials, geosynthetic | planned |  |
+| 33 | Dike, (5) materials, probabilistic analysis, water table | planned |  |
+| 34 | Dam, (3) materials, probabilistic analysis, water table | planned |  |
+| 35 | Dam, (5) materials, probabilistic analysis, reliability index | planned |  |
+| 36 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | planned |  |
+| 37 | Slope, homogenous, distributed load, back analysis of required support force and length | planned |  |
+| 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
+| 39 | Reinforced embankment, (2) materials, tension crack, geosynthetic | planned |  |
+| 40 | Slope, homogenous, sensitivity analysis | planned |  |
+| 41 | Slope, homogenous, ru pore pressure | planned |  |
+| 42 | Dam, (3) materials, water table, ponded water, tension crack | planned |  |
+| 43 | Slope, homogenous, planar surface, RocPlane comparison | planned |  |
+| 44 | Slope, homogenous | planned |  |
+| 45 | Slope, homogenous | planned |  |
+| 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded | planned |  |
+| 47 | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | planned |  |
+| 48 | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | planned |  |
+| 49 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | planned |  |
+| 50 | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | planned |  |
+| 51 | Slope, (4) materials, water table, tension crack, seismic | partial | geometry + circle (18.058, 66.744, R=86) read from figures; blocked on Layer 4 properties and water-table coordinates (Zhu 2003 paper) |
+| 52 | Slope, (4) materials, water table, tension crack | planned |  |
+| 53 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | planned |  |
+| 54 | Slope, homogenous, micro piles | planned | runnable today via the piles sheet (H = 10.7 kN/m, passive; Slide 1.193, Yamagami 1.20) |
+| 55 | Slope, homogenous, water table | planned |  |
+| 56 | Slope, homogenous, water table, tension crack | planned |  |
+| 57 | Slope, (2) materials, water table, tension crack, composite surfaces | planned |  |
+| 58 | Retaining wall, (8) materials, water table, grouted tieback | planned |  |
+| 59 | Retaining wall, homogenous, water table, grouted tieback | planned |  |
+| 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
+| 61 | Slope, homogenous, composite surfaces | planned |  |
+| 62 | Slope, homogenous, ru pore pressure, seismic | planned |  |
+| 63 | Slope, (3) materials, seismic | planned |  |
+| 64 | Embankment, (4) materials, water table, tension crack | planned |  |
+| 65 | Embankment, (4) materials, water table, ponded water | planned |  |
+| 66 | Embankment, (4) materials, water table, ponded water | planned |  |
+| 67 | Embankment, (2) materials | planned |  |
+| 68 | Embankment, (3) materials, ponded water | planned |  |
+| 69 | Embankment, (2) materials, water table, ponded water | planned |  |
+| 70 | Submerged slope, homogenous, water table, ponded water | planned |  |
+| 71 | Slope, homogenous, finite element groundwater seepage analysis, water table | planned |  |
+| 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
+| 73 | Excavated slope, (4) materials, tension crack | planned |  |
+| 74 | Embankment, (2) materials | planned |  |
+| 75 | Dyke, (4) materials | planned |  |
+| 76 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | planned |  |
+| 77 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | planned |  |
+| 78 | Slope, homogenous | planned |  |
+| 79 | Slope, (2) materials, infinite slope failure | planned |  |
+| 80 | Embankment, (6) materials | planned |  |
+| 81 | Embankment, (2) materials, infinite slope failure | planned |  |
+| 82 | Embankment, (2) materials, water table | planned |  |
+| 83 | Embankment, (2) materials | planned |  |
+| 84 | Embankment, (2) materials | planned |  |
+| 85 | Reinforced slope, homogenous, grouted tieback | planned | active/passive tieback acceptance pair (D&W 1.51/1.32); geometry from Fig 85.1 |
+| 86 | Reinforced slope, homogenous, grouted tieback | planned |  |
+| 87 | Retaining wall, (3) materials, geotextile | planned |  |
+| 88 | Retaining wall, (3) materials, geotextile | planned |  |
+| 89 | Retaining wall, (3) materials, geotextile | planned |  |
+| 90 | Retaining wall, (3) materials, geotextile | planned |  |
+| 91 | Retaining wall, (3) materials, geotextile | planned |  |
+| 92 | Retaining wall, (3) materials, geotextile | planned |  |
+| 93 | Retaining wall, (3) materials, distributed load, geotextile | planned |  |
+| 94 | Retaining wall, (3) materials, geotextile | planned |  |
+| 95 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 96 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 97 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 98 | Embankment dam, (5) materials, rapid drawdown, water table | planned |  |
+| 99 | Embankment dam, (3) materials, rapid drawdown, water table | planned |  |
+| 100 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 101 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 102 | Embankment dam, homogenous, rapid drawdown | planned |  |
+| 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
+| 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
+| 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
+| 106 | Support, Ito & Matsui pile | planned | Ito & Matsui pile — direct comparison, no new code |
+| 107 | Retaining walls, gabion walls, supports | planned |  |
+| 108 | Retaining walls, gabion walls, supports | planned |  |
+| 109 | Retaining walls, gabion walls, weak layers | planned |  |
+| 110 | Retaining walls, equivalent fluid pressure | planned |  |
+| 111 | Helical anchor | planned |  |

@@ -1096,6 +1096,10 @@ def main():
         lem_design = Path('docs/lem/design.md')
         if lem_design.exists():
             tests.extend(parse_test_tags(lem_design))
+        # Rocscience Slide2 verification corpus (docs/verification.md table)
+        verification_md = Path('docs/verification.md')
+        if verification_md.exists():
+            tests.extend(parse_test_tags(verification_md))
     if run_fem:
         fem_samples = Path('docs/fem/samples.md')
         if fem_samples.exists():

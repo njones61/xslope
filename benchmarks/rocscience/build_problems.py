@@ -392,7 +392,77 @@ def vp020():
     return 'vp020.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp018, vp019, vp020, vp021a, vp021b]
+def vp017():
+    """Slide #17: Yamagami & Ueta (1988) homogeneous slope, dry. Circular:
+    Slide Bishop 1.344, Ordinary 1.278 (Y&U 1.348 / 1.282). Non-circular:
+    Slide Spencer 1.325 (Y&U 1.339, Greco 1.33)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Y&U soil', c=9.8, phi=10.0, gamma=17.64, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 5.0), (5.0, 5.0), (15.0, 10.0), (25.0, 10.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 10.0, 'Yo': 14.0, 'Depth': 3.0, 'R': 11.0}]
+    sd['non_circ'] = [
+        {'X': 4.5, 'Y': 5.0, 'Movement': 'Free'},
+        {'X': 8.0, 'Y': 4.3, 'Movement': 'Horiz'},
+        {'X': 12.0, 'Y': 5.0, 'Movement': 'Horiz'},
+        {'X': 16.5, 'Y': 10.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp017.xlsx'))
+    return 'vp017.xlsx'
+
+
+def vp024():
+    """Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular
+    search. Slide2: Ordinary 1.439, Bishop 1.439; Low reference 1.44 both."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Upper Layer', 30.0), ('Middle Layer', 20.0), ('Bottom Layer', 150.0)]
+    sd['materials'] = []
+    for name, c in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=0.0, gamma=18.0, option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 14.0), (20.0, 14.0), (34.0, 9.0), (38.0, 8.0), (60.0, 8.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 9.0), (34.0, 9.0), (38.0, 8.0), (60.0, 8.0)]},
+        {'mat_id': 2, 'coords': [(0.0, 5.0), (60.0, 5.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 28.0, 'Yo': 20.0, 'Depth': 5.0, 'R': 15.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp024.xlsx'))
+    return 'vp024.xlsx'
+
+
+def vp023():
+    """Slide #23: Low (1989) slope over two undrained layers; the lower
+    layer's cu grows linearly 15->30 kPa from y=4 to y=0 (xslope 'cp'
+    option: Su = c + cp*(r_elev - y)). Circular search. Slide2:
+    Ordinary 1.370, Bishop 1.192; Low 1.36 / 1.14; Kim (2002) 1.17."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    m = dict(base); m.update(name='Upper Soil', c=95.0, phi=15.0, gamma=20.0, option='mc', u='none')
+    sd['materials'].append(m)
+    m = dict(base); m.update(name='Middle Soil', c=15.0, phi=0.0, gamma=20.0, option='mc', u='none')
+    sd['materials'].append(m)
+    m = dict(base); m.update(name='Lower Soil', c=15.0, phi=0.0, gamma=20.0, option='cp',
+                             cp=3.75, r_elev=4.0, u='none')
+    sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 8.0), (10.0, 8.0), (26.0, 16.0), (40.0, 16.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 8.0), (10.0, 8.0), (40.0, 8.0)]},
+        {'mat_id': 2, 'coords': [(0.0, 4.0), (40.0, 4.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 18.0, 'Yo': 20.0, 'Depth': 2.0, 'R': 18.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp023.xlsx'))
+    return 'vp023.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

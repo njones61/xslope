@@ -231,7 +231,7 @@ def make_polygons_conforming(polygon_coords, tol=1e-8, debug=False):
     return polygon_coords
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -279,6 +279,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         else:
             polygon_coords.append(polygon)
             polygon_mat_ids.append(None)
+
+    # Point constraints (e.g. line-load application points): insert each point as
+    # a vertex into every polygon edge that contains it, so gmsh places a node
+    # exactly there. Done BEFORE the conforming pass so shared edges stay welded.
+    if point_constraints:
+        _insert_point_constraints(polygon_coords, point_constraints,
+                                  tol=1e-6 * max(1.0, target_size), debug=debug)
 
     # Make adjacent zones conforming: split any edge at a neighbour's vertex that
     # lies in its interior (a T-junction), so shared interfaces mesh without slits.
@@ -3459,6 +3466,49 @@ def extract_pile_line_geometry(slope_data):
         for pile in slope_data['pile_lines']:
             lines.append([(pile['x1'], pile['y1']), (pile['x2'], pile['y2'])])
     return lines
+
+
+def _insert_point_constraints(polygon_coords, points, tol=1e-6, debug=False):
+    """Insert each (x, y) constraint point as a vertex into every polygon edge
+    that passes through it (within tol), in place. A point already coincident
+    with a vertex is left alone. Ensures gmsh generates a mesh node exactly at
+    each point — used for line-load application points."""
+    import numpy as np
+    for (px, py) in points:
+        for coords in polygon_coords:
+            n = len(coords)
+            if n < 2:
+                continue
+            # already a vertex?
+            if any(abs(px - x) <= tol and abs(py - y) <= tol for (x, y) in coords):
+                continue
+            closed = (abs(coords[0][0] - coords[-1][0]) <= tol
+                      and abs(coords[0][1] - coords[-1][1]) <= tol)
+            m = n - 1 if closed else n - 1
+            for j in range(m):
+                x1, y1 = coords[j]
+                x2, y2 = coords[j + 1]
+                dx, dy = x2 - x1, y2 - y1
+                L2 = dx * dx + dy * dy
+                if L2 <= tol * tol:
+                    continue
+                t = ((px - x1) * dx + (py - y1) * dy) / L2
+                if t <= 0.0 or t >= 1.0:
+                    continue
+                qx, qy = x1 + t * dx, y1 + t * dy
+                if abs(px - qx) <= max(tol, 1e-9) and abs(py - qy) <= max(tol, 1e-9):
+                    coords.insert(j + 1, (px, py))
+                    if debug:
+                        print(f"Inserted point constraint ({px}, {py}) into polygon edge {j}")
+                    break
+
+
+def extract_point_constraints(slope_data):
+    """Mesh point constraints from slope_data: currently the line-load
+    application points (a node must land exactly at each so the load can be
+    applied as a nodal force). Returns a list of (x, y) tuples for
+    build_mesh_from_polygons(point_constraints=...)."""
+    return [(ll['x'], ll['y']) for ll in (slope_data.get('line_loads') or [])]
 
 
 def extract_constraint_line_geometry(slope_data):

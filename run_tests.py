@@ -300,7 +300,8 @@ def run_fem_test(test):
     """Run a single FEM SSRM test."""
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, solve_ssrm
-    from xslope.mesh import get_material_polygons, build_mesh_from_polygons, extract_constraint_line_geometry
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, extract_point_constraints)
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
@@ -329,7 +330,8 @@ def run_fem_test(test):
         polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
         mesh = build_mesh_from_polygons(
             polygons, target_size=target_size, element_type=element_type,
-            lines=constraint_lines
+            lines=constraint_lines,
+            point_constraints=extract_point_constraints(slope_data)
         )
 
     fem_data = build_fem_data(slope_data, mesh)

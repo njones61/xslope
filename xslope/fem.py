@@ -999,8 +999,35 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 print(f"  Distributed load {load_idx}: {n_load_nodes} nodes, "
                       f"total force = {total_force:.1f}, expected ~{expected_force:.1f}, "
                       f"sum(trib) = {total_trib:.2f}")
-            
-    
+
+
+    # Step 4c: Line loads (v12 'lloads') -> concentrated nodal forces (type 4).
+    # The mesh should carry a node exactly at each load point — pass
+    # mesh.extract_point_constraints(slope_data) to build_mesh_from_polygons
+    # (point_constraints=...) so one is guaranteed; otherwise the force snaps to
+    # the nearest node with a warning.
+    line_loads_fem = slope_data.get('line_loads') or []
+    if line_loads_fem:
+        _span = float(np.max(nodes[:, 0]) - np.min(nodes[:, 0])) if len(nodes) else 1.0
+        _tol_ll = 1e-3 * max(1.0, _span)
+        for _ll_idx, _ll in enumerate(line_loads_fem):
+            _d = np.linalg.norm(nodes - np.array([_ll['x'], _ll['y']]), axis=1)
+            _i = int(np.argmin(_d))
+            if _d[_i] > _tol_ll:
+                warnings.warn(
+                    f"Line load '{_ll.get('label', _ll_idx + 1)}' at ({_ll['x']}, {_ll['y']}): "
+                    f"nearest mesh node is {_d[_i]:.3g} away; the force was applied there. "
+                    "Pass mesh.extract_point_constraints(slope_data) as point_constraints "
+                    "to build_mesh_from_polygons so a node lands exactly at the load point.")
+            _ang = np.radians(_ll.get('angle', -90.0))
+            bc_type[_i] = 4
+            bc_values[_i, 0] += _ll['P'] * np.cos(_ang)
+            bc_values[_i, 1] += _ll['P'] * np.sin(_ang)
+            if verbose:
+                print(f"  Line load '{_ll.get('label', _ll_idx + 1)}': node {_i} at "
+                      f"({nodes[_i,0]:.3f}, {nodes[_i,1]:.3f}), "
+                      f"F = ({_ll['P'] * np.cos(_ang):.1f}, {_ll['P'] * np.sin(_ang):.1f})")
+
     # Get other parameters
     unit_weight = slope_data.get("gamma_water", 9.81)
     k_seismic = slope_data.get("k_seismic", 0.0)

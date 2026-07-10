@@ -446,12 +446,25 @@ A list of line dicts with explicit endpoints and capacities.
 ```python
 slope_data['reinforcement_lines'] = [
     {'x1': 0, 'y1': 0, 'x2': 20, 'y2': 0,      # start -> end
-     't_max': 5000,    # max tension  (LEM & FEM)
+     't_max': 5000,    # max tension  (LEM & FEM), per unit width
      't_res': 0,       # residual tension (FEM)
      'lp1': 0, 'lp2': 0,   # pullout lengths at start / end
-     'E': 0, 'area': 0},   # Young's modulus / cross-section area (FEM)
+     'E': 0, 'area': 0,    # Young's modulus / cross-section area (FEM)
+     # v12 support-type fields (defaults shown = the classic generic line):
+     'label': 'Line 1',
+     'type': '',            # '', 'geosynthetic', 'nail', 'tieback', 'anchor' (preset over dir/appl)
+     'dir': 'tangent',      # 'tangent' (flexible, force along slip surface) | 'axial' (rigid, along the line)
+     'appl': 'active',      # 'active' (allowable force, not /FS) | 'passive' (ultimate, /FS; not in spencer yet)
+     'tend1': 0.0, 'tend2': 0.0,  # end anchorage/plate/connection capacity (per unit width)
+     'spacing': 1.0},       # out-of-plane spacing already divided out at load time
 ]
 ```
+
+Support-type recipes: geosynthetics -> `type='geosynthetic'` (tangent, active); soil nails ->
+`type='nail'` (axial, passive, `tend1` = plate capacity at the face end); tiebacks ->
+`type='tieback'` (axial, active, `tend1` = connection capacity). Enter per-element capacities
+plus `Spacing` in the template and the loader divides; in-memory dicts like the above are
+already per unit width.
 
 **Layout convention** (when the sketch gives spacing but not explicit elevations): the bottom
 line sits **AT the toe/base elevation** (e.g. y=0), then y = s, 2s, … upward; each line starts
@@ -474,7 +487,23 @@ slope_data['pile_lines'] = [
      'D_pile': 2.0, 'S': 6.0,                   # diameter, spacing
      'E': None, 'I': None, 'area': None,        # FEM section props (None -> auto from D)
      'V_cap': None, 'M_cap': None,              # shear / moment capacity per pile
+     'appl': 'active',                          # 'active' (H not /FS) | 'passive' (H /FS; LEM only)
      'fixity': 'free'},                         # 'free' or 'fixed' (FEM head condition)
+]
+```
+
+#### Line loads (`line_loads`)
+
+Concentrated forces per unit width on the ground surface (v12) — e.g. a shotcrete facing
+plate's weight on a nailed wall face. Points are snapped to the ground surface within a small
+tolerance and refused beyond it.
+
+```python
+slope_data['line_loads'] = [
+    {'x': 12.0, 'y': 8.0,    # point on the ground surface
+     'P': 500.0,             # force per unit width (magnitude, > 0)
+     'angle': -90.0,         # direction from horizontal; -90 = straight down (default)
+     'label': 'facing'},
 ]
 ```
 

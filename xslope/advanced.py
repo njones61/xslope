@@ -656,12 +656,21 @@ def _reliability_param_info(materials):
 
 def _perturbed_slope_data(slope_data, materials, param, sign):
     """A shallow copy of slope_data whose materials are copied and the one target
-    parameter shifted by ``sign * std`` (sign +1 -> MLV+sigma, -1 -> MLV-sigma)."""
+    parameter shifted by ``sign * std`` (sign +1 -> MLV+sigma, -1 -> MLV-sigma).
+
+    gamma and gamma_sat are the same soil weighed two ways
+    (gamma_sat - gamma = n*gamma_w*(1 - S_r), correlation ~1), so perturbing
+    gamma shifts gamma_sat by the SAME ABSOLUTE delta — there is deliberately no
+    independent sigma_gamma_sat, which could otherwise produce moist soil
+    heavier than saturated soil inside the FS derivative."""
     sd = slope_data.copy()
     sd['materials'] = [m.copy() for m in materials]
     idx = param['material_id'] - 1
     if idx < len(sd['materials']):
         sd['materials'][idx][param['param']] = param['mlv'] + sign * param['std']
+        if param['param'] == 'gamma' and sd['materials'][idx].get('gamma_sat') is not None:
+            sd['materials'][idx]['gamma_sat'] = (
+                sd['materials'][idx]['gamma_sat'] + sign * param['std'])
     return sd
 
 

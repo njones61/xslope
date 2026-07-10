@@ -890,6 +890,72 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     piezo_y_all = get_piezometric_y_coordinates(slice_centers, piezo_line)
     piezo_y2_all = get_piezometric_y_coordinates(slice_centers, piezo_line2)
 
+    # === Water table for the gamma/gamma_sat weight split (template v12) ===
+    # The water table is GLOBAL — one phreatic surface per problem, independent
+    # of any material's pore-pressure option (the "sidecar" model). It governs
+    # slice WEIGHT only; base pore pressure stays with the per-material u option.
+    # Source precedence: a seepage solution's u = 0 contour (root-found on the
+    # UNCLAMPED signed field) beats a hand-drawn piezo line; rapid drawdown
+    # deliberately keys weight to the PRE-drawdown (stage-1) surfaces, never the
+    # staged ones — the premise of rapid drawdown is that the soil stays
+    # saturated while the pore pressures fall.
+    any_gamma_sat = any(m.get('gamma_sat') is not None for m in materials)
+    water_table_y_all = np.full(len(slice_centers), np.nan)
+    if any_gamma_sat:
+        if has_seep_data:
+            cache = slope_data.get('_water_table_profile')
+            if cache is None:
+                mesh = slope_data['mesh']
+                seep_u = np.asarray(slope_data['seep_u'], dtype=float)
+                nodes = np.asarray(mesh['nodes'], dtype=float)
+                xs_grid = np.linspace(nodes[:, 0].min(), nodes[:, 0].max(), 201)
+                y_lo_all, y_hi_all = nodes[:, 1].min(), nodes[:, 1].max()
+                wt = np.full(xs_grid.shape, np.nan)
+                for k, xg in enumerate(xs_grid):
+                    def _u(yy):
+                        val, found = interpolate_at_point(
+                            mesh['nodes'], mesh['elements'], mesh['element_types'],
+                            seep_u, (xg, yy), return_found=True)
+                        return (val, found)
+                    u_lo, f_lo = _u(y_lo_all + 1e-6)
+                    u_hi, f_hi = _u(y_hi_all - 1e-6)
+                    if not (f_lo or f_hi):
+                        continue
+                    if f_hi and u_hi >= 0:
+                        wt[k] = y_hi_all          # fully saturated column
+                        continue
+                    if f_lo and u_lo <= 0:
+                        wt[k] = y_lo_all          # fully unsaturated column
+                        continue
+                    lo, hi = y_lo_all, y_hi_all
+                    for _ in range(30):           # bisect u(y) = 0
+                        mid = 0.5 * (lo + hi)
+                        um, fm = _u(mid)
+                        if not fm:
+                            hi = mid
+                            continue
+                        if um > 0:
+                            lo = mid
+                        else:
+                            hi = mid
+                    wt[k] = 0.5 * (lo + hi)
+                cache = (xs_grid, wt)
+                slope_data['_water_table_profile'] = cache
+                if piezo_line:
+                    print("gamma_sat weight split: using the seepage solution's u = 0 "
+                          "contour as the water table; the piezometric line is NOT "
+                          "used for unit weight (it may still supply pore pressure "
+                          "and plotting).")
+            xs_grid, wt = cache
+            water_table_y_all = np.interp(slice_centers, xs_grid, wt)
+        elif piezo_line:
+            water_table_y_all = np.asarray(piezo_y_all, dtype=float)
+        else:
+            warnings.warn(
+                "One or more materials specify gamma_sat, but the model has no "
+                "water table (no piezometric line or seepage solution) — the "
+                "saturated unit weight can never apply and gamma is used throughout.")
+
     # Interpolation functions for distributed loads. np.interp requires the
     # sample points to be in ascending-X order; sort each load line so a load
     # entered right-to-left is not silently interpolated to zero everywhere.
@@ -970,9 +1036,25 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
             if h > 0:
                 gamma = materials[mat_index]['gamma']
-                sum_gam_h_y += h * gamma * (overlap_top + overlap_bot) / 2
-                sum_gam_h += h * gamma
-                soil_weight += h * gamma * dx
+                g_sat = materials[mat_index].get('gamma_sat')
+                y_w = water_table_y_all[i] if any_gamma_sat else np.nan
+                if g_sat is not None and not np.isnan(y_w):
+                    # Split the band at the water table: gamma_sat below, gamma
+                    # (moist) above. Degenerate cases fall out of the clamp: a
+                    # water table below the band gives an all-moist band, above
+                    # it an all-saturated one (the right answer under ponded
+                    # water, whose free water arrives as a distributed load).
+                    y_split = min(max(y_w, overlap_bot), overlap_top)
+                    h_sat = y_split - overlap_bot
+                    h_moist = overlap_top - y_split
+                    sum_gam_h_y += (g_sat * h_sat * (y_split + overlap_bot) / 2
+                                    + gamma * h_moist * (overlap_top + y_split) / 2)
+                    sum_gam_h += g_sat * h_sat + gamma * h_moist
+                    soil_weight += (g_sat * h_sat + gamma * h_moist) * dx
+                else:
+                    sum_gam_h_y += h * gamma * (overlap_top + overlap_bot) / 2
+                    sum_gam_h += h * gamma
+                    soil_weight += h * gamma * dx
                 # Base material = the DEEPEST present layer (smallest base
                 # elevation), independent of polygon iteration order. The
                 # previous "last h>0 layer wins" relied on polygons being

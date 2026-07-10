@@ -510,7 +510,11 @@ def load_slope_data(filepath):
         lambda r, c: (_mat_raw.iloc[r - 1, c - 1]
                       if r <= _mat_raw.shape[0] and c <= _mat_raw.shape[1] else None))
     mat_df = _mat_raw.iloc[_mat_hdr:].reset_index(drop=True)
-    mat_df.columns = [('' if pd.isna(v) else str(v).strip()) for v in _mat_raw.iloc[_mat_hdr - 1]]
+    # Header names are matched underscore-insensitively: the master template's
+    # styled headers concatenate to 'pow_a'/'vg_a' while older sheets carry
+    # 'powa'/'vga' - both must resolve to the same column.
+    mat_df.columns = [('' if pd.isna(v) else str(v).strip().replace('_', ''))
+                      for v in _mat_raw.iloc[_mat_hdr - 1]]
     materials = []
 
     def _num(x):
@@ -640,8 +644,8 @@ def load_slope_data(filepath):
             "unsat": unsat_val,
             "kr0" : _num(row.get('kr0', 0)),
             "h0" : _num(row.get('h0', 0)),
-            "vg_a": _num(row.get('vg_a', 0)),
-            "vg_n": _num(row.get('vg_n', 0)),
+            "vg_a": _num(row.get('vga', 0)),
+            "vg_n": _num(row.get('vgn', 0)),
             "E": _num(row.get('E', 0)),
             "nu": _num(row.get('n', 0))
         })
@@ -1427,7 +1431,7 @@ MAT_NUM_HEADERS = [
     ('sigma_gamma', 's(g)'), ('sigma_c', 's(c)'), ('sigma_phi', 's(f)'),
     ('sigma_cp', 's(c/p)'), ('sigma_d', 's(d)'), ('sigma_psi', 's(psi)'),
     ('k1', 'k1'), ('k2', 'k2'), ('alpha', 'alpha'),
-    ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vg_a'), ('vg_n', 'vg_n'),
+    ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vga'), ('vg_n', 'vgn'),
     ('E', 'E'), ('nu', 'n'),
 ]
 # Optional numerics: written only when set (None must stay a blank cell -- e.g.
@@ -1487,7 +1491,8 @@ def _read_mat_header_cols(filepath):
         for c in range(1, ws.max_column + 1):
             v = ws.cell(row=header_row, column=c).value
             if v is not None and str(v).strip() != '':
-                cols[str(v).strip()] = c
+                # underscore-insensitive, matching load_slope_data's mat parse
+                cols[str(v).strip().replace('_', '')] = c
         return header_row, cols
     finally:
         wb.close()

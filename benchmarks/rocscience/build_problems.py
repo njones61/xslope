@@ -548,7 +548,26 @@ def vp054b():
     return 'vp054b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp054a, vp054b, vp085a, vp085b]
+def vp041():
+    """Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with
+    power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 - exercises the
+    v12 pow option and ru together. Slide2: Bishop 1.656, Janbu simplified
+    1.563; Charles & Soares 1.66; Baker 1.56-1.60; Perry 1.67."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='clay (power curve)', c=0.0, phi=0.0, gamma=20.0,
+             option='pow', pow_a=1.4, pow_b=0.8, pow_c=0.0, pow_d=0.0,
+             u='ru', ru=0.3)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 30.0), (5.0, 30.0), (85.0, 10.0), (93.0, 10.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 45.0, 'Yo': 45.0, 'Depth': 8.0, 'R': 37.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp041.xlsx'))
+    return 'vp041.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp041, vp054a, vp054b, vp085a, vp085b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

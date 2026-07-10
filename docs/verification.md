@@ -269,6 +269,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
 <!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
+<!-- test: file=files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
@@ -318,7 +319,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
 | 39 | Reinforced embankment, (2) materials, tension crack, geosynthetic | planned |  |
 | 40 | Slope, homogenous, sensitivity analysis | planned |  |
-| 41 | Slope, homogenous, ru pore pressure | planned |  |
+| 41 | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
 | 42 | Dam, (3) materials, water table, ponded water, tension crack | planned |  |
 | 43 | Slope, homogenous, planar surface, RocPlane comparison | planned |  |
 | 44 | Slope, homogenous | planned |  |

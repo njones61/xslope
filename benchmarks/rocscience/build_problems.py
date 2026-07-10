@@ -601,7 +601,26 @@ def vp045b():
     return 'vp045b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp041, vp045a, vp045b, vp054a, vp054b, vp085a, vp085b]
+def vp036():
+    """Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability
+    benchmark: c'=18+-3.6, phi'=30+-3, gamma=18+-0.9, ru=0.2 (+-0.02, not
+    perturbed by xslope's Taylor-series reliability - its contribution to
+    sigma_F is small). Bishop deterministic FS 1.334 (H&W) / 1.340 (Slide);
+    beta_lognormal on the deterministic surface 2.336 (H&W) / 2.482 (Slide)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Li & Lumb soil', c=18.0, phi=30.0, gamma=18.0, option='mc',
+             u='ru', ru=0.2, sigma_c=3.6, sigma_phi=3.0, sigma_gamma=0.9)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 5.0), (5.0, 5.0), (15.0, 15.0), (20.0, 15.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 10.0, 'Yo': 20.0, 'Depth': 4.0, 'R': 16.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp036.xlsx'))
+    return 'vp036.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp054a, vp054b, vp085a, vp085b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

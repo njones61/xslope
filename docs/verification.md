@@ -269,6 +269,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
 <!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
 <!-- test: file=files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
@@ -316,7 +318,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 33 | Dike, (5) materials, probabilistic analysis, water table | planned |  |
 | 34 | Dam, (3) materials, probabilistic analysis, water table | planned |  |
 | 35 | Dam, (5) materials, probabilistic analysis, reliability index | planned |  |
-| 36 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | planned |  |
+| 36 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, ru=0.2). Deterministic Bishop 1.333 vs H&W 1.334 (Slide 1.340). Taylor-series β_ln on the critical surface 2.263 vs H&W (FOSM) 2.336 and Slide (Monte-Carlo) 2.482 — β estimates legitimately spread by method; xslope does not yet perturb ru (σ=0.02, minor). |
 | 37 | Slope, homogenous, distributed load, back analysis of required support force and length | planned |  |
 | 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
 | 39 | Reinforced embankment, (2) materials, tension crack, geosynthetic | planned |  |

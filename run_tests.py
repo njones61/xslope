@@ -159,6 +159,8 @@ def parse_test_tags(md_path):
         # Resolve file path relative to the markdown file's directory
         if 'file' in params:
             params['file'] = str(md_dir / params['file'])
+        if 'file2' in params:
+            params['file2'] = str(md_dir / params['file2'])
 
         # Convert numeric fields
         for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta']:
@@ -525,6 +527,35 @@ def run_fem_reliability_test(test):
     if not success:
         return None, f"reliability_fem failed: {result}"
     return result['beta_ln'], None
+
+
+def run_gsat_pair_test(test):
+    """The gamma_sat sidecar equivalence gate (plan §1.2 S1): a model hand-zoned
+    into moist/saturated polygons at the water table must give the same FS as the
+    single-material gamma/gamma_sat + piezo-sidecar formulation. Discretization
+    differs (the two force different slice boundaries), so the comparison runs at
+    300 slices where both converge to the same answer (verified 5e-8 at build
+    time); tolerance 1e-5."""
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope import solve
+
+    vals = []
+    for f in (test['file'], test['file2']):
+        sd = load_slope_data(f)
+        ok, result = generate_slices(sd, circle=sd['circles'][0], num_slices=300)
+        if not ok:
+            return None, f"slice generation failed for {f}: {result}"
+        df, _ = result
+        s_ok, r = solve.spencer(df)
+        if not s_ok:
+            return None, f"spencer failed for {f}: {r}"
+        vals.append(r['FS'])
+    d = abs(vals[0] - vals[1])
+    if d > 1e-5:
+        return None, (f"zoned vs sidecar FS differ by {d:.2e} "
+                      f"({vals[0]:.6f} vs {vals[1]:.6f})")
+    return vals[0], None
 
 
 def run_roundtrip_test(test):
@@ -996,6 +1027,8 @@ def run_test(test):
         return run_dxf_roundtrip_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
+    if test_type == 'gsat_pair':
+        return run_gsat_pair_test(test)
     if test_type == 'mp_spencer':
         return run_mp_spencer_test(test)
     if test_type == 'drawdown_tauff':

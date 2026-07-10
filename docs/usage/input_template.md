@@ -33,7 +33,7 @@ This function reads all worksheets, validates the data, and returns a dictionary
 
 ## Template Structure
 
-The template consists of 12 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
+The template consists of 13 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
@@ -48,6 +48,7 @@ The template consists of 12 worksheets, each serving a specific purpose. Differe
 | **dloads** | Distributed surface loads | X   |      | X   |
 | **reinforce** | Soil reinforcement elements (anchors, nails, geosynthetics) | X   |      | X   |
 | **piles** | Pile and concrete pier support elements | X   |      | X   |
+| **lloads** | Line loads (concentrated forces on the ground surface) | X   |      |     |
 | **seep bc** | Seepage analysis boundary conditions |     | X    |     |
 
 The following sections describe each worksheet in detail, including the data structure and how it is used in analysis.
@@ -58,9 +59,11 @@ The following sections describe each worksheet in detail, including the data str
 
 ![sheet_main.png](images/sheet_main.png)
 
+**⚠ FIGURE NEEDS UPDATE (v12): screenshot shows template version 11; current version is 12.**
+
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility
+- **Template version**: Tracks template format for compatibility. The current version is **12**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates.
 - **Unit weight of water** (γw): Used in pore pressure calculations
 - **Tension crack parameters**: Depth and water level within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh): Horizontal seismic acceleration coefficient for pseudo-static earthquake analysis
@@ -102,19 +105,24 @@ the horizontal scale.
 
 ![sheet_mat1.png](images/sheet_mat1.png)
 
+**⚠ FIGURE NEEDS UPDATE (v12): new γ_sat, pow_a–pow_d, and r_u columns; new blank spacer row above the table (headers moved down one row); new `pow` and `ru` legend entries.**
+
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
 **Strength Properties** (for LEM and FEM analysis):
 
-- **$\gamma$**: Unit weight of the soil. This is used to calculate the weight of the soil in each slice.
+- **$\gamma$**: Unit weight of the soil. This is the *total* unit weight — moist above the water table. It is used to calculate the weight of the soil in each slice.
+- **$\gamma_{sat}$**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
-  with depth below a reference elevation.
+  with depth below a reference elevation; `pow` = nonlinear power-curve envelope.
 - **c** (cohesion) and **φ** (friction angle): Mohr-Coulomb shear strength parameters (option = `mc`).
 - **c**, **cp**, and **r-elev** (option = `cp`): undrained strength that increases linearly below a reference
   elevation — see the formula below.
 - **d**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **u**: pore pressure option for effective stress analysis
+- **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — see the formula below.
+- **u**: pore pressure option
+- **$r_u$**: pore pressure ratio (u = `ru`) — see below.
 
 For the **cp** strength option, the undrained shear strength at elevation $y$ is:
 
@@ -125,10 +133,22 @@ unit elevation below it (e.g. psf/ft). At or above **r-elev** the strength equal
 $S_u/\sigma'_v$ (c/p) ratio but is referenced to elevation rather than depth, giving more precise control for
 slope-stability problems.
 
-**Pore Pressure Options** (column K):
+For the **pow** strength option, the shear strength is a curved envelope in terms of the effective normal stress
+$\sigma'_n$ on the failure surface:
+
+>>$\tau = pow_a \cdot (\sigma'_n + pow_d)^{pow_b} + pow_c   \qquad (2)$
+
+With $pow_b = 1$ this collapses to Mohr-Coulomb. Curved envelopes are appropriate for rockfill, waste rock,
+weathered rock, and heavily overconsolidated clays, where a straight-line fit over a wide stress range
+overestimates strength at one end and underestimates it at the other.
+
+**Pore Pressure Options** (column labeled **u**):
 
 - **piezo**: Use piezometric line from **piezo** worksheet
 - **seep**: Interpolate from seepage analysis solution (requires mesh and solution files - see [Using Seepage Results for Pore Pressures](../seep/seep_slope.md))
+- **ru**: Pore pressure as a constant fraction of vertical overburden stress, $u = r_u \cdot \sigma_v$, with the
+  ratio given in the **r_u** column. $\sigma_v$ is the soil-column stress only — distributed loads and tension-crack
+  water are *not* included.
 - **none**: No pore pressure
 
 **Variability** (for reliability analysis):
@@ -136,6 +156,8 @@ slope-stability problems.
 - **σ(γ)**, **σ(c)**, **σ(φ)**, etc.: Standard deviations for probabilistic analysis
 
 ![sheet_mat2.png](images/sheet_mat2.png)
+
+**⚠ FIGURE NEEDS UPDATE (v12): seepage/stiffness columns shifted right by the new strength columns; headers moved down one row.**
 
 **Permeability** (for seepage analysis):
 
@@ -386,54 +408,81 @@ defined by two points with a normal force for each.
 
 ![sheet_reinforce.png](images/sheet_reinforce.png)
 
+**⚠ FIGURE NEEDS UPDATE (v12): new Label column; new Type/Dir/Appl (green), Tend1/Tend2/Spacing (red) columns; columns regrouped by analysis type; legend text box and color key added.**
+
 The **reinforce** worksheet defines soil reinforcement elements such as soil nails, rock anchors, geosynthetic 
 reinforcement, or tiebacks. These elements provide additional resistance to sliding by mobilizing tensile forces 
 along the failure surface. Each reinforcement object is represented as a straight line defined by the XY coordinates of 
-the endpoints. Each line also has a set of properties that define the strength of the reinforcement and the pullout 
-length along the line. The Lp1 and Lp2 parameters control the pullout length along the line. The tensile force is 
-assumed to be zero at the end and linearly increasing to Tmax (or Tres for post-peak behavior) at distance of Lp1 
-from the left end of the line and Lp2 from the right end of the line.
+the endpoints. Each line also has a set of properties that define the type of support, the strength of the
+reinforcement, and the anchorage at each end.
 
 ![reinforce.png](images/reinforce.png)
 
 The template is formatted for up to 20 reinforcement lines (rows 3-22), but additional rows can be added to the 
-table as needed.
+table as needed. Column headers are color-coded by analysis type: **green** = LEM only, **red** = LEM & FEM,
+**blue** = FEM only.
 
 Each reinforcement element is defined by:
 
 - **Geometry**:<br>
+>>Label: Name used in error messages, summaries, and plots (optional)<br>
 >>x1, y1: Start point coordinates <br>
 >>x2, y2: End point coordinates<br>
-- **Strength Properties**:<br>
->>Tmax: Maximum tensile force that can be mobilized<br>
+- **Support Type** (LEM only):<br>
+>>Type: Support preset — selecting a Type fills Dir and Appl automatically: Geosynthetic (Tangent, Active),
+Nail (Axial, Passive), Tieback (Axial, Active), Anchor (Axial, Active). Leave blank for a generic tensile line.<br>
+>>Dir: Force direction at the slip surface. **Tangent** = the force reorients tangent to the slip surface
+(correct for flexible reinforcement such as geosynthetics — the default). **Axial** = the force acts along the
+reinforcement's own axis (correct for rigid supports such as nails and tiebacks). Filled by Type; overtype to
+override.<br>
+>>Appl: Force application. **Active** = the force is a known *allowable* force applied to the driving side and is
+NOT divided by the factor of safety (the default). **Passive** = the force is an *ultimate* capacity added to the
+resisting side and divided by FS, i.e. it mobilizes with the soil. Filled by Type; overtype to override.<br>
+- **Strength / Capacity Properties** (LEM &amp; FEM):<br>
+>>Tmax: Maximum tensile force that can be mobilized. Per unit width of slope; for discrete supports (nails,
+tiebacks) enter the per-element capacity and provide **Spacing**, and xslope divides for you.<br>
+>>Lp1: Pullout bond length at end 1<br>
+>>Lp2: Pullout bond length at end 2<br>
+>>Tend1: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>
+>>Tend2: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
+>>Spacing: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
+already per unit width.<br>
+- **Stiffness / Residual** (for FEM analysis):<br>
 >>Tres: Residual tensile force (for post-peak behavior)<br>
-- **Bond Properties**:<br>
->>Lp1: Pullout bond length at start end<br>
->>Lp2: Pullout bond length at end end<br>
-- **Stiffness** (for FEM analysis):<br>
 >>E: Elastic modulus of reinforcement<br>
 >>Area: Cross-sectional area<br>
 
-The pullout lengths (Lp1, Lp2) control how tensile force develops along the reinforcement as described above. 
-Furthermore:
+The available tensile force at any point along the line is governed by a capacity envelope combining the tensile
+strength, the frictional pullout development from each end, and any end anchorage:
+
+>>$T(x) = \min\left(T_{max},\;\; T_{end1} + T_{max}\dfrac{d_1}{L_{p1}},\;\; T_{end2} + T_{max}\dfrac{d_2}{L_{p2}}\right)$
+
+where $d_1$, $d_2$ are the distances from each end. Consequently:
 
 - If Lp = 0, the end is fully anchored (immediate maximum tension)
-- If Lp > 0, tension develops linearly over the pullout length
-- If the total line length < Lp1 + Lp2, only partial tension is mobilized
+- If Lp > 0 and Tend = 0, tension develops linearly from zero over the pullout length (the classical friction-only
+  taper)
+- If Tend > 0, the end starts with the anchorage capacity (a bearing plate, connection, or end anchor) and the
+  frictional contribution adds to it
+- If the total line length < Lp1 + Lp2 (with no end anchorage), only partial tension is mobilized
 
-For limit equilibrium analysis, xslope assumes that the reinforcement object is flexible and as the slope moves, the 
-force from the reinforcement object is applied parallel to the bottom of the slice, in a direction resisting sliding 
-or failure. Only the Tmax parameter is used in this calculation (Tres is ignored).
+For limit equilibrium analysis, the direction the force is applied depends on **Dir** (tangent to the slice base for
+flexible reinforcement, along the reinforcement axis for rigid supports) and whether it is factored by FS depends on
+**Appl**, as described above. With the defaults (Tangent, Active) the behavior is identical to earlier versions of
+xslope. Only the capacity envelope above is used in LEM (Tres is ignored).
 
 For the finite element method, the reinforcement is modeled as a 1D line element with a constant Young's modulus and 
-cross-sectional area. At any point along the line, if the force applied to the line exceeds Tmax, the line is 
-considered to be in failure and the tension is the line is limited to the residual tension Tres.
+cross-sectional area; Dir and Appl have no effect (the element force emerges from the analysis along the element
+axis). At any point along the line, if the force applied to the line exceeds the capacity envelope, the line is 
+considered to be in failure and the tension in the line is limited to the residual tension Tres.
 
 ---
 
 ## Worksheet: piles
 
 ![sheet_piles.png](images/sheet_piles.png)
+
+**⚠ FIGURE NEEDS UPDATE (v12): new Appl column (green); columns regrouped by analysis type (H, θp, Appl | D, S, Vcap, Mcap | E, I, Area, Fixity); legend text box updated.**
 
 The **piles** worksheet defines pile and concrete pier support elements that provide lateral resistance to slope movement. Unlike flexible reinforcement (soil nails, geogrids) which resists movement through tension along the reinforcement axis, piles are rigid structural elements that resist soil movement through lateral shear and bending at the failure surface intersection.
 
@@ -449,6 +498,7 @@ Each pile is defined by:
 - **LEM Properties**:<br>
 >>H: Pile force magnitude per unit width of slope (force/length). If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
 >>$\theta$: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is auto-computed as the direction perpendicular to the pile axis (0° for vertical piles).<br>
+>>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety (the default, and the behavior of earlier xslope versions). **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
 - **Pile Geometry**:<br>
 >>D: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
 >>S: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$. Also required when structural capacity limits (V_cap, M_cap) are specified, since capacity is per-pile and must be compared against the per-pile force F = H &times; S. Recommended in general so that xslope can report per-pile forces in the summary output.<br>
@@ -473,6 +523,30 @@ For methods with moment equilibrium (OMS, Bishop), the pile force also contribut
 When $H$ is left blank and $D$ and $S$ are provided, xslope auto-computes $H$ using the Ito & Matsui (1975) method for each trial failure surface. This auto-computation requires vertical piles ($x_1 = x_2$). For battered piles, $H$ must be specified directly.
 
 See the [LEM Piles](../lem/piles.md) section for detailed equation derivations and the [FEM Piles](../fem/piles.md) section for the beam element formulation used in finite element analysis.
+
+---
+
+## Worksheet: lloads
+
+**⚠ FIGURE NEEDED (v12): add a screenshot of the new lloads worksheet.**
+
+The **lloads** worksheet defines line loads — concentrated forces applied at a point on the ground surface, per
+unit width of slope. A typical use is the self-weight of a facing element, such as the shotcrete plate of a soil
+nail wall, applied as a point load on the wall face. (For loads spread over an area of the surface, use the
+**dloads** worksheet instead.)
+
+The template is formatted for up to 20 line loads (rows 3-22). Each line load is defined by:
+
+- **Label**: Name used in error messages, summaries, and plots (optional)
+- **x, y**: Coordinates of the point where the load acts. The point must lie on (or within a small tolerance of)
+  the ground surface.
+- **P**: Force magnitude per unit width of slope (force/length)
+- **Angle**: Direction of the force measured from horizontal in degrees. Leave blank for the default of **−90**
+  (straight down — a weight).
+
+During limit equilibrium analysis, the load is applied to the slice whose top boundary contains the point, entering
+the equilibrium equations as force components with a real moment arm (analogous to the pile force terms, but applied
+at the top of the slice rather than at the failure surface).
 
 ---
 

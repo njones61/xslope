@@ -366,6 +366,11 @@ def build_reinforce_lines(reinforcement_lines):
     return lines
 
 
+# Highest input-template version this build can read. Bump together with the
+# template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
+SUPPORTED_TEMPLATE_VERSION = 12
+
+
 def load_slope_data(filepath):
     """
     This function reads input data from various Excel sheets and parses it into
@@ -403,6 +408,22 @@ def load_slope_data(filepath):
     except Exception as e:
         raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
+    # Template version gate. Refuse files NEWER than this build understands, so a
+    # newer template can never be silently mis-read by an older install (new
+    # columns ignored, options like u='ru' silently zeroed). Shipped models carry
+    # versions 8-12; all load through the header-name-driven readers below.
+    try:
+        _tv = int(float(template_version))
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"Unrecognized template version {template_version!r} in cell D5 of the "
+            f"'main' sheet. Expected a number (current version is "
+            f"{SUPPORTED_TEMPLATE_VERSION}).")
+    if _tv > SUPPORTED_TEMPLATE_VERSION:
+        raise ValueError(
+            f"This input file is template version {_tv}, but this installation of "
+            f"xslope supports versions up to {SUPPORTED_TEMPLATE_VERSION}. "
+            "Update xslope to read this file.")
 
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
@@ -517,17 +538,17 @@ def load_slope_data(filepath):
             break  # Stop reading when we encounter an empty material name
         
         # For seep workflows, 'g' (unit weight) and shear strength properties are not required.
-        # A material row is considered "missing" only if Excel columns C:X are empty.
-        # (Excel A:B are number and name; C:X contain the actual property fields.)
-        start_col = 2  # C
-        end_col = min(mat_df.shape[1], 24)  # X is column 24 (1-based) -> index 23, so slice end is 24
-        c_to_x_empty = True if start_col >= end_col else row.iloc[start_col:end_col].isna().all()
-        if c_to_x_empty:
+        # A material row is considered "missing" only if EVERY property column after
+        # 'name' is empty. (Expressed position-free: a column insert can never
+        # silently narrow this check the way the old hardcoded C:X window could.)
+        props_empty = row.iloc[2:].isna().all() if mat_df.shape[1] > 2 else True
+        if props_empty:
             # Excel row number: first data row sits just below the located header
             excel_row = _mat_hdr + 1 + i
             raise ValueError(
                 "CRITICAL ERROR: Material row has empty property fields. "
-                f"Material '{material_name}' (Excel row {excel_row}) is blank in columns C:X."
+                f"Material '{material_name}' (Excel row {excel_row}) has no property "
+                "values after the name column."
             )
 
         # Unsaturated relative-permeability model (template v11+): 'lf' (linear
@@ -547,26 +568,55 @@ def load_slope_data(filepath):
         # Pore pressure option. An unrecognized value used to fall through to
         # u = 0 in slice.py, silently deleting pore pressure and inflating FS.
         u_val = _choice(row.get('u'), 'none')
-        if u_val not in ('none', 'piezo', 'seep'):
+        if u_val not in ('none', 'piezo', 'seep', 'ru'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized pore pressure option u='{u_val}'. "
-                "Expected one of: none, piezo, seep (or leave blank for none)."
+                "Expected one of: none, piezo, seep, ru (or leave blank for none)."
             )
 
         # Strength model. Blank is allowed -- seep-only material rows carry no
         # strength -- but slice.py raises if a blank one reaches a failure surface.
         option_val = _choice(row.get('option'), '')
-        if option_val not in ('', 'mc', 'cp'):
+        if option_val not in ('', 'mc', 'cp', 'pow'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized strength option option='{option_val}'. "
-                "Expected one of: mc, cp."
+                "Expected one of: mc, cp, pow."
             )
+
+        # v12 columns, read by header name. Older templates lack them entirely:
+        # row.get() returns None and the defaults preserve pre-v12 behavior exactly.
+        gamma_val = _num(row.get("g", 0))
+        _gsat_num = pd.to_numeric(row.get('gsat'), errors='coerce')
+        gamma_sat_val = float(_gsat_num) if pd.notna(_gsat_num) else None
+        if gamma_sat_val is not None and gamma_sat_val < gamma_val:
+            raise ValueError(
+                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has "
+                f"gsat = {gamma_sat_val} < g = {gamma_val}. The saturated unit weight "
+                "cannot be less than the moist unit weight; leave gsat blank to use "
+                "g throughout.")
+
+        ru_val = _num(row.get('ru', 0))
+        if u_val == 'ru' and ru_val < 0:
+            raise ValueError(
+                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
+                f"u='ru' but has a negative pore pressure ratio ru = {ru_val}.")
+
+        pow_a_val = _num(row.get('powa', 0))
+        pow_b_val = _num(row.get('powb', 0))
+        pow_c_val = _num(row.get('powc', 0))
+        pow_d_val = _num(row.get('powd', 0))
+        if option_val == 'pow' and (pow_a_val <= 0 or pow_b_val <= 0):
+            raise ValueError(
+                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
+                f"option='pow' but pow_a ({pow_a_val}) and pow_b ({pow_b_val}) must both "
+                "be positive for the envelope tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c.")
 
         materials.append({
             "name": str(material_name).strip(),
-            "gamma": _num(row.get("g", 0)),
+            "gamma": gamma_val,
+            "gamma_sat": gamma_sat_val,
             "option": option_val,
             "c": _num(row.get('c', 0)),
             "phi": _num(row.get('f', 0)),
@@ -574,7 +624,12 @@ def load_slope_data(filepath):
             "r_elev": _num(row.get('r-elev', 0)),
             "d": _num(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
             "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
+            "pow_a": pow_a_val,
+            "pow_b": pow_b_val,
+            "pow_c": pow_c_val,
+            "pow_d": pow_d_val,
             "u": u_val,
+            "ru": ru_val,
             "sigma_gamma": _num(row.get('s(g)', 0)),
             "sigma_c": _num(row.get('s(c)', 0)),
             "sigma_phi": _num(row.get('s(f)', 0)),
@@ -891,36 +946,105 @@ def load_slope_data(filepath):
         }, axis=1))
 
     # === REINFORCEMENT LINES ===
+    # Header-name-driven, so both template layouts load: v11 is
+    # (# | x1 y1 x2 y2 Tmax Tres Lp1 Lp2 E Area); v12 inserts Label at column B,
+    # regroups by analysis type, and adds Type/Dir/Appl/Tend1/Tend2/Spacing.
     reinforce_df = xls.parse('reinforce', header=1)  # Header in row 2 (0-indexed row 1)
+    reinforce_df.columns = [str(c).strip().lower() for c in reinforce_df.columns]
     reinforcement_lines = []    # FEM format: list of dicts with raw line endpoints and properties
 
-    # Process rows starting from row 3 (Excel) which is 0-indexed row 0 in pandas after header=1
-    # Keep reading until we encounter an empty value in column B
+    # Type presets fill Dir/Appl when those cells are blank (mirrors the in-sheet
+    # default formulas); explicit values win. Same table as the template legend.
+    _TYPE_PRESETS = {
+        'geosynthetic': ('tangent', 'active'),
+        'nail':         ('axial',   'passive'),
+        'tieback':      ('axial',   'active'),
+        'anchor':       ('axial',   'active'),
+    }
+
     for i, row in reinforce_df.iterrows():
-        # Check if column B (x1 coordinate) is empty - stop reading if empty
-        if pd.isna(row.iloc[1]):
-            break  # Stop reading when column B is empty
+        excel_row = i + 3
+        # Stop reading when x1 is empty (NOT column B positionally -- in v12,
+        # column B is the optional Label and may be blank on a data row)
+        if pd.isna(row.get('x1')):
+            break
+
+        label = (str(row['label']).strip()
+                 if 'label' in reinforce_df.columns and pd.notna(row.get('label'))
+                 else f"Line {i + 1}")
 
         # Check if other required coordinates are present
-        if pd.isna(row.iloc[2]) or pd.isna(row.iloc[3]) or pd.isna(row.iloc[4]):
+        if pd.isna(row.get('y1')) or pd.isna(row.get('x2')) or pd.isna(row.get('y2')):
             continue  # Skip rows with incomplete coordinate data
 
         # If coordinates are present, check for required parameters (Tmax, Lp1, Lp2)
-        if pd.isna(row.iloc[5]) or pd.isna(row.iloc[7]) or pd.isna(row.iloc[8]):
-            raise ValueError(f"Reinforcement line in row {i + 3} has coordinates but missing required parameters (Tmax, Lp1, Lp2). All three must be specified.")
+        if pd.isna(row.get('tmax')) or pd.isna(row.get('lp1')) or pd.isna(row.get('lp2')):
+            raise ValueError(
+                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
+                "coordinates but missing required parameters (Tmax, Lp1, Lp2). "
+                "All three must be specified.")
+
+        # v12 support-type columns; defaults reproduce pre-v12 behavior exactly
+        # (generic tensile line: tangent direction, active application).
+        rtype = _choice(row.get('type'), '')
+        if rtype not in ('',) + tuple(_TYPE_PRESETS):
+            raise ValueError(
+                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
+                f"an unrecognized Type='{rtype}'. Expected one of: "
+                f"{', '.join(_TYPE_PRESETS)} (or leave blank for a generic line).")
+        _dir_def, _appl_def = _TYPE_PRESETS.get(rtype, ('tangent', 'active'))
+
+        direction = _choice(row.get('dir'), _dir_def)
+        if direction not in ('tangent', 'axial'):
+            raise ValueError(
+                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
+                f"an unrecognized Dir='{direction}'. Expected: tangent or axial.")
+
+        appl = _choice(row.get('appl'), _appl_def)
+        if appl not in ('active', 'passive'):
+            raise ValueError(
+                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
+                f"an unrecognized Appl='{appl}'. Expected: active or passive.")
+
+        _sp_num = pd.to_numeric(row.get('spacing'), errors='coerce')
+        spacing = float(_sp_num) if pd.notna(_sp_num) else 1.0
+        if spacing <= 0:
+            raise ValueError(
+                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
+                f"Spacing = {spacing}; it must be positive (blank or 1 for geosynthetics).")
+
+        tend1 = _num(row.get('tend1', 0))
+        tend2 = _num(row.get('tend2', 0))
+        if tend1 < 0 or tend2 < 0:
+            raise ValueError(
+                f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
+                f"a negative end anchorage capacity (Tend1 = {tend1}, Tend2 = {tend2}).")
 
         try:
-            # Extract coordinates and parameters into the raw (FEM) format.
+            # Extract coordinates and parameters into the raw (FEM) format. All
+            # capacity terms and the axial stiffness are per unit width: discrete
+            # supports enter per-element values plus Spacing and are divided here,
+            # once, for both engines. (spacing defaults to 1 -> no-op for v11 files
+            # and geosynthetics.)
             reinforcement_lines.append({
-                "x1": float(row.iloc[1]), "y1": float(row.iloc[2]),  # Columns B, C
-                "x2": float(row.iloc[3]), "y2": float(row.iloc[4]),  # Columns D, E
-                "t_max": float(row.iloc[5]), "t_res": float(row.iloc[6]),  # Columns F, G
-                "lp1": float(row.iloc[7]) if not pd.isna(row.iloc[7]) else 0.0,  # Column H
-                "lp2": float(row.iloc[8]) if not pd.isna(row.iloc[8]) else 0.0,  # Column I
-                "E": float(row.iloc[9]), "area": float(row.iloc[10]),  # Columns J, K
+                "x1": float(row['x1']), "y1": float(row['y1']),
+                "x2": float(row['x2']), "y2": float(row['y2']),
+                "t_max": float(row['tmax']) / spacing,
+                "t_res": (float(row['tres']) if pd.notna(row.get('tres')) else 0.0) / spacing,
+                "lp1": float(row['lp1']) if not pd.isna(row['lp1']) else 0.0,
+                "lp2": float(row['lp2']) if not pd.isna(row['lp2']) else 0.0,
+                "E": float(row['e']) if pd.notna(row.get('e')) else float('nan'),
+                "area": (float(row['area']) if pd.notna(row.get('area')) else float('nan')) / spacing,
+                "label": label,
+                "type": rtype,
+                "dir": direction,
+                "appl": appl,
+                "tend1": tend1 / spacing,
+                "tend2": tend2 / spacing,
+                "spacing": spacing,
             })
         except Exception as e:
-            raise ValueError(f"Error processing reinforcement line in row {row.name + 3}: {e}")
+            raise ValueError(f"Error processing reinforcement line '{label}' in row {excel_row}: {e}")
 
     # LEM tension-distribution format, derived from the raw endpoints/pullout data.
     reinforce_lines = build_reinforce_lines(reinforcement_lines)
@@ -929,7 +1053,13 @@ def load_slope_data(filepath):
     # === PILE LINES ===
     pile_lines = []
     if 'piles' in xls.sheet_names:
+        # Header-name-driven with case-normalized headers, so the v12 column
+        # regrouping (and the v11 layout) both load. The force-angle column is
+        # 'qp' in the template (theta_p rendered via Symbol font) but 'theta' in
+        # some older files -- accept either.
         piles_df = xls.parse('piles', header=1)
+        piles_df.columns = [str(c).strip().lower() for c in piles_df.columns]
+        _theta_col = 'qp' if 'qp' in piles_df.columns else 'theta'
         for i, row in piles_df.iterrows():
             # Stop reading when column x1 is empty
             if pd.isna(row.get('x1')):
@@ -940,25 +1070,31 @@ def load_slope_data(filepath):
             try:
                 x1, y1 = float(row['x1']), float(row['y1'])
                 x2, y2 = float(row['x2']), float(row['y2'])
-                H = float(row['H']) if pd.notna(row.get('H')) else None
-                if pd.notna(row.get('theta')):
-                    theta_p = float(row['theta'])
+                H = float(row['h']) if pd.notna(row.get('h')) else None
+                if pd.notna(row.get(_theta_col)):
+                    theta_p = float(row[_theta_col])
                 else:
                     # Auto-compute: perpendicular to pile axis (0 for vertical)
                     dx = x2 - x1
                     dy = y2 - y1
                     theta_p = np.degrees(np.arctan2(dx, -dy))
-                D_pile = float(row['D']) if pd.notna(row.get('D')) else None
-                S = float(row['S']) if pd.notna(row.get('S')) else None
-                E_pile = float(row['E']) if pd.notna(row.get('E')) else None
-                I_pile = float(row['I']) if pd.notna(row.get('I')) else None
-                area = float(row['Area']) if pd.notna(row.get('Area')) else None
-                V_cap = float(row['Vcap']) if pd.notna(row.get('Vcap')) else None
-                M_cap = float(row['Mcap']) if pd.notna(row.get('Mcap')) else None
-                fixity_raw = str(row['Fixity']).strip().lower() if pd.notna(row.get('Fixity')) else 'free'
+                D_pile = float(row['d']) if pd.notna(row.get('d')) else None
+                S = float(row['s']) if pd.notna(row.get('s')) else None
+                E_pile = float(row['e']) if pd.notna(row.get('e')) else None
+                I_pile = float(row['i']) if pd.notna(row.get('i')) else None
+                area = float(row['area']) if pd.notna(row.get('area')) else None
+                V_cap = float(row['vcap']) if pd.notna(row.get('vcap')) else None
+                M_cap = float(row['mcap']) if pd.notna(row.get('mcap')) else None
+                fixity_raw = str(row['fixity']).strip().lower() if pd.notna(row.get('fixity')) else 'free'
                 if fixity_raw not in ('free', 'fixed'):
                     raise ValueError(f"Fixity must be 'free' or 'fixed', got '{fixity_raw}'")
                 fixity = fixity_raw
+                # Force application (v12, LEM only): Active = allowable force, not
+                # divided by FS (default, pre-v12 behavior); Passive = ultimate
+                # capacity divided by FS.
+                appl_raw = str(row['appl']).strip().lower() if pd.notna(row.get('appl')) else 'active'
+                if appl_raw not in ('active', 'passive'):
+                    raise ValueError(f"Appl must be 'active' or 'passive', got '{appl_raw}'")
                 label = str(row['label']) if pd.notna(row.get('label')) else f"Pile {i+1}"
 
                 # Validate
@@ -987,10 +1123,61 @@ def load_slope_data(filepath):
                     "V_cap": V_cap,
                     "M_cap": M_cap,
                     "fixity": fixity,
+                    "appl": appl_raw,
                     "label": label,
                 })
             except Exception as e:
                 raise ValueError(f"Error processing pile in row {i + 3}: {e}")
+
+    # === LINE LOADS (v12 'lloads' sheet) ===
+    # A concentrated force per unit width applied at a point on the ground
+    # surface (e.g. the weight of a shotcrete facing plate). Absent in pre-v12
+    # templates -> empty list.
+    line_loads = []
+    if 'lloads' in xls.sheet_names:
+        lloads_df = xls.parse('lloads', header=1)
+        lloads_df.columns = [str(c).strip().lower() for c in lloads_df.columns]
+        # Snap tolerance for "on the ground surface": 0.5% of the model height,
+        # floored to a small absolute value for degenerate geometries.
+        if not ground_surface.is_empty:
+            _gs_ys = [p[1] for p in ground_surface.coords]
+            _ll_tol = max(1e-6, 0.005 * (max(_gs_ys) - min(_gs_ys)))
+        for i, row in lloads_df.iterrows():
+            excel_row = i + 3
+            if pd.isna(row.get('x')):
+                break
+            ll_label = (str(row['label']).strip()
+                        if 'label' in lloads_df.columns and pd.notna(row.get('label'))
+                        else f"Load {i + 1}")
+            if pd.isna(row.get('y')) or pd.isna(row.get('p')):
+                raise ValueError(
+                    f"Line load '{ll_label}' (lloads sheet, Excel row {excel_row}) needs "
+                    "x, y, and P; one or more are blank.")
+            ll_x, ll_y = float(row['x']), float(row['y'])
+            ll_p = float(row['p'])
+            if ll_p <= 0:
+                raise ValueError(
+                    f"Line load '{ll_label}' (lloads sheet, Excel row {excel_row}) has "
+                    f"P = {ll_p}; the magnitude must be positive (use Angle for direction).")
+            ll_angle = float(row['angle']) if pd.notna(row.get('angle')) else -90.0
+            # The load must act on the ground surface: snap small mismatches from
+            # rounded coordinates, refuse anything farther than the tolerance.
+            if not ground_surface.is_empty:
+                _pt = Point(ll_x, ll_y)
+                _d = ground_surface.distance(_pt)
+                if _d > _ll_tol:
+                    raise ValueError(
+                        f"Line load '{ll_label}' (lloads sheet, Excel row {excel_row}) at "
+                        f"({ll_x}, {ll_y}) is {_d:.3g} away from the ground surface "
+                        f"(tolerance {_ll_tol:.3g}). Line loads must act on the ground surface.")
+                _snapped = ground_surface.interpolate(ground_surface.project(_pt))
+                ll_x, ll_y = float(_snapped.x), float(_snapped.y)
+            line_loads.append({
+                "x": ll_x, "y": ll_y,
+                "P": ll_p,
+                "angle": ll_angle,
+                "label": ll_label,
+            })
 
 
     # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===
@@ -1200,6 +1387,7 @@ def load_slope_data(filepath):
     globals_data["reinforce_lines"] = reinforce_lines
     globals_data["reinforcement_lines"] = reinforcement_lines
     globals_data["pile_lines"] = pile_lines
+    globals_data["line_loads"] = line_loads
     globals_data["seepage_bc"] = seepage_bc
     globals_data["seepage_bc2"] = seepage_bc2
     globals_data["has_seepage_bc2"] = bool(seepage_bc2.get("specified_heads") or seepage_bc2.get("exit_face"))
@@ -1236,12 +1424,17 @@ def default_template_path():
 MAT_NUM_HEADERS = [
     ('gamma', 'g'), ('c', 'c'), ('phi', 'f'), ('cp', 'c/p'), ('r_elev', 'r-elev'),
     ('d', 'd'), ('psi', 'psi'),
+    ('pow_a', 'powa'), ('pow_b', 'powb'), ('pow_c', 'powc'), ('pow_d', 'powd'),
+    ('ru', 'ru'),
     ('sigma_gamma', 's(g)'), ('sigma_c', 's(c)'), ('sigma_phi', 's(f)'),
     ('sigma_cp', 's(c/p)'), ('sigma_d', 's(d)'), ('sigma_psi', 's(psi)'),
     ('k1', 'k1'), ('k2', 'k2'), ('alpha', 'alpha'),
     ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vg_a'), ('vg_n', 'vg_n'),
     ('E', 'E'), ('nu', 'n'),
 ]
+# Optional numerics: written only when set (None must stay a blank cell -- e.g.
+# a blank gsat means "fall back to gamma", which 0.0 would not).
+MAT_OPT_NUM_HEADERS = [('gamma_sat', 'gsat')]
 MAT_STR_HEADERS = [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]
 
 # The 'mat' header row is located by scanning for its sentinel cells rather than
@@ -1446,6 +1639,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             if col is None:
                 continue
             mat[cell_ref(row, col)] = _f(material.get(key, 0) or 0)
+        for key, header in MAT_OPT_NUM_HEADERS:
+            col = mat_cols.get(header)
+            if col is None:
+                continue
+            val = material.get(key)
+            if val is not None:
+                mat[cell_ref(row, col)] = _f(val)
     if mat:
         updates['mat'] = mat
 
@@ -1542,21 +1742,50 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         updates['dloads (2)'] = d2
 
     # === reinforce ===  (raw endpoint form in 'reinforcement_lines' round-trips)
+    # v12 layout: # | Label | x1 y1 x2 y2 | Type Dir Appl | Tmax Lp1 Lp2 Tend1
+    # Tend2 Spacing | Tres E Area. Capacity terms were divided by Spacing at load,
+    # so they are multiplied back here -- the file carries per-element values.
+    # Dir/Appl carry in-sheet default formulas driven by Type: those cells are
+    # written ONLY when the value differs from what the Type preset (or the
+    # generic default) would produce, so the formulas survive a round-trip and
+    # the preset behavior stays live for hand editing.
+    _REINF_PRESETS = {
+        'geosynthetic': ('tangent', 'active'),
+        'nail':         ('axial',   'passive'),
+        'tieback':      ('axial',   'active'),
+        'anchor':       ('axial',   'active'),
+    }
     reinf = {}
     for n, r in enumerate(slope_data.get('reinforcement_lines') or []):
         row = 3 + n
+        sp = float(r.get('spacing', 1.0) or 1.0)
         reinf.update({
             cell_ref(row, 1): n + 1,
-            cell_ref(row, 2): _f(r['x1']), cell_ref(row, 3): _f(r['y1']),
-            cell_ref(row, 4): _f(r['x2']), cell_ref(row, 5): _f(r['y2']),
-            cell_ref(row, 6): _f(r['t_max']), cell_ref(row, 7): _f(r['t_res']),
-            cell_ref(row, 8): _f(r['lp1']), cell_ref(row, 9): _f(r['lp2']),
-            cell_ref(row, 10): _f(r['E']), cell_ref(row, 11): _f(r['area']),
+            cell_ref(row, 2): str(r.get('label', f"Line {n + 1}")),
+            cell_ref(row, 3): _f(r['x1']), cell_ref(row, 4): _f(r['y1']),
+            cell_ref(row, 5): _f(r['x2']), cell_ref(row, 6): _f(r['y2']),
+            cell_ref(row, 10): _f(r['t_max']) * sp,
+            cell_ref(row, 11): _f(r['lp1']), cell_ref(row, 12): _f(r['lp2']),
+            cell_ref(row, 13): _f(r.get('tend1', 0.0)) * sp,
+            cell_ref(row, 14): _f(r.get('tend2', 0.0)) * sp,
+            cell_ref(row, 15): sp,
+            cell_ref(row, 16): _f(r.get('t_res', 0.0)) * sp,
+            cell_ref(row, 17): _f(r['E']), cell_ref(row, 18): _f(r['area']) * sp,
         })
+        rtype = str(r.get('type', '') or '')
+        d_def, a_def = _REINF_PRESETS.get(rtype, ('tangent', 'active'))
+        if rtype:
+            reinf[cell_ref(row, 7)] = rtype.capitalize()
+        if str(r.get('dir', d_def)) != d_def:
+            reinf[cell_ref(row, 8)] = str(r['dir']).capitalize()
+        if str(r.get('appl', a_def)) != a_def:
+            reinf[cell_ref(row, 9)] = str(r['appl']).capitalize()
     if reinf:
         updates['reinforce'] = reinf
 
-    # === piles ===  (header row 2, data rows 3+; qp/theta left blank — auto-derived)
+    # === piles ===  (v12 layout: # | Label | x1 y1 x2 y2 | H qp Appl | D S Vcap
+    # Mcap | E I Area Fixity; header row 2, data rows 3+; qp left blank — auto-
+    # derived by the loader from the pile endpoints)
     piles_u = {}
     for n, p in enumerate(slope_data.get('pile_lines') or []):
         row = 3 + n
@@ -1566,14 +1795,29 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         piles_u[cell_ref(row, 4)] = _f(p['y1'])
         piles_u[cell_ref(row, 5)] = _f(p['x2'])
         piles_u[cell_ref(row, 6)] = _f(p['y2'])
-        for key, col in [('H', 7), ('D_pile', 9), ('S', 10), ('E', 11),
-                         ('I', 12), ('area', 13), ('V_cap', 14), ('M_cap', 15)]:
+        for key, col in [('H', 7), ('D_pile', 10), ('S', 11), ('V_cap', 12),
+                         ('M_cap', 13), ('E', 14), ('I', 15), ('area', 16)]:
             val = p.get(key)
             if val is not None:
                 piles_u[cell_ref(row, col)] = _f(val)
-        piles_u[cell_ref(row, 16)] = str(p.get('fixity', 'free'))
+        if str(p.get('appl', 'active')) == 'passive':
+            piles_u[cell_ref(row, 9)] = 'Passive'
+        piles_u[cell_ref(row, 17)] = str(p.get('fixity', 'free'))
     if piles_u:
         updates['piles'] = piles_u
+
+    # === lloads ===  (v12: # | Label | x | y | P | Angle; data rows 3+)
+    lloads_u = {}
+    for n, ll in enumerate(slope_data.get('line_loads') or []):
+        row = 3 + n
+        lloads_u[cell_ref(row, 1)] = n + 1
+        lloads_u[cell_ref(row, 2)] = str(ll.get('label', f"Load {n + 1}"))
+        lloads_u[cell_ref(row, 3)] = _f(ll['x'])
+        lloads_u[cell_ref(row, 4)] = _f(ll['y'])
+        lloads_u[cell_ref(row, 5)] = _f(ll['P'])
+        lloads_u[cell_ref(row, 6)] = _f(ll.get('angle', -90.0))
+    if lloads_u:
+        updates['lloads'] = lloads_u
 
     # === seep bc / seep bc (2) ===
     def _seep_updates(bc):

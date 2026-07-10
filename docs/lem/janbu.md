@@ -73,26 +73,29 @@ Where:
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
 $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
-$P$ = reinforcement force on base of slice <br>
+$P$ = reinforcement force at point $r$ on the base of the slice, at angle $\psi$ from horizontal ($\psi = \alpha$ for tangent/flexible reinforcement, the default; $\psi$ = the line's own inclination for axial/rigid reinforcement) <br>
 $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
+$L$ = line load at point $f$ on the top of the slice, at angle $\delta$ from horizontal (default $-90°$ = straight down) <br>
+
+**⚠ TODO (figures): redraw the force diagram above in LibreOffice Draw — show $P$ at a general angle $\psi$ applied at point $r$ (not tangent to the base), and add the line load $L$ at angle $\delta$ at point $f$ on the top of the slice.**
 
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The external forces enter in two places: their **vertical** components modify the base normal force (vertical equilibrium of the slice), and their **horizontal** components enter the overall horizontal force balance.
 
-**Effective base normal (vertical equilibrium with external forces).** Adding the vertical components of the distributed load ($D\cos\beta$), reinforcement ($P\sin\alpha$), and pile force ($H\sin\theta_p$) to the vertical equilibrium of equation (1) gives the effective base normal $N'$:
+**Effective base normal (vertical equilibrium with external forces).** Adding the vertical components of the distributed load ($D\cos\beta$), reinforcement ($P\sin\psi$), pile force ($H\sin\theta_p$), and line load ($L\sin\delta$) to the vertical equilibrium of equation (1) gives the effective base normal $N'$:
 
->>$N'  = \dfrac{W + D\cos\beta - P\sin\alpha - H\sin\theta_p - u\,\Delta\ell\cos\alpha - \dfrac{1}{F}c\,\Delta\ell\sin\alpha}{m_\alpha}  \qquad (6)$
+>>$N'  = \dfrac{W + D\cos\beta - P\sin\psi - H\sin\theta_p - L\sin\delta - u\,\Delta\ell\cos\alpha - \dfrac{1}{F}c\,\Delta\ell\sin\alpha}{m_\alpha}  \qquad (6)$
 
 The total base normal is $N = N' + u\,\Delta\ell$, and the mobilized base shear capacity is $c\,\Delta\ell + N'\tan\phi$.
 
-**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces: the seismic force $kW$ (horizontal), the distributed-load horizontal component $D\sin\beta$, and the tension-crack water force $T$ are driving; the reinforcement horizontal component $P\cos\alpha$ and the pile horizontal component $H\cos\theta_p$ are resisting. The reinforcement and pile forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator:
+**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces: the seismic force $kW$ (horizontal), the distributed-load horizontal component $D\sin\beta$, and the tension-crack water force $T$ are driving; the reinforcement horizontal component $P\cos\psi$ and the pile horizontal component $H\cos\theta_p$ are resisting, and the line-load horizontal component $L\cos\delta$ enters with its own sign (zero for a straight-down load). The reinforcement (when Appl = Active, the default), pile, and line-load forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator. (A Passive reinforcement force is instead divided by $F$ alongside the soil strength.)
 
->>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum D\sin\beta + \sum T - \sum P\cos\alpha - \sum H\cos\theta_p}   \qquad (7)$
+>>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum D\sin\beta + \sum T - \sum P\cos\psi - \sum H\cos\theta_p - \sum L\cos\delta}   \qquad (7)$
 
 with $N = N' + u\,\Delta\ell$. As in the basic case, equations (6) and (7) are solved together by iteration on $F$. Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
 
-XSLOPE treats reinforcement as **flexible**, so $P$ acts parallel to the base of the slice. Its two components therefore appear consistently: $P\sin\alpha$ in the vertical equilibrium of equation (6), and $P\cos\alpha$ in the horizontal equilibrium of equation (7). This is why the reinforcement enters equation (7) with a $\cos\alpha$ factor, whereas in the [OMS](oms.md) and [Bishop](bishop.md) methods it enters the moment equation as a bare $\sum P$: those methods sum moments about the center of a circular surface, and a force acting tangent to that circle has a moment arm of exactly $R$, so the $R$ cancels.
+The direction of the reinforcement force follows the line's **Dir** setting. For **Tangent** (flexible reinforcement, the default) $\psi = \alpha$ — the force reorients parallel to the base of the slice — and equations (6)-(7) reduce to the classical $P\sin\alpha$ / $P\cos\alpha$ forms. For **Axial** (rigid supports such as nails and tiebacks) $\psi$ is the inclination of the reinforcement line itself, so the same two components are simply evaluated at $\psi$. Note that in the [OMS](oms.md) and [Bishop](bishop.md) methods, tangent reinforcement enters the moment equation as a bare $\sum P$: those methods sum moments about the center of a circular surface, and a force acting tangent to that circle has a moment arm of exactly $R$, so the $R$ cancels — a shortcut that holds *only* for the tangent direction; the axial case requires the full component moment arms given on those pages.
 
 Once again, the correction factor $f_o$ is applied to account for the neglect of inter-slice shear as shown in equation (5) above.
 

@@ -27,17 +27,20 @@ where:
 > $P$ = normal force on the top of the slice<br>
 > $d$ = point of action for the normal force on the top of the slice<br>
 > $T$ = shear force on the top of the slice<br>
-> $R$ = reinforcement force on the base of the slice (parallel to base, acts at base center)<br>
+> $R$ = reinforcement force at point $r = (x_r, y_r)$ on the base of the slice, at angle $\psi$ from horizontal<br>
+> $\psi$ = reinforcement force angle: $\psi = \alpha$ for tangent/flexible reinforcement (the default), or the line's own inclination for axial/rigid reinforcement<br>
 > $V$ = resultant force of water in tension crack (only applies to last slice)<br>
 > $c$ = point of action for the resultant force of water in the tension crack<br>
 > $H$ = pile/pier force at point $e$ on the failure surface<br>
 > $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward)<br>
+> $L$ = line load at point $f = (x_f, y_f)$ on the top of the slice<br>
+> $\delta$ = angle of the line load from horizontal (default $-90°$ = straight down)<br>
 > $\beta$ = angle of the top of the slope<br>
 > $\alpha$ = angle of the base of the slice<br>
 > $\Delta \ell$ = length of the base of the slice<br>
 > $\Delta x$ = width of the slice<br>
 
-**Note**: In the current implementation of Spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. The reinforcement force $R$ is assumed flexible and therefore parallel to the base of the slice, acting at the base center $(x_b, y_b)$. All of the other forces are included.
+**Note**: In the current implementation of Spencer's method in **xslope**, the shear force, $T$, at the top of the slice is not simulated. It is included here for completeness in case it is added in the future. The reinforcement force $R$ acts at the point $r$ where the line crosses the base, at angle $\psi$: for Dir = Tangent (flexible, the default) $\psi = \alpha$ and $r$ is taken at the base center $(x_b, y_b)$; for Dir = Axial (rigid) $\psi$ is the line's own inclination and $r$ is the actual crossing point. When Appl = Active (default) $R$ is not divided by $F$; when Passive it is. All of the other forces are included.
 
 This page follows the UTEXAS symbol convention, in which $P$ is the distributed-load resultant on the top of the slice and $R$ is the reinforcement force. On the [OMS](oms.md), Bishop, Janbu, and [force-equilibrium](force_eq.md) pages these same two forces are written $D$ (distributed load) and $P$ (reinforcement), respectively.
 
@@ -45,21 +48,23 @@ This page follows the UTEXAS symbol convention, in which $P$ is the distributed-
 
 The equations for Spencer's method are derived from the equilibrium of forces and moments acting on the slice. One of the key features of Spencer's method is how the side forces are represented and lumped to a single force $Q_i$, which will be introduced later. Thus, it is helpful to sum forces and moments using the forces acting on the slice except for the side forces and $N$ and $S$. Summing forces in the horizontal and vertical directions gives:
 
->>$F_h = -kW - V + P \sin \beta + T \cos \beta + R \cos \alpha + H \cos \theta_p  \qquad (1)$
+>>$F_h = -kW - V + P \sin \beta + T \cos \beta + R \cos \psi + H \cos \theta_p + L \cos \delta  \qquad (1)$
 
->>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \alpha + H \sin \theta_p  \qquad (2)$
+>>$F_v = - W - P \cos \beta + T \sin \beta + R \sin \psi + H \sin \theta_p + L \sin \delta  \qquad (2)$
 
 Likewise, summing moments about the center of the base of the slice gives:
 
 >>$\begin{aligned}
 M_o &= - P \sin \beta (y_p - y_b) - P \cos \beta (x_p - x_b) - T \cos \beta (y_p - y_b) \\
 &\quad + T \sin \beta (x_p - x_b) + kW (y_k - y_b) + V (y_v - y_b) \\
-&\quad - H \cos \theta_p (y_e - y_b) + H \sin \theta_p (x_e - x_b)
+&\quad - H \cos \theta_p (y_e - y_b) + H \sin \theta_p (x_e - x_b) \\
+&\quad - R \cos \psi (y_r - y_b) + R \sin \psi (x_r - x_b) \\
+&\quad - L \cos \delta (y_f - y_b) + L \sin \delta (x_f - x_b)
 \end{aligned}   \qquad (3)$
 
 Note that counter-clockwise moments are positive (right-hand rule).
 
-The reinforcement $R$ contributes no moment in $M_o$ because it acts at the base center $(x_b, y_b)$, making its moment arms zero.
+For tangent reinforcement the moment terms involving $R$ vanish because the force acts at the base center $(x_b, y_b)$, making its moment arms zero. For axial reinforcement, $r$ is the actual crossing point on the base, so the arms $(y_r - y_b)$ and $(x_f - x_b)$ are small but nonzero; the direction effect is carried primarily through the force components in (1)-(2) and the interslice force propagation. The line load acts at point $f$ on the top of the slice, so its moment arms are generally significant.
 
 The shear force on the base of the slice is:
 

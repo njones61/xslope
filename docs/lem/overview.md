@@ -141,7 +141,9 @@ structural elements that provide additional stability to slopes. These forces ca
 
 ![reinf_layers.png](images/reinf_layers.png)
 
-For the limit equilibrium methods in XSLOPE, the reinforcement is assumed to be flexible and therefore acts in a direction parallel to the base of the slice in a direction that resists shear. More comprehensive treatment of reinforcement is included in the [finite element method](../fem/overview.md).
+For the limit equilibrium methods in XSLOPE, the direction and factoring of the reinforcement force are controlled per line in the input. The **Dir** setting selects the force direction where the line crosses the slip surface: **Tangent** (the default) assumes flexible reinforcement that bends with the sliding mass so the force acts parallel to the base of the slice, correct for geosynthetics; **Axial** applies the force along the reinforcement's own axis, correct for rigid supports such as soil nails and tiebacks. The **Appl** setting selects how the force enters the factor of safety: **Active** (the default) treats it as a known allowable force not divided by $F$; **Passive** treats it as an ultimate capacity that mobilizes with the soil and is divided by $F$. See the [LEM reinforcement page](reinforcement.md) for the full treatment, including the capacity envelope that sets the force magnitude at the crossing point. Reinforcement is also modeled in the [finite element method](../fem/overview.md), where the force emerges from the analysis rather than being prescribed.
+
+**Line Loads:** Concentrated forces per unit width applied at a point on the ground surface — for example the self-weight of a facing element such as the shotcrete plate of a soil nail wall. Each line load has a magnitude $L$ and a direction $\delta$ measured from horizontal (default $-90°$, straight down), and is applied to the slice whose top boundary contains the point.
 
 **Tension Cracks:** In the upper part of the slope, the cohesion of a soil can be greater than the driving forces. 
 Since soils can generally not withstand tension, this is unconservative. To address this problem, a tension crack can be added to a user-specified depth and the tension crack forms the upper boundary of the slices and not cohesive forces are allowed on the slice (crack) boundary. It is also possible to assume that the crack fills with water, providing a small force driving failure as an extra measure of conservative analysis.
@@ -153,11 +155,15 @@ as follows:
 
 ![slice_adv.png](images/slice_adv.png)
 
+**⚠ TODO (figures): redraw this diagram in LibreOffice Draw — show the reinforcement force $P$ at a general angle $\psi$ (not along the base), and add a line load $L$ at angle $\delta$ on the top of the slice.**
+
 The distributed load acting on the top of each slice is converted to a resultant force by multiplying the load 
 intensity by the width of the slice and it acts at point $d$. The seismic force $kW$ acts horizontally at the center 
-of gravity of each slice, and the reinforcement force $P$ acts along the base of the slice in a direction that 
-resists sliding. The load corresponding to water in the tension crack is converted to a single resultant force $T$ 
-acting horizontally at point $c$ which is one third of the distance from the bottom of the slice.
+of gravity of each slice. The reinforcement force $P$ acts at the point where the line crosses the base of the 
+slice, in a direction that resists sliding — parallel to the base for tangent (flexible) reinforcement, or along 
+the reinforcement axis for axial (rigid) supports. A line load $L$ acts at its point of application on the top of 
+the slice at angle $\delta$. The load corresponding to water in the tension crack is converted to a single resultant 
+force $T$ acting horizontally at point $c$ which is one third of the distance from the bottom of the slice.
 
 ## Limit Equilibrium Methods Supported in XSLOPE
 

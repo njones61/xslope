@@ -1185,12 +1185,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 u2 = max(0.0, u2_val)
             else:
                 u2 = 0
+        elif mat_u == 'ru':
+            # Pore pressure ratio (template v12): u = ru * sigma_v, where sigma_v is
+            # the soil-column vertical stress at the base center. sum_gam_h is
+            # sum(gamma_i * h_i) over the material bands of this slice, identically
+            # W/dx, so the quantity already exists. By definition (Bishop &
+            # Morgenstern) sigma_v is the SOIL column only -- distributed loads and
+            # crack water are excluded. There is no staged variant: u2 = u.
+            ru_ratio = materials[base_material_idx].get('ru', 0.0) if base_material_idx is not None else 0.0
+            u = ru_ratio * sum_gam_h
+            u2 = u
         else:
             # Unreachable: load_slope_data validates u against this same set. A bare
             # `u = 0` here silently deleted pore pressure whenever the two lists drifted.
             raise ValueError(
                 f"Material '{materials[base_material_idx]['name']}' has an unrecognized "
-                f"pore pressure option u='{mat_u}'. Expected one of: none, piezo, seep."
+                f"pore pressure option u='{mat_u}'. Expected one of: none, piezo, seep, ru."
             )
 
         # Calculate alpha (slope angle of the failure surface) more efficiently
@@ -1231,6 +1241,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             psi = 0     # not used in rapid drawdown, but must be defined
         else:
             mat_option = materials[base_material_idx]['option']
+            if mat_option == 'pow':
+                # Template v12 defines the power-curve envelope, but the solver
+                # coupling (strength depends on sigma'_n, which depends on FS) is
+                # not implemented yet. Refuse loudly rather than mis-solve.
+                raise NotImplementedError(
+                    f"Material '{materials[base_material_idx]['name']}' uses the power-curve "
+                    "strength option (option='pow'), which is defined in the v12 template "
+                    "but not yet supported by the solvers."
+                )
             if mat_option not in ('mc', 'cp'):
                 # Was silently treated as 'cp'. A blank option is legal on seep-only
                 # material rows, but not on one a failure surface passes through.

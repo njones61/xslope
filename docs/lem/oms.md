@@ -83,18 +83,30 @@ Where:
 $\beta$ = inclination of the distributed load (perpendicular to slope) <br>
 $kW$ = seismic force for pseudo-static seismic analysis <br>
 $c.g.$ = center of gravity of the slice <br>
-$P$ = reinforcement force on base of slice <br>
+$P$ = reinforcement force at point $r$ on the base of the slice <br>
+$\psi$ = angle of the reinforcement force from horizontal <br>
 $T$ = tension crack water force <br>
 $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
+$L$ = line load at point $f$ on the top of the slice <br>
+$\delta$ = angle of the line load from horizontal (default $-90°$ = straight down) <br>
 
 The rest of the forces are the same as before.
+
+**⚠ TODO (figures): the force diagram above must be redrawn in LibreOffice Draw — show the reinforcement force $P$ at a general angle $\psi$ (not tangent to the base) applied at point $r$, and add the line load $L$ at angle $\delta$ applied at point $f$ on the top of the slice.**
 
 The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope, therefore the inclination of the distributed load from a vertical line is equal to the slope angle, $\beta$. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 
 
 The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.
 
-The **reinforcement force** $P$ is a force on the base of the slice resisting sliding. The reinforcement force is calculated using the reinforcement lines in the input, where the user defines a longitudinal reinforcement force $F_L$ and a transverse reinforcement force $F_T$ at a series of points along each reinforcement line. With the current implementation of **xslope**, only the longitudinal reinforcement force $F_L$ is used. We assume that the reinforcement is flexible and therefore bends with the sliding of the failure surface to act parallel to the bottom of the slice. Thus, the reinforcement force is equal to the sum of the interpolated $F_L$ values for the reinforcement lines that intersect the base of the slice.
+The **reinforcement force** $P$ is applied at the point $r = (x_r, y_r)$ where a reinforcement line crosses the base of the slice, in a direction resisting sliding. Its magnitude is the available tensile capacity of the line at the crossing point, interpolated from the line's capacity envelope (tensile strength, pullout development, and end anchorage — see the [reinforcement page](reinforcement.md)). Its *direction* depends on the line's **Dir** setting in the input:
+
+- **Tangent** (the default): flexible reinforcement (geosynthetics) is assumed to bend with the sliding mass so the force acts parallel to the base of the slice, i.e. $\psi = \alpha$.
+- **Axial**: rigid reinforcement (soil nails, tiebacks) carries the force along its own axis, so $\psi$ equals the inclination of the reinforcement line itself.
+
+Whether $P$ is factored by the safety factor depends on the line's **Appl** setting: **Active** (the default) treats $P$ as a known allowable force that is *not* divided by $F$; **Passive** treats $P$ as an ultimate capacity that mobilizes with the soil and *is* divided by $F$. The equations below are written for the active case.
+
+The **line load** $L$ is a concentrated force per unit width applied at point $f = (x_f, y_f)$ on the top of the slice, at angle $\delta$ from horizontal — typically $\delta = -90°$ (straight down) for the weight of a facing element such as a shotcrete plate. Like the distributed load, it is a known applied load; unlike the reinforcement and pile forces it generally *drives* rather than resists (a downward $L$ adds driving moment when it acts on the driving side of the circle center, and resists when it acts on the other side — the signs below handle this automatically).
 
 The **water force** $T$ on the side of the slice is calculated from the tension crack water input only applies if there is both a tension crack, and if the user has selected to fill the crack with water. This force only applies to the side of the uppermost slice and pushes in the direction of sliding. The force is calculated using the hydrostatic water pressure that is zero at the top of the crack (side of slice) and = $\gamma_w d_{tc}$ where $\gamma_w$ = the unit wt of water and $d_{tc}$ is the depth of the tension crack. The resultant force = $\frac{1}{2} \gamma_w d_{tc}^2$ and it acts at point $c$ which is 1/3 of the height of the slice $d_{tc}$.
 
@@ -108,11 +120,13 @@ To revise the factor of safety equation for the OMS method to include the $D$, $
 
 This is defined by considering the forces parallel to N, or perpendicular to the base of the slice. But if we include the new forces, the normal force is:
 
->$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p)$
+>$N = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta)$
+
+Note that for tangent reinforcement ($\psi = \alpha$) the reinforcement term vanishes — a force parallel to the base has no normal component, which recovers the classical flexible-reinforcement formulation. For axial reinforcement the normal component $P\sin(\alpha - \psi)$ increases the effective stress on the base, adding frictional resistance. Similarly, a straight-down line load ($\delta = -90°$) contributes $L\sin(\alpha + 90°) = L\cos\alpha$, exactly as a weight should.
 
 The effective normal force is:
 
->$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell    \qquad (4)$
+>$N' = W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell    \qquad (4)$
 
 This effective normal force is used in the shear force equation in the numerator of the factor of safety equation. The shear force on the base of the slice was originally defined as:
 
@@ -120,7 +134,7 @@ This effective normal force is used in the shear force equation in the numerator
 
 Substituting the new normal force from (4) into this gives:
 
->$S = c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell ) \tan \phi    \qquad (5)$
+>$S = c' \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi    \qquad (5)$
 
 ### Moments
 
@@ -137,36 +151,46 @@ R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the
 | $D \cos \beta$  |  $a_{dx}$  | Horizontal distance from center of circle to point $d$                             |
 | $D \sin \beta$  |  $a_{dy}$  | Vertical distance from center of circle to point $d$                           |
 |      $kW$       |   $a_s$    | Vertical distance from center of circle to center of gravity of the slice        |
-|       $P$       |    $R$     | Radius of the circle                                                             |
+| $P \cos \psi$   |  $a_{ry}$  | Vertical distance from center of circle to point $r$: $Y_o - y_r$                |
+| $P \sin \psi$   |  $a_{rx}$  | Horizontal distance from center of circle to point $r$: $x_r - X_o$              |
 |       $T$       |   $a_t$    | The vertical distance between center of circle and the y-coordinate of point $c$ |
 | $H \cos \theta_p$ |  $a_{ey}$  | Vertical distance from center of circle to point $e$: $Y_o - y_e$             |
 | $H \sin \theta_p$ |  $a_{ex}$  | Horizontal distance from center of circle to point $e$: $x_e - X_o$           |
+| $L \cos \delta$ |  $a_{fy}$  | Vertical distance from center of circle to point $f$: $Y_o - y_f$                |
+| $L \sin \delta$ |  $a_{fx}$  | Horizontal distance from center of circle to point $f$: $x_f - X_o$              |
 
 Notice that for the distributed load, $D$, because the load is at an oblique angle, we decompose it into vertical and horizontal components. The vertical component of the distributed load is $D \cos \beta$ and the horizontal component is $D \sin \beta$.
 
-Similarly, the pile force $H$ at angle $\theta_p$ is decomposed into a horizontal component $H \cos \theta_p$ with vertical moment arm $a_{ey}$, and a vertical component $H \sin \theta_p$ (upward) with horizontal moment arm $a_{ex}$. Both create resisting moments about the circle center, reducing the denominator.
+The reinforcement force $P$ at angle $\psi$, the pile force $H$ at angle $\theta_p$, and the line load $L$ at angle $\delta$ are each decomposed the same way: a horizontal component with a vertical moment arm from the circle center to the point of application, and a vertical component with a horizontal moment arm. For the reinforcement and pile forces both components create resisting moments. For the line load the sign of each term follows from $\delta$ and the location of point $f$ — a straight-down load ($\delta = -90°$) on the driving side of the circle center produces a driving moment, as it should.
 
-We can now add these moments to the limit equilibrium equation (6). The mobilized shear force is $S_{mob} = S/F$, where $S$ is the full shear strength. The reinforcement force $P$ and the pile force $H$ are known applied forces and are **not** factored by $F$. Taking moments about the center of the circle:
+**Tangent reinforcement shortcut.** When Dir = Tangent, $\psi = \alpha$ and point $r$ lies on the circle, so the force is tangent to the circle and its moment arm is exactly $R$:
 
->$R \sum \dfrac{S}{F} + R \sum P + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t   \qquad (7)$
+>$P \cos \alpha \, (Y_o - y_r) + P \sin \alpha \, (x_r - X_o) = P \cdot R$
 
-There is no summation for the term involving $T$ because it only applies to the uppermost slice. The pile terms are summed only over slices that contain a pile (all other $H = 0$).
+so the two component terms collapse to the single term $R \sum P$ used in the classical flexible-reinforcement formulation. The general component form below is required only for Dir = Axial.
+
+We can now add these moments to the limit equilibrium equation (6). The mobilized shear force is $S_{mob} = S/F$, where $S$ is the full shear strength. The reinforcement force $P$ (when Appl = Active), the pile force $H$, and the line load $L$ are known applied forces and are **not** factored by $F$. (When Appl = Passive, the $P$ terms join the shear term on the mobilized side and are divided by $F$.) Taking moments about the center of the circle:
+
+>$R \sum \dfrac{S}{F} + \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] + \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t   \qquad (7)$
+
+There is no summation for the term involving $T$ because it only applies to the uppermost slice. The pile terms are summed only over slices that contain a pile (all other $H = 0$), and likewise for the reinforcement and line-load terms.
 
 Isolating the shear term and solving for $F$:
 
->$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - R \sum P - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]$
+>$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]$
 
->$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - R \sum P - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}$
+>$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
 
 ### Complete Factor of Safety Equation
 
 Substituting (5) into the numerator and dividing by $R$, we get:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \sum P - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right]}   \qquad (8)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
 
 Note that:
 
-- The reinforcement force $P$, the pile force $H$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
+- The reinforcement force $P$ (Appl = Active), the pile force $H$, the line load $L$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
+- For Dir = Tangent ($\psi = \alpha$), the reinforcement moment term reduces to $\sum P$ (moment arm exactly $R$) and the reinforcement term in the numerator vanishes — recovering the classical formulation
 - The water force $T$ only applies to the uppermost slice
 
 ## Summary

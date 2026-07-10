@@ -16,6 +16,8 @@ $\alpha$, $\beta$, $\theta_p$):
 
 ![spencer3_forces.png](images/spencer3_forces.png)
 
+**⚠ TODO (figures): redraw this force diagram in LibreOffice Draw — show the reinforcement force $R$ at a general angle $\psi$ at point $r$ (not tangent to the base), and add the line load $L$ at angle $\delta$ at point $f$ on the top of the slice.**
+
 The two methods differ in exactly **one** assumption — how the inclination of the
 interslice resultant is allowed to vary along the surface. Writing the interslice
 shear $X$ and normal $E$ at a slice boundary, the side-force inclination is
@@ -108,8 +110,11 @@ Summing the per-slice contributions:
 | Surface load $D$ | $(D\sin\beta,\ -D\cos\beta)$ | $(d_x,\ d_y)$ | $-D\,(d_x\cos\beta + d_y\sin\beta)$ |
 | Seismic $kW$ | $(-kW,\ 0)$ | $(x_c,\ y_{cg})$ | $kW\,y_{cg}$ |
 | Tension-crack water $V$ | $(-V,\ 0)$ | $(x_v,\ y_t)$ | $V\,y_t$ |
-| Reinforcement $R$ | $(R\cos\alpha,\ R\sin\alpha)$ | $(x_c,\ y_{cb})$ | $R\,(x_c\sin\alpha - y_{cb}\cos\alpha)$ |
+| Reinforcement $R$ | $(R\cos\psi,\ R\sin\psi)$ | $(x_r,\ y_r)$ | $R\,(x_r\sin\psi - y_r\cos\psi)$ |
 | Pile $H$ | $(H\cos\theta_p,\ H\sin\theta_p)$ | $(x_h,\ y_h)$ | $H\,(x_h\sin\theta_p - y_h\cos\theta_p)$ |
+| Line load $L$ | $(L\cos\delta,\ L\sin\delta)$ | $(x_f,\ y_f)$ | $L\,(x_f\sin\delta - y_f\cos\delta)$ |
+
+The reinforcement force angle is $\psi = \alpha$ with $(x_r, y_r)$ at the base center for Dir = Tangent (flexible, the default), or the line's own inclination at the actual crossing point for Dir = Axial. The line load $L$ acts at angle $\delta$ (default $-90°$, straight down) at point $f$ on the top of the slice.
 
 The total base reaction is split into the effective normal $N'$ and the pore-water
 uplift $U = u\,\Delta\ell$, both acting in the $(-\sin\alpha, \cos\alpha)$ direction,

@@ -1,0 +1,170 @@
+# Soil Reinforcement in LEM Slope Stability
+
+## Introduction
+
+Soil reinforcement — geosynthetics (geotextiles and geogrids), soil nails, grouted tiebacks, and end-anchored
+bars — stabilizes slopes by mobilizing **tensile force** across the failure surface. In the limit equilibrium
+framework, each reinforcement element is a straight line defined by its endpoint coordinates, and wherever a trial
+failure surface crosses a line, a tensile force is applied to the sliding mass at the crossing point.
+
+Three questions determine how that force enters the analysis, and they are independent of one another:
+
+1. **How large is the force?** — governed by the *capacity envelope*: the tensile strength of the element, the
+   frictional pullout development from each end, and any end anchorage (plates, connections, anchors).
+2. **In what direction does it act?** — governed by the **Dir** setting: tangent to the slip surface (flexible
+   reinforcement) or along the reinforcement's own axis (rigid supports).
+3. **Is it factored by the safety factor?** — governed by the **Appl** setting: active (a known allowable force,
+   not divided by $F$) or passive (an ultimate capacity that mobilizes with the soil, divided by $F$).
+
+This decomposition follows the convention used by Slide2 and other commercial programs, which allows xslope
+results to be compared directly against them. The **Type** column in the input template is a *preset* over these
+settings — selecting a support type fills Dir and Appl with the appropriate defaults — not a separate mechanism.
+
+**⚠ TODO (figures): this page needs an annotated figure showing a reinforcement line crossing a slice base, with
+the force drawn both tangent to the base and along the line axis, and a second figure showing the capacity
+envelope $T(x)$ along a line with different end conditions.**
+
+## Capacity Envelope
+
+### Force magnitude at the crossing point
+
+The tensile force available at any point along a reinforcement line is limited by three mechanisms, and the
+available force is the smallest of them:
+
+>$T(x) = \min\left(T_{max},\;\; T_{end1} + T_{max}\dfrac{d_1}{L_{p1}},\;\; T_{end2} + T_{max}\dfrac{d_2}{L_{p2}}\right)$
+
+where:
+
+- $T_{max}$ = tensile capacity of the element (rupture limit)
+- $d_1$, $d_2$ = distances from the point to end 1 and end 2 of the line
+- $L_{p1}$, $L_{p2}$ = pullout lengths at each end — the distance over which interface friction develops the full
+  tensile capacity
+- $T_{end1}$, $T_{end2}$ = anchorage capacity at each end: a bearing plate, a facing connection, or an end anchor
+  (default 0)
+
+Special cases:
+
+- **$T_{end} = 0$, $L_p > 0$** (the classical friction-only taper): tension is zero at the free end and develops
+  linearly over the pullout length. This is the correct model for geosynthetics and for the embedded end of nails.
+- **$L_p = 0$**: the end is fully anchored — the full capacity is available immediately at the end.
+- **$T_{end} > 0$**: the end starts at the anchorage capacity and frictional development adds to it. This models
+  a nail with a bearing plate at the wall face, a geosynthetic connected to facing panels, or a bar anchored at
+  both ends. (If $T_{end} \geq T_{max}$, the end is effectively fully anchored — the tendon governs.)
+- **Line shorter than $L_{p1} + L_{p2}$** with no anchorage: the envelopes from the two ends intersect below
+  $T_{max}$ and only partial tension is mobilized.
+
+**Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
+length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the free length carries whatever
+force the bond zone can supply. This is expressed in the envelope by entering an effective
+$T_{max}' = \min(T_{tendon},\, b \cdot L_{bond})$ and $L_p = T_{max}'/b$ at the bonded end, with the connection
+capacity as $T_{end}$ at the face end.
+
+### Per-unit-width convention and spacing
+
+All LEM forces are per unit width of slope. Geosynthetic properties are already per unit width (kN/m or lb/ft), so
+for them the **Spacing** column is left blank (or 1). Discrete supports — nails, tiebacks — have per-element
+capacities (kN per nail) installed at a horizontal spacing $S$; enter the per-element values and the spacing, and
+xslope divides all capacity terms ($T_{max}$, $T_{res}$, $T_{end1}$, $T_{end2}$, and the FEM stiffness $EA$)
+by $S$.
+
+## Force Direction (Dir)
+
+Where a reinforcement line crosses the base of a slice at point $r = (x_r, y_r)$, the force $T(x_r)$ is applied to
+the sliding mass at angle $\psi$ from horizontal:
+
+- **Tangent to slip surface** ($\psi = \alpha$, the slice base inclination) — the **default**. Flexible
+  reinforcement cannot resist bending; as the sliding mass moves, the reinforcement deforms with it and the force
+  reorients tangent to the slip surface. This is the appropriate (and conservative) assumption for geotextiles and
+  geogrids, and is discussed by Duncan & Wright (2005).
+- **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
+  grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
+  UTEXAS/UTEXASED uses this convention, which is why xslope's tangent results for nail problems differ from
+  UTEXASED's (see the [reinforced slope sample](samples.md), where the UTEXASED axial result is FS = 1.646 versus
+  the tangent 1.587).
+
+The direction affects each solution method the same way the pile force does: the force is resolved into components
+normal and tangential to the slice base — $T\sin(\alpha - \psi)$ normal (zero for tangent) and
+$T\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
+through its real moment arm at point $r$. For tangent reinforcement on a circular surface the force is tangent to
+the circle and its moment arm is exactly $R$, which is why the classical formulation reduces to a bare $\sum P$ in
+the OMS and Bishop denominators. The per-method equations are given on the
+[OMS](oms.md), [Bishop](bishop.md), [Janbu](janbu.md), [force equilibrium](force_eq.md), [Spencer](spencer.md),
+and [Morgenstern-Price](mprice.md) pages.
+
+## Force Application (Appl)
+
+Two conventions exist for how a support force enters the factor of safety, and published solutions use both —
+so the choice is exposed per line:
+
+- **Active** (Slide2's "Method A", the **default**): the force is a known, *allowable* working load. It is applied
+  to the driving side of the equilibrium equations and is **not** divided by $F$ — the factor of safety applies to
+  the soil strength only. Appropriate for pre-tensioned supports (tiebacks) and whenever the entered capacity
+  already carries its own safety factor.
+- **Passive** (Slide2's "Method B"): the force is an *ultimate* capacity that mobilizes together with the soil
+  strength. It is added to the resisting side and **is** divided by $F$. Appropriate when the support only develops
+  force as the soil deforms (nails, geosynthetics in some formulations) and the entered capacity is unfactored.
+
+The distinction matters numerically: on the classic Duncan & Wright tieback example (their Fig. 6.34), the same
+9,000 lb/ft support gives FS = 1.51 active and FS = 1.32 passive. It also changes what you should enter in the
+$T_{max}$ column — an **allowable** force for active, an **ultimate** force for passive.
+
+## Support Type Presets
+
+The **Type** column fills Dir and Appl automatically (either can be overridden by typing over the value):
+
+| Type | Dir | Appl | Typical use |
+|---|---|---|---|
+| Geosynthetic | Tangent | Active | geotextile / geogrid layers |
+| Nail | Axial | Passive | drilled and grouted soil nails |
+| Tieback | Axial | Active | pre-tensioned grouted anchors |
+| Anchor | Axial | Active | end-anchored bars |
+
+Leave Type blank for a generic tensile line with the defaults (Tangent, Active) — the behavior of earlier
+versions of xslope.
+
+## Which sheet models my support?
+
+| Support | Sheet | Settings | Why |
+|---|---|---|---|
+| Geotextile / geogrid | reinforce | Tangent, Active | flexible; reorients with the soil |
+| Soil nail | reinforce | Axial, Passive, $T_{end}$ = plate capacity | tension-dominated |
+| Grouted tieback | reinforce | Axial, Active, $T_{end}$ = connection capacity | pre-tensioned tension member |
+| Micropile / pile / pier | [piles](piles.md) | $H$ (user or Ito-Matsui), $V_{cap}$/$M_{cap}$ | shear and bending govern, not tension |
+| Facing weight (shotcrete) | lloads | $L$ at the face, $\delta = -90°$ | a load, not a resistance |
+
+## LEM vs. FEM
+
+The same reinforcement lines drive both engines, but the mechanics differ:
+
+- **LEM** applies the capacity envelope value as a *prescribed* force at the crossing point, in the Dir direction,
+  factored per Appl. The residual strength $T_{res}$ is not used — LEM has no strain compatibility, so there is no
+  notion of an element loading past peak.
+- **FEM** models each line as tension-only truss elements whose force *emerges* from displacement compatibility;
+  the same capacity envelope caps each element's allowable force, and elements that exceed it drop to a residual
+  (governed by $T_{res}$, and by the end anchorage in anchored zones). Dir and Appl have no meaning in the FEM.
+  See [Soil Reinforcement in FEM](../fem/reinforcement.md).
+
+For typical stiffness values ($E$, $Area$) and guidance on pullout lengths by reinforcement type, see the
+[FEM reinforcement page](../fem/reinforcement.md#reinforcement-line-input-parameters-and-element-properties) —
+the same table serves both engines' inputs.
+
+## Typical Anchorage Capacities
+
+Approximate ranges for the $T_{end}$ columns, for preliminary estimates only:
+
+| End condition | Typical capacity | Notes |
+|---|---|---|
+| Soil nail bearing plate | 50-150 kN (10-35 kip) per nail | plate punching or facing flexure governs |
+| Geosynthetic facing connection | 30-80% of $T_{max}$ | per connection test data (wrap-around, bodkin, panel) |
+| Tieback anchor head / connection | tendon capacity | usually the tendon governs, not the head |
+| Free (no plate) | 0 | the friction-only default |
+
+Capacities are per element; with a Spacing entry they are converted to per-unit-width automatically.
+
+## References
+
+Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John Wiley & Sons.
+
+Rocscience Inc. *Slide2 Documentation — Support: Active/Passive Force Application; Define Support Properties.*
+
+Wright, S.G. (1999). *UTEXAS4 — A Computer Program for Slope Stability Calculations.* Shinoak Software, Austin.

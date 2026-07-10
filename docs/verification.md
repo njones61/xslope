@@ -322,7 +322,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 41 | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
 | 42 | Dam, (3) materials, water table, ponded water, tension crack | planned |  |
 | 43 | Slope, homogenous, planar surface, RocPlane comparison | planned |  |
-| 44 | Slope, homogenous | planned |  |
+| 44 | Slope, homogenous | partial | Baker (2003) ex. 1, linear vs power-curve envelopes. Geometry extracted ((0,0)-(6.43,6)-(20,6)); power-curve case buildable (a=1.107, b=0.86, Spencer 0.960/Baker 0.97), but the Mohr-Coulomb rows (Spencer 1.536) do not reconcile with the extracted property table (c'=0, φ=38 gives ~0.84 on a 43° face) — needs the Baker paper to resolve the intended MC properties before building. |
 | 45 | Slope, homogenous | planned |  |
 | 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded | planned |  |
 | 47 | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | planned |  |

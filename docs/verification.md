@@ -270,6 +270,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
 <!-- test: file=files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
+<!-- test: file=files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
+<!-- test: file=files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
@@ -323,7 +325,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 42 | Dam, (3) materials, water table, ponded water, tension crack | planned |  |
 | 43 | Slope, homogenous, planar surface, RocPlane comparison | planned |  |
 | 44 | Slope, homogenous | partial | Baker (2003) ex. 1, linear vs power-curve envelopes. Geometry extracted ((0,0)-(6.43,6)-(20,6)); power-curve case buildable (a=1.107, b=0.86, Spencer 0.960/Baker 0.97), but the Mohr-Coulomb rows (Spencer 1.536) do not reconcile with the extracted property table (c'=0, φ=38 gives ~0.84 on a 43° face) — needs the Baker paper to resolve the intended MC properties before building. |
-| 45 | Slope, homogenous | planned |  |
+| 45 | Slope, homogenous | **built** | [vp045a.xlsx](files/rocscience/vp045a.xlsx) (Mohr-Coulomb), [vp045b.xlsx](files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: linear vs non-linear envelope on the same 4:1 slope. Spencer: MC 2.801 vs Slide 2.794; power curve 2.649 vs Slide 2.662. (Slide's Janbu values are simplified/uncorrected; ours carry the fo correction and agree once scaled.) |
 | 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded | planned |  |
 | 47 | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | planned |  |
 | 48 | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | planned |  |

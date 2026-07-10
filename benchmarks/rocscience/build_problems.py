@@ -567,7 +567,41 @@ def vp041():
     return 'vp041.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp041, vp054a, vp054b, vp085a, vp085b]
+def _baker2_slope_data():
+    """Baker (2003) example 2 (Slide #45): gentle 4:1 clay slope, 12 m high,
+    ground (0,0)-(48,12)-(100,12), bedrock at y=0."""
+    sd = load_slope_data(ACADS_1A)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (48.0, 12.0), (100.0, 12.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 25.0, 'Yo': 25.0, 'Depth': 2.0, 'R': 23.0}]
+    return sd
+
+
+def vp045a():
+    """Slide #45, Mohr-Coulomb case: c'=11.64, phi'=24.7, gamma=18.
+    Slide2: Janbu simplified 2.662, Spencer 2.794."""
+    sd = _baker2_slope_data()
+    sd['materials'][0].update(name='clay (MC)', c=11.64, phi=24.7, gamma=18.0,
+                              option='mc', u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp045a.xlsx'))
+    return 'vp045a.xlsx'
+
+
+def vp045b():
+    """Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's
+    A=0.58, n=0.86, T=0). Slide2: Janbu simplified 2.559, Spencer 2.662;
+    Baker's accepted values for this example are of the same order."""
+    sd = _baker2_slope_data()
+    sd['materials'][0].update(name='clay (power)', c=0.0, phi=0.0, gamma=18.0,
+                              option='pow', pow_a=1.107, pow_b=0.86,
+                              pow_c=0.0, pow_d=0.0, u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp045b.xlsx'))
+    return 'vp045b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp041, vp045a, vp045b, vp054a, vp054b, vp085a, vp085b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

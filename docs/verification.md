@@ -332,7 +332,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 52 | Slope, (4) materials, water table, tension crack | planned |  |
 | 53 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | planned |  |
 | 54 | Slope, homogenous, micro piles | **built** | [vp054a.xlsx](files/rocscience/vp054a.xlsx) (no pile), [vp054b.xlsx](files/rocscience/vp054b.xlsx) (with pile). Yamagami (2000): micro-pile row at the crest, 10.7 kN shear per pile at 1 m spacing. On the printed critical circle: no-pile Bishop 1.100 vs Slide 1.102 / Yamagami 1.10; with-pile 1.185 vs Slide 1.193 / Yamagami 1.20 (Slide adds the pile shear un-factored, i.e. active application). A free search with the pile finds 1.113 on a circle exiting upslope of the pile — the published comparison is per-circle. |
-| 55 | Slope, homogenous, water table | planned |  |
+| 55 | Slope, homogenous, water table | partial | Pockoski & Duncan (2000) test slope 1 — geometry and properties extracted (ground (-75,100)-(0,100)-(100,150)-(170,150), c=300 psf, φ=30, γ=120 pcf; multi-program table: Spencer 1.30, Bishop 1.29, Janbu 1.15, Lowe 1.32); blocked on the paper's water-table coordinates (figure trace only). |
 | 56 | Slope, homogenous, water table, tension crack | planned |  |
 | 57 | Slope, (2) materials, water table, tension crack, composite surfaces | planned |  |
 | 58 | Retaining wall, (8) materials, water table, grouted tieback | planned |  |
@@ -383,7 +383,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
-| 106 | Support, Ito & Matsui pile | planned | Ito & Matsui pile — direct comparison, no new code |
+| 106 | Support, Ito & Matsui pile | partial | Cai & Ugai (2000): Bishop with Ito & Matsui limit-pressure pile forces (FS 1.13-1.54 vs spacing). XSLOPE models pile resistance via Vcap/Mcap, not the Ito & Matsui pressure equation, so only the no-pile case (1.13/1.14) is directly reproducible; an Ito & Matsui capacity option would be a new feature. |
 | 107 | Retaining walls, gabion walls, supports | planned |  |
 | 108 | Retaining walls, gabion walls, supports | planned |  |
 | 109 | Retaining walls, gabion walls, weak layers | planned |  |

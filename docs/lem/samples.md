@@ -420,11 +420,15 @@ Solution (critical surface and factor of safety):
 <!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.551, fs_corps=1.377, fs_lowe=1.597, fs_spencer=1.587, fs_mprice=1.587 -->
 
 !!! note
-    The solution for this problem found by XSLOPE is not the same as the solution found by UTEXASED. The difference
-    is due to the fact that XSLOPE assumes the reinforcement is flexible and the force from the reinforcement is
-    therefore parallel to the base of the slope. UTEXASED assumes the reinforcement is rigid and the force from the
-    reinforcement is in the direction of the reinforcement line. The flexible assumption is more conservative. The
-    UTEXASED solution for this problem is FS = 1.646.
+    This problem is UTEXASED's Example 5 (Wright), whose reported solution is FS = 1.646 (Spencer) on a critical
+    circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer solution **on that same circle is FS = 1.646**
+    — the two programs' reinforcement mechanics agree (with either the Tangent or Axial direction setting; the
+    geogrid crossings on this deep circle occur where the slip surface is nearly parallel to the horizontal
+    reinforcement, so the two directions differ by less than 0.1% here). The lower value in the table above arises
+    because XSLOPE's automated search finds a **shallower critical surface** (center near (−5, 47), FS = 1.587)
+    in a region UTEXASED's tangent-line grid search modes did not explore. UTEXASED's own example documentation
+    notes that this model's thin cohesive face layer was added specifically to discourage shallow face surfaces —
+    the shallower minimum is a real feature of the model, not a solver disagreement.
 
 ### 10. Slope Stabilized with Piles
 

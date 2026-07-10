@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
+from xml.sax.saxutils import escape as xml_escape
 
 import numpy as np
 import pandas as pd
@@ -1969,7 +1970,8 @@ def _modify_existing_cell(cell_xml, value):
     if isinstance(value, float):
         value = round(value, 10)
     if isinstance(value, str):
-        return f'{open_tag_attrs} t="inlineStr"><is><t>{value}</t></is></c>'
+        return (f'{open_tag_attrs} t="inlineStr"><is><t>'
+                f'{xml_escape(value)}</t></is></c>')
     else:
         return f'{open_tag_attrs}><v>{value}</v></c>'
 
@@ -1980,7 +1982,7 @@ def _build_new_cell(ref, value):
     if isinstance(value, float):
         value = round(value, 10)
     if isinstance(value, str):
-        return f'<c r="{ref}" t="inlineStr"><is><t>{value}</t></is></c>'
+        return f'<c r="{ref}" t="inlineStr"><is><t>{xml_escape(value)}</t></is></c>'
     else:
         return f'<c r="{ref}"><v>{value}</v></c>'
 

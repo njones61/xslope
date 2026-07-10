@@ -437,69 +437,99 @@ def calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl):
     return D, d_x, d_y
 
 
-def _polygon_y_extent_at(ring, x):
-    """Return (min_y, max_y) of a polygon's boundary at a given x.
+def _polygon_bands(polygon):
+    """Decompose a material-zone polygon into y-simple bands.
 
-    `ring` is the exterior coordinate list (without the closing duplicate).
-    Considers every edge that spans x (including vertical edges), so it works
-    for y-simple material-zone polygons regardless of vertex ordering.
-    """
-    ys = []
-    n = len(ring)
-    for i in range(n):
-        x1, y1 = ring[i]
-        x2, y2 = ring[(i + 1) % n]
-        if (x1 <= x <= x2) or (x2 <= x <= x1):
-            if x1 == x2:
-                ys.append(y1)
-                ys.append(y2)
-            else:
-                t = (x - x1) / (x2 - x1)
-                ys.append(y1 + t * (y2 - y1))
-    if not ys:
-        return None, None
-    return min(ys), max(ys)
+    A vertical line may enter and leave a zone polygon more than once (an
+    inclined dam core, a folded seam). Reducing such a polygon to a single
+    (top, bottom) envelope pair counts the gap between its bands as if it were
+    solid material, double-counting slice weight against the neighboring zones
+    that actually fill the gap. Instead, sweep the polygon's vertex x-values
+    and pair boundary crossings per strip into trapezoids, then chain
+    trapezoids that share a y-interval at strip boundaries into bands. Each
+    band IS y-simple, so np.interp on its (top, bottom) tables is exact.
 
-
-def _polygon_top_bottom(polygon):
-    """Decompose a material-zone polygon into top and bottom boundary tables.
-
-    Returns (txs, tys, bxs, bys) as numpy arrays sampled at the polygon's unique
-    vertex x-values, suitable for fast np.interp. The top boundary is the upper
-    envelope (max y at each x); the bottom is the lower envelope (min y). Between
-    vertex x-values the boundary is linear, so interpolation is exact.
+    Returns a list of (txs, tys, bys) numpy arrays, one per band; y-simple
+    polygons yield exactly one band, identical to the former envelope tables.
     """
     ring = list(polygon.exterior.coords)
     if len(ring) > 1 and ring[0] == ring[-1]:
         ring = ring[:-1]
+    n = len(ring)
     xs = sorted(set(p[0] for p in ring))
-    txs, tys, bys = [], [], []
-    for x in xs:
-        lo, hi = _polygon_y_extent_at(ring, x)
-        if lo is None:
+    bands = []       # each: {'xs': [...], 'top': [...], 'bot': [...]}
+    open_bands = []  # bands whose last sample sits at the current strip's left edge
+    for xa, xb in zip(xs[:-1], xs[1:]):
+        if xb - xa <= 1e-12:
             continue
-        txs.append(x)
-        tys.append(hi)
-        bys.append(lo)
-    return np.array(txs), np.array(tys), np.array(txs), np.array(bys)
+        xm = 0.5 * (xa + xb)
+        crossings = []
+        for i in range(n):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % n]
+            if x1 == x2 or not (min(x1, x2) <= xm <= max(x1, x2)):
+                continue
+            t_a = (xa - x1) / (x2 - x1)
+            t_b = (xb - x1) / (x2 - x1)
+            crossings.append((y1 + t_a * (y2 - y1), y1 + t_b * (y2 - y1)))
+        # Strips are split at every vertex x, so edges cannot cross inside a
+        # strip; sorting by midpoint height orders them bottom-to-top even
+        # when two edges touch at a strip boundary (a wedge vertex).
+        crossings.sort(key=lambda ab: ab[0] + ab[1])
+        new_open = []
+        used = [False] * len(open_bands)
+        for j in range(0, len(crossings) - 1, 2):
+            bot_a, bot_b = crossings[j]
+            top_a, top_b = crossings[j + 1]
+            band = None
+            for k, ob in enumerate(open_bands):
+                if used[k]:
+                    continue
+                if min(ob['top'][-1], top_a) - max(ob['bot'][-1], bot_a) > 1e-9:
+                    band = ob
+                    used[k] = True
+                    break
+            if band is None:
+                band = {'xs': [xa], 'top': [top_a], 'bot': [bot_a]}
+                bands.append(band)
+            elif band['top'][-1] != top_a or band['bot'][-1] != bot_a:
+                # A vertical edge steps the boundary at xa: keep both samples
+                # (duplicate x) so the tables carry the jump.
+                band['xs'].append(xa)
+                band['top'].append(top_a)
+                band['bot'].append(bot_a)
+            band['xs'].append(xb)
+            band['top'].append(top_b)
+            band['bot'].append(bot_b)
+            new_open.append(band)
+        open_bands = new_open
+    return [(np.array(b['xs']), np.array(b['top']), np.array(b['bot']))
+            for b in bands if len(b['xs']) >= 2]
 
 
 def _build_polygon_edges(polygons):
-    """Precompute per-polygon top/bottom boundary tables and x-range once per
+    """Precompute per-band top/bottom boundary tables and x-range once per
     generate_slices call, so slice weights can be computed with fast numpy
-    interpolation instead of per-slice geometric intersection."""
+    interpolation instead of per-slice geometric intersection.
+
+    Emits one entry per y-simple band (see _polygon_bands), so a polygon that
+    folds back in x contributes several entries. 'poly_index' ties a band to
+    its source polygon (stable layer-height columns, material fallback);
+    'is_primary' marks one band per polygon for the exterior-based loops
+    (slice breakpoints, failure-surface crossings) that must visit each
+    polygon exactly once."""
     edges = []
-    for poly in polygons:
+    for p_idx, poly in enumerate(polygons):
         geom = poly['polygon']
-        txs, tys, bxs, bys = _polygon_top_bottom(geom)
-        if len(txs) < 2:
-            continue
-        edges.append({
-            'mat_id': poly['mat_id'],
-            'txs': txs, 'tys': tys, 'bxs': bxs, 'bys': bys,
-            'xmin': float(txs[0]), 'xmax': float(txs[-1]),
-            'exterior': geom.exterior,
-        })
+        for b_idx, (txs, tys, bys) in enumerate(_polygon_bands(geom)):
+            edges.append({
+                'mat_id': poly['mat_id'],
+                'poly_index': p_idx,
+                'is_primary': b_idx == 0,
+                'txs': txs, 'tys': tys, 'bxs': txs, 'bys': bys,
+                'xmin': float(txs[0]), 'xmax': float(txs[-1]),
+                'exterior': geom.exterior,
+            })
     return edges
 
 
@@ -575,6 +605,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # from these polygons.
     polygons = slope_data["polygons"]
     poly_edges = _build_polygon_edges(polygons)
+    n_polygons = len(polygons)
     ground_surface = slope_data["ground_surface"]
     piezo_line = slope_data["piezo_line"]
     piezo_line2 = slope_data.get("piezo_line2", [])  # Second piezometric line
@@ -690,6 +721,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     # Vectorized approach for polygon boundary vertices
     for pe in poly_edges:
+        if not pe['is_primary']:
+            continue
         poly_coords = np.array(pe['exterior'].coords)
         x_coords = poly_coords[:, 0]
         y_coords = poly_coords[:, 1]
@@ -750,6 +783,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
         circle_line = LineString(circle_coords)
         for pe in poly_edges:
+            if not pe['is_primary']:
+                continue
             intersection = pe['exterior'].intersection(circle_line)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
@@ -762,6 +797,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     else:
         # For non-circular failure surfaces, use the original approach
         for pe in poly_edges:
+            if not pe['is_primary']:
+                continue
             intersection = pe['exterior'].intersection(clipped_surface)
             if not intersection.is_empty:
                 if hasattr(intersection, 'x'):
@@ -1004,10 +1041,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         dl_top = sqrt((x_r - x_l)**2 + (y_rt - y_lt)**2)
 
         # Calculate layer heights and weight from the material-zone polygons.
-        # Each polygon's vertical extent at the slice center gives the layer band;
-        # overlapping it with [failure surface, ground surface] gives the height —
-        # the polygon equivalent of the former profile-layer calculation.
-        heights = []
+        # Each y-simple band's vertical extent at the slice center gives a layer
+        # band; overlapping it with [failure surface, ground surface] gives the
+        # height. Heights are accumulated per source polygon so the h1..hN
+        # columns stay one-per-zone even when a folded zone has several bands.
+        heights = [0] * n_polygons
         soil_weight = 0
         base_material_idx = None
         base_overlap_bot = float('inf')  # elevation of the deepest present layer's base
@@ -1020,19 +1058,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if mat_id is not None and 0 <= mat_id < len(materials):
                 mat_index = mat_id
             else:
-                mat_index = p_idx
+                mat_index = pe['poly_index']
 
             poly_top = poly_top_all[p_idx][i]
             poly_bot = poly_bot_all[p_idx][i]
             if (not poly_inrange[p_idx][i]) or np.isnan(poly_top) or np.isnan(poly_bot):
-                heights.append(0)
                 continue
 
             # Layer band [poly_bot, poly_top] clipped to [failure surface, ground]
             overlap_top = min(y_ct, poly_top)
             overlap_bot = max(y_cb, poly_bot)
             h = max(0, overlap_top - overlap_bot)
-            heights.append(h)
+            heights[pe['poly_index']] += h
 
             if h > 0:
                 gamma = materials[mat_index]['gamma']

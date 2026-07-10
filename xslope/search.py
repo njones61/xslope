@@ -468,6 +468,15 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     FS, df_slices, failure_surface, solver_result, fs_cache = evaluate_surface(
         points, movement_distance, fs_cache)
     
+    # A dead starting surface (slice generation or the solver failed on it)
+    # leaves failure_surface=None; the search loop can't recover from that, so
+    # report "no valid surface" instead of crashing on best_surface.coords.
+    if failure_surface is None or not np.isfinite(FS):
+        print("[❌ noncircular_search] the starting surface is not viable "
+              "(slice generation or the solver failed on it) — adjust the "
+              "non_circ starting points.")
+        return [], False, []
+
     # Initialize best surface with initial evaluation
     best_points = points.copy()
     best_fs = FS

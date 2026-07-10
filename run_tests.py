@@ -232,6 +232,19 @@ def run_lem_test(test):
                 return None, "rapid search: critical-surface n_eff all-zero (not written back)"
         return fs_cache[0]['FS'], None
 
+    elif test_type == 'single_noncirc':
+        # Evaluate the file's specified non-circular surface as-is (no search) —
+        # the "predefined slip surface" form of the verification problems.
+        success, result = generate_slices(slope_data, non_circ=slope_data['non_circ'],
+                                          num_slices=num_slices)
+        if not success:
+            return None, f"generate_slices failed: {result}"
+        slice_df, failure_surface = result
+        solver_result = solve_selected(method, slice_df, rapid=rapid)
+        if isinstance(solver_result, str):
+            return None, f"solve failed: {solver_result}"
+        return solver_result['FS'], None
+
     elif test_type == 'noncircular_search':
         fs_cache, converged, search_path = noncircular_search(
             slope_data, method, num_slices=num_slices, rapid=rapid
@@ -555,7 +568,7 @@ def run_gsat_pair_test(test):
     if d > 1e-5:
         return None, (f"zoned vs sidecar FS differ by {d:.2e} "
                       f"({vals[0]:.6f} vs {vals[1]:.6f})")
-    return vals[0], None
+    return 0.0, None    # pass/fail test: 0.0 = the two formulations agree
 
 
 def run_roundtrip_test(test):
@@ -1283,7 +1296,8 @@ def main():
             label = 'beta'
         elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
                             'mesh_conform', 'seep_elements', 'fem_elements',
-                            'mp_spencer', 'drawdown_tauff', 'drawdown_guard'):
+                            'mp_spencer', 'drawdown_tauff', 'drawdown_guard',
+                            'gsat_pair'):
             expected = 0.0          # these return 0.0 on success (pass/fail tests)
             tol = 0.0
             label = 'mismatch'
@@ -1305,7 +1319,14 @@ def main():
             status = f"ERROR: {error_msg}"
             errors += 1
             comp_str = "    --    "
-        elif expected is not None and abs(computed - expected) <= tol:
+        elif expected is None:
+            # A tag with no expected value for its type (e.g. a typo'd key or a
+            # type missing from the pass/fail list above) is a broken tag, not
+            # a pass — surface it instead of crashing the summary.
+            status = "ERROR: tag has no expected value for this test type"
+            errors += 1
+            comp_str = f"{computed:10.3f}" if computed is not None else "    --    "
+        elif abs(computed - expected) <= tol:
             status = f"PASS ({elapsed:.1f}s)"
             passed += 1
             comp_str = f"{computed:10.3f}"

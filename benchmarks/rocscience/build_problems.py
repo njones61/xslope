@@ -507,7 +507,48 @@ def vp085b():
     return 'vp085b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp085a, vp085b]
+def _yamagami_pile_slope(with_pile):
+    """Yamagami (2000) micro-pile slope (Slide #54): homogeneous c=4.9,
+    phi=10, gamma=15.68; single vertical micro-pile row at x=9 (crest),
+    10.7 kN shear per pile at 1 m spacing."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Material 1', c=4.9, phi=10.0, gamma=15.68, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-6.0, 0.0), (0.0, 0.0), (8.0, 4.0), (12.0, 4.0)]},
+    ]
+    sd['max_depth'] = -5.0
+    sd['circles'] = [{'Xo': 2.674, 'Yo': 7.573, 'Depth': 7.573 - 8.031, 'R': 8.031}]
+    if with_pile:
+        sd['pile_lines'] = [{
+            'x1': 9.0, 'y1': 4.0, 'x2': 9.0, 'y2': -2.0,
+            'H': None, 'theta_p': 0.0, 'D_pile': 0.3, 'S': 1.0,
+            'E': None, 'I': None, 'area': None,
+            'V_cap': 10.7, 'M_cap': 1.0e6, 'fixity': 'free',   # shear governs; Mcap>0 required
+            # Slide applies the micro-pile shear in the ACTIVE sense (added
+            # to the resisting sum un-factored): active reproduces its 1.193
+            # on the printed circle (1.185); passive-(/F) gives 1.172.
+            'appl': 'active', 'label': 'micro-pile',
+        }]
+    return sd
+
+
+def vp054a():
+    """Slide #54, unreinforced case on the printed critical circle
+    (2.674, 7.573, R=8.031). Slide Bishop 1.102; Yamagami 1.10."""
+    sd = _yamagami_pile_slope(False)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp054a.xlsx'))
+    return 'vp054a.xlsx'
+
+
+def vp054b():
+    """Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20."""
+    sd = _yamagami_pile_slope(True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp054b.xlsx'))
+    return 'vp054b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp054a, vp054b, vp085a, vp085b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

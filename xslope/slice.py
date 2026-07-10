@@ -600,14 +600,45 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     else:
         circular = False
 
-    # Prepare reinforcement lines data
+    # Prepare reinforcement lines data. Preferred source is the raw
+    # 'reinforcement_lines' dicts, which carry the full capacity envelope
+    # (t_max/lp/tend) plus the v12 Dir/Appl settings; the available tension at a
+    # crossing is evaluated exactly via fileio.reinforce_available_tension. The
+    # legacy 'reinforce_lines' point-list path is kept for callers that build
+    # slope_data by hand (treated as tangent/active, interpolated on X as before).
     reinf_lines_data = []
-    if slope_data.get("reinforce_lines"):
+    if slope_data.get("reinforcement_lines"):
+        from .fileio import reinforce_available_tension  # shared envelope
+        for r in slope_data["reinforcement_lines"]:
+            dxl = r["x2"] - r["x1"]
+            dyl = r["y2"] - r["y1"]
+            length = np.hypot(dxl, dyl)
+            if length == 0:
+                continue
+            # Line inclination in the same angular convention as the slice base
+            # angle alpha: measured from +x with the direction normalized so
+            # cos(psi) > 0 (left-to-right), and mirrored for right-facing slopes
+            # exactly as alpha/beta are.
+            if dxl < 0:
+                dxl, dyl = -dxl, -dyl
+            psi_line = atan2(dyl, dxl)   # radians
+            reinf_lines_data.append({
+                "geom": LineString([(r["x1"], r["y1"]), (r["x2"], r["y2"])]),
+                "envelope": (r["t_max"], r["lp1"], r["lp2"],
+                             r.get("tend1", 0.0), r.get("tend2", 0.0)),
+                "length": length,
+                "dir": r.get("dir", "tangent"),
+                "appl": r.get("appl", "active"),
+                "psi": psi_line,
+                "avail": reinforce_available_tension,
+            })
+    elif slope_data.get("reinforce_lines"):
         for line in slope_data["reinforce_lines"]:
             xs = [pt["X"] for pt in line]
             ts = [pt["T"] for pt in line]
             geom = LineString([(pt["X"], pt["Y"]) for pt in line])
-            reinf_lines_data.append({"xs": xs, "ts": ts, "geom": geom})
+            reinf_lines_data.append({"xs": xs, "ts": ts, "geom": geom,
+                                     "dir": "tangent", "appl": "active"})
 
     # Prepare pile lines data
     pile_lines_data = []
@@ -622,8 +653,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "S": pile.get("S"),
                 "V_cap": pile.get("V_cap"),
                 "M_cap": pile.get("M_cap"),
+                "appl": pile.get("appl", "active"),
                 "label": pile.get("label", ""),
             })
+
+    # Line loads (v12 'lloads' sheet): concentrated forces per unit width on the
+    # ground surface, assigned below to the slice whose top contains each point.
+    line_loads_data = list(slope_data.get("line_loads") or [])
 
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
@@ -1015,29 +1051,70 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # 1) Build this slice's base as a LineString from (x_l, y_lb) to (x_r, y_rb):
         slice_base = LineString([(x_l, y_lb), (x_r, y_rb)])
 
-        # 2) For each reinforcement line, check a single‐point intersection:
-        p_sum = 0.0
+        # 2) For each reinforcement line crossing this base, evaluate the available
+        # tension and route it by the line's Dir/Appl settings:
+        #   tangent + active  -> the classical scalar p (the pre-v12 behavior)
+        #   tangent + passive -> scalar p_pt (methods apply it with psi = alpha,
+        #                        factored by FS)
+        #   axial             -> component sums at angle psi (the line's own
+        #                        inclination) with the crossing point folded into
+        #                        first-moment sums, so any moment center works:
+        #                        M about (Xo,Yo) = Yo*cx - my + mx - Xo*cy
+        p_sum = 0.0        # tangent, active (legacy column)
+        p_pt_sum = 0.0     # tangent, passive
+        pa_cx = pa_cy = pa_mx = pa_my = 0.0   # axial, active
+        pp_cx = pp_cy = pp_mx = pp_my = 0.0   # axial, passive
         for rl in reinf_lines_data:
             intersec = slice_base.intersection(rl["geom"])
             if intersec.is_empty:
                 continue
 
             # Since we guarantee only one intersection point, it must be a Point:
-            if isinstance(intersec, Point):
-                xi = intersec.x
-                # interpolated T at xi
-                t_i = np.interp(xi, rl["xs"], rl["ts"], left=0.0, right=0.0)
-                p_sum += t_i
-            else:
+            if not isinstance(intersec, Point):
                 # (In the extremely unlikely case that intersection is not a Point,
                 #  skip it. Our assumption is only one Point per slice-base.)
                 continue
+
+            if "envelope" in rl:
+                s_along = rl["geom"].project(intersec)
+                t_mx, lp1, lp2, te1, te2 = rl["envelope"]
+                t_i = rl["avail"](s_along, rl["length"] - s_along,
+                                  t_mx, lp1, lp2, te1, te2)
+            else:
+                # legacy point-list path (hand-built slope_data): interp on X
+                t_i = np.interp(intersec.x, rl["xs"], rl["ts"], left=0.0, right=0.0)
+            if t_i <= 0.0:
+                continue
+
+            if rl.get("dir", "tangent") == "tangent":
+                if rl.get("appl", "active") == "active":
+                    p_sum += t_i
+                else:
+                    p_pt_sum += t_i
+            else:
+                # Axial: force at the line's own inclination, applied at the
+                # crossing point. Components are stored in the REAL frame
+                # (cos(psi) > 0); each solution method applies its own
+                # right-facing flip, exactly as it does for the tangent force.
+                psi_i = rl["psi"]
+                ci, si = cos(psi_i), sin(psi_i)
+                if rl.get("appl", "active") == "active":
+                    pa_cx += t_i * ci
+                    pa_cy += t_i * si
+                    pa_mx += t_i * si * intersec.x
+                    pa_my += t_i * ci * intersec.y
+                else:
+                    pp_cx += t_i * ci
+                    pp_cy += t_i * si
+                    pp_mx += t_i * si * intersec.x
+                    pp_my += t_i * ci * intersec.y
 
         # Now p_sum is the TOTAL T‐pull acting at this slice's base.
         # === END: "Reinforcement lines" ===
 
         # === BEGIN: "Pile lines" ===
         h_pile = 0.0
+        h_pile_pas = 0.0   # passive (Appl) portion of h_pile, factored by FS
         theta_p_val = 0.0
         x_pile = 0.0
         y_pile = 0.0
@@ -1112,10 +1189,49 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     pile_H = F_capped / S_pile
 
                 h_pile += pile_H
+                if pl.get("appl", "active") == "passive":
+                    h_pile_pas += pile_H
                 theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
                 x_pile = intersec.x
                 y_pile = intersec.y
         # === END: "Pile lines" ===
+
+        # === BEGIN: "Line loads" ===
+        # Fold each line load acting on this slice's top into an equivalent
+        # distributed-load resultant: magnitude ll_res at an equivalent
+        # inclination ll_beta (the dload convention, force = (F sin b, -F cos b))
+        # acting at (ll_x_pt, ll_y_pt). The solvers then reuse the proven D-term
+        # sign machinery verbatim. The horizontal component is mirrored for
+        # right-facing slopes, exactly as the top-edge beta is above. A straight-
+        # down load (angle = -90) maps to ll_beta = 0.
+        ll_h = ll_v = 0.0
+        ll_wx = ll_wy = ll_wsum = 0.0
+        _is_last_slice = (i == len(all_xs) - 2)
+        for _ll in line_loads_data:
+            _in = (x_l - 1e-9) <= _ll["x"] < x_r or \
+                  (_is_last_slice and abs(_ll["x"] - x_r) <= 1e-9)
+            if not _in:
+                continue
+            _delta = radians(_ll["angle"])
+            _h = _ll["P"] * cos(_delta)
+            if right_facing:
+                _h = -_h
+            ll_h += _h
+            ll_v += _ll["P"] * sin(_delta)
+            ll_wx += _ll["P"] * _ll["x"]
+            ll_wy += _ll["P"] * _ll["y"]
+            ll_wsum += _ll["P"]
+        if ll_wsum > 0.0:
+            ll_res = sqrt(ll_h * ll_h + ll_v * ll_v)
+            ll_beta = degrees(atan2(ll_h, -ll_v))
+            ll_x_pt = ll_wx / ll_wsum
+            ll_y_pt = ll_wy / ll_wsum
+        else:
+            ll_res = 0.0
+            ll_beta = 0.0
+            ll_x_pt = 0.0
+            ll_y_pt = 0.0
+        # === END: "Line loads" ===
 
         # Process piezometric line and pore pressures using pre-computed coordinates
         piezo_y = piezo_y_all[i]
@@ -1309,8 +1425,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'kw': kw,   # seismic force
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action
-            'p': p_sum,   # sum of reinforcement line T values that intersect base of slice.
+            'p': p_sum,   # sum of reinforcement line T values that intersect base of slice (tangent, active).
+            'p_pt': p_pt_sum,   # tangent, passive reinforcement (factored by FS)
+            'pa_cx': pa_cx,   # axial active reinforcement: sum T*cos(psi)
+            'pa_cy': pa_cy,   # axial active: sum T*sin(psi)
+            'pa_mx': pa_mx,   # axial active: sum T*sin(psi)*x_r (moment linearization)
+            'pa_my': pa_my,   # axial active: sum T*cos(psi)*y_r
+            'pp_cx': pp_cx,   # axial passive reinforcement components (factored by FS)
+            'pp_cy': pp_cy,
+            'pp_mx': pp_mx,
+            'pp_my': pp_my,
+            'lload': ll_res,   # line-load resultant on slice top (dload convention)
+            'll_beta': ll_beta,   # equivalent inclination of the line-load resultant (deg)
+            'll_x': ll_x_pt,   # line-load application point
+            'll_y': ll_y_pt,
             'h_pile': h_pile,    # pile force magnitude per unit width (0 if no pile)
+            'h_pile_pas': h_pile_pas,  # passive portion of h_pile (factored by FS)
             'theta_p': radians(theta_p_val),  # pile force angle from horizontal in radians
             'x_pile': x_pile,    # x-coordinate of pile-failure surface intersection
             'y_pile': y_pile,    # y-coordinate of pile-failure surface intersection

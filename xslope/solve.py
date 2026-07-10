@@ -194,6 +194,24 @@ def oms(slice_df, debug=False):
     y_pile  = slice_df['y_pile'].values  if 'y_pile'  in slice_df.columns else np.zeros(n)
     x_pile  = slice_df['x_pile'].values  if 'x_pile'  in slice_df.columns else np.zeros(n)
 
+    # v12 support/load terms (all zero when the columns are absent -> pre-v12
+    # behavior). Axial reinforcement mirrors the pile-force pattern (a known
+    # force at a point with a real direction); line loads mirror the
+    # distributed-load pattern (an equivalent resultant at an inclination in the
+    # dload convention); passive terms are factored by FS where supported.
+    def _c12(name):
+        return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n)
+    P_pt  = _c12('p_pt')
+    pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
+    pa_mx = _c12('pa_mx'); pa_my = _c12('pa_my')
+    pp_cx = _c12('pp_cx'); pp_cy = _c12('pp_cy')
+    pp_mx = _c12('pp_mx'); pp_my = _c12('pp_my')
+    H_pas = _c12('h_pile_pas')
+    LL    = _c12('lload')
+    ll_b  = np.radians(_c12('ll_beta'))
+    ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
+    has_passive = bool(np.any(P_pt) or np.any(pp_cx) or np.any(pp_cy) or np.any(H_pas))
+
     # 3) Convert angles to radians
     alpha = np.radians(alpha_deg)   # αᵢ [rad]
     phi   = np.radians(phi_deg)     # φᵢ [rad]
@@ -219,7 +237,9 @@ def oms(slice_df, debug=False):
       - kw * sin_alpha
       - T * sin_alpha
       - (u * dl)
-      + H_pile * np.sin(alpha - theta_p)
+      + (H_pile - H_pas) * np.sin(alpha - theta_p)
+      + (sin_alpha * pa_cx - cos_alpha * pa_cy)   # axial reinforcement, normal comp
+      + LL * np.cos(alpha - ll_b)                 # line load (dload pattern)
     )
 
     #   Σ  Dᵢ·sinβᵢ·(Yo - d_{y,i}) 
@@ -261,14 +281,44 @@ def oms(slice_df, debug=False):
     # correction as the distributed-load a_dx arm). Only matters for battered piles
     # (theta_p != 0); for theta_p = 0 this term is zero.
     pile_x_arm = -(x_pile - Xo) if right_facing else (x_pile - Xo)
+    h_act = H_pile - H_pas
     sum_pile_moment = np.sum(
-        H_pile * np.cos(theta_p) * (Yo - y_pile)
-      + H_pile * np.sin(theta_p) * pile_x_arm
+        h_act * np.cos(theta_p) * (Yo - y_pile)
+      + h_act * np.sin(theta_p) * pile_x_arm
+    )
+    sum_pile_moment_pas = np.sum(
+        H_pas * np.cos(theta_p) * (Yo - y_pile)
+      + H_pas * np.sin(theta_p) * pile_x_arm
     )
 
+    # Axial reinforcement moment about the circle center (pile pattern: the
+    # x-arm flips on right-facing slopes). M = cx*(Yo - y_r) + cy*(x_r - Xo),
+    # linearized through the slice sums (mx = sum cy*x_r, my = sum cx*y_r).
+    ra_x_part = (pa_mx - Xo * pa_cy)
+    rp_x_part = (pp_mx - Xo * pp_cy)
+    if right_facing:
+        ra_x_part = -ra_x_part
+        rp_x_part = -rp_x_part
+    sum_reinf_moment_a = np.sum(pa_cx * Yo - pa_my + ra_x_part)
+    sum_reinf_moment_p = np.sum(pp_cx * Yo - pp_my + rp_x_part)
+
+    # Line-load moment terms mirror the distributed-load terms exactly.
+    ll_x_arm = -(ll_x - Xo) if right_facing else (ll_x - Xo)
+    sum_LLx = np.sum(LL * np.cos(ll_b) * ll_x_arm)
+    sum_LLy = np.sum(LL * np.sin(ll_b) * (Yo - ll_y))
+
     # Put them together with their 1/R factors:
-    # P, sum_Dy, and pile moment are known resisting forces, not factored by FS
-    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy - (1.0 / R) * sum_pile_moment
+    # Active P, sum_Dy, and the pile/axial moments are known resisting forces,
+    # not factored by FS; line loads are known applied loads.
+    denominator = (sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T + sum_LLx)
+                   - np.sum(P) - (1.0 / R) * (sum_Dy + sum_LLy)
+                   - (1.0 / R) * sum_pile_moment - (1.0 / R) * sum_reinf_moment_a)
+
+    # Passive support (ultimate capacities mobilized with the soil) joins the
+    # RESISTING side: numerator gains the capacity moments (arm/R). OMS is
+    # non-iterative, so passive components cannot enter N_eff; their resisting
+    # moment is the entire contribution (consistent with OMS's moment-only basis).
+    numerator = numerator + np.sum(P_pt) + (1.0 / R) * (sum_reinf_moment_p + sum_pile_moment_pas)
 
     # 7) Finally compute FS = (numerator)/(denominator)
     if denominator <= 0:
@@ -341,6 +391,19 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     y_pile  = slice_df['y_pile'].values  if 'y_pile'  in slice_df.columns else np.zeros(n)
     x_pile  = slice_df['x_pile'].values  if 'x_pile'  in slice_df.columns else np.zeros(n)
 
+    # v12 support/load terms (all zero when the columns are absent)
+    def _c12(name):
+        return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n)
+    P_pt  = _c12('p_pt')
+    pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
+    pa_mx = _c12('pa_mx'); pa_my = _c12('pa_my')
+    pp_cx = _c12('pp_cx'); pp_cy = _c12('pp_cy')
+    pp_mx = _c12('pp_mx'); pp_my = _c12('pp_my')
+    H_pas = _c12('h_pile_pas')
+    LL    = _c12('lload')
+    ll_b  = np.radians(_c12('ll_beta'))
+    ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
+
     # Trigonometric terms
     sin_alpha = np.sin(alpha)
     cos_alpha = np.cos(alpha)
@@ -363,18 +426,41 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     # Pile resisting moment about circle center (same term as OMS) — flip the
     # vertical-component arm (x_pile - Xo) on right-facing slopes, as for a_dx above.
     pile_x_arm = -(x_pile - Xo) if right_facing else (x_pile - Xo)
+    h_act = H_pile - H_pas
     sum_pile_moment = np.sum(
-        H_pile * np.cos(theta_p) * (Yo - y_pile)
-      + H_pile * np.sin(theta_p) * pile_x_arm
+        h_act * np.cos(theta_p) * (Yo - y_pile)
+      + h_act * np.sin(theta_p) * pile_x_arm
+    )
+    sum_pile_moment_pas = np.sum(
+        H_pas * np.cos(theta_p) * (Yo - y_pile)
+      + H_pas * np.sin(theta_p) * pile_x_arm
     )
 
-    # Denominator (moment equilibrium) — pile moment is a known resisting force, not factored by FS
+    # Axial reinforcement and line-load moment terms (see oms())
+    ra_x_part = (pa_mx - Xo * pa_cy)
+    rp_x_part = (pp_mx - Xo * pp_cy)
+    if right_facing:
+        ra_x_part = -ra_x_part
+        rp_x_part = -rp_x_part
+    sum_reinf_moment_a = np.sum(pa_cx * Yo - pa_my + ra_x_part)
+    sum_reinf_moment_p = np.sum(pp_cx * Yo - pp_my + rp_x_part)
+    ll_x_arm = -(ll_x - Xo) if right_facing else (ll_x - Xo)
+    sum_LLx = np.sum(LL * np.cos(ll_b) * ll_x_arm)
+    sum_LLy = np.sum(LL * np.sin(ll_b) * (Yo - ll_y))
+
+    # Denominator (moment equilibrium) — active pile/axial moments are known
+    # resisting forces, not factored by FS; line loads are known applied loads
     sum_W = np.sum(W * sin_alpha)
     sum_Dx = np.sum(D * cos_beta * a_dx)
     sum_Dy = np.sum(D * sin_beta * a_dy)
     sum_kw = np.sum(kw * a_s)
     sum_T = np.sum(T * a_t)
-    denominator = sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T) - np.sum(P) - (1.0 / R) * sum_Dy - (1.0 / R) * sum_pile_moment
+    denominator = (sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T + sum_LLx)
+                   - np.sum(P) - (1.0 / R) * (sum_Dy + sum_LLy)
+                   - (1.0 / R) * sum_pile_moment - (1.0 / R) * sum_reinf_moment_a)
+
+    # Passive capacity moments join the resisting side (the numerator of F)
+    res_passive = np.sum(P_pt) + (1.0 / R) * (sum_reinf_moment_p + sum_pile_moment_pas)
 
     if denominator <= 0:
         return False, "Net driving moment is non-positive (resisting forces exceed driving forces)."
@@ -386,20 +472,25 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     F = 1.0
     for _ in range(max_iter):
         # Compute N_eff — H·sin(θp) enters vertical equilibrium
+        # Vertical equilibrium: known loads at full value; passive support
+        # mobilizes with the soil, so its vertical components carry 1/F.
+        vert_known = (W + D * cos_beta + LL * np.cos(ll_b)
+                      - P * sin_alpha - pa_cy - (H_pile - H_pas) * np.sin(theta_p))
+        vert_pas = (P_pt * sin_alpha + pp_cy + H_pas * np.sin(theta_p))
         num_N = (
-            W + D * cos_beta - P * sin_alpha - H_sin_tp
+            vert_known - vert_pas / F
             - u * dl * cos_alpha
             - (c * dl * sin_alpha) / F
         )
         denom_N = cos_alpha + (sin_alpha * tan_phi) / F
         N_eff = num_N / denom_N
 
-        # Numerator for FS — same H·sin(θp) term in the weight group
+        # Numerator for FS — same vertical-equilibrium group
         shear = (
             c * dl * cos_alpha
-            + (W + D * cos_beta - P * sin_alpha - H_sin_tp - u * dl * cos_alpha) * tan_phi
+            + (vert_known - vert_pas / F - u * dl * cos_alpha) * tan_phi
         )
-        numerator = np.sum(shear / denom_N)
+        numerator = np.sum(shear / denom_N) + res_passive
         F_new = numerator / denominator
 
         if abs(F_new - F) < tol:
@@ -480,6 +571,20 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     H_sin_tp = H_pile * np.sin(theta_p)
     H_cos_tp = H_pile * np.cos(theta_p)
 
+    # v12 support/load terms (all zero when the columns are absent)
+    def _c12(name):
+        return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n)
+    P_pt  = _c12('p_pt')
+    pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
+    pp_cx = _c12('pp_cx'); pp_cy = _c12('pp_cy')
+    H_pas = _c12('h_pile_pas')
+    LL    = _c12('lload')
+    ll_b  = np.radians(_c12('ll_beta'))
+    H_sin_act = (H_pile - H_pas) * np.sin(theta_p)
+    H_cos_act = (H_pile - H_pas) * np.cos(theta_p)
+    H_sin_pas = H_pas * np.sin(theta_p)
+    H_cos_pas = H_pas * np.cos(theta_p)
+
     # External horizontal driving forces (independent of F): seismic (driving),
     # distributed-load horizontal component (driving), tension-crack water
     # (driving), reinforcement and pile horizontal components (resisting).
@@ -489,8 +594,8 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     # P*sin(alpha) vertical component already used in num_N below, and matching
     # spencer's `R * cos_psi` with psi = alpha. Summing the bare magnitude here
     # over-credited the reinforcement and raised FS non-conservatively.
-    horiz_ext = (np.sum(kw) + np.sum(D * sin_beta) + np.sum(T)
-                 - np.sum(P * cos_alpha) - np.sum(H_cos_tp))
+    horiz_ext = (np.sum(kw) + np.sum(D * sin_beta) + np.sum(T) + np.sum(LL * np.sin(ll_b))
+                 - np.sum(P * cos_alpha) - np.sum(pa_cx) - np.sum(H_cos_act))
 
     # Iterate F: the base normal depends on F through m_alpha, exactly as Bishop.
     F = 1.0
@@ -499,14 +604,18 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     for _ in range(max_iter):
         m_alpha = cos_alpha + sin_alpha * tan_phi / F
         # Effective base normal from VERTICAL slice equilibrium (Bishop's N').
-        num_N = (W + D * cos_beta - P * sin_alpha - H_sin_tp
+        num_N = (W + D * cos_beta + LL * np.cos(ll_b) - P * sin_alpha - pa_cy - H_sin_act
+                 - (P_pt * sin_alpha + pp_cy + H_sin_pas) / F
                  - u * dl * cos_alpha - (c * dl * sin_alpha) / F)
         N_eff = num_N / m_alpha
         N_total = N_eff + u * dl
         # Horizontal force equilibrium: resisting shear (projected horizontally)
         # over driving (base-normal horizontal component + external horizontal).
         resisting = np.sum((c * dl + N_eff * tan_phi) * cos_alpha)
-        driving = np.sum(N_total * sin_alpha) + horiz_ext
+        # Passive support mobilizes with the soil: its horizontal components
+        # reduce the driving side factored by 1/F.
+        driving = (np.sum(N_total * sin_alpha) + horiz_ext
+                   - (np.sum(P_pt * cos_alpha) + np.sum(pp_cx) + np.sum(H_cos_pas)) / F)
         if driving <= 0:
             return False, "Net horizontal driving force is non-positive (resisting forces exceed driving forces)."
         F_new = resisting / driving
@@ -595,7 +704,9 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     }
 
 
-def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta_p, theta, FS):
+def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta_p, theta, FS,
+                       P_pt=None, pa_cx=None, pa_cy=None, pp_cx=None, pp_cy=None,
+                       H_pas=None, LL=None, ll_b=None):
     """Shared fixed-FS force-equilibrium march (left -> right over slices).
 
     The per-slice engine extracted from `force_equilibrium` so it can be reused:
@@ -656,12 +767,29 @@ def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta
     cp = np.cos(theta_p); sp = np.sin(theta_p)
     c_m = c / FS
     tan_phi_m = np.tan(phi) / FS
+
+    # v12 support/load terms (zeros when not supplied). Axial reinforcement
+    # mirrors the pile terms; passive support carries 1/FS (mobilizes with the
+    # soil, like c_m); line loads mirror the distributed-load terms.
+    z = np.zeros(n)
+    P_pt  = z if P_pt  is None else P_pt
+    pa_cx = z if pa_cx is None else pa_cx
+    pa_cy = z if pa_cy is None else pa_cy
+    pp_cx = z if pp_cx is None else pp_cx
+    pp_cy = z if pp_cy is None else pp_cy
+    H_pas = z if H_pas is None else H_pas
+    LL    = z if LL    is None else LL
+    ll_b  = z if ll_b  is None else ll_b
+    h_act_cp = (H_pile - H_pas) * cp
+    h_act_sp = (H_pile - H_pas) * sp
     a11 = tan_phi_m * ca - sa                          # A first column (N coefficients)
     a21 = tan_phi_m * sa + ca
     a12 = -ct[1:]; a22 = -st[1:]                       # A second column at boundary i+1
     det = a11 * a22 - a12 * a21
-    b0base = -c_m*dl*ca - P*ca + u*dl*sa - D*sb + kw + T - H_pile*cp
-    b1base = -c_m*dl*sa - P*sa - u*dl*ca + w + D*cb - H_pile*sp
+    b0base = (-c_m*dl*ca - P*ca - pa_cx + u*dl*sa - D*sb - LL*np.sin(ll_b) + kw + T
+              - h_act_cp - (P_pt*ca + pp_cx + H_pas*cp) / FS)
+    b1base = (-c_m*dl*sa - P*sa - pa_cy - u*dl*ca + w + D*cb + LL*np.cos(ll_b)
+              - h_act_sp - (P_pt*sa + pp_cy + H_pas*sp) / FS)
     cti = ct[:-1]; sti = st[:-1]                       # interslice angle at boundary i
 
     # Z[i+1] = p[i] + q[i]·Z[i]
@@ -686,7 +814,9 @@ def _equilibrium_march(alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta
 
 def _moment_about_origin(N, FS, *, x_c, y_cg, y_cb, alpha, c, phi, dl, u, w,
                          D, beta, d_x, d_y, kw, V, y_t, P, H_pile, theta_p,
-                         x_pile, y_pile):
+                         x_pile, y_pile, P_pt=None, pa_mx=None, pa_my=None,
+                         pp_mx=None, pp_my=None, H_pas=None, LL=None, ll_b=None,
+                         ll_x=None, ll_y=None):
     """Moment of the WHOLE sliding mass about the origin (0,0), CCW positive.
 
     This is the Morgenstern-Price moment residual (plan §4a). Its root in `FS` at a
@@ -729,7 +859,29 @@ def _moment_about_origin(N, FS, *, x_c, y_cg, y_cb, alpha, c, phi, dl, u, w,
         + P * (x_c * sa - y_cb * ca)              # reinforcement (∥ base) at (x_c, y_cb)
         + H_pile * (x_pile * np.sin(theta_p) - y_pile * np.cos(theta_p))  # pile
     )
-    return float(np.sum(M))
+    Msum = float(np.sum(M))
+    # v12 terms (zeros when not supplied): axial reinforcement (components at the
+    # crossing point, moment about origin = mx - my), passive support factored by
+    # FS, and line loads (distributed-load pattern at their own point).
+    z = np.zeros_like(x_c)
+    P_pt  = z if P_pt  is None else P_pt
+    pa_mx = z if pa_mx is None else pa_mx
+    pa_my = z if pa_my is None else pa_my
+    pp_mx = z if pp_mx is None else pp_mx
+    pp_my = z if pp_my is None else pp_my
+    H_pas = z if H_pas is None else H_pas
+    LL    = z if LL    is None else LL
+    ll_b  = z if ll_b  is None else ll_b
+    ll_x  = z if ll_x  is None else ll_x
+    ll_y  = z if ll_y  is None else ll_y
+    Msum += float(np.sum(
+        (pa_mx - pa_my)                                     # axial active
+        + (pp_mx - pp_my) / FS                              # axial passive
+        + P_pt * (x_c * sa - y_cb * ca) / FS                # tangent passive
+        - H_pas * (x_pile * np.sin(theta_p) - y_pile * np.cos(theta_p)) * (1.0 - 1.0 / FS)
+        - LL * (ll_x * np.cos(ll_b) + ll_y * np.sin(ll_b))  # line load
+    ))
+    return Msum
 
 
 def _mp_extract(slice_df, right_facing):
@@ -756,11 +908,35 @@ def _mp_extract(slice_df, right_facing):
         d_x=g('d_x'), d_y=g('d_y'), y_t=g('y_t'),
         x_pile=g('x_pile') if 'x_pile' in slice_df.columns else np.zeros(n),
         y_pile=g('y_pile') if 'y_pile' in slice_df.columns else np.zeros(n),
+        # v12 support/load terms
+        P_pt=g('p_pt') if 'p_pt' in slice_df.columns else np.zeros(n),
+        pa_cx=g('pa_cx') if 'pa_cx' in slice_df.columns else np.zeros(n),
+        pa_cy=g('pa_cy') if 'pa_cy' in slice_df.columns else np.zeros(n),
+        pa_mx=g('pa_mx') if 'pa_mx' in slice_df.columns else np.zeros(n),
+        pa_my=g('pa_my') if 'pa_my' in slice_df.columns else np.zeros(n),
+        pp_cx=g('pp_cx') if 'pp_cx' in slice_df.columns else np.zeros(n),
+        pp_cy=g('pp_cy') if 'pp_cy' in slice_df.columns else np.zeros(n),
+        pp_mx=g('pp_mx') if 'pp_mx' in slice_df.columns else np.zeros(n),
+        pp_my=g('pp_my') if 'pp_my' in slice_df.columns else np.zeros(n),
+        H_pas=g('h_pile_pas') if 'h_pile_pas' in slice_df.columns else np.zeros(n),
+        LL=g('lload') if 'lload' in slice_df.columns else np.zeros(n),
+        ll_b=np.radians(g('ll_beta')) if 'll_beta' in slice_df.columns else np.zeros(n),
+        ll_x=g('ll_x') if 'll_x' in slice_df.columns else np.zeros(n),
+        ll_y=g('ll_y') if 'll_y' in slice_df.columns else np.zeros(n),
     )
     if right_facing:
         for k in ('alpha', 'beta', 'phi', 'c', 'P', 'kw', 'V'):
             A[k] = -A[k]
         A['theta_p'] = np.pi - A['theta_p']
+        # Axial reinforcement: only the HORIZONTAL component flips with the
+        # facing (like the pile cos-theta_p component); vertical stays. The
+        # my-sums carry the horizontal component, the mx-sums the vertical.
+        for k in ('pa_cx', 'pa_my', 'pp_cx', 'pp_my'):
+            A[k] = -A[k]
+        # Line loads mirror beta's flip
+        A['ll_b'] = -A['ll_b']
+        # tangent-passive mirrors P
+        A['P_pt'] = -A['P_pt']
     return A
 
 
@@ -776,13 +952,19 @@ def _mp_residuals(A, f_vals, lam, FS):
     theta = np.arctan(lam * f_vals)
     N, Z = _equilibrium_march(A['alpha'], A['phi'], A['c'], A['w'], A['u'], A['dl'],
                               A['D'], A['beta'], A['kw'], A['V'], A['P'],
-                              A['H_pile'], A['theta_p'], theta, FS)
+                              A['H_pile'], A['theta_p'], theta, FS,
+                              P_pt=A['P_pt'], pa_cx=A['pa_cx'], pa_cy=A['pa_cy'],
+                              pp_cx=A['pp_cx'], pp_cy=A['pp_cy'], H_pas=A['H_pas'],
+                              LL=A['LL'], ll_b=A['ll_b'])
     force_res = Z[-1]
     moment_res = _moment_about_origin(
         N, FS, x_c=A['x_c'], y_cg=A['y_cg'], y_cb=A['y_cb'], alpha=A['alpha'],
         c=A['c'], phi=A['phi'], dl=A['dl'], u=A['u'], w=A['w'], D=A['D'], beta=A['beta'],
         d_x=A['d_x'], d_y=A['d_y'], kw=A['kw'], V=A['V'], y_t=A['y_t'], P=A['P'],
-        H_pile=A['H_pile'], theta_p=A['theta_p'], x_pile=A['x_pile'], y_pile=A['y_pile'])
+        H_pile=A['H_pile'], theta_p=A['theta_p'], x_pile=A['x_pile'], y_pile=A['y_pile'],
+        P_pt=A['P_pt'], pa_mx=A['pa_mx'], pa_my=A['pa_my'], pp_mx=A['pp_mx'],
+        pp_my=A['pp_my'], H_pas=A['H_pas'], LL=A['LL'], ll_b=A['ll_b'],
+        ll_x=A['ll_x'], ll_y=A['ll_y'])
     return N, Z, force_res, moment_res
 
 
@@ -854,6 +1036,16 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     H_pile  = slice_df['h_pile'].values  if 'h_pile'  in slice_df.columns else np.zeros(n)
     theta_p = slice_df['theta_p'].values if 'theta_p' in slice_df.columns else np.zeros(n)
 
+    # v12 support/load terms (all zero when the columns are absent)
+    def _c12(name):
+        return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n)
+    P_pt  = _c12('p_pt')
+    pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
+    pp_cx = _c12('pp_cx'); pp_cy = _c12('pp_cy')
+    H_pas = _c12('h_pile_pas')
+    LL    = _c12('lload')
+    ll_b  = np.radians(_c12('ll_beta'))
+
     N = np.zeros(n)  # normal forces on slice bases (filled by each march)
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
 
@@ -866,7 +1058,9 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
         values at the converged FS. Pure extraction — arithmetic is unchanged.
         """
         N_march, Z_march = _equilibrium_march(
-            alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta_p, theta, FS)
+            alpha, phi, c, w, u, dl, D, beta, kw, T, P, H_pile, theta_p, theta, FS,
+            P_pt=P_pt, pa_cx=pa_cx, pa_cy=pa_cy, pp_cx=pp_cx, pp_cy=pp_cy,
+            H_pas=H_pas, LL=LL, ll_b=ll_b)
         N[:] = N_march
         Z[:] = Z_march
         return Z[n]
@@ -1125,6 +1319,21 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     x_pile    = slice_df['x_pile'].values  if 'x_pile'  in slice_df.columns else np.zeros(n_slices)
     y_pile    = slice_df['y_pile'].values  if 'y_pile'  in slice_df.columns else np.zeros(n_slices)
 
+    # v12 support/load terms (all zero when the columns are absent)
+    def _c12(name):
+        return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n_slices)
+    pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
+    pa_mx = _c12('pa_mx'); pa_my = _c12('pa_my')
+    LL    = _c12('lload')
+    ll_b  = np.radians(_c12('ll_beta'))
+    ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
+    # Passive support requires 1/F factoring inside Spencer's Newton system
+    # (its Q derivatives are closed-form in F); deliberately not implemented yet.
+    if (np.any(_c12('p_pt')) or np.any(_c12('pp_cx')) or np.any(_c12('pp_cy'))
+            or np.any(_c12('h_pile_pas'))):
+        return False, ("Passive (Appl) support is not yet supported in Spencer's "
+                       "method — use bishop/janbu/corps/lowe, or set Appl=Active.")
+
     # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
     # at the bottom of the slice. Therefore, the psi value used in the derivation is set to alpha, 
     # and the point of action is the center of the base of the slice.
@@ -1175,12 +1384,21 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     H_sin_tp = H_pile * np.sin(theta_pile)  # vertical component (upward)
     if right_facing:
         H_cos_tp = -H_cos_tp
+        # Axial reinforcement: flip the horizontal component only (pile pattern);
+        # the my-sums carry the horizontal component. Line loads mirror beta.
+        pa_cx = -pa_cx
+        pa_my = -pa_my
+        ll_b = -ll_b
 
-    Fh = - kw - V + P * sin_b + R * cos_psi + H_cos_tp       # Equation (1) + pile horizontal
-    Fv = - W - P * cos_b + R * sin_psi + H_sin_tp        # Equation (2) + pile vertical (upward)
+    Fh = (- kw - V + P * sin_b + R * cos_psi + H_cos_tp      # Equation (1) + pile horizontal
+          + pa_cx + LL * np.sin(ll_b))                         # + axial reinf + line load
+    Fv = (- W - P * cos_b + R * sin_psi + H_sin_tp             # Equation (2) + pile vertical (upward)
+          + pa_cy - LL * np.cos(ll_b))                         # + axial reinf + line load
     Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
         + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) \
-        - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b)  # Equation (3) + pile moment
+        - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b) \
+        - (pa_my - y_b * pa_cx) + (pa_mx - x_b * pa_cy) \
+        - LL * np.sin(ll_b) * (ll_y - y_b) - LL * np.cos(ll_b) * (ll_x - x_b)  # Eq (3) + pile/axial/line-load moments
     
     # ========== BEGIN SOLUTION ==========
 

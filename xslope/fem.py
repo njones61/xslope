@@ -487,26 +487,40 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
                     dist_to_left = np.linalg.norm(elem_centroid - [x1, y1])
                     dist_to_right = np.linalg.norm(elem_centroid - [x2, y2])
-                    dist_to_nearest_end = min(dist_to_left, dist_to_right)
 
                     # Get reinforcement properties
                     t_max = line_data.get("t_max", 0.0)
                     t_res = line_data.get("t_res", 0.0)
-                    lp1 = line_data.get("lp1", 0.0)  # Pullout length left end
-                    lp2 = line_data.get("lp2", 0.0)  # Pullout length right end
+                    lp1 = line_data.get("lp1", 0.0)   # Pullout length left end
+                    lp2 = line_data.get("lp2", 0.0)   # Pullout length right end
+                    tend1 = line_data.get("tend1", 0.0)  # End anchorage capacities
+                    tend2 = line_data.get("tend2", 0.0)
 
-                    # Use appropriate pullout length based on which end is closer
-                    lp = lp1 if dist_to_left < dist_to_right else lp2
+                    # Allowable tension from the capacity envelope shared with the
+                    # LEM point list (fileio.reinforce_available_tension): tensile
+                    # strength, frictional development from BOTH ends, and end
+                    # anchorage. With tend = 0 this reproduces the historical
+                    # nearest-end taper for any element whose centroid lies in at
+                    # most one pullout zone, and is the correct min() when zones
+                    # overlap.
+                    from .fileio import reinforce_available_tension
+                    t_allow = reinforce_available_tension(
+                        dist_to_left, dist_to_right, t_max, lp1, lp2, tend1, tend2)
+                    t_allow_by_1d_elem[elem_idx] = t_allow
 
-                    # Compute allowable and residual tensile forces
-                    if dist_to_nearest_end < lp:
-                        # Within pullout zone - linear variation
-                        t_allow_by_1d_elem[elem_idx] = t_max * (dist_to_nearest_end / lp)
-                        t_res_by_1d_elem[elem_idx] = 0.0  # Sudden pullout failure
-                    else:
-                        # Beyond pullout zone - full capacity
-                        t_allow_by_1d_elem[elem_idx] = t_max
+                    if t_allow >= t_max - 1e-12:
+                        # Beyond the pullout zones - full capacity, material residual
                         t_res_by_1d_elem[elem_idx] = t_res
+                    else:
+                        # Inside a friction ramp. Historically residual = 0 (sudden,
+                        # complete pullout). With end anchorage, the hardware
+                        # survives soil/grout failure up to its own capacity,
+                        # capped by the material residual: min(Tres, Tend of the
+                        # governing end).
+                        cap1 = t_max if lp1 <= 0 else tend1 + t_max * dist_to_left / lp1
+                        cap2 = t_max if lp2 <= 0 else tend2 + t_max * dist_to_right / lp2
+                        tend_g = tend1 if cap1 <= cap2 else tend2
+                        t_res_by_1d_elem[elem_idx] = min(t_res, tend_g)
 
                     # Compute axial stiffness
                     E = line_data.get("E", 2e11)  # Steel default

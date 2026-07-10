@@ -94,7 +94,7 @@ ROUNDTRIP_KEYS = [
     'gamma_water', 'tcrack_depth', 'tcrack_water', 'k_seismic', 'max_depth',
     'profile_lines', 'materials', 'piezo_line', 'piezo_line2', 'circles',
     'non_circ', 'dloads', 'dloads2', 'reinforcement_lines', 'pile_lines',
-    'seepage_bc', 'seepage_bc2',
+    'line_loads', 'seepage_bc', 'seepage_bc2',
 ]
 
 

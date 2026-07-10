@@ -264,9 +264,33 @@ def _validate_polygons_no_overlap(polygons):
                     f"notch), not drawn on top of it.")
 
 
-def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area):
+def reinforce_available_tension(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0):
+    """Available tensile force at a point along a reinforcement line — the
+    capacity envelope shared by the LEM point list and the FEM element taper:
+
+        T = min( Tmax,
+                 Tend1 + Tmax*d1/Lp1,     (Lp1 = 0 -> end 1 fully anchored)
+                 Tend2 + Tmax*d2/Lp2 )    (Lp2 = 0 -> end 2 fully anchored)
+
+    d1/d2 are the distances from the point to end 1 / end 2. Tend* are end
+    anchorage capacities (plate/connection/anchor); 0 reproduces the classical
+    friction-only taper exactly. One implementation for both engines, so the
+    two can never drift.
+    """
+    cap1 = t_max if lp1 <= 0 else min(t_max, tend1 + t_max * d1 / lp1)
+    cap2 = t_max if lp2 <= 0 else min(t_max, tend2 + t_max * d2 / lp2)
+    return max(0.0, min(cap1, cap2))
+
+
+def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
+                           Tend1=0.0, Tend2=0.0):
     """Build the LEM tension-distribution point list for ONE reinforcement line
-    from its raw endpoints + pullout lengths. Returns [] for a zero-length line.
+    from its raw endpoints, pullout lengths, and end anchorage. Returns [] for a
+    zero-length line.
+
+    The available tension is the piecewise-linear capacity envelope of
+    :func:`reinforce_available_tension`; the point list holds its breakpoints so
+    linear interpolation between points reproduces the envelope exactly.
 
     Extracted from load_slope_data so the same derivation can be reused (e.g. by
     the GUI) to rebuild the display format after editing the raw line data."""
@@ -279,88 +303,61 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area):
     dx = (x2 - x1) / line_length
     dy = (y2 - y1) / line_length
 
+    def T_at(s):
+        return reinforce_available_tension(s, line_length - s, Tmax, Lp1, Lp2,
+                                           Tend1, Tend2)
+
+    # Candidate breakpoints: the endpoints plus every kink of the envelope —
+    # where each end's ramp reaches Tmax, and where the two ramps cross.
+    cands = {0.0, line_length}
+    if Lp1 > 0 and Tend1 < Tmax:
+        cands.add(min(line_length, (Tmax - Tend1) * Lp1 / Tmax))
+    if Lp2 > 0 and Tend2 < Tmax:
+        cands.add(max(0.0, line_length - (Tmax - Tend2) * Lp2 / Tmax))
+    if Lp1 > 0 and Lp2 > 0:
+        m1, m2 = Tmax / Lp1, Tmax / Lp2
+        s_x = (Tend2 + m2 * line_length - Tend1) / (m1 + m2)
+        # only a breakpoint when the ramps cross BELOW the Tmax plateau
+        if 0.0 < s_x < line_length and (Tend1 + m1 * s_x) < Tmax:
+            cands.add(s_x)
+
+    # Emit ordered, deduplicated breakpoints. The stored Tres mirrors the old
+    # semantics: the material residual where the full capacity is available,
+    # zero inside a friction ramp (sudden pullout) unless the governing end is
+    # anchored, in which case the anchor hardware survives up to min(Tres, Tend).
+    tol = max(1e-9, 1e-9 * line_length)
     line_points = []
-
-    # Handle different cases based on pullout lengths
-    if Lp1 + Lp2 >= line_length:
-        # Line too short - create single interior point
-        if Lp1 == 0 and Lp2 == 0:
-            # Both ends anchored - uniform tension
-            line_points = [
-                {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
-                {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
-            ]
+    for s in sorted(cands):
+        if line_points and abs(s - line_points[-1]["_s"]) < tol:
+            continue
+        T = T_at(s)
+        if T >= Tmax - 1e-12:
+            tres_pt = Tres
         else:
-            # Find equilibrium point where tensions are equal
-            if Lp1 == 0:
-                # End 1 anchored, all tension at end 1
-                line_points = [
-                    {"X": x1, "Y": y1, "T": Tmax, "Tres": Tres, "E": E, "Area": Area},
-                    {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
-                ]
-            elif Lp2 == 0:
-                # End 2 anchored, all tension at end 2
-                line_points = [
-                    {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
-                    {"X": x2, "Y": y2, "T": Tmax, "Tres": Tres, "E": E, "Area": Area}
-                ]
-            else:
-                # Both ends have pullout - find equilibrium point
-                ratio_sum = 1.0 / Lp1 + 1.0 / Lp2
-                d1 = line_length / (Lp2 * ratio_sum)
-                T_eq = Tmax * d1 / Lp1  # = Tmax * d2 / Lp2
-                x_int = x1 + d1 * dx
-                y_int = y1 + d1 * dy
-                line_points = [
-                    {"X": x1, "Y": y1, "T": 0.0, "Tres": 0, "E": E, "Area": Area},
-                    {"X": x_int, "Y": y_int, "T": T_eq, "Tres": Tres, "E": E, "Area": Area},
-                    {"X": x2, "Y": y2, "T": 0.0, "Tres": 0, "E": E, "Area": Area}
-                ]
-    else:
-        # Normal case - line long enough for 4 points
-        points_to_add = []
-        points_to_add.append((x1, y1, 0.0, 0.0))                 # Point 1: start
-        if Lp1 > 0:                                              # Point 2: Lp1 from start
-            points_to_add.append((x1 + Lp1 * dx, y1 + Lp1 * dy, Tmax, Tres))
-        else:
-            points_to_add[0] = (x1, y1, Tmax, Tres)              # start gets Tmax
-        if Lp2 > 0:                                              # Point 3: Lp2 back from end
-            points_to_add.append((x2 - Lp2 * dx, y2 - Lp2 * dy, Tmax, Tres))
-        if Lp2 > 0:                                              # Point 4: end
-            points_to_add.append((x2, y2, 0.0, 0.0))
-        else:
-            points_to_add.append((x2, y2, Tmax, Tres))
-
-        # Remove duplicate points (same x,y), keeping the max tension at a location
-        unique_points = []
-        tolerance = 1e-6
-        for x, y, T, Tr in points_to_add:
-            is_duplicate = False
-            for ux, uy, uT, uTres in unique_points:
-                if abs(x - ux) < tolerance and abs(y - uy) < tolerance:
-                    for k, (px, py, pT, pTres) in enumerate(unique_points):
-                        if abs(x - px) < tolerance and abs(y - py) < tolerance:
-                            unique_points[k] = (px, py, max(pT, T), max(pTres, Tr))
-                    is_duplicate = True
-                    break
-            if not is_duplicate:
-                unique_points.append((x, y, T, Tr))
-
-        line_points = [{"X": x, "Y": y, "T": T, "Tres": Tr, "E": E, "Area": Area}
-                       for x, y, T, Tr in unique_points]
+            governing_tend = tend_g = 0.0
+            cap1 = Tmax if Lp1 <= 0 else Tend1 + Tmax * s / Lp1
+            cap2 = Tmax if Lp2 <= 0 else Tend2 + Tmax * (line_length - s) / Lp2
+            tend_g = Tend1 if cap1 <= cap2 else Tend2
+            tres_pt = min(Tres, tend_g)
+        line_points.append({"X": x1 + s * dx, "Y": y1 + s * dy, "T": T,
+                            "Tres": tres_pt, "E": E, "Area": Area, "_s": s})
+    for p in line_points:
+        del p["_s"]
 
     return line_points
 
 
 def build_reinforce_lines(reinforcement_lines):
     """Map raw FEM-format reinforcement dicts (x1,y1,x2,y2,t_max,t_res,lp1,lp2,E,
-    area) to the LEM display/analysis format (a list of tension point-lists).
-    Lines resolving to fewer than 2 points are dropped, matching load_slope_data."""
+    area, and optionally tend1/tend2) to the LEM display/analysis format (a list
+    of tension point-lists). Lines resolving to fewer than 2 points are dropped,
+    matching load_slope_data."""
     lines = []
     for r in reinforcement_lines:
         pts = _reinforce_line_points(
             r["x1"], r["y1"], r["x2"], r["y2"], r["t_max"], r["t_res"],
-            r["lp1"], r["lp2"], r["E"], r["area"])
+            r["lp1"], r["lp2"], r["E"], r["area"],
+            r.get("tend1", 0.0), r.get("tend2", 0.0))
         if len(pts) >= 2:
             lines.append(pts)
     return lines

@@ -1324,15 +1324,13 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         return slice_df[name].values.astype(float) if name in slice_df.columns else np.zeros(n_slices)
     pa_cx = _c12('pa_cx'); pa_cy = _c12('pa_cy')
     pa_mx = _c12('pa_mx'); pa_my = _c12('pa_my')
+    pp_cx = _c12('pp_cx'); pp_cy = _c12('pp_cy')
+    pp_mx = _c12('pp_mx'); pp_my = _c12('pp_my')
+    P_pt  = _c12('p_pt')
+    H_pas = _c12('h_pile_pas')
     LL    = _c12('lload')
     ll_b  = np.radians(_c12('ll_beta'))
     ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
-    # Passive support requires 1/F factoring inside Spencer's Newton system
-    # (its Q derivatives are closed-form in F); deliberately not implemented yet.
-    if (np.any(_c12('p_pt')) or np.any(_c12('pp_cx')) or np.any(_c12('pp_cy'))
-            or np.any(_c12('h_pile_pas'))):
-        return False, ("Passive (Appl) support is not yet supported in Spencer's "
-                       "method — use bishop/janbu/corps/lowe, or set Appl=Active.")
 
     # For now, we assume that reinforcement is flexible and therefore is parallel to the failure surface
     # at the bottom of the slice. Therefore, the psi value used in the derivation is set to alpha, 
@@ -1388,12 +1386,31 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         # the my-sums carry the horizontal component. Line loads mirror beta.
         pa_cx = -pa_cx
         pa_my = -pa_my
+        pp_cx = -pp_cx
+        pp_my = -pp_my
+        P_pt = -P_pt          # tangent passive mirrors R
         ll_b = -ll_b
+
+    # Passive pile portion: mobilized (divided by F), so it is removed from the
+    # constant pile components and carried in the F-dependent passive arrays.
+    frac_pas = np.divide(H_pas, H_pile, out=np.zeros_like(H_pas), where=H_pile != 0)
+    H_cos_pas = H_cos_tp * frac_pas
+    H_sin_pas = H_sin_tp * frac_pas
+    H_cos_tp = H_cos_tp - H_cos_pas
+    H_sin_tp = H_sin_tp - H_sin_pas
 
     Fh = (- kw - V + P * sin_b + R * cos_psi + H_cos_tp      # Equation (1) + pile horizontal
           + pa_cx + LL * np.sin(ll_b))                         # + axial reinf + line load
     Fv = (- W - P * cos_b + R * sin_psi + H_sin_tp             # Equation (2) + pile vertical (upward)
           + pa_cy - LL * np.cos(ll_b))                         # + axial reinf + line load
+
+    # Passive (ultimate) support components: enter every equation divided by F.
+    # Tangent-passive acts parallel to the base at the base center (like R);
+    # axial-passive at its crossing point; passive piles per their components.
+    Fh_pas = P_pt * cos_psi + pp_cx + H_cos_pas
+    Fv_pas = P_pt * sin_psi + pp_cy + H_sin_pas
+    Mo_pas = (- (pp_my - y_b * pp_cx) + (pp_mx - x_b * pp_cy)
+              - H_cos_pas * (y_pile - y_b) + H_sin_pas * (x_pile - x_b))
     Mo = - P * sin_b * (y_p - y_b) - P * cos_b * (x_p - x_b) \
         + kw * (y_k - y_b) + V * (y_v - y_b) - R * cos_psi * (y_r - y_b) + R * sin_psi * (x_r - x_b) \
         - H_cos_tp * (y_pile - y_b) + H_sin_tp * (x_pile - x_b) \
@@ -1403,19 +1420,22 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     # ========== BEGIN SOLUTION ==========
 
     def compute_Q_and_yQ(F, theta_rad):
-        """Compute Q and y_Q for given F and theta values."""
+        """Compute Q and y_Q for given F and theta values. Passive support
+        mobilizes with the soil: its components carry 1/F."""
+        Fv_e = Fv + Fv_pas / F
+        Fh_e = Fh + Fh_pas / F
         # Equation (24): m_alpha
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
 
         # Equation (23): Q
-        Q = (- Fv * sin_a - Fh * cos_a - (c / F) * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p / F) * ma
+        Q = (- Fv_e * sin_a - Fh_e * cos_a - (c / F) * dl + (Fv_e * cos_a - Fh_e * sin_a + u * dl) * tan_p / F) * ma
 
         # Equation (26): y_Q with numerical safeguard
         # Add small epsilon to prevent divide-by-zero when Q * cos(theta) is very small
         Q_cos_theta = Q * np.cos(theta_rad)
         eps = 1e-10
         safe_denom = np.where(np.abs(Q_cos_theta) < eps, eps * np.sign(Q_cos_theta + eps), Q_cos_theta)
-        y_q = y_b + Mo / safe_denom
+        y_q = y_b + (Mo + Mo_pas / F) / safe_denom
 
         return Q, y_q
     
@@ -1441,17 +1461,28 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         cos_theta = np.cos(theta_rad)
         sin_theta = np.sin(theta_rad)
         
-        # Constants for Q expression (Equations 45-49)
-        C1 = -Fv * sin_a - Fh * cos_a
-        C2 = -c * dl + (Fv * cos_a - Fh * sin_a + u * dl) * tan_p
+        # Constants for Q expression (Equations 45-49), generalized: passive
+        # support makes C1, C2 (and Mo) functions of F —
+        #   C1(F) = C1_0 + C1_p/F,  C2(F) = C2_0 + C2_p/F,  Mo(F) = Mo + Mo_pas/F
+        # so N(F) = C1 + C2/F and dN/dF = -(C1_p + C2_0 + 2*C2_p/F)/F^2, written
+        # below as -(C1_p + C2 + C2_p/F)/F^2 using C2_0 = C2 - C2_p/F. With no
+        # passive elements (C1_p = C2_p = 0) every expression reduces to the
+        # original closed forms exactly.
+        Fv_e = Fv + Fv_pas / F
+        Fh_e = Fh + Fh_pas / F
+        C1 = -Fv_e * sin_a - Fh_e * cos_a
+        C2 = -c * dl + (Fv_e * cos_a - Fh_e * sin_a + u * dl) * tan_p
+        C1_p = -Fv_pas * sin_a - Fh_pas * cos_a
+        C2_p = (Fv_pas * cos_a - Fh_pas * sin_a) * tan_p
         C3 = cos_alpha_theta
         C4 = sin_alpha_theta * tan_p
         
         # Denominator for Q
         denom_Q = C3 + C4 / F
         
-        # First-order partial derivatives of Q (Equations 50-51)
-        dQ_dF = (-1 / denom_Q**2) * ((denom_Q * C2 / F**2) - (C1 + C2 / F) * C4 / F**2)
+        # First-order partial derivatives of Q (Equations 50-51, generalized)
+        dN_dF = -(C1_p + C2 + C2_p / F) / F**2
+        dQ_dF = (1 / denom_Q**2) * (dN_dF * denom_Q + (C1 + C2 / F) * C4 / F**2)
         
         dC3_dtheta = sin_alpha_theta  # Equation (55)
         dC4_dtheta = -cos_alpha_theta * tan_p  # Equation (56)
@@ -1466,8 +1497,10 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         # Where |Q * cos_theta| < eps, set derivatives to a large value to signal ill-conditioning
         safe_denom = np.where(np.abs(Q_cos_theta) < eps, eps * np.sign(Q_cos_theta + eps), Q_cos_theta)
 
-        dyQ_dF = (-1 / safe_denom**2) * Mo * dQ_dF * cos_theta
-        dyQ_dtheta = (-1 / safe_denom**2) * Mo * (dQ_dtheta * cos_theta - Q * sin_theta)
+        Mo_e = Mo + Mo_pas / F
+        dyQ_dF = ((-Mo_pas / F**2) / safe_denom
+                  + (-1 / safe_denom**2) * Mo_e * dQ_dF * cos_theta)
+        dyQ_dtheta = (-1 / safe_denom**2) * Mo_e * (dQ_dtheta * cos_theta - Q * sin_theta)
         
         # First-order partial derivatives of R1 (Equations 35-36)
         dR1_dF = np.sum(dQ_dF)

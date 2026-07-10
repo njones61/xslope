@@ -430,6 +430,15 @@ Solution (critical surface and factor of safety):
     notes that this model's thin cohesive face layer was added specifically to discourage shallow face surfaces —
     the shallower minimum is a real feature of the model, not a solver disagreement.
 
+A mirrored (right-facing) variant of this model, with the reinforcement set to Type = Nail (Axial direction,
+Passive application), is included as a regression guard on the v12 support mechanics: every method must return
+the same factor of safety on the mirrored geometry as on the original for each Dir/Appl combination, and the
+values below pin the axial + passive path on a right-facing slope.
+
+<!-- test: file=files/xslope_reinforce_rface.xlsx, type=circular_search, num_slices=40, fs_oms=1.282, fs_bishop=1.475, fs_janbu=1.420, fs_spencer=1.471, fs_corps=1.091, fs_lowe=1.477, fs_mprice=1.471 -->
+<!-- test: file=files/xslope_reinforce_rface.xlsx, type=mp_spencer -->
+<!-- test: file=files/xslope_reinforce_rface.xlsx, type=roundtrip -->
+
 ### 10. Slope Stabilized with Piles
 
 This problem features a 1:1 slope in a medium-stiff clay stabilized by two rows of drilled shafts.

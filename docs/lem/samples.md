@@ -578,7 +578,7 @@ Solution (critical surface and factor of safety):
 
 The remaining problems are **verification benchmarks**: published cases used to
 validate the limit-equilibrium implementation. Each is locked into the
-automated regression suite. See also the [Verification](../verification.md) page.
+automated regression suite. See also the [Verification](../verification/index.md) page.
 
 ### 12. Verification: ACADS Simple Homogeneous Slope {#verification-acads-simple}
 
@@ -620,7 +620,7 @@ slices, each method searched independently):
 All rigorous methods fall within the ACADS accepted band; OMS reads low, as
 expected for the legacy method (its conservative bias on this class of problem
 is why it is reported for completeness only). This benchmark also appears on
-the [Verification](../verification.md#limit-equilibrium) page.
+the [Verification](../verification/lem.md) page.
 
 **Sources:** Donald, I.B. & Giam, P. (1989), *Soil slope stability programs
 review*, ACADS, Melbourne; Giam, P. & Donald, I.B. (1992); GeoStudio
@@ -683,7 +683,7 @@ Engineers reads modestly
 high here, consistent with ground-parallel side-force inclinations on a surface
 with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
 [Force Equilibrium Methods](force_eq.md)). This benchmark also appears on the
-[Verification](../verification.md#limit-equilibrium) page.
+[Verification](../verification/lem.md) page.
 
 **Sources:** GeoStudio [SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
 sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
@@ -728,7 +728,7 @@ Results for all six methods (automated critical-circle search, 50 slices):
 | Morgenstern-Price | 1.400 | 1.451 | -3.5% |
 
 This benchmark also appears on the
-[Verification](../verification.md#limit-equilibrium) page.
+[Verification](../verification/lem.md) page.
 
 **Source:** Arai, K. & Tagyo, K. (1985). Determination of noncircular slip
 surface giving the minimum factor of safety in slope stability analysis.

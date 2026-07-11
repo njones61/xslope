@@ -1109,14 +1109,25 @@ def main():
         lem_design = Path('docs/lem/design.md')
         if lem_design.exists():
             tests.extend(parse_test_tags(lem_design))
-        # Rocscience Slide2 verification corpus (docs/verification.md table)
-        verification_md = Path('docs/verification.md')
-        if verification_md.exists():
-            tests.extend(parse_test_tags(verification_md))
+
     if run_fem:
         fem_samples = Path('docs/fem/samples.md')
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
+    # Verification corpus pages (docs/verification/*.md): tags are routed by
+    # type so LEM, SSRM, and seepage assertions can live on the same page.
+    for verification_md in sorted(Path('docs/verification').glob('*.md')):
+        for t in parse_test_tags(verification_md):
+            ttype = t.get('type', '')
+            if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
+                if run_fem:
+                    tests.append(t)
+            elif ttype in ('seep', 'seep_elements'):
+                if run_seep:
+                    tests.append(t)
+            elif run_lem:
+                tests.append(t)
+
     if run_seep:
         # Fast, file-less unit check for the van Genuchten kr function + dispatch.
         tests.append({'type': 'vg_kr', 'file': 'kr_vg_vec (unit)', 'method': '-',

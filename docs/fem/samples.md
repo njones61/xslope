@@ -282,7 +282,7 @@ contribution directly.
 The remaining problems are **verification benchmarks**: published or
 analytically-anchored cases used to validate the FEM-SSRM implementation.
 Each is locked into the automated regression suite. See also the
-[Verification](../verification.md) page.
+[Verification](../verification/index.md) page.
 
 ### 5. Verification: Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
 
@@ -332,7 +332,7 @@ order of magnitude by F = 1.6.
 ![griffiths1_sweep.png](images/griffiths1_sweep.png){width=700}
 
 This benchmark also appears on the
-[Verification](../verification.md#finite-element-slope-stability-ssrm) page.
+[Verification](../verification/ssrm.md) page.
 
 <!-- test: file=files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-1 -->
 <!-- Element-type coverage: SSRM on each quadratic type (tri6, quad8, quad9). Slower (SSRM x3), so benchmark-gated. -->
@@ -404,7 +404,7 @@ the default non-convergence criterion. The agreement with limit equilibrium is
 striking: XSLOPE's own Spencer analysis of the same section gives 1.915 (vs the
 paper's limit-equilibrium 1.90), with the same downstream critical surface, and
 the relative reservoir effect matches the paper (wet/dry = 0.78 vs 0.79). See
-the [Verification](../verification.md#finite-element-slope-stability-ssrm) page.
+the [Verification](../verification/ssrm.md) page.
 
 <!-- test: file=files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
 <!-- test: file=files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.91, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=4000, benchmark=SSRM-2 -->

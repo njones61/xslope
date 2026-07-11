@@ -120,7 +120,7 @@ Identical-mesh comparison over all 2,604 nodes:
 The largest local head difference (~2 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in
 detail; the bulk flow field agrees to about 0.1 ft. See the
-[Verification](../verification.md#finite-element-seepage) page.
+[Verification](../verification/seep.md) page.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.958, tolerance=0.05, benchmark=SEEP-2 -->
 
@@ -190,7 +190,7 @@ Solution:
 
 The remaining problems are **verification benchmarks**: analytically-anchored
 cases used to validate the seepage implementation. Each is locked into the
-automated regression suite. See also the [Verification](../verification.md) page.
+automated regression suite. See also the [Verification](../verification/index.md) page.
 
 ### 8. Verification: Confined Radial Flow {#verification-confined-radial}
 
@@ -220,7 +220,7 @@ Results against the exact solution:
 The result is mesh-converged (identical at 2k and 6k nodes; quad8 gives the
 same value), and tri3 linear elements agree to +0.01%. The only error source
 is faceting of the curved arcs by the polygon boundary. See the
-[Verification](../verification.md#finite-element-seepage) page.
+[Verification](../verification/seep.md) page.
 
 **Source:** standard exact solution of Laplace's equation in polar coordinates
 (e.g. Bear, *Dynamics of Fluids in Porous Media*).
@@ -262,7 +262,7 @@ exact solution that the FE solution reproduces to four decimals. The
 Pavlovsky form factor itself was additionally confirmed by an independent
 finite-difference solution of the same boundary-value problem (~0.4-0.5%
 agreement at three penetration ratios). See the
-[Verification](../verification.md#finite-element-seepage) page.
+[Verification](../verification/seep.md) page.
 
 **Sources:** Harr, M.E. (1962), *Groundwater and Seepage*, McGraw-Hill;
 Polubarinova-Kochina, P.Ya. (1962), *Theory of Ground Water Movement*,

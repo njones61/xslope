@@ -350,7 +350,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
 | 61 | Slope, homogenous, composite surfaces | planned |  |
 | 62 | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
-| 63 | Slope, (3) materials, seismic | planned |  |
+| 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (kc=0.155, Spencer should be 1.0; Slide path search 0.991). Properties extracted; the Slide geometry figure is unlabeled — needs the layer coordinates from the Loukidis paper. |
 | 64 | Embankment, (4) materials, water table, tension crack | planned |  |
 | 65 | Embankment, (4) materials, water table, ponded water | planned |  |
 | 66 | Embankment, (4) materials, water table, ponded water | planned |  |

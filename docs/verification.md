@@ -280,6 +280,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
 <!-- test: file=files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
 <!-- test: file=files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
+<!-- test: file=files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
 <!-- test: file=files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
 <!-- test: file=files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
@@ -381,8 +382,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 92 | Retaining wall, (3) materials, geotextile | planned |  |
 | 93 | Retaining wall, (3) materials, distributed load, geotextile | planned |  |
 | 94 | Retaining wall, (3) materials, geotextile | planned |  |
-| 95 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
-| 96 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 95 | Embankment dam, homogenous, rapid drawdown, water table | partial | USACE EM 1110-2-1902 App. G example with the **Corps 1970 2-stage** method (Slide 1.347, USACE 1.35). XSLOPE implements the Duncan-Wright-Wong 3-stage procedure (see #96, same model file) — the 2-stage variant would be a new option. |
+| 96 | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example (Figure G-5: 3:1 / 2.5:1 face, pool 103→24, Kc=1 envelope d=1379 psf ψ=18.2°), specified circle (169.5, 210, R=210), Duncan-Wright-Wong 3-stage: Spencer 1.434 / Bishop 1.432 vs Slide 1.443 and USACE 1.44 (Modified Swedish). First corpus problem through the rapid-drawdown pipeline. |
 | 97 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
 | 98 | Embankment dam, (5) materials, rapid drawdown, water table | planned |  |
 | 99 | Embankment dam, (3) materials, rapid drawdown, water table | planned |  |

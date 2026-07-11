@@ -742,7 +742,41 @@ def vp062b():
     return 'vp062b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086]
+def vp096():
+    """Slide #96 / USACE EM 1110-2-1902 (2003) Appendix G example: 3:1 then
+    2.5:1 embankment face, max pool el. 103 drawn down to 24, specified
+    circle (169.5, 210, R=210). Material: c'=0, phi'=30, gamma=135 pcf with
+    the Kc=1 envelope d=1379 psf, psi=18.2 deg (Figure G-5). Duncan-Wright-
+    Wong 3-stage: Slide 1.443, USACE reference 1.44. (Slide's #95 runs the
+    same model with the older Corps 2-stage method: 1.347.)"""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='embankment', c=0.0, phi=30.0, gamma=135.0, option='mc',
+             u='piezo', d=1379.0, psi=18.2)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (222.0, 74.0), (312.0, 110.0), (380.0, 110.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circles'] = [{'Xo': 169.5, 'Yo': 210.0, 'Depth': 0.0, 'R': 210.0}]
+    sd['piezo_line'] = [(0.0, 103.0), (380.0, 103.0)]
+    sd['piezo_line2'] = [(0.0, 24.0), (380.0, 24.0)]
+    gw = 62.4
+    # ponded water on the submerged face, stage 1 (pool 103) and stage 2 (24)
+    sd['dloads'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 103.0},
+        {'X': 222.0, 'Y': 74.0, 'Normal': gw * 29.0},
+        {'X': 294.5, 'Y': 103.0, 'Normal': 0.0},
+    ]]
+    sd['dloads2'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 24.0},
+        {'X': 72.0, 'Y': 24.0, 'Normal': 0.0},
+    ]]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp096.xlsx'))
+    return 'vp096.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

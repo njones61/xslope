@@ -351,7 +351,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
 | 61 | Slope, homogenous, composite surfaces | planned |  |
 | 62 | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
-| 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (kc=0.155, Spencer should be 1.0; Slide path search 0.991). Properties extracted; the Slide geometry figure is unlabeled — needs the layer coordinates from the Loukidis paper. |
+| 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (paper now in `ref_docs_lim_eq/`). Outline fully pinned from the paper's Fig. 9 (bench el 20 to x=20, 2:1 to (60,40), 8 m bench, 2.5:1 to (105.5,55), crest to 150); interfaces are 22:1 but their face anchors are not dimensioned and FS=1.0-calibration attempts with plausible anchors give 1.17-1.21 — the paper's Fig. 10 profile also appears inconsistent with Fig. 9's mesh. Needs a closer read of the paper (or the SLOPE/W .gsz) before building. |
 | 64 | Embankment, (4) materials, water table, tension crack | planned |  |
 | 65 | Embankment, (4) materials, water table, ponded water | planned |  |
 | 66 | Embankment, (4) materials, water table, ponded water | planned |  |
@@ -453,7 +453,7 @@ solution, so those columns are compared via the correction factor where noted.
 | 2.36 | Pockoski & Duncan – Reinforcement | partial | Same. |
 | 2.37 | Pockoski & Duncan – Soil Nails | partial | Same. |
 | 2.38 | Loukidis – Seismic Coefficient | **built** | [vp062a/b.xlsx](files/rocscience/vp062a.xlsx) (Rocscience #62): Spencer 1.001 (both cases) vs SLOPE/W 1.00 — exact. |
-| 2.39 | Loukidis – Seismic Coefficient #2 | partial | Same as Rocscience #63: geometry unlabeled in both manuals — needs Loukidis et al. (2003). |
+| 2.39 | Loukidis – Seismic Coefficient #2 | partial | See Rocscience #63 — outline pinned from the paper, interface anchors still ambiguous. |
 | 2.40 | Rapid Drawdown – Walter Bouldin Dam | planned | Drawdown case history (candidate for the rapid-drawdown pipeline). |
 | 2.41 | Rapid Drawdown – USACE Benchmark | **built** | [vp096.xlsx](files/rocscience/vp096.xlsx) (Rocscience #96): 3-stage Spencer 1.434 / Bishop 1.432 vs published 1.44. |
 | 2.42 | Rapid Drawdown – Pumped Storage Dam | planned | Drawdown case history. |

@@ -12,17 +12,17 @@ solution, so those columns are compared via the correction factor where noted.
 
 | § | Problem | Status | XSLOPE file / results vs SLOPE/W |
 |---:|---|---|---|
-| 2.1 | ACADS Simple Slope | covered | `xslope_acads_simple.xlsx` (LEM sample 12): Bishop 0.985 vs SLOPE/W 0.963, Slide 0.987; ACADS reference 1.00. |
+| 2.1 | ACADS Simple Slope | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx): Bishop 0.985 vs SLOPE/W 0.963, Slide 0.987; ACADS reference 1.00. — [details](rocscience.md#vp1) |
 | 2.2 | ACADS Tension Crack | **built** | [vp002.xlsx](../files/rocscience/vp002.xlsx): Bishop 1.589 / M-P 1.586 vs SLOPE/W 1.664 / 1.660 and Slide 1.596 / 1.592; ACADS reference 1.65-1.70. SLOPE/W sits closer to the ACADS band; the difference is tension-crack water handling and search. — [details](rocscience.md#vp2) |
 | 2.3 | ACADS Non-Homogeneous | **built** | [vp003.xlsx](../files/rocscience/vp003.xlsx): Bishop 1.403 / M-P 1.371 vs SLOPE/W 1.414 / 1.382; ACADS 1.39. — [details](rocscience.md#vp3) |
 | 2.4 | ACADS Non-Homogeneous + Seismic | **built** | [vp004.xlsx](../files/rocscience/vp004.xlsx): Bishop 1.013 / M-P 0.987 vs SLOPE/W 1.02 / 0.989; ACADS 1.00. — [details](rocscience.md#vp4) |
 | 2.5 | ACADS Talbingo Dam – Dry | **built** | [vp005.xlsx](../files/rocscience/vp005.xlsx): 1.955 (all methods, infinite-slope mechanism) vs SLOPE/W 1.951. — [details](rocscience.md#vp5) |
 | 2.6 | ACADS Talbingo – Specified Surface | **built** | [vp006.xlsx](../files/rocscience/vp006.xlsx): Bishop 2.206 / M-P 2.299 vs SLOPE/W 2.207 / 2.299 — exact. The problem that exposed the folded-zone weight bug. — [details](rocscience.md#vp6) |
-| 2.7 | ACADS Weak Layer | covered | `xslope_acads_weak_layer.xlsx` (LEM sample 13): Spencer 1.258 / M-P 1.248 vs SLOPE/W Bishop 1.269 / M-P 1.261. |
+| 2.7 | ACADS Weak Layer | **built** | [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx): Spencer 1.258 / M-P 1.248 vs SLOPE/W Bishop 1.269 / M-P 1.261 — [details](#acads-weak-layer). |
 | 2.8 | ACADS Weak Layer – Specified Surface | **built** | [vp008.xlsx](../files/rocscience/vp008.xlsx): M-P 1.260 vs SLOPE/W 1.261 — exact; Janbu(corr) 1.294 vs SLOPE/W force 1.197 (×fo ≈ 1.29). — [details](rocscience.md#vp8) |
 | 2.9 | ACADS External Loading | **built** | [vp009.xlsx](../files/rocscience/vp009.xlsx): Spencer 0.724 / Janbu(corr) 0.718 vs SLOPE/W Bishop 0.699 / M-P 0.689 — search-sensitive problem, published spread 0.67-0.81. — [details](rocscience.md#vp9) |
 | 2.10 | Lanester Embankment | planned | GS-only problem; figure to be assessed. |
-| 2.11 | Arai & Tagyo Homogeneous | covered | `xslope_arai_tagyo.xlsx` (LEM sample 14) vs SLOPE/W Bishop 1.417 / M-P 1.414; A&T 1.451. |
+| 2.11 | Arai & Tagyo Homogeneous | **built** | [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx) vs SLOPE/W Bishop 1.417 / M-P 1.414; A&T 1.451. — [details](rocscience.md#vp14) |
 | 2.12 | Arai & Tagyo Pore-Water Pressure | **built** | [vp016.xlsx](../files/rocscience/vp016.xlsx): Bishop 1.112 vs Slide 1.118, A&T 1.138 — SLOPE/W reports 1.190, the outlier of the four sources. — [details](rocscience.md#vp16) |
 | 2.13 | Greco Layered Slope | **built** | [vp019.xlsx](../files/rocscience/vp019.xlsx): circular Spencer 1.429 vs SLOPE/W M-P 1.389, Greco 1.40-1.42. — [details](rocscience.md#vp19) |
 | 2.14 | Greco Weak Layer | **built** | [vp020.xlsx](../files/rocscience/vp020.xlsx): noncircular Spencer 1.082, circular 1.091 vs SLOPE/W Spencer 1.054, Greco 1.08. — [details](rocscience.md#vp20) |
@@ -59,3 +59,67 @@ solution, so those columns are compared via the correction factor where noted.
 | 2.45 | Eurocode 7 – Cutting in Clay | planned | Partial-factor design check. |
 | 2.46 | Eurocode 7 – Earth Dam | planned | Partial-factor design check. |
 | 2.47 | Compound Strength vs Anisotropic Function | planned | Anisotropic-strength comparison (feature assessment needed). |
+
+## Problem details
+
+### ACADS weak-layer slope (non-circular) {#acads-weak-layer}
+
+The ACADS weak-layer case
+([SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
+sec. 2.7): a 2:1 slope
+crossed by a thin low-strength interlayer with a piezometric line at its base.
+The critical surface is non-circular, sliding along the weak layer with a back
+scarp to the crest — this is the non-circular search verification test. The
+ACADS accepted band is FOS ≈ 1.26.
+
+| Property | Soil 1 | Weak layer |
+|---|---|---|
+| Cohesion, $c'$ (kPa) | 28.5 | 0 |
+| Friction angle, $\phi'$ | 20° | 10° |
+| Unit weight, $\gamma$ (kN/m³) | 18.84 | 18.84 |
+
+Excel input file: [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx)
+
+![acads_weak_layer_inputs.png](../lem/images/acads_weak_layer_inputs.png){width=900}
+
+Critical non-circular surface (Spencer's method shown):
+
+![acads_weak_layer_solution.png](../lem/images/acads_weak_layer_solution.png){width=900}
+
+Results for the methods applicable to non-circular surfaces:
+
+| Method | XSLOPE FOS | Reference | Diff |
+|---|---|---|---|
+| Spencer | 1.258 | ~1.26 | −0.2% |
+| Morgenstern-Price | 1.248 | ~1.26 | −1.0% |
+| Corps of Engineers | 1.336 | ~1.26 | +6.0% |
+| Lowe & Karafiath | 1.249 | ~1.26 | −0.9% |
+| Simplified Janbu | 1.278 | ~1.26 | +1.4% |
+
+The two interior surface points are seeded just above the base of the weak
+layer (base $y=26.5$, top $y=27.0$). Because the non-circular search moves
+``Horiz`` points horizontally only, that seed elevation *is* the sliding plane:
+placing it near the base of a weak interlayer is standard practice and matches
+the reference, whereas seeding it at the layer center biases the factor of
+safety roughly 1.5% high. With the base placement, XSLOPE's complete-equilibrium
+methods land within ~1% of SLOPE/W's Morgenstern-Price value (1.261): Spencer at
+1.258 (−0.2%) and Morgenstern-Price (half-sine) at 1.248 (−1.0%). Corps of
+Engineers reads modestly
+high here, consistent with ground-parallel side-force inclinations on a surface
+with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
+[Force Equilibrium Methods](../lem/force_eq.md)). This benchmark also appears on the
+[Verification](../verification/lem.md) page.
+
+**Sources:** GeoStudio [SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| — | — | 1.278 | 1.336 | 1.249 | 1.258 | 1.248 |
+<!-- /fs-table -->
+
+<!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=noncircular_search, num_slices=50, fs_janbu=1.278, fs_corps=1.336, fs_lowe=1.249, fs_spencer=1.258, fs_mprice=1.248, benchmark=LEM-2 -->
+

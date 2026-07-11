@@ -69,7 +69,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
-| 1 | Slope, homogenous | covered | [LEM sample 12](../lem/samples.md#verification-acads-simple) (`xslope_acads_simple.xlsx`); ACADS table above. Bishop 0.985 vs Slide 0.987. |
+| [1](#vp1) | Slope, homogenous | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx). ACADS 1(a): seven-method comparison vs the ACADS consensus 1.00; Bishop 0.985 vs Slide 0.987. |
 | [2](#vp2) | Slope, homogenous, tension crack | **built** | [vp002.xlsx](../files/rocscience/vp002.xlsx). Bishop 1.589 / Spencer 1.585 / Janbu(corr) 1.495 / M-P 1.586 vs Slide 1.596 / 1.592 / 1.489 / 1.592 (±0.4%); Giam reference 1.65. |
 | [3](#vp3) | Slope, (3) materials | **built** | [vp003.xlsx](../files/rocscience/vp003.xlsx). Bishop 1.403 / Spencer 1.372 / Janbu(corr) 1.354 / M-P 1.371 vs Slide 1.405 / 1.375 / 1.357 / 1.374 (±0.3%); ACADS reference 1.39. Interface coordinates read from the labeled GeoStudio verification-manual figure of the same ACADS 1(c) problem. |
 | [4](#vp4) | Slope, (3) materials, seismic | **built** | [vp004.xlsx](../files/rocscience/vp004.xlsx). Problem #3 + k=0.15g. Bishop 1.013 / Spencer 0.989 / Janbu(corr) 0.963 / M-P 0.987 vs Slide 1.016 / 0.991 / 0.965 / 0.989 (±0.3%); ACADS reference 1.00. |
@@ -82,7 +82,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 11 | Embankment, (2) materials, pore pressure grid | planned |  |
 | 12 | Embankment, (4) materials, tension crack, pore pressure grid | planned |  |
 | 13 | Embankment, (3) materials, pore pressure grid | planned |  |
-| 14 | Slope, homogenous | covered | Arai & Tagyo (1985) ex. 1 — [LEM sample 14](../lem/samples.md#verification-arai-tagyo) (`xslope_arai_tagyo.xlsx`); Bishop ref 1.451, Janbu 1.265 |
+| [14](#vp14) | Slope, homogenous | **built** | [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx). Arai & Tagyo (1985) ex. 1: seven-method comparison; Bishop 1.404 vs published 1.451. |
 | [15](#vp15) | Slope, (3) materials, weak layer | **built** | [vp015.xlsx](../files/rocscience/vp015.xlsx). Arai & Tagyo (1985) ex. 2, weak middle band. Circular search: Bishop 0.419 / Spencer 0.422 / Janbu(corr) 0.436 / M-P 0.420 vs Slide 0.420 / 0.409 / 0.423 / (GLE) 0.437; A&T Bishop 0.417; Kim et al. 0.43. |
 | [16](#vp16) | Slope, homogenous, water table | **built** | [vp016.xlsx](../files/rocscience/vp016.xlsx). Arai & Tagyo (1985) ex. 3, piezometric line. Circular search: Bishop 1.112 / Spencer 1.113 / Janbu(corr) 1.122 / M-P 1.111 vs Slide 1.118 / 1.118 / 1.131; A&T Bishop 1.138. |
 | [17](#vp17) | Slope, homogenous | **built** | [vp017.xlsx](../files/rocscience/vp017.xlsx). Yamagami & Ueta (1988). Circular search: Ordinary 1.274 / Bishop 1.342 / Spencer 1.340 vs Slide 1.278 / 1.344 and Y&U 1.282 / 1.348; published non-circular Spencer 1.325-1.339 (our local non-circular search reaches 1.394 — same search-power note as #19/#20). |
@@ -111,7 +111,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 40 | Slope, homogenous, sensitivity analysis | planned |  |
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
 | 42 | Dam, (3) materials, water table, ponded water, tension crack | partial | Baker & Leshchinsky (2001) safety-map dam. Geometry and core polygon fully labeled (extracted); reservoir level 30 on the right face; Slide Spencer 1.925 circular / 1.877 non-circular, Baker 1.91. Blocked on the internal phreatic-line coordinates through the core (drawn but unlabeled) — needs the B&L paper. |
-| 43 | Slope, homogenous, planar surface, RocPlane comparison | planned |  |
+| 43 | Slope, homogenous, planar surface, RocPlane comparison | partial | [vp043.xlsx](../files/rocscience/vp043.xlsx) built from the printed table (c'=30, φ'=30, γ=20, labeled geometry). xslope Janbu = hand Culmann exactly (1.429 vs 1.430 at 49.5°), but Slide/RocPlane/Baker all report ≈1.35 — reproducible only with different inputs (γ≈21.8 or c'≈27.5), so the manual's property table appears not to be what was run. Needs Baker (2001) [same blocked source as #42] to resolve before tagging. |
 | [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](../files/rocscience/vp044a.xlsx) (power curve), [vp044b.xlsx](../files/rocscience/vp044b.xlsx) (Mohr-Coulomb), [vp044c.xlsx](../files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: 43° face, H=6. Spencer: power 0.958 vs Slide 0.960 / Baker 0.97; MC 1.518 vs Slide 1.536 / Baker 1.50; LLA 0.980 vs Slide 0.981. Baker's paper resolved the MC row (c'=11.64, φ'=24.7 — Table I it. 0) and γ=18. |
 | [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](../files/rocscience/vp045a.xlsx) (Mohr-Coulomb), [vp045b.xlsx](../files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: linear vs non-linear envelope on the same 4:1 slope. Spencer: MC 2.801 vs Slide 2.794; power curve 2.649 vs Slide 2.662. (Slide's Janbu values are simplified/uncorrected; ours carry the fo correction and agree once scaled.) |
 | 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | partial | Baker (1993) three-stage dam (dry / steady-state seep / rapid drawdown). The manual itself calls this a validation problem: permeabilities were estimated by Rocscience and the stage-3 undrained strengths live in discrete .fn6 functions. Stage 1 (dry, Spencer 2.534 / Baker 2.41 / theory 2.5) buildable once Figure 46.1 coordinates are read; stages 2-3 map onto xslope's seep + rapid-drawdown pipeline but need those source functions. |
@@ -187,6 +187,63 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 
 Each built problem below shows the XSLOPE inputs (with coordinate labels) beside a representative solved surface. The build scripts live in `benchmarks/rocscience/build_problems.py`; the figures are regenerated by `benchmarks/rocscience/make_figures.py`.
 
+### VP1: Slope, homogeneous (ACADS 1(a)) {#vp1}
+
+This is the headline limit-equilibrium verification benchmark, from the ACADS
+slope stability program review (Donald & Giam, 1989; Giam & Donald, 1992), as
+documented in the [GeoStudio SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf). A simple
+homogeneous slope analyzed with a circular search; the ACADS consensus answer
+is FOS ≈ 1.00, making percent differences easy to read.
+
+| Property | Value |
+|---|---|
+| Slope | 2:1, 10 m high, with a bench |
+| Cohesion, $c'$ | 3.0 kPa |
+| Friction angle, $\phi'$ | 19.6° |
+| Unit weight, $\gamma$ | 20.0 kN/m³ |
+| Pore pressure | none (total stress) |
+
+Excel input file: [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx)
+
+![acads_simple_inputs.png](../lem/images/acads_simple_inputs.png){width=900}
+
+Critical circle from the automated search (Spencer's method shown):
+
+![acads_simple_solution.png](../lem/images/acads_simple_solution.png){width=900}
+
+XSLOPE results for all six methods (automated critical-circle search, 50
+slices, each method searched independently):
+
+| Method | XSLOPE FOS | Reference | Diff |
+|---|---|---|---|
+| Ordinary (OMS) | 0.942 | 1.00 | -5.8% |
+| Bishop's Simplified | 0.985 | 1.00 | -1.5% |
+| Simplified Janbu | 0.986 | 1.00 | -1.4% |
+| Corps of Engineers | 0.990 | 1.00 | -1.0% |
+| Lowe & Karafiath | 0.987 | 1.00 | -1.3% |
+| Spencer | 0.984 | 1.00 | -1.6% |
+| Morgenstern-Price | 0.984 | 1.00 | -1.6% |
+
+All rigorous methods fall within the ACADS accepted band; OMS reads low, as
+expected for the legacy method (its conservative bias on this class of problem
+is why it is reported for completeness only). This benchmark also appears on
+the [Verification](../verification/lem.md) page.
+
+**Sources:** Donald, I.B. & Giam, P. (1989), *Soil slope stability programs
+review*, ACADS, Melbourne; Giam, P. & Donald, I.B. (1992); GeoStudio
+[SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+ACADS suite.
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.942 | 0.985 | 0.986 | 0.990 | 0.987 | 0.984 | 0.984 |
+<!-- /fs-table -->
+
+<!-- test: file=../lem/files/xslope_acads_simple.xlsx, type=circular_search, num_slices=50, fs_oms=0.942, fs_bishop=0.985, fs_janbu=0.986, fs_corps=0.990, fs_lowe=0.987, fs_spencer=0.984, fs_mprice=0.984, benchmark=LEM-1 -->
+
 ### VP2: Slope, homogenous, tension crack {#vp2}
 
 ACADS 1(b) (Giam & Donald 1989): the 1(a) slope with c'=32, phi'=10, gamma=20 and a water-filled tension crack of depth 2c/(gamma*sqrt(ka)) [Craig 1997]. Slide2: Bishop 1.596, Spencer 1.592, Janbu corrected 1.489, GLE 1.592; Giam reference 1.65.
@@ -203,6 +260,7 @@ ACADS 1(b) (Giam & Donald 1989): the 1(a) slope with c'=32, phi'=10, gamma=20 an
 *ACADS reference band 1.65–1.70 (Giam & Donald).*
 
 ![vp002: inputs and representative solution](images/vp002.png)
+
 
 ### VP3: Slope, (3) materials {#vp3}
 
@@ -303,6 +361,55 @@ ACADS 4 (Slide #9): weak-layer slope + piezometric surface (Table 9.3) + two sur
 
 ![vp009: inputs and representative solution](images/vp009.png)
 
+### VP14: Slope, homogeneous (Arai & Tagyo ex. 1) {#vp14}
+
+From [Arai & Tagyo (1985)](https://doi.org/10.3208/sandf1972.25.43), *Soils
+and Foundations* 25(1), and republished by Greco (1996), Malkawi et al.
+(2001), and Kim et al. (2002); also
+[SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
+sec. 2.11. A homogeneous 1.5:1 slope, 20 m high, with
+c = 41.65 kPa, φ = 15.0°, γ = 18.82 kN/m³ (total stress). Published FOS ≈ 1.451.
+
+Excel input file: [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)
+
+![arai_tagyo_inputs.png](../lem/images/arai_tagyo_inputs.png){width=900}
+
+Critical circle (Spencer's method shown):
+
+![arai_tagyo_solution.png](../lem/images/arai_tagyo_solution.png){width=900}
+
+Results for all six methods (automated critical-circle search, 50 slices):
+
+| Method | XSLOPE FOS | Reference | Diff |
+|---|---|---|---|
+| Ordinary (OMS) | 1.344 | 1.451 | -7.4% |
+| Bishop's Simplified | 1.404 | 1.451 | -3.2% |
+| Simplified Janbu | 1.411 | 1.451 | -2.8% |
+| Corps of Engineers | 1.476 | 1.451 | +1.7% |
+| Lowe & Karafiath | 1.438 | 1.451 | -0.9% |
+| Spencer | 1.401 | 1.451 | -3.4% |
+| Morgenstern-Price | 1.400 | 1.451 | -3.5% |
+
+This benchmark also appears on the
+[Verification](../verification/lem.md) page.
+
+**Source:** Arai, K. & Tagyo, K. (1985). Determination of noncircular slip
+surface giving the minimum factor of safety in slope stability analysis.
+*Soils and Foundations* 25(1):43-51.
+[doi:10.3208/sandf1972.25.43](https://doi.org/10.3208/sandf1972.25.43).
+Republished in Greco (1996), Malkawi et al. (2001), and Kim et al. (2002);
+also SLOPE/W Verification Manual sec. 2.11.
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.344 | 1.404 | 1.411 | 1.476 | 1.438 | 1.401 | 1.400 |
+<!-- /fs-table -->
+
+<!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=circular_search, num_slices=50, fs_oms=1.344, fs_bishop=1.404, fs_janbu=1.411, fs_corps=1.476, fs_lowe=1.438, fs_spencer=1.401, fs_mprice=1.400, benchmark=LEM-2b -->
+
 ### VP15: Slope, (3) materials, weak layer {#vp15}
 
 Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak (c=9.8, phi=5) middle band, no water. Circular search. Slide2 (auto refine): Bishop 0.420, Spencer 0.409, GLE 0.437, Janbu corrected 0.423; A&T Bishop 0.417; Kim et al. 0.43.
@@ -319,6 +426,7 @@ Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak (c=9.8, phi=
 *Kim et al. (2002) 0.43.*
 
 ![vp015: inputs and representative solution](images/vp015.png)
+
 
 ### VP16: Slope, homogenous, water table {#vp16}
 

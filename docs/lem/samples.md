@@ -1,5 +1,8 @@
 # Sample Problems - Limit Equilibrium Method
 
+> **Verification benchmarks** (ACADS, Arai & Tagyo, and the vendor-manual corpora) are documented in the [Verification and Validation](../verification/index.md) section — see the [LEM page](../verification/lem.md).
+
+
 The following examples illustrate how to use XSLOPE to perform limit equilibrium slope stability analysis. Each of the Excel input files below can be uploaded and used with the following Google Colab notebook which has been set up specifically for running slope stability analyses:
 
 <a href="https://colab.research.google.com/github/njones61/xslope/blob/main/notebooks/xslope_lem.ipynb" target="_"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
@@ -580,174 +583,7 @@ The remaining problems are **verification benchmarks**: published cases used to
 validate the limit-equilibrium implementation. Each is locked into the
 automated regression suite. See also the [Verification](../verification/index.md) page.
 
-### 12. Verification: ACADS Simple Homogeneous Slope {#verification-acads-simple}
-
-This is the headline limit-equilibrium verification benchmark, from the ACADS
-slope stability program review (Donald & Giam, 1989; Giam & Donald, 1992), as
-documented in the [GeoStudio SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf). A simple
-homogeneous slope analyzed with a circular search; the ACADS consensus answer
-is FOS ≈ 1.00, making percent differences easy to read.
-
-| Property | Value |
-|---|---|
-| Slope | 2:1, 10 m high, with a bench |
-| Cohesion, $c'$ | 3.0 kPa |
-| Friction angle, $\phi'$ | 19.6° |
-| Unit weight, $\gamma$ | 20.0 kN/m³ |
-| Pore pressure | none (total stress) |
-
-Excel input file: [xslope_acads_simple.xlsx](files/xslope_acads_simple.xlsx)
-
-![acads_simple_inputs.png](images/acads_simple_inputs.png){width=900}
-
-Critical circle from the automated search (Spencer's method shown):
-
-![acads_simple_solution.png](images/acads_simple_solution.png){width=900}
-
-XSLOPE results for all six methods (automated critical-circle search, 50
-slices, each method searched independently):
-
-| Method | XSLOPE FOS | Reference | Diff |
-|---|---|---|---|
-| Ordinary (OMS) | 0.942 | 1.00 | -5.8% |
-| Bishop's Simplified | 0.985 | 1.00 | -1.5% |
-| Simplified Janbu | 0.986 | 1.00 | -1.4% |
-| Corps of Engineers | 0.990 | 1.00 | -1.0% |
-| Lowe & Karafiath | 0.987 | 1.00 | -1.3% |
-| Spencer | 0.984 | 1.00 | -1.6% |
-| Morgenstern-Price | 0.984 | 1.00 | -1.6% |
-
-All rigorous methods fall within the ACADS accepted band; OMS reads low, as
-expected for the legacy method (its conservative bias on this class of problem
-is why it is reported for completeness only). This benchmark also appears on
-the [Verification](../verification/lem.md) page.
-
-**Sources:** Donald, I.B. & Giam, P. (1989), *Soil slope stability programs
-review*, ACADS, Melbourne; Giam, P. & Donald, I.B. (1992); GeoStudio
-[SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
-ACADS suite.
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 0.942 | 0.985 | 0.986 | 0.990 | 0.987 | 0.984 | 0.984 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_acads_simple.xlsx, type=circular_search, num_slices=50, fs_oms=0.942, fs_bishop=0.985, fs_janbu=0.986, fs_corps=0.990, fs_lowe=0.987, fs_spencer=0.984, fs_mprice=0.984, benchmark=LEM-1 -->
-
-### 13. Verification: ACADS Weak-Layer Slope (Non-Circular) {#verification-acads-weak-layer}
-
-The ACADS weak-layer case
-([SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
-sec. 2.7): a 2:1 slope
-crossed by a thin low-strength interlayer with a piezometric line at its base.
-The critical surface is non-circular, sliding along the weak layer with a back
-scarp to the crest — this is the non-circular search verification test. The
-ACADS accepted band is FOS ≈ 1.26.
-
-| Property | Soil 1 | Weak layer |
-|---|---|---|
-| Cohesion, $c'$ (kPa) | 28.5 | 0 |
-| Friction angle, $\phi'$ | 20° | 10° |
-| Unit weight, $\gamma$ (kN/m³) | 18.84 | 18.84 |
-
-Excel input file: [xslope_acads_weak_layer.xlsx](files/xslope_acads_weak_layer.xlsx)
-
-![acads_weak_layer_inputs.png](images/acads_weak_layer_inputs.png){width=900}
-
-Critical non-circular surface (Spencer's method shown):
-
-![acads_weak_layer_solution.png](images/acads_weak_layer_solution.png){width=900}
-
-Results for the methods applicable to non-circular surfaces:
-
-| Method | XSLOPE FOS | Reference | Diff |
-|---|---|---|---|
-| Spencer | 1.258 | ~1.26 | −0.2% |
-| Morgenstern-Price | 1.248 | ~1.26 | −1.0% |
-| Corps of Engineers | 1.336 | ~1.26 | +6.0% |
-| Lowe & Karafiath | 1.249 | ~1.26 | −0.9% |
-| Simplified Janbu | 1.278 | ~1.26 | +1.4% |
-
-The two interior surface points are seeded just above the base of the weak
-layer (base $y=26.5$, top $y=27.0$). Because the non-circular search moves
-``Horiz`` points horizontally only, that seed elevation *is* the sliding plane:
-placing it near the base of a weak interlayer is standard practice and matches
-the reference, whereas seeding it at the layer center biases the factor of
-safety roughly 1.5% high. With the base placement, XSLOPE's complete-equilibrium
-methods land within ~1% of SLOPE/W's Morgenstern-Price value (1.261): Spencer at
-1.258 (−0.2%) and Morgenstern-Price (half-sine) at 1.248 (−1.0%). Corps of
-Engineers reads modestly
-high here, consistent with ground-parallel side-force inclinations on a surface
-with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
-[Force Equilibrium Methods](force_eq.md)). This benchmark also appears on the
-[Verification](../verification/lem.md) page.
-
-**Sources:** GeoStudio [SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
-sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| — | — | 1.278 | 1.336 | 1.249 | 1.258 | 1.248 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_acads_weak_layer.xlsx, type=noncircular_search, num_slices=50, fs_janbu=1.278, fs_corps=1.336, fs_lowe=1.249, fs_spencer=1.258, fs_mprice=1.248, benchmark=LEM-2 -->
-
-### 14. Verification: Arai & Tagyo Homogeneous Slope {#verification-arai-tagyo}
-
-From [Arai & Tagyo (1985)](https://doi.org/10.3208/sandf1972.25.43), *Soils
-and Foundations* 25(1), and republished by Greco (1996), Malkawi et al.
-(2001), and Kim et al. (2002); also
-[SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
-sec. 2.11. A homogeneous 1.5:1 slope, 20 m high, with
-c = 41.65 kPa, φ = 15.0°, γ = 18.82 kN/m³ (total stress). Published FOS ≈ 1.451.
-
-Excel input file: [xslope_arai_tagyo.xlsx](files/xslope_arai_tagyo.xlsx)
-
-![arai_tagyo_inputs.png](images/arai_tagyo_inputs.png){width=900}
-
-Critical circle (Spencer's method shown):
-
-![arai_tagyo_solution.png](images/arai_tagyo_solution.png){width=900}
-
-Results for all six methods (automated critical-circle search, 50 slices):
-
-| Method | XSLOPE FOS | Reference | Diff |
-|---|---|---|---|
-| Ordinary (OMS) | 1.344 | 1.451 | -7.4% |
-| Bishop's Simplified | 1.404 | 1.451 | -3.2% |
-| Simplified Janbu | 1.411 | 1.451 | -2.8% |
-| Corps of Engineers | 1.476 | 1.451 | +1.7% |
-| Lowe & Karafiath | 1.438 | 1.451 | -0.9% |
-| Spencer | 1.401 | 1.451 | -3.4% |
-| Morgenstern-Price | 1.400 | 1.451 | -3.5% |
-
-This benchmark also appears on the
-[Verification](../verification/lem.md) page.
-
-**Source:** Arai, K. & Tagyo, K. (1985). Determination of noncircular slip
-surface giving the minimum factor of safety in slope stability analysis.
-*Soils and Foundations* 25(1):43-51.
-[doi:10.3208/sandf1972.25.43](https://doi.org/10.3208/sandf1972.25.43).
-Republished in Greco (1996), Malkawi et al. (2001), and Kim et al. (2002);
-also SLOPE/W Verification Manual sec. 2.11.
-
-<!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1.344 | 1.404 | 1.411 | 1.476 | 1.438 | 1.401 | 1.400 |
-<!-- /fs-table -->
-
-<!-- test: file=files/xslope_arai_tagyo.xlsx, type=circular_search, num_slices=50, fs_oms=1.344, fs_bishop=1.404, fs_janbu=1.411, fs_corps=1.476, fs_lowe=1.438, fs_spencer=1.401, fs_mprice=1.400, benchmark=LEM-2b -->
-
-### 15. Rapid Drawdown (Johnson Reservoir Dam)
+### 12. Rapid Drawdown (Johnson Reservoir Dam)
 
 This sample exercises XSLOPE's **rapid drawdown** capability — the three-stage
 procedure (Duncan, Wright & Brandon) for the *upstream* slope of an earth dam
@@ -799,7 +635,7 @@ above the rigorous Spencer value.
 
 <!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.355, fs_bishop=1.649, fs_janbu=1.686, fs_corps=2.119, fs_lowe=1.804, fs_spencer=1.646, fs_mprice=1.649 -->
 
-### 16. Multiple Local Minima
+### 13. Multiple Local Minima
 
 A two-layer slope — a **cohesionless embankment** ($c' = 0$, $\phi' = 30°$) over a
 **soft clay foundation** ($c = 450$ psf, $\phi = 0$) — with two competing failure
@@ -848,7 +684,7 @@ circle:
 
 <!-- test: file=files/xslope_mult_min_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.354, fs_bishop=1.434, fs_janbu=1.417, fs_corps=1.719, fs_lowe=1.524, fs_spencer=1.426, fs_mprice=1.431 -->
 
-### 17. Tension Crack
+### 14. Tension Crack
 
 A slope whose upper layer has cohesion, so an unmodified analysis produces
 non-physical **tension at the crest** (and an inverted line of thrust) that
@@ -881,7 +717,7 @@ Solution (critical surface with the tension crack, Spencer's method):
 
 <!-- test: file=files/xslope_tension_KEY.xlsx, type=circular_search, num_slices=40, fs_oms=1.413, fs_bishop=1.414, fs_janbu=1.453, fs_corps=1.673, fs_lowe=1.544, fs_spencer=1.414, fs_mprice=1.414 -->
 
-### 18. Reliability Analysis (Submerged Slope)
+### 15. Reliability Analysis (Submerged Slope)
 
 XSLOPE can run a **reliability analysis** with any of the limit equilibrium methods
 (see [Reliability Analysis](reliability.md)). Instead of a single factor of safety,
@@ -916,7 +752,7 @@ analysis summary:
 
 <!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.935, tolerance=0.03 -->
 
-### 19. Saturated vs. Moist Unit Weight (γ_sat)
+### 16. Saturated vs. Moist Unit Weight (γ_sat)
 
 **⚠ FIGURE NEEDED: add result plots for the paired models below.**
 

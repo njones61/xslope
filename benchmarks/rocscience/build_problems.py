@@ -1435,7 +1435,36 @@ def vp099():
     return 'vp099.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp043():
+    """Slide #43 / Baker (2001): planar (Culmann) failure through the toe of
+    a steep homogeneous slope ((0,0)-(3,10) face, crest to (20,10); c'=30,
+    phi'=30, gamma=20, dry). Slide Janbu simplified on the critical plane:
+    1.352 at 49.5 deg (RocPlane 1.351, Baker's Culmann 1.35; Slide circular
+    1.329). A 3-m apron is added left of the toe so the surface has ground
+    to cross. Stored surface = the 49.5-deg critical plane."""
+    import math
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Material 1', c=30.0, phi=30.0, gamma=20.0, option='mc', u='none')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-3.0, 0.0), (0.0, 0.0), (3.0, 10.0), (20.0, 10.0)]},
+    ]
+    sd['max_depth'] = -3.0
+    sd['circular'] = False
+    sd['circles'] = []
+    run = 10.0 / math.tan(math.radians(49.5))
+    sd['non_circ'] = [
+        {'X': -0.3, 'Y': 0.21, 'Movement': 'Free'},
+        {'X': 0.0, 'Y': 0.0, 'Movement': 'Free'},
+        {'X': run, 'Y': 10.0, 'Movement': 'Free'},
+        {'X': run + 0.3, 'Y': 10.21, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp043.xlsx'))
+    return 'vp043.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

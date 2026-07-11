@@ -281,6 +281,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
 <!-- test: file=files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
 <!-- test: file=files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
+<!-- test: file=files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
 <!-- test: file=files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
 <!-- test: file=files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
@@ -385,7 +386,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 94 | Retaining wall, (3) materials, geotextile | planned |  |
 | 95 | Embankment dam, homogenous, rapid drawdown, water table | partial | USACE EM 1110-2-1902 App. G example with the **Corps 1970 2-stage** method (Slide 1.347, USACE 1.35). XSLOPE implements the Duncan-Wright-Wong 3-stage procedure (see #96, same model file) — the 2-stage variant would be a new option. |
 | 96 | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example (Figure G-5: 3:1 / 2.5:1 face, pool 103→24, Kc=1 envelope d=1379 psf ψ=18.2°), specified circle (169.5, 210, R=210), Duncan-Wright-Wong 3-stage: Spencer 1.434 / Bishop 1.432 vs Slide 1.443 and USACE 1.44 (Modified Swedish). First corpus problem through the rapid-drawdown pipeline. |
-| 97 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 97 | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp097.xlsx](files/rocscience/vp097.xlsx). Pilarcitos Dam (Duncan, Wright & Wong 1990 — paper in `ref_docs_slope/`), drawdown 72→37 ft; Kc=1 envelope from D&W eqs 9.6-9.7 (d=64.1 psf, ψ=24.4°, the same equations reproduce USACE's 1379/18.2 exactly). Rapid 3-stage search: Spencer 1.044 / Bishop 1.042 vs Slide 1.043 and DWW 1.05 — the dam that actually failed in drawdown sits right at FS≈1. |
 | 98 | Embankment dam, (5) materials, rapid drawdown, water table | planned |  |
 | 99 | Embankment dam, (3) materials, rapid drawdown, water table | planned |  |
 | 100 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
@@ -457,7 +458,7 @@ solution, so those columns are compared via the correction factor where noted.
 | 2.40 | Rapid Drawdown – Walter Bouldin Dam | planned | Drawdown case history (candidate for the rapid-drawdown pipeline). |
 | 2.41 | Rapid Drawdown – USACE Benchmark | **built** | [vp096.xlsx](files/rocscience/vp096.xlsx) (Rocscience #96): 3-stage Spencer 1.434 / Bishop 1.432 vs published 1.44. |
 | 2.42 | Rapid Drawdown – Pumped Storage Dam | planned | Drawdown case history. |
-| 2.43 | Rapid Drawdown – Pilarcitos Dam | planned | Drawdown case history. |
+| 2.43 | Rapid Drawdown – Pilarcitos Dam | **built** | [vp097.xlsx](files/rocscience/vp097.xlsx) (Rocscience #97): Spencer 1.044 / Bishop 1.042. |
 | 2.44 | Probability – James Bay Case History | planned | Classic reliability case history (El-Ramly et al.) — strong candidate for the reliability pipeline. |
 | 2.45 | Eurocode 7 – Cutting in Clay | planned | Partial-factor design check. |
 | 2.46 | Eurocode 7 – Earth Dam | planned | Partial-factor design check. |

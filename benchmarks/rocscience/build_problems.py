@@ -814,7 +814,44 @@ def vp051():
     return 'vp051.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096]
+def vp097():
+    """Slide #97: Pilarcitos Dam (Duncan, Wright & Wong 1990). Homogeneous
+    earthfill, gamma=135 pcf, c'=0, phi'=45; R-envelope cR=60 psf, phiR=23.
+    Kc=1 envelope via D&W (2014) eqs 9.6-9.7: d = cR cos(phiR) cos(phi') /
+    (1-sin(phiR)) = 64.1 psf, psi = 24.4 deg (the same equations reproduce
+    the USACE App G values 1379/18.2 exactly). Drawdown 72 -> 37 ft.
+    DWW 3-stage 1.05; Slide 3-stage 1.043 (Corps 2-stage 0.823/0.82)."""
+    import math
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    cR, phiR, phi = 60.0, 23.0, 45.0
+    d = cR * math.cos(math.radians(phiR)) * math.cos(math.radians(phi)) / (1 - math.sin(math.radians(phiR)))
+    psi = math.degrees(math.atan(math.sin(math.radians(phiR)) * math.cos(math.radians(phi)) / (1 - math.sin(math.radians(phiR)))))
+    m.update(name='Pilarcitos fill', c=0.0, phi=45.0, gamma=135.0, option='mc',
+             u='piezo', d=round(d, 1), psi=round(psi, 1))
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (145.0, 58.0), (205.0, 78.0), (240.0, 78.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circles'] = [{'Xo': 90.0, 'Yo': 95.0, 'Depth': 20.0, 'R': 75.0}]
+    sd['piezo_line'] = [(0.0, 72.0), (240.0, 72.0)]
+    sd['piezo_line2'] = [(0.0, 37.0), (240.0, 37.0)]
+    gw = 62.4
+    sd['dloads'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 72.0},
+        {'X': 145.0, 'Y': 58.0, 'Normal': gw * 14.0},
+        {'X': 187.0, 'Y': 72.0, 'Normal': 0.0},
+    ]]
+    sd['dloads2'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 37.0},
+        {'X': 92.5, 'Y': 37.0, 'Normal': 0.0},
+    ]]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp097.xlsx'))
+    return 'vp097.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096, vp097]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

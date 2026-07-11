@@ -38,6 +38,10 @@ MAX_BASE_TENSION_FRAC = 0.25
 def _net_driving_too_small(df_slices):
     """True if the surface has negligible net gravitational driving force (a flat,
     non-failure surface) and should be rejected as a search candidate."""
+    # Degenerate circles (e.g. grazing a stepped wall face) can yield an empty
+    # slice table with no columns: reject those outright.
+    if df_slices is None or len(df_slices) == 0 or 'w' not in df_slices.columns:
+        return True
     W = df_slices['w'].values
     total = float(np.abs(W).sum())
     if total <= 0:

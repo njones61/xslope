@@ -942,7 +942,500 @@ def vp052b():
     return 'vp052b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096, vp097, vp100, vp101]
+def _sheahan_nail(x_head, y_head, into_x_sign, length, decl_deg, t_max, tend_head,
+                  bond, spacing, label, constant=False):
+    """One Sheahan-style soil nail: head on the wall face, embedded end
+    declined into the ground. constant=True models Sheahan's constant-tension
+    assumption (thin Clouterre tubes); otherwise the FHWA-style envelope:
+    head capacity = plate strength, tapering at the bond strength."""
+    import math
+    a = math.radians(decl_deg)
+    x2 = x_head + into_x_sign * length * math.cos(a)
+    y2 = y_head - length * math.sin(a)
+    if constant:
+        lp1 = lp2 = 0.0
+        tend1 = tend2 = 0.0
+    else:
+        lp1 = lp2 = t_max / bond   # physical anchorage length (per-nail values)
+        tend1, tend2 = tend_head, 0.0
+    # in-memory reinforcement dicts are per-unit-width (loader divides the
+    # sheet's per-element capacities by Spacing; the writer multiplies back)
+    t_max, tend1, tend2 = t_max / spacing, tend1 / spacing, tend2 / spacing
+    return {
+        'x1': x_head, 'y1': y_head, 'x2': x2, 'y2': y2,
+        't_max': t_max, 't_res': 0.0, 'lp1': lp1, 'lp2': lp2,
+        'E': float('nan'), 'area': float('nan'), 'label': label,
+        'type': 'nail', 'dir': 'axial', 'appl': 'passive',
+        'tend1': tend1, 'tend2': tend2, 'spacing': spacing,
+    }
+
+
+def vp047():
+    """Slide #47 / Sheahan & Ho (2003): Amherst test wall - 6 m vertical cut
+    in undrained clay (cu=25, gamma=18.9), two nail rows (L=4.9 m at 20 deg,
+    tensile 118 kN, plate 86 kN, bond 15 kN/m, spacing 1.5 m), 14.6 kN/m
+    shotcrete line load at the wall crest. Critical planar surface through
+    the toe: Slide Janbu 0.890 (simplified = corrected); Sheahan 0.887.
+    Nails modeled axial/passive (Slide's nail default): xslope janbu 0.899 at
+    the 44.5-deg critical plane; Sheahan's unfactored-tension assumption
+    corresponds to appl='active' and gives 0.893."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Amherst Clay', c=25.0, phi=0.0, gamma=18.9, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-6.0, 0.0), (0.0, 0.0), (0.001, 6.0), (11.0, 6.0)]},
+    ]
+    sd['max_depth'] = -2.0
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['line_loads'] = [{'x': 0.3, 'y': 6.0, 'P': 14.6, 'angle': -90.0,
+                         'label': 'shotcrete'}]
+    sd['reinforcement_lines'] = [
+        _sheahan_nail(0.001, 5.0, +1, 4.9, 20.0, 118.0, 86.0, 15.0, 1.5, 'Nail row 1'),
+        _sheahan_nail(0.001, 3.5, +1, 4.9, 20.0, 118.0, 86.0, 15.0, 1.5, 'Nail row 2'),
+    ]
+    sd['reinforce_lines'] = sd['reinforcement_lines']
+    # critical plane found by the angle sweep in verification (see docs row);
+    # stored so the tag evaluates a deterministic surface
+    # critical plane from the builder-side angle sweep: theta = 44.5 deg
+    # (44-45 deg is the theoretical critical inclination for phi = 0)
+    import math
+    run6 = 6.0 / math.tan(math.radians(44.5))
+    sd['non_circ'] = [
+        {'X': -0.3, 'Y': 0.21, 'Movement': 'Free'},
+        {'X': 0.0, 'Y': 0.0, 'Movement': 'Free'},
+        {'X': run6, 'Y': 6.0, 'Movement': 'Free'},
+        {'X': run6 + 0.3, 'Y': 6.21, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp047.xlsx'))
+    return 'vp047.xlsx'
+
+
+def vp048():
+    """Slide #48 / Sheahan & Ho (2003): Clouterre Test Wall No. 1 - 7 m cut
+    in Fontainebleau sand (c=3, phi=38, gamma=20), seven nail rows at 10 deg
+    (lengths 6/8/7.5/8/8/8/6 m from Fig. 4a; constant 15 kN tension per
+    Sheahan), 13.2 kN/m shotcrete line load. FS vs failure-plane angle
+    (45-70 deg through the toe): Slide 1.123/1.043/0.989/0.945/0.922/0.923;
+    Sheahan 1.176/1.070/0.989/0.929/0.893/0.887."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Fontainebleau Sand', c=3.0, phi=38.0, gamma=20.0, option='mc', u='none')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 8.0), (12.0, 8.0), (12.001, 1.0), (20.0, 1.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['line_loads'] = [{'x': 11.7, 'y': 8.0, 'P': 13.2, 'angle': -90.0,
+                         'label': 'shotcrete'}]
+    lengths = [6.0, 8.0, 7.5, 8.0, 8.0, 8.0, 6.0]
+    rows = []
+    for i, L in enumerate(lengths):
+        y = 7.5 - i
+        rows.append(_sheahan_nail(11.999, y, -1, L, 10.0, 15.0, 0.0, 7.5, 1.15,
+                                  f'Nail row {i+1}', constant=True))
+    sd['reinforcement_lines'] = rows
+    sd['reinforce_lines'] = rows
+    # 55-degree plane stored (the angle at which Slide and Sheahan agree)
+    import math
+    run = 7.0 / math.tan(math.radians(55.0))
+    sd['non_circ'] = [
+        {'X': 12.0 - run - 0.3, 'Y': 8.21, 'Movement': 'Free'},
+        {'X': 12.0 - run, 'Y': 8.0, 'Movement': 'Free'},
+        {'X': 12.0, 'Y': 1.0, 'Movement': 'Free'},
+        {'X': 12.3, 'Y': 1.21, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp048.xlsx'))
+    return 'vp048.xlsx'
+
+
+def _baker1_slope_data():
+    """Baker (2003) example problem 1 geometry: straight 43-degree face,
+    H = 6 m. Baker states gamma = 18 for all his example problems; the Slide
+    manual's property table prints 19.5, but both programs' results reconcile
+    only with 18 (Spencer 1.518 vs Slide 1.536 at 18; 1.459 at 19.5)."""
+    sd = load_slope_data(ACADS_1A)
+    sd['materials'] = [sd['materials'][0]]
+    sd['profile_lines'] = [{'mat_id': 0,
+                            'coords': [(-6.0, 0.0), (0.0, 0.0), (6.43, 6.0), (20.0, 6.0)]}]
+    sd['max_depth'] = -4.0
+    sd['circles'] = [{'Xo': 3.0, 'Yo': 10.0, 'Depth': -1.0, 'R': 11.0}]
+    sd['circular'] = True
+    return sd
+
+
+def vp044a():
+    """Slide #44, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's
+    compacted Israeli clays, A=0.58, n=0.86, T=0), 43-deg face, H=6.
+    Slide2: Janbu simplified 0.921, Spencer 0.960; Baker's non-linear
+    solution 0.97 (sigma_max = 8.7 kPa)."""
+    sd = _baker1_slope_data()
+    sd['materials'][0].update(name='clay (power)', c=0.0, phi=0.0, gamma=18.0,
+                              option='pow', pow_a=1.107, pow_b=0.86,
+                              pow_c=0.0, pow_d=0.0, u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp044a.xlsx'))
+    return 'vp044a.xlsx'
+
+
+def vp044b():
+    """Slide #44, Mohr-Coulomb case: the experimentally fitted M-C envelope
+    c'=11.64, phi'=24.7 (Baker Table I, iteration 0). Slide2: Janbu
+    simplified 1.469, Spencer 1.536; Baker 1.50 (sigma_max = 40.2 kPa)."""
+    sd = _baker1_slope_data()
+    sd['materials'][0].update(name='clay (MC)', c=11.64, phi=24.7, gamma=18.0,
+                              option='mc', u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp044b.xlsx'))
+    return 'vp044b.xlsx'
+
+
+def vp044c():
+    """Slide #44, local-linear-approximation case: Baker's converged LLA
+    parameters c'=0.39, phi'=38.6 (Table I, iteration 6). Slide2: Janbu
+    simplified 0.957, Spencer 0.981; Baker's converged Fs 0.97."""
+    sd = _baker1_slope_data()
+    sd['materials'][0].update(name='clay (LLA)', c=0.39, phi=38.6, gamma=18.0,
+                              option='mc', u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp044c.xlsx'))
+    return 'vp044c.xlsx'
+
+
+def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
+                        fnd=(10.0, 34.0), L=6.3, ta_of=None, water=False,
+                        surcharge=None, left_x=0.0):
+    """Leshchinsky & Han (2004) multitiered MSE wall (Slide #87-#94 family).
+
+    Baseline (Fig. 1 of the paper): three 3-m tiers offset 1.2 m, 0.3-m block
+    facing columns (c=2.5, phi=34), reinforced/retained fill c=0 phi=34,
+    foundation soil c=10 phi=34 (6 m deep), gamma=18 everywhere, domain 24 m
+    wide with the toe at x=6 (foundation top y=6, crest y=15). Geosynthetic
+    layers every 0.6 m (lowest 0.3 m above each tier base), length L from the
+    wall face, tensile strength per ta_of(layer_index_from_bottom, total).
+    Pullout resistance = 80% of fill strength on both sides (the paper's
+    assumption): anchorage lengths lp are set from the local overburden at
+    each end. Slide applies the geotextile force horizontally: dir='axial',
+    appl='passive' reproduces Slide's printed VP87 circle within 1%
+    (axial/active gives +1%; tangent orientation is 5-7% low).
+    """
+    import math as _math
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    if ta_of is None:
+        ta_of = lambda i, n: 10.0
+    sd = load_slope_data(LEVEE_POLY)
+    base = dict(sd['materials'][0])
+    mats = []
+    # the paper's hw is the water level above the FOUNDATION soil: the MSE
+    # fill and blocks drain (u=0); only the foundation carries pore pressure.
+    for name, (c, phi) in (('Reinforced and retained fill', fill),
+                           ('Foundation soil', fnd), ('Blocks', (2.5, 34.0))):
+        m = dict(base)
+        uopt = 'piezo' if (water and name == 'Foundation soil') else 'none'
+        m.update(name=name, c=c, phi=phi, gamma=18.0, option='mc', u=uopt)
+        mats.append(m)
+    sd['materials'] = mats
+    toe, ftop = 6.0, 6.0
+    H = n_tiers * tier_h
+    faces = [toe + offset * t for t in range(n_tiers)]
+    ys = [ftop + tier_h * t for t in range(n_tiers)]
+    zones = []
+    pts = [(faces[0] + 0.3, ftop), (24.0, ftop), (24.0, ftop + H),
+           (faces[-1] + 0.3, ftop + H)]
+    for t in range(n_tiers - 1, 0, -1):
+        pts += [(faces[t] + 0.3, ys[t]), (faces[t - 1] + 0.3, ys[t])]
+    zones.append((0, pts))
+    zones.append((1, [(left_x, 0.0), (24.0, 0.0), (24.0, ftop), (left_x, ftop)]))
+    for t in range(n_tiers):
+        zones.append((2, [(faces[t], ys[t]), (faces[t] + 0.3, ys[t]),
+                          (faces[t] + 0.3, ys[t] + tier_h), (faces[t], ys[t] + tier_h)]))
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
+    sd['max_depth'] = 0.0
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['piezo_line'] = []
+    sd['dloads'] = []
+    sd['line_loads'] = []
+    sd['pile_lines'] = []
+
+    def gelev(x):
+        e = ftop
+        for t in range(n_tiers):
+            if x >= faces[t]:
+                e = ys[t] + tier_h
+        return e
+
+    phi_f = _math.radians(fill[1])
+    rows = []
+    K = round(tier_h / 0.6)
+    idx = 0
+    total = n_tiers * K
+    for t in range(n_tiers):
+        for k in range(K):
+            y = ys[t] + 0.3 + 0.6 * k
+            ta = ta_of(idx, total)
+            d1 = max(ys[t] + tier_h - y, 0.3)
+            d2 = max(gelev(faces[t] + L) - y, 0.3)
+            po = 2 * 0.8 * _math.tan(phi_f) * 18.0
+            rows.append({'x1': faces[t] + 0.05, 'y1': y, 'x2': faces[t] + L, 'y2': y,
+                         't_max': ta, 't_res': 0.0,
+                         'lp1': ta / (po * d1), 'lp2': ta / (po * d2),
+                         'E': float('nan'), 'area': float('nan'),
+                         'label': f'T{t + 1}L{k + 1}', 'type': 'geosynthetic',
+                         'dir': 'axial', 'appl': 'passive',
+                         'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
+            idx += 1
+    sd['reinforcement_lines'] = rows
+    sd['reinforce_lines'] = rows
+    if water:
+        # water table 3 m above the foundation soil (hw = 3): flat piezometric
+        # line at y = 9 plus the 3-m pond standing against the lower tier
+        sd['gamma_water'] = 9.81
+        sd['piezo_line'] = [(left_x, 9.0), (24.0, 9.0)]
+        pond = 3.0 * 9.81
+        sd['dloads'] = [[{'X': left_x, 'Y': ftop, 'Normal': pond},
+                         {'X': faces[0], 'Y': ftop, 'Normal': pond},
+                         {'X': faces[0], 'Y': 9.0, 'Normal': 0.0}]]
+    if surcharge is not None:
+        # uniform surcharge on the uppermost tier's crest
+        sd['dloads'] = [[{'X': faces[-1] + 0.3, 'Y': ftop + H, 'Normal': surcharge},
+                         {'X': 24.0, 'Y': ftop + H, 'Normal': surcharge}]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': -5.713, 'Yo': 20.432, 'Depth': 20.432 - 18.547, 'R': 18.547}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp087():
+    """Slide #87 / Leshchinsky & Han (2004) baseline three-tier wall:
+    Ta=10 kN/m, L=6.3 m. Slide circular Bishop 1.040 (their grid); L&H
+    reference 0.99 (FLAC) / 1.00 (Bishop). xslope free search finds 0.990."""
+    sd = _lh_wall_slope_data()
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp087.xlsx'))
+    return 'vp087.xlsx'
+
+
+def vp088():
+    """Slide #88, fill-quality case: fill phi=25 (c=0), Ta=22. Slide circular
+    Bishop 1.045; L&H 0.99/1.00."""
+    sd = _lh_wall_slope_data(fill=(0.0, 25.0), ta_of=lambda i, n: 22.0)
+    # Slide's printed critical circle: (-11.368, 42.221) R=40.023, spencer 1.043
+    sd['circles'] = [{'Xo': -11.368, 'Yo': 42.221, 'Depth': 42.221 - 40.023, 'R': 40.023}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp088.xlsx'))
+    return 'vp088.xlsx'
+
+
+def vp089():
+    """Slide #89, reinforcement-length case: L=4.2 m, Ta=11.4. Slide circular
+    Bishop 0.976; L&H 0.98/1.00."""
+    sd = _lh_wall_slope_data(L=4.2, ta_of=lambda i, n: 11.4)
+    # Slide's printed critical circle: (-17.531, 39.139) R=40.572, spencer 0.971
+    sd['circles'] = [{'Xo': -17.531, 'Yo': 39.139, 'Depth': 39.139 - 40.572, 'R': 40.572}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp089.xlsx'))
+    return 'vp089.xlsx'
+
+
+def vp090():
+    """Slide #90, reinforcement-type case: two geotextile types - lower seven
+    layers Ta=11.0, upper eight Ta=7.5. Slide circular Bishop 1.004; L&H
+    1.01/1.00."""
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.0 if i < 7 else 7.5)
+    # Slide's printed critical circle: (-9.069, 23.079) R=22.754, spencer 1.002
+    sd['circles'] = [{'Xo': -9.069, 'Yo': 23.079, 'Depth': 23.079 - 22.754, 'R': 22.754}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp090.xlsx'))
+    return 'vp090.xlsx'
+
+
+def vp091():
+    """Slide #91, foundation-soil case: foundation c=0, phi=18. Slide circular
+    Bishop 0.985; L&H 0.86 (FLAC, bearing failure) / 1.00."""
+    sd = _lh_wall_slope_data(fnd=(0.0, 18.0), left_x=-6.0)
+    # Slide's printed critical circle (4.658, 15.000) R=10.934 (spencer 0.964)
+    # exits exactly tangent at crest elevation (Yo = crest = 15), which xslope
+    # rejects as a single intersection; nudged minimally to force a crossing
+    sd['circles'] = [{'Xo': 4.658, 'Yo': 15.05, 'Depth': 15.05 - 10.99, 'R': 10.99}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091.xlsx'))
+    return 'vp091.xlsx'
+
+
+def vp092():
+    """Slide #92, water case: water table 3 m above the foundation soil
+    (piezo at y=9 with a 3-m pond against the lower tier), Ta=9.25. Slide
+    circular Bishop 1.037; L&H 1.01/1.00."""
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 9.25, water=True)
+    # Slide's printed critical circle: (-4.903, 20.532) R=18.112, bishop 1.037
+    sd['circles'] = [{'Xo': -4.903, 'Yo': 20.532, 'Depth': 20.532 - 18.112, 'R': 18.112}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp092.xlsx'))
+    return 'vp092.xlsx'
+
+
+def vp093():
+    """Slide #93, surcharge case: q=20 kPa on the uppermost tier, Ta=11.6.
+    Slide circular Bishop 0.958; L&H 1.02/1.00."""
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0)
+    # Slide's printed critical circle: (-8.825, 23.102) R=22.603, spencer 0.957
+    sd['circles'] = [{'Xo': -8.825, 'Yo': 23.102, 'Depth': 23.102 - 22.603, 'R': 22.603}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093.xlsx'))
+    return 'vp093.xlsx'
+
+
+def vp094():
+    """Slide #94, number-of-tiers case: five 1.8-m tiers offset 0.6 m
+    (3 layers per tier), Ta=10.1. Slide circular Bishop 1.040 (printed circle
+    center -5.537, 20.452, R=18.450); L&H 1.00."""
+    sd = _lh_wall_slope_data(n_tiers=5, tier_h=1.8, offset=0.6,
+                             ta_of=lambda i, n: 10.1)
+    sd['circles'] = [{'Xo': -5.537, 'Yo': 20.452, 'Depth': 20.452 - 18.450, 'R': 18.450}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp094.xlsx'))
+    return 'vp094.xlsx'
+
+
+def vp098():
+    """Slide #98 / Duncan, Wright & Wong (1990): Walter Bouldin Dam rapid
+    drawdown (pool 47 ft -> 15 ft). Geometry from Slide's coordinate-labeled
+    Figure 98.1 ((0,0) face toe, (100,40) slope break, (140,60)-(180,60)
+    crest, right-edge interfaces at 51/30/17) with interior boundary slopes
+    traced from the figure's color zones; strata: clayey silty sand face
+    band over micaceous sand over cretaceous clay over clayey sandy gravel,
+    riprap band on the upper (1:2) face. Kc=1 envelopes (d, psi) from the
+    paper's Table 2: CSS (750 psf, 15 deg), MS (480, 13), CC (280, 15.5);
+    riprap and gravel drained. DWW 3-stage: Slide 1.039, paper 1.04
+    (Corps 2-stage 0.93 and L&K 1.09 are not implemented in xslope)."""
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)
+    base = dict(sd['materials'][0])
+    props = [
+        ('Clayey Silty Sand', 240.0, 32.7, 128.0, 750.0, 15.0),
+        ('Micaceous Sand',    220.0, 22.5, 123.0, 480.0, 13.0),
+        ('Cretaceous Clay',   180.0, 19.0, 124.0, 280.0, 15.5),
+        ('Clayey Sandy Gravel',  0.0, 40.0, 125.0,   0.0,  0.0),
+        ('Riprap',               0.0, 40.0, 125.0,   0.0,  0.0),
+    ]
+    sd['materials'] = []
+    for name, c, phi, gamma, d, psi in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo',
+                 d=d, psi=psi)
+        sd['materials'].append(m)
+    zones = [
+        (0, [(0.0, 0.0), (100.0, 40.0), (104.0, 40.0), (144.0, 60.0),
+             (180.0, 60.0), (180.0, 51.0), (158.0, 51.0), (5.3, 0.0)]),
+        (1, [(95.6, 30.0), (158.0, 51.0), (180.0, 51.0), (180.0, 30.0)]),
+        (2, [(5.3, 0.0), (95.6, 30.0), (180.0, 30.0), (180.0, 17.0),
+             (58.0, 17.0), (11.0, 0.0)]),
+        (3, [(11.0, 0.0), (58.0, 17.0), (180.0, 17.0), (180.0, 0.0)]),
+        (4, [(100.0, 40.0), (140.0, 60.0), (144.0, 60.0), (104.0, 40.0)]),
+    ]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['line_loads'] = []
+    sd['pile_lines'] = []
+    sd['reinforcement_lines'] = []
+    sd['reinforce_lines'] = []
+    gw = 62.4
+    sd['piezo_line'] = [(0.0, 47.0), (180.0, 47.0)]
+    sd['piezo_line2'] = [(0.0, 15.0), (180.0, 15.0)]
+    # ponded water on the submerged face: stage 1 (pool 47), stage 2 (pool 15)
+    sd['dloads'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 47.0},
+        {'X': 100.0, 'Y': 40.0, 'Normal': gw * 7.0},
+        {'X': 114.0, 'Y': 47.0, 'Normal': 0.0},
+    ]]
+    sd['dloads2'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 15.0},
+        {'X': 37.5, 'Y': 15.0, 'Normal': 0.0},
+    ]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 100.0, 'Yo': 100.0, 'Depth': 20.0, 'R': 80.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp098.xlsx'))
+    return 'vp098.xlsx'
+
+
+def vp099():
+    """Slide #99 / Duncan, Wright & Wong (1990): hypothetical pumped-storage
+    project dam, rapid drawdown 285 ft -> 120 ft (paper El 545 -> 380). 1:3
+    bermed lower upstream face, 1:2.2 upper face, crest at 285 (= initial
+    pool in Slide's model), silty clay core + random zone (c'=0, phi'=36,
+    gamma=140, Kc=1 envelope tau0=2250 psf / 20 deg from the paper's Table
+    3), free-draining rockfill shells (phi'=37, gamma=142). Geometry traced
+    from Slide's Figure 99.1 color zones against its axis rulers (pool
+    dashes at 285/120 pin the vertical scale). DWW 3-stage: Slide 1.534,
+    paper 1.56."""
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)
+    base = dict(sd['materials'][0])
+    props = [
+        ('Compacted Rockfill',     0.0, 37.0, 142.0,    0.0,  0.0),
+        ('Silty Clay Core',        0.0, 36.0, 140.0, 2250.0, 20.0),
+        ('Silty Clay Random Zone', 0.0, 36.0, 140.0, 2250.0, 20.0),
+    ]
+    sd['materials'] = []
+    for name, c, phi, gamma, d, psi in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo',
+                 d=d, psi=psi)
+        sd['materials'].append(m)
+    zones = [
+        (0, [(490.0, 114.0), (640.0, 164.0), (658.0, 164.0), (920.0, 285.0),
+             (927.5, 285.0), (768.5, 114.0)]),
+        (0, [(947.8, 285.0), (955.0, 285.0), (1727.0, 4.0), (1269.7, 4.0)]),
+        # core carries the (768.5, 114) seam vertex so the shared edges of the
+        # upstream shell and random zone are exact (a sliver gap otherwise
+        # splits the polygon union and truncates the derived ground surface)
+        (1, [(666.2, 4.0), (768.5, 114.0), (927.5, 285.0), (947.8, 285.0),
+             (1269.7, 4.0)]),
+        (2, [(18.0, 4.0), (168.0, 54.0), (237.0, 54.0), (415.0, 114.0),
+             (768.5, 114.0), (666.2, 4.0)]),
+    ]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
+    sd['max_depth'] = 4.0
+    sd['gamma_water'] = 62.4
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['line_loads'] = []; sd['pile_lines'] = []
+    sd['reinforcement_lines'] = []; sd['reinforce_lines'] = []
+    gw = 62.4
+    # initial steady seepage: full pool upstream, descending through the core
+    sd['piezo_line'] = [(0.0, 285.0), (890.0, 285.0), (1269.7, 4.0), (1800.0, 4.0)]
+    # post-drawdown: pool at 120 upstream, same downstream tail
+    sd['piezo_line2'] = [(0.0, 120.0), (890.0, 120.0), (1269.7, 4.0), (1800.0, 4.0)]
+    sd['dloads'] = [[
+        {'X': 18.0, 'Y': 4.0, 'Normal': gw * 281.0},
+        {'X': 168.0, 'Y': 54.0, 'Normal': gw * 231.0},
+        {'X': 237.0, 'Y': 54.0, 'Normal': gw * 231.0},
+        {'X': 415.0, 'Y': 114.0, 'Normal': gw * 171.0},
+        {'X': 490.0, 'Y': 114.0, 'Normal': gw * 171.0},
+        {'X': 640.0, 'Y': 164.0, 'Normal': gw * 121.0},
+        {'X': 658.0, 'Y': 164.0, 'Normal': gw * 121.0},
+        {'X': 920.0, 'Y': 285.0, 'Normal': 0.0},
+    ]]
+    sd['dloads2'] = [[
+        {'X': 18.0, 'Y': 4.0, 'Normal': gw * 116.0},
+        {'X': 168.0, 'Y': 54.0, 'Normal': gw * 66.0},
+        {'X': 237.0, 'Y': 54.0, 'Normal': gw * 66.0},
+        {'X': 415.0, 'Y': 114.0, 'Normal': gw * 6.0},
+        {'X': 490.0, 'Y': 114.0, 'Normal': gw * 6.0},
+        {'X': 508.0, 'Y': 120.0, 'Normal': 0.0},
+    ]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 450.0, 'Yo': 400.0, 'Depth': 50.0, 'R': 350.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp099.xlsx'))
+    return 'vp099.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

@@ -211,6 +211,14 @@ def oms(slice_df, debug=False):
     ll_b  = np.radians(_c12('ll_beta'))
     ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
     has_passive = bool(np.any(P_pt) or np.any(pp_cx) or np.any(pp_cy) or np.any(H_pas))
+    # Axial components are stored normalized to cos(psi) > 0; on a right-facing
+    # slope the tension on the sliding mass is the NEGATION of that direction,
+    # so its vertical component flips sign. Only the vertical-equilibrium copies
+    # flip: the horizontal component is consumed as a resisting magnitude, and
+    # the moment terms flip their own x-part where used.
+    _rf = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+    pa_cy_v = -pa_cy if _rf else pa_cy
+    pp_cy_v = -pp_cy if _rf else pp_cy
 
     # 3) Convert angles to radians
     alpha = np.radians(alpha_deg)   # αᵢ [rad]
@@ -238,7 +246,7 @@ def oms(slice_df, debug=False):
       - T * sin_alpha
       - (u * dl)
       + (H_pile - H_pas) * np.sin(alpha - theta_p)
-      + (sin_alpha * pa_cx - cos_alpha * pa_cy)   # axial reinforcement, normal comp
+      + (sin_alpha * pa_cx - cos_alpha * pa_cy_v)   # axial reinforcement, normal comp
       + LL * np.cos(alpha - ll_b)                 # line load (dload pattern)
     )
 
@@ -260,7 +268,7 @@ def oms(slice_df, debug=False):
     # by the β sign-flip applied in generate_slices, so flip it here. The horizontal
     # D-component term (a_dy / sum_Dy) is already sign-correct via that β-flip and is
     # left untouched; likewise the seismic (a_s) and tension-crack (a_t) arms.
-    right_facing = slice_df['y_lt'].iat[0] > slice_df['y_rt'].iat[-1]
+    right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
     a_dx = d_x - Xo
     if right_facing:
         a_dx = -a_dx
@@ -294,11 +302,10 @@ def oms(slice_df, debug=False):
     # Axial reinforcement moment about the circle center (pile pattern: the
     # x-arm flips on right-facing slopes). M = cx*(Yo - y_r) + cy*(x_r - Xo),
     # linearized through the slice sums (mx = sum cy*x_r, my = sum cx*y_r).
+    # (facing-invariant: on right-facing slopes the stored axial components and
+    # the resisting-rotation sense both negate, so the raw expression stands)
     ra_x_part = (pa_mx - Xo * pa_cy)
     rp_x_part = (pp_mx - Xo * pp_cy)
-    if right_facing:
-        ra_x_part = -ra_x_part
-        rp_x_part = -rp_x_part
     sum_reinf_moment_a = np.sum(pa_cx * Yo - pa_my + ra_x_part)
     sum_reinf_moment_p = np.sum(pp_cx * Yo - pp_my + rp_x_part)
 
@@ -403,6 +410,11 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     LL    = _c12('lload')
     ll_b  = np.radians(_c12('ll_beta'))
     ll_x  = _c12('ll_x'); ll_y = _c12('ll_y')
+    # Vertical-equilibrium copies of the axial components: flip on right-facing
+    # slopes (see oms(); the moment terms below flip their own x-part instead).
+    _rf = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+    pa_cy_v = -pa_cy if _rf else pa_cy
+    pp_cy_v = -pp_cy if _rf else pp_cy
 
     # Trigonometric terms
     sin_alpha = np.sin(alpha)
@@ -415,7 +427,7 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     # slopes and is not corrected by the β sign-flip in generate_slices (cosβ is
     # even in β), so flip it here. a_dy (horizontal-D-component) is already correct
     # via that β-flip; a_s/a_t track the sliding-direction convention. See oms().
-    right_facing = slice_df['y_lt'].iat[0] > slice_df['y_rt'].iat[-1]
+    right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
     a_dx = d_x - Xo
     if right_facing:
         a_dx = -a_dx
@@ -437,11 +449,10 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     )
 
     # Axial reinforcement and line-load moment terms (see oms())
+    # (facing-invariant: on right-facing slopes the stored axial components and
+    # the resisting-rotation sense both negate, so the raw expression stands)
     ra_x_part = (pa_mx - Xo * pa_cy)
     rp_x_part = (pp_mx - Xo * pp_cy)
-    if right_facing:
-        ra_x_part = -ra_x_part
-        rp_x_part = -rp_x_part
     sum_reinf_moment_a = np.sum(pa_cx * Yo - pa_my + ra_x_part)
     sum_reinf_moment_p = np.sum(pp_cx * Yo - pp_my + rp_x_part)
     ll_x_arm = -(ll_x - Xo) if right_facing else (ll_x - Xo)
@@ -475,8 +486,8 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
         # Vertical equilibrium: known loads at full value; passive support
         # mobilizes with the soil, so its vertical components carry 1/F.
         vert_known = (W + D * cos_beta + LL * np.cos(ll_b)
-                      - P * sin_alpha - pa_cy - (H_pile - H_pas) * np.sin(theta_p))
-        vert_pas = (P_pt * sin_alpha + pp_cy + H_pas * np.sin(theta_p))
+                      - P * sin_alpha - pa_cy_v - (H_pile - H_pas) * np.sin(theta_p))
+        vert_pas = (P_pt * sin_alpha + pp_cy_v + H_pas * np.sin(theta_p))
         num_N = (
             vert_known - vert_pas / F
             - u * dl * cos_alpha
@@ -580,6 +591,11 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     H_pas = _c12('h_pile_pas')
     LL    = _c12('lload')
     ll_b  = np.radians(_c12('ll_beta'))
+    # Vertical-equilibrium copies of the axial components: flip on right-facing
+    # slopes (see oms()).
+    _rf = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+    pa_cy_v = -pa_cy if _rf else pa_cy
+    pp_cy_v = -pp_cy if _rf else pp_cy
     H_sin_act = (H_pile - H_pas) * np.sin(theta_p)
     H_cos_act = (H_pile - H_pas) * np.cos(theta_p)
     H_sin_pas = H_pas * np.sin(theta_p)
@@ -604,8 +620,8 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     for _ in range(max_iter):
         m_alpha = cos_alpha + sin_alpha * tan_phi / F
         # Effective base normal from VERTICAL slice equilibrium (Bishop's N').
-        num_N = (W + D * cos_beta + LL * np.cos(ll_b) - P * sin_alpha - pa_cy - H_sin_act
-                 - (P_pt * sin_alpha + pp_cy + H_sin_pas) / F
+        num_N = (W + D * cos_beta + LL * np.cos(ll_b) - P * sin_alpha - pa_cy_v - H_sin_act
+                 - (P_pt * sin_alpha + pp_cy_v + H_sin_pas) / F
                  - u * dl * cos_alpha - (c * dl * sin_alpha) / F)
         N_eff = num_N / m_alpha
         N_total = N_eff + u * dl
@@ -623,7 +639,10 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
             F = F_new
             converged = True
             break
-        F = F_new
+        # Damped update: the passive-support 1/F terms on the driving side can
+        # make the plain fixed-point map non-contractive (oscillating between
+        # two values); the half-step converges to the same fixed point.
+        F = 0.5 * (F + F_new)
 
     if not converged:
         return False, "Janbu method did not converge within the maximum number of iterations."
@@ -633,10 +652,10 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     # === Compute Janbu correction factor ===
 
     # Get failure surface endpoints
-    x_l = slice_df['x_l'].iloc[0]  # leftmost x
-    y_lt = slice_df['y_lt'].iloc[0]  # leftmost top y
-    x_r = slice_df['x_r'].iloc[-1]  # rightmost x
-    y_rt = slice_df['y_rt'].iloc[-1]  # rightmost top y
+    x_l = slice_df['x_l'].iloc[0]   # leftmost x
+    y_lt = slice_df['y_lb'].iloc[0]   # left surface endpoint (base corner; the slice
+    x_r = slice_df['x_r'].iloc[-1]  # rightmost x        top sits at crest elevation
+    y_rt = slice_df['y_rb'].iloc[-1]  # right surface endpoint  against a vertical face)
 
     # Length of failure surface (straight line approximation)
     L = np.hypot(x_r - x_l, y_rt - y_lt)
@@ -928,10 +947,12 @@ def _mp_extract(slice_df, right_facing):
         for k in ('alpha', 'beta', 'phi', 'c', 'P', 'kw', 'V'):
             A[k] = -A[k]
         A['theta_p'] = np.pi - A['theta_p']
-        # Axial reinforcement: only the HORIZONTAL component flips with the
-        # facing (like the pile cos-theta_p component); vertical stays. The
-        # my-sums carry the horizontal component, the mx-sums the vertical.
-        for k in ('pa_cx', 'pa_my', 'pp_cx', 'pp_my'):
+        # Axial reinforcement enters in real components at real positions and
+        # the stored direction (cos(psi) > 0) is the NEGATION of the real
+        # tension on a right-facing slope: negate the whole vector (all sums),
+        # as in spencer().
+        for k in ('pa_cx', 'pa_cy', 'pa_mx', 'pa_my',
+                  'pp_cx', 'pp_cy', 'pp_mx', 'pp_my'):
             A[k] = -A[k]
         # Line loads mirror beta's flip
         A['ll_b'] = -A['ll_b']
@@ -1045,6 +1066,14 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     H_pas = _c12('h_pile_pas')
     LL    = _c12('lload')
     ll_b  = np.radians(_c12('ll_beta'))
+    # The march mixes the orientation-normalized frame (alpha, theta) with the
+    # stored axial components (normalized to cos(psi) > 0). The horizontal
+    # component enters as a resisting magnitude (facing-agnostic), but the real
+    # tension on a right-facing slope is the negation of the stored direction,
+    # so its VERTICAL component flips (same correction as janbu()).
+    if right_facing:
+        pa_cy = -pa_cy
+        pp_cy = -pp_cy
 
     N = np.zeros(n)  # normal forces on slice bases (filled by each march)
     Z = np.zeros(n+1)  # interslice forces, Z[0] = 0 by definition (no force entering leftmost slice)
@@ -1154,8 +1183,8 @@ def corps(slice_df, variant=2, debug=False):
 
     if variant == 1:
         # endpoints of the slip surface -> one constant θ
-        x0, y0 = slice_df['x_l'].iat[0], slice_df['y_lt'].iat[0]
-        x1, y1 = slice_df['x_r'].iat[-1], slice_df['y_rt'].iat[-1]
+        x0, y0 = slice_df['x_l'].iat[0], slice_df['y_lb'].iat[0]
+        x1, y1 = slice_df['x_r'].iat[-1], slice_df['y_rb'].iat[-1]
         dx = x1 - x0
         dy = y1 - y0
         if abs(dx) < 1e-12:
@@ -1190,7 +1219,7 @@ def corps(slice_df, variant=2, debug=False):
     # shipped benchmark). Without it, force-equilibrium FS is asymmetric under
     # mirroring and can violate the expected method ordering on right-facing
     # geometries.
-    right_facing = slice_df['y_lt'].iat[0] > slice_df['y_rt'].iat[-1]
+    right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
     if right_facing:
         theta_list = -theta_list
         theta_out = -theta_out
@@ -1223,7 +1252,7 @@ def lowe(slice_df, debug=False):
     y_rb = slice_df['y_rb'].values
 
     # determine facing
-    right_facing = (y_lt[0] > y_rt[-1])
+    right_facing = (y_lb[0] > y_rb[-1])
 
     # precompute each slice's top & bottom slopes
     widths   = (x_r - x_l)
@@ -1349,8 +1378,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
     tan_p = np.tan(phi)  # tan(phi)
 
-    y_ct = slice_df['y_ct'].values
-    right_facing = (y_ct[0] > y_ct[-1])
+    right_facing = (y_cb[0] > y_cb[-1])
     # If right facing, swap angles and strengths. For most methods, you can use the normal angle conventions
     # and get the right answer. But for Spencer, due to the way that the moment equation is written,
     # you need to swap the angles and strengths if the slope is right facing.
@@ -1382,12 +1410,15 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     H_sin_tp = H_pile * np.sin(theta_pile)  # vertical component (upward)
     if right_facing:
         H_cos_tp = -H_cos_tp
-        # Axial reinforcement: flip the horizontal component only (pile pattern);
-        # the my-sums carry the horizontal component. Line loads mirror beta.
-        pa_cx = -pa_cx
-        pa_my = -pa_my
-        pp_cx = -pp_cx
-        pp_my = -pp_my
+        # Axial reinforcement enters in REAL components at real positions, and
+        # the stored direction (cos(psi) > 0) is the NEGATION of the real
+        # tension on a right-facing slope: negate the whole vector (all four
+        # sums; verified against the left-facing mirror oracle). Line loads
+        # mirror beta.
+        pa_cx = -pa_cx; pa_cy = -pa_cy
+        pa_mx = -pa_mx; pa_my = -pa_my
+        pp_cx = -pp_cx; pp_cy = -pp_cy
+        pp_mx = -pp_mx; pp_my = -pp_my
         P_pt = -P_pt          # tangent passive mirrors R
         ll_b = -ll_b
 
@@ -1877,8 +1908,9 @@ def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing, FS=1.0):
 
     if right_facing:                            # same reflection as spencer()/_mp_march
         beta = -beta; psi = -psi; R = -R; kw = -kw; V = -V
-        pa_cx = -pa_cx; pa_my = -pa_my          # axial: horizontal component flips
-        pp_cx = -pp_cx; pp_my = -pp_my
+        # axial: negate the whole force vector, as in spencer()
+        pa_cx = -pa_cx; pa_cy = -pa_cy; pa_mx = -pa_mx; pa_my = -pa_my
+        pp_cx = -pp_cx; pp_cy = -pp_cy; pp_mx = -pp_mx; pp_my = -pp_my
         P_pt = -P_pt                            # tangent passive mirrors R
         ll_b = -ll_b                            # line loads mirror beta
     sin_b, cos_b = np.sin(beta), np.cos(beta)
@@ -1960,8 +1992,8 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         return False, "Morgenstern-Price needs at least 2 slices."
 
     # Facing detection mirrors spencer(); _mp_march applies the right-facing flip set.
-    y_ct = slice_df['y_ct'].values
-    right_facing = bool(y_ct[0] > y_ct[-1])
+    _ycb = slice_df['y_cb'].values
+    right_facing = bool(_ycb[0] > _ycb[-1])
 
     try:
         f_vals = _mp_f_vals(slice_df, f_type)

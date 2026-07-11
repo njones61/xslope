@@ -59,6 +59,8 @@ BUNDLED_TEMPLATE = 'xslope/resources/input_template.xlsx'  # copy shipped in the
 SKILL_MASTER = 'docs/usage/claude/xslope.md'
 BUNDLED_SKILL = 'xslope/resources/xslope_skill.md'
 # M-P with f(x)==1 must reproduce Spencer exactly, on both slope facings (the S3b gate).
+AXIAL_MIRROR_LEFT = 'docs/inputs/slope/xslope_nail_axial.xlsx'
+AXIAL_MIRROR_RIGHT = 'docs/inputs/slope/xslope_nail_axial_rface.xlsx'
 MP_SPENCER_LEFT = 'docs/inputs/slope/xslope_simple1.xlsx'
 MP_SPENCER_RIGHT = 'docs/inputs/slope/xslope_rface.xlsx'
 # Stage-1 FS 1.91 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
@@ -797,6 +799,64 @@ def run_drawdown_guard_test(test):
     return 0.0, None
 
 
+def run_axial_mirror_test(test):
+    """Axial (nail) reinforcement must be facing-invariant: a nailed wall and its
+    exact left/right mirror must give the same FS in every method, on both a
+    circular and a planar surface. Locks the right-facing axial sign conventions
+    (vertical force component, facing detection against a vertical wall face,
+    spencer/mprice full-vector negation) fixed while building Slide VP47/VP48.
+
+    corps/lowe carry a small inherent directional asymmetry (their interslice
+    inclinations are read from the geometry left-to-right), so they get a looser
+    tolerance. Pass/fail test: returns (0.0, None) on success.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope import solve
+
+    lp, rp = test['file'], test['file2']
+    for fp in (lp, rp):
+        if not os.path.exists(fp):
+            return None, f"input missing: {fp}"
+    left = load_slope_data(lp)
+    right = load_slope_data(rp)
+
+    problems = []
+    for kind in ('circle', 'plane'):
+        if kind == 'circle':
+            ok_l, pl = generate_slices(left, circle=left['circles'][0], num_slices=50)
+            ok_r, pr = generate_slices(right, circle=right['circles'][0], num_slices=50)
+            methods = ('oms', 'bishop', 'janbu', 'spencer', 'mprice', 'corps', 'lowe')
+        else:
+            ok_l, pl = generate_slices(left, non_circ=left['non_circ'], num_slices=50)
+            ok_r, pr = generate_slices(right, non_circ=right['non_circ'], num_slices=50)
+            methods = ('janbu', 'spencer', 'mprice', 'corps', 'lowe')
+        if not (ok_l and ok_r):
+            problems.append(f"{kind}: slice generation failed")
+            continue
+        df_l, df_r = pl[0], pr[0]
+        for m in methods:
+            fn = getattr(solve, m)
+            ok1, r1 = fn(df_l.copy())
+            ok2, r2 = fn(df_r.copy())
+            if ok1 != ok2:
+                # both-fail is acceptable (method admissibility, mirror-symmetric);
+                # one-sided failure is a facing bug
+                problems.append(f"{kind}/{m}: one facing failed "
+                                f"(L={'ok' if ok1 else 'fail'}, R={'ok' if ok2 else 'fail'})")
+                continue
+            if not ok1:
+                continue
+            tol = 0.01 if m in ('corps', 'lowe') else 1e-3
+            rel = abs(r1['FS'] - r2['FS']) / max(abs(r1['FS']), 1e-9)
+            if rel > tol:
+                problems.append(f"{kind}/{m}: L={r1['FS']:.4f} R={r2['FS']:.4f} "
+                                f"rel diff {rel:.1e} > {tol:.0e}")
+    if problems:
+        return None, "; ".join(problems)
+    return 0.0, None
+
+
 def run_mp_spencer_test(test):
     """Morgenstern-Price with f(x) == 1 must reproduce Spencer exactly, on BOTH
     slope facings. Spencer is the f == 1 special case of M-P, so any divergence
@@ -1042,6 +1102,8 @@ def run_test(test):
         return run_template_sync_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
+    if test_type == 'axial_mirror':
+        return run_axial_mirror_test(test)
     if test_type == 'mp_spencer':
         return run_mp_spencer_test(test)
     if test_type == 'drawdown_tauff':
@@ -1206,6 +1268,12 @@ def main():
                 tests.append({'type': 'mp_spencer', 'file': _fp, 'facing': _facing,
                               'method': 'mprice=spencer', 'source': f'{_facing}-facing'})
 
+        # Axial reinforcement facing-invariance: nailed wall vs its exact mirror
+        if Path(AXIAL_MIRROR_LEFT).exists() and Path(AXIAL_MIRROR_RIGHT).exists():
+            tests.append({'type': 'axial_mirror', 'file': AXIAL_MIRROR_LEFT,
+                          'file2': AXIAL_MIRROR_RIGHT, 'method': 'all-methods L==R',
+                          'source': 'axial_mirror'})
+
         # Rapid-drawdown Stage-2 strength pipeline, against the worked example in
         # Duncan/Wright/Brandon Table 9.2. File-less: an infinite slope, hand-computable.
         tests.append({'type': 'drawdown_tauff', 'file': 'DWB Table 9.2 (unit)',
@@ -1307,7 +1375,7 @@ def main():
             label = 'beta'
         elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
                             'mesh_conform', 'seep_elements', 'fem_elements',
-                            'mp_spencer', 'drawdown_tauff', 'drawdown_guard',
+                            'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                             'gsat_pair'):
             expected = 0.0          # these return 0.0 on success (pass/fail tests)
             tol = 0.0

@@ -51,9 +51,9 @@ solution, so those columns are compared via the correction factor where noted.
 | 2.37 | Pockoski & Duncan – Soil Nails | partial | Same. |
 | 2.38 | Loukidis – Seismic Coefficient | **built** | [vp062a/b.xlsx](../files/rocscience/vp062a.xlsx) (Rocscience #62): Spencer 1.001 (both cases) vs SLOPE/W 1.00 — exact. — [details](rocscience.md#vp62) |
 | 2.39 | Loukidis – Seismic Coefficient #2 | partial | See Rocscience #63 — outline pinned from the paper, interface anchors still ambiguous. |
-| 2.40 | Rapid Drawdown – Walter Bouldin Dam | planned | Drawdown case history (candidate for the rapid-drawdown pipeline). |
+| 2.40 | Rapid Drawdown – Walter Bouldin Dam | **built** | Same problem as Slide VP98 ([details](rocscience.md#vp98)): xslope DWW 3-stage 1.046 vs SLOPE/W Bishop 1.016 / Spencer 1.02, DWW 1.04. |
 | 2.41 | Rapid Drawdown – USACE Benchmark | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx) (Rocscience #96): 3-stage Spencer 1.434 / Bishop 1.432 vs published 1.44. — [details](rocscience.md#vp96) |
-| 2.42 | Rapid Drawdown – Pumped Storage Dam | planned | Drawdown case history. |
+| 2.42 | Rapid Drawdown – Pumped Storage Dam | **built** | Same problem as Slide VP99 ([details](rocscience.md#vp99)): xslope 1.390 vs SLOPE/W 1.550, DWW 1.56 (~7% low; geometry to be re-pinned from the .gsz). |
 | 2.43 | Rapid Drawdown – Pilarcitos Dam | **built** | [vp097.xlsx](../files/rocscience/vp097.xlsx) (Rocscience #97): Spencer 1.044 / Bishop 1.042. — [details](rocscience.md#vp97) |
 | 2.44 | Probability – James Bay Case History | planned | Classic reliability case history (El-Ramly et al.) — strong candidate for the reliability pipeline. |
 | 2.45 | Eurocode 7 – Cutting in Clay | planned | Partial-factor design check. |

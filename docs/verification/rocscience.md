@@ -13,7 +13,7 @@ Problems are built from the manual's tabulated data and coordinate-labeled figur
 geometry exists only as an unlabeled figure, the original source publication is consulted before the
 problem is marked *built* — no digitized guesses are used for benchmark inputs.
 
-<!-- test: file=../files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.495, fs_mprice=1.586, benchmark=VP2 -->
+<!-- test: file=../files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
 <!-- test: file=../files/rocscience/vp003.xlsx, type=circular_search, num_slices=40, fs_bishop=1.403, fs_spencer=1.372, fs_janbu=1.354, fs_mprice=1.371, benchmark=VP3 -->
 <!-- test: file=../files/rocscience/vp004.xlsx, type=circular_search, num_slices=40, fs_bishop=1.013, fs_spencer=0.989, fs_janbu=0.963, fs_mprice=0.987, benchmark=VP4 -->
 <!-- test: file=../files/rocscience/vp005.xlsx, type=single_circle, num_slices=60, fs_bishop=1.955, fs_spencer=1.955, fs_janbu=1.965, fs_mprice=1.955, benchmark=VP5 -->
@@ -32,8 +32,13 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
+<!-- test: file=../files/rocscience/vp044a.xlsx, type=circular_search, num_slices=40, fs_spencer=0.958, benchmark=VP44-pow -->
+<!-- test: file=../files/rocscience/vp044b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.518, benchmark=VP44-mc -->
+<!-- test: file=../files/rocscience/vp044c.xlsx, type=circular_search, num_slices=40, fs_spencer=0.980, benchmark=VP44-lla -->
 <!-- test: file=../files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
 <!-- test: file=../files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
+<!-- test: file=../files/rocscience/vp047.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.899, benchmark=VP47 -->
+<!-- test: file=../files/rocscience/vp048.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.991, fs_spencer=0.991, benchmark=VP48 -->
 <!-- test: file=../files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
 <!-- test: file=../files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.205, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
 <!-- test: file=../files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
@@ -46,6 +51,16 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
 <!-- test: file=../files/rocscience/vp100.xlsx, type=circular_search, num_slices=50, fs_bishop=1.201, fs_spencer=1.206, benchmark=VP100 -->
 <!-- test: file=../files/rocscience/vp101.xlsx, type=circular_search, num_slices=50, fs_bishop=1.416, fs_spencer=1.422, benchmark=VP101 -->
+<!-- test: file=../files/rocscience/vp087.xlsx, type=single_circle, num_slices=50, fs_bishop=1.031, benchmark=VP87 -->
+<!-- test: file=../files/rocscience/vp088.xlsx, type=single_circle, num_slices=50, fs_spencer=1.057, benchmark=VP88 -->
+<!-- test: file=../files/rocscience/vp089.xlsx, type=single_circle, num_slices=50, fs_spencer=1.011, benchmark=VP89 -->
+<!-- test: file=../files/rocscience/vp090.xlsx, type=single_circle, num_slices=50, fs_bishop=1.012, benchmark=VP90 -->
+<!-- test: file=../files/rocscience/vp091.xlsx, type=single_circle, num_slices=50, fs_spencer=0.960, benchmark=VP91 -->
+<!-- test: file=../files/rocscience/vp092.xlsx, type=single_circle, num_slices=50, fs_bishop=1.010, benchmark=VP92 -->
+<!-- test: file=../files/rocscience/vp093.xlsx, type=single_circle, num_slices=50, fs_bishop=1.017, benchmark=VP93 -->
+<!-- test: file=../files/rocscience/vp094.xlsx, type=single_circle, num_slices=50, fs_bishop=1.020, benchmark=VP94 -->
+<!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
+<!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.390, benchmark=VP99 -->
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=../files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
 <!-- test: file=../files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
@@ -97,11 +112,11 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
 | 42 | Dam, (3) materials, water table, ponded water, tension crack | partial | Baker & Leshchinsky (2001) safety-map dam. Geometry and core polygon fully labeled (extracted); reservoir level 30 on the right face; Slide Spencer 1.925 circular / 1.877 non-circular, Baker 1.91. Blocked on the internal phreatic-line coordinates through the core (drawn but unlabeled) — needs the B&L paper. |
 | 43 | Slope, homogenous, planar surface, RocPlane comparison | planned |  |
-| 44 | Slope, homogenous | partial | Baker (2003) ex. 1, linear vs power-curve envelopes. Geometry extracted ((0,0)-(6.43,6)-(20,6)); power-curve case buildable (a=1.107, b=0.86, Spencer 0.960/Baker 0.97), but the Mohr-Coulomb rows (Spencer 1.536) do not reconcile with the extracted property table (c'=0, φ=38 gives ~0.84 on a 43° face) — needs the Baker paper to resolve the intended MC properties before building. |
+| [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](../files/rocscience/vp044a.xlsx) (power curve), [vp044b.xlsx](../files/rocscience/vp044b.xlsx) (Mohr-Coulomb), [vp044c.xlsx](../files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: 43° face, H=6. Spencer: power 0.958 vs Slide 0.960 / Baker 0.97; MC 1.518 vs Slide 1.536 / Baker 1.50; LLA 0.980 vs Slide 0.981. Baker's paper resolved the MC row (c'=11.64, φ'=24.7 — Table I it. 0) and γ=18. |
 | [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](../files/rocscience/vp045a.xlsx) (Mohr-Coulomb), [vp045b.xlsx](../files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: linear vs non-linear envelope on the same 4:1 slope. Spencer: MC 2.801 vs Slide 2.794; power curve 2.649 vs Slide 2.662. (Slide's Janbu values are simplified/uncorrected; ours carry the fo correction and agree once scaled.) |
 | 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | partial | Baker (1993) three-stage dam (dry / steady-state seep / rapid drawdown). The manual itself calls this a validation problem: permeabilities were estimated by Rocscience and the stage-3 undrained strengths live in discrete .fn6 functions. Stage 1 (dry, Spencer 2.534 / Baker 2.41 / theory 2.5) buildable once Figure 46.1 coordinates are read; stages 2-3 map onto xslope's seep + rapid-drawdown pipeline but need those source functions. |
-| 47 | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | planned |  |
-| 48 | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | planned |  |
+| [47](#vp47) | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | **built** | [vp047.xlsx](../files/rocscience/vp047.xlsx). Sheahan & Ho (2003) Amherst test wall: 6 m undrained cut, 2 nail rows (FHWA capacity envelope) + shotcrete line load. Critical 44.5° plane: Janbu 0.899 vs Slide 0.890 / Sheahan 0.887. |
+| [48](#vp48) | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | **built** | [vp048.xlsx](../files/rocscience/vp048.xlsx). Clouterre full-scale test wall: 7 nail rows (constant 15 kN tension), planar surfaces through the toe at 45–70°; Janbu/Spencer within 0.3% of Slide at 55–70°. Building this exposed (and fixed) right-facing axial-reinforcement sign bugs in every LEM method. |
 | 49 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | planned |  |
 | [50](#vp50) | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](../files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 rows with per-row length/tensile/bond values, evaluated on the printed deep wedge (-15.8,0)-(0,-5)-(41.7,25). With Slide's nail defaults (tangent orientation, force factored by FS): Janbu(corr) 1.448 vs SNAILZ 1.46 and Slide 1.417. The capacity envelope reproduces the hand-computed available tension at every crossing (Σ 10.6 kip). The shallow (0,0) surface's kink is not printed — only the deep case is tagged. |
 | [51](#vp51) | Slope, (4) materials, water table, tension crack, seismic | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx). Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86). Seven methods vs Slide/Zhu: Bishop 1.278 vs 1.278/1.278 and M-P 1.304 vs 1.304/1.303 — exact; Spencer 1.294 vs 1.293; Lowe 1.296 vs 1.288/1.290; Corps 1.404 vs 1.422/1.377 (in-band); OMS 1.069 vs Zhu 1.066 (Slide's 1.145 is the outlier); Janbu(corr) 1.205 ≡ simplified 1.112 × fo. Phreatic line calibrated against the two independently agreeing published Bishop/Spencer values (±1 m bracket spans them). |
@@ -140,19 +155,19 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 84 | Embankment, (2) materials | planned |  |
 | [85](#vp85) | Reinforced slope, homogenous, grouted tieback | **built** | [vp085a.xlsx](../files/rocscience/vp085a.xlsx) (active), [vp085b.xlsx](../files/rocscience/vp085b.xlsx) (passive). Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope — the reinforcement acceptance benchmark from the design plan. On Slide's printed critical circles: active 1.567 vs Slide GLE 1.575 (D&W 1.51); passive Bishop 1.319 vs Slide 1.324 (D&W 1.32). Slide's own method table scatters 1.42-2.05 here (concentrated force strains interslice assumptions), so per-circle comparison is the meaningful one. |
 | [86](#vp86) | Reinforced slope, homogenous, grouted tieback | **built** | [vp086.xlsx](../files/rocscience/vp086.xlsx). Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on rock: five 800 lb/ft geogrids. Circular search: Bishop 1.617 / Spencer 1.611 vs Slide 1.629 / 1.620; D&W reference 1.61. |
-| 87 | Retaining wall, (3) materials, geotextile | planned |  |
-| 88 | Retaining wall, (3) materials, geotextile | planned |  |
-| 89 | Retaining wall, (3) materials, geotextile | planned |  |
-| 90 | Retaining wall, (3) materials, geotextile | planned |  |
-| 91 | Retaining wall, (3) materials, geotextile | planned |  |
-| 92 | Retaining wall, (3) materials, geotextile | planned |  |
-| 93 | Retaining wall, (3) materials, distributed load, geotextile | planned |  |
-| 94 | Retaining wall, (3) materials, geotextile | planned |  |
+| [87](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp087.xlsx](../files/rocscience/vp087.xlsx). Baseline three-tier wall (Ta=10, L=6.3): Bishop 1.031 on Slide's printed circle vs Slide 1.040; free search 0.99 vs L&H 0.99–1.00. |
+| [88](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp088.xlsx](../files/rocscience/vp088.xlsx). Fill-quality case (φ=25, Ta=22): Spencer 1.057 vs Slide 1.043. |
+| [89](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp089.xlsx](../files/rocscience/vp089.xlsx). Reinforcement-length case (L=4.2, Ta=11.4): Spencer 1.011 (≈L&H design intent 1.0); with Slide's actual baseline Ta=10 supports: 0.980 vs Slide 0.971. |
+| [90](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp090.xlsx](../files/rocscience/vp090.xlsx). Two reinforcement types (7.5 upper 8 / 11.0 lower 7): Bishop 1.012 vs Slide 1.004. |
+| [91](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp091.xlsx](../files/rocscience/vp091.xlsx). Weak foundation (c=0, φ=18): deep bearing circle, Spencer 0.960 vs Slide 0.964. |
+| [92](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp092.xlsx](../files/rocscience/vp092.xlsx). Water table 3 m above foundation (drained fill + pond): with Ta=10, Bishop 1.039 vs Slide 1.037; at the paper's Ta=9.25: 1.010 ≈ L&H 1.01. |
+| [93](#vp87) | Retaining wall, (3) materials, distributed load, geotextile | **built** | [vp093.xlsx](../files/rocscience/vp093.xlsx). 20 kPa crest surcharge: at the paper's Ta=11.6, Bishop 1.017 ≈ L&H 1.02; with Ta=10, 0.961 vs Slide 0.958. |
+| [94](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp094.xlsx](../files/rocscience/vp094.xlsx). Five 1.8-m tiers (Ta=10.1): Bishop 1.020 on Slide's printed circle vs Slide 1.040. |
 | 95 | Embankment dam, homogenous, rapid drawdown, water table | partial | USACE EM 1110-2-1902 App. G example with the **Corps 1970 2-stage** method (Slide 1.347, USACE 1.35). XSLOPE implements the Duncan-Wright-Wong 3-stage procedure (see #96, same model file) — the 2-stage variant would be a new option. |
 | [96](#vp96) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example (Figure G-5: 3:1 / 2.5:1 face, pool 103→24, Kc=1 envelope d=1379 psf ψ=18.2°), specified circle (169.5, 210, R=210), Duncan-Wright-Wong 3-stage: Spencer 1.434 / Bishop 1.432 vs Slide 1.443 and USACE 1.44 (Modified Swedish). First corpus problem through the rapid-drawdown pipeline. |
 | [97](#vp97) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp097.xlsx](../files/rocscience/vp097.xlsx). Pilarcitos Dam (Duncan, Wright & Wong 1990 — paper in `ref_docs_slope/`), drawdown 72→37 ft; Kc=1 envelope from D&W eqs 9.6-9.7 (d=64.1 psf, ψ=24.4°, the same equations reproduce USACE's 1379/18.2 exactly). Rapid 3-stage search: Spencer 1.044 / Bishop 1.042 vs Slide 1.043 and DWW 1.05 — the dam that actually failed in drawdown sits right at FS≈1. |
-| 98 | Embankment dam, (5) materials, rapid drawdown, water table | partial | Walter Bouldin Dam (DWW 1990): properties table + mostly-labeled Slide figure extracted; the five-zone shell/seam tips against the face still need the paper's Fig. 6 section — DWW paper now in `ref_docs_slope/`, build queued. Targets: DWW 3-stage 1.04, Slide 1.039. |
-| 99 | Embankment dam, (3) materials, rapid drawdown, water table | partial | Pumped-storage project dam (DWW 1990): same paper in hand, build queued. Targets: DWW 3-stage vs Slide per Table 99.2. |
+| [98](#vp98) | Embankment dam, (5) materials, rapid drawdown, water table | **built** | [vp098.xlsx](../files/rocscience/vp098.xlsx). Walter Bouldin Dam (DWW 1990): 5-zone section from Slide's labeled Figure 98.1 + color-zone tracing; Kc=1 envelopes from the paper's Table 2. DWW 3-stage Spencer search: 1.046 vs Slide 1.039 / paper 1.04. Critical surface matches the observed slide location. |
+| [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](../files/rocscience/vp099.xlsx). DWW pumped-storage dam, drawdown 285→120. Geometry axis-calibrated from Slide's figure (vertices unlabeled). DWW 3-stage Spencer: 1.390 (search) / 1.428 (Slide's printed circle) vs Slide 1.534, SLOPE/W 1.550, paper 1.56 — ~7% low, attributed to core-geometry reading; to be re-pinned from the vendor .gsz when available. |
 | [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](../files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown, B̄=1 — the residual pore-pressure field maps exactly onto a piezometric line at the slope surface, so this runs as a single-stage analysis. Bishop 1.201 vs Morgenstern chart 1.20 and Slide (B-bar method) 1.212. Paper in `ref_docs_slope/`. |
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](../files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | 102 | Embankment dam, homogenous, rapid drawdown | planned |  |
@@ -440,6 +455,26 @@ Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curv
 
 ![vp041: inputs and representative solution](images/vp041.png)
 
+### VP44: Slope, homogeneous — linear vs non-linear envelope (Baker ex. 1) {#vp44}
+
+Slide #44 / Baker (2003) example problem 1: a straight 43° slope, H = 6 m, γ = 18 kN/m³, in compacted Israeli clays, analyzed with three strength models fitted to the same triaxial data: (a) the power curve τ = 1.107·σ′^0.86 (Baker's A = 0.58, n = 0.86, T = 0); (b) the experimentally fitted Mohr-Coulomb envelope c′ = 11.64 kPa, φ′ = 24.7° (Table I, iteration 0 of Baker's paper — this resolves the property-table ambiguity in the Slide manual); and (c) Baker's converged local-linear-approximation parameters c′ = 0.39 kPa, φ′ = 38.6°. The point of the example is the danger of extrapolating a linear envelope into the low-stress range: the M-C fit says FS = 1.5, the non-linear law says the slope is failing.
+
+**Input files:** [vp044a.xlsx](../files/rocscience/vp044a.xlsx), [vp044b.xlsx](../files/rocscience/vp044b.xlsx), [vp044c.xlsx](../files/rocscience/vp044c.xlsx)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| (a) power curve | Spencer | 0.958 | Slide 0.960; Baker 0.97 |
+| (b) Mohr-Coulomb | Spencer | 1.518 | Slide 1.536; Baker 1.50 |
+| (c) LLA converged | Spencer | 0.980 | Slide 0.981; Baker 0.97 |
+
+*Baker states γ = 18 for all his examples; the Slide manual's table prints 19.5, which reconciles with neither program's results (γ = 19.5 gives Spencer 1.459 on case b). Slide's Janbu values are simplified/uncorrected, as in [#45](#vp45).*
+
+![vp044a: inputs and representative solution](images/vp044a.png)
+
+![vp044b: inputs and representative solution](images/vp044b.png)
+
+![vp044c: inputs and representative solution](images/vp044c.png)
+
 ### VP45: Slope, homogenous {#vp45}
 
 Slide #45, Mohr-Coulomb case: c'=11.64, phi'=24.7, gamma=18. Slide2: Janbu simplified 2.662, Spencer 2.794.
@@ -465,6 +500,39 @@ Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's A=0.58, n=0.86, 
 ![vp045a: inputs and representative solution](images/vp045a.png)
 
 ![vp045b: inputs and representative solution](images/vp045b.png)
+
+### VP47: Soil-nailed wall in clay (Amherst test wall) {#vp47}
+
+Slide #47 / Sheahan & Ho (2003): 6 m vertical cut in undrained Amherst clay (cᵤ = 25 kPa, γ = 18.9 kN/m³), two nail rows at 20° declination (L = 4.9 m, tensile 118 kN, plate 86 kN, bond 15 kN/m, sₕ = 1.5 m) and the shotcrete facing weight applied as a 14.6 kN/m vertical line load at the crest. The wall failed in the field test; the published analyses sweep planar surfaces through the toe. Nails are modeled axial/passive with the FHWA-style capacity envelope (plate strength at the head, bond-strength taper at the tip).
+
+**Input files:** [vp047.xlsx](../files/rocscience/vp047.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Janbu, critical plane (44.5°) | 0.899 | Slide 0.890 (simplified = corrected); Sheahan trial wedge 0.887 |
+
+*Sheahan adds the nail tension unfactored; that convention (`appl=active`) gives 0.893. The tabulated 0.899 uses Slide's nail default (passive).*
+
+![vp047: inputs and representative solution](images/vp047.png)
+
+### VP48: Soil-nailed wall in sand (Clouterre test wall no. 1) {#vp48}
+
+Slide #48 / Sheahan & Ho (2003): the CEBTP Clouterre full-scale wall — 7 m cut in Fontainebleau sand (c′ = 3 kPa, φ′ = 38°, γ = 20 kN/m³), seven nail rows at 10° declination (lengths 6/8/7.5/8/8/8/6 m from the paper's Fig. 4a, sₕ = 1.15 m), shotcrete weight as a 13.2 kN/m line load. Following Sheahan, each nail carries a constant 15 kN tension (fully anchored ends in xslope). The benchmark evaluates planar surfaces through the toe at 45–70°:
+
+**Input files:** [vp048.xlsx](../files/rocscience/vp048.xlsx)
+
+| Plane angle | XSLOPE Janbu | XSLOPE Spencer | Slide Janbu | Sheahan |
+|---|---|---|---|---|
+| 45° | 1.154 | 1.154 | 1.123 | 1.176 |
+| 50° | 1.060 | 1.060 | 1.043 | 1.070 |
+| 55° | 0.991 | 0.991 | 0.989 | 0.989 |
+| 60° | 0.944 | 0.944 | 0.945 | 0.929 |
+| 65° | 0.920 | 0.920 | 0.922 | 0.893 |
+| 70° | — | 0.921 | 0.923 | 0.887 |
+
+*The stored surface (and test tag) is the 55° plane, where Slide and Sheahan agree exactly. Janbu's fixed-point iteration does not converge at 70° (Spencer shown). This problem exposed a family of right-facing axial-reinforcement sign errors (vertical force component, facing detection against a vertical wall face, and the Janbu correction-factor chord), all fixed and locked by a left/right mirror consistency test.*
+
+![vp048: inputs and representative solution](images/vp048.png)
 
 ### VP50: Reinforced slope, (2) materials, predefined slip surface, geosynthetic {#vp50}
 
@@ -624,6 +692,41 @@ Slide #86: Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on a strong
 
 ![vp086: inputs and representative solution](images/vp086.png)
 
+### VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004) {#vp87}
+
+Slide #87–#94 reproduce the parametric study in Leshchinsky & Han (2004): a three-tier segmental (block-faced) MSE wall — three 3-m tiers offset 1.2 m, 0.3-m block columns (c=2.5 kPa, φ=34°), reinforced/retained fill c=0/φ=34°, foundation c=10 kPa/φ=34° (6 m deep), γ=18 kN/m³ throughout — with geotextile layers every 0.6 m, L=6.3 m, and the tensile strength Ta the paper *required* for FS=1.0 in each variation. Pullout resistance is 80% of the fill strength (translated to xslope anchorage lengths from the local overburden at each layer end); the geotextile force is applied horizontally (`dir=axial`, `appl=passive` — Slide's convention, verified against its printed VP87 circle). Each problem's Slide-printed critical circle is stored in the file, so the test tags evaluate a deterministic surface.
+
+Two manual quirks resolved during the build: (1) Slide's VP89/92/93 *results* were computed with the **baseline Ta = 10** supports even though their support tables print the paper's per-case required strengths (11.4/9.25/11.6) — with Ta=10 xslope lands within 1% of all three Slide numbers, and with the paper's strengths it lands on L&H's design intent (FS ≈ 1.0). (2) VP91's printed circle exits exactly tangent to the crest and needs a hair of extra radius to intersect.
+
+| # | Case | Method (Slide's figure) | XSLOPE | Slide | L&H reference |
+|---|---|---|---|---|---|
+| 87 | Baseline (Ta=10) | Bishop | 1.031 | 1.040 | 0.99 (FLAC) / 1.00 (Bishop) |
+| 88 | Fill φ=25 (Ta=22) | Spencer | 1.057 | 1.043 | 0.99 / 1.00 |
+| 89 | L=4.2 m (Ta=11.4) | Spencer | 1.011 *(0.980 at Ta=10)* | 0.971 *(used Ta=10)* | 0.98 / 1.00 |
+| 90 | Two types (7.5/11.0) | Bishop | 1.012 | 1.004 | 1.01 / 1.00 |
+| 91 | Foundation c=0, φ=18 | Spencer | 0.960 | 0.964 | 0.86 (FLAC, bearing) / 1.00 |
+| 92 | Water hw=3 m (Ta=9.25) | Bishop | 1.010 *(1.039 at Ta=10)* | 1.037 *(used Ta=10)* | 1.01 / 1.00 |
+| 93 | Surcharge q=20 (Ta=11.6) | Bishop | 1.017 *(0.961 at Ta=10)* | 0.958 *(used Ta=10)* | 1.02 / 1.00 |
+| 94 | Five 1.8-m tiers (Ta=10.1) | Bishop | 1.020 | 1.040 | 1.00 |
+
+*VP92 models the paper's hw as pore pressure in the foundation soil only (a drained MSE fill), plus the 3-m pond standing against the lower tier — treating the fill as saturated drops FS to ~0.89 and reconciles with neither program. xslope's free circular search finds slightly more critical circles than Slide's grid on several of these (e.g. 0.99 on the baseline, matching the L&H reference).*
+
+![vp087: inputs and representative solution](images/vp087.png)
+
+![vp088: inputs and representative solution](images/vp088.png)
+
+![vp089: inputs and representative solution](images/vp089.png)
+
+![vp090: inputs and representative solution](images/vp090.png)
+
+![vp091: inputs and representative solution](images/vp091.png)
+
+![vp092: inputs and representative solution](images/vp092.png)
+
+![vp093: inputs and representative solution](images/vp093.png)
+
+![vp094: inputs and representative solution](images/vp094.png)
+
 ### VP96: Embankment dam, homogenous, rapid drawdown, water table {#vp96}
 
 Slide #96 / USACE EM 1110-2-1902 (2003) Appendix G example: 3:1 then 2.5:1 embankment face, max pool el. 103 drawn down to 24, specified circle (169.5, 210, R=210). Material: c'=0, phi'=30, gamma=135 pcf with the Kc=1 envelope d=1379 psf, psi=18.2 deg (Figure G-5). Duncan-Wright- Wong 3-stage: Slide 1.443, USACE reference 1.44. (Slide's #95 runs the same model with the older Corps 2-stage method: 1.347.)
@@ -653,6 +756,35 @@ Slide #97: Pilarcitos Dam (Duncan, Wright & Wong 1990). Homogeneous earthfill, g
 *The dam that actually failed in drawdown sits right at FS ≈ 1.*
 
 ![vp097: inputs and representative solution](images/vp097.png)
+
+### VP98: Walter Bouldin Dam rapid drawdown (Duncan, Wright & Wong 1990) {#vp98}
+
+Slide #98: the Walter Bouldin Dam failure case — a rolled earthfill dam that failed during a 32-ft drawdown in 1975. Pool drops 47 ft → 15 ft. Five zones (riprap, clayey silty sand, micaceous sand, cretaceous clay, clayey sandy gravel) rebuilt from Slide's coordinate-labeled Figure 98.1 with the interior boundaries traced from its color zones (axis-calibrated, ±1 ft); the Kc=1 undrained envelopes come from the paper's own Table 2 — (750 psf, 15°), (480, 13°), (280, 15.5°) — with riprap and gravel drained.
+
+**Input files:** [vp098.xlsx](../files/rocscience/vp098.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| DWW 3-stage (Spencer, circular search) | 1.046 | Slide 1.039; DWW 1.04 |
+
+*The critical circle ((52,21)→(157,60)) falls where the dam actually slid. Slide's Corps 2-stage (0.931) and Lowe & Karafiath (1.075) rows exercise staged procedures xslope does not implement.*
+
+![vp098: inputs and representative solution](images/vp098.png)
+
+### VP99: Pumped-storage project dam rapid drawdown (DWW 1990) {#vp99}
+
+Slide #99: the paper's hypothetical pumped-storage dam — silty clay core and random zone (c′=0, φ′=36°, Kc=1 envelope 2250 psf/20°), free-draining rockfill shells (φ′=37°), drawdown 285 ft → 120 ft (paper El 545 → 380). Slide's figure has no vertex labels, so the geometry was extracted by axis-calibrated color segmentation (the 285/120 pool dashes pin the vertical scale; the crest coincides with the initial pool).
+
+**Input files:** [vp099.xlsx](../files/rocscience/vp099.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| DWW 3-stage (Spencer, circular search) | 1.390 | Slide 1.534; SLOPE/W 1.550; DWW 1.56 |
+| DWW 3-stage (Spencer, Slide's printed circle) | 1.428 | Slide 1.534 |
+
+*≈7% low. The two vendors' own geometries differ visibly (berm elevations, core width), and the result is sensitive to the core-face position; the geometry will be re-pinned from GeoStudio's published .gsz project when available. Tagged at the current value as a regression lock.*
+
+![vp099: inputs and representative solution](images/vp099.png)
 
 ### VP100: Embankment dam, homogenous, rapid drawdown, water table {#vp100}
 

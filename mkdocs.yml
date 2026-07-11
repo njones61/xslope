@@ -70,26 +70,25 @@ nav:
     - Reliability Analysis: fem/reliability.md
     - Sample Problems: fem/samples.md
   - Verification:
-    - Verification and Validation:
-        - Overview: verification/index.md
-        - Limit Equilibrium: verification/lem.md
-        - FE Seepage: verification/seep.md
-        - FE Slope Stability (SSRM): verification/ssrm.md
-        - Rocscience Slide2 Corpus: verification/rocscience.md
-        - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
+    - Overview: verification/index.md
+    - Limit Equilibrium: verification/lem.md
+    - FE Seepage: verification/seep.md
+    - FE Slope Stability (SSRM): verification/ssrm.md
+    - Rocscience Slide2 Corpus: verification/rocscience.md
+    - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
   - API:
-      - Advanced: api/advanced.md
-      - FEM: api/fem.md
-      - File I/O: api/fileio.md
-      - Global Config: api/global_config.md
-      - Mesh: api/mesh.md
-      - Plot: api/plot.md
-      - Plot FEM: api/plot_fem.md
-      - Plot SEEP: api/plot_seep.md
-      - SEEP: api/seep.md
-      - Search: api/search.md
-      - Slice: api/slice.md
-      - Solve: api/solve.md
+    - Advanced: api/advanced.md
+    - FEM: api/fem.md
+    - File I/O: api/fileio.md
+    - Global Config: api/global_config.md
+    - Mesh: api/mesh.md
+    - Plot: api/plot.md
+    - Plot FEM: api/plot_fem.md
+    - Plot SEEP: api/plot_seep.md
+    - SEEP: api/seep.md
+    - Search: api/search.md
+    - Slice: api/slice.md
+    - Solve: api/solve.md
   - Coding:
       - Contributing: coding/contributing.md
 

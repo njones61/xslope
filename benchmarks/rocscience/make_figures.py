@@ -34,6 +34,9 @@ SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocs
 # the crest - no readable label layout exists at panel size, so those two
 # figures skip the coordinate labels (the manual's Table 5.2 carries them).
 NO_COORD_LABELS = {'vp005', 'vp006'}
+# Geometries with tight vertex clusters where the leader-line layout helps;
+# everywhere else labels sit plainly beside their vertices (coord_arrows=False).
+COORD_ARROWS = {'vp051'}
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'images')
 
 # (file stem, surface kind, method) — kind: circle = the stored circle is the
@@ -131,6 +134,7 @@ def make_figure(stem, kind, method, panel_size=(8.0, 5.0), dpi=150):
             plot_inputs(sd, fig=fig, mat_table=False, show_title=True,
                         title=f'{stem} — inputs',
                         label_coordinates=stem not in NO_COORD_LABELS,
+                        coord_arrows=stem in COORD_ARROWS,
                         coord_label_size=6)
         else:
             plot_solution(sd, df, fs, results, fig=fig, show_title=True)

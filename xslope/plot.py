@@ -361,7 +361,7 @@ def plot_base_geometry(ax, slope_data, labels=False, style=None):
         plot_domain_base(ax, slope_data.get('domain_polygon'), style=style)
 
 
-def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
+def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None):
     """Annotate the geometry's vertex coordinates, verification-manual style.
 
     Labels every unique vertex of the profile lines (or material-zone polygon
@@ -373,6 +373,10 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
         ax: matplotlib Axes object
         slope_data: dict with 'profile_lines' or 'polygons'
         fontsize: label font size in points (default 7)
+        arrows: if True, tie each label to its vertex with a thin gray leader
+            line and allow labels to be pushed well clear of dense clusters;
+            if False (default) labels stay adjacent to their vertices and no
+            leaders are drawn
         style: reserved for future style-sheet control (unused)
     """
     seen = set()
@@ -436,7 +440,8 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
             angles = [a for a in angles if math.cos(math.radians(a)) < 0.3]
         if near_left:
             angles = [a for a in angles if math.cos(math.radians(a)) > -0.3]
-        for r in (9, 20, 32, 46, 62, 80, 100, 122):
+        radii = (9, 20, 32, 46, 62, 80, 100, 122) if arrows else (6, 12, 20)
+        for r in radii:
             for a in angles:
                 yield (r * math.cos(math.radians(a)), r * math.sin(math.radians(a)))
 
@@ -465,14 +470,19 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
             if bb_best is not None:
                 placed.append(bb_best)
 
+        kwargs = {}
+        # Leaders only where a collision actually displaced the label beyond
+        # the near ring — labels sitting beside their vertex need no arrow.
+        displaced = (dx_best ** 2 + dy_best ** 2) ** 0.5 > 13
+        if arrows and displaced:
+            kwargs['arrowprops'] = dict(arrowstyle="-", color="0.45",
+                                        linewidth=0.5, shrinkA=1, shrinkB=1)
         ax.annotate(label, (x, y), textcoords="offset points",
                     xytext=(dx_best, dy_best), fontsize=fontsize, color="black",
                     ha=ha_best, va=va_best,
                     bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
                               edgecolor="none", alpha=0.8),
-                    arrowprops=dict(arrowstyle="-", color="0.45", linewidth=0.5,
-                                    shrinkA=1, shrinkB=1),
-                    zorder=6, gid="COORD_LABEL")
+                    zorder=6, gid="COORD_LABEL", **kwargs)
 
 
 def plot_failure_surface(ax, failure_surface):
@@ -1984,6 +1994,7 @@ def plot_inputs(
     show_legend=True,
     label_coordinates=False,
     coord_label_size=7,
+    coord_arrows=False,
     fig=None,
     style=None,
 ):
@@ -2024,6 +2035,9 @@ def plot_inputs(
             vendor verification manuals (default: False).
         coord_label_size: Font size in points for the coordinate labels
             (default: 7).
+        coord_arrows: If True, labels in dense clusters are pushed clear and
+            tied back to their vertices with thin leader lines; by default
+            (False) labels stay adjacent to their vertices with no leaders.
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -2236,7 +2250,8 @@ def plot_inputs(
     # collision layout measures label boxes in display pixels, so placing them
     # earlier (before the equal-aspect rescale) invalidates the measurements.
     if label_coordinates:
-        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size, style=style)
+        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size,
+                               arrows=coord_arrows, style=style)
 
     # Get legend handles and labels
     handles, labels = ax.get_legend_handles_labels()

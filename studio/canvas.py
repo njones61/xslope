@@ -200,6 +200,7 @@ class MplCanvas(QWidget):
             tab_loc=opts.get("tab_loc", "top"),
             label_coordinates=opts.get("label_coordinates", False),
             coord_label_size=opts.get("coord_label_size", 7),
+            coord_arrows=opts.get("coord_arrows", False),
             legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), style=style))
 
     def render_solution(self, slope_data, slice_df, failure_surface, results, opts=None, style=None):

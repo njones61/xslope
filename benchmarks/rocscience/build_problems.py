@@ -851,7 +851,51 @@ def vp097():
     return 'vp097.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096, vp097]
+def _morgenstern_slope_data():
+    """Morgenstern (1963) drawdown chart slope (Slide #100/#101): 3:1 face
+    100 ft high, gamma=124.8 pcf, c'=312 psf, phi'=30. The B-bar=1 drawdown
+    pore-pressure field maps exactly onto a piezometric line: after drawdown
+    by L, u = gamma_w * (head below min(ground, initial pool - L))."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Morgenstern soil', c=312.0, phi=30.0, gamma=124.8,
+             option='mc', u='piezo')
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (300.0, 100.0), (373.0, 100.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circles'] = [{'Xo': 120.0, 'Yo': 130.0, 'Depth': 20.0, 'R': 110.0}]
+    return sd
+
+
+def vp100():
+    """Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore
+    pressure is hydrostatic below the slope surface, i.e. piezo = ground, no
+    external pond. Slide B-bar method 1.212; Morgenstern chart 1.20."""
+    sd = _morgenstern_slope_data()
+    sd['piezo_line'] = [(0.0, 0.0), (300.0, 100.0), (373.0, 100.0)]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp100.xlsx'))
+    return 'vp100.xlsx'
+
+
+def vp101():
+    """Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the
+    ground where the face is above the pool and stays at 50 below it, with
+    the remaining pond loading the submerged face. Slide 1.417;
+    Morgenstern chart 1.41."""
+    sd = _morgenstern_slope_data()
+    sd['piezo_line'] = [(0.0, 50.0), (150.0, 50.0), (300.0, 100.0), (373.0, 100.0)]
+    gw = 62.4
+    sd['dloads'] = [[
+        {'X': 0.0, 'Y': 0.0, 'Normal': gw * 50.0},
+        {'X': 150.0, 'Y': 50.0, 'Normal': 0.0},
+    ]]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp101.xlsx'))
+    return 'vp101.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

@@ -282,6 +282,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
 <!-- test: file=files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
 <!-- test: file=files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
+<!-- test: file=files/rocscience/vp100.xlsx, type=circular_search, num_slices=50, fs_bishop=1.201, fs_spencer=1.206, benchmark=VP100 -->
+<!-- test: file=files/rocscience/vp101.xlsx, type=circular_search, num_slices=50, fs_bishop=1.416, fs_spencer=1.422, benchmark=VP101 -->
 <!-- test: file=files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
 <!-- test: file=files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
@@ -389,8 +391,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 97 | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp097.xlsx](files/rocscience/vp097.xlsx). Pilarcitos Dam (Duncan, Wright & Wong 1990 — paper in `ref_docs_slope/`), drawdown 72→37 ft; Kc=1 envelope from D&W eqs 9.6-9.7 (d=64.1 psf, ψ=24.4°, the same equations reproduce USACE's 1379/18.2 exactly). Rapid 3-stage search: Spencer 1.044 / Bishop 1.042 vs Slide 1.043 and DWW 1.05 — the dam that actually failed in drawdown sits right at FS≈1. |
 | 98 | Embankment dam, (5) materials, rapid drawdown, water table | partial | Walter Bouldin Dam (DWW 1990): properties table + mostly-labeled Slide figure extracted; the five-zone shell/seam tips against the face still need the paper's Fig. 6 section — DWW paper now in `ref_docs_slope/`, build queued. Targets: DWW 3-stage 1.04, Slide 1.039. |
 | 99 | Embankment dam, (3) materials, rapid drawdown, water table | partial | Pumped-storage project dam (DWW 1990): same paper in hand, build queued. Targets: DWW 3-stage vs Slide per Table 99.2. |
-| 100 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
-| 101 | Embankment dam, homogenous, rapid drawdown, water table | planned |  |
+| 100 | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown, B̄=1 — the residual pore-pressure field maps exactly onto a piezometric line at the slope surface, so this runs as a single-stage analysis. Bishop 1.201 vs Morgenstern chart 1.20 and Slide (B-bar method) 1.212. Paper in `ref_docs_slope/`. |
+| 101 | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | 102 | Embankment dam, homogenous, rapid drawdown | planned |  |
 | 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |

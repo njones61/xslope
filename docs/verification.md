@@ -309,8 +309,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 22 | Slope, (2) materials, weak layer, ru pore pressure | planned |  |
 | 23 | Slope, (3) materials | **built** | [vp023.xlsx](files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
 | 24 | Slope, (3) materials | **built** | [vp024.xlsx](files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
-| 25 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | planned |  |
-| 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | planned |  |
+| 25 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | blocked | Prandtl bearing-capacity mechanism (weightless φ=0 soil, surface load, theoretical FS=1.0; Slide Spencer 1.051). XSLOPE's surface-validity checks reject failure surfaces whose two ends sit at equal elevation (the 'flat arc' guard) — flat-ground bearing mechanisms cannot currently be evaluated. Feature gap noted for a relaxed guard when driving comes from loads. |
+| 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | blocked | Prandtl bearing-capacity mechanism (weightless φ=0 soil, surface load, theoretical FS=1.0; Slide Spencer 0.940). XSLOPE's surface-validity checks reject failure surfaces whose two ends sit at equal elevation (the 'flat arc' guard) — flat-ground bearing mechanisms cannot currently be evaluated. Feature gap noted for a relaxed guard when driving comes from loads. |
 | 27 | Slope, (2) materials, tension crack, water table (auto Hu) | planned |  |
 | 28 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | planned |  |
 | 29 | Submerged slope, homogenous, probabilistic analysis, water table | planned |  |

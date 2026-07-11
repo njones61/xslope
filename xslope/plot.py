@@ -361,6 +361,54 @@ def plot_base_geometry(ax, slope_data, labels=False, style=None):
         plot_domain_base(ax, slope_data.get('domain_polygon'), style=style)
 
 
+def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
+    """Annotate the geometry's vertex coordinates, verification-manual style.
+
+    Labels every unique vertex of the profile lines (or material-zone polygon
+    exteriors) with "(x, y)". Vertices shared by several lines — ground points
+    repeated on each layer's profile line, coincident polygon corners — are
+    labelled once. Values print with %g so integers stay clean.
+
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: dict with 'profile_lines' or 'polygons'
+        fontsize: label font size in points (default 7)
+        style: reserved for future style-sheet control (unused)
+    """
+    seen = set()
+    points = []
+
+    def _add(x, y):
+        key = (round(float(x), 6), round(float(y), 6))
+        if key not in seen:
+            seen.add(key)
+            points.append(key)
+
+    if slope_data.get('profile_lines'):
+        for line in slope_data['profile_lines']:
+            for x, y in line['coords']:
+                _add(x, y)
+        md = slope_data.get('max_depth')
+        if md is not None and slope_data['profile_lines']:
+            xs = [x for line in slope_data['profile_lines'] for x, _ in line['coords']]
+            _add(min(xs), md)
+            _add(max(xs), md)
+    elif slope_data.get('polygons'):
+        for poly in slope_data['polygons']:
+            coords = list(poly['polygon'].exterior.coords)
+            if len(coords) > 1 and coords[0] == coords[-1]:
+                coords = coords[:-1]
+            for x, y in coords:
+                _add(x, y)
+
+    for x, y in points:
+        ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
+                    xytext=(4, 4), fontsize=fontsize, color="black",
+                    bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                              edgecolor="none", alpha=0.65),
+                    zorder=6, gid="COORD_LABEL")
+
+
 def plot_failure_surface(ax, failure_surface):
     """
     Plots the failure surface as a black line.
@@ -1868,6 +1916,8 @@ def plot_inputs(
     legend_frame=False,
     show_title=True,
     show_legend=True,
+    label_coordinates=False,
+    coord_label_size=7,
     fig=None,
     style=None,
 ):
@@ -1903,6 +1953,11 @@ def plot_inputs(
         legend_ncol: Legend column count. Use "auto" (default) to lay it out
             automatically — as wide as fits the axes, with the fewest, neatly
             balanced rows — or pass an int to force a specific column count.
+        label_coordinates: If True, annotate every unique profile-line /
+            polygon vertex with its "(x, y)" coordinates, in the style of the
+            vendor verification manuals (default: False).
+        coord_label_size: Font size in points for the coordinate labels
+            (default: 7).
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -1950,6 +2005,8 @@ def plot_inputs(
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
     plot_base_geometry(ax, slope_data, labels=True, style=style)
+    if label_coordinates:
+        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size, style=style)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data, style=style)
     if mode == "seep":

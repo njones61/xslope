@@ -242,15 +242,23 @@ class InputsDisplayPanel(QWidget):
         self.tab_loc.addItems(TAB_LOCATIONS)
         form.addRow("", self.mat_table)
         form.addRow("Table position", self.tab_loc)
+        self.label_coords = QCheckBox("Coordinate labels")
+        self.coord_size = _ispin(4, 16, 7, suffix=" pt")
+        form.addRow("", self.label_coords)
+        form.addRow("Coordinate label size", self.coord_size)
         _add_legend_controls(self, form)         # 'Legend' toggle + column layout
 
         self.mat_table.toggled.connect(self._sync)
         self.mat_table.toggled.connect(self._emit)
         self.tab_loc.currentIndexChanged.connect(self._emit)
+        self.label_coords.toggled.connect(self._sync)
+        self.label_coords.toggled.connect(self._emit)
+        self.coord_size.valueChanged.connect(self._emit)
         self._sync()
 
     def _sync(self, *_):
         self.tab_loc.setEnabled(self.mat_table.isChecked())
+        self.coord_size.setEnabled(self.label_coords.isChecked())
 
     def _emit(self, *_):
         self.changed.emit()
@@ -259,6 +267,8 @@ class InputsDisplayPanel(QWidget):
         return {
             "mat_table": self.mat_table.isChecked(),
             "tab_loc": self.tab_loc.currentText(),
+            "label_coordinates": self.label_coords.isChecked(),
+            "coord_label_size": self.coord_size.value(),
             "legend_ncol": _legend_option(self),
             "legend_frame": _legend_frame_option(self),
             "show_title": _show_title_option(self),

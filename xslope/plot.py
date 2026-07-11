@@ -403,25 +403,63 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
 
     if not points:
         return
-    # Edge-aware placement: labels hug the inside of the geometry so points on
-    # the right/left extremes don't bleed past the axes.
+    # Placement is edge-aware AND collision-aware: points on the right/left
+    # extremes keep their labels inside the axes, and clustered vertices (a
+    # dam crest with several nearly coincident corners) fan their labels
+    # through candidate offsets instead of overprinting each other. Collision
+    # checks need rendered text extents, so the figure is drawn once here.
     xs = [p[0] for p in points]
     x_min, x_max = min(xs), max(xs)
     span = max(x_max - x_min, 1e-9)
-    for x, y in points:
+    fig = ax.figure
+    renderer = None
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        pass
+
+    # Candidate (dx, dy, ha) offsets in points, nearest first. Right-edge
+    # points only get inward candidates.
+    spread = [(4, 4, "left"), (-4, 4, "right"), (4, -11, "left"),
+              (-4, -11, "right"), (4, 17, "left"), (-4, 17, "right"),
+              (18, 4, "left"), (4, -24, "left"), (4, 30, "left")]
+    spread_right = [(-4, 4, "right"), (-4, -11, "right"), (-4, 17, "right"),
+                    (-18, 4, "right"), (-4, -24, "right"), (-4, 30, "right")]
+
+    placed = []
+    for x, y in sorted(points, key=lambda p: (p[0], -p[1])):
         near_right = (x_max - x) < 0.02 * span
-        near_left = (x - x_min) < 0.02 * span
-        if near_right:
-            dx, ha = -4, "right"
-        elif near_left:
-            dx, ha = 4, "left"
+        candidates = spread_right if near_right else spread
+        ann = ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
+                          xytext=candidates[0][:2], fontsize=fontsize,
+                          color="black", ha=candidates[0][2],
+                          bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                                    edgecolor="none", alpha=0.75),
+                          zorder=6, gid="COORD_LABEL")
+        if renderer is None:
+            continue
+        best_bb, best_overlap = None, None
+        for dx, dy, ha in candidates:
+            ann.set_position((dx, dy))
+            ann.set_ha(ha)
+            try:
+                bb = ann.get_window_extent(renderer).expanded(1.08, 1.25)
+            except Exception:
+                break
+            overlap = sum(bb.overlaps(pb) for pb in placed)
+            if overlap == 0:
+                best_bb = bb
+                break
+            if best_overlap is None or overlap < best_overlap:
+                best_bb, best_overlap = bb, overlap
+                best_pos = (dx, dy, ha)
         else:
-            dx, ha = 4, "left"
-        ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
-                    xytext=(dx, 4), fontsize=fontsize, color="black", ha=ha,
-                    bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
-                              edgecolor="none", alpha=0.65),
-                    zorder=6, gid="COORD_LABEL")
+            if best_bb is not None:
+                ann.set_position(best_pos[:2])
+                ann.set_ha(best_pos[2])
+        if best_bb is not None:
+            placed.append(best_bb)
 
 
 def plot_failure_surface(ax, failure_surface):

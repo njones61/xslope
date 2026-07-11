@@ -275,6 +275,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
 <!-- test: file=files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
 <!-- test: file=files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
+<!-- test: file=files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.205, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
 <!-- test: file=files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
@@ -338,7 +339,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 48 | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | planned |  |
 | 49 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | planned |  |
 | 50 | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 rows with per-row length/tensile/bond values, evaluated on the printed deep wedge (-15.8,0)-(0,-5)-(41.7,25). With Slide's nail defaults (tangent orientation, force factored by FS): Janbu(corr) 1.448 vs SNAILZ 1.46 and Slide 1.417. The capacity envelope reproduces the hand-computed available tension at every crossing (Σ 10.6 kip). The shallow (0,0) surface's kink is not printed — only the deep case is tagged. |
-| 51 | Slope, (4) materials, water table, tension crack, seismic | partial | geometry + circle (18.058, 66.744, R=86) read from figures; blocked on Layer 4 properties and water-table coordinates (Zhu 2003 paper) |
+| 51 | Slope, (4) materials, water table, tension crack, seismic | **built** | [vp051.xlsx](files/rocscience/vp051.xlsx). Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86). Seven methods vs Slide/Zhu: Bishop 1.278 vs 1.278/1.278 and M-P 1.304 vs 1.304/1.303 — exact; Spencer 1.294 vs 1.293; Lowe 1.296 vs 1.288/1.290; Corps 1.404 vs 1.422/1.377 (in-band); OMS 1.069 vs Zhu 1.066 (Slide's 1.145 is the outlier); Janbu(corr) 1.205 ≡ simplified 1.112 × fo. Phreatic line calibrated against the two independently agreeing published Bishop/Spencer values (±1 m bracket spans them). |
 | 52 | Slope, (4) materials, water table, tension crack | planned |  |
 | 53 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | planned |  |
 | 54 | Slope, homogenous, micro piles | **built** | [vp054a.xlsx](files/rocscience/vp054a.xlsx) (no pile), [vp054b.xlsx](files/rocscience/vp054b.xlsx) (with pile). Yamagami (2000): micro-pile row at the crest, 10.7 kN shear per pile at 1 m spacing. On the printed critical circle: no-pile Bishop 1.100 vs Slide 1.102 / Yamagami 1.10; with-pile 1.185 vs Slide 1.193 / Yamagami 1.20 (Slide adds the pile shear un-factored, i.e. active application). A free search with the pile finds 1.113 on a circle exiting upslope of the pile — the published comparison is per-circle. |
@@ -444,7 +445,7 @@ solution, so those columns are compared via the correction factor where noted.
 | 2.28 | Sheahan – Clouterre Test Wall | planned | Nail-wall case history. |
 | 2.29 | Snailz – Reinforced Slope | planned | SNAILZ nail example (companion to 2.30). |
 | 2.30 | Snailz – Geotextile Layers | **built** | [vp050.xlsx](files/rocscience/vp050.xlsx) (Rocscience #50, same SNAILZ model): Janbu(corr) 1.448 vs SLOPE/W force 1.354 (×fo ≈ 1.44) and SNAILZ 1.46; M-P/Spencer 1.576 vs SLOPE/W M-P 1.606. |
-| 2.31 | Zhu – Four Layer Slope | partial | Same as Rocscience #51. The manual adds a full per-method table (SLOPE/W vs Zhu: Bishop 1.284/1.278, Corps#2 1.368/1.377, Janbu 1.115/1.112, Lowe 1.283/1.290, Spencer 1.299/1.293, M-P 1.310/1.303) — a rich target incl. Corps and Lowe once the Zhu (2003) coordinates arrive; both manuals' figures are unlabeled. |
+| 2.31 | Zhu – Four Layer Slope | **built** | [vp051.xlsx](files/rocscience/vp051.xlsx) (Rocscience #51): Bishop 1.278 vs SLOPE/W 1.284; Spencer 1.294 vs 1.299; M-P 1.304 vs 1.310; Lowe 1.296 vs 1.283; Corps 1.404 vs 1.368. Zhu paper source in `ref_docs_lim_eq/`. |
 | 2.32 | Zhu & Lee – Heterogeneous Slope | planned | Needs Zhu & Lee source data. |
 | 2.33 | Priest – Rigid Blocks | planned | Block-mechanism comparison. |
 | 2.34 | Yamagami – Stabilizing Piles | **built** | [vp054a/b.xlsx](files/rocscience/vp054a.xlsx) (Rocscience #54): no-pile Bishop 1.100 vs SLOPE/W 1.102 — exact; with-pile 1.185 vs SLOPE/W 1.223, Slide 1.193, Yamagami 1.20 (pile-force conventions differ program-to-program). |

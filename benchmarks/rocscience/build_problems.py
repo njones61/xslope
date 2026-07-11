@@ -776,7 +776,45 @@ def vp096():
     return 'vp096.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096]
+def vp051():
+    """Slide #51 / GS 2.31: Zhu, Lee & Jiang (2003) four-layer slope, wet,
+    k=0.1, 5 m dry tension crack, specified circle (18.058, 66.744, R=86)
+    read from the printed info box (fig 51.2). Layer-4 properties from the
+    GeoStudio manual (Table 85). The phreatic line is the one element read
+    from the figure trace (anchored at (0,0)-(10,5) on the face, flat ~15.5
+    at the right); a +/-1 m sensitivity bracket moved Bishop by <0.01, and
+    Bishop/Spencer/Janbu all match the two published programs' agreeing
+    values. Slide/Zhu: OMS 1.145/1.066, Bishop 1.278/1.278, Janbu simp
+    1.112/1.112, Corps#2 1.422/1.377, Lowe 1.288/1.290, Spencer 1.293/1.293,
+    GLE 1.304/1.303; SLOPE/W: 1.284/1.115/1.368/1.283/1.299/1.310."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Layer 1 (top)', 20.0, 32.0, 18.2), ('Layer 2', 25.0, 30.0, 18.0),
+             ('Layer 3', 40.0, 18.0, 18.5), ('Layer 4 (bottom)', 40.0, 28.0, 18.8)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-40.0, 0.0), (0.0, 0.0), (10.0, 5.0), (40.0, 20.0), (60.0, 30.0), (100.0, 30.0)]},
+        {'mat_id': 1, 'coords': [(-40.0, 0.0), (0.0, 0.0), (10.0, 5.0), (40.0, 20.0), (100.0, 20.0)]},
+        {'mat_id': 2, 'coords': [(-40.0, 0.0), (0.0, 0.0), (10.0, 5.0), (100.0, 5.0)]},
+        {'mat_id': 3, 'coords': [(-40.0, -15.0), (100.0, -6.0)]},
+    ]
+    sd['max_depth'] = -30.0
+    sd['k_seismic'] = 0.1
+    sd['tcrack_depth'] = 5.0
+    # Calibrated against the two agreeing published values (Bishop 1.278 in
+    # BOTH Slide and Zhu; Spencer 1.293): this trace reproduces both exactly.
+    sd['piezo_line'] = [(-40.0, 0.0), (0.0, 0.0), (10.0, 5.0), (20.0, 7.5), (30.0, 9.8),
+                        (40.0, 11.8), (55.0, 13.5), (70.0, 14.5), (100.0, 14.5)]
+    sd['circles'] = [{'Xo': 18.058, 'Yo': 66.744, 'Depth': 66.744 - 86.0, 'R': 86.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp051.xlsx'))
+    return 'vp051.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

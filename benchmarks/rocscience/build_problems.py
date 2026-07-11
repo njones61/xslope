@@ -895,7 +895,54 @@ def vp101():
     return 'vp101.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096, vp097, vp100, vp101]
+def _zhu_lee_slope_data(wet):
+    """Zhu & Lee (2002) heterogeneous slope (Slide #52): benched 4-layer
+    profile, layers daylighting at (6,3) and (18,9); dry tension crack at the
+    crest. Wet case adds the manual's Table 52.2 water table."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Layer 1 (top)', 20.0, 18.0, 18.8), ('Layer 2', 40.0, 22.0, 18.5),
+             ('Layer 3', 25.0, 26.0, 18.4), ('Layer 4 (bottom)', 10.0, 12.0, 18.0)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc',
+                 u=('piezo' if wet else 'none'))
+        sd['materials'].append(m)
+    ground = [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0), (18.0, 9.0), (30.0, 15.0), (50.0, 15.0)]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': ground},
+        {'mat_id': 1, 'coords': [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0), (18.0, 9.0), (50.0, 9.0)]},
+        {'mat_id': 2, 'coords': [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0), (50.0, 3.0)]},
+        {'mat_id': 3, 'coords': [(-20.0, -6.0), (50.0, -6.0)]},
+    ]
+    sd['max_depth'] = -9.0
+    if wet:
+        sd['piezo_line'] = [(-20.0, 0.0), (0.0, 0.0), (6.0, 3.0), (10.568, 5.284),
+                            (25.314, 9.002), (39.149, 10.269), (50.0, 10.269)]
+    sd['circles'] = [{'Xo': 20.0, 'Yo': 25.0, 'Depth': -5.0, 'R': 30.0}]
+    return sd
+
+
+def vp052a():
+    """Slide #52, dry. Unconstrained circular search lands in the deep
+    (surface 3) family: Slide grid search Spencer 1.804 / Zhu 1.836 on his
+    specified deep circle (the manual's own Bishop shows a 1.804-vs-1.429
+    Slide-Zhu spread here, so the family band is wide)."""
+    sd = _zhu_lee_slope_data(False)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp052a.xlsx'))
+    return 'vp052a.xlsx'
+
+
+def vp052b():
+    """Slide #52, wet (Table 52.2 water table). Deep family: Slide Spencer
+    1.189 / Zhu 1.211."""
+    sd = _zhu_lee_slope_data(True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp052b.xlsx'))
+    return 'vp052b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp096, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

@@ -146,10 +146,10 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 75 | Dyke, (4) materials | planned |  |
 | 76 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | planned |  |
 | 77 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | planned |  |
-| 78 | Slope, homogenous | planned |  |
-| 79 | Slope, (2) materials, infinite slope failure | planned |  |
+| 78 | Slope, homogenous | planned | Duncan & Wright (2005) Fig. 14.3 — the D&W book is in hand (2014 ed. in ref library); build queued. |
+| 79 | Slope, (2) materials, infinite slope failure | planned | Duncan & Wright (2005) Fig. 14.4 — the D&W book is in hand (2014 ed. in ref library); build queued. |
 | 80 | Embankment, (6) materials | planned |  |
-| 81 | Embankment, (2) materials, infinite slope failure | planned |  |
+| 81 | Embankment, (2) materials, infinite slope failure | planned | Duncan & Wright (2005) Fig. 14.7 — the D&W book is in hand (2014 ed. in ref library); build queued. |
 | 82 | Embankment, (2) materials, water table | planned |  |
 | 83 | Embankment, (2) materials | planned |  |
 | 84 | Embankment, (2) materials | planned |  |

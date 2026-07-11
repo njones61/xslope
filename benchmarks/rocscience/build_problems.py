@@ -709,7 +709,40 @@ def vp086():
     return 'vp086.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp085a, vp085b, vp086]
+def _loukidis_slope_data(k, ru):
+    """Loukidis et al. (2003) ex. 1 (Slide #62): 3:1 homogeneous clay slope,
+    c'=25, phi'=30, gamma=20, analyzed at the critical seismic coefficient
+    (FS should equal 1.0)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Clay', c=25.0, phi=30.0, gamma=20.0, option='mc',
+             u=('ru' if ru else 'none'), ru=ru)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-50.0, 0.0), (0.0, 0.0), (75.0, 25.0), (150.0, 25.0)]},
+    ]
+    sd['max_depth'] = -25.0
+    sd['k_seismic'] = k
+    sd['circles'] = [{'Xo': 30.0, 'Yo': 45.0, 'Depth': 0.0, 'R': 45.0}]
+    return sd
+
+
+def vp062a():
+    """Slide #62 dry case, kc=0.432. Slide circular: Spencer 1.001,
+    Bishop 0.991; Loukidis log-spiral Spencer 1.000."""
+    sd = _loukidis_slope_data(0.432, 0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp062a.xlsx'))
+    return 'vp062a.xlsx'
+
+
+def vp062b():
+    """Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001,
+    Bishop 0.987; Loukidis 1.000."""
+    sd = _loukidis_slope_data(0.132, 0.5)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp062b.xlsx'))
+    return 'vp062b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp045a, vp045b, vp050, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

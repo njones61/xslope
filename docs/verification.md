@@ -278,6 +278,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
 <!-- test: file=files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
+<!-- test: file=files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
+<!-- test: file=files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
 <!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
 <!-- test: file=files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
 <!-- test: file=files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
@@ -346,7 +348,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 59 | Retaining wall, homogenous, water table, grouted tieback | planned |  |
 | 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
 | 61 | Slope, homogenous, composite surfaces | planned |  |
-| 62 | Slope, homogenous, ru pore pressure, seismic | planned |  |
+| 62 | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
 | 63 | Slope, (3) materials, seismic | planned |  |
 | 64 | Embankment, (4) materials, water table, tension crack | planned |  |
 | 65 | Embankment, (4) materials, water table, ponded water | planned |  |

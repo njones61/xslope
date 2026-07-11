@@ -401,9 +401,24 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
             for x, y in coords:
                 _add(x, y)
 
+    if not points:
+        return
+    # Edge-aware placement: labels hug the inside of the geometry so points on
+    # the right/left extremes don't bleed past the axes.
+    xs = [p[0] for p in points]
+    x_min, x_max = min(xs), max(xs)
+    span = max(x_max - x_min, 1e-9)
     for x, y in points:
+        near_right = (x_max - x) < 0.02 * span
+        near_left = (x - x_min) < 0.02 * span
+        if near_right:
+            dx, ha = -4, "right"
+        elif near_left:
+            dx, ha = 4, "left"
+        else:
+            dx, ha = 4, "left"
         ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
-                    xytext=(4, 4), fontsize=fontsize, color="black",
+                    xytext=(dx, 4), fontsize=fontsize, color="black", ha=ha,
                     bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
                               edgecolor="none", alpha=0.65),
                     zorder=6, gid="COORD_LABEL")

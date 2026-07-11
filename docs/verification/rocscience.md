@@ -178,7 +178,14 @@ ACADS 1(b) (Giam & Donald 1989): the 1(a) slope with c'=32, phi'=10, gamma=20 an
 
 **Input files:** [vp002.xlsx](../files/rocscience/vp002.xlsx)
 
-**Results.** Bishop 1.589 / Spencer 1.585 / Janbu(corr) 1.495 / M-P 1.586 vs Slide 1.596 / 1.592 / 1.489 / 1.592 (±0.4%); Giam reference 1.65.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.589 | Slide 1.596; SLOPE/W 1.664 |
+| Janbu (corrected) | 1.495 | Slide 1.489 |
+| Spencer | 1.585 | Slide 1.592 |
+| Morgenstern-Price | 1.586 | Slide 1.592; SLOPE/W 1.660 |
+
+*ACADS reference band 1.65–1.70 (Giam & Donald).*
 
 ![vp002: inputs and representative solution](images/vp002.png)
 
@@ -188,7 +195,14 @@ ACADS 1(c): non-homogeneous three-layer slope, critical circle. Slide2: Bishop 1
 
 **Input files:** [vp003.xlsx](../files/rocscience/vp003.xlsx)
 
-**Results.** Bishop 1.403 / Spencer 1.372 / Janbu(corr) 1.354 / M-P 1.371 vs Slide 1.405 / 1.375 / 1.357 / 1.374 (±0.3%); ACADS reference 1.39. Interface coordinates read from the labeled GeoStudio verification-manual figure of the same ACADS 1(c) problem.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.403 | Slide 1.405; SLOPE/W 1.414 |
+| Janbu (corrected) | 1.354 | Slide 1.357 |
+| Spencer | 1.372 | Slide 1.375 |
+| Morgenstern-Price | 1.371 | Slide 1.374; SLOPE/W 1.382 |
+
+*ACADS reference 1.39.*
 
 ![vp003: inputs and representative solution](images/vp003.png)
 
@@ -198,7 +212,14 @@ ACADS 1(d): problem #3 plus horizontal seismic coefficient 0.15. Slide2: Bishop 
 
 **Input files:** [vp004.xlsx](../files/rocscience/vp004.xlsx)
 
-**Results.** Problem #3 + k=0.15g. Bishop 1.013 / Spencer 0.989 / Janbu(corr) 0.963 / M-P 0.987 vs Slide 1.016 / 0.991 / 0.965 / 0.989 (±0.3%); ACADS reference 1.00.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.013 | Slide 1.016; SLOPE/W 1.02 |
+| Janbu (corrected) | 0.963 | Slide 0.965 |
+| Spencer | 0.989 | Slide 0.991 |
+| Morgenstern-Price | 0.987 | Slide 0.989; SLOPE/W 0.989 |
+
+*ACADS reference 1.00.*
 
 ![vp004: inputs and representative solution](images/vp004.png)
 
@@ -208,7 +229,14 @@ ACADS 2(a) (Giam & Donald 1989): Talbingo Dam at end of construction, 4 zones, c
 
 **Input files:** [vp005.xlsx](../files/rocscience/vp005.xlsx)
 
-**Results.** Talbingo Dam, end of construction (polygon-zone geometry). Critical mechanism is the infinite-slope limit on the upstream face: stored shallow circle gives 1.955 (all methods) vs Slide 1.948-1.949 and the tan φ/tan β limit 1.9475.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.955 | Slide 1.948; SLOPE/W 1.951 |
+| Janbu (corrected) | 1.965 | Slide 1.949 |
+| Spencer | 1.955 | Slide 1.948 |
+| Morgenstern-Price | 1.955 | Slide 1.948 |
+
+*Critical mechanism is the infinite-slope limit: tan φ′/tan β = 1.9475.*
 
 ![vp005: inputs and representative solution](images/vp005.png)
 
@@ -218,7 +246,14 @@ ACADS 2(b): Talbingo Dam, single specified circle Xc=100.3, Yc=291.0, R=278.8 (T
 
 **Input files:** [vp006.xlsx](../files/rocscience/vp006.xlsx)
 
-**Results.** Specified circle (100.3, 291, R=278.8) through the inclined core. Bishop 2.206 / Spencer 2.290 / Janbu(corr) 2.073 / M-P 2.299 vs Slide 2.208 / 2.292 / 2.073 / 2.301 (±0.1%); ACADS reference 2.29. This problem exposed (and now guards) the folded-zone slice-weight bug fixed in `slice.py`.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 2.206 | Slide 2.208; SLOPE/W 2.207 |
+| Janbu (corrected) | 2.073 | Slide 2.073 |
+| Spencer | 2.290 | Slide 2.292 |
+| Morgenstern-Price | 2.299 | Slide 2.301; SLOPE/W 2.299 |
+
+*ACADS reference 2.29. The problem that exposed the folded-zone slice-weight bug.*
 
 ![vp006: inputs and representative solution](images/vp006.png)
 
@@ -228,7 +263,13 @@ ACADS 3(b): the weak-layer slope (= LEM sample 13 / Slide #7) with the fully spe
 
 **Input files:** [vp008.xlsx](../files/rocscience/vp008.xlsx)
 
-**Results.** Specified 4-point surface (Table 8.2). Spencer 1.276 / Janbu(corr) 1.294 / M-P 1.260 vs Slide 1.277 / 1.294 / 1.262 (exact to ±0.002); SLOPE/W M-P 1.261; Giam reference 1.34.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Janbu (corrected) | 1.294 | Slide 1.294 |
+| Spencer | 1.276 | Slide 1.277 |
+| Morgenstern-Price | 1.260 | Slide 1.262; SLOPE/W 1.261 |
+
+*Giam reference 1.34.*
 
 ![vp008: inputs and representative solution](images/vp008.png)
 
@@ -238,7 +279,12 @@ ACADS 4 (Slide #9): weak-layer slope + piezometric surface (Table 9.3) + two sur
 
 **Input files:** [vp009.xlsx](../files/rocscience/vp009.xlsx)
 
-**Results.** ACADS 4: inclined 0.6 m seam (geometry from the labeled GeoStudio figure), 8-point piezometric line, two surcharge strips. Non-circular search: Spencer 0.724 / Janbu(corr) 0.718 (M-P reaches 0.707 from a wider seed but does not solve the stored seed, so it is not tagged) vs Slide 0.760/0.720/0.734 (block search) and 0.707/0.683/0.699 (optimized); SLOPE/W 0.699-0.689; ACADS references 0.78 [Giam], 0.6878 [Slope 2000], 20-program mean 0.808. Published spread is wide; XSLOPE sits mid-band.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Janbu (corrected) | 0.718 | Slide 0.734 / 0.699 |
+| Spencer | 0.724 | Slide 0.760 (block) / 0.707 (optimized) |
+
+*SLOPE/W Bishop 0.699, M-P 0.689; ACADS 0.6878 (Slope 2000), 20-program mean 0.808 — a wide published band.*
 
 ![vp009: inputs and representative solution](images/vp009.png)
 
@@ -248,7 +294,14 @@ Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak (c=9.8, phi=
 
 **Input files:** [vp015.xlsx](../files/rocscience/vp015.xlsx)
 
-**Results.** Arai & Tagyo (1985) ex. 2, weak middle band. Circular search: Bishop 0.419 / Spencer 0.422 / Janbu(corr) 0.436 / M-P 0.420 vs Slide 0.420 / 0.409 / 0.423 / (GLE) 0.437; A&T Bishop 0.417; Kim et al. 0.43.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 0.419 | Slide 0.420; A&T 0.417 |
+| Janbu (corrected) | 0.436 | Slide 0.423; A&T 0.430 |
+| Spencer | 0.422 | Slide 0.409 |
+| Morgenstern-Price | 0.420 | Slide (GLE) 0.437 |
+
+*Kim et al. (2002) 0.43.*
 
 ![vp015: inputs and representative solution](images/vp015.png)
 
@@ -258,7 +311,14 @@ Slide #16: Arai & Tagyo (1985) example 3 - homogeneous slope with a water table.
 
 **Input files:** [vp016.xlsx](../files/rocscience/vp016.xlsx)
 
-**Results.** Arai & Tagyo (1985) ex. 3, piezometric line. Circular search: Bishop 1.112 / Spencer 1.113 / Janbu(corr) 1.122 / M-P 1.111 vs Slide 1.118 / 1.118 / 1.131; A&T Bishop 1.138.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.112 | Slide 1.118; A&T 1.138 |
+| Janbu (corrected) | 1.122 | Slide 1.131 |
+| Spencer | 1.113 | Slide 1.118 |
+| Morgenstern-Price | 1.111 | — |
+
+*SLOPE/W reports 1.190, the outlier of the four sources.*
 
 ![vp016: inputs and representative solution](images/vp016.png)
 
@@ -268,7 +328,13 @@ Slide #17: Yamagami & Ueta (1988) homogeneous slope, dry. Circular: Slide Bishop
 
 **Input files:** [vp017.xlsx](../files/rocscience/vp017.xlsx)
 
-**Results.** Yamagami & Ueta (1988). Circular search: Ordinary 1.274 / Bishop 1.342 / Spencer 1.340 vs Slide 1.278 / 1.344 and Y&U 1.282 / 1.348; published non-circular Spencer 1.325-1.339 (our local non-circular search reaches 1.394 — same search-power note as #19/#20).
+| Method | XSLOPE | Published |
+|---|---|---|
+| Ordinary | 1.274 | Slide 1.278; Y&U 1.282 |
+| Bishop | 1.342 | Slide 1.344; Y&U 1.348 |
+| Spencer | 1.340 | published non-circular 1.325–1.339 |
+
+*Our local non-circular search reaches 1.394 — same search-power note as VP19/VP20.*
 
 ![vp017: inputs and representative solution](images/vp017.png)
 
@@ -278,7 +344,10 @@ Slide #18: Spencer (1969) / Baker (1980) homogeneous slope with ru=0.5, non-circ
 
 **Input files:** [vp018.xlsx](../files/rocscience/vp018.xlsx)
 
-**Results.** Spencer (1969)/Baker (1980) slope, ru=0.5, non-circular search (right-facing). Spencer 1.033 / M-P 1.024 vs Slide 1.010 (random search + Monte-Carlo optimization), Baker 1.02, Spencer (1969) 1.08.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 1.033 | Slide 1.010 (MC-optimized); Baker 1.02; Spencer (1969) 1.08 |
+| Morgenstern-Price | 1.024 | — |
 
 ![vp018: inputs and representative solution](images/vp018.png)
 
@@ -288,7 +357,12 @@ Slide #19: Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope, no wate
 
 **Input files:** [vp019.xlsx](../files/rocscience/vp019.xlsx)
 
-**Results.** Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope. Circular search: Spencer 1.429 / Bishop 1.448 vs published Spencer 1.40-1.42. Non-circular: XSLOPE's local search plateaus at ~1.45 from the stored seed while Slide's Monte-Carlo optimization reaches 1.398 — a search-power gap (noted for future search work), not a model difference.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.448 | — |
+| Spencer | 1.429 | Greco / Y&U 1.40–1.42; Slide MC 1.398 |
+
+*Circular-search values; the local non-circular search plateaus ~1.45 (search-power gap).*
 
 ![vp019: inputs and representative solution](images/vp019.png)
 
@@ -298,7 +372,12 @@ Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a 0.5 m wea
 
 **Input files:** [vp020.xlsx](../files/rocscience/vp020.xlsx)
 
-**Results.** Greco (1996) ex. 5 / Chen & Shao (1988): 0.5 m weak seam along the inclined base (polygon zones), water table. Circular: Bishop 1.086 / Spencer 1.091 vs Slide 1.087 / 1.093 (exact). Non-circular seam block: local search 1.082 vs Slide Monte-Carlo 1.010, Chen & Shao 1.01-1.03, Greco 0.973-1.1 — same search-power gap as #19.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.086 | Slide 1.087 |
+| Spencer | 1.082 | Slide 1.093; Greco 1.08 |
+
+*Non-circular seam block: local search 1.082 vs Slide MC 1.010, Chen & Shao 1.01–1.03.*
 
 ![vp020: inputs and representative solution](images/vp020.png)
 
@@ -308,7 +387,12 @@ Slide #23: Low (1989) slope over two undrained layers; the lower layer's cu grow
 
 **Input files:** [vp023.xlsx](../files/rocscience/vp023.xlsx)
 
-**Results.** Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19).
+| Method | XSLOPE | Published |
+|---|---|---|
+| Ordinary | 1.357 | Slide 1.370; Low 1.36 |
+| Bishop | 1.130 | Slide 1.192; Low 1.14; Kim 1.17 |
+
+*Published Bishop values themselves spread 1.14–1.19 on this deep φ=0 problem.*
 
 ![vp023: inputs and representative solution](images/vp023.png)
 
@@ -318,7 +402,10 @@ Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular search. Slid
 
 **Input files:** [vp024.xlsx](../files/rocscience/vp024.xlsx)
 
-**Results.** Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Ordinary | 1.433 | Slide 1.439; Low 1.44 |
+| Bishop | 1.433 | Slide 1.439; Low 1.44 |
 
 ![vp024: inputs and representative solution](images/vp024.png)
 
@@ -328,7 +415,12 @@ Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18
 
 **Input files:** [vp036.xlsx](../files/rocscience/vp036.xlsx)
 
-**Results.** Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, ru=0.2). Deterministic Bishop 1.333 vs H&W 1.334 (Slide 1.340). Taylor-series β_ln on the critical surface 2.263 vs H&W (FOSM) 2.336 and Slide (Monte-Carlo) 2.482 — β estimates legitimately spread by method; xslope does not yet perturb ru (σ=0.02, minor).
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.333 | H&W 1.334; Slide 1.340 |
+| β_ln (reliability) | 2.263 | H&W (FOSM) 2.336; Slide (Monte-Carlo) 2.482 |
+
+*β estimates legitimately spread by estimation method; xslope does not yet perturb ru (σ = 0.02, minor).*
 
 ![vp036: inputs and representative solution](images/vp036.png)
 
@@ -338,7 +430,13 @@ Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curv
 
 **Input files:** [vp041.xlsx](../files/rocscience/vp041.xlsx)
 
-**Results.** Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.668 | Slide 1.656 (path search); Charles & Soares 1.66 |
+| Janbu (corrected) | 1.660 | Slide simplified 1.563 |
+| Spencer | 1.670 | — |
+
+*Published range 1.56–1.67.*
 
 ![vp041: inputs and representative solution](images/vp041.png)
 
@@ -350,7 +448,19 @@ Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's A=0.58, n=0.86, 
 
 **Input files:** [vp045a.xlsx](../files/rocscience/vp045a.xlsx), [vp045b.xlsx](../files/rocscience/vp045b.xlsx)
 
-**Results.** (Mohr-Coulomb), vp045b.xlsx (power curve). Baker (2003) ex. 2: linear vs non-linear envelope on the same 4:1 slope. Spencer: MC 2.801 vs Slide 2.794; power curve 2.649 vs Slide 2.662. (Slide's Janbu values are simplified/uncorrected; ours carry the fo correction and agree once scaled.)
+*Mohr-Coulomb case*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 2.801 | Slide 2.794 |
+
+*Power-curve case*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 2.649 | Slide 2.662 |
+
+*Slide’s Janbu values are simplified/uncorrected; ours carry fo and agree once scaled.*
 
 ![vp045a: inputs and representative solution](images/vp045a.png)
 
@@ -362,7 +472,12 @@ Slide #50 (SNAILZ reference manual): nail-reinforced wall, 14 horizontal rows wi
 
 **Input files:** [vp050.xlsx](../files/rocscience/vp050.xlsx)
 
-**Results.** SNAILZ reference-manual nail wall: 14 rows with per-row length/tensile/bond values, evaluated on the printed deep wedge (-15.8,0)-(0,-5)-(41.7,25). With Slide's nail defaults (tangent orientation, force factored by FS): Janbu(corr) 1.448 vs SNAILZ 1.46 and Slide 1.417. The capacity envelope reproduces the hand-computed available tension at every crossing (Σ 10.6 kip). The shallow (0,0) surface's kink is not printed — only the deep case is tagged.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Janbu (corrected) | 1.448 | SNAILZ 1.46; Slide 1.417; SLOPE/W force 1.354 (×fo ≈ 1.44) |
+| Spencer | 1.576 | SLOPE/W M-P 1.606 |
+
+*Tangent orientation with the force factored by FS (Slide’s nail defaults + SNAILZ convention); axial+active gives 1.675 — conventions dominate this comparison.*
 
 ![vp050: inputs and representative solution](images/vp050.png)
 
@@ -372,7 +487,17 @@ Slide #51 / GS 2.31: Zhu, Lee & Jiang (2003) four-layer slope, wet, k=0.1, 5 m d
 
 **Input files:** [vp051.xlsx](../files/rocscience/vp051.xlsx)
 
-**Results.** Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86). Seven methods vs Slide/Zhu: Bishop 1.278 vs 1.278/1.278 and M-P 1.304 vs 1.304/1.303 — exact; Spencer 1.294 vs 1.293; Lowe 1.296 vs 1.288/1.290; Corps 1.404 vs 1.422/1.377 (in-band); OMS 1.069 vs Zhu 1.066 (Slide's 1.145 is the outlier); Janbu(corr) 1.205 ≡ simplified 1.112 × fo. Phreatic line calibrated against the two independently agreeing published Bishop/Spencer values (±1 m bracket spans them).
+| Method | XSLOPE | Published |
+|---|---|---|
+| Ordinary | 1.069 | Slide 1.145; Zhu 1.066; SLOPE/W 1.284* |
+| Bishop | 1.278 | Slide 1.278; Zhu 1.278; SLOPE/W 1.284 |
+| Janbu (corrected) | 1.205 | Slide/Zhu simplified 1.112 (×fo ≈ 1.20) |
+| Corps #2 | 1.404 | Slide 1.422; Zhu 1.377; SLOPE/W 1.368 |
+| Lowe-Karafiath | 1.296 | Slide 1.288; Zhu 1.290; SLOPE/W 1.283 |
+| Spencer | 1.294 | Slide 1.293; Zhu 1.293; SLOPE/W 1.299 |
+| Morgenstern-Price | 1.304 | Slide 1.304; Zhu 1.303; SLOPE/W 1.310 |
+
+*Phreatic line calibrated against the two independently agreeing Bishop/Spencer anchors (±1 m bracket).*
 
 ![vp051: inputs and representative solution](images/vp051.png)
 
@@ -384,7 +509,21 @@ Slide #52, wet (Table 52.2 water table). Deep family: Slide Spencer 1.189 / Zhu 
 
 **Input files:** [vp052a.xlsx](../files/rocscience/vp052a.xlsx), [vp052b.xlsx](../files/rocscience/vp052b.xlsx)
 
-**Results.** Zhu & Lee (2002), heterogeneous benched slope; water table from the manual's Table 52.2. Unconstrained circular search lands in the governing deep (surface 3) family: wet Spencer 1.189 and Bishop 1.176 vs Slide 1.189 / 1.176 — exact; dry 1.797 / 1.796 vs Slide 1.804. Zhu's own values on his specified circle: 1.211 / 1.836 (the manual shows a wide Slide-Zhu spread on this family). The shallow/noncircular cases (surfaces 1, 2, 4) use constrained/block searches xslope does not yet expose — noted, not tagged. Paper in `ref_docs_lim_eq/`.
+*Dry — governing deep (surface 3) family*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.796 | Slide 1.804; Zhu 1.429 |
+| Spencer | 1.797 | Slide 1.804; Zhu 1.836 |
+
+*Wet — governing deep (surface 3) family*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.176 | Slide 1.176; Zhu 1.079 |
+| Spencer | 1.189 | Slide 1.189; Zhu 1.211 |
+
+*Wet Spencer and Bishop match Slide exactly; the manual itself shows a wide Slide–Zhu spread on this family.*
 
 ![vp052a: inputs and representative solution](images/vp052a.png)
 
@@ -398,7 +537,19 @@ Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 
 **Input files:** [vp054a.xlsx](../files/rocscience/vp054a.xlsx), [vp054b.xlsx](../files/rocscience/vp054b.xlsx)
 
-**Results.** Yamagami (2000): micro-pile row at the crest, 10.7 kN shear per pile at 1 m spacing. On the printed critical circle: no-pile Bishop 1.100 vs Slide 1.102 / Yamagami 1.10; with-pile 1.185 vs Slide 1.193 / Yamagami 1.20 (Slide adds the pile shear un-factored, i.e. active application). A free search with the pile finds 1.113 on a circle exiting upslope of the pile — the published comparison is per-circle.
+*No pile*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.100 | Slide 1.102; Yamagami 1.10; SLOPE/W 1.102 |
+
+*With micro-pile row*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.185 | Slide 1.193; Yamagami 1.20; SLOPE/W 1.223 |
+
+*Slide adds the pile shear un-factored (= our active application); a free search finds 1.113 on a circle exiting upslope of the pile, so the tags pin the printed circle.*
 
 ![vp054a: inputs and representative solution](images/vp054a.png)
 
@@ -412,7 +563,19 @@ Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001, Bishop 0.987; Lo
 
 **Input files:** [vp062a.xlsx](../files/rocscience/vp062a.xlsx), [vp062b.xlsx](../files/rocscience/vp062b.xlsx)
 
-**Results.** Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact.
+*Dry, kc = 0.432*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 0.991 | Slide 0.991; SLOPE/W 0.993 |
+| Spencer | 1.001 | Slide 1.001; SLOPE/W 1.001; Loukidis 1.000 |
+
+*ru = 0.5, kc = 0.132*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 0.986 | Slide 0.987; SLOPE/W 0.988 |
+| Spencer | 1.001 | Slide 1.001; SLOPE/W 1.001; Loukidis 1.000 |
 
 ![vp062a: inputs and representative solution](images/vp062a.png)
 
@@ -426,7 +589,21 @@ Slide #85 case 2 (passive). D&W reference 1.32; Slide circular Bishop 1.324.
 
 **Input files:** [vp085a.xlsx](../files/rocscience/vp085a.xlsx), [vp085b.xlsx](../files/rocscience/vp085b.xlsx)
 
-**Results.** Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope — the reinforcement acceptance benchmark from the design plan. On Slide's printed critical circles: active 1.567 vs Slide GLE 1.575 (D&W 1.51); passive Bishop 1.319 vs Slide 1.324 (D&W 1.32). Slide's own method table scatters 1.42-2.05 here (concentrated force strains interslice assumptions), so per-circle comparison is the meaningful one.
+*Active support, on Slide’s printed GLE circle*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.567 | Slide GLE 1.575 (same circle); D&W 1.51 |
+| Spencer | 1.567 | Slide GLE 1.575 (same circle) |
+
+*Passive support, on Slide’s printed Bishop circle*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Ordinary | 1.319 | Slide Bishop 1.324 (same circle); D&W 1.32 |
+| Bishop | 1.319 | Slide 1.324; D&W 1.32 |
+
+*Slide’s own method table scatters 1.42–2.05 here (concentrated force strains interslice assumptions), so per-circle comparison is the meaningful one.*
 
 ![vp085a: inputs and representative solution](images/vp085a.png)
 
@@ -438,7 +615,12 @@ Slide #86: Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on a strong
 
 **Input files:** [vp086.xlsx](../files/rocscience/vp086.xlsx)
 
-**Results.** Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on rock: five 800 lb/ft geogrids. Circular search: Bishop 1.617 / Spencer 1.611 vs Slide 1.629 / 1.620; D&W reference 1.61.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.617 | Slide 1.629 |
+| Spencer | 1.611 | Slide 1.620 |
+
+*Duncan & Wright reference 1.61.*
 
 ![vp086: inputs and representative solution](images/vp086.png)
 
@@ -448,7 +630,12 @@ Slide #96 / USACE EM 1110-2-1902 (2003) Appendix G example: 3:1 then 2.5:1 emban
 
 **Input files:** [vp096.xlsx](../files/rocscience/vp096.xlsx)
 
-**Results.** USACE EM 1110-2-1902 (2003) Appendix G example (Figure G-5: 3:1 / 2.5:1 face, pool 103→24, Kc=1 envelope d=1379 psf ψ=18.2°), specified circle (169.5, 210, R=210), Duncan-Wright-Wong 3-stage: Spencer 1.434 / Bishop 1.432 vs Slide 1.443 and USACE 1.44 (Modified Swedish). First corpus problem through the rapid-drawdown pipeline.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.432 | Slide 1.443; USACE 1.44 |
+| Spencer | 1.434 | Slide 1.443; USACE 1.44 |
+
+*Duncan-Wright-Wong 3-stage on the specified circle; Kc=1 envelope d=1379 psf, ψ=18.2°.*
 
 ![vp096: inputs and representative solution](images/vp096.png)
 
@@ -458,7 +645,12 @@ Slide #97: Pilarcitos Dam (Duncan, Wright & Wong 1990). Homogeneous earthfill, g
 
 **Input files:** [vp097.xlsx](../files/rocscience/vp097.xlsx)
 
-**Results.** Pilarcitos Dam (Duncan, Wright & Wong 1990 — paper in `ref_docs_slope/`), drawdown 72→37 ft; Kc=1 envelope from D&W eqs 9.6-9.7 (d=64.1 psf, ψ=24.4°, the same equations reproduce USACE's 1379/18.2 exactly). Rapid 3-stage search: Spencer 1.044 / Bishop 1.042 vs Slide 1.043 and DWW 1.05 — the dam that actually failed in drawdown sits right at FS≈1.
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.042 | Slide 1.043; DWW 1.05 |
+| Spencer | 1.044 | Slide 1.043; DWW 1.05 |
+
+*The dam that actually failed in drawdown sits right at FS ≈ 1.*
 
 ![vp097: inputs and representative solution](images/vp097.png)
 
@@ -468,7 +660,12 @@ Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure 
 
 **Input files:** [vp100.xlsx](../files/rocscience/vp100.xlsx)
 
-**Results.** Morgenstern (1963) chart problem, complete drawdown, B̄=1 — the residual pore-pressure field maps exactly onto a piezometric line at the slope surface, so this runs as a single-stage analysis. Bishop 1.201 vs Morgenstern chart 1.20 and Slide (B-bar method) 1.212. Paper in `ref_docs_slope/`.
+*Complete drawdown (100 → 0)*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.201 | Morgenstern chart 1.20; Slide (B-bar) 1.212 |
+| Spencer | 1.206 | — |
 
 ![vp100: inputs and representative solution](images/vp100.png)
 
@@ -478,6 +675,11 @@ Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground wh
 
 **Input files:** [vp101.xlsx](../files/rocscience/vp101.xlsx)
 
-**Results.** Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41.
+*Partial drawdown (100 → 50)*
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.416 | Slide 1.417; Morgenstern chart 1.41 |
+| Spencer | 1.422 | — |
 
 ![vp101: inputs and representative solution](images/vp101.png)

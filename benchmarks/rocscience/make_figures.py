@@ -29,6 +29,11 @@ from xslope import solve
 from xslope.plot import plot_inputs, plot_solution
 
 SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience')
+
+# Talbingo (vp005/vp006) has 26 vertices, half of them within a few metres at
+# the crest - no readable label layout exists at panel size, so those two
+# figures skip the coordinate labels (the manual's Table 5.2 carries them).
+NO_COORD_LABELS = {'vp005', 'vp006'}
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'images')
 
 # (file stem, surface kind, method) — kind: circle = the stored circle is the
@@ -124,7 +129,8 @@ def make_figure(stem, kind, method, panel_size=(8.0, 5.0), dpi=150):
         fig = plt.figure(figsize=panel_size)
         if which == 'inputs':
             plot_inputs(sd, fig=fig, mat_table=False, show_title=True,
-                        title=f'{stem} — inputs', label_coordinates=True,
+                        title=f'{stem} — inputs',
+                        label_coordinates=stem not in NO_COORD_LABELS,
                         coord_label_size=6)
         else:
             plot_solution(sd, df, fs, results, fig=fig, show_title=True)

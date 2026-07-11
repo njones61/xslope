@@ -403,63 +403,76 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, style=None):
 
     if not points:
         return
-    # Placement is edge-aware AND collision-aware: points on the right/left
-    # extremes keep their labels inside the axes, and clustered vertices (a
-    # dam crest with several nearly coincident corners) fan their labels
-    # through candidate offsets instead of overprinting each other. Collision
-    # checks need rendered text extents, so the figure is drawn once here.
+    # Placement is collision-aware with leader lines. Label boxes are measured
+    # manually (text metrics + transData) rather than via the annotation
+    # extent API, which reports stale positions for artists that have not
+    # been drawn. Each label walks a ring of candidate offsets at increasing
+    # radius until its box clears every already-placed label, and a thin gray
+    # leader ties displaced labels back to their vertex so dense clusters (a
+    # dam crest with several nearly coincident corners) stay attributable.
+    # Right/left-edge points only get inward candidates.
+    import math
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.transforms import Bbox
+
     xs = [p[0] for p in points]
     x_min, x_max = min(xs), max(xs)
     span = max(x_max - x_min, 1e-9)
     fig = ax.figure
     renderer = None
     try:
-        fig.canvas.draw()
+        fig.canvas.draw()          # settle limits; obtain a renderer
         renderer = fig.canvas.get_renderer()
     except Exception:
         pass
 
-    # Candidate (dx, dy, ha) offsets in points, nearest first. Right-edge
-    # points only get inward candidates.
-    spread = [(4, 4, "left"), (-4, 4, "right"), (4, -11, "left"),
-              (-4, -11, "right"), (4, 17, "left"), (-4, 17, "right"),
-              (18, 4, "left"), (4, -24, "left"), (4, 30, "left")]
-    spread_right = [(-4, 4, "right"), (-4, -11, "right"), (-4, 17, "right"),
-                    (-18, 4, "right"), (-4, -24, "right"), (-4, 30, "right")]
+    prop = FontProperties(size=fontsize)
+    scale = fig.dpi / 72.0         # offset points -> pixels
+
+    def candidates(near_left, near_right):
+        angles = [55, 125, 20, 160, 90, 35, 145, -35, -145, 70, 110, -90,
+                  0, 180, -15, -165]
+        if near_right:
+            angles = [a for a in angles if math.cos(math.radians(a)) < 0.3]
+        if near_left:
+            angles = [a for a in angles if math.cos(math.radians(a)) > -0.3]
+        for r in (9, 20, 32, 46, 62, 80, 100, 122):
+            for a in angles:
+                yield (r * math.cos(math.radians(a)), r * math.sin(math.radians(a)))
 
     placed = []
     for x, y in sorted(points, key=lambda p: (p[0], -p[1])):
         near_right = (x_max - x) < 0.02 * span
-        candidates = spread_right if near_right else spread
-        ann = ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
-                          xytext=candidates[0][:2], fontsize=fontsize,
-                          color="black", ha=candidates[0][2],
-                          bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
-                                    edgecolor="none", alpha=0.75),
-                          zorder=6, gid="COORD_LABEL")
-        if renderer is None:
-            continue
-        best_bb, best_overlap = None, None
-        for dx, dy, ha in candidates:
-            ann.set_position((dx, dy))
-            ann.set_ha(ha)
-            try:
-                bb = ann.get_window_extent(renderer).expanded(1.08, 1.25)
-            except Exception:
-                break
-            overlap = sum(bb.overlaps(pb) for pb in placed)
-            if overlap == 0:
-                best_bb = bb
-                break
-            if best_overlap is None or overlap < best_overlap:
-                best_bb, best_overlap = bb, overlap
-                best_pos = (dx, dy, ha)
-        else:
-            if best_bb is not None:
-                ann.set_position(best_pos[:2])
-                ann.set_ha(best_pos[2])
-        if best_bb is not None:
-            placed.append(best_bb)
+        near_left = (x - x_min) < 0.02 * span
+        label = f"({x:g}, {y:g})"
+
+        dx_best, dy_best, ha_best, va_best, bb_best, n_best = 6, 6, "left", "bottom", None, None
+        if renderer is not None:
+            w, h, _ = renderer.get_text_width_height_descent(label, prop, False)
+            px, py = ax.transData.transform((x, y))
+            for dx, dy in candidates(near_left, near_right):
+                ha = "left" if dx > 2 else ("right" if dx < -2 else "center")
+                va = "bottom" if dy > 2 else ("top" if dy < -2 else "center")
+                ox, oy = px + dx * scale, py + dy * scale
+                x0 = ox - (w if ha == "right" else w / 2 if ha == "center" else 0)
+                y0 = oy - (h if va == "top" else h / 2 if va == "center" else 0)
+                bb = Bbox.from_bounds(x0 - 2, y0 - 2, w + 4, h + 4)
+                n = sum(bb.overlaps(pb) for pb in placed)
+                if n_best is None or n < n_best:
+                    dx_best, dy_best, ha_best, va_best, bb_best, n_best = dx, dy, ha, va, bb, n
+                if n == 0:
+                    break
+            if bb_best is not None:
+                placed.append(bb_best)
+
+        ax.annotate(label, (x, y), textcoords="offset points",
+                    xytext=(dx_best, dy_best), fontsize=fontsize, color="black",
+                    ha=ha_best, va=va_best,
+                    bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                              edgecolor="none", alpha=0.8),
+                    arrowprops=dict(arrowstyle="-", color="0.45", linewidth=0.5,
+                                    shrinkA=1, shrinkB=1),
+                    zorder=6, gid="COORD_LABEL")
 
 
 def plot_failure_surface(ax, failure_surface):
@@ -2058,8 +2071,6 @@ def plot_inputs(
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
     plot_base_geometry(ax, slope_data, labels=True, style=style)
-    if label_coordinates:
-        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size, style=style)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data, style=style)
     if mode == "seep":
@@ -2220,6 +2231,12 @@ def plot_inputs(
         pad = 0.05 * (y1 - y0)
         ax.set_ylim(y0, y1 + pad)
     ax.grid(False)
+
+    # Coordinate labels go on AFTER the aspect and limits are final: their
+    # collision layout measures label boxes in display pixels, so placing them
+    # earlier (before the equal-aspect rescale) invalidates the measurements.
+    if label_coordinates:
+        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size, style=style)
 
     # Get legend handles and labels
     handles, labels = ax.get_legend_handles_labels()

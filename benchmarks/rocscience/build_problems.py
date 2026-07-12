@@ -1699,7 +1699,32 @@ def vp080b():
     return 'vp080b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp074():
+    """Slide #74 / Duncan & Wright (2005) Fig. 7.12: 100-ft sand embankment
+    (c=0, phi=40, gamma=140) on a 50-ft saturated clay foundation (c=2500,
+    phi=0, gamma=140). Labeled figure: (100,50)-(300,150) crest to (400,150),
+    down to (600,50); base y=0. Circular search: D&W Bishop 1.22 / Spencer
+    1.19; Slide 1.228 / 1.201 (Janbu simplified 1.079, D&W 1.07)."""
+    sd = load_slope_data(ACADS_1A)
+    m0 = dict(sd['materials'][0]); m1 = dict(sd['materials'][0])
+    m0.update(name='Sand', c=0.0, phi=40.0, gamma=140.0, option='mc', u='none')
+    m1.update(name='Saturated clay', c=2500.0, phi=0.0, gamma=140.0, option='mc', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 50.0), (100.0, 50.0), (300.0, 150.0),
+                                 (400.0, 150.0), (600.0, 50.0), (700.0, 50.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 50.0), (700.0, 50.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 250.0, 'Yo': 260.0, 'Depth': 10.0, 'R': 250.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp074.xlsx'))
+    return 'vp074.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

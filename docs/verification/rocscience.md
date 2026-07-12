@@ -66,6 +66,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
 <!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.390, benchmark=VP99 -->
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
+<!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
 <!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
 <!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
 <!-- test: file=../files/rocscience/vp080a.xlsx, type=single_circle, num_slices=60, fs_bishop=2.533, fs_spencer=2.530, benchmark=VP80-t0 -->
@@ -151,7 +152,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 71 | Slope, homogenous, finite element groundwater seepage analysis, water table | planned |  |
 | 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
 | 73 | Excavated slope, (4) materials, tension crack | planned |  |
-| 74 | Embankment, (2) materials | planned |  |
+| [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
 | 75 | Dyke, (4) materials | planned |  |
 | 76 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | planned |  |
 | 77 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | planned |  |
@@ -806,6 +807,20 @@ Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001, Bishop 0.987; Lo
 ![vp062a: inputs and representative solution](images/vp062a.png)
 
 ![vp062b: inputs and representative solution](images/vp062b.png)
+
+### VP74: Sand embankment on saturated clay (D&W Fig. 7.12) {#vp74}
+
+Slide #74 / Duncan & Wright (2005) Fig. 7.12: a 100-ft cohesionless embankment (c=0, φ=40°, γ=140 pcf) on a 50-ft saturated clay foundation (c=2500 psf, φ=0); fully labeled figure, imperial units, dry. Free circular search.
+
+**Input files:** [vp074.xlsx](../files/rocscience/vp074.xlsx)
+
+| Method | XSLOPE (search) | Published |
+|---|---|---|
+| Bishop | 1.219 | Slide 1.228; D&W 1.22 |
+| Spencer | 1.194 | Slide 1.201; D&W 1.19 |
+| Janbu (corrected) | 1.161 | Slide corrected 1.174 (simplified 1.079; D&W 1.07) |
+
+![vp074: inputs and representative solution](images/vp074.png)
 
 ### VP78: Pure cohesive slope on a foundation (D&W Fig. 14.3) {#vp78}
 

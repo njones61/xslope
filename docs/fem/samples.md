@@ -276,8 +276,11 @@ contribution directly.
     decimal regardless of the `F_min`/`F_max` bracket — see
     [Numerical precision](reliability.md#numerical-precision-and-reproducibility).
 
-<!-- FEM reliability regression (marginally-stable two-layer slope). Slow (13 SSRM solves), so benchmark-gated. -->
-<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.196, tolerance=0.1, element_type=tri6, target_size=2.4, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
+<!-- FEM reliability regression (marginally-stable two-layer slope). 13 SSRM solves, so it runs
+     on a deliberately coarse 205-element mesh (target_size=5): at 2.4 this one test WAS the suite's
+     wall clock (~510s; 5.0 runs in ~110s). beta is mesh-dependent but bit-reproducible for a fixed
+     mesh, and the test guards the TSPM-over-SSRM pipeline, not mesh convergence. -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.630, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 
 ---

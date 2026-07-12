@@ -69,6 +69,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
 <!-- test: file=../files/rocscience/vp065.xlsx, type=single_circle, num_slices=60, fs_bishop=2.725, fs_spencer=2.748, benchmark=VP65 -->
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
+<!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
+<!-- test: file=../files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
 <!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
 <!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
 <!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
@@ -151,7 +153,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [67](#vp67) | Embankment, (2) materials | **built** | [vp067.xlsx](../files/rocscience/vp067.xlsx). USACE EM 1110-2-1902 example F-5 end-of-construction embankment: specified toe circle — Spencer 1.316 vs Slide 1.328 / USACE 1.33; Bishop 1.320 vs 1.332. |
 | 68 | Embankment, (3) materials, ponded water | planned |  |
 | 69 | Embankment, (2) materials, water table, ponded water | planned |  |
-| 70 | Submerged slope, homogenous, water table, ponded water | planned |  |
+| [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](../files/rocscience/vp070a.xlsx) / [vp070b.xlsx](../files/rocscience/vp070b.xlsx). D&W Fig. 6.27 submerged slope, pools 30 and 60 ft above the crest: Bishop 1.596 / Spencer 1.593 vs Slide 1.603/1.599, D&W 1.60 — and identical between the two depths, the submergence-independence property the example demonstrates. |
 | 71 | Slope, homogenous, finite element groundwater seepage analysis, water table | planned |  |
 | 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
 | 73 | Excavated slope, (4) materials, tension crack | planned |  |
@@ -854,6 +856,21 @@ Slide #67 / USACE EM 1110-2-1902 (2003) example F-5: a non-homogeneous embankmen
 | Janbu (corrected) | 1.340 | Slide 1.345 |
 
 ![vp067: inputs and representative solution](images/vp067.png)
+
+### VP70: Submerged slope, two pool depths (D&W Fig. 6.27) {#vp70}
+
+Slide #70 / Duncan & Wright (2005) Fig. 6.27: a fully submerged homogeneous slope (c = 100 psf, φ = 20°, γ = 128 pcf; (0,15)–(30,15)–(105,45)–(140,45)) analyzed with the pool 30 ft and then 60 ft above the crest. The point of the example is that the factor of safety is independent of the submergence depth — the extra water weight and the extra pore pressure cancel. Pond loads applied over the whole submerged surface; free circular search.
+
+**Input files:** [vp070a.xlsx](../files/rocscience/vp070a.xlsx), [vp070b.xlsx](../files/rocscience/vp070b.xlsx)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| pool +30 ft | Bishop / Spencer | 1.596 / 1.593 | Slide 1.603 / 1.599; D&W 1.60 |
+| pool +60 ft | Bishop / Spencer | 1.596 / 1.593 | Slide 1.603 / 1.599; D&W 1.60 |
+
+*xslope reproduces the depth-independence exactly (identical FS at both pools) — a direct check on the consistency of the pond-load and pore-pressure treatments.*
+
+![vp070a: inputs and representative solution](images/vp070a.png)
 
 ### VP74: Sand embankment on saturated clay (D&W Fig. 7.12) {#vp74}
 

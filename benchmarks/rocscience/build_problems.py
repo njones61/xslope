@@ -1846,7 +1846,47 @@ def vp065():
     return 'vp065.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp067, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def _dw627_slope_data(pool):
+    """Duncan & Wright (2005) Fig. 6.27 (Slide #70): fully submerged
+    homogeneous slope (c=100 psf, phi=20, gamma=128), ground
+    (0,15)-(30,15)-(105,45)-(140,45), base el 0, pool at `pool` (30 or 60 ft
+    above the crest). Pond load on the whole submerged surface; FS should be
+    independent of the submergence depth (D&W 1.60)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Material 1', c=100.0, phi=20.0, gamma=128.0, option='mc', u='piezo')
+    sd['materials'] = [m]
+    ground = [(0.0, 15.0), (30.0, 15.0), (105.0, 45.0), (140.0, 45.0)]
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': ground}]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(0.0, pool), (140.0, pool)]
+    gw = 62.4
+    sd['dloads'] = [[{'X': x, 'Y': y, 'Normal': gw * (pool - y)} for x, y in ground]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 60.0, 'Yo': 80.0, 'Depth': 5.0, 'R': 70.0}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp070a():
+    """Slide #70 case 1 (pool 30 ft above the crest, el 75). Slide circular
+    Bishop 1.603 / Spencer 1.599; D&W 1.60."""
+    sd = _dw627_slope_data(75.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp070a.xlsx'))
+    return 'vp070a.xlsx'
+
+
+def vp070b():
+    """Slide #70 case 2 (pool 60 ft above the crest, el 105): identical FS
+    to case 1 — the submergence-independence demonstration. Slide Bishop
+    1.603 / Spencer 1.599; D&W 1.60."""
+    sd = _dw627_slope_data(105.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp070b.xlsx'))
+    return 'vp070b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp067, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

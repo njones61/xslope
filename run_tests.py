@@ -513,8 +513,11 @@ def run_reliability_test(test):
     method = test.get('method', 'spencer')
     circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
 
+    do_search = str(test.get('search', 'true')).lower() not in ('false', '0', 'no')
+
     slope_data = load_slope_data(file_path)
-    success, result = reliability_analysis(slope_data, method, circular=circular, debug_level=0)
+    success, result = reliability_analysis(slope_data, method, circular=circular, debug_level=0,
+                                           search=do_search)
     if not success:
         return None, f"reliability failed: {result}"
     return result['beta_ln'], None

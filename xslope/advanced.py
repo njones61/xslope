@@ -326,7 +326,8 @@ def rapid_drawdown(df, method_name, debug_level=1):
 
 def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
                 progress_callback=None, cancel_check=None,
-                fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles'):
+                fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles',
+                search=True):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -399,9 +400,35 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
         print(f"Rapid drawdown: {rapid}")
         print(f"Circular search: {circular}")
     
+    # search=False evaluates the SPECIFIED surface (circles[0] or non_circ) for
+    # F_MLV and every perturbation instead of re-searching — the right mode when
+    # a benchmark prescribes the slip surface (e.g. Duncan's LASH terminal,
+    # corpus VP29), and immune to search pathologies on submerged slopes.
+    def _solve_fixed(sd_):
+        from .slice import generate_slices
+        from . import solve as _solve
+        if circular:
+            ok_, res_ = generate_slices(sd_, circle=sd_['circles'][0],
+                                        num_slices=40, composite=composite)
+        else:
+            ok_, res_ = generate_slices(sd_, non_circ=sd_['non_circ'], num_slices=40)
+        if not ok_:
+            return None
+        df_, surf_ = res_
+        ok2, r_ = getattr(_solve, method)(df_)
+        if not ok2:
+            return None
+        return [{"FS": r_['FS'], "slices": df_, "failure_surface": surf_,
+                 "solver_result": r_}]
+
     # Step 1: Find the critical failure surface using search
     _progress(0, None, "Searching for the critical surface…")
-    if circular:
+    if not search:
+        fs_cache = _solve_fixed(slope_data)
+        converged = True
+        if fs_cache is None:
+            return False, "Fixed-surface evaluation failed at the most likely values"
+    elif circular:
         if debug_level >= 1:
             print("Performing circular search...")
         fs_cache, converged, search_path, circle_cache = circular_search(slope_data, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
@@ -494,7 +521,10 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
             slope_data_minus['materials'][mat_index][param['param']] = param['mlv'] - param['std']
         
         # Calculate F+ and F-
-        if circular:
+        if not search:
+            fs_cache_plus = _solve_fixed(slope_data_plus)
+            fs_cache_minus = _solve_fixed(slope_data_minus)
+        elif circular:
             fs_cache_plus, _, _, _ = circular_search(slope_data_plus, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
             fs_cache_minus, _, _, _ = circular_search(slope_data_minus, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
         else:

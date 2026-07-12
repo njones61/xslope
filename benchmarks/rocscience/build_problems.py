@@ -767,6 +767,65 @@ def vp045b():
     return 'vp045b.xlsx'
 
 
+def vp029():
+    """Slide #29 / Duncan (2000): the LASH terminal underwater slope (Port of San
+    Francisco) — the canonical Taylor-series (TSPM) reliability example, which is
+    exactly the method xslope's reliability() implements. San Francisco Bay Mud,
+    Su = 100 psf at el. -20 growing 9.8 psf/ft with depth (the `cp` option),
+    gamma = 100 pcf, fully submerged below el. 0. Probabilistic inputs (Table
+    29.2): sigma_gamma = 3.3, sigma_cp = 1.2. The slip surface is Duncan's
+    estimated surface; Slide prints its axis (131.484, 148.399) and endpoints,
+    and the center-to-endpoint distances are equal (268.72) — a true circle,
+    stored as circles[0]. Targets: Slide (Latin hypercube, 10000) Spencer det
+    1.157 / mean 1.166 / PF 13.96% / RI_ln 1.088; Duncan's own TSPM: FS 1.17,
+    PF 18%."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='San Francisco Bay Mud', c=100.0, phi=0.0, gamma=100.0,
+             gamma_sat=100.0, option='cp', cp=9.8, r_elev=-20.0, u='piezo',
+             sigma_c=0.0, sigma_phi=0.0, sigma_gamma=3.3, sigma_cp=1.2)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-28.0, -40.0), (0.0, -40.0), (71.0, -120.0),
+                                 (138.0, -120.0), (228.0, -18.0), (283.0, -17.0),
+                                 (350.0, -8.0), (389.0, 22.0), (461.0, 22.0)]},
+    ]
+    sd['max_depth'] = -143.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-28.0, 0.0), (461.0, 0.0)]
+    # free water above the submerged ground (el 0 pool; waterline meets the
+    # slope at (360.4, 0))
+    gw = 62.4
+    pts = [(-28.0,-40.0),(0.0,-40.0),(71.0,-120.0),(138.0,-120.0),(228.0,-18.0),
+           (283.0,-17.0),(350.0,-8.0),(360.4,0.0)]
+    sd['dloads'] = [[{'X': x, 'Y': y, 'Normal': gw*max(0.0, -y)} for x, y in pts]]
+    sd['circular'] = True
+    # Duncan's estimated surface, traced from Figure 29.1 (bright-red isolation,
+    # axis-tick calibration; trace ends validate against the printed endpoints
+    # (137.767,-120.245)/(350.168,-7.761) within line thickness). phi=0, so FS
+    # is set by the surface geometry alone.
+    sd['non_circ'] = [
+        # construction point above the trench floor: Slide prints the entry
+        # pulled 0.25 ft below it, so the polyline must re-cross the ground
+        {'X': 136.0, 'Y': -119.6, 'Movement': 'Free'},
+        {'X': 137.767, 'Y': -120.245, 'Movement': 'Horiz'},
+        {'X': 160.0, 'Y': -106.9, 'Movement': 'Horiz'},
+        {'X': 180.0, 'Y': -104.6, 'Movement': 'Horiz'},
+        {'X': 200.0, 'Y': -97.1, 'Movement': 'Horiz'},
+        {'X': 220.0, 'Y': -89.7, 'Movement': 'Horiz'},
+        {'X': 240.0, 'Y': -79.9, 'Movement': 'Horiz'},
+        {'X': 260.0, 'Y': -71.5, 'Movement': 'Horiz'},
+        {'X': 280.0, 'Y': -59.0, 'Movement': 'Horiz'},
+        {'X': 300.0, 'Y': -47.9, 'Movement': 'Horiz'},
+        {'X': 320.0, 'Y': -33.1, 'Movement': 'Horiz'},
+        {'X': 340.0, 'Y': -16.0, 'Movement': 'Horiz'},
+        {'X': 350.168, 'Y': -7.761, 'Movement': 'Free'},
+    ]
+    sd['circles'] = [{'Xo': 131.484, 'Yo': 148.399, 'Depth': 148.399 - 268.72, 'R': 268.72}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp029.xlsx'))
+    return 'vp029.xlsx'
+
+
 def vp036():
     """Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability
     benchmark: c'=18+-3.6, phi'=30+-3, gamma=18+-0.9, ru=0.2 (+-0.02, not
@@ -2817,7 +2876,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp029, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

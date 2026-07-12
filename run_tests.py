@@ -1128,6 +1128,51 @@ def run_test(test):
         return run_lem_test(test)
 
 
+def _expected_and_tol(test, default_tolerance):
+    """Expected value and tolerance for a test dict (shared by both runners)."""
+    test_type = test.get('type', '?')
+    if test_type == 'seep':
+        expected = test.get('expected_flowrate')
+        tol = test.get('tolerance', 0.05) * abs(expected) if expected else 0
+    elif test_type in ('reliability', 'fem_reliability'):
+        expected = test.get('expected_beta')
+        tol = test.get('tolerance', 0.02)
+    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
+                       'mesh_conform', 'seep_elements', 'fem_elements',
+                       'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
+                       'gsat_pair'):
+        expected = 0.0          # these return 0.0 on success (pass/fail tests)
+        tol = 0.0
+    else:
+        expected = test.get('expected_fs')
+        tol = test.get('tolerance', default_tolerance)
+    return expected, tol
+
+
+# Rough per-type cost ranks so the parallel scheduler starts the slow tests
+# first (wall time is otherwise dominated by an FEM case landing last).
+_COST_RANK = {'fem_reliability': 6, 'fem_ssrm': 5, 'fem_elements': 5,
+              'reliability': 4, 'seep_elements': 3, 'seep': 3,
+              'noncircular_search': 2, 'circular_search': 2}
+
+
+def _parallel_worker(item):
+    """Run one test in a worker process, stdout/stderr suppressed."""
+    i, test = item
+    import io as _io
+    import contextlib as _ctx
+    import warnings as _w
+    _w.filterwarnings('ignore')
+    t0 = time.time()
+    buf = _io.StringIO()
+    try:
+        with _ctx.redirect_stdout(buf), _ctx.redirect_stderr(buf):
+            computed, error_msg = run_test(test)
+    except Exception as e:
+        computed, error_msg = None, str(e)
+    return i, computed, error_msg, time.time() - t0
+
+
 def main():
     parser = argparse.ArgumentParser(description='xslope regression test suite')
     parser.add_argument('--lem', action='store_true', help='Run only LEM tests')
@@ -1146,6 +1191,9 @@ def main():
                         help='Skip verification benchmark tests (annotations '
                              'carrying a benchmark=<ID> tag), e.g. the slow '
                              'SSRM dam cases')
+    parser.add_argument('--jobs', default='1',
+                        help="Parallel worker processes: an integer or 'auto' "
+                             "(cpu_count - 2). Default 1 (sequential).")
     parser.add_argument('--quick', action='store_true',
                         help='For LEM problems that list several methods, check '
                              'only one method per problem (prefers Spencer) so '
@@ -1357,43 +1405,14 @@ def main():
     failed = 0
     errors = 0
     total_time = 0
+    wall_t0 = time.time()
 
-    for i, test in enumerate(tests, 1):
+    def report(i, test, computed, error_msg, elapsed):
+        nonlocal passed, failed, errors
         file_name = Path(test['file']).name
         test_type = test.get('type', '?')
         method = test.get('method', '-')
-        is_seep = test_type == 'seep'
-
-        # Get expected value and tolerance
-        if is_seep:
-            expected = test.get('expected_flowrate')
-            tol = test.get('tolerance', 0.05) * abs(expected) if expected else 0
-            label = 'flowrate'
-        elif test_type in ('reliability', 'fem_reliability'):
-            expected = test.get('expected_beta')
-            tol = test.get('tolerance', 0.02)
-            label = 'beta'
-        elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
-                            'mesh_conform', 'seep_elements', 'fem_elements',
-                            'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                            'gsat_pair'):
-            expected = 0.0          # these return 0.0 on success (pass/fail tests)
-            tol = 0.0
-            label = 'mismatch'
-        else:
-            expected = test.get('expected_fs')
-            tol = test.get('tolerance', args.tolerance)
-            label = 'FS'
-
-        t0 = time.time()
-        try:
-            computed, error_msg = run_test(test)
-        except Exception as e:
-            computed = None
-            error_msg = str(e)
-        elapsed = time.time() - t0
-        total_time += elapsed
-
+        expected, tol = _expected_and_tol(test, args.tolerance)
         if error_msg:
             status = f"ERROR: {error_msg}"
             errors += 1
@@ -1414,13 +1433,51 @@ def main():
             status = f"FAIL (diff={diff:+.4f}, {elapsed:.1f}s)"
             failed += 1
             comp_str = f"{computed:10.3f}" if computed is not None else "    --    "
-
         exp_str = f"{expected:10.3f}" if expected is not None else "    --    "
-        print(f"{i:<4} {file_name:<45} {test_type:<20} {method:<10} {exp_str}  {comp_str}  {status}")
+        print(f"{i:<4} {file_name:<45} {test_type:<20} {method:<10} {exp_str}  {comp_str}  {status}",
+              flush=True)
+
+    jobs = os.cpu_count() - 2 if str(args.jobs) == 'auto' else int(args.jobs)
+    jobs = max(1, min(jobs, len(tests) or 1))
+
+    if jobs > 1:
+        # Keep numpy's BLAS single-threaded inside each worker so N processes
+        # don't oversubscribe the CPU (inherited by spawned children).
+        for _v in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS',
+                   'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS'):
+            os.environ.setdefault(_v, '1')
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        indexed = list(enumerate(tests, 1))
+        # slowest types first: wall time is set by the last straggler
+        indexed.sort(key=lambda it: -(_COST_RANK.get(it[1].get('type'), 1)
+                                      + (2 if it[1].get('rapid') else 0)))
+        print(f"Running {len(tests)} tests on {jobs} workers "
+              f"(rows print as they finish)")
+        with ProcessPoolExecutor(max_workers=jobs) as ex:
+            futures = [ex.submit(_parallel_worker, item) for item in indexed]
+            for fut in as_completed(futures):
+                i, computed, error_msg, elapsed = fut.result()
+                total_time += elapsed
+                report(i, tests[i - 1], computed, error_msg, elapsed)
+    else:
+        for i, test in enumerate(tests, 1):
+            t0 = time.time()
+            try:
+                computed, error_msg = run_test(test)
+            except Exception as e:
+                computed = None
+                error_msg = str(e)
+            elapsed = time.time() - t0
+            total_time += elapsed
+            report(i, test, computed, error_msg, elapsed)
 
     print("-" * 120)
     print(f"\nResults: {passed} passed, {failed} failed, {errors} errors out of {len(tests)} tests")
-    print(f"Total time: {total_time:.1f}s")
+    if jobs > 1:
+        print(f"Total time: {time.time() - wall_t0:.1f}s wall on {jobs} workers "
+              f"({total_time:.1f}s of test time)")
+    else:
+        print(f"Total time: {total_time:.1f}s")
 
     if failed > 0 or errors > 0:
         sys.exit(1)

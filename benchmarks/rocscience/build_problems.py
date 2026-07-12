@@ -283,6 +283,127 @@ def vp022b():
     return 'vp022b.xlsx'
 
 
+def vp053():
+    """Slide #53: Priest (1993) rigid-block example — planar failure at 30 deg
+    from the toe (0,0), 15-m dry... no: WATER-BEARING tension crack at the crest
+    (crack bottom y=15, 25% filled -> 3.75 m of water, tcrack_water). WT
+    horizontal at el. 18.75 from the right until above the crack/plane
+    intersection (25.981, 15), then linear to the toe — Priest's triangular
+    uplift on the plane. c'=20 kPa, phi'=30, gamma=25 kN/m3, gamma_w=9.81.
+    Slide Janbu simplified 1.049 = RocPlane 1.049 = Priest 1.049."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Priest block', c=20.0, phi=30.0, gamma=25.0, gamma_sat=25.0,
+             option='mc', u='piezo')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-25.0, 0.0), (0.0, 0.0), (17.0, 30.0), (60.0, 30.0)]},
+    ]
+    sd['max_depth'] = -15.0
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = [(-25.0, 0.0), (0.0, 0.0), (25.981, 18.75), (60.0, 18.75)]
+    sd['tcrack_depth'] = 15.0
+    sd['tcrack_water'] = 3.75
+    sd['circular'] = False
+    sd['circles'] = []
+    # 30-deg plane from the toe, extended to the crest so it crosses the ground;
+    # the tension-crack surface then truncates it at (25.981, 15).
+    sd['non_circ'] = [
+        {'X': 0.0, 'Y': 0.0, 'Movement': 'Free'},
+        {'X': 51.962, 'Y': 30.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp053.xlsx'))
+    return 'vp053.xlsx'
+
+
+def vp055():
+    """Slide #55: Pockoski & Duncan (2000) test slope 1 — homogeneous sandy clay
+    (c'=300 psf, phi'=30, gamma=120 pcf), water table at ground on the lower
+    plateau rising to 10 ft below the crest. No tension crack. Free circular
+    search (Slide ran an 80x80 grid at tol 1e-4). Slide: Spencer 1.300 / Bishop
+    1.293 / Janbu simplified 1.151 / Lowe 1.318; UTEXAS4 1.30 / 1.29 / 1.15 /
+    1.32. Seed = Slide's printed critical (center (24.103, 195.256), R=100.266,
+    endpoints (-7.197, 100) -> (113.575, 150))."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Sandy clay', c=300.0, phi=30.0, gamma=120.0, gamma_sat=120.0,
+             option='mc', u='piezo')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-75.0, 100.0), (0.0, 100.0), (100.0, 150.0), (170.0, 150.0)]},
+    ]
+    sd['max_depth'] = 75.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-75.0, 100.0), (0.0, 100.0), (100.0, 140.0), (170.0, 140.0)]
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 24.103, 'Yo': 195.256, 'Depth': 195.256 - 100.266, 'R': 100.266}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp055.xlsx'))
+    return 'vp055.xlsx'
+
+
+def vp056():
+    """Slide #56: Pockoski & Duncan (2000) test slope 2 — the #55 slope (left
+    plateau from x=-70, crest bend at (100,150)) plus a DRY 5.5-ft tension crack
+    (Slide's critical exits at y=144.5 with slope intercept 150). Slide: Spencer
+    1.290 / Bishop 1.285 / Janbu simplified 1.141 / Lowe 1.304. Seed = Slide's
+    printed critical (center (24.662, 197.656), R=100.790)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Sandy clay', c=300.0, phi=30.0, gamma=120.0, gamma_sat=120.0,
+             option='mc', u='piezo')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-70.0, 100.0), (0.0, 100.0), (100.0, 150.0), (170.0, 150.0)]},
+    ]
+    sd['max_depth'] = 75.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-70.0, 100.0), (0.0, 100.0), (100.0, 140.0), (170.0, 140.0)]
+    sd['tcrack_depth'] = 5.5
+    sd['tcrack_water'] = 0.0
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 24.662, 'Yo': 197.656, 'Depth': 197.656 - 100.790, 'R': 100.790}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp056.xlsx'))
+    return 'vp056.xlsx'
+
+
+def vp057():
+    """Slide #57: Pockoski & Duncan (2000) test slope 3 — sandy clay (c'=300 psf,
+    phi'=35) over a 5-ft highly plastic clay seam (c'=0, phi'=25) on the model
+    base at el. 85; water table at ground on the lower plateau rising to 10 ft
+    below the crest; dry 6-ft tension crack. Analyzed BOTH ways in the manual:
+    composite surfaces (Slide Spencer 1.400 / Bishop 1.392 / Janbu 1.222 /
+    Lowe 1.385 / OMS 1.257) and circles only (1.422 / 1.417 / 1.263 / 1.414 /
+    1.319). circles[0] is Slide's printed composite critical (its arc bottoms at
+    el. 82.5, below the base -> truncated); circles[1] is Slide's circles-only
+    critical (bottom el. 85.02 — tangent to the base, as a clamped search must)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Sandy clay', c=300.0, phi=35.0, gamma=130.0,
+                               gamma_sat=130.0, option='mc', u='piezo')
+    m1 = dict(base); m1.update(name='Highly plastic clay', c=0.0, phi=25.0, gamma=130.0,
+                               gamma_sat=130.0, option='mc', u='piezo')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-70.0, 100.0), (0.0, 100.0), (125.0, 150.0), (200.0, 150.0)]},
+        {'mat_id': 1, 'coords': [(-70.0, 90.0), (200.0, 90.0)]},
+    ]
+    sd['max_depth'] = 85.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-70.0, 100.0), (0.0, 100.0), (125.0, 140.0), (200.0, 140.0)]
+    sd['tcrack_depth'] = 6.0
+    sd['tcrack_water'] = 0.0
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [
+        {'Xo': 37.547, 'Yo': 191.192, 'Depth': 191.192 - 108.668, 'R': 108.668},
+        {'Xo': 36.451, 'Yo': 201.910, 'Depth': 201.910 - 116.891, 'R': 116.891},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp057.xlsx'))
+    return 'vp057.xlsx'
+
+
 def vp018():
     """Slide #18: Spencer (1969) / Baker (1980) homogeneous slope with ru=0.5,
     non-circular critical surface. The slope descends left-to-right (a
@@ -2433,7 +2554,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

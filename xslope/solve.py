@@ -192,7 +192,7 @@ def oms(slice_df, debug=False):
 
 
     """
-    if 'r' not in slice_df.columns:
+    if 'r' not in slice_df.columns or slice_df['r'].iloc[0] is None:
         return False, "Circle is required for OMS method."
 
     # 1) Unpack circle‐center and radius as single values
@@ -406,7 +406,7 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
         (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
     """
 
-    if 'r' not in slice_df.columns:
+    if 'r' not in slice_df.columns or slice_df['r'].iloc[0] is None:
         return False, "Circle is required for Bishop method."
 
     # 1) Unpack circle‐center and radius as single values

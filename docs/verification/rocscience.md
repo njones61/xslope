@@ -47,6 +47,14 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.189, fs_bishop=1.176, benchmark=VP52-wet -->
 <!-- test: file=../files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=../files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
+<!-- test: file=../files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
+<!-- test: file=../files/rocscience/vp055.xlsx, type=single_circle, num_slices=60, fs_oms=1.138, fs_bishop=1.290, fs_spencer=1.297, fs_lowe=1.321, benchmark=VP55-circle -->
+<!-- test: file=../files/rocscience/vp055.xlsx, type=circular_search, num_slices=50, fs_bishop=1.289, fs_spencer=1.295, benchmark=VP55-search -->
+<!-- test: file=../files/rocscience/vp056.xlsx, type=single_circle, num_slices=60, fs_oms=1.142, fs_bishop=1.283, fs_spencer=1.288, fs_lowe=1.307, benchmark=VP56-circle -->
+<!-- test: file=../files/rocscience/vp056.xlsx, type=circular_search, num_slices=50, fs_bishop=1.282, fs_spencer=1.288, benchmark=VP56-search -->
+<!-- test: file=../files/rocscience/vp057.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.086, fs_bishop=1.389, fs_spencer=1.396, fs_mprice=1.375, fs_lowe=1.387, benchmark=VP57-composite-circle -->
+<!-- test: file=../files/rocscience/vp057.xlsx, type=circular_search, num_slices=50, fs_bishop=1.411, fs_spencer=1.416, benchmark=VP57-circles-only -->
+<!-- test: file=../files/rocscience/vp057.xlsx, type=circular_search, composite=true, num_slices=50, fs_bishop=1.388, fs_spencer=1.396, benchmark=VP57-composite-search -->
 <!-- test: file=../files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
 <!-- test: file=../files/rocscience/vp061a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.466, benchmark=VP61-pow -->
 <!-- test: file=../files/rocscience/vp061b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.367, benchmark=VP61-mc -->
@@ -157,11 +165,11 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [50](#vp50) | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](../files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 rows with per-row length/tensile/bond values, evaluated on the printed deep wedge (-15.8,0)-(0,-5)-(41.7,25). With Slide's nail defaults (tangent orientation, force factored by FS): Janbu(corr) 1.448 vs SNAILZ 1.46 and Slide 1.417. The capacity envelope reproduces the hand-computed available tension at every crossing (Σ 10.6 kip). The shallow (0,0) surface's kink is not printed — only the deep case is tagged. |
 | [51](#vp51) | Slope, (4) materials, water table, tension crack, seismic | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx). Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86). Seven methods vs Slide/Zhu: Bishop 1.278 vs 1.278/1.278 and M-P 1.304 vs 1.304/1.303 — exact; Spencer 1.294 vs 1.293; Lowe 1.296 vs 1.288/1.290; Corps 1.404 vs 1.422/1.377 (in-band); OMS 1.069 vs Zhu 1.066 (Slide's 1.145 is the outlier); Janbu(corr) 1.205 ≡ simplified 1.112 × fo. Phreatic line calibrated against the two independently agreeing published Bishop/Spencer values (±1 m bracket spans them). |
 | [52](#vp52) | Slope, (4) materials, water table, tension crack | **built** | [vp052a.xlsx](../files/rocscience/vp052a.xlsx) (dry), [vp052b.xlsx](../files/rocscience/vp052b.xlsx) (wet). Zhu & Lee (2002), heterogeneous benched slope; water table from the manual's Table 52.2. Unconstrained circular search lands in the governing deep (surface 3) family: wet Spencer 1.189 and Bishop 1.176 vs Slide 1.189 / 1.176 — exact; dry 1.797 / 1.796 vs Slide 1.804. Zhu's own values on his specified circle: 1.211 / 1.836 (the manual shows a wide Slide-Zhu spread on this family). The shallow/noncircular cases (surfaces 1, 2, 4) use constrained/block searches xslope does not yet expose — noted, not tagged. Paper in `ref_docs_lim_eq/`. |
-| 53 | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | planned |  |
+| [53](#vp53) | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | **built** | [vp053.xlsx](../files/rocscience/vp053.xlsx). Priest (1993) rigid block: 30° plane from the toe, 15-m tension crack 25% filled with water (`tcrack_water`). All methods 1.048 vs Slide Janbu 1.049 = RocPlane 1.049 = Priest 1.049 — on a single plane every method coincides. |
 | [54](#vp54) | Slope, homogenous, micro piles | **built** | [vp054a.xlsx](../files/rocscience/vp054a.xlsx) (no pile), [vp054b.xlsx](../files/rocscience/vp054b.xlsx) (with pile). Yamagami (2000): micro-pile row at the crest, 10.7 kN shear per pile at 1 m spacing. On the printed critical circle: no-pile Bishop 1.100 vs Slide 1.102 / Yamagami 1.10; with-pile 1.185 vs Slide 1.193 / Yamagami 1.20 (Slide adds the pile shear un-factored, i.e. active application). A free search with the pile finds 1.113 on a circle exiting upslope of the pile — the published comparison is per-circle. |
-| 55 | Slope, homogenous, water table | partial | Pockoski & Duncan (2000) test slope 1 — geometry and properties extracted (ground (-75,100)-(0,100)-(100,150)-(170,150), c=300 psf, φ=30, γ=120 pcf; multi-program table: Spencer 1.30, Bishop 1.29, Janbu 1.15, Lowe 1.32); blocked on the paper's water-table coordinates (figure trace only). |
-| 56 | Slope, homogenous, water table, tension crack | planned |  |
-| 57 | Slope, (2) materials, water table, tension crack, composite surfaces | planned |  |
+| [55](#vp55) | Slope, homogenous, water table | **built** | [vp055.xlsx](../files/rocscience/vp055.xlsx). Pockoski & Duncan (2000) test slope 1. On Slide's printed critical circle: Bishop 1.290 / Spencer 1.297 / Lowe 1.321 vs Slide 1.293 / 1.300 / 1.318; search confirms. The water table (ground at the lower plateau, 10 ft below the crest) is validated by that three-method 0.003 agreement. |
+| [56](#vp56) | Slope, homogenous, water table, tension crack | **built** | [vp056.xlsx](../files/rocscience/vp056.xlsx). P&D test slope 2: slope 1 plus a dry 5.5-ft tension crack (depth from Slide's slip-endpoint/intercept pair). Bishop 1.283 / Spencer 1.288 / Lowe 1.307 vs Slide 1.285 / 1.290 / 1.304. |
+| [57](#vp57) | Slope, (2) materials, water table, tension crack, composite surfaces | **built** | [vp057.xlsx](../files/rocscience/vp057.xlsx). Pockoski & Duncan (2000) test slope 3. The manual analyzes it with and without composite surfaces, and XSLOPE reproduces both: composite Bishop 1.389 / Spencer 1.396 vs Slide 1.392 / 1.400; circles-only search 1.411 / 1.416 vs Slide 1.417 / 1.422. The composite search finds the truncated critical on its own. |
 | 58 | Retaining wall, (8) materials, water table, grouted tieback | planned |  |
 | 59 | Retaining wall, homogenous, water table, grouted tieback | planned |  |
 | 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
@@ -809,6 +817,73 @@ Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 ![vp054a: inputs and representative solution](images/vp054a.png)
 
 ![vp054b: inputs and representative solution](images/vp054b.png)
+
+### VP53: Priest (1993) rigid block on a plane {#vp53}
+
+Slide #53: Priest's (1993) example rigid-block problem, cross-checked by Rocscience against both Slide and RocPlane. A homogeneous slope (c' = 20 kN/m², φ' = 30°, γ = 25 kN/m³) fails on a specified 30° plane from the toe (0,0). A 15-m tension crack at the crest cuts the surface at (25.981, 15) and holds 3.75 m of water (25% filled — XSLOPE's `tcrack_water`, giving the ½γ<sub>w</sub>d² crack thrust). The water table runs horizontal at el. 18.75 from the right until above the crack/plane intersection, then linearly to the toe — which reproduces Priest's triangular uplift distribution on the plane through the ordinary piezometric-line machinery.
+
+**Input files:** [vp053.xlsx](../files/rocscience/vp053.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Janbu (uncorrected = corrected) | 1.048 | Slide 1.049; RocPlane 1.049; Priest 1.049 |
+| Spencer / M-P / Corps / Lowe | 1.048 | — |
+
+*On a single plane the sliding block is statically determinate: every method returns the same 1.048, and Janbu's correction factor is exactly 1 (d/L = 0). The 0.001 gap to the three published sources is rounding.*
+
+![vp053: inputs and representative solution](images/vp053.png)
+
+### VP55: Pockoski & Duncan test slope 1 {#vp55}
+
+Slide #55: Pockoski & Duncan (2000) test slope 1 — a homogeneous sandy clay slope (c' = 300 psf, φ' = 30°, γ = 120 pcf), 2:1 face, 50 ft high, with the water table at ground on the lower plateau rising to 10 ft below the crest. P&D used this trio of slopes to compare eight programs; Slide ran an 80×80 grid at tolerance 10⁻⁴. XSLOPE's seed is Slide's printed critical circle (center (24.103, 195.256), R = 100.266), whose endpoints XSLOPE reproduces to 0.01 ft.
+
+**Input files:** [vp055.xlsx](../files/rocscience/vp055.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.290 *(search 1.289)* | Slide 1.293; UTEXAS4/SLOPE/W/XSTABL/RSS 1.29 |
+| Spencer | 1.297 *(search 1.295)* | Slide 1.300; UTEXAS4/SLOPE/W 1.30 |
+| Lowe–Karafiath | 1.321 | Slide 1.318; UTEXAS4 1.32 |
+| Janbu (uncorrected) | 1.178 | Slide 1.151; published spread 1.15–1.24 |
+
+*The water table between its two pinned ends (at ground on the plateau, 10 ft below the crest) is a figure trace; the 0.003 three-method agreement on Slide's own circle validates it.*
+
+![vp055: inputs and representative solution](images/vp055.png)
+
+### VP56: Pockoski & Duncan test slope 2 {#vp56}
+
+Slide #56: P&D test slope 2 — the slope of #55 with a **dry 5.5-ft tension crack**. The crack depth comes straight from Slide's info box: the critical surface's right endpoint sits at el. 144.5 while its slope intercept is 150.0. Seed = Slide's printed critical (center (24.662, 197.656), R = 100.790).
+
+**Input files:** [vp056.xlsx](../files/rocscience/vp056.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.283 *(search 1.282)* | Slide 1.285; UTEXAS4/SLOPE/W 1.28 |
+| Spencer | 1.288 *(search 1.288)* | Slide 1.290; UTEXAS4/SLOPE/W 1.29 |
+| Lowe–Karafiath | 1.307 | Slide 1.304; UTEXAS4 1.31 |
+| Janbu (uncorrected) | 1.175 | Slide 1.141; published spread 1.13–1.23 |
+
+![vp056: inputs and representative solution](images/vp056.png)
+
+### VP57: Pockoski & Duncan test slope 3 — composite vs. circles-only {#vp57}
+
+Slide #57: Pockoski & Duncan (2000) test slope 3 — sandy clay (c' = 300 psf, φ' = 35°, γ = 130 pcf) over a 5-ft highly plastic clay seam (c' = 0, φ' = 25°) resting on the model base at el. 85; water table at ground on the lower plateau rising to 10 ft below the crest; dry 6-ft tension crack. The manual runs the problem **twice — with and without composite surfaces** — precisely to compare programs that have the option against those that don't, which makes it the ideal A/B test of XSLOPE's `composite` option against the clamped default.
+
+Slide's printed composite critical (center (37.547, 191.192), R = 108.668) bottoms at el. 82.5, below the base, so the surface truncates and rides the weak seam; XSLOPE reproduces its endpoints (−21.55, 100)–(135.43, 144) to 0.01 ft. Slide's circles-only critical (center (36.451, 201.910), R = 116.891) bottoms at el. 85.02 — tangent to the base, exactly what a clamped search must settle for.
+
+**Input files:** [vp057.xlsx](../files/rocscience/vp057.xlsx)
+
+| Method | XSLOPE composite | Slide composite | XSLOPE circles-only | Slide circles-only |
+|---|---|---|---|---|
+| Bishop | 1.389 | 1.392 | 1.415 *(search 1.411)* | 1.417 |
+| Spencer | 1.396 | 1.400 | 1.419 *(search 1.416)* | 1.422 |
+| Lowe–Karafiath | 1.387 | 1.385 | 1.422 | 1.414 |
+| Janbu (uncorrected) | 1.240 | 1.222 *(XSTABL 1.34)* | 1.284 | 1.263 |
+| Ordinary | 1.086 | 1.257 *(SLOPE/W 0.85)* | 1.162 | 1.319 |
+
+*Bishop, Spencer and Lowe agree with Slide to 0.008 in both modes, and `circular_search(composite=True)` finds the truncated critical unaided (1.388 / 1.396). The Ordinary method is the outlier by design, not by error: the manual's own table shows the published OMS values spanning 0.85 (SLOPE/W) to 1.257 (Slide) on the composite surface — the same pore-pressure pathology documented on [VP22](#vp22) — and XSLOPE's 1.086 sits inside that spread. Janbu simplified spans 1.21–1.34 across the published codes; XSLOPE's uncorrected 1.240 is in range and its corrected value (1.336) matches XSTABL.*
+
+![vp057: inputs and representative solution](images/vp057.png)
 
 ### VP61: London clay, linear vs non-linear envelope (Baker ex. 3) {#vp61}
 

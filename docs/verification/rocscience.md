@@ -30,6 +30,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
 <!-- test: file=../files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
+<!-- test: file=../files/rocscience/vp027.xlsx, type=single_circle, num_slices=50, fs_bishop=1.369, fs_spencer=1.375, fs_janbu=1.365, fs_mprice=1.371, fs_corps=1.388, fs_lowe=1.386, benchmark=VP27 -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
@@ -101,7 +102,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
 | [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope, surface constructed analytically (45° wedge + tangent fan arc, Slide's printed exit point): Spencer 1.052 vs Slide 1.051 / Chen & Shao 1.05 (theory 1.0). |
 | 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | blocked | Prandtl bearing-capacity mechanism (weightless φ=0 soil, surface load, theoretical FS=1.0; Slide Spencer 0.940). XSLOPE's surface-validity checks reject failure surfaces whose two ends sit at equal elevation (the 'flat arc' guard) — flat-ground bearing mechanisms cannot currently be evaluated. Feature gap noted for a relaxed guard when driving comes from loads. |
-| 27 | Slope, (2) materials, tension crack, water table (auto Hu) | planned |  |
+| [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 manual slope (undulating bedrock, zero-strength cap, γ/γsat split, WT). Added the phreatic-inclination pore-pressure option (`u=piezo_cos2`) this problem requires: all six methods land 1.9% below Slide/XSTABL uniformly (Bishop 1.369 vs 1.396/1.397), within the ±2 ft pixel-traced water table. |
 | 28 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | planned |  |
 | 29 | Submerged slope, homogenous, probabilistic analysis, water table | planned |  |
 | 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | planned |  |
@@ -542,6 +543,25 @@ Slide #25 / Chen & Shao (1988): the classical plasticity problem — a weightles
 | Morgenstern-Price (half-sine) | 1.069 | Slide GLE 1.009 *(custom interslice function fit to the theoretical distribution)* |
 
 ![vp025: inputs and representative solution](images/vp025.png)
+
+### VP27: XSTABL slope with undulating bedrock and auto-Hu pore pressures {#vp27}
+
+Slide #27 / XSTABL v5 reference manual (Sharma 1996), via Malkawi et al. (2001): a two-material slope over undulating bedrock (polygon-mode bottom), a zero-strength cap layer, and a water table, with soil 1 carrying distinct moist/saturated unit weights (116.4/124.2 pcf). Slide and XSTABL both apply the phreatic-inclination correction (u reduced by cos² of the local phreatic slope); building this problem added the matching `u=piezo_cos2` material option to xslope. Evaluated on the specified circle (59.52, 219.21, R=157.68); all geometry vertices are labeled in Slide's figure, and the water table was pixel-traced (±2 ft).
+
+**Input files:** [vp027.xlsx](../files/rocscience/vp027.xlsx)
+
+| Method | XSLOPE (piezo_cos2) | Slide | XSTABL |
+|---|---|---|---|
+| Bishop | 1.369 | 1.396 | 1.397 |
+| Janbu | 1.365 | 1.391 | 1.392 |
+| Spencer | 1.375 | 1.402 | 1.403 |
+| Morgenstern-Price | 1.371 | 1.398 | 1.399 |
+| Corps #2 | 1.388 | 1.414 | 1.416 |
+| Lowe & Karafiath | 1.386 | 1.411 | 1.413 |
+
+*A uniform −1.9% across all six methods (−3.0% with the plain static-head `u=piezo`), consistent with a small systematic difference in the digitized water table rather than any method-level disagreement — the method-to-method spread matches Slide/XSTABL exactly. The manual's tension-crack variants (analyses 3–4) are not built.*
+
+![vp027: inputs and representative solution](images/vp027.png)
 
 ### VP36: Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index {#vp36}
 

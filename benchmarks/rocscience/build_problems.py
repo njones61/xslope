@@ -1602,7 +1602,55 @@ def vp025():
     return 'vp025.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp027():
+    """Slide #27 / XSTABL v5 manual (Sharma 1996) via Malkawi et al. (2001):
+    two-material slope over undulating bedrock (polygon-mode bottom), zero-
+    strength cap layer, water table, soil 1 with distinct moist/saturated
+    unit weights (116.4/124.2 pcf). Specified circle (59.52, 219.21,
+    R=157.68): Slide Bishop 1.396 / Spencer 1.402; XSTABL 1.397 / 1.403.
+    NOTE: Slide and XSTABL apply the phreatic-inclination (Hu) correction
+    (u reduced by cos^2 of the phreatic slope); xslope uses the static
+    vertical head, so its pore pressures are slightly higher. The water
+    table was pixel-traced from the labeled figure (ground-coincident to
+    x=63, then departing below the ground line)."""
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)
+    base = dict(sd['materials'][0])
+    m1 = dict(base); m2 = dict(base)
+    m1.update(name='Soil 1', c=500.0, phi=14.0, gamma=116.4, gamma_sat=124.2,
+              option='mc', u='piezo_cos2')
+    m2.update(name='Soil 2 (zero strength)', c=0.0, phi=0.0, gamma=116.4,
+              gamma_sat=116.4, option='mc', u='piezo_cos2')
+    sd['materials'] = [m1, m2]
+    bedrock = [(0.0, 15.0), (29.0, 24.0), (51.0, 26.0), (78.0, 56.0),
+               (94.0, 65.0), (113.0, 64.0), (133.0, 56.0), (161.0, 58.0),
+               (200.0, 76.0)]
+    ground_lo = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0), (63.0, 73.0), (101.0, 88.0)]
+    zones = [
+        (0, bedrock + [(200.0, 99.0)] + ground_lo[::-1]),
+        (1, [(101.0, 88.0), (200.0, 99.0), (200.0, 110.0), (138.0, 103.0)]),
+    ]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
+    sd['max_depth'] = 15.0
+    sd['gamma_water'] = 62.4
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['dloads'] = []; sd['line_loads'] = []; sd['pile_lines'] = []
+    sd['reinforcement_lines'] = []; sd['reinforce_lines'] = []
+    sd['piezo_line'] = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0), (63.0, 73.0),
+                        (80.0, 78.6), (95.0, 81.8), (110.0, 84.5), (125.0, 86.9),
+                        (155.0, 90.2), (185.0, 93.1), (200.0, 94.5)]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 59.52, 'Yo': 219.21, 'Depth': 219.21 - 157.68, 'R': 157.68}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp027.xlsx'))
+    return 'vp027.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

@@ -570,7 +570,7 @@ def load_slope_data(filepath):
         # Pore pressure option. An unrecognized value used to fall through to
         # u = 0 in slice.py, silently deleting pore pressure and inflating FS.
         u_val = _choice(row.get('u'), 'none')
-        if u_val not in ('none', 'piezo', 'seep', 'ru'):
+        if u_val not in ('none', 'piezo', 'piezo_cos2', 'seep', 'ru'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized pore pressure option u='{u_val}'. "

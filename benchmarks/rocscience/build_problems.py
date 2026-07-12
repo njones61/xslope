@@ -2056,6 +2056,63 @@ def vp071b():
     return 'vp071b.xlsx'
 
 
+def _vp102_slope_data():
+    """Slide #102 / Huang & Jia (2008): a homogeneous earth dam, c'=13.8 kPa,
+    phi'=37, gamma=18.2 kN/m3. Labeled figure: ground (0,7)-(34,7)-(87,24)-
+    (100,29)-(107,29)-(158,7)-(191,7) over a base at el 0; reservoir at el 24
+    (the upstream slope breaks exactly at the waterline)."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='Material 1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
+             option='mc', u='none', k1=1.0, k2=1.0, alpha=0.0, kr0=0.001, h0=-1.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 7.0), (34.0, 7.0), (87.0, 24.0), (100.0, 29.0),
+                                 (107.0, 29.0), (158.0, 7.0), (191.0, 7.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 120.0, 'Yo': 50.0, 'Depth': 5.0, 'R': 45.0},
+                     {'Xo': 130.0, 'Yo': 70.0, 'Depth': 0.0, 'R': 70.0}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp102a():
+    """Slide #102, dry conditions: no reservoir, no pore pressures.
+    Slide Spencer 2.455; Huang & Jia (2008) 2.43."""
+    sd = _vp102_slope_data()
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp102a.xlsx'))
+    return 'vp102a.xlsx'
+
+
+def vp102b():
+    """Slide #102, initial steady-state seepage before the drawdown: reservoir
+    at el 24 against the upstream face, tailwater at the downstream ground
+    (el 7), pore pressures from an FE seepage analysis (u='seep').
+    Slide Spencer 1.745; Huang & Jia (2008) 1.70.
+
+    (The rest of #102 is a transient unsaturated drawdown series with a phi_b
+    term -- XSLOPE has no transient seepage, so only the dry and steady-state
+    end members are reproducible here.)"""
+    sd = _vp102_slope_data()
+    sd['materials'][0]['u'] = 'seep'
+    gw = 9.81
+    sd['dloads'] = [[{'X': 0.0, 'Y': 7.0, 'Normal': gw * 17.0},
+                     {'X': 34.0, 'Y': 7.0, 'Normal': gw * 17.0},
+                     {'X': 87.0, 'Y': 24.0, 'Normal': 0.0}]]
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 24.0, 'coords': [(0.0, 7.0), (34.0, 7.0), (87.0, 24.0)]},
+            {'head': 7.0, 'coords': [(158.0, 7.0), (191.0, 7.0)]},
+        ],
+        'exit_face': [(107.0, 29.0), (158.0, 7.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp102b.xlsx'))
+    return 'vp102b.xlsx'
+
+
 def vp082():
     """Slide #82 / D&W (2005) Fig. 14.20-a: an earth embankment with a water
     table. Labeled figure: ground (0,60)-(60,60)-(140,20)-(200,20), foundation
@@ -2331,7 +2388,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

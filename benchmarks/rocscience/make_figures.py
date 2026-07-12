@@ -120,6 +120,7 @@ CASES = [
     ('vp097', 'rapid_csearch', 'spencer'),
     ('vp098', 'rapid_csearch', 'spencer'),
     ('vp099', 'rapid_csearch', 'spencer'),
+    ('vp102b', 'csearch', 'spencer'),
     ('vp100', 'csearch', 'bishop'),
     ('vp101', 'csearch', 'bishop'),
 ]

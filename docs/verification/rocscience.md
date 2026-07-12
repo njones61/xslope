@@ -76,6 +76,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp076a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.065, fs_spencer=1.072, benchmark=VP76-seep -->
 <!-- test: file=../files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.049, fs_spencer=1.056, benchmark=VP76-piezo -->
 <!-- test: file=../files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
+<!-- test: file=../files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
+<!-- test: file=../files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
 <!-- test: file=../files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.533, benchmark=VP82 -->
 <!-- test: file=../files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=../files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
@@ -201,7 +203,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](../files/rocscience/vp099.xlsx). DWW pumped-storage dam, drawdown 285→120. Geometry axis-calibrated from Slide's figure (vertices unlabeled). DWW 3-stage Spencer: 1.390 (search) / 1.428 (Slide's printed circle) vs Slide 1.534, SLOPE/W 1.550, paper 1.56 — ~7% low, attributed to core-geometry reading; to be re-pinned from the vendor .gsz when available. |
 | [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](../files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown, B̄=1 — the residual pore-pressure field maps exactly onto a piezometric line at the slope surface, so this runs as a single-stage analysis. Bishop 1.201 vs Morgenstern chart 1.20 and Slide (B-bar method) 1.212. Paper in `ref_docs_slope/`. |
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](../files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
-| 102 | Embankment dam, homogenous, rapid drawdown | planned |  |
+| [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **partial** | [vp102a.xlsx](../files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](../files/rocscience/vp102b.xlsx) (initial steady seepage). Huang & Jia (2008). Dry: Spencer 2.379 vs Slide 2.455, H&J 2.43. Steady state before drawdown: Spencer 1.719 vs Slide 1.745, H&J 1.70. The rest of #102 is a *transient* unsaturated drawdown series with a φ<sup>b</sup> term — XSLOPE has no transient seepage, so only these two end members are reproducible. |
 | 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
@@ -1282,3 +1284,20 @@ Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground wh
 | Spencer | 1.422 | — |
 
 ![vp101: inputs and representative solution](images/vp101.png)
+
+### VP102: Earth dam before rapid drawdown (Huang & Jia 2008) {#vp102}
+
+Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis of soil slopes subjected to transient unsaturated seepage*: a homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³; ground (0,7)–(34,7)–(87,24)–(100,29)–(107,29)–(158,7)–(191,7)) with the reservoir at el. 24 — the upstream face breaks slope exactly at the waterline.
+
+The bulk of the Slide problem is a *transient* drawdown series (factors of safety at 60–1500 h for φ<sup>b</sup> = 0° and 37°). XSLOPE has no transient unsaturated seepage, so this entry reproduces the two end members Slide reports separately: the dry dam, and the initial steady-state seepage condition from which the drawdown starts (pool at el. 24, tailwater at the downstream ground, pore pressures from XSLOPE's FE seepage solver).
+
+**Input files:** [vp102a.xlsx](../files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](../files/rocscience/vp102b.xlsx) (initial steady seepage)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| Dry | Bishop / Spencer | 2.381 / 2.379 | Slide 2.455; Huang & Jia 2.43 |
+| Steady state (t = 0) | Bishop / Spencer | 1.711 / 1.719 | Slide 1.745; Huang & Jia 1.70 |
+
+*Both critical surfaces are shallow wedges on the downstream face, which makes them sensitive to the toe geometry: on Slide's own printed circles XSLOPE gives 2.390 and 1.721, so the search is not the source of the difference. The steady-state case straddles the two references (−1.5% from Slide, +1.1% from Huang & Jia); the dry case sits 1.7% below Huang & Jia's strength-reduction FEM value, which is the primary reference here.*
+
+![vp102b: inputs and representative solution](images/vp102b.png)

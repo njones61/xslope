@@ -214,65 +214,9 @@ def make_figure(stem, kind, method, src=None, panel_size=(8.0, 5.0), dpi=150):
     return out
 
 
-# FE-seepage problems: a second two-panel figure (mesh + BCs | head contours,
-# flowlines and phreatic surface) built straight from the stored sidecars, so
-# the FE side of the LEM comparison is visible, not just cited.
-SEEP_CASES = ['vp071a', 'vp072a', 'vp076a', 'vp077a', 'vp102b']
-
-
-def make_seep_figure(stem, panel_size=(8.0, 5.0), dpi=150):
-    from xslope.mesh import import_mesh_from_json
-    from xslope.seep import build_seep_data, import_seep_solution
-    from xslope.plot_seep import plot_seep_data, plot_seep_solution
-
-    sd = load_slope_data(os.path.join(SRC, f'{stem}.xlsx'))
-    mesh = import_mesh_from_json(os.path.join(SRC, f'{stem}_mesh.json'))
-    seep_data = build_seep_data(mesh, sd)
-    solution = import_seep_solution(seep_data, os.path.join(SRC, f'{stem}_seep.csv'))
-
-    paths = []
-    for which in ('mesh', 'solution'):
-        fig = plt.figure(figsize=panel_size)
-        with contextlib.redirect_stdout(io.StringIO()):
-            if which == 'mesh':
-                plot_seep_data(seep_data, show_nodes=False, show_bc=True, fig=fig)
-            else:
-                # mesh off: at panel size the element edges bury the contours;
-                # title off: the ft^3/s flowrate rounds to '0.000' and reads broken
-                plot_seep_solution(seep_data, solution, variable='head',
-                                   flowlines=True, phreatic=True, mesh=False,
-                                   show_title=False, fig=fig)
-        pth = os.path.join(OUT, f'_{stem}_seep_{which}.png')
-        fig.savefig(pth, dpi=dpi, bbox_inches='tight')
-        plt.close(fig)
-        paths.append(pth)
-
-    imgs = [Image.open(pth) for pth in paths]
-    h = min(im.height for im in imgs)
-    imgs = [im.resize((int(im.width * h / im.height), h)) for im in imgs]
-    combo = Image.new('RGB', (sum(im.width for im in imgs) + 20, h), 'white')
-    x = 0
-    for im in imgs:
-        combo.paste(im, (x, 0))
-        x += im.width + 20
-    out = os.path.join(OUT, f'{stem}_seep.png')
-    combo.save(out)
-    for pth in paths:
-        os.remove(pth)
-    return out
-
-
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     only = set(sys.argv[1:])
-    for stem in SEEP_CASES:
-        if only and stem not in only:
-            continue
-        try:
-            make_seep_figure(stem)
-            print('ok ', stem, '(seep)')
-        except Exception as e:
-            print('FAIL', stem, '(seep):', repr(e)[:100])
     for case in CASES:
         stem, kind, method = case[:3]
         src = case[3] if len(case) > 3 else None

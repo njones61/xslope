@@ -1055,10 +1055,6 @@ Case 1 runs XSLOPE's own FE seepage solver on the section (specified heads of 40
 
 ![vp071a: inputs and representative solution](images/vp071a.png)
 
-The FE seepage model behind case (a) — mesh with boundary conditions, and the flow net:
-
-![vp071a: seepage mesh and flow net](images/vp071a_seep.png)
-
 ### VP72: Dam on a layered foundation — underseepage and artesian uplift (D&W Fig. 6.39) {#vp72}
 
 Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam (3:1 shell faces, 90 ft high, narrow 0.5H:1V clay core) on a **layered foundation** — 30 ft of clay over 15 ft of much more permeable sand — with pond at el. 302 and tailwater at the downstream ground. Elevations, slopes and properties come from D&W's figure; x-coordinates from vertex extraction of Slide's Figure 72.1, self-consistent with D&W's slopes to 0.5 ft. The physics D&W built this example around: underseepage through the sand produces **upward flow beneath the downstream shell**, and a single piezometric line cannot represent it — their FS with FE pore pressures is 14–19% lower than with the piezo line. One modelling detail matters enormously: Slide's BC markers (zoomed) show *no-flow vertical edges* — the heads sit on the ground surface only, forcing all underseepage up through the clay. Giving the sand a fixed-head exit at the model edge guts the artesian pressures and reads ~13% high; XSLOPE's FE solution with the correct BCs shows u at the toe 40% above hydrostatic, and 65% at 5 ft depth.
@@ -1076,10 +1072,6 @@ Pore pressures both ways, as in the manual: FE seepage (XSLOPE's own solver, tri
 *The tagged benchmarks are the circles tangent to el. 197 (bottom of the foundation clay) — D&W's own reported case, well-posed and reproducible; XSLOPE's constrained-sweep criticals are stored in the input files. The piezo case agrees with Slide to 0.6%; the FE case (1.34) sits inside the D&W–Slide spread (1.31–1.37). The **global** critical (Slide FE 1.149 / piezo 1.306) is deliberately not tagged: it is a shallow toe slough driven by the artesian exit gradient, and its factor of safety depends on the minimum admissible surface size — XSLOPE reads 1.28 on a 40-ft-radius slough and 0.87 on a 4-ft sliver at the singular toe point, and Slide does not print its critical surface. The 0.87 is itself physically meaningful: the FE solution predicts local heave marginality at the toe, which is why D&W's global value (1.11) barely exceeds 1.*
 
 ![vp072a: inputs and representative solution](images/vp072a.png)
-
-The FE seepage model itself — mesh with boundary conditions, and the resulting flow net. The equipotential drop concentrates across the core, refracts into the permeable sand, and fans **upward** beneath the downstream shell — the artesian mechanism the piezometric line cannot represent:
-
-![vp072a: seepage mesh and flow net](images/vp072a_seep.png)
 
 The piezometric-line case for comparison (Slide's line from Figure 72.2, with its tangent-197 critical):
 
@@ -1147,10 +1139,6 @@ Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c'
 
 ![vp076a: inputs and representative solution](images/vp076a.png)
 
-The FE seepage model behind case (a) — mesh with boundary conditions, and the flow net:
-
-![vp076a: seepage mesh and flow net](images/vp076a_seep.png)
-
 ### VP77: Thick-core dam, FE seepage vs. piezometric line (D&W Fig. 7.24) {#vp77}
 
 Slide #77 / Duncan & Wright (2005) Fig. 7.24 (Fig. 7.37 in the 2014 edition): a symmetric earth dam with a thick clay core on an impervious foundation, pond at el. 315. Geometry comes from D&W's coordinate-labeled figure — shell faces 2.75:1 to an 80-ft crest at el. 338; the core is a trapezoid with 1.5:1 faces and a 50-ft top at el. **328** (the Slide figure leaves the core-top vertices unlabeled; the core does not reach the crest). Core c' = 0, φ' = 20°, γ = 120 pcf, k = 10⁻⁵ ft/min; shell c' = 0, φ' = 38°, γ = 140 pcf, k = 10⁻³ — a 100:1 contrast. Both zones are cohesionless, so the benchmark targets the **deep circle tangent to the base** at el. 127; both of Slide's printed criticals bottom at exactly 127.0.
@@ -1169,10 +1157,6 @@ Like VP71 and VP76, pore pressures are modelled two ways. Case 1 runs **XSLOPE's
 *Values on Slide's printed circles (endpoints reproduced to 0.1 ft); the free-search values in parentheses are slightly deeper circles of the same family. D&W's four-program Spencer spread for the FE case is 1.67–1.72 (UTEXAS 1.69, SLIDE 1.70, SLOPE/W 1.67); XSLOPE's 1.724 sits at its top edge, equal to Slide's own manual value. Two numerical notes from the seepage run, both documented in the builder: the unsaturated front width must scale with the dam (h0 = −5 ft ≈ one element; the VP76-style −1 ft is sub-grid here and the fixed-point iteration never converges), and the sidecar is generated on a tri3 mesh because tri6 midside kr sampling oscillates. Spencer reads 1.753/1.737/1.724/1.715 at h0 = −20/−10/−5/−2 — the h0 = −5 choice is the sharpest mesh-resolvable front, not a fit.*
 
 ![vp077a: inputs and representative solution](images/vp077a.png)
-
-The FE seepage model behind case 1 — mesh with boundary conditions, and the flow net (the head drop concentrates across the thick core):
-
-![vp077a: seepage mesh and flow net](images/vp077a_seep.png)
 
 ### VP78: Pure cohesive slope on a foundation (D&W Fig. 14.3) {#vp78}
 
@@ -1460,7 +1444,3 @@ The bulk of the Slide problem is a *transient* drawdown series (factors of safet
 *Both critical surfaces are shallow wedges on the downstream face, which makes them sensitive to the toe geometry: on Slide's own printed circles XSLOPE gives 2.390 and 1.721, so the search is not the source of the difference. The steady-state case straddles the two references (−1.5% from Slide, +1.1% from Huang & Jia); the dry case sits 1.7% below Huang & Jia's strength-reduction FEM value, which is the primary reference here.*
 
 ![vp102b: inputs and representative solution](images/vp102b.png)
-
-The FE seepage model behind the steady-state case — mesh with boundary conditions, and the flow net:
-
-![vp102b: seepage mesh and flow net](images/vp102b_seep.png)

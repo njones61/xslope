@@ -705,13 +705,26 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         return False, "Failed to generate surface:" + result
 
     # Reject failure surfaces that leave the domain polygon (plan_polygons.md §5.4).
-    # For a flat-bottomed domain (all profile-line inputs, and polygon inputs whose
-    # bottom is horizontal) the search's scalar depth clamp already enforces this, so
-    # _domain_containment() returns None and the (more expensive) geometric check is
-    # skipped. Only irregular bottoms (e.g. dipping bedrock) need the covers() test.
+    # Only irregular bottoms (e.g. dipping bedrock) need the geometric covers()
+    # test; for a flat bottom the same check reduces to a scalar depth comparison.
+    # circular_search clamps its own trial circles to the domain bottom, but a
+    # circle read straight from the input file is not clamped, and slices below
+    # the bottom would otherwise silently inherit the deepest material.
     prepared_domain = _domain_containment(slope_data)
-    if prepared_domain is not None and not prepared_domain.covers(clipped_surface):
-        return False, "Failure surface extends outside the domain polygon"
+    if prepared_domain is not None:
+        if not prepared_domain.covers(clipped_surface):
+            return False, "Failure surface extends outside the domain polygon"
+    else:
+        domain = slope_data.get('domain_polygon')
+        if domain is not None:
+            y_bot = domain.bounds[1]
+            surf_min_y = min(y for _, y in clipped_surface.coords)
+            if surf_min_y < y_bot - 1e-6:
+                return False, (
+                    f"Failure surface reaches y={surf_min_y:.3f}, below the bottom of "
+                    f"the domain (y={y_bot:.3f}). XSLOPE does not truncate a slip "
+                    f"surface at an impenetrable boundary (no composite surfaces) — "
+                    f"raise the surface or lower max_depth.")
 
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right

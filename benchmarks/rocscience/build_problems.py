@@ -238,6 +238,51 @@ def vp021b():
     return 'vp021b.xlsx'
 
 
+def _fk_weak_slope_data():
+    """Fredlund & Krahn (1977) slope with the weak layer (Slide #22): the same
+    ground as #21, (0,60)-(60,60)-(140,20)-(180,20), but with a 1-ft weak seam
+    between el 16 and el 15 (the model base). Upper soil c'=600 psf, phi'=20;
+    weak soil c'=0, phi'=10; both gamma=120 pcf. The F&K circle (120, 90, R=80)
+    dips below the seam, so the surface is composite -- it follows the circle
+    down to the weak layer and runs along it."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Upper soil', c=600.0, phi=20.0, gamma=120.0,
+                               gamma_sat=120.0, option='mc', u='none')
+    m1 = dict(base); m1.update(name='Weak soil', c=0.0, phi=10.0, gamma=120.0,
+                               gamma_sat=120.0, option='mc', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 60.0), (60.0, 60.0), (140.0, 20.0), (180.0, 20.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 16.0), (180.0, 16.0)]},
+    ]
+    sd['max_depth'] = 15.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 120.0, 'Yo': 90.0, 'Depth': 10.0, 'R': 80.0}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp022a():
+    """Slide #22 case 1 (dry). Slide: OMS 1.300 / Bishop 1.382 / Spencer 1.382 /
+    GLE 1.372. F&K: 1.288 / 1.377 / 1.373 / 1.370."""
+    sd = _fk_weak_slope_data()
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp022a.xlsx'))
+    return 'vp022a.xlsx'
+
+
+def vp022b():
+    """Slide #22 case 2 (ru = 0.25 in both materials). Slide: OMS 1.121 /
+    Bishop 1.124 / Spencer 1.124 / GLE 1.114. F&K: 1.029 / 1.124 / 1.118 /
+    1.118."""
+    sd = _fk_weak_slope_data()
+    for m in sd['materials']:
+        m.update(u='ru', ru=0.25)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp022b.xlsx'))
+    return 'vp022b.xlsx'
+
+
 def vp018():
     """Slide #18: Spencer (1969) / Baker (1980) homogeneous slope with ru=0.5,
     non-circular critical surface. The slope descends left-to-right (a
@@ -2388,7 +2433,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

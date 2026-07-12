@@ -934,8 +934,8 @@ def plot_dloads(ax, slope_data, style=None):
         # Head size: nominally proportional to the arrow height, but capped by
         # the arrow spacing so the heads of tall arrows (deep ponded water)
         # cannot grow into each other and merge into a solid band.
-        head_length = min(arrow_height / 12, 1.5 * arrow_spacing)
-        head_width = min(0.8 * head_length, 0.75 * arrow_spacing)
+        head_length = min(arrow_height / 12, 0.75 * arrow_spacing)
+        head_width = 0.8 * head_length
         
         # Find the maximum load value for scaling
         max_load = 0

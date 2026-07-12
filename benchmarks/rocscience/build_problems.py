@@ -1910,7 +1910,47 @@ def vp066():
     return 'vp066.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp068():
+    """Slide #68 / USACE EM 1110-2-1902 example E-10: undrained (phi=0)
+    three-layer slope with 8 ft of ponded water (pool el 0). Labeled figure:
+    ground (-10,-20)-(0,-8)-(40,-8)-(50,4)-(60,16)-(100,16); soil 1
+    (c=600, gamma=120) above el 4, soil 2 (400/100) to el -8, soil 3
+    (500/105) to the base at el -20. Circle center 8.4 right / 36 above the
+    toe (40,-8) -> (48.4, 28), tangent to the base (R=48).
+    Slide Bishop/Spencer 1.241; USACE E-10 chart solution 1.33."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Soil 1', 600.0, 120.0), ('Soil 2', 400.0, 100.0), ('Soil 3', 500.0, 105.0)]
+    sd['materials'] = []
+    for name, c, gamma in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=0.0, gamma=gamma, option='mc', u='piezo')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-10.0, -20.0), (0.0, -8.0), (40.0, -8.0),
+                                 (50.0, 4.0), (60.0, 16.0), (100.0, 16.0)]},
+        {'mat_id': 1, 'coords': [(-10.0, -20.0), (0.0, -8.0), (40.0, -8.0),
+                                 (50.0, 4.0), (100.0, 4.0)]},
+        {'mat_id': 2, 'coords': [(-10.0, -20.0), (0.0, -8.0), (100.0, -8.0)]},
+    ]
+    sd['max_depth'] = -20.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-10.0, 0.0), (100.0, 0.0)]
+    gw = 62.4
+    sd['dloads'] = [[
+        {'X': -10.0, 'Y': -20.0, 'Normal': gw * 20.0},
+        {'X': 0.0, 'Y': -8.0, 'Normal': gw * 8.0},
+        {'X': 40.0, 'Y': -8.0, 'Normal': gw * 8.0},
+        {'X': 46.667, 'Y': 0.0, 'Normal': 0.0},
+    ]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 48.4, 'Yo': 28.0, 'Depth': -20.0, 'R': 48.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp068.xlsx'))
+    return 'vp068.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

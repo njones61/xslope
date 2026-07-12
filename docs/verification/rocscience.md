@@ -72,6 +72,12 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
 <!-- test: file=../files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
+<!-- test: file=../files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
+<!-- test: file=../files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
+<!-- test: file=../files/rocscience/vp084a.xlsx, type=circular_search, num_slices=40, fs_bishop=0.756, fs_spencer=0.751, benchmark=VP84-I -->
+<!-- test: file=../files/rocscience/vp084b.xlsx, type=circular_search, num_slices=40, fs_bishop=0.905, fs_spencer=0.897, benchmark=VP84-II -->
+<!-- test: file=../files/rocscience/vp084c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.042, fs_spencer=1.028, benchmark=VP84-III -->
+<!-- test: file=../files/rocscience/vp084d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.151, fs_spencer=1.131, benchmark=VP84-IV -->
 <!-- test: file=../files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-seep -->
 <!-- test: file=../files/rocscience/vp071b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-piezo -->
 <!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
@@ -171,8 +177,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [80](#vp80) | Embankment, (6) materials | **built** | [vp080a.xlsx](../files/rocscience/vp080a.xlsx) / [vp080b.xlsx](../files/rocscience/vp080b.xlsx). D&W (2005) Fig. 14.5 six-layer stratified foundation, circles from (142,147): tangent-0 Spencer 2.530 vs Slide 2.545 / D&W 2.56; tangent-15 Spencer 1.352 vs Slide 1.359 / D&W 1.35. |
 | [81](#vp81) | Embankment, (2) materials, infinite slope failure | **built** | [vp081.xlsx](../files/rocscience/vp081.xlsx). D&W (2005) Fig. 14.7 embankment on a φ=0 foundation: base-tangent circle Bishop 1.223 / Spencer 1.204 vs Slide 1.230 / 1.209, D&W 1.21. |
 | 82 | Embankment, (2) materials, water table | planned |  |
-| 83 | Embankment, (2) materials | planned |  |
-| 84 | Embankment, (2) materials | planned |  |
+| [83](#vp83) | Embankment, (2) materials | **built** | [vp083a.xlsx](../files/rocscience/vp083a.xlsx) (c<sub>u</sub> = 200 + 15·z), [vp083b.xlsx](../files/rocscience/vp083b.xlsx) (c<sub>u</sub> = 300). D&W Fig. 14.20-b embankment wall on an undrained foundation; free circular search. Bishop/Spencer 1.305/1.275 and 1.328/1.326 vs Slide 1.313/1.285 and 1.335/1.330. |
+| [84](#vp84) | Embankment, (2) materials | **built** | [vp084a](../files/rocscience/vp084a.xlsx)–[d](../files/rocscience/vp084d.xlsx). D&W Fig. 15.9 embankment on an undrained foundation with c<sub>u</sub> = 300 + c<sub>z</sub>·z, four strength gradients (c<sub>z</sub> = 0/5/10/15 psf/ft). Bishop 0.756 / 0.905 / 1.042 / 1.151 vs Slide 0.761 / 0.909 / 1.045 / 1.154 — the whole family within 0.7%. |
 | [85](#vp85) | Reinforced slope, homogenous, grouted tieback | **built** | [vp085a.xlsx](../files/rocscience/vp085a.xlsx) (active), [vp085b.xlsx](../files/rocscience/vp085b.xlsx) (passive). Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope — the reinforcement acceptance benchmark from the design plan. On Slide's printed critical circles: active 1.567 vs Slide GLE 1.575 (D&W 1.51); passive Bishop 1.319 vs Slide 1.324 (D&W 1.32). Slide's own method table scatters 1.42-2.05 here (concentrated force strains interslice assumptions), so per-circle comparison is the meaningful one. |
 | [86](#vp86) | Reinforced slope, homogenous, grouted tieback | **built** | [vp086.xlsx](../files/rocscience/vp086.xlsx). Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on rock: five 800 lb/ft geogrids. Circular search: Bishop 1.617 / Spencer 1.611 vs Slide 1.629 / 1.620; D&W reference 1.61. |
 | [87](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp087.xlsx](../files/rocscience/vp087.xlsx). Baseline three-tier wall (Ta=10, L=6.3): Bishop 1.031 on Slide's printed circle vs Slide 1.040; free search 0.99 vs L&H 0.99–1.00. |
@@ -1009,6 +1015,40 @@ Slide #81 / Duncan & Wright (2005) Fig. 14.7: a c=0, φ=30°, γ=124 pcf embankm
 | Spencer | 1.204 | Slide 1.209 |
 
 ![vp081: inputs and representative solution](images/vp081.png)
+
+### VP83: Embankment wall on an undrained foundation (D&W Fig. 14.20-b) {#vp83}
+
+Slide #83 / Duncan & Wright (2005) Fig. 14.20-b: an embankment (c' = 0, φ' = 36°, γ = 123 pcf; ground (0,40)–(55,40)–(75,30)–(140,30)) on a 30-ft undrained foundation (φ = 0, γ = 97 pcf) down to a base at el. 0. Two foundation strength profiles are tested: profile I increases with depth, c<sub>u</sub> = 200 + 15·z psf, and profile II is constant at 300 psf. Free circular search.
+
+Profile I uses XSLOPE's `cp` strength option, which is exactly this form — an undrained strength `c` at a reference elevation `r_elev`, growing at rate `cp` per foot below it.
+
+**Input files:** [vp083a.xlsx](../files/rocscience/vp083a.xlsx) (profile I), [vp083b.xlsx](../files/rocscience/vp083b.xlsx) (profile II)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| I: c<sub>u</sub> = 200 + 15·z | Bishop / Spencer | 1.305 / 1.275 | Slide 1.313 / 1.285; D&W 1.300 |
+| II: c<sub>u</sub> = 300 | Bishop / Spencer | 1.328 / 1.326 | Slide 1.335 / 1.330; D&W 1.312 |
+
+*With the constant profile the critical circle runs all the way down to the base of the foundation, as Slide notes; the free search finds it without being told to.*
+
+![vp083a: inputs and representative solution](images/vp083a.png)
+
+### VP84: Embankment on a foundation with four strength gradients (D&W Fig. 15.9) {#vp84}
+
+Slide #84 / Duncan & Wright (2005) Fig. 15.9: an embankment (c' = 0, φ' = 35°, γ = 125 pcf; ground (0,20)–(40,20)–(90,40)–(140,40)) on a 20-ft undrained foundation (φ = 0, γ = 100 pcf) whose strength is c<sub>u</sub> = 300 + c<sub>z</sub>·z. The same slope is run with four strength gradients, c<sub>z</sub> = 0, 5, 10 and 15 psf/ft — a systematic sweep of the `cp` option.
+
+**Input files:** [vp084a.xlsx](../files/rocscience/vp084a.xlsx), [vp084b.xlsx](../files/rocscience/vp084b.xlsx), [vp084c.xlsx](../files/rocscience/vp084c.xlsx), [vp084d.xlsx](../files/rocscience/vp084d.xlsx)
+
+| Profile | c<sub>z</sub> (psf/ft) | XSLOPE Bishop / Spencer | Published |
+|---|---|---|---|
+| I | 0 | 0.756 / 0.751 | Slide 0.761 / 0.756; D&W 0.75 |
+| II | 5 | 0.905 / 0.897 | Slide 0.909 / 0.898; D&W 0.90 |
+| III | 10 | 1.042 / 1.028 | Slide 1.045 / 1.032; D&W 1.03 |
+| IV | 15 | 1.151 / 1.131 | Slide 1.154 / 1.134; D&W 1.13 |
+
+*Four gradients, one geometry: the whole family tracks Slide within 0.7% and D&W within 1%. Together with VP83 this exercises the depth-varying undrained strength option across five different gradients, from constant to 15 psf/ft.*
+
+![vp084a: inputs and representative solution](images/vp084a.png)
 
 ### VP85: Reinforced slope, homogenous, grouted tieback {#vp85}
 

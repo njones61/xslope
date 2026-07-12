@@ -2056,7 +2056,98 @@ def vp071b():
     return 'vp071b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def _vp083_slope_data(fnd):
+    """Slide #83 / D&W (2005) Fig. 14.20-b: an embankment wall, ground
+    (0,40)-(55,40)-(75,30)-(140,30), foundation el 30 down to a base at el 0.
+    Embankment c'=0, phi'=36, gamma=123 pcf. ``fnd`` supplies the foundation's
+    undrained strength profile."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Embankment', c=0.0, phi=36.0, gamma=123.0,
+                               gamma_sat=123.0, option='mc', u='none')
+    m1 = dict(base); m1.update(name='Foundation', phi=0.0, gamma=97.0,
+                               gamma_sat=97.0, u='none', **fnd)
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 40.0), (55.0, 40.0), (75.0, 30.0), (140.0, 30.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 30.0), (140.0, 30.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 65.0, 'Yo': 80.0, 'Depth': 5.0, 'R': 75.0}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp083a():
+    """Slide #83 case 1: foundation strength profile I, cu = 200 + 15*depth psf
+    below the foundation surface (el 30) -- XSLOPE's 'cp' option with c=200,
+    cp=15, r_elev=30. Circular search.
+    Slide Bishop 1.313 / Spencer 1.285 / GLE 1.294; D&W average 1.300."""
+    sd = _vp083_slope_data(dict(option='cp', c=200.0, cp=15.0, r_elev=30.0))
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp083a.xlsx'))
+    return 'vp083a.xlsx'
+
+
+def vp083b():
+    """Slide #83 case 2: foundation strength profile II, cu = 300 psf constant.
+    The critical circle runs down to the base of the foundation.
+    Slide Bishop 1.335 / Spencer 1.330 / GLE 1.331; D&W average 1.312."""
+    sd = _vp083_slope_data(dict(option='mc', c=300.0))
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp083b.xlsx'))
+    return 'vp083b.xlsx'
+
+
+def _vp084(cz, tag):
+    """Slide #84 / D&W (2005) Fig. 15.9: an earth embankment, ground
+    (0,20)-(40,20)-(90,40)-(140,40), foundation el 20 down to a base at el 0.
+    Embankment c'=0, phi'=35, gamma=125 pcf; foundation phi=0, gamma=100 pcf,
+    cu = 300 + cz*z with z the depth below the foundation surface -- XSLOPE's
+    'cp' option with c=300, cp=cz, r_elev=20. Four strength profiles,
+    cz = 0/5/10/15 psf/ft. Circular search."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Embankment', c=0.0, phi=35.0, gamma=125.0,
+                               gamma_sat=125.0, option='mc', u='none')
+    m1 = dict(base); m1.update(name='Foundation', c=300.0, cp=cz, r_elev=20.0,
+                               phi=0.0, gamma=100.0, gamma_sat=100.0,
+                               option='cp', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 20.0), (40.0, 20.0), (90.0, 40.0), (140.0, 40.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 20.0), (140.0, 20.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 65.0, 'Yo': 70.0, 'Depth': 5.0, 'R': 65.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, f'vp084{tag}.xlsx'))
+    return f'vp084{tag}.xlsx'
+
+
+def vp084a():
+    """Profile I (cz=0): Slide Bishop 0.761 / Spencer 0.756 / GLE 0.762; D&W 0.75."""
+    return _vp084(0.0, 'a')
+
+
+def vp084b():
+    """Profile II (cz=5): Slide Bishop 0.909 / Spencer 0.898 / GLE 0.908; D&W 0.90."""
+    return _vp084(5.0, 'b')
+
+
+def vp084c():
+    """Profile III (cz=10): Slide Bishop 1.045 / Spencer 1.032 / GLE 1.034; D&W 1.03."""
+    return _vp084(10.0, 'c')
+
+
+def vp084d():
+    """Profile IV (cz=15): Slide Bishop 1.154 / Spencer 1.134 / GLE 1.138; D&W 1.13."""
+    return _vp084(15.0, 'd')
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

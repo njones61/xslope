@@ -1464,7 +1464,30 @@ def vp043():
     return 'vp043.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp078():
+    """Slide #78 / Duncan & Wright (2005) Fig. 14.3: pure-cohesive slope
+    (c=1000 psf, phi=0, gamma=100 pcf), 50-ft slope at 1:0.8 over a 30-ft
+    foundation (labeled figure: (0,30)-(90,30)-(130,80)-(240,80), base y=0).
+    Slide, 30-ft foundation: toe circle Bishop 1.126 (D&W reference 1.124);
+    base-tangent circle Bishop 1.141 / Spencer 1.139. The free circular
+    search finds the base-tangent family."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Material 1', c=1000.0, phi=0.0, gamma=100.0, option='mc', u='none')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 30.0), (90.0, 30.0), (130.0, 80.0), (240.0, 80.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 105.0, 'Yo': 110.0, 'Depth': 0.0, 'R': 110.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp078.xlsx'))
+    return 'vp078.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

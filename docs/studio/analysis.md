@@ -21,6 +21,14 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
 - **Analysis** — single surface, automated search, or reliability.
 - **Surface** — circular or non-circular (shown only when the file has both).
 - **Number of slices**, the **rapid drawdown** flag, and a **diagnostic** toggle.
+- **Composite surfaces** — lets a circle deeper than the bottom of the model be
+  truncated at it and run along the base between the two crossings (see
+  [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces)).
+  Off by default, and only available for circular surfaces. Turn it on when the
+  base of the model is a real impenetrable boundary — bedrock, or a weak seam
+  resting on it — because the critical mechanism there follows the base and no
+  ordinary circle can reach it. Leave it off when the bottom of the model is
+  simply how deep you chose to look.
 - **Search tolerances** (`fs_tol`, `tol`, `max_iter`) — enabled for the
   search-driven analyses.
 

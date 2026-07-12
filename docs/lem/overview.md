@@ -144,7 +144,17 @@ Two things follow from the kink where arc meets floor, and XSLOPE handles both:
 - **The crossings become slice boundaries.** A boundary is forced at each point where the arc meets the floor, so no slice base straddles the kink. Every slice then lies wholly on the arc or wholly on the floor, and its base angle $\alpha$ is exact on either one — the circle's tangent on the arc, the floor's own slope on the floor.
 - **The moment methods lose their constant radius.** OMS and Bishop take moments about the center of the circle, and both classically assume that every slice base sits at radius $R$ and that every base normal points straight at the center. Neither is true along the floor. XSLOPE uses generalized moment arms, derived in [Ordinary Method of Slices](oms.md); they collapse identically to the classic form on a true circle, so no circular result changes. The force-equilibrium and complete-equilibrium methods (Janbu, Corps of Engineers, Lowe & Karafiath, Spencer, Morgenstern–Price) never reference a circle at all, so they need no change.
 
-There is no input flag for this. A circle that clears the floor is analyzed as an ordinary circle; one that does not is truncated automatically.
+Composite surfaces are **opt-in**, because the floor does not always mean the same thing. In a polygon model it is the bottom of the material — a real boundary. In a profile-line model it is `max_depth`, which is usually just a bound on how deep you want to look, and truncating a circle against an arbitrary search bound would be meaningless. So you say when the floor is real:
+
+```python
+# a single circle that dips below the base
+success, result = generate_slices(slope_data, circle=circle, composite=True)
+
+# let the search ride the base — the critical surface for a weak seam on bedrock
+fs_cache, converged, path, cache = circular_search(slope_data, 'bishop', composite=True)
+```
+
+With `composite=False` (the default) a circle deeper than the floor is rejected, and the search will not go below it — at best it finds a circle tangent to the base. That is exactly the limitation `composite=True` removes: the critical mechanism for a soft layer resting on bedrock *runs along the bedrock*, and no clamped circle can reach it.
 
 ## Advanced Loading Conditions
 

@@ -77,7 +77,7 @@ def _check_cancel(cancel_check):
 
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
-                    diagnostic=False, num_slices=40, cancel_check=None):
+                    diagnostic=False, num_slices=40, cancel_check=None, composite=False):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -94,6 +94,14 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     spacing and ``max_iter`` caps the count. Keying the stop on FS (not an absolute
     length like ``grid < 0.01``, which means different things on a 20 ft vs a
     500 ft slope) makes it scale-invariant.
+
+    ``composite`` (default False) lets trial circles dip below the bottom of the
+    model, where they are truncated into a composite surface that runs along the
+    base (see slice.CompositeSurface). Turn it on when the base is a real
+    impenetrable boundary with a weak seam or soft layer on it — the critical
+    mechanism there rides the base, and a search clamped to the floor can only ever
+    reach a circle tangent to it. Leave it off when the floor is just ``max_depth``,
+    a search bound rather than bedrock.
 
     Returns:
         list of dict: sorted fs_cache by FS
@@ -124,13 +132,24 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     depth_floor = slope_data['domain_polygon'].bounds[1]
     y_min = depth_floor
     delta_y = y_max - y_min
+
+    # composite=True lets trial circles dip BELOW the floor, where generate_slices
+    # truncates them into a composite surface that runs along the floor (see
+    # slice.CompositeSurface). This is what a weak seam or a soft layer sitting on
+    # bedrock actually fails along, and a search clamped to the floor can never find
+    # it: the best it can do is a circle tangent to the base. Off by default,
+    # because on a profile-line model the floor is `max_depth` — a search bound the
+    # user picked, not a real impenetrable boundary, and truncating there would be
+    # meaningless. The lower bound is generous; a circle that goes too deep flattens
+    # out along the floor and its FS climbs again, so the optimizer turns back.
+    search_floor = depth_floor - delta_y if composite else depth_floor
     min_grid = delta_y * min_grid_frac   # required center-grid resolution before FS convergence
 
     circles = slope_data['circles']
 
     def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, circle_cache, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
-        best_depth = max(depth_guess, depth_floor)
+        best_depth = max(depth_guess, search_floor)
         best_fs = fs_fail
         best_result = None
         depth_tol = depth_step * tol_frac
@@ -138,14 +157,15 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
 
         while depth_step > depth_tol:
             depths = [
-                max(best_depth - depth_step, depth_floor),
+                max(best_depth - depth_step, search_floor),
                 best_depth,
                 best_depth + depth_step
             ]
             fs_results = []
             for d in depths:
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
-                success, result = generate_slices(slope_data, circle=test_circle, num_slices=num_slices)
+                success, result = generate_slices(slope_data, circle=test_circle,
+                                                  num_slices=num_slices, composite=composite)
                 if not success:
                     FS = fs_fail
                     df_slices = None

@@ -203,12 +203,17 @@ def run_lem_test(test):
     # `rapid=true` runs the 3-stage rapid-drawdown analysis (needs the seep solution
     # + dloads/seep-bc stage-2 data in the input). Works with any test type.
     rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
+    # `composite=true` lets a circle be truncated at the bottom of the model and run
+    # along it (slice.CompositeSurface). Only for problems whose base is a real
+    # impenetrable boundary; off by default.
+    composite = str(test.get('composite', 'false')).strip().lower() in ('true', '1', 'yes')
 
     slope_data = load_slope_data(file_path)
 
     if test_type == 'single_circle':
         circle = slope_data['circles'][0]
-        success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices)
+        success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
+                                          composite=composite)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
@@ -224,7 +229,7 @@ def run_lem_test(test):
 
     elif test_type == 'circular_search':
         fs_cache, converged, search_path, circle_cache = circular_search(
-            slope_data, method, num_slices=num_slices, rapid=rapid
+            slope_data, method, num_slices=num_slices, rapid=rapid, composite=composite
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "circular_search found no valid surface"

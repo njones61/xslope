@@ -131,7 +131,10 @@ def _solve_case(sd, kind, method):
     """Return (slice_df, failure_surface, results) for the representative surface."""
     fn = getattr(solve, method)
     if kind in ('circle', 'rapid_circle'):
-        ok, res = generate_slices(sd, circle=sd['circles'][0], num_slices=60)
+        # VP22's circle dips below the model base: it is a composite surface.
+        composite = sd['circles'][0]['Depth'] < sd['domain_polygon'].bounds[1]
+        ok, res = generate_slices(sd, circle=sd['circles'][0], num_slices=60,
+                                  composite=composite)
         if not ok:
             raise RuntimeError(res)
         df, fs = res

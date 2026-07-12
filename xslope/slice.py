@@ -721,7 +721,8 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
     return CompositeSurface(circle, fx, fy, crossings, x_min, x_max)
 
 
-def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True):
+def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
+                    composite=False):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -856,27 +857,31 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     else:
         return False, "Failed to generate surface:" + result
 
-    # === Composite surfaces ===
-    # A circle that dips below the impenetrable bottom of the model is truncated at
-    # it and follows it between the crossings (see CompositeSurface). This is the
-    # ordinary way an LEM code handles a slip surface that would otherwise cut
-    # through bedrock, and it is what makes deep circles admissible at all. The
-    # exact-arc fast paths below stay in force whenever the arc clears the floor,
-    # which is the overwhelmingly common case; `use_arc` gates them.
-    composite = None
-    if circular:
-        composite = build_composite_surface(slope_data, circle, x_min, x_max)
-        if composite is not None:
-            clipped_surface = composite.line_string(y_left, y_right)
-    use_arc = circular and composite is None
+    # === Composite surfaces (opt-in) ===
+    # With composite=True, a circle that dips below the bottom of the model is
+    # truncated at it and follows it between the crossings (see CompositeSurface) —
+    # the standard way an LEM code handles a slip surface that would otherwise cut
+    # through bedrock. It is OFF by default because the floor of a profile-line
+    # model is `max_depth`, a search bound the user chose rather than a real
+    # impenetrable boundary; truncating there would be meaningless. With
+    # composite=False a below-floor circle is rejected outright, as before.
+    #
+    # The exact-arc fast paths below stay in force whenever the arc clears the
+    # floor, which is the overwhelmingly common case; `use_arc` gates them.
+    comp = None
+    if circular and composite:
+        comp = build_composite_surface(slope_data, circle, x_min, x_max)
+        if comp is not None:
+            clipped_surface = comp.line_string(y_left, y_right)
+    use_arc = circular and comp is None
 
     def surf_y(xs):
         """Failure-surface elevation at each x. Exact for the arc and composite
         cases; a vertical-line intersection for a hand-entered polyline."""
         if use_arc:
             return get_circular_y_coordinates(xs, Xo, Yo, R)
-        if composite is not None:
-            return composite.y(xs)
+        if comp is not None:
+            return comp.y(xs)
         return np.array([get_y_from_intersection(
             clipped_surface.intersection(LineString([(x, -1e6), (x, 1e6)]))) for x in xs])
 
@@ -896,7 +901,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if surf_min_y < y_bot - 1e-6:
                 return False, (
                     f"Failure surface reaches y={surf_min_y:.3f}, below the bottom of "
-                    f"the domain (y={y_bot:.3f}). Raise the surface or lower max_depth.")
+                    f"the domain (y={y_bot:.3f}). Raise the surface, lower max_depth, or "
+                    f"pass composite=True to truncate the circle at the bottom of the "
+                    f"model and run it along the base.")
 
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right
@@ -943,8 +950,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     # The arc/floor crossings are kinks in the base: force a slice boundary at each
     # so that no slice base straddles one.
-    if composite is not None:
-        fixed_xs.update(x for x in composite.crossings if x_min < x < x_max)
+    if comp is not None:
+        fixed_xs.update(x for x in comp.crossings if x_min < x < x_max)
 
     # Add transition points from dloads
     if dloads:
@@ -1654,12 +1661,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 y1 = get_circular_y_coordinates([x_c - delta], Xo, Yo, R)[0]
                 y2 = get_circular_y_coordinates([x_c + delta], Xo, Yo, R)[0]
                 alpha = degrees(atan2(y2 - y1, 2 * delta))
-        elif composite is not None:
+        elif comp is not None:
             # Exact on both branches: the circle equation on the arc, the floor
             # segment's own slope on the floor. Every slice lies wholly on one
             # branch (the crossings are slice boundaries), so this never averages
             # across the kink the way a +/-delta finite difference would.
-            alpha = composite.alpha_deg(x_c)
+            alpha = comp.alpha_deg(x_c)
         else:
             # For non-circular failure surface, use geometric intersection
             failure_line = clipped_surface

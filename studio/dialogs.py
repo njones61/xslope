@@ -323,6 +323,21 @@ class RunLemDialog(QDialog):
         self.rapid.setChecked(bool(defaults.get("rapid", False)))
         form.addRow("", self.rapid)
 
+        # Composite surfaces: let a circle be truncated at the bottom of the model
+        # and run along it. Off by default — the floor of a profile-line model is
+        # max_depth, a search bound rather than a real impenetrable boundary.
+        self.composite = QCheckBox("Composite surfaces (truncate circles at the base)")
+        self.composite.setChecked(bool(defaults.get("composite", False)))
+        self.composite.setToolTip(
+            "Allow a circle deeper than the bottom of the model to be truncated at it "
+            "and run along the base between the two crossings.\n\n"
+            "Turn this on when the base is a real impenetrable boundary — bedrock, or a "
+            "weak seam resting on it — because the critical mechanism there follows the "
+            "base and no ordinary circle can reach it.\n\n"
+            "Leave it off when the bottom of the model is just how deep you chose to "
+            "look. Circular surfaces only.")
+        form.addRow("", self.composite)
+
         self.diagnostic = QCheckBox("Diagnostic output (verbose log)")
         self.diagnostic.setChecked(bool(defaults.get("diagnostic", False)))
         form.addRow("", self.diagnostic)
@@ -393,8 +408,14 @@ class RunLemDialog(QDialog):
     def _sync_tols(self):
         is_search = self.analysis.currentData() in ("auto_search", "reliability")
         self.tol_group.setEnabled(is_search)
+        circular = self._surface_value() == "circular"
         # Geometric tol applies to circular search only.
-        self.tol.setEnabled(is_search and self._surface_value() == "circular")
+        self.tol.setEnabled(is_search and circular)
+        # A composite surface is a truncated circle; the idea has no meaning for a
+        # non-circular surface, whose points are placed by the user or the search.
+        self.composite.setEnabled(circular)
+        if not circular:
+            self.composite.setChecked(False)
 
     def options(self):
         return {
@@ -403,6 +424,7 @@ class RunLemDialog(QDialog):
             "surface": self._surface_value(),
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
+            "composite": self.composite.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),
             "fs_tol": self.fs_tol.value(),
             "tol": self.tol.value(),

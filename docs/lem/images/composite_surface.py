@@ -29,7 +29,7 @@ OUT = os.path.join(HERE, "composite_surface.png")
 def main():
     sd = load_slope_data(XLSX)
     circle = sd["circles"][0]
-    ok, (df, fs) = generate_slices(sd, circle=circle, num_slices=40)
+    ok, (df, fs) = generate_slices(sd, circle=circle, num_slices=40, composite=True)
     if not ok:
         raise RuntimeError(fs)
 

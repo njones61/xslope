@@ -235,6 +235,7 @@ class LemRunner(QThread):
         self._surface = options.get("surface", "circular")
         self._num_slices = options.get("num_slices", 40)
         self._rapid = options.get("rapid", False)
+        self._composite = options.get("composite", False)
         self._diagnostic = options.get("diagnostic", False)
         self._fs_tol = options.get("fs_tol")
         self._tol = options.get("tol")
@@ -301,7 +302,8 @@ class LemRunner(QThread):
                   f"{self._num_slices} slices{self._rapid_tag()}…")
 
         ok, result = generate_slices(sd, circle=circle, non_circ=non_circ,
-                                     num_slices=self._num_slices)
+                                     num_slices=self._num_slices,
+                                     composite=self._composite)
         if not ok:
             self.failed.emit(str(result))
             return
@@ -329,6 +331,7 @@ class LemRunner(QThread):
             fs_cache, converged, search_path, circle_cache = circular_search(
                 sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
                 diagnostic=self._diagnostic, cancel_check=self._cancel.is_set,
+                composite=self._composite,
                 **self._search_kwargs(circular=True))
             search = {"kind": "circular", "fs_cache": fs_cache,
                       "search_path": search_path, "circle_cache": circle_cache}
@@ -382,7 +385,7 @@ class LemRunner(QThread):
                                  debug_level=1 if self._diagnostic else 0,
                                  progress_callback=cb, cancel_check=self._cancel.is_set,
                                  fs_tol=self._fs_tol, tol=self._tol,
-                                 max_iter=self._max_iter)
+                                 max_iter=self._max_iter, composite=self._composite)
         if not ok:
             self.failed.emit(str(result))
             return

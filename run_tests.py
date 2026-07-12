@@ -1191,9 +1191,11 @@ def main():
                         help='Skip verification benchmark tests (annotations '
                              'carrying a benchmark=<ID> tag), e.g. the slow '
                              'SSRM dam cases')
-    parser.add_argument('--jobs', default='1',
+    parser.add_argument('--jobs', default='auto',
                         help="Parallel worker processes: an integer or 'auto' "
-                             "(cpu_count - 2). Default 1 (sequential).")
+                             "(cpu_count - 2, the default). Use --jobs 1 for "
+                             "sequential runs (in-order rows, full solver "
+                             "output — the debugging mode).")
     parser.add_argument('--quick', action='store_true',
                         help='For LEM problems that list several methods, check '
                              'only one method per problem (prefers Spencer) so '

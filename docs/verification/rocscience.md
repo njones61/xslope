@@ -68,6 +68,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
 <!-- test: file=../files/rocscience/vp065.xlsx, type=single_circle, num_slices=60, fs_bishop=2.725, fs_spencer=2.748, benchmark=VP65 -->
+<!-- test: file=../files/rocscience/vp066.xlsx, type=single_circle, num_slices=60, fs_bishop=2.254, fs_spencer=2.258, benchmark=VP66 -->
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
 <!-- test: file=../files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
@@ -149,7 +150,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (paper now in `ref_docs_lim_eq/`). Outline fully pinned from the paper's Fig. 9 (bench el 20 to x=20, 2:1 to (60,40), 8 m bench, 2.5:1 to (105.5,55), crest to 150); interfaces are 22:1 but their face anchors are not dimensioned and FS=1.0-calibration attempts with plausible anchors give 1.17-1.21 — the paper's Fig. 10 profile also appears inconsistent with Fig. 9's mesh. Needs a closer read of the paper (or the SLOPE/W .gsz) before building. |
 | [64](#vp64) | Embankment, (4) materials, water table, tension crack | **built** | [vp064.xlsx](../files/rocscience/vp064.xlsx). USACE EM 1110-2-1902 Fig. 4-1 end-of-construction dam (4 materials, core trench, WT, 7-ft crack, specified circle (102,163,R=163)): Spencer 2.488 vs Slide 2.445 / USACE 2.44 (+1.8%; crest placement pinned from USACE's slice table — figures are vertex-unlabeled). |
 | [65](#vp65) | Embankment, (4) materials, water table, ponded water | **built** | [vp065.xlsx](../files/rocscience/vp065.xlsx). USACE Fig. 4-2: the #64 dam, drained strengths, upstream low pool (el 20): Bishop 2.725 vs Slide 2.716 / USACE 2.71; Spencer 2.748 vs 2.736. |
-| 66 | Embankment, (4) materials, water table, ponded water | partial | [vp066.xlsx](../files/rocscience/vp066.xlsx) built (USACE Fig. 4-3 chart-check set on the #64/#65 dam; printed circle (−135,169,R=169)): Spencer 2.184 vs Slide 2.307 / USACE 2.30 — 5% low. Slide's info box shows their crest edge at x=−15 (mine ±17 from the USACE slice-table reconciliation), so their dam geometry differs slightly; crest/toe variant test queued. |
+| [66](#vp66) | Embankment, (4) materials, water table, ponded water | **built** | [vp066.xlsx](../files/rocscience/vp066.xlsx). USACE Fig. 4-3 chart-check set; Slide's own face geometry recovered from its printed slip endpoints (toe −222, crest edge −15): Spencer 2.258 vs Slide 2.307 / USACE 2.30 (−2.1%). |
 | [67](#vp67) | Embankment, (2) materials | **built** | [vp067.xlsx](../files/rocscience/vp067.xlsx). USACE EM 1110-2-1902 example F-5 end-of-construction embankment: specified toe circle — Spencer 1.316 vs Slide 1.328 / USACE 1.33; Bishop 1.320 vs 1.332. |
 | 68 | Embankment, (3) materials, ponded water | planned |  |
 | 69 | Embankment, (2) materials, water table, ponded water | planned |  |
@@ -842,6 +843,21 @@ Slide #65: the [#64](#vp64) dam under steady low-pool conditions — drained str
 *Janbu corrected reads 2.522 vs Slide's 2.650 — the fo chart correction differs on this deep, pond-loaded upstream circle; the force-equilibrium base values agree.*
 
 ![vp065: inputs and representative solution](images/vp065.png)
+
+### VP66: USACE dam, chart-check properties (EM 1110-2-1902 Fig. 4-3) {#vp66}
+
+Slide #66: the same dam family as [#64](#vp64)/[#65](#vp65) with the manual's chart-check property set (single unit weights: embankment c = 200 psf, φ = 25°, γ = 115; sand 0/35/130; clay 0/27/115), pool at el. 20, evaluated on Slide's printed circle (center (−135, 169), tangent to the sand top). Slide's printed slip endpoints prove its model uses a slightly different face than its #64/#65 siblings (toe −222, crest edge −15, 1:4.14) — reproduced here; the circle needs +0.1 ft of radius past its exact crest-corner tangency to intersect.
+
+**Input files:** [vp066.xlsx](../files/rocscience/vp066.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 2.258 | Slide 2.307; USACE 2.30 |
+| Bishop | 2.254 | Slide 2.307 |
+
+*−2.1%; the three Slide sibling models (#64/#65/#66) carry three slightly different digitizations of the same USACE dam, so each is matched against its own printed evidence.*
+
+![vp066: inputs and representative solution](images/vp066.png)
 
 ### VP67: USACE end-of-construction embankment (example F-5) {#vp67}
 

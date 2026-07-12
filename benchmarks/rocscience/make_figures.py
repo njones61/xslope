@@ -87,6 +87,7 @@ CASES = [
     ('vp062b', 'csearch', 'spencer'),
     ('vp064', 'circle', 'spencer'),
     ('vp065', 'circle', 'bishop'),
+    ('vp066', 'circle', 'spencer'),
     ('vp067', 'circle', 'spencer'),
     ('vp070a', 'csearch', 'spencer'),
     ('vp074', 'csearch', 'spencer'),

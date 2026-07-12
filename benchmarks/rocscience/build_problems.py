@@ -1897,7 +1897,15 @@ def vp066():
     props = [(200.0, 25.0, 115.0), (0.0, 35.0, 130.0), (0.0, 27.0, 115.0), (0.0, 45.0, 160.0)]
     for m, (c, phi, gamma) in zip(sd['materials'], props):
         m.update(c=c, phi=phi, gamma=gamma, gamma_sat=gamma)
-    sd['circles'] = [{'Xo': -135.0, 'Yo': 169.0, 'Depth': 0.0, 'R': 169.0}]
+    # Slide's own VP66 geometry (its printed slip endpoints prove a
+    # -222 toe / -15 crest-edge face, slope 1:4.14 - different from the
+    # #64/#65 models); R nudged +0.1 past the exact crest-corner tangency
+    sd['profile_lines'][0]['coords'] = [(-225.0, 0.0), (-222.0, 0.0), (-15.0, 50.0),
+                                        (15.0, 50.0), (222.0, 0.0), (225.0, 0.0)]
+    sd['dloads'] = [[{'X': -225.0, 'Y': 0.0, 'Normal': 62.4 * 20.0},
+                     {'X': -222.0, 'Y': 0.0, 'Normal': 62.4 * 20.0},
+                     {'X': -139.2, 'Y': 20.0, 'Normal': 0.0}]]
+    sd['circles'] = [{'Xo': -135.0, 'Yo': 169.0, 'Depth': 169.0 - 169.1, 'R': 169.1}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp066.xlsx'))
     return 'vp066.xlsx'
 

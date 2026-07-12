@@ -2147,7 +2147,67 @@ def vp084d():
     return _vp084(15.0, 'd')
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp073():
+    """Slide #73 / Duncan & Wright (2005) and Skempton & LaRochelle (1965): the
+    Bradwell reactor-1 excavated slope. The lower excavation is cut at 1/2:1 in
+    London Clay; the overlying Marsh Clay and the clay fill (spoil from the
+    excavation, placed on the Marsh Clay) are both at 1:1. Geometry read off
+    Slide's Figure 73.2 vertex markers, with the face-crossing elevations
+    reconstructed from the 1/2:1 batter.
+
+    London Clay is stratified into six sublayers, each with an undrained
+    strength that grows linearly with depth: Su = cz + (yz - y)*dcz. That is
+    exactly XSLOPE's 'cp' option (c at r_elev, growing at rate cp below it), so
+    the six rows of Slide's Table 73.2 map straight onto six materials. The
+    clay fill is cracked to its full depth (11.4 ft).
+    Slide Bishop 1.762 / Janbu simplified 1.628 / Janbu corrected 1.736 /
+    Spencer 1.758; D&W 1.76 / 1.63 / 1.74 / 1.76."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    # name, c, phi, gamma, option, cp, r_elev
+    props = [
+        ('Clay fill',    1.0, 35.0, 110.0, 'mc', 0.0, 0.0),
+        ('Marsh clay', 300.0,  0.0, 105.0, 'mc', 0.0, 0.0),
+        ('Brown LC 1',  750.0, 0.0, 120.0, 'cp', 90.0,  -3.0),
+        ('Brown LC 2', 1335.0, 0.0, 120.0, 'cp', 82.0,  -9.5),
+        ('Brown LC 3', 1704.0, 0.0, 120.0, 'cp', 53.0, -14.0),
+        ('Brown LC 4', 2234.0, 0.0, 120.0, 'cp', 47.0, -24.0),
+        ('Blue LC 1',  2375.0, 0.0, 120.0, 'cp', 47.0, -27.0),
+        ('Blue LC 2',  2469.0, 0.0, 120.0, 'cp', 39.0, -29.0),
+    ]
+    sd['materials'] = []
+    for name, c, phi, gamma, opt, cp, relev in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option=opt, cp=cp, r_elev=relev, u='none')
+        sd['materials'].append(m)
+    # excavation face: 1/2:1 from the crest (83.4, -3) down to the floor
+    # (97.5, -31.2); x on the face at elevation y is 83.4 + 0.5*(-3 - y)
+    def face_x(y):
+        return round(83.4 + 0.5 * (-3.0 - y), 2)
+    FLOOR = [(97.5, -31.2), (145.0, -31.2)]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 17.4), (45.0, 17.4), (56.4, 6.0), (68.4, 6.0),
+                                 (77.4, -3.0), (83.4, -3.0)] + FLOOR},
+        {'mat_id': 1, 'coords': [(0.0, 6.0), (68.4, 6.0), (77.4, -3.0), (83.4, -3.0)] + FLOOR},
+        {'mat_id': 2, 'coords': [(0.0, -3.0), (83.4, -3.0)] + FLOOR},
+        {'mat_id': 3, 'coords': [(0.0, -9.5), (face_x(-9.5), -9.5)] + FLOOR},
+        {'mat_id': 4, 'coords': [(0.0, -14.0), (face_x(-14.0), -14.0)] + FLOOR},
+        {'mat_id': 5, 'coords': [(0.0, -24.0), (face_x(-24.0), -24.0)] + FLOOR},
+        {'mat_id': 6, 'coords': [(0.0, -27.0), (face_x(-27.0), -27.0)] + FLOOR},
+        {'mat_id': 7, 'coords': [(0.0, -29.0), (face_x(-29.0), -29.0)] + FLOOR},
+    ]
+    sd['max_depth'] = -50.0
+    sd['gamma_water'] = 62.4
+    sd['tcrack_depth'] = 11.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 65.0, 'Yo': 30.0, 'Depth': -20.0, 'R': 50.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp073.xlsx'))
+    return 'vp073.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

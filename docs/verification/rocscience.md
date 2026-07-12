@@ -72,6 +72,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
 <!-- test: file=../files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
+<!-- test: file=../files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
 <!-- test: file=../files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=../files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
 <!-- test: file=../files/rocscience/vp084a.xlsx, type=circular_search, num_slices=40, fs_bishop=0.756, fs_spencer=0.751, benchmark=VP84-I -->
@@ -167,7 +168,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](../files/rocscience/vp070a.xlsx) / [vp070b.xlsx](../files/rocscience/vp070b.xlsx). D&W Fig. 6.27 submerged slope, pools 30 and 60 ft above the crest: Bishop 1.596 / Spencer 1.593 vs Slide 1.603/1.599, D&W 1.60 — and identical between the two depths, the submergence-independence property the example demonstrates. |
 | [71](#vp71) | Slope, homogenous, finite element groundwater seepage analysis, water table | **built** | [vp071a.xlsx](../files/rocscience/vp071a.xlsx) / [vp071b.xlsx](../files/rocscience/vp071b.xlsx). D&W Figs. 6.37–6.38, the same slope solved twice: pore pressures from XSLOPE's own FE seepage solution (`u='seep'`) and from the piezometric-line approximation. Bishop/Spencer 1.132 both ways vs Slide 1.141/1.142, D&W 1.138/1.141 — the two pore-pressure models agree with each other to 0.0006, as they do in Slide. |
 | 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
-| 73 | Excavated slope, (4) materials, tension crack | planned |  |
+| [73](#vp73) | Excavated slope, (4) materials, tension crack | **built** | [vp073.xlsx](../files/rocscience/vp073.xlsx). The Bradwell reactor-1 excavation (Skempton & LaRochelle 1965): London Clay in six sublayers of depth-increasing undrained strength, cracked clay fill on top. Bishop 1.766 / Spencer 1.766 / Janbu corrected 1.733 vs Slide 1.762 / 1.758 / 1.736 — the closest agreement in the D&W group. |
 | [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
 | 75 | Dyke, (4) materials | planned |  |
 | 76 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | planned |  |
@@ -945,6 +946,24 @@ Case 1 runs XSLOPE's own FE seepage solver on the section (specified heads of 40
 *The two pore-pressure models land within 0.0006 of each other — the same near-identity Slide reports (1.141 vs 1.142). This is the corpus's end-to-end check on the seepage → limit-equilibrium handoff: XSLOPE's phreatic surface, computed from scratch, reproduces the one Duncan & Wright drew.*
 
 ![vp071a: inputs and representative solution](images/vp071a.png)
+
+### VP73: The Bradwell excavated slope (Skempton & LaRochelle 1965) {#vp73}
+
+Slide #73 / Duncan & Wright (2005): the excavated slope for reactor 1 at Bradwell — one of the classic case histories of short-term failure in stiff-fissured clay. The lower excavation is cut at ½:1 in London Clay; the overlying Marsh Clay and the clay fill (spoil, placed back on the Marsh Clay) are both at 1:1. The fill is cracked to its full depth (11.4 ft).
+
+London Clay is stratified into six sublayers, each with an undrained strength that grows linearly with depth, S<sub>u</sub> = c<sub>z</sub> + (y<sub>z</sub> − y)·Δc<sub>z</sub>. That is precisely XSLOPE's `cp` option, so the six rows of Slide's Table 73.2 map straight onto six materials — with the two upper units (clay fill, Marsh Clay) that makes eight. Free circular search.
+
+**Input files:** [vp073.xlsx](../files/rocscience/vp073.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.766 | Slide 1.762; D&W 1.76 |
+| Spencer | 1.766 | Slide 1.758; D&W 1.76 |
+| Janbu (corrected) | 1.733 | Slide 1.736; D&W 1.74 |
+
+*Every method within 0.5% — the tightest agreement of the Duncan & Wright group, and a good check that the stratified `cp` profile and the full-depth tension crack compose correctly.*
+
+![vp073: inputs and representative solution](images/vp073.png)
 
 ### VP74: Sand embankment on saturated clay (D&W Fig. 7.12) {#vp74}
 

@@ -1643,9 +1643,15 @@ def vp042():
     sd['dloads'] = [[{'X': 190.0, 'Y': 30.0, 'Normal': 0.0},
                      {'X': 265.0, 'Y': 0.0, 'Normal': 9.81 * 30.0}]]
     sd['circular'] = True
-    # seed on the upstream (right, submerged) side — the safety map's global
-    # minimum zone; the search refines from here
-    sd['circles'] = [{'Xo': 190.0, 'Yo': 90.0, 'Depth': 5.0, 'R': 85.0}]
+    # circles[0] = Slide's printed critical (safety-map global minimum, Figure
+    # 42.3 info box). NOTE the published FS values use a different statics
+    # convention: with rigorous total-weight + u + reservoir-load statics this
+    # circle reads Spencer 1.572; Baker's SSA (and Slide, matching Baker) used
+    # the buoyant-weight shortcut (gamma' below the phreatic, no u, no pond),
+    # which an independent hand integral reproduces at 1.87 vs their 1.91-1.925.
+    # The two differ by the seepage forces of the inclined phreatic. See the
+    # corpus page.
+    sd['circles'] = [{'Xo': 233.762, 'Yo': 188.495, 'Depth': 188.495 - 187.195, 'R': 187.195}]
     # Baker's noncircular surface, fully labeled in Figure 42.2
     # Slide prints its endpoints pulled slightly inside the ground, and the top
     # of the surface enters via the 5-m tension crack at (117,49): extend both

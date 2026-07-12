@@ -34,6 +34,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
+<!-- test: file=../files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.436, fs_bishop=1.530, fs_spencer=1.572, fs_mprice=1.572, benchmark=VP42-circle -->
+<!-- test: file=../files/rocscience/vp042.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.792, fs_mprice=1.781, benchmark=VP42-noncirc -->
 <!-- test: file=../files/rocscience/vp044a.xlsx, type=circular_search, num_slices=40, fs_spencer=0.958, benchmark=VP44-pow -->
 <!-- test: file=../files/rocscience/vp044b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.518, benchmark=VP44-mc -->
 <!-- test: file=../files/rocscience/vp044c.xlsx, type=circular_search, num_slices=40, fs_spencer=0.980, benchmark=VP44-lla -->
@@ -159,7 +161,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 39 | Reinforced embankment, (2) materials, tension crack, geosynthetic | planned |  |
 | 40 | Slope, homogenous, sensitivity analysis | planned |  |
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
-| 42 | Dam, (3) materials, water table, ponded water, tension crack | partial | [vp042.xlsx](../files/rocscience/vp042.xlsx). Baker & Leshchinsky (2001) safety-map dam — **inputs now complete**: all six core vertices labeled, phreatic traced with self-validating anchors (jump top reproduces the labeled (88,16)), Baker's noncircular surface stored from Figure 42.2's labeled vertices. FS interpretation open: on Slide's own printed critical circle XSLOPE reads Spencer 1.572 vs Slide 1.925, with slice-level inputs verified exact (pond dload 524.4 vs hand 524.4; u 280.4 vs hydrostatic 280.4) and mirror-invariant solvers. Dry interior gives 3.30; u×0.80 or pond×1.27 reproduce 1.925 — the pore-pressure model B&L intended is the open question, and the paper (ASCE JGGE 2001) is paywalled. No tags until resolved. |
+| [42](#vp42) | Dam, (3) materials, water table, ponded water, tension crack | **built** | [vp042.xlsx](../files/rocscience/vp042.xlsx). Baker & Leshchinsky (2001) safety-map dam. **Convention finding**: with rigorous total-weight + u + reservoir-load statics, Slide's printed critical circle reads Spencer 1.572 and Baker's noncircular surface 1.792; the published 1.925 / 1.91 correspond to the buoyant-weight shortcut (γ′ below the phreatic, no u, no pond), which an independent hand integral reproduces at 1.87 — the difference is the seepage forces of the inclined phreatic. XSLOPE's rigorous values are regression-locked; the published values are not comparable without adopting the shortcut convention. |
 | 43 | Slope, homogenous, planar surface, RocPlane comparison | partial | [vp043.xlsx](../files/rocscience/vp043.xlsx) built from the printed table (c'=30, φ'=30, γ=20, labeled geometry). xslope Janbu = hand Culmann exactly (1.429 vs 1.430 at 49.5°), but Slide/RocPlane/Baker all report ≈1.35 — reproducible only with different inputs (γ≈21.8 or c'≈27.5), so the manual's property table appears not to be what was run. Needs Baker (2001) [same blocked source as #42] to resolve before tagging. |
 | [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](../files/rocscience/vp044a.xlsx) (power curve), [vp044b.xlsx](../files/rocscience/vp044b.xlsx) (Mohr-Coulomb), [vp044c.xlsx](../files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: 43° face, H=6. Spencer: power 0.958 vs Slide 0.960 / Baker 0.97; MC 1.518 vs Slide 1.536 / Baker 1.50; LLA 0.980 vs Slide 0.981. Baker's paper resolved the MC row (c'=11.64, φ'=24.7 — Table I it. 0) and γ=18. |
 | [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](../files/rocscience/vp045a.xlsx) (Mohr-Coulomb), [vp045b.xlsx](../files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: linear vs non-linear envelope on the same 4:1 slope. Spencer: MC 2.801 vs Slide 2.794; power curve 2.649 vs Slide 2.662. (Slide's Janbu values are simplified/uncorrected; ours carry the fo correction and agree once scaled.) |
@@ -654,6 +656,23 @@ Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curv
 *Published range 1.56–1.67.*
 
 ![vp041: inputs and representative solution](images/vp041.png)
+
+### VP42: Baker & Leshchinsky safety-map dam — a statics-convention finding {#vp42}
+
+Slide #42 / Baker & Leshchinsky (2001): the safety-map clay-core dam — granular fill (c' = 0, φ' = 40°, γ = 21.5) around a diamond core (c' = 20, φ' = 20°, γ = 20) on a hard base (c' = 200, φ' = 45°), reservoir on the upstream (right) face, phreatic dropping through the core to a tailwater exit at the downstream toe, and a 5-m cracked layer at the crest modeled as a dry tension crack. Geometry is fully labeled in Slide's figure (all six core vertices); the phreatic was traced with independently validated calibration, and B&L's own Fig. 5(a) — the paper is in the reference library — confirms the model: reservoir at half height, phreatic flat through the shell and descending through the core, pore pressures "evaluated using the vertical distance between the phreatic surface and the slice."
+
+**The finding.** With rigorous statics — total unit weights, pore pressures from the phreatic, and the reservoir applied as a hydrostatic boundary load — XSLOPE reads Spencer **1.572** on Slide's printed critical circle (center (233.762, 188.495), R = 187.195) and **1.792** on Baker's fully-labeled noncircular surface, against published values of **1.925** (Slide) and **1.91** (Baker). The gap survives a complete audit: slice-level loads and pore pressures verified against hand values, mirror-symmetric solvers, Spencer = M-P to three decimals, insensitivity to the tension-crack treatment and to the reservoir level read (27 vs 30 vs 32.8). An independent from-scratch Bishop integral (no XSLOPE code) confirms the rigorous value (~1.5). The same integral run with the **buoyant-weight shortcut** — γ′ below the phreatic, no pore pressures, no reservoir load — gives **1.87**, matching the published values within 3%. Baker's SSA used that classical convention, and Slide's model evidently matched Baker rather than the rigorous statics; the two formulations differ by the seepage forces of the inclined phreatic, which are not negligible in a dam with an active core gradient.
+
+**Input files:** [vp042.xlsx](../files/rocscience/vp042.xlsx)
+
+| Case | XSLOPE (rigorous statics) | Published | Shortcut convention (hand integral) |
+|---|---|---|---|
+| Slide's critical circle, Spencer | 1.572 | Slide 1.925 | 1.87 |
+| Baker's noncircular surface, Spencer | 1.792 | Baker 1.91 | — |
+
+*The XSLOPE values are regression-locked as our own consistency guard. They are deliberately **not** expected to match the published numbers: reproducing those requires adopting the no-seepage-force convention, which XSLOPE does not offer (the rigorous formulation is strictly more defensible for steady seepage). This problem is the corpus's clearest demonstration that two codes can "verify" against each other while sharing a convention rather than the physics.*
+
+![vp042: inputs and representative solution](images/vp042.png)
 
 ### VP44: Slope, homogeneous — linear vs non-linear envelope (Baker ex. 1) {#vp44}
 

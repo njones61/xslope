@@ -45,9 +45,9 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.205, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
 <!-- test: file=../files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
 <!-- test: file=../files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.189, fs_bishop=1.176, benchmark=VP52-wet -->
+<!-- test: file=../files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
 <!-- test: file=../files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=../files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
-<!-- test: file=../files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
 <!-- test: file=../files/rocscience/vp055.xlsx, type=single_circle, num_slices=60, fs_oms=1.138, fs_bishop=1.290, fs_spencer=1.297, fs_lowe=1.321, benchmark=VP55-circle -->
 <!-- test: file=../files/rocscience/vp055.xlsx, type=circular_search, num_slices=50, fs_bishop=1.289, fs_spencer=1.295, benchmark=VP55-search -->
 <!-- test: file=../files/rocscience/vp056.xlsx, type=single_circle, num_slices=60, fs_oms=1.142, fs_bishop=1.283, fs_spencer=1.288, fs_lowe=1.307, benchmark=VP56-circle -->
@@ -792,6 +792,21 @@ Slide #52, wet (Table 52.2 water table). Deep family: Slide Spencer 1.189 / Zhu 
 
 ![vp052b: inputs and representative solution](images/vp052b.png)
 
+### VP53: Priest (1993) rigid block on a plane {#vp53}
+
+Slide #53: Priest's (1993) example rigid-block problem, cross-checked by Rocscience against both Slide and RocPlane. A homogeneous slope (c' = 20 kN/m², φ' = 30°, γ = 25 kN/m³) fails on a specified 30° plane from the toe (0,0). A 15-m tension crack at the crest cuts the surface at (25.981, 15) and holds 3.75 m of water (25% filled — XSLOPE's `tcrack_water`, giving the ½γ<sub>w</sub>d² crack thrust). The water table runs horizontal at el. 18.75 from the right until above the crack/plane intersection, then linearly to the toe — which reproduces Priest's triangular uplift distribution on the plane through the ordinary piezometric-line machinery.
+
+**Input files:** [vp053.xlsx](../files/rocscience/vp053.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Janbu (uncorrected = corrected) | 1.048 | Slide 1.049; RocPlane 1.049; Priest 1.049 |
+| Spencer / M-P / Corps / Lowe | 1.048 | — |
+
+*On a single plane the sliding block is statically determinate: every method returns the same 1.048, and Janbu's correction factor is exactly 1 (d/L = 0). The 0.001 gap to the three published sources is rounding.*
+
+![vp053: inputs and representative solution](images/vp053.png)
+
 ### VP54: Slope, homogenous, micro piles {#vp54}
 
 Slide #54, unreinforced case on the printed critical circle (2.674, 7.573, R=8.031). Slide Bishop 1.102; Yamagami 1.10.
@@ -817,21 +832,6 @@ Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 ![vp054a: inputs and representative solution](images/vp054a.png)
 
 ![vp054b: inputs and representative solution](images/vp054b.png)
-
-### VP53: Priest (1993) rigid block on a plane {#vp53}
-
-Slide #53: Priest's (1993) example rigid-block problem, cross-checked by Rocscience against both Slide and RocPlane. A homogeneous slope (c' = 20 kN/m², φ' = 30°, γ = 25 kN/m³) fails on a specified 30° plane from the toe (0,0). A 15-m tension crack at the crest cuts the surface at (25.981, 15) and holds 3.75 m of water (25% filled — XSLOPE's `tcrack_water`, giving the ½γ<sub>w</sub>d² crack thrust). The water table runs horizontal at el. 18.75 from the right until above the crack/plane intersection, then linearly to the toe — which reproduces Priest's triangular uplift distribution on the plane through the ordinary piezometric-line machinery.
-
-**Input files:** [vp053.xlsx](../files/rocscience/vp053.xlsx)
-
-| Method | XSLOPE | Published |
-|---|---|---|
-| Janbu (uncorrected = corrected) | 1.048 | Slide 1.049; RocPlane 1.049; Priest 1.049 |
-| Spencer / M-P / Corps / Lowe | 1.048 | — |
-
-*On a single plane the sliding block is statically determinate: every method returns the same 1.048, and Janbu's correction factor is exactly 1 (d/L = 0). The 0.001 gap to the three published sources is rounding.*
-
-![vp053: inputs and representative solution](images/vp053.png)
 
 ### VP55: Pockoski & Duncan test slope 1 {#vp55}
 

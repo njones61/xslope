@@ -71,6 +71,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp066.xlsx, type=single_circle, num_slices=60, fs_bishop=2.254, fs_spencer=2.258, benchmark=VP66 -->
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
+<!-- test: file=../files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
 <!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
 <!-- test: file=../files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
 <!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
@@ -154,7 +155,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [66](#vp66) | Embankment, (4) materials, water table, ponded water | **built** | [vp066.xlsx](../files/rocscience/vp066.xlsx). USACE Fig. 4-3 chart-check set; Slide's own face geometry recovered from its printed slip endpoints (toe −222, crest edge −15): Spencer 2.258 vs Slide 2.307 / USACE 2.30 (−2.1%). |
 | [67](#vp67) | Embankment, (2) materials | **built** | [vp067.xlsx](../files/rocscience/vp067.xlsx). USACE EM 1110-2-1902 example F-5 end-of-construction embankment: specified toe circle — Spencer 1.316 vs Slide 1.328 / USACE 1.33; Bishop 1.320 vs 1.332. |
 | [68](#vp68) | Embankment, (3) materials, ponded water | **built** | [vp068.xlsx](../files/rocscience/vp068.xlsx). USACE example E-10 (φ=0 three-layer slope, 8-ft pond, specified base-tangent circle): Bishop 1.234 / M-P 1.234 vs Slide 1.241 / GLE 1.244. |
-| 69 | Embankment, (2) materials, water table, ponded water | partial | USACE example F-6 (steady seepage, R=280 circle): Slide's figure is vertex-unlabeled with an internal piezometric line and duplicate zones (e2/f2) suggesting per-zone water assignments — needs the EM appendix F-6 figure read for the WT coordinates before building. Slide Spencer 2.026, USACE 2.01. |
+| [69](#vp69) | Embankment, (2) materials, water table, ponded water | **built** | [vp069.xlsx](../files/rocscience/vp069.xlsx). USACE example F-6 steady-seepage dam (piezometric line, ponded tailwater, specified R=280 circle): Bishop 1.999 / Spencer 2.013 / M-P 2.013 vs Slide 2.011 / 2.026 / GLE 2.027, USACE 2.01. |
 | [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](../files/rocscience/vp070a.xlsx) / [vp070b.xlsx](../files/rocscience/vp070b.xlsx). D&W Fig. 6.27 submerged slope, pools 30 and 60 ft above the crest: Bishop 1.596 / Spencer 1.593 vs Slide 1.603/1.599, D&W 1.60 — and identical between the two depths, the submergence-independence property the example demonstrates. |
 | 71 | Slope, homogenous, finite element groundwater seepage analysis, water table | planned |  |
 | 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
@@ -888,6 +889,22 @@ Slide #68 / USACE EM 1110-2-1902 example E-10: an undrained three-layer slope (c
 *USACE's own E-10 chart solution is 1.33; Slide notes the same offset. Spencer's admissibility guard declines this surface (base tension at the φ=0 crest slices); M-P carries the complete-equilibrium comparison.*
 
 ![vp068: inputs and representative solution](images/vp068.png)
+
+### VP69: Steady-seepage dam with a piezometric line (USACE example F-6) {#vp69}
+
+Slide #69 / USACE EM 1110-2-1902 example F-6: a 112-ft embankment (c' = 0, φ' = 34°, γ = 130 pcf) on a granular foundation (c' = 0, φ' = 35°, γ = 125 pcf) under steady seepage. Pore pressures come from the piezometric line, which leaves the pool surface at el. 100, drops to the chimney drain, follows it down to the tailwater elevation (el. 22.5) and then runs out flat to the downstream face. USACE computes u as γ<sub>w</sub> times the *vertical* distance from the slice base to that line, so it is a plain piezometric line — the `phreatic` (cos²θ) flag is off. The tailwater ponds the toe from x = 337.4 rightward. Specified circle: center (269, 248), R = 280 — 131 ft left of and 248 ft above the toe, bottoming out exactly on USACE's el. −32 stratum line.
+
+**Input files:** [vp069.xlsx](../files/rocscience/vp069.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.999 | Slide 2.011; USACE 2.01 |
+| Spencer | 2.013 | Slide 2.026 |
+| Morgenstern-Price | 2.013 | Slide GLE 2.027 |
+
+*Slide's Figure 69.1 carries axis ticks and vertex markers, so the section was recovered exactly rather than estimated: ground (0,100)–(38.4,100)–(60.8,112)–(81,112)–(194.9,73.7)–(400,0)–(450,0). The rip-rap, chimney drain and drainage blanket are given the embankment properties, as USACE does — the circle misses all three. The uniform −0.6% offset is the residual of the piezometric-line kink, which the figure locates only to about a foot.*
+
+![vp069: inputs and representative solution](images/vp069.png)
 
 ### VP70: Submerged slope, two pool depths (D&W Fig. 6.27) {#vp70}
 

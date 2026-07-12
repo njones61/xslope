@@ -1950,7 +1950,57 @@ def vp068():
     return 'vp068.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp069():
+    """Slide #69 / USACE EM 1110-2-1902 example F-6: steady-seepage embankment
+    on a granular foundation. Geometry read off Slide's Figure 69.1 (the
+    figure has axis ticks and vertex markers, so the vertices are exact):
+    ground (0,100)-(38.4,100)-(60.8,112)-(81,112)-(194.9,73.7)-(400,0)-(450,0),
+    foundation el 0 down to the model base el -75. Embankment c'=0, phi'=34,
+    gamma=130; foundation c'=0, phi'=35, gamma=125 (total unit weights). The
+    piezometric line runs from the pool surface (el 100) down to the chimney
+    drain and out to the tailwater at el 22.5; USACE takes u = gamma_w times
+    the vertical distance to that line, so the line is a plain piezo line (no
+    cos^2 correction). Tailwater ponds the toe from x=337.4 to the right edge.
+    Circle: center (269, 248), R = 280 (131 ft left of / 248 ft above the toe;
+    it bottoms out exactly on USACE's el -32 stratum line).
+    USACE 2.01; Slide Bishop 2.011 / Spencer 2.026 / GLE 2.027 / Janbu corr 1.830.
+
+    The small zones in the real section (rip-rap, chimney drain, drainage
+    blanket) are all given the embankment properties, as USACE does -- the
+    circle misses them anyway. Slide's own section flattens the upstream face
+    to a bench at the pool elevation; the circle enters on that bench, so
+    everything further upstream is outside the sliding mass."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, phi, gamma in [('Embankment', 34.0, 130.0), ('Foundation', 35.0, 125.0)]:
+        m = dict(base)
+        m.update(name=name, c=0.0, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option='mc', u='piezo')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 100.0), (38.4, 100.0), (60.8, 112.0),
+                                 (81.0, 112.0), (194.9, 73.7), (400.0, 0.0),
+                                 (450.0, 0.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 0.0), (450.0, 0.0)]},
+    ]
+    sd['max_depth'] = -75.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(0.0, 100.0), (38.4, 100.0), (121.1, 69.0),
+                        (179.4, 22.5), (450.0, 22.5)]
+    sd['piezo_phreatic'] = False
+    gw = 62.4
+    sd['dloads'] = [[{'X': 337.4, 'Y': 22.5, 'Normal': 0.0},
+                     {'X': 400.0, 'Y': 0.0, 'Normal': gw * 22.5},
+                     {'X': 450.0, 'Y': 0.0, 'Normal': gw * 22.5}]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 269.0, 'Yo': 248.0, 'Depth': -32.0, 'R': 280.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp069.xlsx'))
+    return 'vp069.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

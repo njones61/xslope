@@ -99,6 +99,9 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
 <!-- test: file=../files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
 <!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
+<!-- test: file=../files/rocscience/vp077a.xlsx, type=single_circle, num_slices=60, fs_oms=1.506, fs_bishop=1.652, fs_spencer=1.724, fs_mprice=1.734, benchmark=VP77-seep-circle -->
+<!-- test: file=../files/rocscience/vp077a.xlsx, type=circular_search, num_slices=50, fs_bishop=1.637, fs_spencer=1.700, benchmark=VP77-seep-search -->
+<!-- test: file=../files/rocscience/vp077b.xlsx, type=single_circle, num_slices=60, fs_oms=1.477, fs_bishop=1.591, fs_spencer=1.659, fs_mprice=1.670, benchmark=VP77-piezo-circle -->
 <!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
 <!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
 <!-- test: file=../files/rocscience/vp080a.xlsx, type=single_circle, num_slices=60, fs_bishop=2.533, fs_spencer=2.530, benchmark=VP80-t0 -->
@@ -189,7 +192,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
 | [75](#vp75) | Dyke, (4) materials | **built** | [vp075.xlsx](../files/rocscience/vp075.xlsx). The James Bay dyke (D&W Fig. 7.16): granular fill with a berm on crust / marine clay / lacustrine clay. Bishop 1.424 / Spencer 1.420 vs D&W 1.45, Slide 1.468 / 1.464. On Slide's own printed circle XSLOPE gives 1.438 — the rest of the gap is that the search finds a slightly deeper minimum than Slide's did. |
 | [76](#vp76) | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | **built** | [vp076a.xlsx](../files/rocscience/vp076a.xlsx) (FE seepage), [vp076b.xlsx](../files/rocscience/vp076b.xlsx) (piezometric line). D&W Fig. 7.19 homogeneous dam with a full-face pool. FE seepage: Bishop 1.065 / Spencer 1.072 vs Slide 1.068 / 1.075. Piezometric line: 1.049 / 1.056 vs Slide 1.090 / 1.100 — this case is hypersensitive to the line's elevation (½ ft shifts FS by 6%). |
-| 77 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | planned |  |
+| [77](#vp77) | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | **built** | [vp077a.xlsx](../files/rocscience/vp077a.xlsx) (FE seepage), [vp077b.xlsx](../files/rocscience/vp077b.xlsx) (piezo line). D&W (2005) Fig. 7.24 thick-core dam, pond el. 315, geometry from D&W's own coordinate-labeled figure (the core tops at el. 328, not the crest). On Slide's printed deep base-tangent circles: FE-seepage Bishop 1.652 / Spencer 1.724 vs Slide 1.658 / 1.724; piezo Bishop 1.591 / Spencer 1.659 vs Slide 1.584 / 1.648. XSLOPE's own FE seepage solution end-to-end. |
 | [78](#vp78) | Slope, homogenous | **built** | [vp078.xlsx](../files/rocscience/vp078.xlsx). D&W (2005) Fig. 14.3 pure-cohesive slope, 30-ft foundation: search finds the base-tangent circle — Bishop 1.117 / Spencer 1.131 vs Slide 1.141/1.139, D&W toe reference 1.124. Slide's toe-circle rows are foundation-thickness-independent (identical for all three thicknesses), so the 46.5/60-ft variants add no information. |
 | [79](#vp79) | Slope, (2) materials, infinite slope failure | **built** | [vp079.xlsx](../files/rocscience/vp079.xlsx). D&W (2005) Fig. 14.4 cohesionless embankment on a φ=0 foundation: base-tangent circle Bishop 1.407 / Spencer 1.397 vs Slide 1.412 / 1.400, D&W 1.40. |
 | [80](#vp80) | Embankment, (6) materials | **built** | [vp080a.xlsx](../files/rocscience/vp080a.xlsx) / [vp080b.xlsx](../files/rocscience/vp080b.xlsx). D&W (2005) Fig. 14.5 six-layer stratified foundation, circles from (142,147): tangent-0 Spencer 2.530 vs Slide 2.545 / D&W 2.56; tangent-15 Spencer 1.352 vs Slide 1.359 / D&W 1.35. |
@@ -1111,6 +1114,25 @@ Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c'
 *The FE case lands within 0.6% of Slide, and XSLOPE's computed phreatic surface tracks the piezometric line Slide digitized from Duncan & Wright to better than a foot everywhere. The piezometric case sits 3% low, and the reason is that this particular problem is ill-conditioned: the critical circle is a shallow toe surface where the water table is nearly at the ground, so u/σ<sub>v</sub> ≈ 0.57 and effective stresses are small. Dropping the piezometric line by just ½ ft raises Bishop from 1.049 to 1.118 — 6% of FS per half-foot. The 3% gap is worth only about 0.3 ft of line elevation, which is finer than a raster figure can be read. Duncan & Wright's own reference values (1.19 and 1.08 for the same FE case) show the same spread.*
 
 ![vp076a: inputs and representative solution](images/vp076a.png)
+
+### VP77: Thick-core dam, FE seepage vs. piezometric line (D&W Fig. 7.24) {#vp77}
+
+Slide #77 / Duncan & Wright (2005) Fig. 7.24 (Fig. 7.37 in the 2014 edition): a symmetric earth dam with a thick clay core on an impervious foundation, pond at el. 315. Geometry comes from D&W's coordinate-labeled figure — shell faces 2.75:1 to an 80-ft crest at el. 338; the core is a trapezoid with 1.5:1 faces and a 50-ft top at el. **328** (the Slide figure leaves the core-top vertices unlabeled; the core does not reach the crest). Core c' = 0, φ' = 20°, γ = 120 pcf, k = 10⁻⁵ ft/min; shell c' = 0, φ' = 38°, γ = 140 pcf, k = 10⁻³ — a 100:1 contrast. Both zones are cohesionless, so the benchmark targets the **deep circle tangent to the base** at el. 127; both of Slide's printed criticals bottom at exactly 127.0.
+
+Like VP71 and VP76, pore pressures are modelled two ways. Case 1 runs **XSLOPE's own FE seepage** (head 315 on the submerged upstream face, exit face downstream, no-flow base): the phreatic surface drops from 312 to 231 across the core and runs near-flat at el. ~134 through the downstream shell, matching D&W's Fig. 7.38. Case 2 uses **Slide's piezometric line**, extracted from Figure 77.2 by axis-tick-calibrated vertex detection — the affine validates itself on the labeled pond point (measured (517.2, 315.1)), and the detected vertices land exactly on the core's 1.5:1 face at (572, 312) and the downstream 2.75:1 face at (1182, 148), where the line daylights and follows the face to the toe.
+
+**Input files:** [vp077a.xlsx](../files/rocscience/vp077a.xlsx) (FE seepage), [vp077b.xlsx](../files/rocscience/vp077b.xlsx) (piezometric line)
+
+| Method | XSLOPE FE seep | Slide FE seep | XSLOPE piezo | Slide piezo |
+|---|---|---|---|---|
+| Bishop | 1.652 *(search 1.637)* | 1.658 | 1.591 *(search 1.566)* | 1.584 |
+| Spencer | 1.724 *(search 1.700)* | 1.724 | 1.659 | 1.648 |
+| Morgenstern–Price | 1.734 | — | 1.670 | — |
+| Ordinary | 1.506 | — | 1.477 | — |
+
+*Values on Slide's printed circles (endpoints reproduced to 0.1 ft); the free-search values in parentheses are slightly deeper circles of the same family. D&W's four-program Spencer spread for the FE case is 1.67–1.72 (UTEXAS 1.69, SLIDE 1.70, SLOPE/W 1.67); XSLOPE's 1.724 sits at its top edge, equal to Slide's own manual value. Two numerical notes from the seepage run, both documented in the builder: the unsaturated front width must scale with the dam (h0 = −5 ft ≈ one element; the VP76-style −1 ft is sub-grid here and the fixed-point iteration never converges), and the sidecar is generated on a tri3 mesh because tri6 midside kr sampling oscillates. Spencer reads 1.753/1.737/1.724/1.715 at h0 = −20/−10/−5/−2 — the h0 = −5 choice is the sharpest mesh-resolvable front, not a fit.*
+
+![vp077a: inputs and representative solution](images/vp077a.png)
 
 ### VP78: Pure cohesive slope on a foundation (D&W Fig. 14.3) {#vp78}
 

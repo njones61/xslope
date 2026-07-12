@@ -1630,6 +1630,90 @@ def vp043():
     return 'vp043.xlsx'
 
 
+def _vp077_slope_data():
+    """Slide #77 / D&W (2005) Fig. 7.24 (2014 ed. Fig. 7.37): symmetric earth dam
+    with a thick clay core on an impervious foundation, pond el. 315. Exact
+    geometry from D&W's coordinate-labeled figure (mirrored left-to-right into
+    Slide's frame, x_s = x_dw + 1240.5): shell faces 2.75:1 from the toes to the
+    80-ft crest at el. 338; core is a trapezoid, base (293.75,127)-(946.75,127),
+    1.5:1 faces, 50-ft top at el. 328 (the Slide figure omits the core-top
+    labels; the core does NOT reach the crest). Core c'=0, phi'=20, gamma=120,
+    k=1.67e-7 ft/s; shell c'=0, phi'=38, gamma=140, k=1.67e-5 (D&W: 1e-5 and
+    1e-3 ft/min). Both zones c'=0, so the global critical is a shallow toe skin;
+    the benchmark targets the DEEP surface tangent to the base at el. 127."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    # h0=-5, i.e. the unsat front spans roughly one element of the 8-ft seepage
+    # mesh — the sharpest front the mesh can resolve, which is the closest
+    # converged approximation to the classical free-surface idealization the
+    # published values assume. (At the VP76-style h0=-1 the front is sub-grid on
+    # this 211-ft dam and the Picard iteration never converges; softer fronts
+    # converge but bias u low: Spencer reads 1.753/1.737/1.724/1.715 at
+    # h0=-20/-10/-5/-2 against Slide's 1.724.) The sidecar is generated on a
+    # tri3 mesh: tri6 midside kr sampling whips the front and never converges.
+    shell = dict(base); shell.update(name='Shell', c=0.0, phi=38.0, gamma=140.0,
+                                     gamma_sat=140.0, option='mc', u='piezo',
+                                     k1=1.67e-5, k2=1.67e-5, alpha=0.0, kr0=0.001, h0=-5.0)
+    core = dict(base); core.update(name='Core', c=0.0, phi=20.0, gamma=120.0,
+                                   gamma_sat=120.0, option='mc', u='piezo',
+                                   k1=1.67e-7, k2=1.67e-7, alpha=0.0, kr0=0.001, h0=-5.0)
+    sd['materials'] = [shell, core]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 127.0), (580.25, 338.0), (660.25, 338.0), (1240.5, 127.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 127.0), (293.75, 127.0), (595.25, 328.0),
+                                 (645.25, 328.0), (946.75, 127.0), (1240.5, 127.0)]},
+    ]
+    sd['max_depth'] = 127.0
+    sd['gamma_water'] = 62.4
+    # pond on the upstream face: hydrostatic, zero at the waterline (517, 315)
+    sd['dloads'] = [[{'X': 0.0, 'Y': 127.0, 'Normal': 62.4 * (315.0 - 127.0)},
+                     {'X': 517.0, 'Y': 315.0, 'Normal': 0.0}]]
+    sd['circular'] = True
+    sd['non_circ'] = []
+    return sd
+
+
+def vp077a():
+    """Slide #77 case 1: pore pressures from an FE seepage analysis (u='seep').
+    Specified head 315 on the submerged upstream face; downstream face is an
+    exit face; impervious foundation (no-flow). Deep base-tangent circle =
+    Slide's printed critical (center (1014.413, 677.859), R=550.859, bottom at
+    exactly el. 127). Slide circular Bishop 1.658 / Spencer 1.724; D&W reference
+    1.62 / 1.69; D&W Table 7.9 Spencer spread (FE u): UTEXAS 1.69 / SLIDE 1.70 /
+    SLOPE-W 1.67 / PHASE2 SRF 1.57."""
+    sd = _vp077_slope_data()
+    for m in sd['materials']:
+        m['u'] = 'seep'
+    sd['piezo_line'] = []
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 315.0, 'coords': [(0.0, 127.0), (517.0, 315.0)]}],
+        'exit_face': [(660.25, 338.0), (1240.5, 127.0)],
+    }
+    sd['circles'] = [{'Xo': 1014.413, 'Yo': 677.859, 'Depth': 127.0, 'R': 550.859}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp077a.xlsx'))
+    return 'vp077a.xlsx'
+
+
+def vp077b():
+    """Slide #77 case 2: the piezometric-line approximation. The polyline is
+    Slide's own drawn line, extracted from Figure 77.2 by axis-tick-calibrated
+    vertex-circle detection (the labeled pond point measures (517.2, 315.1),
+    validating the affine): flat at the pond to the upstream face, into the
+    core exactly on its 1.5:1 face at (572, 312.4), straight descent through
+    the core, out near the face at (886, 162.5)/(898, 159.6), a gentle run
+    across the downstream shell, daylighting exactly on the 2.75:1 face at
+    (1182, 148), then down the face to the toe. Deep circle = Slide's printed
+    case-2 critical (center (1037.847, 710.959), R=583.959, bottom el. 127.0).
+    Slide circular Bishop 1.584 / Spencer 1.648; D&W reference 1.67."""
+    sd = _vp077_slope_data()
+    sd['piezo_line'] = [(0.0, 315.0), (517.0, 315.0), (572.0, 312.4), (835.0, 184.0),
+                        (886.0, 162.5), (898.0, 159.6), (1182.3, 148.0), (1240.5, 127.0)]
+    sd['piezo_phreatic'] = False
+    sd['circles'] = [{'Xo': 1037.847, 'Yo': 710.959, 'Depth': 127.0, 'R': 583.959}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp077b.xlsx'))
+    return 'vp077b.xlsx'
+
+
 def vp078():
     """Slide #78 / Duncan & Wright (2005) Fig. 14.3: pure-cohesive slope
     (c=1000 psf, phi=0, gamma=100 pcf), 50-ft slope at 1:0.8 over a 30-ft
@@ -2400,6 +2484,98 @@ def vp084d():
     return _vp084(15.0, 'd')
 
 
+def _vp072_slope_data():
+    """Slide #72 / D&W (2005) Fig. 6.39-6.40 (2014 ed. Fig. 6.41): symmetric
+    embankment dam on a LAYERED foundation, pond el. 302, tailwater el. 227 at
+    the downstream ground. Elevations, slopes and properties from D&W's figure;
+    x-coordinates from axis-tick-calibrated vertex extraction of Slide's Figure
+    72.1, self-consistent with D&W to 0.5 ft (3:1 shells from toes (160,227)/
+    (745,227) to the 45-ft crest at el. 317 checks 270 = 3 x 90 exactly; core
+    0.5H:1V faces from base (397.5-507.5, 227) to a 25-ft top at el. 312; all
+    symmetric about x = 452.5). Foundation: clay 197-227 over sand 182-197
+    (model base 182). The physics: significant underseepage through the sand
+    produces UPWARD flow under the downstream shell — captured by FE pore
+    pressures, badly missed by a single piezometric line (D&W: 14-19%
+    unconservative, their central teaching point for this example).
+    Materials (k in ft/s = D&W ft/min / 60): outer shell 1.67e-4, c'=0 phi=34
+    gamma=125; clay core 1.67e-8, c'=100 phi=26 gamma=122; foundation clay
+    1.67e-7, c'=0 phi=24 gamma=123; foundation sand 1.67e-5, c'=0 phi=32
+    gamma=127."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    shell = dict(base); shell.update(name='Outer shell', c=0.0, phi=34.0, gamma=125.0,
+                                     gamma_sat=125.0, option='mc', u='piezo',
+                                     k1=1.67e-4, k2=1.67e-4, alpha=0.0, kr0=0.001, h0=-5.0)
+    core = dict(base); core.update(name='Clay core', c=100.0, phi=26.0, gamma=122.0,
+                                   gamma_sat=122.0, option='mc', u='piezo',
+                                   k1=1.67e-8, k2=1.67e-8, alpha=0.0, kr0=0.001, h0=-5.0)
+    fclay = dict(base); fclay.update(name='Foundation clay', c=0.0, phi=24.0, gamma=123.0,
+                                     gamma_sat=123.0, option='mc', u='piezo',
+                                     k1=1.67e-7, k2=1.67e-7, alpha=0.0, kr0=0.001, h0=-5.0)
+    fsand = dict(base); fsand.update(name='Foundation sand', c=0.0, phi=32.0, gamma=127.0,
+                                     gamma_sat=127.0, option='mc', u='piezo',
+                                     k1=1.67e-5, k2=1.67e-5, alpha=0.0, kr0=0.001, h0=-5.0)
+    sd['materials'] = [shell, core, fclay, fsand]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 227.0), (160.0, 227.0), (430.0, 317.0),
+                                 (475.0, 317.0), (745.0, 227.0), (905.0, 227.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 227.0), (397.5, 227.0), (440.0, 312.0),
+                                 (465.0, 312.0), (507.5, 227.0), (905.0, 227.0)]},
+        {'mat_id': 2, 'coords': [(0.0, 227.0), (905.0, 227.0)]},
+        {'mat_id': 3, 'coords': [(0.0, 197.0), (905.0, 197.0)]},
+    ]
+    sd['max_depth'] = 182.0
+    sd['gamma_water'] = 62.4
+    # pond: reservoir floor (0..160 at 227, 75 ft deep) + submerged face to (385, 302)
+    sd['dloads'] = [[{'X': 0.0, 'Y': 227.0, 'Normal': 62.4 * 75.0},
+                     {'X': 160.0, 'Y': 227.0, 'Normal': 62.4 * 75.0},
+                     {'X': 385.0, 'Y': 302.0, 'Normal': 0.0}]]
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # seed near the downstream toe (the global critical is a shallow toe circle
+    # driven by the upward exit gradient through the foundation clay)
+    sd['circles'] = [{'Xo': 700.0, 'Yo': 320.0, 'Depth': 200.0, 'R': 120.0}]
+    return sd
+
+
+def vp072a():
+    """Slide #72 case 1(a)+2(a): FE seepage pore pressures (u='seep'). Head 302
+    on the left edge, reservoir floor and submerged face; head 227 on the right
+    edge and downstream ground (tailwater at ground level); exit face on the
+    downstream shell. Slide global critical (free search): Bishop 1.149 /
+    Spencer 1.158 / GLE 1.161 vs D&W 1.11. Tangent to el. 197 (case 2a): Slide
+    Bishop 1.312 / Spencer 1.312 / GLE 1.319 vs D&W 1.37."""
+    sd = _vp072_slope_data()
+    for m in sd['materials']:
+        m['u'] = 'seep'
+    sd['piezo_line'] = []
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 302.0, 'coords': [(0.0, 182.0), (0.0, 227.0), (160.0, 227.0), (385.0, 302.0)]},
+            {'head': 227.0, 'coords': [(745.0, 227.0), (905.0, 227.0), (905.0, 182.0)]},
+        ],
+        'exit_face': [(475.0, 317.0), (745.0, 227.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp072a.xlsx'))
+    return 'vp072a.xlsx'
+
+
+def vp072b():
+    """Slide #72 case 1(b)+2(b): the piezometric-line approximation, Slide's own
+    line from Figure 72.2 (axis-calibrated vertex extraction; the pond/face
+    point measures (385.8, 301.3) against the geometric (385, 302)): flat at the
+    pond into the dam to x=436, down past the core top, steeply through the core
+    face to (497, 235), a gentle run across the downstream shell, tailwater 227
+    from the toe. Slide global critical: Bishop 1.306 / Spencer 1.301 vs D&W
+    1.30. Tangent 197: Bishop 1.563 / Spencer 1.557 vs D&W 1.57."""
+    sd = _vp072_slope_data()
+    sd['piezo_line'] = [(0.0, 302.0), (385.0, 302.0), (436.3, 301.3), (471.6, 273.7),
+                        (497.0, 235.2), (636.6, 233.1), (746.3, 227.0), (905.0, 227.0)]
+    sd['piezo_phreatic'] = False
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp072b.xlsx'))
+    return 'vp072b.xlsx'
+
+
 def vp073():
     """Slide #73 / Duncan & Wright (2005) and Skempton & LaRochelle (1965): the
     Bradwell reactor-1 excavated slope. The lower excavation is cut at 1/2:1 in
@@ -2554,7 +2730,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

@@ -236,6 +236,7 @@ class LemRunner(QThread):
         self._num_slices = options.get("num_slices", 40)
         self._rapid = options.get("rapid", False)
         self._composite = options.get("composite", False)
+        self._seed = 'grid' if options.get("grid_seed", False) else 'circles'
         self._diagnostic = options.get("diagnostic", False)
         self._fs_tol = options.get("fs_tol")
         self._tol = options.get("tol")
@@ -323,15 +324,16 @@ class LemRunner(QThread):
         sd = self._sd
         circular = self._surface == "circular"
         if circular:
-            if not (sd.get("circular") and sd.get("circles")):
-                self.failed.emit("Circular search needs at least one starting circle.")
+            if self._seed != 'grid' and not (sd.get("circular") and sd.get("circles")):
+                self.failed.emit("Circular search needs at least one starting circle "
+                                 "(or turn on grid seeding).")
                 return
             print(f"Searching for the critical circular surface with "
                   f"{self._method.upper()}{self._rapid_tag()}…")
             fs_cache, converged, search_path, circle_cache = circular_search(
                 sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
                 diagnostic=self._diagnostic, cancel_check=self._cancel.is_set,
-                composite=self._composite,
+                composite=self._composite, seed=self._seed,
                 **self._search_kwargs(circular=True))
             search = {"kind": "circular", "fs_cache": fs_cache,
                       "search_path": search_path, "circle_cache": circle_cache}
@@ -385,7 +387,8 @@ class LemRunner(QThread):
                                  debug_level=1 if self._diagnostic else 0,
                                  progress_callback=cb, cancel_check=self._cancel.is_set,
                                  fs_tol=self._fs_tol, tol=self._tol,
-                                 max_iter=self._max_iter, composite=self._composite)
+                                 max_iter=self._max_iter, composite=self._composite,
+                                 seed=self._seed)
         if not ok:
             self.failed.emit(str(result))
             return

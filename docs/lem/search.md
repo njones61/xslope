@@ -34,6 +34,32 @@ At the end of the process, the search results can be displayed using the **plot_
 
 Note that all circles tested in the search are displayed along with all grid points evaluated using the 9-point search algorithm. Furthermore, the sequence of center points for the moving 9-point grids are connected with a series of arrows showing the "search path".
 
+### Grid Seeding (Global Search)
+
+The adaptive search described above is a **local** optimizer: it refines whatever neighborhood its starting circles put it in, and it will do so even when a far better minimum exists elsewhere. This matters more than it might appear. On an embankment over a layered foundation, a shallow circle in the fill and a deep circle riding the base of the foundation are two *competing families* of failure surface, separated by a ridge of higher factors of safety that the local search will not cross. Started from a single circle in the wrong family, the search converges cleanly — reporting convergence, a stable factor of safety, and a plausible-looking surface — at a value that can be 20% or more too high. Nothing in the output warns you.
+
+Grid seeding (`seed='grid'`) removes this trap by adding a global stage in front of the local search:
+
+```python
+fs_cache, converged, search_path, circle_cache = circular_search(
+    slope_data, 'spencer', seed='grid')
+```
+
+The global stage is the classical **grid-and-tangent** sweep (the model used by Slide2 and SLOPE/W). Circle centers are laid out on a coarse grid over a box derived from the slope geometry — spanning the slope horizontally and sitting above the crest at heights scaled to the full crest-to-base depth of the model, which brackets where the center of any circle that cuts the slope can be. For each center, one trial circle is made *tangent* to each of a series of elevations between the bottom of the model and mid-slope. Sweeping tangent elevations rather than depths is what exposes competing families: the shallow face circle and the deep base-tangent circle occur at similar centers but different tangent lines, so each family appears as its own row of the sweep. Every trial circle (typically ~300) is solved at a reduced slice count, with the same degenerate-surface guards as the main search.
+
+The best circle from each surviving tangent family — every family within 25% of the best factor of safety found, up to four — then seeds the adaptive search, together with any circles from the input file, and **each family is refined independently**. This last point matters: families can differ by only a few percent at the coarse stage yet refine to very different minima, so refining only the best coarse result would re-introduce the trap one stage later. The shared evaluation cache makes the extra refinements cheap; the whole grid-seeded search typically costs a few times a plain seeded search (seconds to tens of seconds).
+
+Because the seeds come from the geometry, grid seeding also works with an **empty circles sheet** — the search needs no starting guess at all.
+
+Two behaviors of a global search are worth understanding before turning it on:
+
+- **It reports the most critical surface anywhere in the model.** If the model contains a genuinely marginal minor feature — say a steep fill face standing near its limit — the global minimum is there, not on the main slope, and that is what the search returns. This is correct behavior, but it differs from a benchmark or a design check that targets one specific mechanism. To interrogate a particular mechanism, use the default seeded mode with circles placed in that mechanism's family.
+- **Surficial skin slides are filtered — in grid mode only.** On a steep face with little cohesion, a vanishingly thin surface hugging the face can undercut every real mechanism (a raveling mode, not a slope failure), so grid mode rejects trial surfaces whose maximum thickness is under 5% of the slope height. The filter deliberately does **not** apply to the default seeded search, because a thin surface can also be the correct answer — a submerged cohesionless slope fails as an infinite-slope skin at essentially zero depth, and a seeded search must be able to follow your circles there. If your problem's true critical is that kind of skin, use seeded mode.
+
+On the James Bay dyke verification problem ([VP75](../verification/rocscience.md#vp75)), a single plausible starting circle traps the local search at FS = 1.745; grid seeding finds FS = 1.421 from the same file with the circles sheet ignored entirely — marginally better than the 1.425 found from three hand-picked seeds, and closest to Slide2's published 1.415.
+
+In XSLOPE Studio, grid seeding is the **Grid search** toggle in the Run LEM dialog, available when the analysis is an automated circular search.
+
 ## Non-Circular Failure Surfaces
 
 The non-circular search algorithm (`noncircular_search()` in xslope/search.py) takes a fundamentally different approach from the circular search, as it must optimize the positions of multiple control points that define an arbitrary failure surface rather than just optimizing a center and depth. The algorithm begins with a user-defined initial failure surface specified as a sequence of points in the slope_data['non_circ'] array. Each point in this sequence is characterized by its x and y coordinates along with a movement constraint that controls how the point is allowed to move during the optimization process.

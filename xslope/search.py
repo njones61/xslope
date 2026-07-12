@@ -50,6 +50,28 @@ def _net_driving_too_small(df_slices):
     return driving < MIN_DRIVING_FRAC * total
 
 
+MIN_THICKNESS_FRAC = 0.05
+
+
+def _too_thin(df_slices, h_ground, frac):
+    """True if the sliding mass is thinner than ``frac`` of the slope height.
+
+    GRID MODE ONLY (frac=0 disables). A global sweep of a benched geometry finds
+    surficial skins hugging any steep face — on a c~0 face they undercut every
+    real mechanism. They are usually a raveling mode, not the slope failure the
+    search is after, and Slide2 suppresses them the same way (its 'minimum
+    depth' filter). But thin criticals can also be THE answer (a submerged c=0
+    slope fails as an infinite-slope skin at zero depth), which is why this must
+    never apply to the default seeded search: there the user's circles define
+    the mechanism of interest, thin or not."""
+    if frac <= 0:
+        return False
+    if df_slices is None or len(df_slices) == 0 or 'y_ct' not in df_slices.columns:
+        return True
+    thick = float((df_slices['y_ct'] - df_slices['y_cb']).max())
+    return thick < frac * h_ground
+
+
 def _base_tension_too_extensive(df_slices):
     """True if a large fraction of slices carry a negative effective base normal
     (base in tension) — a non-physical surface, e.g. a circle through a
@@ -75,9 +97,122 @@ def _check_cancel(cancel_check):
         raise AnalysisCancelled()
 
 
+def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
+                       rapid=False, composite=False, nx=10, ny=5, n_tangents=6,
+                       keep=4, diagnostic=False, cancel_check=None, circle_cache=None):
+    """Coarse grid-and-tangent sweep that SEEDS the adaptive circular search.
+
+    The adaptive 9-point search is a local optimizer: it refines whatever
+    neighborhood its starting circles put it in, and a single seed in the wrong
+    family converges to a local minimum with no warning (a shallow circle in a
+    fill can read 20%+ high while the true critical rides the base of the
+    foundation). This sweep is the global stage that protects against that.
+
+    It is Slide2's grid-and-tangent model. Centers are laid out on an nx-by-ny
+    grid over a box derived from the slope geometry — spanning the slope
+    horizontally (extended 0.75H past the toe and crest) and sitting 0.25H to
+    2H above the crest, which brackets where the center of a circle that cuts
+    the slope can be. For each center, one trial circle is made TANGENT to each
+    of ``n_tangents`` elevations between the bottom of the model and mid-slope.
+    Sweeping tangent elevations, not depths-below-center, is what finds
+    competing families: the shallow face circle and the deep base-tangent
+    circle live at similar centers but different tangent lines, and a local
+    depth optimizer started in one family never sees the other.
+
+    Every trial is solved (at a reduced slice count) with the same degenerate-
+    surface guards as the search proper. The best circle from each tangent
+    family within 25% of the global best FS is returned as a seed, deepest
+    families first among ties, capped at ``keep``. The caller merges these with
+    any user-entered circles and runs the normal adaptive search from all of
+    them.
+    """
+    solver = getattr(solve, method_name)
+    coords = list(slope_data['ground_surface'].coords)
+    ys_g = [y for _, y in coords]
+    y_hi, y_lo = max(ys_g), min(ys_g)
+    H = y_hi - y_lo
+    if H <= 0:
+        return []
+    right_facing = coords[0][1] > coords[-1][1]
+    tol_y = 1e-6 * max(1.0, H)
+    his = [x for x, y in coords if y > y_hi - tol_y]
+    los = [x for x, y in coords if y < y_lo + tol_y]
+    x_crest = max(his) if right_facing else min(his)
+    x_toe = min(los) if right_facing else max(los)
+
+    # The box must scale with the FULL model depth, not just the slope height: a
+    # circle tangent to the base of a deep foundation spans the whole model, and
+    # its center sits several slope-heights above the crest (VP75's critical
+    # centers run to ~2.5x the crest-to-floor depth above the toe).
+    depth_floor = slope_data['domain_polygon'].bounds[1]
+    Hm = max(H, y_hi - depth_floor)
+    xs = np.linspace(min(x_toe, x_crest) - 0.75 * Hm, max(x_toe, x_crest) + 0.75 * Hm, nx)
+    ys = np.linspace(y_hi + 0.25 * Hm, y_hi + 2.5 * Hm, ny)
+    y_mid = 0.5 * (y_lo + y_hi)
+    tangents = list(np.linspace(depth_floor, y_mid, n_tangents))
+    if composite:
+        # one below-floor family: its circles truncate at the base and run along it
+        tangents.insert(0, depth_floor - 0.5 * H)
+
+    if rapid:
+        from .advanced import rapid_drawdown
+
+    sweep_slices = min(num_slices, 20)
+    best_by_tan = {}
+    n_valid = 0
+    for yt in tangents:
+        for yc in ys:
+            _check_cancel(cancel_check)
+            for xc in xs:
+                R = yc - yt
+                if R <= 0:
+                    continue
+                circle = {'Xo': float(xc), 'Yo': float(yc), 'Depth': float(yt), 'R': float(R)}
+                success, result = generate_slices(slope_data, circle=circle,
+                                                  num_slices=sweep_slices,
+                                                  composite=composite)
+                if not success:
+                    continue
+                df_slices, failure_surface = result
+                if _net_driving_too_small(df_slices) or _too_thin(df_slices, H, MIN_THICKNESS_FRAC):
+                    continue
+                if rapid:
+                    ok, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
+                else:
+                    ok, solver_result = solver(df_slices)
+                if not ok:
+                    continue
+                FS = solver_result['FS']
+                if not (0 < FS < fs_fail) or _base_tension_too_extensive(df_slices):
+                    continue
+                n_valid += 1
+                if circle_cache is not None:
+                    circle_cache.append({"Xo": circle['Xo'], "Yo": circle['Yo'],
+                                         "Depth": circle['Depth'], "R": circle['R'],
+                                         "FS": FS, "failure_surface": failure_surface})
+                if yt not in best_by_tan or FS < best_by_tan[yt][0]:
+                    best_by_tan[yt] = (FS, circle)
+
+    if not best_by_tan:
+        return []
+    fs_best = min(fs for fs, _ in best_by_tan.values())
+    ranked = sorted(best_by_tan.items(), key=lambda kv: kv[1][0])
+    seeds = [circ for yt, (fs, circ) in ranked if fs <= 1.25 * fs_best][:keep]
+    print(f"[grid seed] swept {len(tangents) * nx * ny} circles ({n_valid} valid), "
+          f"best FS={fs_best:.4f}; seeding {len(seeds)} tangent "
+          f"famil{'y' if len(seeds) == 1 else 'ies'}")
+    if diagnostic:
+        for fs, c in [v for _, v in ranked]:
+            tag = 'seed' if c in seeds else '    '
+            print(f"  [{tag}] tangent y={c['Depth']:8.2f}  FS={fs:7.4f}  "
+                  f"center=({c['Xo']:.1f}, {c['Yo']:.1f})")
+    return seeds
+
+
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
-                    diagnostic=False, num_slices=40, cancel_check=None, composite=False):
+                    diagnostic=False, num_slices=40, cancel_check=None, composite=False,
+                    seed='circles'):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -95,6 +230,15 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     length like ``grid < 0.01``, which means different things on a 20 ft vs a
     500 ft slope) makes it scale-invariant.
 
+    ``seed`` selects the starting circles. ``'circles'`` (default) refines from
+    the circles sheet, exactly as before. ``'grid'`` first runs a coarse
+    grid-and-tangent sweep over a box derived from the slope geometry and seeds
+    the refinement with the best circle from each competing tangent family (plus
+    any user circles) — see _grid_seed_circles. Use it when a single starting
+    circle risks trapping the search in a local minimum, e.g. an embankment on a
+    layered foundation where a shallow fill circle and a deep foundation circle
+    compete.
+
     ``composite`` (default False) lets trial circles dip below the bottom of the
     model, where they are truncated into a composite surface that runs along the
     base (see slice.CompositeSurface). Turn it on when the base is a real
@@ -110,9 +254,10 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         list of dict: circle_cache - all circles tested during search
     """
 
-    if not slope_data.get('circles'):
+    if seed != 'grid' and not slope_data.get('circles'):
         print("\nERROR: Circular search requires at least one circle defined in the input.")
         print("       Add circle data to the 'circles' sheet in the input template.")
+        print("       (Or run with seed='grid' to generate starting circles automatically.)")
         raise SystemExit(1)
 
     if rapid:
@@ -126,6 +271,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     ground_surface = slope_data['ground_surface']
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
     y_max = max(y for _, y in ground_surface.coords)
+    h_ground = y_max - min(y for _, y in ground_surface.coords)   # slope height, for the skin-slide guard
     # The deepest allowable failure-surface elevation is the bottom of the domain
     # polygon (not max_depth, which is only a profile-sheet input). Circles below an
     # irregular bottom are rejected by the containment check in generate_slices.
@@ -145,7 +291,29 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     search_floor = depth_floor - delta_y if composite else depth_floor
     min_grid = delta_y * min_grid_frac   # required center-grid resolution before FS convergence
 
-    circles = slope_data['circles']
+    # The skin-slide filter runs only in grid mode: a global sweep must not report
+    # a raveling sliver as the critical, but the seeded search must stay able to
+    # follow a user's circles to a genuinely thin critical (e.g. a submerged c=0
+    # slope, whose infinite-slope skin IS the answer). See _too_thin.
+    thin_frac = MIN_THICKNESS_FRAC if seed == 'grid' else 0.0
+
+    if seed == 'grid':
+        # Global stage: sweep a geometry-derived center grid against tangent
+        # elevations and seed the adaptive search with the best circle from each
+        # competing family (see _grid_seed_circles). User circles, if any, stay in
+        # as extra seeds. This is the protection against the local-minimum trap —
+        # a single user seed in the wrong family otherwise converges 20%+ high
+        # with no warning.
+        _check_cancel(cancel_check)
+        circles = _grid_seed_circles(
+            slope_data, method_name, num_slices=num_slices, fs_fail=fs_fail,
+            rapid=rapid, composite=composite, diagnostic=diagnostic,
+            cancel_check=cancel_check, circle_cache=circle_cache)
+        circles = circles + list(slope_data.get('circles') or [])
+        if not circles:
+            return [], False, [], circle_cache
+    else:
+        circles = slope_data['circles']
 
     def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, circle_cache, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
@@ -173,8 +341,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                     solver_result = None
                 else:
                     df_slices, failure_surface = result
-                    if _net_driving_too_small(df_slices):
-                        FS = fs_fail  # degenerate surface (near-zero net driving)
+                    if _net_driving_too_small(df_slices) or _too_thin(df_slices, h_ground, thin_frac):
+                        FS = fs_fail  # degenerate (near-zero driving; grid mode also drops skins)
                         solver_result = None
                     else:
                         if rapid:
@@ -278,64 +446,88 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         all_starts.append((start_circle, best_point))
 
     all_starts.sort(key=lambda t: t[1]['FS'])
-    start_circle, best_start = all_starts[0]
-    x0 = best_start['Xo']
-    y0 = best_start['Yo']
-    depth_guess = best_start['Depth']
-    grid_size = (y0 - depth_guess) * 0.15
-    best_fs = best_start['FS']
 
-    # Include initial jump from user-defined circle to best point on its grid
-    search_path = [
-        {"x": start_circle['Xo'], "y": start_circle['Yo'], "FS": None},
-        {"x": x0, "y": y0, "FS": best_fs}
-    ]
-    converged = False
+    def refine(start_circle, best_start, launch_label=""):
+        """Adaptive 9-point refinement from one start. Returns (fs, converged, path)."""
+        nonlocal fs_cache
+        x0 = best_start['Xo']
+        y0 = best_start['Yo']
+        depth_guess = best_start['Depth']
+        grid_size = (y0 - depth_guess) * 0.15
+        best_fs = best_start['FS']
 
-    if diagnostic:
-        print(f"\n[✅ launch grid] Starting refinement from FS={best_fs:.4f} at ({x0:.2f}, {y0:.2f})")
+        # Include initial jump from the seed circle to the best point on its grid
+        path = [
+            {"x": start_circle['Xo'], "y": start_circle['Yo'], "FS": None},
+            {"x": x0, "y": y0, "FS": best_fs}
+        ]
+        converged = False
 
-    fs_level_start = best_fs   # best FS at the start of the current grid resolution
-    small_levels = 0           # consecutive refinements that barely improved FS
+        if diagnostic:
+            print(f"\n[✅ launch grid{launch_label}] Starting refinement from FS={best_fs:.4f} at ({x0:.2f}, {y0:.2f})")
 
-    for iteration in range(max_iter):
-        _check_cancel(cancel_check)
-        print(f"[🔁 iteration {iteration+1}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
-        fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
+        fs_level_start = best_fs   # best FS at the start of the current grid resolution
+        small_levels = 0           # consecutive refinements that barely improved FS
 
-        if best_point['FS'] < best_fs:
-            # Found a better center at this resolution — move there and keep exploring.
-            best_fs = best_point['FS']
-            x0 = best_point['Xo']
-            y0 = best_point['Yo']
-            depth_guess = best_point['Depth']
-            search_path.append({"x": x0, "y": y0, "FS": best_fs})
-            continue
+        for iteration in range(max_iter):
+            _check_cancel(cancel_check)
+            print(f"[🔁 iteration {iteration+1}{launch_label}] center=({x0:.2f}, {y0:.2f}), FS={best_fs:.4f}, grid={grid_size:.4f}")
+            fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
 
-        # No improvement at this resolution. Refine the grid, and converge once the
-        # FS gain over a refinement level has been negligible twice in a row (so the
-        # third decimal of FS is stable). The grid floor `tol` is only a backstop.
-        level_gain = fs_level_start - best_fs
-        if level_gain < fs_tol and grid_size < min_grid:
-            small_levels += 1
-            if small_levels >= 2:
+            if best_point['FS'] < best_fs:
+                # Found a better center at this resolution — move there and keep exploring.
+                best_fs = best_point['FS']
+                x0 = best_point['Xo']
+                y0 = best_point['Yo']
+                depth_guess = best_point['Depth']
+                path.append({"x": x0, "y": y0, "FS": best_fs})
+                continue
+
+            # No improvement at this resolution. Refine the grid, and converge once the
+            # FS gain over a refinement level has been negligible twice in a row (so the
+            # third decimal of FS is stable). The grid floor `tol` is only a backstop.
+            level_gain = fs_level_start - best_fs
+            if level_gain < fs_tol and grid_size < min_grid:
+                small_levels += 1
+                if small_levels >= 2:
+                    converged = True
+                    elapsed = time.time() - start_time
+                    print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} (ΔFS<{fs_tol}) at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
+                    break
+            else:
+                small_levels = 0
+            fs_level_start = best_fs
+            grid_size *= shrink_factor
+
+            if grid_size < tol:
                 converged = True
                 elapsed = time.time() - start_time
-                print(f"[✅ converged] Iter={iteration+1}, FS={best_fs:.4f} (ΔFS<{fs_tol}) at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
+                print(f"[✅ converged: grid floor] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
                 break
-        else:
-            small_levels = 0
-        fs_level_start = best_fs
-        grid_size *= shrink_factor
 
-        if grid_size < tol:
-            converged = True
-            elapsed = time.time() - start_time
-            print(f"[✅ converged: grid floor] Iter={iteration+1}, FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f}, depth={depth_guess:.2f}), elapsed time={elapsed:.2f} seconds")
-            break
+        if not converged and diagnostic:
+            print(f"\n[❌ max iterations reached] FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f})")
+        return best_fs, converged, path
 
-    if not converged and diagnostic:
-        print(f"\n[❌ max iterations reached] FS={best_fs:.4f} at (x={x0:.2f}, y={y0:.2f})")
+    # Grid seeding refines EVERY surviving family, not just the best start —
+    # competing families can differ by only a few percent at the coarse stage yet
+    # refine to very different minima, and launching only the best start is
+    # exactly the local-minimum trap the grid exists to remove. Seeded mode
+    # ('circles') keeps the original single-launch behavior unchanged.
+    if seed == 'grid':
+        fs_cut = all_starts[0][1]['FS'] * 1.15
+        launches = [t for t in all_starts if t[1]['FS'] <= fs_cut][:4]
+    else:
+        launches = all_starts[:1]
+
+    search_path = []
+    best_fs, converged = None, False
+    for i, (sc, bs) in enumerate(launches):
+        label = f" (family {i+1}/{len(launches)})" if len(launches) > 1 else ""
+        fs_i, conv_i, path_i = refine(sc, bs, launch_label=label)
+        search_path.extend(path_i)
+        if best_fs is None or fs_i < best_fs:
+            best_fs, converged = fs_i, conv_i
 
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path, circle_cache

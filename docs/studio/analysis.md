@@ -29,6 +29,15 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   resting on it — because the critical mechanism there follows the base and no
   ordinary circle can reach it. Leave it off when the bottom of the model is
   simply how deep you chose to look.
+- **Grid search** — seeds the circular search from an automatic
+  grid-and-tangent sweep instead of (only) the circles sheet (see
+  [Grid Seeding](../lem/search.md#grid-seeding-global-search)). Off by default,
+  available for circular auto-search and reliability. Turn it on to protect
+  against the local-minimum trap of a single starting circle — a seed in the
+  wrong family can converge 20% or more too high with no warning — or when you
+  have no idea where the critical circle is (the circles sheet may even be
+  empty). It reports the most critical surface anywhere in the model; leave it
+  off to interrogate a specific mechanism with your own circles.
 - **Search tolerances** (`fs_tol`, `tol`, `max_iter`) — enabled for the
   search-driven analyses.
 

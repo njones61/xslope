@@ -338,6 +338,22 @@ class RunLemDialog(QDialog):
             "look. Circular surfaces only.")
         form.addRow("", self.composite)
 
+        # Grid seeding: a coarse grid-and-tangent sweep seeds the circular search
+        # instead of (only) the circles sheet, protecting against the local-minimum
+        # trap of a single bad starting circle. Circular auto-search only.
+        self.grid_seed = QCheckBox("Grid search (auto-seed the circular search)")
+        self.grid_seed.setChecked(bool(defaults.get("grid_seed", False)))
+        self.grid_seed.setToolTip(
+            "Sweep a grid of circle centers against a range of tangent elevations, "
+            "derived from the slope geometry, and refine from the best circle of every "
+            "competing family — plus your entered circles, if any.\n\n"
+            "This is a GLOBAL search: it reports the most critical surface anywhere in "
+            "the model. Without it the search only refines the neighborhood of your "
+            "starting circles, and a single seed in the wrong place can converge to a "
+            "local minimum that reads 20% or more too high, with no warning.\n\n"
+            "Leave it off to interrogate a specific mechanism with your own circles.")
+        form.addRow("", self.grid_seed)
+
         self.diagnostic = QCheckBox("Diagnostic output (verbose log)")
         self.diagnostic.setChecked(bool(defaults.get("diagnostic", False)))
         form.addRow("", self.diagnostic)
@@ -411,6 +427,11 @@ class RunLemDialog(QDialog):
         circular = self._surface_value() == "circular"
         # Geometric tol applies to circular search only.
         self.tol.setEnabled(is_search and circular)
+        # Grid seeding drives the circular search; meaningless for a single surface
+        # or a non-circular search.
+        self.grid_seed.setEnabled(is_search and circular)
+        if not (is_search and circular):
+            self.grid_seed.setChecked(False)
         # A composite surface is a truncated circle; the idea has no meaning for a
         # non-circular surface, whose points are placed by the user or the search.
         self.composite.setEnabled(circular)
@@ -425,6 +446,7 @@ class RunLemDialog(QDialog):
             "num_slices": self.num_slices.value(),
             "rapid": self.rapid.isChecked(),
             "composite": self.composite.isChecked(),
+            "grid_seed": self.grid_seed.isChecked(),
             "diagnostic": self.diagnostic.isChecked(),
             "fs_tol": self.fs_tol.value(),
             "tol": self.tol.value(),

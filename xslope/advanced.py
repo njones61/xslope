@@ -326,7 +326,7 @@ def rapid_drawdown(df, method_name, debug_level=1):
 
 def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
                 progress_callback=None, cancel_check=None,
-                fs_tol=None, tol=None, max_iter=None, composite=False):
+                fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles'):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -367,6 +367,8 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
         _circ_kwargs['tol'] = tol
     if composite:
         _circ_kwargs['composite'] = True
+    if seed != 'circles':
+        _circ_kwargs['seed'] = seed
 
     def _progress(done, total, label):
         if progress_callback is not None:

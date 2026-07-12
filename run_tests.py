@@ -207,6 +207,9 @@ def run_lem_test(test):
     # along it (slice.CompositeSurface). Only for problems whose base is a real
     # impenetrable boundary; off by default.
     composite = str(test.get('composite', 'false')).strip().lower() in ('true', '1', 'yes')
+    # `seed=grid` runs the circular search from an automatic grid-and-tangent sweep
+    # instead of (only) the circles sheet — the global-search mode.
+    seed = str(test.get('seed', 'circles')).strip().lower()
 
     slope_data = load_slope_data(file_path)
 
@@ -229,7 +232,8 @@ def run_lem_test(test):
 
     elif test_type == 'circular_search':
         fs_cache, converged, search_path, circle_cache = circular_search(
-            slope_data, method, num_slices=num_slices, rapid=rapid, composite=composite
+            slope_data, method, num_slices=num_slices, rapid=rapid, composite=composite,
+            seed=seed
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "circular_search found no valid surface"

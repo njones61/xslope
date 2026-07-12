@@ -1773,7 +1773,36 @@ def vp064():
     return 'vp064.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp067():
+    """Slide #67 / USACE EM 1110-2-1902 example F-5: end-of-construction
+    embankment on an undrained fine-grained foundation. Labeled figure:
+    ground (-100,100)-(0,100)-(174,158)-(257,191)-(301,191)-(400,150),
+    foundation top el 100, base el 0. Embankment c=1780 psf, phi=5,
+    gamma=135; foundation c=1600, phi=2, gamma=127. Circle centered 259 ft
+    above / 101 ft right of the toe (0,100), through the toe (R=278.0).
+    USACE 1.33; Slide Bishop 1.332 / Spencer 1.328 / Janbu corr 1.345."""
+    import math
+    sd = load_slope_data(ACADS_1A)
+    m0 = dict(sd['materials'][0]); m1 = dict(sd['materials'][0])
+    m0.update(name='Embankment', c=1780.0, phi=5.0, gamma=135.0, option='mc', u='none')
+    m1.update(name='Foundation', c=1600.0, phi=2.0, gamma=127.0, option='mc', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-100.0, 100.0), (0.0, 100.0), (174.0, 158.0),
+                                 (257.0, 191.0), (301.0, 191.0), (400.0, 150.0)]},
+        {'mat_id': 1, 'coords': [(-100.0, 100.0), (400.0, 100.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    R = math.hypot(101.0, 259.0)
+    sd['circles'] = [{'Xo': 101.0, 'Yo': 359.0, 'Depth': 359.0 - R, 'R': R}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp067.xlsx'))
+    return 'vp067.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp067, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

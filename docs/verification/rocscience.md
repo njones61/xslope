@@ -67,6 +67,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.390, benchmark=VP99 -->
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
+<!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
 <!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
 <!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
@@ -146,7 +147,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [64](#vp64) | Embankment, (4) materials, water table, tension crack | **built** | [vp064.xlsx](../files/rocscience/vp064.xlsx). USACE EM 1110-2-1902 Fig. 4-1 end-of-construction dam (4 materials, core trench, WT, 7-ft crack, specified circle (102,163,R=163)): Spencer 2.488 vs Slide 2.445 / USACE 2.44 (+1.8%; crest placement pinned from USACE's slice table — figures are vertex-unlabeled). |
 | 65 | Embankment, (4) materials, water table, ponded water | planned |  |
 | 66 | Embankment, (4) materials, water table, ponded water | planned |  |
-| 67 | Embankment, (2) materials | planned |  |
+| [67](#vp67) | Embankment, (2) materials | **built** | [vp067.xlsx](../files/rocscience/vp067.xlsx). USACE EM 1110-2-1902 example F-5 end-of-construction embankment: specified toe circle — Spencer 1.316 vs Slide 1.328 / USACE 1.33; Bishop 1.320 vs 1.332. |
 | 68 | Embankment, (3) materials, ponded water | planned |  |
 | 69 | Embankment, (2) materials, water table, ponded water | planned |  |
 | 70 | Submerged slope, homogenous, water table, ponded water | planned |  |
@@ -823,6 +824,20 @@ Slide #64 / USACE EM 1110-2-1902 (2003) Figure 4-1: the manual's Spencer hand-ve
 *+1.8%. Neither figure labels its vertices; the crest half-width (17 ft) and toes (±217) were pinned by reconciling USACE's printed slice table (slice 1: width 23 ft, average height 16 ft; 173-ft total span). The residual is within that geometric uncertainty.*
 
 ![vp064: inputs and representative solution](images/vp064.png)
+
+### VP67: USACE end-of-construction embankment (example F-5) {#vp67}
+
+Slide #67 / USACE EM 1110-2-1902 (2003) example F-5: a non-homogeneous embankment (c = 1780 psf, φ = 5°, γ = 135 pcf) on a 100-ft undrained fine-grained foundation (c = 1600 psf, φ = 2°, γ = 127 pcf), analyzed at end of construction. Slide's figure labels every vertex; the circle is centered 259 ft above and 101 ft right of the toe and passes through the toe (R = 278.0).
+
+**Input files:** [vp067.xlsx](../files/rocscience/vp067.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 1.316 | Slide 1.328; USACE 1.33 |
+| Bishop | 1.320 | Slide 1.332 |
+| Janbu (corrected) | 1.340 | Slide 1.345 |
+
+![vp067: inputs and representative solution](images/vp067.png)
 
 ### VP74: Sand embankment on saturated clay (D&W Fig. 7.12) {#vp74}
 

@@ -66,6 +66,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
 <!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.390, benchmark=VP99 -->
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
+<!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
 <!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
 <!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
 <!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
@@ -142,7 +143,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [61](#vp61) | Slope, homogenous, composite surfaces | **built** | [vp061a.xlsx](../files/rocscience/vp061a.xlsx) (power), [vp061b.xlsx](../files/rocscience/vp061b.xlsx) (M-C). Baker (2003) ex. 3 (London clay) on the #44 geometry: Spencer power 1.466 vs Slide 1.468 / Baker 1.48; MC 1.367 vs Slide 1.366 / Baker 1.35. |
 | [62](#vp62) | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](../files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](../files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
 | 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (paper now in `ref_docs_lim_eq/`). Outline fully pinned from the paper's Fig. 9 (bench el 20 to x=20, 2:1 to (60,40), 8 m bench, 2.5:1 to (105.5,55), crest to 150); interfaces are 22:1 but their face anchors are not dimensioned and FS=1.0-calibration attempts with plausible anchors give 1.17-1.21 — the paper's Fig. 10 profile also appears inconsistent with Fig. 9's mesh. Needs a closer read of the paper (or the SLOPE/W .gsz) before building. |
-| 64 | Embankment, (4) materials, water table, tension crack | planned |  |
+| [64](#vp64) | Embankment, (4) materials, water table, tension crack | **built** | [vp064.xlsx](../files/rocscience/vp064.xlsx). USACE EM 1110-2-1902 Fig. 4-1 end-of-construction dam (4 materials, core trench, WT, 7-ft crack, specified circle (102,163,R=163)): Spencer 2.488 vs Slide 2.445 / USACE 2.44 (+1.8%; crest placement pinned from USACE's slice table — figures are vertex-unlabeled). |
 | 65 | Embankment, (4) materials, water table, ponded water | planned |  |
 | 66 | Embankment, (4) materials, water table, ponded water | planned |  |
 | 67 | Embankment, (2) materials | planned |  |
@@ -807,6 +808,21 @@ Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001, Bishop 0.987; Lo
 ![vp062a: inputs and representative solution](images/vp062a.png)
 
 ![vp062b: inputs and representative solution](images/vp062b.png)
+
+### VP64: USACE end-of-construction dam (EM 1110-2-1902 Fig. 4-1) {#vp64}
+
+Slide #64 / USACE EM 1110-2-1902 (2003) Figure 4-1: the manual's Spencer hand-verification dam at end-of-construction — a symmetric 50-ft embankment at 4H:1V (undrained c=1000 psf, φ=5°) over a 10-ft sand blanket, foundation clay (c=3000, φ=0) and rock, with an embankment core trench through the sand, groundwater at the sand top, and a 7-ft crest tension crack. Evaluated on the specified circle (center (102,163), tangent to el. 0).
+
+**Input files:** [vp064.xlsx](../files/rocscience/vp064.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 2.488 | Slide 2.445; USACE 2.44 |
+| Bishop | 2.489 | Slide 2.447 |
+
+*+1.8%. Neither figure labels its vertices; the crest half-width (17 ft) and toes (±217) were pinned by reconciling USACE's printed slice table (slice 1: width 23 ft, average height 16 ft; 173-ft total span). The residual is within that geometric uncertainty.*
+
+![vp064: inputs and representative solution](images/vp064.png)
 
 ### VP74: Sand embankment on saturated clay (D&W Fig. 7.12) {#vp74}
 

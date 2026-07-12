@@ -1724,7 +1724,55 @@ def vp074():
     return 'vp074.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp064():
+    """Slide #64 / USACE EM 1110-2-1902 Figure 4-1: end-of-construction
+    Spencer hand-check dam. Symmetric 50-ft embankment at 4H:1V (crest
+    x=-5..5, toes at +-205), 10-ft sand blanket over foundation clay
+    (-10..-37) and rock (-37..-40), embankment core trench through the sand
+    at x=-17..17, groundwater at the sand top (el 0, dipping through the
+    trench), 7-ft crest tension crack. Undrained strengths: embankment
+    1000/5 (115/120 pcf), sand 0/35 (125/130), clay 3000/0 (110/115), rock
+    0/45 (160/165). Specified circle: center (102, 163), tangent to el 0
+    (R=163). USACE Spencer 2.44; Slide Bishop 2.447 / Spencer 2.445 /
+    Janbu corrected 2.430. xslope Spencer 2.488 (+1.8%; Slide's figure is
+    vertex-unlabeled, so the crest/toe placement carries a small
+    uncertainty)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Embankment', 1000.0, 5.0, 115.0, 120.0),
+             ('Sand', 0.0, 35.0, 125.0, 130.0),
+             ('Foundation Clay', 3000.0, 0.0, 110.0, 115.0),
+             ('Rock', 0.0, 45.0, 160.0, 165.0)]
+    sd['materials'] = []
+    for name, c, phi, gm, gs in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gm, gamma_sat=gs,
+                 option='mc', u='piezo')
+        sd['materials'].append(m)
+    # crest half-width 17 / toes at 217 (4H:1V): pinned by reconciling
+    # USACE's Fig 4-1 slice table (slice 1 width 23 ft, avg height 16 ft;
+    # total slice span 173 ft matches the crack-truncated arc)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-225.0, 0.0), (-217.0, 0.0), (-17.0, 50.0),
+                                 (17.0, 50.0), (217.0, 0.0), (225.0, 0.0)]},
+        {'mat_id': 1, 'coords': [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0),
+                                 (8.0, -10.0), (17.0, 0.0), (225.0, 0.0)]},
+        {'mat_id': 2, 'coords': [(-225.0, -10.0), (225.0, -10.0)]},
+        {'mat_id': 3, 'coords': [(-225.0, -37.0), (225.0, -37.0)]},
+    ]
+    sd['max_depth'] = -40.0
+    sd['gamma_water'] = 62.4
+    sd['tcrack_depth'] = 7.0
+    sd['piezo_line'] = [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0),
+                        (8.0, -10.0), (17.0, 0.0), (225.0, 0.0)]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 102.0, 'Yo': 163.0, 'Depth': 0.0, 'R': 163.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp064.xlsx'))
+    return 'vp064.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

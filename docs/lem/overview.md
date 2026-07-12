@@ -127,6 +127,16 @@ directions of the forces are reversed simply by changing the sign convention of 
 
 One exception to this is Spencer's method. Details can be found in the XSLOPE source code for Spencer's method.
 
+## Water Pressures: a Practice Note
+
+XSLOPE deliberately offers **no buoyant-unit-weight option**. Water always enters an analysis explicitly: total unit weights for the soil, pore pressures from a piezometric line, r<sub>u</sub>, or an FE seepage solution, and free water (reservoirs, ponds, tailwater) as hydrostatic pressure loads on the ground surface. This follows a maxim Stephen G. Wright taught for decades:
+
+> *"Never use buoyant unit weights. Always use external loads, piezometric lines, etc."*
+
+The reason is not stylistic. The buoyant shortcut — γ′ = γ − γ<sub>w</sub> below the water table, with pore pressures and boundary water loads dropped in exchange — is provably identical to the explicit formulation **only when the water is static** (a horizontal water table, no flow). The moment the phreatic surface is inclined, water is moving, and the shortcut silently omits the seepage forces (γ<sub>w</sub>·i per unit volume) that the flow exerts on the soil skeleton. The explicit formulation costs nothing extra and never carries that hidden assumption: it reproduces the buoyant answer automatically when water happens to be static, and the correct answer when it is not.
+
+The error is not academic. The classic bracket is the infinite slope: fully submerged under a still pool, FS = tanφ′/tanβ, and the shortcut is exact; with seepage parallel to the face, FS ≈ (γ′/γ<sub>sat</sub>)·tanφ′/tanβ — roughly **half** — while the buoyant weight is identical in both cases and cannot tell them apart. For a full-scale case study, see verification problem [VP42](../verification/rocscience.md#vp42), a clay-core dam with an active phreatic gradient where the buoyant shortcut used by the published references reads 20% higher than the explicit statics on the same surface.
+
 ## Composite Failure Surfaces
 
 Every model has a floor: bedrock in a polygon-defined problem, or the `max_depth` line in a profile-line problem. No material is defined below it, so no slip surface may pass through it. A trial circle, however, knows nothing about the floor — make it deep enough and it will dip below.

@@ -661,16 +661,23 @@ Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curv
 
 Slide #42 / Baker & Leshchinsky (2001): the safety-map clay-core dam — granular fill (c' = 0, φ' = 40°, γ = 21.5) around a diamond core (c' = 20, φ' = 20°, γ = 20) on a hard base (c' = 200, φ' = 45°), reservoir on the upstream (right) face, phreatic dropping through the core to a tailwater exit at the downstream toe, and a 5-m cracked layer at the crest modeled as a dry tension crack. Geometry is fully labeled in Slide's figure (all six core vertices); the phreatic was traced with independently validated calibration, and B&L's own Fig. 5(a) — the paper is in the reference library — confirms the model: reservoir at half height, phreatic flat through the shell and descending through the core, pore pressures "evaluated using the vertical distance between the phreatic surface and the slice."
 
-**The finding.** With rigorous statics — total unit weights, pore pressures from the phreatic, and the reservoir applied as a hydrostatic boundary load — XSLOPE reads Spencer **1.572** on Slide's printed critical circle (center (233.762, 188.495), R = 187.195) and **1.792** on Baker's fully-labeled noncircular surface, against published values of **1.925** (Slide) and **1.91** (Baker). The gap survives a complete audit: slice-level loads and pore pressures verified against hand values, mirror-symmetric solvers, Spencer = M-P to three decimals, insensitivity to the tension-crack treatment and to the reservoir level read (27 vs 30 vs 32.8). An independent from-scratch Bishop integral (no XSLOPE code) confirms the rigorous value (~1.5). The same integral run with the **buoyant-weight shortcut** — γ′ below the phreatic, no pore pressures, no reservoir load — gives **1.87**, matching the published values within 3%. Baker's SSA used that classical convention, and Slide's model evidently matched Baker rather than the rigorous statics; the two formulations differ by the seepage forces of the inclined phreatic, which are not negligible in a dam with an active core gradient.
+**The finding, step by step.**
+
+1. XSLOPE computes the factors of safety the standard way: total unit weights, pore pressures from the piezometric line, and the reservoir applied as a hydrostatic pressure on the submerged face. On Slide's printed critical circle this gives Spencer **1.572**; on Baker's surface, **1.792**. Every input was audited — slice-level pond pressures and pore pressures match hand calculations exactly, and an independent Bishop integral written from scratch (no XSLOPE code) confirms the value.
+2. The published results are far higher: Slide reports **1.925** and Baker **1.91**. A 20% gap on fully-verified inputs means the published values were computed under *different assumptions*, not different arithmetic.
+3. The assumption was identified by running the same independent integral under the classical **buoyant-weight shortcut**: use γ′ = γ − γ<sub>w</sub> below the phreatic surface, and in exchange apply no pore pressures and no reservoir load. That reproduces the published values almost exactly (see table). Baker's SSA program used this convention, and Slide evidently set up its model to match Baker.
+4. The two formulations are provably identical **only when the water is static** (a horizontal water table). Here the phreatic drops ~28 m across the dam — water is flowing — and the buoyant shortcut then omits the seepage forces (≈ γ<sub>w</sub>·i ≈ 1.9 kN/m³, about 16% of the buoyant unit weight, acting over a deep, mostly-submerged mass). That omission is worth the entire 20%.
 
 **Input files:** [vp042.xlsx](../files/rocscience/vp042.xlsx)
 
-| Case | XSLOPE (rigorous statics) | Published | Shortcut convention (hand integral) |
-|---|---|---|---|
-| Slide's critical circle, Spencer | 1.572 | Slide 1.925 | 1.87 |
-| Baker's noncircular surface, Spencer | 1.792 | Baker 1.91 | — |
+| Case (Spencer / Bishop-integral) | XSLOPE, rigorous statics | Hand integral, rigorous statics | Hand integral, buoyant-weight shortcut | Published |
+|---|---|---|---|---|
+| Slide's critical circle | 1.572 | 1.48 | **1.87** | Slide **1.925** |
+| Baker's noncircular surface | 1.792 | — | **1.90** | Baker **1.91** |
 
-*The XSLOPE values are regression-locked as our own consistency guard. They are deliberately **not** expected to match the published numbers: reproducing those requires adopting the no-seepage-force convention, which XSLOPE does not offer (the rigorous formulation is strictly more defensible for steady seepage). This problem is the corpus's clearest demonstration that two codes can "verify" against each other while sharing a convention rather than the physics.*
+*The hand integral is a plain Bishop summation, so its rigorous-statics value (1.48) sits slightly below XSLOPE's Spencer (1.572) — the point is the convention comparison within each column, not the method. Reading across a row: the same surface, same soil, same water level moves from ~1.5–1.6 to ~1.9 purely by switching conventions, and the shortcut column matches the published column to 0.3–3%.*
+
+*The XSLOPE values are regression-locked as our own consistency guard. They are deliberately **not** expected to match the published numbers: reproducing those requires adopting the no-seepage-force convention, which XSLOPE does not offer — the rigorous formulation gives the same answer when water is static and the correct answer when it is not (see the [pore-pressure practice note](../lem/overview.md#water-pressures-a-practice-note)). This problem is the corpus's clearest demonstration that two codes can "verify" against each other while sharing a convention rather than the physics.*
 
 ![vp042: inputs and representative solution](images/vp042.png)
 

@@ -1368,28 +1368,30 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         if mat_u == 'none':
             u = 0
             u2 = 0
-        elif mat_u in ('piezo', 'piezo_cos2'):
+        elif mat_u == 'piezo':
             if not np.isnan(piezo_y) and piezo_y > y_cb:
                 hw = piezo_y - y_cb
             if not np.isnan(piezo_y2) and piezo_y2 > y_cb:
                 hw2 = piezo_y2 - y_cb
             u = hw * gamma_w if not np.isnan(piezo_y) else 0
             u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
-            if mat_u == 'piezo_cos2':
-                # phreatic-inclination correction (XSTABL / Slide "Hu: auto"):
-                # for steady seepage roughly parallel to an inclined phreatic
-                # surface, the head at the base is reduced by cos^2(theta) of
-                # the LOCAL phreatic-line slope above the slice
-                def _cos2(line, xc):
-                    if not line or len(line) < 2:
-                        return 1.0
-                    xs = [p[0] for p in line]; ys = [p[1] for p in line]
-                    for k in range(len(xs) - 1):
-                        if xs[k] <= xc <= xs[k + 1] and xs[k + 1] > xs[k]:
-                            m = (ys[k + 1] - ys[k]) / (xs[k + 1] - xs[k])
-                            return 1.0 / (1.0 + m * m)
+            # Lines declared Type='phreatic' on the piezo sheet get the
+            # phreatic-inclination correction (XSTABL / Slide "Hu: auto"):
+            # for steady seepage roughly parallel to an inclined phreatic
+            # surface, the head at the base is reduced by cos^2(theta) of
+            # the LOCAL phreatic-line slope above the slice.
+            def _cos2(line, xc):
+                if not line or len(line) < 2:
                     return 1.0
+                xs = [p[0] for p in line]; ys = [p[1] for p in line]
+                for k in range(len(xs) - 1):
+                    if xs[k] <= xc <= xs[k + 1] and xs[k + 1] > xs[k]:
+                        m = (ys[k + 1] - ys[k]) / (xs[k + 1] - xs[k])
+                        return 1.0 / (1.0 + m * m)
+                return 1.0
+            if slope_data.get('piezo_phreatic'):
                 u *= _cos2(slope_data.get('piezo_line'), x_c)
+            if slope_data.get('piezo_phreatic2'):
                 u2 *= _cos2(slope_data.get('piezo_line2'), x_c)
         elif mat_u == 'seep':
             # Seepage-based pore pressure calculation using mesh interpolation
@@ -1454,7 +1456,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             # `u = 0` here silently deleted pore pressure whenever the two lists drifted.
             raise ValueError(
                 f"Material '{materials[base_material_idx]['name']}' has an unrecognized "
-                f"pore pressure option u='{mat_u}'. Expected one of: none, piezo, piezo_cos2, seep, ru."
+                f"pore pressure option u='{mat_u}'. Expected one of: none, piezo, seep, ru."
             )
 
         # Calculate alpha (slope angle of the failure surface) more efficiently

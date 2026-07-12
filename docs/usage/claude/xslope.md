@@ -36,7 +36,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
    **Required for LEM:**
    - At least one starting circle or non-circular surface definition
-   - Pore pressure option for each material (none, piezo, piezo_cos2, seep, or ru)
+   - Pore pressure option for each material (none, piezo, seep, or ru); piezometric lines carry a Type (piezo = static head, phreatic = cos^2 inclination correction)
    - If u="piezo", piezometric line coordinates
 
    **Required for seepage:**
@@ -217,7 +217,7 @@ slope_data['materials'] = [
         'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi) or 'cp' (c/p ratio)
         'c':     200.0,          # cohesion
         'phi':   28.0,           # friction angle (degrees)
-        'u':     'piezo',        # pore pressure: 'none', 'piezo', 'piezo_cos2' (phreatic-inclination cos^2 correction), 'seep', or 'ru'
+        'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
         # --- option='cp' only ---
         'cp':    0.0,            # c/p ratio
         'r_elev':0.0,            # reference elevation for c/p

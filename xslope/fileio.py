@@ -366,7 +366,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 12
+SUPPORTED_TEMPLATE_VERSION = 13
 
 
 def load_slope_data(filepath):
@@ -409,7 +409,7 @@ def load_slope_data(filepath):
     # Template version gate. Refuse files NEWER than this build understands, so a
     # newer template can never be silently mis-read by an older install (new
     # columns ignored, options like u='ru' silently zeroed). Shipped models carry
-    # versions 8-12; all load through the header-name-driven readers below.
+    # versions 8-13; all load through the header-name-driven readers below.
     try:
         _tv = int(float(template_version))
     except (TypeError, ValueError):
@@ -570,7 +570,7 @@ def load_slope_data(filepath):
         # Pore pressure option. An unrecognized value used to fall through to
         # u = 0 in slice.py, silently deleting pore pressure and inflating FS.
         u_val = _choice(row.get('u'), 'none')
-        if u_val not in ('none', 'piezo', 'piezo_cos2', 'seep', 'ru'):
+        if u_val not in ('none', 'piezo', 'seep', 'ru'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized pore pressure option u='{u_val}'. "
@@ -732,9 +732,29 @@ def load_slope_data(filepath):
     piezo_line = []
     piezo_line2 = []
 
-    # Read first piezometric line (columns A:B, starting at row 4, Excel row 4 = index 3)
-    # Keep reading until we encounter an empty row
-    start_row = 3  # Excel row 4 (0-indexed row 3)
+    # Locate the x/y header row by content so both layouts load: v13 adds a
+    # 'Type:' row (piezo | phreatic) above the headers, shifting data down one
+    # row. The Type value sits one row above the header in the y column.
+    _hdr = 2  # v12 default (headers in Excel row 3)
+    for _r in range(min(8, piezo_df.shape[0])):
+        if str(piezo_df.iloc[_r, 0]).strip().lower() == 'x':
+            _hdr = _r
+            break
+    def _line_type(col):
+        if _hdr >= 1:
+            v = piezo_df.iloc[_hdr - 1, col]
+            if pd.notna(v) and str(v).strip().lower() == 'phreatic':
+                return True
+            if pd.notna(v) and str(v).strip().lower() not in ('', 'piezo', 'type:'):
+                raise ValueError(
+                    f"Unrecognized piezometric line Type {v!r} on the 'piezo' "
+                    f"sheet. Expected 'piezo' (static head, default) or "
+                    f"'phreatic' (cos^2 inclination correction).")
+        return False
+    piezo_phreatic = _line_type(1)
+    piezo_phreatic2 = _line_type(4)
+
+    start_row = _hdr + 1
     x_col = 0  # Column A
     y_col = 1  # Column B
     
@@ -1380,6 +1400,8 @@ def load_slope_data(filepath):
     globals_data["tcrack_surface"] = tcrack_surface
     globals_data["materials"] = materials
     globals_data["piezo_line"] = piezo_line
+    globals_data["piezo_phreatic"] = piezo_phreatic
+    globals_data["piezo_phreatic2"] = piezo_phreatic2
     globals_data["piezo_line2"] = piezo_line2
     globals_data["circular"] = circular # True if circles are present
     globals_data["circles"] = circles
@@ -1692,14 +1714,17 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                     poly_u[cell_ref(8 + i, y_col)] = _f(y)
             updates['polygon'] = poly_u
 
-    # === piezo ===  (line 1 in cols A:B, line 2 in cols D:E, data from row 4)
+    # === piezo ===  (v13 layout: Type row at Excel row 3 — 'piezo' static head
+    # or 'phreatic' cos^2 correction — x/y headers row 4, data from row 5)
     piezo = {}
+    piezo[cell_ref(3, 2)] = 'phreatic' if slope_data.get('piezo_phreatic') else 'piezo'
+    piezo[cell_ref(3, 5)] = 'phreatic' if slope_data.get('piezo_phreatic2') else 'piezo'
     for i, (x, y) in enumerate(slope_data.get('piezo_line') or []):
-        piezo[cell_ref(4 + i, 1)] = _f(x)
-        piezo[cell_ref(4 + i, 2)] = _f(y)
+        piezo[cell_ref(5 + i, 1)] = _f(x)
+        piezo[cell_ref(5 + i, 2)] = _f(y)
     for i, (x, y) in enumerate(slope_data.get('piezo_line2') or []):
-        piezo[cell_ref(4 + i, 4)] = _f(x)
-        piezo[cell_ref(4 + i, 5)] = _f(y)
+        piezo[cell_ref(5 + i, 4)] = _f(x)
+        piezo[cell_ref(5 + i, 5)] = _f(y)
     if piezo:
         updates['piezo'] = piezo
 

@@ -267,6 +267,7 @@ stay within the domain polygon, which can therefore represent an irregular bedro
 
 ## Worksheet: piezo
 
+<!-- TODO (Norm): update images/sheet_piezo.png — the v13 sheet adds the Type: row (piezo | phreatic) above the x/y headers -->
 ![sheet_piezo.png](images/sheet_piezo.png)
 
 The **piezo** worksheet defines piezometric lines for calculating pore water pressures in limit equilibrium analysis 
@@ -292,6 +293,17 @@ analysis:
 
 Each piezometric line requires at least two XY coordinate pairs The table is formatted for 20 rows, but XY coordinates can be entered beyond the bottom of the table as needed. The points 
 should be ordered from left to right.
+
+Each line also carries a **Type** cell (template version 13+) with two options:
+
+- **piezo** (default — a blank cell means the same): the line is a true piezometric line, and the pore pressure at a
+  slice base is the full static head, u = γw × vertical distance below the line.
+- **phreatic**: the line represents the phreatic surface under inclined, roughly surface-parallel steady seepage. The
+  static head is reduced by cos²θ, where θ is the local slope of the line directly above the slice — the same
+  correction as Slide2's "Hu: Auto" and XSTABL's phreatic surface option. If you have a genuine piezometric line
+  (e.g., from a flow net or a seepage analysis), use **piezo**; the correction is a shortcut for when only the
+  phreatic surface is known. For full rigor, use a finite element seepage solution with the "seep" pore-pressure
+  option instead.
 
 ---
 

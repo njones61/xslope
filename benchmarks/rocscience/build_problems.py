@@ -1619,9 +1619,9 @@ def vp027():
     base = dict(sd['materials'][0])
     m1 = dict(base); m2 = dict(base)
     m1.update(name='Soil 1', c=500.0, phi=14.0, gamma=116.4, gamma_sat=124.2,
-              option='mc', u='piezo_cos2')
+              option='mc', u='piezo')
     m2.update(name='Soil 2 (zero strength)', c=0.0, phi=0.0, gamma=116.4,
-              gamma_sat=116.4, option='mc', u='piezo_cos2')
+              gamma_sat=116.4, option='mc', u='piezo')
     sd['materials'] = [m1, m2]
     bedrock = [(0.0, 15.0), (29.0, 24.0), (51.0, 26.0), (78.0, 56.0),
                (94.0, 65.0), (113.0, 64.0), (133.0, 56.0), (161.0, 58.0),
@@ -1640,6 +1640,7 @@ def vp027():
     sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['dloads'] = []; sd['line_loads'] = []; sd['pile_lines'] = []
     sd['reinforcement_lines'] = []; sd['reinforce_lines'] = []
+    sd['piezo_phreatic'] = True   # XSTABL/Slide phreatic (Hu) correction
     sd['piezo_line'] = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0), (63.0, 73.0),
                         (80.0, 78.6), (95.0, 81.8), (110.0, 84.5), (125.0, 86.9),
                         (155.0, 90.2), (185.0, 93.1), (200.0, 94.5)]

@@ -1802,7 +1802,51 @@ def vp067():
     return 'vp067.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp067, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp065():
+    """Slide #65 / USACE EM 1110-2-1902 Figure 4-2: the #64 dam under
+    upstream low-pool steady conditions (pool el 20, no tension crack),
+    drained strengths: embankment c=100 psf phi=25 (115/120 pcf), sand
+    0/35 (125/130), clay 0/28 (110/115), rock 0/45 (160/165). Printed
+    circle center (-102, 163), R=173 (tangent to the clay top at el -10).
+    USACE Bishop 2.71; Slide Bishop 2.716 / Spencer 2.736 / GLE 2.744."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Embankment', 100.0, 25.0, 115.0, 120.0),
+             ('Sand', 0.0, 35.0, 125.0, 130.0),
+             ('Foundation Clay', 0.0, 28.0, 110.0, 115.0),
+             ('Rock', 0.0, 45.0, 160.0, 165.0)]
+    sd['materials'] = []
+    for name, c, phi, gm, gs in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gm, gamma_sat=gs,
+                 option='mc', u='piezo')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-225.0, 0.0), (-217.0, 0.0), (-17.0, 50.0),
+                                 (17.0, 50.0), (217.0, 0.0), (225.0, 0.0)]},
+        {'mat_id': 1, 'coords': [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0),
+                                 (8.0, -10.0), (17.0, 0.0), (225.0, 0.0)]},
+        {'mat_id': 2, 'coords': [(-225.0, -10.0), (225.0, -10.0)]},
+        {'mat_id': 3, 'coords': [(-225.0, -37.0), (225.0, -37.0)]},
+    ]
+    sd['max_depth'] = -40.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-225.0, 20.0), (225.0, 20.0)]
+    gw = 62.4
+    # ponded water on the submerged upstream face (pool el 20)
+    sd['dloads'] = [[
+        {'X': -225.0, 'Y': 0.0, 'Normal': gw * 20.0},
+        {'X': -217.0, 'Y': 0.0, 'Normal': gw * 20.0},
+        {'X': -137.0, 'Y': 20.0, 'Normal': 0.0},
+    ]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': -102.0, 'Yo': 163.0, 'Depth': -10.0, 'R': 173.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp065.xlsx'))
+    return 'vp065.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp067, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

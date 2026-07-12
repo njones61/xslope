@@ -64,6 +64,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
 <!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
+<!-- test: file=../files/rocscience/vp081.xlsx, type=circular_search, num_slices=40, fs_bishop=1.223, fs_spencer=1.204, benchmark=VP81 -->
 <!-- test: file=../files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
 <!-- test: file=../files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
 <!-- test: file=../files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
@@ -151,7 +152,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [78](#vp78) | Slope, homogenous | **built** | [vp078.xlsx](../files/rocscience/vp078.xlsx). D&W (2005) Fig. 14.3 pure-cohesive slope, 30-ft foundation: search finds the base-tangent circle — Bishop 1.117 / Spencer 1.131 vs Slide 1.141/1.139, D&W toe reference 1.124. Slide's toe-circle rows are foundation-thickness-independent (identical for all three thicknesses), so the 46.5/60-ft variants add no information. |
 | [79](#vp79) | Slope, (2) materials, infinite slope failure | **built** | [vp079.xlsx](../files/rocscience/vp079.xlsx). D&W (2005) Fig. 14.4 cohesionless embankment on a φ=0 foundation: base-tangent circle Bishop 1.407 / Spencer 1.397 vs Slide 1.412 / 1.400, D&W 1.40. |
 | 80 | Embankment, (6) materials | planned |  |
-| 81 | Embankment, (2) materials, infinite slope failure | planned | Duncan & Wright (2005) Fig. 14.7 — the D&W book is in hand (2014 ed. in ref library); build queued. |
+| [81](#vp81) | Embankment, (2) materials, infinite slope failure | **built** | [vp081.xlsx](../files/rocscience/vp081.xlsx). D&W (2005) Fig. 14.7 embankment on a φ=0 foundation: base-tangent circle Bishop 1.223 / Spencer 1.204 vs Slide 1.230 / 1.209, D&W 1.21. |
 | 82 | Embankment, (2) materials, water table | planned |  |
 | 83 | Embankment, (2) materials | planned |  |
 | 84 | Embankment, (2) materials | planned |  |
@@ -786,6 +787,19 @@ Slide #79 / Duncan & Wright (2005) Fig. 14.4: a c=0, φ=30°, γ=120 pcf embankm
 | Spencer | 1.397 | Slide 1.400 |
 
 ![vp079: inputs and representative solution](images/vp079.png)
+
+### VP81: Embankment on a φ=0 foundation (D&W Fig. 14.7) {#vp81}
+
+Slide #81 / Duncan & Wright (2005) Fig. 14.7: a c=0, φ=30°, γ=124 pcf embankment (19 ft at ~26.6°) over a 15-ft φ=0 foundation with c=500 psf, γ=98 pcf; geometry fully labeled in Slide's figure ((0,15)–(35,15)–(73,34)–(128,34), base y=0). The deep base-tangent circle governs.
+
+**Input files:** [vp081.xlsx](../files/rocscience/vp081.xlsx)
+
+| Method | XSLOPE (search) | Published |
+|---|---|---|
+| Bishop | 1.223 | Slide 1.230; D&W 1.21 |
+| Spencer | 1.204 | Slide 1.209 |
+
+![vp081: inputs and representative solution](images/vp081.png)
 
 ### VP85: Reinforced slope, homogenous, grouted tieback {#vp85}
 

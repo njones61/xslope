@@ -1511,7 +1511,30 @@ def vp079():
     return 'vp079.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp081():
+    """Slide #81 / Duncan & Wright (2005) Fig. 14.7: embankment (c=0,
+    phi=30, gamma=124) on a phi=0 foundation (c=500 psf, gamma=98, 15 ft).
+    Labeled figure: (0,15)-(35,15)-(73,34)-(128,34), base y=0. Deep circle
+    tangent to the base: Slide Bishop 1.230 / Spencer 1.209; D&W 1.21."""
+    sd = load_slope_data(ACADS_1A)
+    m0 = dict(sd['materials'][0]); m1 = dict(sd['materials'][0])
+    m0.update(name='Embankment', c=0.0, phi=30.0, gamma=124.0, option='mc', u='none')
+    m1.update(name='Foundation', c=500.0, phi=0.0, gamma=98.0, option='mc', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 15.0), (35.0, 15.0), (73.0, 34.0), (128.0, 34.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 15.0), (128.0, 15.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 55.0, 'Yo': 55.0, 'Depth': 0.0, 'R': 55.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp081.xlsx'))
+    return 'vp081.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

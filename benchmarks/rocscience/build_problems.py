@@ -1601,6 +1601,73 @@ def vp099():
     return 'vp099.xlsx'
 
 
+def vp042():
+    """Slide #42: Baker & Leshchinsky (2001) safety-map dam — clay core (c'=20,
+    phi'=20, gamma=20) in granular fill (0/40/21.5) on a hard base (200/45/24),
+    reservoir el. 30 on the RIGHT face, dry 5-m cracked layer at the crest
+    (tcrack_depth=5). Geometry fully labeled in Slide's Figure 42.1, including
+    all six vertices of the diamond core: base (110,0)-(130,0), waist (88,16)/
+    (152,18), top (110,49)-(130,49). The fill wraps UNDER the core's lower
+    flanks, so the stack uses a second fill layer below the core (partial-span
+    profile lines, sample-8 style). Phreatic line traced from the figure by
+    labeled-anchor calibration (the jump top reproduces the labeled (88,16), the
+    left end lands at the toe, the right run at the stated el. 30): tailwater
+    (0,1.5) rising to (88,7.2), a jump across the core's left face to (88,16),
+    through the core to the reservoir at (145,30). Slide: circular (80x80 grid)
+    Spencer 1.925; noncircular (random + optimization) 1.877; Baker 1.91 on the
+    labeled Figure 42.2 surface, which is stored here as non_circ."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    fill = dict(base); fill.update(name='Granular fill', c=0.0, phi=40.0, gamma=21.5,
+                                   gamma_sat=21.5, option='mc', u='piezo')
+    core = dict(base); core.update(name='Clay core', c=20.0, phi=20.0, gamma=20.0,
+                                   gamma_sat=20.0, option='mc', u='piezo')
+    fill2 = dict(fill); fill2.update(name='Granular fill (below core)')
+    hard = dict(base); hard.update(name='Hard base', c=200.0, phi=45.0, gamma=24.0,
+                                   gamma_sat=24.0, option='mc', u='piezo')
+    sd['materials'] = [fill, core, fill2, hard]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (110.0, 54.0), (130.0, 54.0), (265.0, 0.0)]},
+        {'mat_id': 1, 'coords': [(88.0, 16.0), (110.0, 49.0), (130.0, 49.0), (152.0, 18.0)]},
+        {'mat_id': 2, 'coords': [(88.0, 16.0), (110.0, 0.0), (130.0, 0.0), (152.0, 18.0)]},
+        {'mat_id': 3, 'coords': [(0.0, 0.0), (265.0, 0.0)]},
+    ]
+    sd['max_depth'] = -10.0
+    sd['gamma_water'] = 9.81
+    sd['tcrack_depth'] = 5.0
+    sd['tcrack_water'] = 0.0
+    sd['piezo_line'] = [(0.0, 1.5), (88.0, 7.2), (88.1, 16.0), (110.0, 22.3),
+                        (130.0, 25.8), (145.0, 30.0), (265.0, 30.0)]
+    sd['piezo_phreatic'] = False
+    # reservoir el. 30 on the right face: waterline meets the 135:54 face at x=190
+    sd['dloads'] = [[{'X': 190.0, 'Y': 30.0, 'Normal': 0.0},
+                     {'X': 265.0, 'Y': 0.0, 'Normal': 9.81 * 30.0}]]
+    sd['circular'] = True
+    # seed on the upstream (right, submerged) side — the safety map's global
+    # minimum zone; the search refines from here
+    sd['circles'] = [{'Xo': 190.0, 'Yo': 90.0, 'Depth': 5.0, 'R': 85.0}]
+    # Baker's noncircular surface, fully labeled in Figure 42.2
+    # Slide prints its endpoints pulled slightly inside the ground, and the top
+    # of the surface enters via the 5-m tension crack at (117,49): extend both
+    # construction ends past the ground so the clip + tension-crack machinery
+    # reproduces Baker's surface exactly ((110,54) is the drawn crack wall).
+    sd['non_circ'] = [
+        {'X': 112.33, 'Y': 54.6, 'Movement': 'Free'},
+        {'X': 117.0, 'Y': 49.0, 'Movement': 'Horiz'},
+        {'X': 122.0, 'Y': 43.0, 'Movement': 'Horiz'},
+        {'X': 134.0, 'Y': 33.0, 'Movement': 'Horiz'},
+        {'X': 145.0, 'Y': 24.0, 'Movement': 'Horiz'},
+        {'X': 149.0, 'Y': 22.0, 'Movement': 'Horiz'},
+        {'X': 162.0, 'Y': 17.0, 'Movement': 'Horiz'},
+        {'X': 174.0, 'Y': 13.0, 'Movement': 'Horiz'},
+        {'X': 185.0, 'Y': 11.0, 'Movement': 'Horiz'},
+        {'X': 243.0, 'Y': 3.0, 'Movement': 'Horiz'},
+        {'X': 264.0, 'Y': 0.79, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp042.xlsx'))
+    return 'vp042.xlsx'
+
+
 def vp043():
     """Slide #43 / Baker (2001): planar (Culmann) failure through the toe of
     a steep homogeneous slope ((0,0)-(3,10) face, crest to (20,10); c'=30,
@@ -2744,7 +2811,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

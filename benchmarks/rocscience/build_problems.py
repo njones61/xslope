@@ -1650,7 +1650,56 @@ def vp027():
     return 'vp027.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def _dw145_slope_data():
+    """Duncan & Wright (2005) Fig. 14.5 (Slide #80): embankment (c=1,
+    phi=35, gamma=120) over five flat foundation layers alternating
+    phi=0 clays and c~0 sands (950/0/110, 1/32/122, 500/0/98, 1/37/131,
+    600/0/103), all labeled in Slide's figure. Imperial units."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Embankment', 1.0, 35.0, 120.0), ('Foundation I', 950.0, 0.0, 110.0),
+             ('Foundation II', 1.0, 32.0, 122.0), ('Foundation III', 500.0, 0.0, 98.0),
+             ('Foundation IV', 1.0, 37.0, 131.0), ('Foundation V', 600.0, 0.0, 103.0)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='none')
+        sd['materials'].append(m)
+    tops = [
+        [(0.0, 60.0), (80.0, 60.0), (205.0, 110.0), (330.0, 110.0)],
+        [(0.0, 60.0), (330.0, 60.0)],
+        [(0.0, 45.0), (330.0, 45.0)],
+        [(0.0, 35.0), (330.0, 35.0)],
+        [(0.0, 25.0), (330.0, 25.0)],
+        [(0.0, 20.0), (330.0, 20.0)],
+    ]
+    sd['profile_lines'] = [{'mat_id': i, 'coords': c} for i, c in enumerate(tops)]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['non_circ'] = []
+    return sd
+
+
+def vp080a():
+    """Slide #80 case 1: circle from (142,147) tangent to the foundation
+    top (R=87). Slide Bishop 2.549 / Spencer 2.545; D&W 2.56."""
+    sd = _dw145_slope_data()
+    sd['circles'] = [{'Xo': 142.0, 'Yo': 147.0, 'Depth': 60.0, 'R': 87.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp080a.xlsx'))
+    return 'vp080a.xlsx'
+
+
+def vp080b():
+    """Slide #80 case 2: circle tangent to the 15-ft-depth line (R=102).
+    Slide Bishop 1.398 / Spencer 1.359; D&W 1.35."""
+    sd = _dw145_slope_data()
+    sd['circles'] = [{'Xo': 142.0, 'Yo': 147.0, 'Depth': 45.0, 'R': 102.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp080b.xlsx'))
+    return 'vp080b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

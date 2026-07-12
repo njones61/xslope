@@ -2000,7 +2000,63 @@ def vp069():
     return 'vp069.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def _vp071_slope_data():
+    """Common geometry for Slide #71 / D&W Figs. 6.37-6.38: a homogeneous
+    2H:1V slope, ground (0,40)-(120,40)-(200,80)-(440,80) over a base at el 0,
+    c'=200 psf, phi'=20 deg, gamma=125 pcf. Water stands at el 40 on the left
+    (toe) boundary and el 75 on the right."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='Material 1', c=200.0, phi=20.0, gamma=125.0, gamma_sat=125.0,
+             option='mc', u='piezo', k1=1.0, k2=1.0, alpha=0.0, kr0=0.001, h0=-1.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 40.0), (120.0, 40.0), (200.0, 80.0),
+                                 (440.0, 80.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 190.0, 'Yo': 140.0, 'Depth': 20.0, 'R': 120.0}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp071a():
+    """Slide #71 case 1 / D&W Fig. 6.37: pore pressures from a finite-element
+    seepage analysis (u='seep'). Heads: 40 ft on the left boundary (x=0, the
+    toe-side water level), 75 ft on the right boundary (x=440); the ground
+    surface from the left edge up over the slope face is an exit face.
+    Slide Bishop/Spencer/GLE 1.141 (circular); D&W 1.138."""
+    sd = _vp071_slope_data()
+    sd['materials'][0]['u'] = 'seep'
+    sd['piezo_line'] = []
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 40.0, 'coords': [(0.0, 0.0), (0.0, 40.0)]},
+            {'head': 75.0, 'coords': [(440.0, 0.0), (440.0, 75.0)]},
+        ],
+        'exit_face': [(0.0, 40.0), (120.0, 40.0), (200.0, 80.0), (440.0, 80.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp071a.xlsx'))
+    return 'vp071a.xlsx'
+
+
+def vp071b():
+    """Slide #71 case 2 / D&W Fig. 6.38: the same slope with the piezometric
+    line approximation. The line was read off Slide's Figure 71.2 vertex
+    markers: (0,40)-(120,40)-(127.4,43.2)-(147.4,46.2)-(181.7,50.7)-
+    (232.3,56.7)-(326.8,65.7)-(440,75).
+    Slide Bishop/Spencer 1.142, GLE 1.141 (circular); D&W 1.141."""
+    sd = _vp071_slope_data()
+    sd['piezo_line'] = [(0.0, 40.0), (120.0, 40.0), (127.4, 43.2), (147.4, 46.2),
+                        (181.7, 50.7), (232.3, 56.7), (326.8, 65.7), (440.0, 75.0)]
+    sd['piezo_phreatic'] = False
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp071b.xlsx'))
+    return 'vp071b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

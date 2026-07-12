@@ -72,6 +72,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
 <!-- test: file=../files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
+<!-- test: file=../files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-seep -->
+<!-- test: file=../files/rocscience/vp071b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-piezo -->
 <!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
 <!-- test: file=../files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
 <!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
@@ -157,7 +159,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [68](#vp68) | Embankment, (3) materials, ponded water | **built** | [vp068.xlsx](../files/rocscience/vp068.xlsx). USACE example E-10 (φ=0 three-layer slope, 8-ft pond, specified base-tangent circle): Bishop 1.234 / M-P 1.234 vs Slide 1.241 / GLE 1.244. |
 | [69](#vp69) | Embankment, (2) materials, water table, ponded water | **built** | [vp069.xlsx](../files/rocscience/vp069.xlsx). USACE example F-6 steady-seepage dam (piezometric line, ponded tailwater, specified R=280 circle): Bishop 1.999 / Spencer 2.013 / M-P 2.013 vs Slide 2.011 / 2.026 / GLE 2.027, USACE 2.01. |
 | [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](../files/rocscience/vp070a.xlsx) / [vp070b.xlsx](../files/rocscience/vp070b.xlsx). D&W Fig. 6.27 submerged slope, pools 30 and 60 ft above the crest: Bishop 1.596 / Spencer 1.593 vs Slide 1.603/1.599, D&W 1.60 — and identical between the two depths, the submergence-independence property the example demonstrates. |
-| 71 | Slope, homogenous, finite element groundwater seepage analysis, water table | planned |  |
+| [71](#vp71) | Slope, homogenous, finite element groundwater seepage analysis, water table | **built** | [vp071a.xlsx](../files/rocscience/vp071a.xlsx) / [vp071b.xlsx](../files/rocscience/vp071b.xlsx). D&W Figs. 6.37–6.38, the same slope solved twice: pore pressures from XSLOPE's own FE seepage solution (`u='seep'`) and from the piezometric-line approximation. Bishop/Spencer 1.132 both ways vs Slide 1.141/1.142, D&W 1.138/1.141 — the two pore-pressure models agree with each other to 0.0006, as they do in Slide. |
 | 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
 | 73 | Excavated slope, (4) materials, tension crack | planned |  |
 | [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
@@ -920,6 +922,23 @@ Slide #70 / Duncan & Wright (2005) Fig. 6.27: a fully submerged homogeneous slop
 *xslope reproduces the depth-independence exactly (identical FS at both pools) — a direct check on the consistency of the pond-load and pore-pressure treatments.*
 
 ![vp070a: inputs and representative solution](images/vp070a.png)
+
+### VP71: FE seepage vs. piezometric line, same slope (D&W Figs. 6.37–6.38) {#vp71}
+
+Slide #71 / Duncan & Wright (2005) Figs. 6.37 and 6.38: a homogeneous 2H:1V slope (c' = 200 psf, φ' = 20°, γ = 125 pcf; ground (0,40)–(120,40)–(200,80)–(440,80) over a base at el. 0) with water standing at el. 40 on the toe side and el. 75 behind the crest. The point of the example is that the same slope is solved two ways — pore pressures from a finite-element seepage analysis, and pore pressures from a piezometric line — and the two must agree.
+
+Case 1 runs XSLOPE's own FE seepage solver on the section (specified heads of 40 and 75 on the two vertical boundaries, the ground surface an exit face), exports the nodal pore pressures, and feeds them to the limit-equilibrium search through `u = 'seep'`. Case 2 uses the piezometric line read off Slide's Figure 71.2. Free circular search in both cases.
+
+**Input files:** [vp071a.xlsx](../files/rocscience/vp071a.xlsx) (FE seepage), [vp071b.xlsx](../files/rocscience/vp071b.xlsx) (piezometric line)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| FE seepage | Bishop / Spencer | 1.132 / 1.132 | Slide 1.141 / 1.141; D&W 1.138 |
+| Piezometric line | Bishop / Spencer | 1.132 / 1.132 | Slide 1.142 / 1.142; D&W 1.141 |
+
+*The two pore-pressure models land within 0.0006 of each other — the same near-identity Slide reports (1.141 vs 1.142). This is the corpus's end-to-end check on the seepage → limit-equilibrium handoff: XSLOPE's phreatic surface, computed from scratch, reproduces the one Duncan & Wright drew.*
+
+![vp071a: inputs and representative solution](images/vp071a.png)
 
 ### VP74: Sand embankment on saturated clay (D&W Fig. 7.12) {#vp74}
 

@@ -72,7 +72,11 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
 <!-- test: file=../files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
 <!-- test: file=../files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
+<!-- test: file=../files/rocscience/vp075.xlsx, type=circular_search, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75 -->
+<!-- test: file=../files/rocscience/vp076a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.065, fs_spencer=1.072, benchmark=VP76-seep -->
+<!-- test: file=../files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.049, fs_spencer=1.056, benchmark=VP76-piezo -->
 <!-- test: file=../files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
+<!-- test: file=../files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.533, benchmark=VP82 -->
 <!-- test: file=../files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=../files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
 <!-- test: file=../files/rocscience/vp084a.xlsx, type=circular_search, num_slices=40, fs_bishop=0.756, fs_spencer=0.751, benchmark=VP84-I -->
@@ -170,14 +174,14 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
 | [73](#vp73) | Excavated slope, (4) materials, tension crack | **built** | [vp073.xlsx](../files/rocscience/vp073.xlsx). The Bradwell reactor-1 excavation (Skempton & LaRochelle 1965): London Clay in six sublayers of depth-increasing undrained strength, cracked clay fill on top. Bishop 1.766 / Spencer 1.766 / Janbu corrected 1.733 vs Slide 1.762 / 1.758 / 1.736 — the closest agreement in the D&W group. |
 | [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
-| 75 | Dyke, (4) materials | planned |  |
-| 76 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | planned |  |
+| [75](#vp75) | Dyke, (4) materials | **built** | [vp075.xlsx](../files/rocscience/vp075.xlsx). The James Bay dyke (D&W Fig. 7.16): granular fill with a berm on crust / marine clay / lacustrine clay. Bishop 1.424 / Spencer 1.420 vs D&W 1.45, Slide 1.468 / 1.464. On Slide's own printed circle XSLOPE gives 1.438 — the rest of the gap is that the search finds a slightly deeper minimum than Slide's did. |
+| [76](#vp76) | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | **built** | [vp076a.xlsx](../files/rocscience/vp076a.xlsx) (FE seepage), [vp076b.xlsx](../files/rocscience/vp076b.xlsx) (piezometric line). D&W Fig. 7.19 homogeneous dam with a full-face pool. FE seepage: Bishop 1.065 / Spencer 1.072 vs Slide 1.068 / 1.075. Piezometric line: 1.049 / 1.056 vs Slide 1.090 / 1.100 — this case is hypersensitive to the line's elevation (½ ft shifts FS by 6%). |
 | 77 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | planned |  |
 | [78](#vp78) | Slope, homogenous | **built** | [vp078.xlsx](../files/rocscience/vp078.xlsx). D&W (2005) Fig. 14.3 pure-cohesive slope, 30-ft foundation: search finds the base-tangent circle — Bishop 1.117 / Spencer 1.131 vs Slide 1.141/1.139, D&W toe reference 1.124. Slide's toe-circle rows are foundation-thickness-independent (identical for all three thicknesses), so the 46.5/60-ft variants add no information. |
 | [79](#vp79) | Slope, (2) materials, infinite slope failure | **built** | [vp079.xlsx](../files/rocscience/vp079.xlsx). D&W (2005) Fig. 14.4 cohesionless embankment on a φ=0 foundation: base-tangent circle Bishop 1.407 / Spencer 1.397 vs Slide 1.412 / 1.400, D&W 1.40. |
 | [80](#vp80) | Embankment, (6) materials | **built** | [vp080a.xlsx](../files/rocscience/vp080a.xlsx) / [vp080b.xlsx](../files/rocscience/vp080b.xlsx). D&W (2005) Fig. 14.5 six-layer stratified foundation, circles from (142,147): tangent-0 Spencer 2.530 vs Slide 2.545 / D&W 2.56; tangent-15 Spencer 1.352 vs Slide 1.359 / D&W 1.35. |
 | [81](#vp81) | Embankment, (2) materials, infinite slope failure | **built** | [vp081.xlsx](../files/rocscience/vp081.xlsx). D&W (2005) Fig. 14.7 embankment on a φ=0 foundation: base-tangent circle Bishop 1.223 / Spencer 1.204 vs Slide 1.230 / 1.209, D&W 1.21. |
-| 82 | Embankment, (2) materials, water table | planned |  |
+| [82](#vp82) | Embankment, (2) materials, water table | **built** | [vp082.xlsx](../files/rocscience/vp082.xlsx). D&W Fig. 14.20-a embankment with a water table; free circular search. Bishop 1.521 / Spencer 1.533 vs Slide 1.533 / 1.540, D&W 1.535. |
 | [83](#vp83) | Embankment, (2) materials | **built** | [vp083a.xlsx](../files/rocscience/vp083a.xlsx) (c<sub>u</sub> = 200 + 15·z), [vp083b.xlsx](../files/rocscience/vp083b.xlsx) (c<sub>u</sub> = 300). D&W Fig. 14.20-b embankment wall on an undrained foundation; free circular search. Bishop/Spencer 1.305/1.275 and 1.328/1.326 vs Slide 1.313/1.285 and 1.335/1.330. |
 | [84](#vp84) | Embankment, (2) materials | **built** | [vp084a](../files/rocscience/vp084a.xlsx)–[d](../files/rocscience/vp084d.xlsx). D&W Fig. 15.9 embankment on an undrained foundation with c<sub>u</sub> = 300 + c<sub>z</sub>·z, four strength gradients (c<sub>z</sub> = 0/5/10/15 psf/ft). Bishop 0.756 / 0.905 / 1.042 / 1.151 vs Slide 0.761 / 0.909 / 1.045 / 1.154 — the whole family within 0.7%. |
 | [85](#vp85) | Reinforced slope, homogenous, grouted tieback | **built** | [vp085a.xlsx](../files/rocscience/vp085a.xlsx) (active), [vp085b.xlsx](../files/rocscience/vp085b.xlsx) (passive). Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope — the reinforcement acceptance benchmark from the design plan. On Slide's printed critical circles: active 1.567 vs Slide GLE 1.575 (D&W 1.51); passive Bishop 1.319 vs Slide 1.324 (D&W 1.32). Slide's own method table scatters 1.42-2.05 here (concentrated force strains interslice assumptions), so per-circle comparison is the meaningful one. |
@@ -979,6 +983,36 @@ Slide #74 / Duncan & Wright (2005) Fig. 7.12: a 100-ft cohesionless embankment (
 
 ![vp074: inputs and representative solution](images/vp074.png)
 
+### VP75: The James Bay dyke (D&W Fig. 7.16) {#vp75}
+
+Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes — a granular fill embankment with a wide berm (ground (−17,31)–(40,31)–(58,25)–(114,25)–(132,19)–(168,19), metric) resting on three soft clay units: a 4 m crust (c = 41 kN/m²), 8 m of marine clay (34.5) and 7 m of lacustrine clay (31.2), all φ = 0. Fill c' = 0, φ' = 30°. Free circular search.
+
+**Input files:** [vp075.xlsx](../files/rocscience/vp075.xlsx)
+
+| Method | XSLOPE (search) | XSLOPE on Slide's circle | Published |
+|---|---|---|---|
+| Bishop | 1.424 | 1.438 | D&W 1.45; Slide 1.468 |
+| Spencer | 1.420 | 1.436 | Slide 1.464 |
+
+*The critical surface is a deep circle tangent to the base of the lacustrine clay, cutting all three foundation units. Two notes. First, XSLOPE's search needs seed circles that reach that depth: from a single shallow seed the 9-point descent settles into a local minimum up in the fill at FS 1.74, so the input file carries three seeds spanning shallow to deep (this is what the multiple-starting-circle facility is for). Second, on Slide's own printed critical circle (center (89.28, 139.38), R = 139.37) XSLOPE gives 1.438 against Slide's 1.468; XSLOPE and Slide bracket Duncan & Wright's 1.45 from either side.*
+
+![vp075: inputs and representative solution](images/vp075.png)
+
+### VP76: Homogeneous dam, FE seepage vs. piezometric line (D&W Fig. 7.19) {#vp76}
+
+Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c' = 100 psf, φ' = 30°, γ = 100 pcf) on an impermeable foundation, ground (0,0)–(100,40)–(120,48)–(135,48)–(255,0), with the pool at el. 40 covering the entire upstream face. As in VP71, pore pressures are modelled two ways — an FE seepage analysis and a piezometric line — and the critical circle is found by free search.
+
+**Input files:** [vp076a.xlsx](../files/rocscience/vp076a.xlsx) (FE seepage), [vp076b.xlsx](../files/rocscience/vp076b.xlsx) (piezometric line)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| FE seepage | Bishop / Spencer | 1.065 / 1.072 | Slide 1.068 / 1.075; D&W 1.19 & 1.08 (chart) |
+| Piezometric line | Bishop / Spencer | 1.049 / 1.056 | Slide 1.090 / 1.100; D&W 1.16 |
+
+*The FE case lands within 0.6% of Slide, and XSLOPE's computed phreatic surface tracks the piezometric line Slide digitized from Duncan & Wright to better than a foot everywhere. The piezometric case sits 3% low, and the reason is that this particular problem is ill-conditioned: the critical circle is a shallow toe surface where the water table is nearly at the ground, so u/σ<sub>v</sub> ≈ 0.57 and effective stresses are small. Dropping the piezometric line by just ½ ft raises Bishop from 1.049 to 1.118 — 6% of FS per half-foot. The 3% gap is worth only about 0.3 ft of line elevation, which is finer than a raster figure can be read. Duncan & Wright's own reference values (1.19 and 1.08 for the same FE case) show the same spread.*
+
+![vp076a: inputs and representative solution](images/vp076a.png)
+
 ### VP78: Pure cohesive slope on a foundation (D&W Fig. 14.3) {#vp78}
 
 Slide #78 / Duncan & Wright (2005) Fig. 14.3: c = 1000 psf, φ = 0, γ = 100 pcf; a 50-ft slope at 1V:0.8H over a 30-ft foundation ((0,30)–(90,30)–(130,80)–(240,80), base at y = 0, all vertices labeled in Slide's figure). For φ = 0 the critical circle is the deep, base-tangent one, which the free search finds directly.
@@ -1034,6 +1068,19 @@ Slide #81 / Duncan & Wright (2005) Fig. 14.7: a c=0, φ=30°, γ=124 pcf embankm
 | Spencer | 1.204 | Slide 1.209 |
 
 ![vp081: inputs and representative solution](images/vp081.png)
+
+### VP82: Embankment with a water table (D&W Fig. 14.20-a) {#vp82}
+
+Slide #82 / Duncan & Wright (2005) Fig. 14.20-a: an embankment (c' = 600 psf, φ' = 25°, γ = 125 pcf; ground (0,60)–(60,60)–(140,20)–(200,20)) on a cohesionless foundation (c' = 0, φ' = 30°, γ = 132 pcf), with a piezometric line running (0,40)–(100,30)–(140,20)–(200,20). Free circular search.
+
+**Input files:** [vp082.xlsx](../files/rocscience/vp082.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Bishop | 1.521 | Slide 1.533; D&W 1.535 |
+| Spencer | 1.533 | Slide 1.540 |
+
+![vp082: inputs and representative solution](images/vp082.png)
 
 ### VP83: Embankment wall on an undrained foundation (D&W Fig. 14.20-b) {#vp83}
 

@@ -2056,6 +2056,36 @@ def vp071b():
     return 'vp071b.xlsx'
 
 
+def vp082():
+    """Slide #82 / D&W (2005) Fig. 14.20-a: an earth embankment with a water
+    table. Labeled figure: ground (0,60)-(60,60)-(140,20)-(200,20), foundation
+    el 20 down to a base at el 0. Embankment c'=600 psf, phi'=25, gamma=125;
+    foundation c'=0, phi'=30, gamma=132. Piezometric line (0,40)-(100,30)-
+    (140,20)-(200,20), read off Slide's Figure 82.1. Circular search.
+    Slide Bishop 1.533 / Spencer 1.540 / GLE 1.540; D&W average 1.535."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Embankment', c=600.0, phi=25.0, gamma=125.0,
+                               gamma_sat=125.0, option='mc', u='piezo')
+    m1 = dict(base); m1.update(name='Foundation', c=0.0, phi=30.0, gamma=132.0,
+                               gamma_sat=132.0, option='mc', u='piezo')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 60.0), (60.0, 60.0), (140.0, 20.0), (200.0, 20.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 20.0), (200.0, 20.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(0.0, 40.0), (100.0, 30.0), (140.0, 20.0), (200.0, 20.0)]
+    sd['piezo_phreatic'] = False
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 90.0, 'Yo': 100.0, 'Depth': 20.0, 'R': 80.0},
+                     {'Xo': 90.0, 'Yo': 120.0, 'Depth': 0.0, 'R': 120.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp082.xlsx'))
+    return 'vp082.xlsx'
+
+
 def _vp083_slope_data(fnd):
     """Slide #83 / D&W (2005) Fig. 14.20-b: an embankment wall, ground
     (0,40)-(55,40)-(75,30)-(140,30), foundation el 30 down to a base at el 0.
@@ -2207,7 +2237,101 @@ def vp073():
     return 'vp073.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp075():
+    """Slide #75 / Duncan & Wright (2005) Fig. 7.16: the James Bay dyke -- a
+    granular fill embankment with a berm, on a three-layer soft clay foundation.
+    Fully labeled figure (metric): ground (-17,31)-(40,31)-(58,25)-(114,25)-
+    (132,19)-(168,19); clay crust el 19-15, marine clay 15-7, lacustrine clay
+    7-0. Fill c'=0/phi'=30/gamma=20; crust 41/0/20; marine 34.5/0/18.8;
+    lacustrine 31.2/0/20.3 (kN units). Circular search.
+    Slide Bishop 1.468 / GLE 1.466 / Spencer 1.464; D&W 1.45."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Fill', 0.0, 30.0, 20.0), ('Clay crust', 41.0, 0.0, 20.0),
+             ('Marine clay', 34.5, 0.0, 18.8), ('Lacustrine clay', 31.2, 0.0, 20.3)]
+    sd['materials'] = []
+    for name, c, phi, gamma in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-17.0, 31.0), (40.0, 31.0), (58.0, 25.0),
+                                 (114.0, 25.0), (132.0, 19.0), (168.0, 19.0)]},
+        {'mat_id': 1, 'coords': [(-17.0, 19.0), (168.0, 19.0)]},
+        {'mat_id': 2, 'coords': [(-17.0, 15.0), (168.0, 15.0)]},
+        {'mat_id': 3, 'coords': [(-17.0, 7.0), (168.0, 7.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['circular'] = True
+    # Three seeds spanning shallow -> deep. The critical surface here is a deep
+    # base-tangent circle through all three foundation clays; a single shallow
+    # seed leaves the 9-point search in a local minimum up in the fill (FS 1.74).
+    sd['circles'] = [{'Xo': 60.0, 'Yo': 60.0, 'Depth': 5.0, 'R': 55.0},
+                     {'Xo': 75.0, 'Yo': 90.0, 'Depth': 0.0, 'R': 90.0},
+                     {'Xo': 90.0, 'Yo': 130.0, 'Depth': 0.0, 'R': 130.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp075.xlsx'))
+    return 'vp075.xlsx'
+
+
+def _vp076_slope_data():
+    """Slide #76 / D&W (2005) Fig. 7.19: a homogeneous earth embankment on an
+    impermeable foundation, ground (0,0)-(100,40)-(120,48)-(135,48)-(255,0),
+    pool at el 40 against the whole upstream face. c'=100 psf, phi'=30,
+    gamma=100 pcf; ksat 1.67e-7 ft/s, kunsat 1.67e-10 (kr0 = 1e-3)."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='Material 1', c=100.0, phi=30.0, gamma=100.0, gamma_sat=100.0,
+             option='mc', u='piezo', k1=1.0, k2=1.0, alpha=0.0, kr0=0.001, h0=-1.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (100.0, 40.0), (120.0, 48.0),
+                                 (135.0, 48.0), (255.0, 0.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    # pool on the upstream face: hydrostatic, zero at the waterline (100,40)
+    sd['dloads'] = [[{'X': 0.0, 'Y': 0.0, 'Normal': 62.4 * 40.0},
+                     {'X': 100.0, 'Y': 40.0, 'Normal': 0.0}]]
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 160.0, 'Yo': 80.0, 'Depth': 10.0, 'R': 70.0}]
+    sd['non_circ'] = []
+    return sd
+
+
+def vp076a():
+    """Slide #76 case 1: pore pressures from an FE seepage analysis (u='seep').
+    Specified head 40 on the submerged upstream face; the downstream face is an
+    exit face; the foundation is impermeable (no-flow, so no BC).
+    Slide Bishop 1.068 / Spencer 1.075 / GLE 1.074; D&W 1.19 & 1.08 (chart)."""
+    sd = _vp076_slope_data()
+    sd['materials'][0]['u'] = 'seep'
+    sd['piezo_line'] = []
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 40.0, 'coords': [(0.0, 0.0), (100.0, 40.0)]}],
+        'exit_face': [(135.0, 48.0), (255.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp076a.xlsx'))
+    return 'vp076a.xlsx'
+
+
+def vp076b():
+    """Slide #76 case 2: the piezometric-line approximation, read off Slide's
+    Figure 76.2 vertex markers. The line leaves the pool at (100,40), crosses
+    the dam, and daylights on the downstream face at (213.4, 16.6) -- exactly
+    where the 2.5:1 face reaches that elevation -- then follows the face to the
+    toe. Slide Bishop 1.090 / Spencer 1.100 / GLE 1.094; D&W 1.16."""
+    sd = _vp076_slope_data()
+    sd['piezo_line'] = [(0.0, 40.0), (100.0, 40.0), (120.6, 36.0), (134.8, 33.4),
+                        (177.6, 25.0), (205.4, 18.8), (213.4, 16.6), (255.0, 0.0)]
+    sd['piezo_phreatic'] = False
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp076b.xlsx'))
+    return 'vp076b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp073, vp075, vp076a, vp076b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

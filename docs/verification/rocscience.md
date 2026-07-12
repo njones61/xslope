@@ -99,6 +99,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
 <!-- test: file=../files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
 <!-- test: file=../files/rocscience/vp021b.xlsx, type=single_circle, num_slices=60, fs_oms=1.606, fs_bishop=1.759, fs_spencer=1.757, fs_mprice=1.756, benchmark=VP21-ru -->
+<!-- test: file=../files/rocscience/vp022a.xlsx, type=single_circle, num_slices=60, fs_oms=1.297, fs_bishop=1.380, fs_spencer=1.379, fs_mprice=1.370, benchmark=VP22-dry -->
+<!-- test: file=../files/rocscience/vp022b.xlsx, type=single_circle, num_slices=60, fs_oms=1.037, fs_bishop=1.121, fs_spencer=1.122, fs_mprice=1.112, benchmark=VP22-ru -->
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
@@ -123,7 +125,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [19](#vp19) | Slope, (4) materials | **built** | [vp019.xlsx](../files/rocscience/vp019.xlsx). Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope. Circular search: Spencer 1.429 / Bishop 1.448 vs published Spencer 1.40-1.42. Non-circular: XSLOPE's local search plateaus at ~1.45 from the stored seed while Slide's Monte-Carlo optimization reaches 1.398 — a search-power gap (noted for future search work), not a model difference. |
 | [20](#vp20) | Slope, (4) materials, weak layer, water table | **built** | [vp020.xlsx](../files/rocscience/vp020.xlsx). Greco (1996) ex. 5 / Chen & Shao (1988): 0.5 m weak seam along the inclined base (polygon zones), water table. Circular: Bishop 1.086 / Spencer 1.091 vs Slide 1.087 / 1.093 (exact). Non-circular seam block: local search 1.082 vs Slide Monte-Carlo 1.010, Chen & Shao 1.01-1.03, Greco 0.973-1.1 — same search-power gap as #19. |
 | 21 | Slope, homogenous, ru pore pressure | partial | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry), [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (ru=0.25) — Fredlund & Krahn (1977) classic, fixed circle (120,90,R=80), imperial units. Dry: OMS 1.927 / Bishop 2.075 / Spencer 2.071 / M-P 2.071 vs F&K 1.928 / 2.080 / 2.073 / 2.076. ru: OMS 1.606 / Bishop 1.759 / Spencer 1.757 / M-P 1.756 vs F&K 1.607 / 1.766 / 1.761 / 1.764 (XSLOPE matches the F&K OMS-ru value exactly; Slide reports 1.687 there). Case 3 (water table) pending the phreatic-line coordinates. |
-| 22 | Slope, (2) materials, weak layer, ru pore pressure | **blocked** | Fredlund & Krahn (1977) with a weak seam. Model files are built and ready ([vp022a.xlsx](../files/rocscience/vp022a.xlsx) dry, [vp022b.xlsx](../files/rocscience/vp022b.xlsx) r<sub>u</sub>=0.25) — same ground as #21 plus a 1-ft weak seam (c'=0, φ'=10) between el. 16 and the base at el. 15. **Blocked on composite slip surfaces:** F&K's circle (120, 90, R=80) bottoms out at el. 10, five feet below the impenetrable base, so the surface must be *truncated* to run along the base. XSLOPE has no such truncation, and the circle is now rejected outright (see the note below). Slide: OMS/Bishop/Spencer/GLE 1.300/1.382/1.382/1.372 dry and 1.121/1.124/1.124/1.114 for r<sub>u</sub>. |
+| [22](#vp22) | Slope, (2) materials, weak layer, ru pore pressure | **built** | [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry), [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub>=0.25). Fredlund & Krahn (1977) with a weak seam. The **first composite-surface problem** in the corpus: F&K's circle (120, 90, R=80) bottoms out five feet below the impenetrable base, so the surface is truncated and runs along the seam. Dry: OMS 1.297 / Bishop 1.380 / Spencer 1.379 / M-P 1.370 vs Slide 1.300 / 1.382 / 1.382 / 1.372. r<sub>u</sub>: Bishop 1.121 / Spencer 1.122 / M-P 1.112 vs Slide 1.124 / 1.124 / 1.114. |
 | [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
 | [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
 | [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope, surface constructed analytically (45° wedge + tangent fan arc, Slide's printed exit point): Spencer 1.052 vs Slide 1.051 / Chen & Shao 1.05 (theory 1.0). |
@@ -528,6 +530,25 @@ Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a 0.5 m wea
 *Non-circular seam block: local search 1.082 vs Slide MC 1.010, Chen & Shao 1.01–1.03.*
 
 ![vp020: inputs and representative solution](images/vp020.png)
+
+### VP22: Slope, (2) materials, weak layer, composite surface {#vp22}
+
+Slide #22: the Fredlund & Krahn (1977) slope of #21 with a 1-ft weak seam (c'=0, φ'=10°) between el. 16 and the impenetrable base at el. 15. This is the corpus's **composite-surface** benchmark. F&K's circle — center (120, 90), R = 80 — bottoms out at el. 10, five feet *below* the base, so it cannot be used as a circle at all: the slip surface descends on the arc until it meets the base, runs horizontally along the weak seam, and climbs back out on the arc. Here 30 of the 59 slices sit on the seam.
+
+Two cases: dry, and r<sub>u</sub> = 0.25 in both materials.
+
+**Input files:** [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry), [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub> = 0.25)
+
+| Method | XSLOPE (dry) | Published (dry) | XSLOPE (r<sub>u</sub>) | Published (r<sub>u</sub>) |
+|---|---|---|---|---|
+| Ordinary | 1.297 | Slide 1.300; F&K 1.288 | 1.037 | F&K 1.029 *(Slide 1.121)* |
+| Bishop | 1.380 | Slide 1.382; F&K 1.377 | 1.121 | Slide 1.124; F&K 1.124 |
+| Spencer | 1.379 | Slide 1.382; F&K 1.373 | 1.122 | Slide 1.124; F&K 1.118 |
+| Morgenstern–Price | 1.370 | Slide (GLE) 1.372; F&K 1.370 | 1.112 | Slide (GLE) 1.114; F&K 1.118 |
+
+*Every method agrees with Slide to within 0.004 except the Ordinary method with r<sub>u</sub>, where XSLOPE (1.037) reproduces Fredlund & Krahn's own published value (1.029) rather than Slide's (1.121). The Ordinary method has no unique treatment of pore pressure — it takes N' = W·cosα − u·Δℓ from equilibrium perpendicular to the base, which on the near-horizontal seam drives N' far down — and the published values themselves split on it. The three methods that satisfy real equilibrium all agree.*
+
+![vp022a: inputs and representative solution](images/vp022a.png)
 
 ### VP23: Slope, (3) materials {#vp23}
 

@@ -125,6 +125,37 @@ def solve_all(slice_df, rapid=False):
     solve_selected('spencer', slice_df, rapid=rapid)
     solve_selected('mprice', slice_df, rapid=rapid)
 
+
+def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
+    """Per-slice moment arms about the center of rotation (Xo, Yo), for the two
+    moment methods (OMS, Bishop).
+
+        xr   horizontal arm of the slice weight        ( = R·sinα  on a circle )
+        a_S  moment arm of the base shear              ( = R       on a circle )
+        a_N  perpendicular offset of the base normal   ( = 0       on a circle )
+
+    On a true circular arc the base normal points straight at the center, so it
+    exerts no moment, and every base is at radius R — which is what lets the
+    textbook OMS/Bishop equations factor R out and drop the normal entirely.
+    Neither holds on a COMPOSITE surface (a circle truncated at bedrock, see
+    slice.CompositeSurface): the run along the floor is not at radius R and its
+    normal misses the center. These are the general arms — SLOPE/W's per-slice R
+    and its normal offset f — and they collapse identically to (R·sinα, R, 0) when
+    the surface is a circle, so no circular result moves.
+
+    The x-arms are taken in the orientation-normalized frame that alpha lives in
+    (mirrored on right-facing slopes), the same correction as a_dx / pile_x_arm.
+    """
+    xr = slice_df['x_c'].values - Xo
+    if right_facing:
+        xr = -xr
+    yr = slice_df['y_cb'].values - Yo
+    sa, ca = np.sin(alpha), np.cos(alpha)
+    a_S = xr * sa - yr * ca
+    a_N = xr * ca + yr * sa
+    return xr, a_S, a_N
+
+
 def oms(slice_df, debug=False):
     """
     Computes FS by direct application of Equation 9 (Ordinary Method of Slices).
@@ -254,13 +285,11 @@ def oms(slice_df, debug=False):
     a_dy = Yo - d_y
     sum_Dy = np.sum(D * np.sin(beta) * a_dy)
 
-    numerator = np.sum(c * dl + N_eff * tan_phi)
-
     # ————————————————————————————————————————————————————————
-    # 6) Build each piece of the DENOMINATOR exactly as Eqn 8:
-
-    #  (A) = Σ [ Wᵢ · sinαᵢ ]
-    sum_W = np.sum(W * sin_alpha)
+    # 6) Build each piece of the DENOMINATOR exactly as Eqn 8, as MOMENTS about the
+    # center of rotation. (The classic form divides the moment terms by R instead;
+    # the two are the same equation, but only the moment form survives a composite
+    # surface, where the base is not everywhere at radius R.)
 
     #  (B) = Σ  Dᵢ·cosβᵢ·(Xo - d_{x,i})
     # The vertical D-component (D·cosβ) acts at horizontal arm (d_x - Xo). That arm
@@ -269,6 +298,13 @@ def oms(slice_df, debug=False):
     # D-component term (a_dy / sum_Dy) is already sign-correct via that β-flip and is
     # left untouched; likewise the seismic (a_s) and tension-crack (a_t) arms.
     right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+
+    # Moment arms about (Xo, Yo). a_S == R and a_N == 0 on a true circle.
+    xr, a_S, a_N = _moment_arms(slice_df, Xo, Yo, alpha, right_facing)
+
+    #  (A) = Σ [ Wᵢ · sinαᵢ ] · R  =  Σ [ Wᵢ · xrᵢ ]
+    sum_W = np.sum(W * xr)
+
     a_dx = d_x - Xo
     if right_facing:
         a_dx = -a_dx
@@ -314,18 +350,23 @@ def oms(slice_df, debug=False):
     sum_LLx = np.sum(LL * np.cos(ll_b) * ll_x_arm)
     sum_LLy = np.sum(LL * np.sin(ll_b) * (Yo - ll_y))
 
-    # Put them together with their 1/R factors:
-    # Active P, sum_Dy, and the pile/axial moments are known resisting forces,
-    # not factored by FS; line loads are known applied loads.
-    denominator = (sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T + sum_LLx)
-                   - np.sum(P) - (1.0 / R) * (sum_Dy + sum_LLy)
-                   - (1.0 / R) * sum_pile_moment - (1.0 / R) * sum_reinf_moment_a)
+    # Put them together. Every term is now a moment about (Xo, Yo): the support/load
+    # terms already were (that is why the classic form divides them by R), and the
+    # slice terms pick up their arms here. Active P, sum_Dy, and the pile/axial
+    # moments are known resisting forces, not factored by FS; line loads are known
+    # applied loads. The base normal joins the driving side through a_N — zero for
+    # every slice of a circle, non-zero along a composite surface's floor run.
+    denominator = (sum_W + sum_Dx + sum_kw + sum_T + sum_LLx
+                   - np.sum(P * a_S) - (sum_Dy + sum_LLy)
+                   - sum_pile_moment - sum_reinf_moment_a
+                   - np.sum((N_eff + u * dl) * a_N))
 
     # Passive support (ultimate capacities mobilized with the soil) joins the
-    # RESISTING side: numerator gains the capacity moments (arm/R). OMS is
-    # non-iterative, so passive components cannot enter N_eff; their resisting
-    # moment is the entire contribution (consistent with OMS's moment-only basis).
-    numerator = numerator + np.sum(P_pt) + (1.0 / R) * (sum_reinf_moment_p + sum_pile_moment_pas)
+    # RESISTING side: numerator gains the capacity moments. OMS is non-iterative,
+    # so passive components cannot enter N_eff; their resisting moment is the
+    # entire contribution (consistent with OMS's moment-only basis).
+    numerator = (np.sum((c * dl + N_eff * tan_phi) * a_S) + np.sum(P_pt * a_S)
+                 + sum_reinf_moment_p + sum_pile_moment_pas)
 
     # 7) Finally compute FS = (numerator)/(denominator)
     if denominator <= 0:
@@ -435,6 +476,11 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     a_s  = Yo - y_cg
     a_t  = Yo - y_t
 
+    # Slice moment arms about (Xo, Yo): a_S == R and a_N == 0 on a true circle, so
+    # this reproduces the classic R-normalized Bishop equation exactly. A composite
+    # surface (circle truncated at bedrock) needs the general arms. See _moment_arms.
+    xr, a_S, a_N = _moment_arms(slice_df, Xo, Yo, alpha, right_facing)
+
     # Pile resisting moment about circle center (same term as OMS) — flip the
     # vertical-component arm (x_pile - Xo) on right-facing slopes, as for a_dx above.
     pile_x_arm = -(x_pile - Xo) if right_facing else (x_pile - Xo)
@@ -459,22 +505,20 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     sum_LLx = np.sum(LL * np.cos(ll_b) * ll_x_arm)
     sum_LLy = np.sum(LL * np.sin(ll_b) * (Yo - ll_y))
 
-    # Denominator (moment equilibrium) — active pile/axial moments are known
-    # resisting forces, not factored by FS; line loads are known applied loads
-    sum_W = np.sum(W * sin_alpha)
+    # Driving moment about (Xo, Yo) — active pile/axial moments are known resisting
+    # forces, not factored by FS; line loads are known applied loads. Everything here
+    # is FS-independent; the base-normal moment is not, and is added in the loop.
+    sum_W = np.sum(W * xr)
     sum_Dx = np.sum(D * cos_beta * a_dx)
     sum_Dy = np.sum(D * sin_beta * a_dy)
     sum_kw = np.sum(kw * a_s)
     sum_T = np.sum(T * a_t)
-    denominator = (sum_W + (1.0 / R) * (sum_Dx + sum_kw + sum_T + sum_LLx)
-                   - np.sum(P) - (1.0 / R) * (sum_Dy + sum_LLy)
-                   - (1.0 / R) * sum_pile_moment - (1.0 / R) * sum_reinf_moment_a)
+    denom_fixed = (sum_W + sum_Dx + sum_kw + sum_T + sum_LLx
+                   - np.sum(P * a_S) - (sum_Dy + sum_LLy)
+                   - sum_pile_moment - sum_reinf_moment_a)
 
     # Passive capacity moments join the resisting side (the numerator of F)
-    res_passive = np.sum(P_pt) + (1.0 / R) * (sum_reinf_moment_p + sum_pile_moment_pas)
-
-    if denominator <= 0:
-        return False, "Net driving moment is non-positive (resisting forces exceed driving forces)."
+    res_passive = np.sum(P_pt * a_S) + sum_reinf_moment_p + sum_pile_moment_pas
 
     # Vertical component of pile force (upward, reduces net downward force on slice)
     H_sin_tp = H_pile * np.sin(theta_p)
@@ -496,12 +540,15 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
         denom_N = cos_alpha + (sin_alpha * tan_phi) / F
         N_eff = num_N / denom_N
 
-        # Numerator for FS — same vertical-equilibrium group
-        shear = (
-            c * dl * cos_alpha
-            + (vert_known - vert_pas / F - u * dl * cos_alpha) * tan_phi
-        )
-        numerator = np.sum(shear / denom_N) + res_passive
+        # The base normal exerts a moment only where it misses the center of
+        # rotation (a_N = 0 on every slice of a true arc, non-zero along a composite
+        # surface's floor run). It depends on N_eff, so it lives inside the loop.
+        denominator = denom_fixed - np.sum((N_eff + u * dl) * a_N)
+        if denominator <= 0:
+            return False, "Net driving moment is non-positive (resisting forces exceed driving forces)."
+
+        # Resisting moment: the mobilized base shear (c·dl + N'·tanφ) on its own arm
+        numerator = np.sum((c * dl + N_eff * tan_phi) * a_S) + res_passive
         F_new = numerator / denominator
 
         if abs(F_new - F) < tol:

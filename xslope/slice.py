@@ -569,6 +569,158 @@ def _domain_containment(slope_data):
     return slope_data['_domain_check']
 
 
+def domain_lower_envelope(domain):
+    """Return the lower boundary of the domain polygon as (x, y) points, left to
+    right, sampled at the exterior vertex x-values (piecewise-linear between)."""
+    ring = list(domain.exterior.coords)
+    if len(ring) > 1 and ring[0] == ring[-1]:
+        ring = ring[:-1]
+    n = len(ring)
+    pts = []
+    for x in sorted(set(p[0] for p in ring)):
+        ys = []
+        for i in range(n):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % n]
+            if (x1 <= x <= x2) or (x2 <= x <= x1):
+                if x1 == x2:
+                    ys.extend([y1, y2])
+                else:
+                    ys.append(y1 + (x - x1) / (x2 - x1) * (y2 - y1))
+        if ys:
+            pts.append((x, min(ys)))
+    return pts
+
+
+def _domain_floor(slope_data):
+    """Cached (xs, ys) arrays of the domain's lower boundary, for np.interp.
+
+    None when the problem has no domain polygon. The floor is the impenetrable
+    boundary of the model — bedrock for a polygon input, the max_depth line for a
+    profile-line input.
+    """
+    if '_domain_floor' not in slope_data:
+        domain = slope_data.get('domain_polygon')
+        pts = domain_lower_envelope(domain) if domain is not None else []
+        slope_data['_domain_floor'] = (
+            (np.array([p[0] for p in pts]), np.array([p[1] for p in pts]))
+            if len(pts) >= 2 else None)
+    return slope_data['_domain_floor']
+
+
+class CompositeSurface:
+    """A circular arc truncated at the bottom of the domain.
+
+    A trial circle that dips below the impenetrable boundary of the model (bedrock,
+    or the user's max_depth line) is not an admissible slip surface. Rather than
+    reject it, every LEM code runs the surface ALONG the boundary between the two
+    points where the arc crosses it. That is a COMPOSITE surface, and because the
+    floor is single-valued in x it is simply the upper envelope of the two:
+
+        y(x) = max(arc_y(x), floor_y(x))
+
+    The arc portion keeps its exact circular geometry (y and alpha come from the
+    circle equation, not from a polyline chord), and the floor portion takes the
+    slope of the floor segment it lies on. The two crossing points are returned so
+    the caller can force slice boundaries there, which keeps every slice base
+    wholly on one branch or the other — no slice straddles the kink.
+
+    The circle center is still carried into slice_df, because the moment methods
+    (OMS, Bishop) take moments about it. Their moment arms are no longer the
+    constant R, though; see solve.oms/solve.bishop.
+    """
+
+    def __init__(self, circle, fx, fy, crossings, x_min, x_max):
+        self.circle = circle
+        self.fx, self.fy = fx, fy
+        self.crossings = crossings
+        self.x_min, self.x_max = x_min, x_max
+
+    def floor_y(self, x):
+        return np.interp(x, self.fx, self.fy)
+
+    def y(self, x):
+        """Elevation of the composite surface at x (vectorized)."""
+        x = np.asarray(x, dtype=float)
+        c = self.circle
+        arc = get_circular_y_coordinates(x, c['Xo'], c['Yo'], c['R'])
+        # nan outside the circle's x-span: those x lie on the floor by definition
+        arc = np.where(np.isnan(arc), -np.inf, arc)
+        return np.maximum(arc, self.floor_y(x))
+
+    def on_floor(self, x, tol=1e-9):
+        c = self.circle
+        arc = get_circular_y_coordinates(np.atleast_1d(float(x)), c['Xo'], c['Yo'], c['R'])[0]
+        return np.isnan(arc) or arc <= self.floor_y(x) + tol
+
+    def alpha_deg(self, x):
+        """Base inclination at x, degrees, positive when the surface rises to the
+        right (the same left-to-right convention as the non-circular path; the
+        caller applies the right-facing sign flip)."""
+        if self.on_floor(x):
+            i = int(np.clip(np.searchsorted(self.fx, x) - 1, 0, len(self.fx) - 2))
+            dx = self.fx[i + 1] - self.fx[i]
+            return degrees(atan2(self.fy[i + 1] - self.fy[i], dx)) if dx > 0 else 0.0
+        c = self.circle
+        dx_circle = x - c['Xo']
+        R = c['R']
+        if abs(dx_circle) >= R:
+            return 0.0
+        return degrees(atan(dx_circle / sqrt(R ** 2 - dx_circle ** 2)))
+
+    def line_string(self, y_left, y_right, n=400):
+        """Dense polyline of the composite surface, for plotting and for the
+        material-boundary / piezo-line intersections that build slice breakpoints."""
+        xs = set(np.linspace(self.x_min, self.x_max, n))
+        xs.update(self.crossings)
+        xs.update(x for x in self.fx if self.x_min < x < self.x_max)
+        xs = np.array(sorted(xs))
+        ys = self.y(xs)
+        ys[0], ys[-1] = y_left, y_right      # pin to the exact ground intersections
+        return LineString(list(zip(xs, ys)))
+
+
+def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
+    """Build the CompositeSurface for a circle that dips below the domain floor.
+
+    Returns None when the arc clears the floor over its whole span — the ordinary
+    circular case, which must stay on its exact-arc fast path.
+    """
+    floor = _domain_floor(slope_data)
+    if floor is None:
+        return None
+    fx, fy = floor
+    Xo, Yo, R = circle['Xo'], circle['Yo'], circle['R']
+
+    xs = np.linspace(x_min, x_max, n)
+    arc = get_circular_y_coordinates(xs, Xo, Yo, R)
+    d = arc - np.interp(xs, fx, fy)          # < 0 where the arc is below the floor
+    below = np.isnan(d) | (d < -1e-9)
+    if not below.any():
+        return None
+
+    # Exact crossings by bisection on each sign change of d(x). An irregular floor
+    # can be crossed more than twice; every crossing becomes a slice breakpoint.
+    def d_at(x):
+        a = get_circular_y_coordinates(np.array([x]), Xo, Yo, R)[0]
+        return -1e9 if np.isnan(a) else a - float(np.interp(x, fx, fy))
+
+    crossings = []
+    for i in range(len(xs) - 1):
+        if below[i] != below[i + 1]:
+            lo, hi = xs[i], xs[i + 1]
+            lo_below = below[i]
+            for _ in range(80):
+                mid = 0.5 * (lo + hi)
+                if (d_at(mid) < 0) == lo_below:
+                    lo = mid
+                else:
+                    hi = mid
+            crossings.append(0.5 * (lo + hi))
+
+    return CompositeSurface(circle, fx, fy, crossings, x_min, x_max)
+
+
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True):
 
     """
@@ -704,12 +856,34 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     else:
         return False, "Failed to generate surface:" + result
 
-    # Reject failure surfaces that leave the domain polygon (plan_polygons.md §5.4).
-    # Only irregular bottoms (e.g. dipping bedrock) need the geometric covers()
-    # test; for a flat bottom the same check reduces to a scalar depth comparison.
-    # circular_search clamps its own trial circles to the domain bottom, but a
-    # circle read straight from the input file is not clamped, and slices below
-    # the bottom would otherwise silently inherit the deepest material.
+    # === Composite surfaces ===
+    # A circle that dips below the impenetrable bottom of the model is truncated at
+    # it and follows it between the crossings (see CompositeSurface). This is the
+    # ordinary way an LEM code handles a slip surface that would otherwise cut
+    # through bedrock, and it is what makes deep circles admissible at all. The
+    # exact-arc fast paths below stay in force whenever the arc clears the floor,
+    # which is the overwhelmingly common case; `use_arc` gates them.
+    composite = None
+    if circular:
+        composite = build_composite_surface(slope_data, circle, x_min, x_max)
+        if composite is not None:
+            clipped_surface = composite.line_string(y_left, y_right)
+    use_arc = circular and composite is None
+
+    def surf_y(xs):
+        """Failure-surface elevation at each x. Exact for the arc and composite
+        cases; a vertical-line intersection for a hand-entered polyline."""
+        if use_arc:
+            return get_circular_y_coordinates(xs, Xo, Yo, R)
+        if composite is not None:
+            return composite.y(xs)
+        return np.array([get_y_from_intersection(
+            clipped_surface.intersection(LineString([(x, -1e6), (x, 1e6)]))) for x in xs])
+
+    # Reject failure surfaces that still leave the domain polygon (plan_polygons.md
+    # §5.4) — a hand-entered non-circular surface below the floor, or a composite
+    # surface that failed to close. Only irregular bottoms need the geometric
+    # covers() test; for a flat bottom the same check is a scalar depth comparison.
     prepared_domain = _domain_containment(slope_data)
     if prepared_domain is not None:
         if not prepared_domain.covers(clipped_surface):
@@ -722,9 +896,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if surf_min_y < y_bot - 1e-6:
                 return False, (
                     f"Failure surface reaches y={surf_min_y:.3f}, below the bottom of "
-                    f"the domain (y={y_bot:.3f}). XSLOPE does not truncate a slip "
-                    f"surface at an impenetrable boundary (no composite surfaces) — "
-                    f"raise the surface or lower max_depth.")
+                    f"the domain (y={y_bot:.3f}). Raise the surface or lower max_depth.")
 
     # Determine if the failure surface is right-facing
     right_facing = y_left > y_right
@@ -753,8 +925,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         # Check if points are above the failure surface
         if circular:
-            # Use parametric equation for circular failure surface
-            failure_y = get_circular_y_coordinates(x_filtered, Xo, Yo, R)
+            failure_y = surf_y(x_filtered)
             above_mask = y_filtered > failure_y
         else:
             # For non-circular, use geometric intersection (slower but necessary)
@@ -767,8 +938,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         # Add points that are above the failure surface
         fixed_xs.update(x_filtered[above_mask])
-    
+
     fixed_xs.update([x_min, x_max])
+
+    # The arc/floor crossings are kinks in the base: force a slice boundary at each
+    # so that no slice base straddles one.
+    if composite is not None:
+        fixed_xs.update(x for x in composite.crossings if x_min < x < x_max)
 
     # Add transition points from dloads
     if dloads:
@@ -792,7 +968,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         )
 
     # Find intersections between material-zone boundaries and the failure surface
-    if circular:
+    if use_arc:
         # For circular failure surfaces, we can use a more efficient approach
         # by creating a dense circle representation and finding intersections
         theta_range = np.linspace(np.pi, 2 * np.pi, 200)
@@ -828,7 +1004,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Find intersections with piezometric lines
     if piezo_line:
         piezo_geom1 = LineString(piezo_line)
-        if circular:
+        if use_arc:
             # Use dense circle representation for intersection
             theta_range = np.linspace(np.pi, 2 * np.pi, 200)
             circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
@@ -850,7 +1026,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     if piezo_line2:
         piezo_geom2 = LineString(piezo_line2)
-        if circular:
+        if use_arc:
             theta_range = np.linspace(np.pi, 2 * np.pi, 200)
             circle_coords = [(Xo + R * np.cos(t), Yo + R * np.sin(t)) for t in theta_range]
             circle_line = LineString(circle_coords)
@@ -910,16 +1086,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     slice_centers = (slice_x_coords[:-1] + slice_x_coords[1:]) / 2
     
     # Get failure surface y-coordinates
-    if circular:
-        # Use parametric equations for circular failure surface
-        y_lb_all = get_circular_y_coordinates(slice_x_coords[:-1], Xo, Yo, R)
-        y_rb_all = get_circular_y_coordinates(slice_x_coords[1:], Xo, Yo, R)
-        y_cb_all = get_circular_y_coordinates(slice_centers, Xo, Yo, R)
-    else:
-        # For non-circular, we need to use geometric intersections
-        y_lb_all = np.array([get_y_from_intersection(clipped_surface.intersection(LineString([(x, -1e6), (x, 1e6)]))) for x in slice_x_coords[:-1]])
-        y_rb_all = np.array([get_y_from_intersection(clipped_surface.intersection(LineString([(x, -1e6), (x, 1e6)]))) for x in slice_x_coords[1:]])
-        y_cb_all = np.array([get_y_from_intersection(clipped_surface.intersection(LineString([(x, -1e6), (x, 1e6)]))) for x in slice_centers])
+    y_lb_all = surf_y(slice_x_coords[:-1])
+    y_rb_all = surf_y(slice_x_coords[1:])
+    y_cb_all = surf_y(slice_centers)
 
     # Get ground surface y-coordinates
     y_lt_all = get_ground_surface_y_coordinates(slice_x_coords[:-1], ground_surface)
@@ -1474,7 +1643,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
         # Calculate alpha (slope angle of the failure surface) more efficiently
         delta = 0.01
-        if circular:
+        if use_arc:
             # For circular failure surface, use parametric equation for derivative
             # The slope at any point on the circle is: dy/dx = (x - Xo) / sqrt(R^2 - (x - Xo)^2)
             dx_circle = x_c - Xo
@@ -1485,6 +1654,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 y1 = get_circular_y_coordinates([x_c - delta], Xo, Yo, R)[0]
                 y2 = get_circular_y_coordinates([x_c + delta], Xo, Yo, R)[0]
                 alpha = degrees(atan2(y2 - y1, 2 * delta))
+        elif composite is not None:
+            # Exact on both branches: the circle equation on the arc, the floor
+            # segment's own slope on the floor. Every slice lies wholly on one
+            # branch (the crossings are slice boundaries), so this never averages
+            # across the kink the way a +/-delta finite difference would.
+            alpha = composite.alpha_deg(x_c)
         else:
             # For non-circular failure surface, use geometric intersection
             failure_line = clipped_surface

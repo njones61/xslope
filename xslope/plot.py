@@ -19,7 +19,7 @@ from matplotlib.path import Path
 from shapely.geometry import LineString
 import math
 
-from .slice import generate_failure_surface
+from .slice import generate_failure_surface, domain_lower_envelope
 
 # Configure matplotlib for better text rendering
 plt.rcParams.update({
@@ -288,29 +288,6 @@ def plot_max_depth(ax, profile_lines, max_depth, style=None):
         ax.plot([x, x - dx], [max_depth, max_depth - dy], color=color, linewidth=1, gid='MAX_DEPTH')
 
 
-def _domain_lower_envelope(domain):
-    """Return the lower boundary of the domain polygon as (x, y) points, left to
-    right, sampled at the exterior vertex x-values (piecewise-linear between)."""
-    ring = list(domain.exterior.coords)
-    if len(ring) > 1 and ring[0] == ring[-1]:
-        ring = ring[:-1]
-    n = len(ring)
-    pts = []
-    for x in sorted(set(p[0] for p in ring)):
-        ys = []
-        for i in range(n):
-            x1, y1 = ring[i]
-            x2, y2 = ring[(i + 1) % n]
-            if (x1 <= x <= x2) or (x2 <= x <= x1):
-                if x1 == x2:
-                    ys.extend([y1, y2])
-                else:
-                    ys.append(y1 + (x - x1) / (x2 - x1) * (y2 - y1))
-        if ys:
-            pts.append((x, min(ys)))
-    return pts
-
-
 def plot_domain_base(ax, domain_polygon, label='Max Depth', style=None):
     """Draw the domain's lower boundary as a hatched base line (the polygon
     analog of plot_max_depth). Works for a flat bottom — reproducing the old
@@ -323,7 +300,7 @@ def plot_domain_base(ax, domain_polygon, label='Max Depth', style=None):
     color = fs.get("color", "black")
     lw = fs.get("linewidth", 1.5)
     ls = fs.get("linestyle", "-")
-    base = _domain_lower_envelope(domain_polygon)
+    base = domain_lower_envelope(domain_polygon)
     if len(base) < 2:
         return
     bx = np.array([p[0] for p in base])

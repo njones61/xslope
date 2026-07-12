@@ -138,7 +138,7 @@ Substituting the new normal force from (4) into this gives:
 
 ### Moments
 
-The OMS equation is based on moment equilibrium about the center of the slip circle. The moments in the original method of slices formulation included the weight of the slice and the shear force. The normal force acts through the center of the slice and therefore produces no moment. In the original equation, the limit equilibrium equation is:
+The OMS equation is based on moment equilibrium about the center of the slip circle. The moments in the original method of slices formulation included the weight of the slice and the shear force. The normal force acts through the center of the circle and therefore produces no moment. (That last statement holds only while every slice base is on the circle; see [Composite Surfaces](#composite-surfaces) below.) In the original equation, the limit equilibrium equation is:
 
 >$F = \dfrac{R \sum S}{R \sum W sin \alpha}    \qquad (6)$ 
 
@@ -181,6 +181,30 @@ Isolating the shear term and solving for $F$:
 
 >$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
 
+### Composite Surfaces
+
+Everything above assumes that the base of every slice lies on the circle, and that assumption buys two simplifications: the moment arm of $S$ (and of $W \sin \alpha$) is the constant $R$, and the normal force $N$ points straight at the center, so it produces no moment at all and never appears. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock — neither is true of the slices that run along the floor. Their bases are not at radius $R$, and their normals miss the center.
+
+XSLOPE therefore uses the general moment arms, taken about the center of rotation $(X_o, Y_o)$. Writing
+
+>$x_r = x_c - X_o \qquad \qquad y_r = y_{cb} - Y_o$
+
+for the offsets of the slice base center from the center of rotation, the three slice forces have arms:
+
+|         Force          | Moment Arm                                    | Value on a true circle |
+|:----------------------:|:----------------------------------------------|:----------------------:|
+| $W$ (vertical)         | $x_r$                                         |   $R \sin \alpha$      |
+| $S$ (along the base)   | $a_S = x_r \sin \alpha - y_r \cos \alpha$     |   $R$                  |
+| $N$ (normal to the base) | $a_N = x_r \cos \alpha + y_r \sin \alpha$   |   $0$                  |
+
+The load and support moments need no generalization — they were always true moments about the center, which is precisely why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
+
+>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_s + T \, a_t - \ldots}   \qquad (8a)$
+
+where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term — which is why every circular factor of safety is unchanged.
+
+The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** base normal about the center. It vanishes on every slice of a true arc and it is easy to overlook, but it is not small: on the Fredlund & Krahn weak-seam benchmark ([VP22](../verification/rocscience.md#vp22)) dropping it moves Bishop's factor of safety from 1.380 to 1.189.
+
 ### Complete Factor of Safety Equation
 
 Substituting (5) into the numerator and dividing by $R$, we get:
@@ -195,7 +219,7 @@ Note that:
 
 ## Summary
 
-- Applicable only to **circular** slip surfaces.
+- Applicable only to **circular** and **composite** (circle truncated at bedrock) slip surfaces — the method takes moments, so it needs a center of rotation.
 - **Only moment equilibrium** is satisfied.
 - **No iteration** is required.
 - **Less accurate** than more complete methods (e.g., Bishop's or Spencer's).

@@ -202,12 +202,22 @@ This is the **complete formulation** for Bishop's Simplified Method. Note that:
 
 The factor of safety $F$ appears on both sides of the equation, so it must be solved **iteratively**, just like the basic formulation.
 
+### Composite Surfaces
+
+Bishop's moment equation, like the OMS equation, factors out a constant radius $R$ and drops the base normal on the grounds that it points at the center of rotation. Both steps assume every slice base lies on the circle. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock, running along the floor between the crossings — they do not, and XSLOPE substitutes the general moment arms derived in [Ordinary Method of Slices](oms.md#composite-surfaces):
+
+>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_s + T \, a_t - \ldots}$
+
+with $a_S = x_r \sin \alpha - y_r \cos \alpha$ and $a_N = x_r \cos \alpha + y_r \sin \alpha$, both measured from the center of rotation. On a true circle $a_S = R$ and $a_N = 0$, recovering the equation above exactly.
+
+One difference from OMS: $N'$ in Bishop comes from vertical equilibrium and so depends on $F$, which means the normal-force moment $\sum (N' + u \Delta \ell)\, a_N$ is itself part of the iteration. It is recomputed inside the fixed-point loop rather than once up front. The expression for $N'$ (equation 11) is unaffected — it comes from vertical equilibrium of a single slice, which knows nothing about the shape of the surface as a whole.
+
 ---
 
 ## Summary
 
 Assumes **horizontal side forces**<br>
 Satisfies **moment** and **vertical force** equilibrium<br>
-Applicable to **circular slip surfaces**<br>
+Applicable to **circular** and **composite** slip surfaces<br>
 Requires **iteration** to solve for $F$<br>
 More accurate than OMS, especially for **effective stress analysis** with high pore pressures

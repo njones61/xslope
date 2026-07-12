@@ -127,6 +127,25 @@ directions of the forces are reversed simply by changing the sign convention of 
 
 One exception to this is Spencer's method. Details can be found in the XSLOPE source code for Spencer's method.
 
+## Composite Failure Surfaces
+
+Every model has a floor: bedrock in a polygon-defined problem, or the `max_depth` line in a profile-line problem. No material is defined below it, so no slip surface may pass through it. A trial circle, however, knows nothing about the floor — make it deep enough and it will dip below.
+
+XSLOPE handles this the way every limit equilibrium code does, by **truncating** the circle at the floor. The surface follows the arc down until it meets the floor, runs *along* the floor to the far crossing, and climbs back out on the arc. Because the floor is single-valued in $x$, the truncated surface is just the upper envelope of the two:
+
+>$y(x) = \max \left[ \, y_{circle}(x), \; y_{floor}(x) \, \right]$
+
+The result is called a **composite surface**. Far from being a special case, it is the correct failure mechanism whenever a slope is underlain by a weak seam or a hard stratum: the mass shears along the arc where it can, and along the weak base where that is cheaper. The example below is the Fredlund & Krahn (1977) benchmark, where a 1-ft weak seam sits on the model base — half the slices ride the seam.
+
+![composite_surface.png](images/composite_surface.png)
+
+Two things follow from the kink where arc meets floor, and XSLOPE handles both:
+
+- **The crossings become slice boundaries.** A boundary is forced at each point where the arc meets the floor, so no slice base straddles the kink. Every slice then lies wholly on the arc or wholly on the floor, and its base angle $\alpha$ is exact on either one — the circle's tangent on the arc, the floor's own slope on the floor.
+- **The moment methods lose their constant radius.** OMS and Bishop take moments about the center of the circle, and both classically assume that every slice base sits at radius $R$ and that every base normal points straight at the center. Neither is true along the floor. XSLOPE uses generalized moment arms, derived in [Ordinary Method of Slices](oms.md); they collapse identically to the classic form on a true circle, so no circular result changes. The force-equilibrium and complete-equilibrium methods (Janbu, Corps of Engineers, Lowe & Karafiath, Spencer, Morgenstern–Price) never reference a circle at all, so they need no change.
+
+There is no input flag for this. A circle that clears the floor is analyzed as an ordinary circle; one that does not is truncated automatically.
+
 ## Advanced Loading Conditions
 
 In addition to the basic forces acting on each slice, modern slope stability analysis often incorporates additional loading conditions that can significantly affect the stability calculations. These advanced loading conditions include distributed loads, seismic loads, reinforcement forces, and tension cracks.

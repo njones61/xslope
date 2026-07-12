@@ -267,43 +267,52 @@ stay within the domain polygon, which can therefore represent an irregular bedro
 
 ## Worksheet: piezo
 
-<!-- TODO (Norm): update images/sheet_piezo.png — the v13 sheet adds the Type: row (piezo | phreatic) above the x/y headers -->
 ![sheet_piezo.png](images/sheet_piezo.png)
 
-The **piezo** worksheet defines piezometric lines for calculating pore water pressures in limit equilibrium analysis 
-for materials in the mat sheet where the pore pressure option is set to "piezo". This option should only be used on 
-soils where effective stress analysis is being used. A piezometric line represents the top of the phreatic surface 
-or water table elevation. Below 
-this 
-line, pore pressures are 
-positive (hydrostatic); above it, they are zero. Pore pressures are calculated using the vertical distance from 
-the piezometric line to the slice base as follows:
+The **piezo** worksheet defines up to two water lines used to compute pore water pressures in limit equilibrium
+analysis. A line is used by every material on the **mat** sheet whose pore pressure option is set to "piezo", so it
+applies to soils analyzed with effective-stress (drained) strengths. Below the line, pore pressures are positive;
+above it, they are zero.
+
+Each line has a **Type** cell that states what the line represents, which determines how the pressure head is
+computed:
+
+- **piezo** (the default — a blank cell means the same): the line is a true *piezometric line*, i.e., the locus of
+  pressure heads measured by piezometers at the slip surface. The pore pressure at a slice base is the full static
+  head:
+
+    u = γw · Δz
+
+  where Δz is the vertical distance from the slice base up to the line, as shown below:
 
 ![piezo.png](images/piezo.png)
 
-It should be noted that the use of a piezometric line is optional for limit equilibrium analysis. XSLOPE can also 
-calculate pore pressures from a finite element seepage analysis solution, which is more accurate and can be used for 
-more complex problems.
+- **phreatic**: the line is the *phreatic surface* (the water table) in a slope with inclined, roughly
+  surface-parallel steady seepage. In that flow regime the equipotentials are not vertical, so the head at depth is
+  less than the static column and the static head is reduced by cos²θ of the line's local slope:
 
-The worksheet provides space for two piezometric lines (columns A-B and D-E), which is useful for rapid drawdown 
-analysis:
+    u = γw · Δz · cos²θ
 
-- **First line (A-B)**: Steady-state or initial condition water table
-- **Second line (D-E)**: Drawdown condition water table (optional)
+  where θ is the inclination of the phreatic-line segment directly above the slice base. This is the same correction
+  as Slide2's "Hu: Auto" and the phreatic-surface option in XSTABL, and it matters most on steep phreatic lines — on
+  a flat line the two types are identical.
 
-Each piezometric line requires at least two XY coordinate pairs The table is formatted for 20 rows, but XY coordinates can be entered beyond the bottom of the table as needed. The points 
-should be ordered from left to right.
+Choosing between them: if the line came from piezometer readings, a flow net, or a seepage analysis, it is a
+piezometric line — use **piezo**. If all you have is the water table position, **phreatic** is the appropriate
+shortcut. For full rigor on complex problems, run a finite element seepage analysis and set the material pore
+pressure option to "seep" instead; the pore pressures then come from the seepage solution directly and neither line
+type is needed.
 
-Each line also carries a **Type** cell (template version 13+) with two options:
+The worksheet provides space for two lines, which supports rapid drawdown analysis:
 
-- **piezo** (default — a blank cell means the same): the line is a true piezometric line, and the pore pressure at a
-  slice base is the full static head, u = γw × vertical distance below the line.
-- **phreatic**: the line represents the phreatic surface under inclined, roughly surface-parallel steady seepage. The
-  static head is reduced by cos²θ, where θ is the local slope of the line directly above the slice — the same
-  correction as Slide2's "Hu: Auto" and XSTABL's phreatic surface option. If you have a genuine piezometric line
-  (e.g., from a flow net or a seepage analysis), use **piezo**; the correction is a shortcut for when only the
-  phreatic surface is known. For full rigor, use a finite element seepage solution with the "seep" pore-pressure
-  option instead.
+- **Piezometric Line 1 (columns A–B)**: steady-state or initial condition
+- **Piezometric Line 2 (columns D–E)**: post-drawdown condition (only required for rapid drawdown)
+
+Each line has its own Type cell and requires at least two XY coordinate pairs, ordered from left to right. The table
+is formatted for 20 rows, but coordinates can be entered beyond the bottom of the table as needed.
+
+The Type cell was added in template version 13. Older (v8–v12) input files load unchanged: a file with no Type cell
+behaves as **piezo**, which reproduces their previous results exactly.
 
 ---
 

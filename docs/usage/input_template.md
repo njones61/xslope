@@ -279,23 +279,16 @@ computed:
 
 - **piezo** (the default — a blank cell means the same): the line is a true *piezometric line*, i.e., the locus of
   pressure heads measured by piezometers at the slip surface. The pore pressure at a slice base is the full static
-  head:
-
-    u = γw · Δz
-
-  where Δz is the vertical distance from the slice base up to the line, as shown below:
-
-![piezo.png](images/piezo.png)
+  head, u = γw · Δz, where Δz is the vertical distance from the slice base up to the line (upper figure below).
 
 - **phreatic**: the line is the *phreatic surface* (the water table) in a slope with inclined, roughly
   surface-parallel steady seepage. In that flow regime the equipotentials are not vertical, so the head at depth is
-  less than the static column and the static head is reduced by cos²θ of the line's local slope:
+  less than the static column and the static head is reduced by cos²θ, where θ is the inclination of the line
+  segment directly above the slice base (lower figure below). This is the same correction as Slide2's "Hu: Auto"
+  and the phreatic-surface option in XSTABL, and it matters most on steep phreatic lines — on a flat line the two
+  types are identical.
 
-    u = γw · Δz · cos²θ
-
-  where θ is the inclination of the phreatic-line segment directly above the slice base. This is the same correction
-  as Slide2's "Hu: Auto" and the phreatic-surface option in XSTABL, and it matters most on steep phreatic lines — on
-  a flat line the two types are identical.
+![piezo.png](images/piezo.png)
 
 Choosing between them: if the line came from piezometer readings, a flow net, or a seepage analysis, it is a
 piezometric line — use **piezo**. If all you have is the water table position, **phreatic** is the appropriate

@@ -2516,11 +2516,14 @@ def _vp072_slope_data():
                                      gamma_sat=127.0, option='mc', u='piezo',
                                      k1=1.67e-5, k2=1.67e-5, alpha=0.0, kr0=0.001, h0=-5.0)
     sd['materials'] = [shell, core, fclay, fsand]
+    # Partial-span profile lines (the house style — see LEM sample problem 8,
+    # the same dam from the book): the core line spans only its own footprint,
+    # so no zero-thickness pinch-outs reach the mesher.
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(0.0, 227.0), (160.0, 227.0), (430.0, 317.0),
                                  (475.0, 317.0), (745.0, 227.0), (905.0, 227.0)]},
-        {'mat_id': 1, 'coords': [(0.0, 227.0), (397.5, 227.0), (440.0, 312.0),
-                                 (465.0, 312.0), (507.5, 227.0), (905.0, 227.0)]},
+        {'mat_id': 1, 'coords': [(397.5, 227.0), (440.0, 312.0),
+                                 (465.0, 312.0), (507.5, 227.0)]},
         {'mat_id': 2, 'coords': [(0.0, 227.0), (905.0, 227.0)]},
         {'mat_id': 3, 'coords': [(0.0, 197.0), (905.0, 197.0)]},
     ]
@@ -2532,9 +2535,14 @@ def _vp072_slope_data():
                      {'X': 385.0, 'Y': 302.0, 'Normal': 0.0}]]
     sd['circular'] = True
     sd['non_circ'] = []
-    # seed near the downstream toe (the global critical is a shallow toe circle
-    # driven by the upward exit gradient through the foundation clay)
-    sd['circles'] = [{'Xo': 700.0, 'Yo': 320.0, 'Depth': 200.0, 'R': 120.0}]
+    # circles[0] = xslope's tangent-to-el-197 critical (constrained center sweep,
+    # 20-ft grid refined to 5 ft) — the well-posed benchmark case. The GLOBAL
+    # critical (Slide case 1) is a toe slough driven by the artesian exit
+    # gradient; its FS depends on the minimum admissible surface size (a heave
+    # singularity: xslope reads 1.28 on a 40-ft-radius slough and 0.87 on a
+    # 4-ft sliver at the singular toe point) and Slide does not print its
+    # surface, so case 1 is documented, not regression-tagged.
+    sd['circles'] = [{'Xo': 715.0, 'Yo': 335.0, 'Depth': 197.0, 'R': 138.0}]
     return sd
 
 
@@ -2549,10 +2557,15 @@ def vp072a():
     for m in sd['materials']:
         m['u'] = 'seep'
     sd['piezo_line'] = []
+    # Heads on the GROUND SURFACE only — Slide's BC markers (Figure 72.3, zoomed)
+    # show plain no-flow circles on both vertical edges and the base. All
+    # underseepage is forced down through the clay, along the sand, and back UP
+    # through the clay downstream: giving the sand a fixed-head exit at either
+    # vertical edge guts the artesian pressures and reads ~13% high at the toe.
     sd['seepage_bc'] = {
         'specified_heads': [
-            {'head': 302.0, 'coords': [(0.0, 182.0), (0.0, 227.0), (160.0, 227.0), (385.0, 302.0)]},
-            {'head': 227.0, 'coords': [(745.0, 227.0), (905.0, 227.0), (905.0, 182.0)]},
+            {'head': 302.0, 'coords': [(0.0, 227.0), (160.0, 227.0), (385.0, 302.0)]},
+            {'head': 227.0, 'coords': [(745.0, 227.0), (905.0, 227.0)]},
         ],
         'exit_face': [(475.0, 317.0), (745.0, 227.0)],
     }
@@ -2572,6 +2585,7 @@ def vp072b():
     sd['piezo_line'] = [(0.0, 302.0), (385.0, 302.0), (436.3, 301.3), (471.6, 273.7),
                         (497.0, 235.2), (636.6, 233.1), (746.3, 227.0), (905.0, 227.0)]
     sd['piezo_phreatic'] = False
+    sd['circles'] = [{'Xo': 695.0, 'Yo': 390.0, 'Depth': 197.0, 'R': 193.0}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp072b.xlsx'))
     return 'vp072b.xlsx'
 

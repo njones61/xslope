@@ -84,6 +84,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp075.xlsx, type=circular_search, seed=grid, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75-grid -->
 <!-- test: file=../files/rocscience/vp076a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.065, fs_spencer=1.072, benchmark=VP76-seep -->
 <!-- test: file=../files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.049, fs_spencer=1.056, benchmark=VP76-piezo -->
+<!-- test: file=../files/rocscience/vp072a.xlsx, type=single_circle, num_slices=60, fs_oms=1.071, fs_bishop=1.339, fs_spencer=1.341, fs_mprice=1.342, benchmark=VP72-seep-tan197 -->
+<!-- test: file=../files/rocscience/vp072b.xlsx, type=single_circle, num_slices=60, fs_oms=1.348, fs_bishop=1.572, fs_spencer=1.563, fs_mprice=1.564, benchmark=VP72-piezo-tan197 -->
 <!-- test: file=../files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
 <!-- test: file=../files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
 <!-- test: file=../files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
@@ -187,7 +189,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [69](#vp69) | Embankment, (2) materials, water table, ponded water | **built** | [vp069.xlsx](../files/rocscience/vp069.xlsx). USACE example F-6 steady-seepage dam (piezometric line, ponded tailwater, specified R=280 circle): Bishop 1.999 / Spencer 2.013 / M-P 2.013 vs Slide 2.011 / 2.026 / GLE 2.027, USACE 2.01. |
 | [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](../files/rocscience/vp070a.xlsx) / [vp070b.xlsx](../files/rocscience/vp070b.xlsx). D&W Fig. 6.27 submerged slope, pools 30 and 60 ft above the crest: Bishop 1.596 / Spencer 1.593 vs Slide 1.603/1.599, D&W 1.60 — and identical between the two depths, the submergence-independence property the example demonstrates. |
 | [71](#vp71) | Slope, homogenous, finite element groundwater seepage analysis, water table | **built** | [vp071a.xlsx](../files/rocscience/vp071a.xlsx) / [vp071b.xlsx](../files/rocscience/vp071b.xlsx). D&W Figs. 6.37–6.38, the same slope solved twice: pore pressures from XSLOPE's own FE seepage solution (`u='seep'`) and from the piezometric-line approximation. Bishop/Spencer 1.132 both ways vs Slide 1.141/1.142, D&W 1.138/1.141 — the two pore-pressure models agree with each other to 0.0006, as they do in Slide. |
-| 72 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | planned |  |
+| [72](#vp72) | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | **built** | [vp072a.xlsx](../files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](../files/rocscience/vp072b.xlsx) (piezo line). D&W (2005) Fig. 6.39/6.40 dam on a layered foundation (clay over sand): underseepage through the sand produces artesian uplift under the downstream shell (u 40% over hydrostatic at the toe in XSLOPE's FE solution). Tangent-to-el-197 criticals: FE Bishop 1.339 / Spencer 1.341 vs Slide 1.312 / 1.312 and D&W 1.37 (in-spread); piezo Bishop 1.572 / Spencer 1.563 vs Slide 1.563 / 1.557. The global-slough cases are documented but untagged — a heave singularity whose FS depends on the minimum surface size. |
 | [73](#vp73) | Excavated slope, (4) materials, tension crack | **built** | [vp073.xlsx](../files/rocscience/vp073.xlsx). The Bradwell reactor-1 excavation (Skempton & LaRochelle 1965): London Clay in six sublayers of depth-increasing undrained strength, cracked clay fill on top. Bishop 1.766 / Spencer 1.766 / Janbu corrected 1.733 vs Slide 1.762 / 1.758 / 1.736 — the closest agreement in the D&W group. |
 | [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
 | [75](#vp75) | Dyke, (4) materials | **built** | [vp075.xlsx](../files/rocscience/vp075.xlsx). The James Bay dyke (D&W Fig. 7.16): granular fill with a berm on crust / marine clay / lacustrine clay. Bishop 1.424 / Spencer 1.420 vs D&W 1.45, Slide 1.468 / 1.464. On Slide's own printed circle XSLOPE gives 1.438 — the rest of the gap is that the search finds a slightly deeper minimum than Slide's did. |
@@ -1052,6 +1054,24 @@ Case 1 runs XSLOPE's own FE seepage solver on the section (specified heads of 40
 *The two pore-pressure models land within 0.0006 of each other — the same near-identity Slide reports (1.141 vs 1.142). This is the corpus's end-to-end check on the seepage → limit-equilibrium handoff: XSLOPE's phreatic surface, computed from scratch, reproduces the one Duncan & Wright drew.*
 
 ![vp071a: inputs and representative solution](images/vp071a.png)
+
+### VP72: Dam on a layered foundation — underseepage and artesian uplift (D&W Fig. 6.39) {#vp72}
+
+Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam (3:1 shell faces, 90 ft high, narrow 0.5H:1V clay core) on a **layered foundation** — 30 ft of clay over 15 ft of much more permeable sand — with pond at el. 302 and tailwater at the downstream ground. Elevations, slopes and properties come from D&W's figure; x-coordinates from vertex extraction of Slide's Figure 72.1, self-consistent with D&W's slopes to 0.5 ft. The physics D&W built this example around: underseepage through the sand produces **upward flow beneath the downstream shell**, and a single piezometric line cannot represent it — their FS with FE pore pressures is 14–19% lower than with the piezo line. One modelling detail matters enormously: Slide's BC markers (zoomed) show *no-flow vertical edges* — the heads sit on the ground surface only, forcing all underseepage up through the clay. Giving the sand a fixed-head exit at the model edge guts the artesian pressures and reads ~13% high; XSLOPE's FE solution with the correct BCs shows u at the toe 40% above hydrostatic, and 65% at 5 ft depth.
+
+Pore pressures both ways, as in the manual: FE seepage (XSLOPE's own solver, tri3, converged in 29 iterations) and Slide's piezometric line (vertex-extracted from Figure 72.2; the pond/face point measures (385.8, 301.3) against the geometric (385, 302)). This dam is also [LEM sample problem 8](../lem/samples.md#8-earth-dam), built independently from the book: its piezometric line agrees with the Slide-figure trace within a few feet, and its downstream deep criticals (Bishop 1.561 / Spencer 1.558) sit within ~1% of Slide's tangent-197 values — though the corpus file follows Slide's slightly different crest and core-top dimensions (45-ft crest, core top el. 312) rather than the book's (50 ft, el. 307), since Slide's published numbers are the benchmark here.
+
+**Input files:** [vp072a.xlsx](../files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](../files/rocscience/vp072b.xlsx) (piezometric line)
+
+| Method | XSLOPE FE, tan. 197 | Slide FE | XSLOPE piezo, tan. 197 | Slide piezo |
+|---|---|---|---|---|
+| Bishop | 1.339 | 1.312 | 1.572 | 1.563 |
+| Spencer | 1.341 | 1.312 | 1.562 | 1.557 |
+| D&W reference | — | 1.37 | — | 1.57 |
+
+*The tagged benchmarks are the circles tangent to el. 197 (bottom of the foundation clay) — D&W's own reported case, well-posed and reproducible; XSLOPE's constrained-sweep criticals are stored in the input files. The piezo case agrees with Slide to 0.6%; the FE case (1.34) sits inside the D&W–Slide spread (1.31–1.37). The **global** critical (Slide FE 1.149 / piezo 1.306) is deliberately not tagged: it is a shallow toe slough driven by the artesian exit gradient, and its factor of safety depends on the minimum admissible surface size — XSLOPE reads 1.28 on a 40-ft-radius slough and 0.87 on a 4-ft sliver at the singular toe point, and Slide does not print its critical surface. The 0.87 is itself physically meaningful: the FE solution predicts local heave marginality at the toe, which is why D&W's global value (1.11) barely exceeds 1.*
+
+![vp072a: inputs and representative solution](images/vp072a.png)
 
 ### VP73: The Bradwell excavated slope (Skempton & LaRochelle 1965) {#vp73}
 

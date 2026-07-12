@@ -2010,7 +2010,34 @@ def get_material_polygons(slope_data, reinf_lines=None):
         # the constraint-line edges and silently produces an empty mesh.
         if reinf_lines:
             polygons = add_intersection_points_to_polygons(polygons, reinf_lines)
-    return add_dload_points_to_polygons(polygons, slope_data)
+    return add_dload_points_to_polygons(_clean_pinchouts(polygons), slope_data)
+
+
+def _clean_pinchouts(polygons):
+    """Repair self-touching material polygons produced by pinched-out layers.
+
+    A profile line drawn at zero thickness outside a zone's span (e.g. a dam
+    core's top line running along the foundation surface beyond the core) makes
+    build_polygons emit a bowtie ring: the real zone plus zero-width whiskers.
+    The LEM slicer never sees this (it interpolates profile lines per slice),
+    but gmsh refuses the ring outright ('Some NULL points exist in 2D mesh').
+    buffer(0) resolves the self-touches; the zone is the largest piece, and the
+    zero-area whiskers vanish. Valid polygons pass through untouched.
+    """
+    from shapely.geometry import Polygon, MultiPolygon
+    cleaned = []
+    for p in polygons:
+        poly = Polygon(p['coords'])
+        if poly.is_valid or poly.area <= 0:
+            cleaned.append(p)
+            continue
+        fixed = poly.buffer(0)
+        if isinstance(fixed, MultiPolygon):
+            fixed = max(fixed.geoms, key=lambda q: q.area)
+        q = dict(p)
+        q['coords'] = list(fixed.exterior.coords)
+        cleaned.append(q)
+    return cleaned
 
 
 def add_dload_points_to_polygons(polygons, slope_data):

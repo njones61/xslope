@@ -80,11 +80,7 @@ ACADS accepted band is FOS ≈ 1.26.
 
 Excel input file: [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx)
 
-![acads_weak_layer_inputs.png](../lem/images/acads_weak_layer_inputs.png){width=900}
-
-Critical non-circular surface (Spencer's method shown):
-
-![acads_weak_layer_solution.png](../lem/images/acads_weak_layer_solution.png){width=900}
+![xslope_acads_weak_layer: inputs and representative solution](images/xslope_acads_weak_layer.png)
 
 Results for the methods applicable to non-circular surfaces:
 

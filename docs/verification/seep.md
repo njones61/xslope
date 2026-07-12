@@ -103,6 +103,4 @@ The largest local head difference (~2 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in
 detail; the bulk flow field agrees to about 0.1 ft.
 
-![Johnson Reservoir](../seep/images/johnson_res.png)
-
-![Johnson Reservoir](../seep/images/johnson_res_solution.png)
+![Johnson Reservoir: inputs and SEEP2D cross-check solution](images/johnson_res.png)

@@ -44,6 +44,9 @@ OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification'
 # stored back); csearch/ncsearch = re-run the search; noncirc = the stored
 # non-circular surface; rapid = rapid drawdown on the stored circle / search.
 CASES = [
+    ('xslope_acads_simple', 'csearch', 'bishop', 'lem'),
+    ('xslope_arai_tagyo', 'csearch', 'bishop', 'lem'),
+    ('xslope_acads_weak_layer', 'ncsearch', 'spencer', 'lem'),
     ('vp002', 'csearch', 'bishop'),
     ('vp003', 'csearch', 'spencer'),
     ('vp004', 'csearch', 'spencer'),
@@ -140,8 +143,9 @@ def _solve_case(sd, kind, method):
     raise ValueError(kind)
 
 
-def make_figure(stem, kind, method, panel_size=(8.0, 5.0), dpi=150):
-    sd = load_slope_data(os.path.join(SRC, f'{stem}.xlsx'))
+def make_figure(stem, kind, method, src=None, panel_size=(8.0, 5.0), dpi=150):
+    base = SRC if src is None else os.path.join(os.path.dirname(__file__), '..', '..', 'docs', src, 'files')
+    sd = load_slope_data(os.path.join(base, f'{stem}.xlsx'))
     with contextlib.redirect_stdout(io.StringIO()):
         df, fs, results = _solve_case(sd, kind, method)
 
@@ -180,11 +184,13 @@ def make_figure(stem, kind, method, panel_size=(8.0, 5.0), dpi=150):
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     only = set(sys.argv[1:])
-    for stem, kind, method in CASES:
+    for case in CASES:
+        stem, kind, method = case[:3]
+        src = case[3] if len(case) > 3 else None
         if only and stem not in only:
             continue
         try:
-            out = make_figure(stem, kind, method)
+            out = make_figure(stem, kind, method, src=src)
             print('ok ', stem)
         except Exception as e:
             print('FAIL', stem, ':', repr(e)[:100])

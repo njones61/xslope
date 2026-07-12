@@ -208,11 +208,7 @@ is FOS ≈ 1.00, making percent differences easy to read.
 
 Excel input file: [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx)
 
-![acads_simple_inputs.png](../lem/images/acads_simple_inputs.png){width=900}
-
-Critical circle from the automated search (Spencer's method shown):
-
-![acads_simple_solution.png](../lem/images/acads_simple_solution.png){width=900}
+![xslope_acads_simple: inputs and representative solution](images/xslope_acads_simple.png)
 
 XSLOPE results for all six methods (automated critical-circle search, 50
 slices, each method searched independently):
@@ -375,11 +371,7 @@ c = 41.65 kPa, φ = 15.0°, γ = 18.82 kN/m³ (total stress). Published FOS ≈ 
 
 Excel input file: [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)
 
-![arai_tagyo_inputs.png](../lem/images/arai_tagyo_inputs.png){width=900}
-
-Critical circle (Spencer's method shown):
-
-![arai_tagyo_solution.png](../lem/images/arai_tagyo_solution.png){width=900}
+![xslope_arai_tagyo: inputs and representative solution](images/xslope_arai_tagyo.png)
 
 Results for all six methods (automated critical-circle search, 50 slices):
 

@@ -46,6 +46,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
 <!-- test: file=../files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
 <!-- test: file=../files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
+<!-- test: file=../files/rocscience/vp061a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.466, benchmark=VP61-pow -->
+<!-- test: file=../files/rocscience/vp061b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.367, benchmark=VP61-mc -->
 <!-- test: file=../files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
 <!-- test: file=../files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
 <!-- test: file=../files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
@@ -132,7 +134,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 58 | Retaining wall, (8) materials, water table, grouted tieback | planned |  |
 | 59 | Retaining wall, homogenous, water table, grouted tieback | planned |  |
 | 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
-| 61 | Slope, homogenous, composite surfaces | planned |  |
+| [61](#vp61) | Slope, homogenous, composite surfaces | **built** | [vp061a.xlsx](../files/rocscience/vp061a.xlsx) (power), [vp061b.xlsx](../files/rocscience/vp061b.xlsx) (M-C). Baker (2003) ex. 3 (London clay) on the #44 geometry: Spencer power 1.466 vs Slide 1.468 / Baker 1.48; MC 1.367 vs Slide 1.366 / Baker 1.35. |
 | [62](#vp62) | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](../files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](../files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
 | 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (paper now in `ref_docs_lim_eq/`). Outline fully pinned from the paper's Fig. 9 (bench el 20 to x=20, 2:1 to (60,40), 8 m bench, 2.5:1 to (105.5,55), crest to 150); interfaces are 22:1 but their face anchors are not dimensioned and FS=1.0-calibration attempts with plausible anchors give 1.17-1.21 — the paper's Fig. 10 profile also appears inconsistent with Fig. 9's mesh. Needs a closer read of the paper (or the SLOPE/W .gsz) before building. |
 | 64 | Embankment, (4) materials, water table, tension crack | planned |  |
@@ -725,6 +727,23 @@ Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 ![vp054a: inputs and representative solution](images/vp054a.png)
 
 ![vp054b: inputs and representative solution](images/vp054b.png)
+
+### VP61: London clay, linear vs non-linear envelope (Baker ex. 3) {#vp61}
+
+Slide #61 / Baker (2003) example problem 3: the same 43°, H = 6 m slope as [#44](#vp44), with strength functions fitted to Perry's CD triaxial data on London clay — (a) power curve τ = 3.39344·(σ′+0.152)^0.6 (Baker A = 0.535, n = 0.60, T = 0.0015) and (b) the fitted Mohr-Coulomb envelope c′ = 6.0 kPa, φ′ = 32°. Unlike the compacted-clay data of #44, this data set includes measurements at very low normal stress, so the two envelopes give similar factors of safety.
+
+**Input files:** [vp061a.xlsx](../files/rocscience/vp061a.xlsx), [vp061b.xlsx](../files/rocscience/vp061b.xlsx)
+
+| Case | Method | XSLOPE | Published |
+|---|---|---|---|
+| (a) power curve | Spencer | 1.466 | Slide 1.468; Baker 1.48 |
+| (b) Mohr-Coulomb | Spencer | 1.367 | Slide 1.366; Baker 1.35 |
+
+*Slide's Janbu rows (1.348/1.291) are simplified/uncorrected, as in [#44](#vp44)/[#45](#vp45).*
+
+![vp061a: inputs and representative solution](images/vp061a.png)
+
+![vp061b: inputs and representative solution](images/vp061b.png)
 
 ### VP62: Slope, homogenous, ru pore pressure, seismic {#vp62}
 

@@ -1534,7 +1534,31 @@ def vp081():
     return 'vp081.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp061a():
+    """Slide #61, power-curve case / Baker (2003) ex. 3: London clay
+    tau = 3.39344*(sigma'+0.152)^0.6 (Baker A=0.535, n=0.6, T=0.0015) on
+    the same 43-deg, H=6 slope as #44. Slide: Janbu simplified 1.348,
+    Spencer 1.468; Baker's non-linear solution 1.48 (sigma_max 21.4)."""
+    sd = _baker1_slope_data()
+    sd['materials'][0].update(name='London clay (power)', c=0.0, phi=0.0,
+                              gamma=18.0, option='pow', pow_a=3.39344,
+                              pow_b=0.6, pow_c=0.0, pow_d=0.152, u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp061a.xlsx'))
+    return 'vp061a.xlsx'
+
+
+def vp061b():
+    """Slide #61, Mohr-Coulomb case: the fitted M-C envelope c'=6.0,
+    phi'=32 (Baker's London-clay fit). Slide: Janbu simplified 1.291,
+    Spencer 1.366; Baker 1.35 (sigma_max 27.5)."""
+    sd = _baker1_slope_data()
+    sd['materials'][0].update(name='London clay (MC)', c=6.0, phi=32.0,
+                              gamma=18.0, option='mc', u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp061b.xlsx'))
+    return 'vp061b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

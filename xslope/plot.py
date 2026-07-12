@@ -931,8 +931,11 @@ def plot_dloads(ax, slope_data, style=None):
             max_dload = max(max_dload, max(pt['Normal'] for pt in line))
 
         arrow_height = max_dload / gamma_w
-        head_length = arrow_height / 12
-        head_width = head_length * 0.8
+        # Head size: nominally proportional to the arrow height, but capped by
+        # the arrow spacing so the heads of tall arrows (deep ponded water)
+        # cannot grow into each other and merge into a solid band.
+        head_length = min(arrow_height / 12, 1.5 * arrow_spacing)
+        head_width = min(0.8 * head_length, 0.75 * arrow_spacing)
         
         # Find the maximum load value for scaling
         max_load = 0

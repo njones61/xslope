@@ -25,7 +25,9 @@ suite (`run_tests.py`).
 | [FE Seepage](seep.md) | Confined/unconfined flow benchmarks and analytical anchors |
 | [FE Slope Stability (SSRM)](ssrm.md) | Strength-reduction benchmarks |
 | [Rocscience Slide2 Corpus](rocscience.md) | The 111-problem Slide2 verification manual, problem by problem |
+| [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual — *stub, planned* |
 | [GeoStudio (SLOPE/W) Corpus](geostudio.md) | The 47-problem SLOPE/W verification manual, cross-referenced |
+| [PLAXIS LE (SVSLOPE) Corpus](plaxis_le.md) | The ~105-problem SVSLOPE verification manual (third-source cross-bearing) — *stub, planned* |
 
 ---
 

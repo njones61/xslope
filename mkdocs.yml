@@ -75,7 +75,9 @@ nav:
     - FE Seepage: verification/seep.md
     - FE Slope Stability (SSRM): verification/ssrm.md
     - Rocscience Slide2 Corpus: verification/rocscience.md
+    - Rocscience Groundwater Corpus: verification/rocscience_groundwater.md
     - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
+    - PLAXIS LE (SVSLOPE) Corpus: verification/plaxis_le.md
   - API:
     - Advanced: api/advanced.md
     - FEM: api/fem.md

@@ -1558,7 +1558,51 @@ def vp061b():
     return 'vp061b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp025():
+    """Slide #25 / Chen & Shao (1988): Prandtl's weightless bearing-capacity
+    mechanism on a 60-deg, 10-m slope (c=49 kPa, phi=0, gamma=1e-6), strip
+    load q=149.31 kPa over 10 m on the crest. Surface = active 45-deg wedge
+    from the load's right edge, circular fan centered on the load's left
+    edge (R=7.071, tangent to both straight segments), exit through the
+    face at Slide's printed (0.773, 1.340). Theoretical FS=1.0; Slide
+    Spencer 1.051 (Chen & Shao 1.05); their M-P 1.009 uses a custom f(x)."""
+    import numpy as np
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='weightless clay', c=49.0, phi=0.0, gamma=1e-6, option='mc', u='none')
+    sd['materials'] = [m]
+    xc = 10.0 / np.tan(np.radians(60.0))   # crest edge x = 5.7735
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-3.0, 0.0), (0.0, 0.0), (xc, 10.0), (20.0, 10.0)]},
+    ]
+    sd['max_depth'] = -2.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = [[
+        {'X': xc, 'Y': 10.0, 'Normal': 149.31},
+        {'X': xc + 10.0, 'Y': 10.0, 'Normal': 149.31},
+    ]]
+    sd['circular'] = False
+    sd['circles'] = []
+    # Prandtl surface: exit point (printed), tangent line to the fan arc,
+    # arc to the apex (10.774, 5), 45-deg line to the load's right edge
+    C = np.array([xc, 10.0]); R = 10.0 / np.sqrt(2.0)
+    P = np.array([0.773, 1.340])
+    d = C - P; L2 = d @ d; t2 = L2 - R * R
+    # lower tangent point from external point P
+    a = t2 / L2; b = R * np.sqrt(t2) / L2
+    T1 = P + a * d + b * np.array([d[1], -d[0]])
+    ang1 = np.arctan2(*(T1 - C)[::-1])
+    ang2 = np.arctan2(-5.0, 5.0)   # apex (xc+5, 5)
+    pts = [(-0.05, 2.05), tuple(P)]
+    for t in np.linspace(ang1, ang2, 13):
+        pts.append((C[0] + R * np.cos(t), C[1] + R * np.sin(t)))
+    pts += [(xc + 10.0, 10.0), (xc + 10.3, 10.3)]
+    sd['non_circ'] = [{'X': round(x, 4), 'Y': round(y, 4), 'Movement': 'Free'} for x, y in pts]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp025.xlsx'))
+    return 'vp025.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp078, vp079, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

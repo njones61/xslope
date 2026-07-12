@@ -29,6 +29,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
 <!-- test: file=../files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
+<!-- test: file=../files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
@@ -98,7 +99,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 22 | Slope, (2) materials, weak layer, ru pore pressure | planned |  |
 | [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
 | [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
-| 25 | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | planned | Chen & Shao (1988) / Prandtl 60° weightless slope (qc=149.31 kN/m over 10 m; theoretical FS 1.0; Slide Spencer 1.051, SLOPE/W 1.036). Buildable — the mechanism's ends are at different elevations, so the flat-arc guard (which blocks #26) does not apply; needs the theoretical surface construction. |
+| [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope, surface constructed analytically (45° wedge + tangent fan arc, Slide's printed exit point): Spencer 1.052 vs Slide 1.051 / Chen & Shao 1.05 (theory 1.0). |
 | 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | blocked | Prandtl bearing-capacity mechanism (weightless φ=0 soil, surface load, theoretical FS=1.0; Slide Spencer 0.940). XSLOPE's surface-validity checks reject failure surfaces whose two ends sit at equal elevation (the 'flat arc' guard) — flat-ground bearing mechanisms cannot currently be evaluated. Feature gap noted for a relaxed guard when driving comes from loads. |
 | 27 | Slope, (2) materials, tension crack, water table (auto Hu) | planned |  |
 | 28 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | planned |  |
@@ -528,6 +529,19 @@ Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular search. Slid
 | Bishop | 1.433 | Slide 1.439; Low 1.44 |
 
 ![vp024: inputs and representative solution](images/vp024.png)
+
+### VP25: Prandtl bearing mechanism on a 60° slope (Chen & Shao 1988) {#vp25}
+
+Slide #25 / Chen & Shao (1988): the classical plasticity problem — a weightless, frictionless 10-m slope at 60° (c = 49 kPa, γ = 10⁻⁶) loaded by the critical strip load q = 149.31 kPa over 10 m of crest, evaluated on the Prandtl slip surface (theoretical FS = 1.0). The surface is built analytically: a 45° active wedge from the load's right edge, a circular fan of radius 10/√2 centered on the load's left edge (tangent to both straight segments), and an exit through the face at Slide's printed endpoint (0.773, 1.340).
+
+**Input files:** [vp025.xlsx](../files/rocscience/vp025.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 1.052 | Slide 1.051; Chen & Shao 1.05; theory 1.0 |
+| Morgenstern-Price (half-sine) | 1.069 | Slide GLE 1.009 *(custom interslice function fit to the theoretical distribution)* |
+
+![vp025: inputs and representative solution](images/vp025.png)
 
 ### VP36: Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index {#vp36}
 

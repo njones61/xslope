@@ -1886,7 +1886,23 @@ def vp070b():
     return 'vp070b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp067, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
+def vp066():
+    """Slide #66 / USACE EM 1110-2-1902 Figure 4-3: the #64/#65 dam with the
+    chart-check property set (single unit weights): embankment c=200 psf
+    phi=25 gamma=115; sand 0/35/130; clay 0/27/115; rock 0/45/160. Pool at
+    el 20, printed circle center (-135, 169), R=169 (tangent to el 0).
+    USACE 2.30; Slide Bishop 2.307 / Spencer 2.307 / Janbu corr 2.290."""
+    sd = vp065.__wrapped__() if hasattr(vp065, '__wrapped__') else None
+    sd = load_slope_data(os.path.join(OUT, 'vp065.xlsx'))
+    props = [(200.0, 25.0, 115.0), (0.0, 35.0, 130.0), (0.0, 27.0, 115.0), (0.0, 45.0, 160.0)]
+    for m, (c, phi, gamma) in zip(sd['materials'], props):
+        m.update(c=c, phi=phi, gamma=gamma, gamma_sat=gamma)
+    sd['circles'] = [{'Xo': -135.0, 'Yo': 169.0, 'Depth': 0.0, 'R': 169.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp066.xlsx'))
+    return 'vp066.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp023, vp024, vp025, vp027, vp036, vp041, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp070a, vp070b, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp054a, vp054b, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

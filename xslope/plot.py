@@ -1073,8 +1073,12 @@ def plot_circles(ax, slope_data, style=None):
         ax.plot(x_clip, y_clip, color=c_color, linestyle=c_ls, linewidth=c_lw,
                 label="Circle", gid='CIRCLES')
 
-        # Center marker
-        ax.plot(Xo, Yo, marker='+', color=c_color, linestyle='None', markersize=10, gid='CIRCLES')
+        # Center marker — annotation layer (add_artist), not data: a center far
+        # above the section must not inflate the autoscaled view. It still
+        # draws whenever the equal-aspect view reaches it, and clips otherwise.
+        center_marker = Line2D([Xo], [Yo], marker='+', color=c_color,
+                               linestyle='None', markersize=10, gid='CIRCLES')
+        ax.add_artist(center_marker)
 
         # Arrow direction: point from center to midpoint of failure surface
         mid_idx = len(x_clip) // 2
@@ -1091,7 +1095,7 @@ def plot_circles(ax, slope_data, style=None):
             dy /= length
 
         # Draw arrow with pixel-based head size
-        ax.annotate('',
+        ann = ax.annotate('',
                     xy=(Xo + dx * R, Yo + dy * R),  # arrow tip
                     xytext=(Xo, Yo),                 # arrow start
                     arrowprops=dict(
@@ -1100,6 +1104,9 @@ def plot_circles(ax, slope_data, style=None):
                         lw=1.0,            # shaft width in points
                         mutation_scale=20  # head size in points
                     ))
+        # Annotations default to clip_on=False; with the center allowed outside
+        # the view, the shaft must stop at the axes edge.
+        ann.arrow_patch.set_clip_box(ax.bbox)
 
 def plot_non_circ(ax, non_circ, style=None):
     """

@@ -44,6 +44,11 @@ lockable rather than tuned to match.
 <!-- test: file=../files/rocscience/vp044c.xlsx, type=fem_ssrm, expected_fs=0.966, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.6, f_max=1.4, max_iter=4000, benchmark=RS2-31b -->
 <!-- test: file=../files/rocscience/vp056.xlsx, type=fem_ssrm, expected_fs=1.247, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=4000, benchmark=RS2-33 -->
 <!-- test: file=../files/rocscience/vp061b.xlsx, type=fem_ssrm, expected_fs=1.369, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=1.9, max_iter=4000, benchmark=RS2-34 -->
+<!-- test: file=../files/rocscience/vp071a.xlsx, type=fem_ssrm, expected_fs=1.118, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=4000, benchmark=RS2-36a -->
+<!-- test: file=../files/rocscience/vp071b.xlsx, type=fem_ssrm, expected_fs=1.118, element_type=tri6, target_size=4.4, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=4000, benchmark=RS2-36b -->
+<!-- test: file=../files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.491, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=4000, benchmark=RS2-40 -->
+<!-- test: file=../files/rocscience/vp075.xlsx, type=fem_ssrm, expected_fs=1.249, element_type=tri6, target_size=1.85, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=4000, benchmark=RS2-42 -->
+<!-- test: file=../files/rocscience/vp082.xlsx, type=fem_ssrm, expected_fs=1.511, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=2.1, max_iter=4000, benchmark=RS2-44 -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -98,13 +103,13 @@ cross-bearings.
 | # | Problem | Slide2 counterpart |
 |---|---|---|
 | 35 | Submerged slope | VP64 family |
-| 36 | Seepage analysis, homogeneous slope | VP70 |
-| 37 | Seepage analysis, embankment with layered foundation | **VP72** |
+| 36 | Seepage analysis, homogeneous slope (D&W Fig 6.37; = Slide2 VP71, not VP70) — **built**, both cases: SSRM 1.118 on the FE-seepage model and 1.118 on the piezo approximation vs RS2 SSR 1.12 / 1.12; referee 1.138/1.141; XSLOPE LEM locks 1.132 (on [vp071a](../files/rocscience/vp071a.xlsx)/[b](../files/rocscience/vp071b.xlsx); the seep case runs on tri6 sidecars) | VP71 |
+| 37 | Embankment with layered foundation (D&W Fig 6.39) — reported, no lock: RS2's SSR is the artesian downstream-toe slide, quoted as 0.95 in its table and 1.1 in its own convergence graph; XSLOPE's SSRM finds the deep mechanism at 1.31 (LEM on the tangent circle 1.339, Slide2 1.15/1.16, referee 1.11). Reproducing the toe mechanism needs toe-refined meshing — noted with the artesian-toe discussion in the Slide2 VP72 section | VP72 |
 | 38 | Cohesionless embankment on saturated clay foundation | VP73/VP74 family |
 | 39, 41, 43 | Earth embankment, infinite-slope mechanism (I–III) | VP69 family |
-| 40 | Seepage analysis, dam with impermeable foundation | **VP77** |
-| 42 | Planned cross-section of James dike | **VP75** |
-| 44 | Seepage analysis for an earth embankment | VP76 |
+| 40 | Dam with impermeable foundation (D&W Fig 7.24) — **built** (piezo case): SSRM 1.491 vs RS2 SSR 1.53; the FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core (the documented tri3/tri6 trade) (on [vp077b.xlsx](../files/rocscience/vp077b.xlsx)) | VP77 |
+| 42 | James dike — **built**: SSRM 1.249 vs RS2 SSR 1.26 (−0.9%); Slide2 noncircular LEM 1.11–1.16, referee 1.17 (on [vp075.xlsx](../files/rocscience/vp075.xlsx)) | VP75 |
+| 44 | Seepage analysis for an earth embankment (D&W Fig 14.20-a; = Slide2 VP82, not VP76 — §39's body carries VP76) — **built**: SSRM 1.511 vs RS2 SSR 1.51 (+0.1%); Slide2 LEM 1.532/1.541, referee 1.528–1.542 (on [vp082.xlsx](../files/rocscience/vp082.xlsx)) | VP82 |
 | 45–46 | Varying undrained shear strength profiles (I, II) | VP83/VP84 |
 | 47 | Purely cohesive slope with varying thickness | VP78 family |
 | 48–54 | Multi-tiered walls (tiers, fill, length, type, foundation, seepage, surcharge) | VP85–VP94 |

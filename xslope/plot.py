@@ -1636,6 +1636,10 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
         _, dy0, _, dy1 = domain.bounds
         y_vals.extend([dy0, dy1])
 
+    # 2c) line-load arrows extend above the ground at their application points;
+    # their tails (and the label riding on them) must stay inside the view
+    y_vals.extend(y for _, y in _line_load_tails(data))
+
     if not y_vals:
         return 0.0, 1.0
 
@@ -1708,6 +1712,30 @@ def plot_reinforcement_lines(ax, slope_data, style=None):
                 tension_points_plotted = True
 
 
+def _line_load_tails(slope_data):
+    """Arrow-tail points for the line-load glyphs: the head sits on the point
+    of application, the tail 6% of the model span opposite the force
+    direction. Both plot_line_loads (drawing) and compute_ylim (view limits)
+    use these, so the arrow and its label are always inside the axes."""
+    import numpy as np
+    loads = slope_data.get('line_loads') or []
+    if not loads:
+        return []
+    gs = slope_data.get('ground_surface')
+    if gs is not None and not gs.is_empty:
+        xs = [p[0] for p in gs.coords]
+        span = max(xs) - min(xs)
+    else:
+        span = 100.0
+    alen = 0.06 * span
+    tails = []
+    for ll in loads:
+        ang = np.radians(ll.get('angle', -90.0))
+        tails.append((ll['x'] - np.cos(ang) * alen,
+                      ll['y'] - np.sin(ang) * alen))
+    return tails
+
+
 def plot_line_loads(ax, slope_data, style=None):
     """
     Plots line loads (v12 'lloads') as arrows at their points of application on
@@ -1719,33 +1747,22 @@ def plot_line_loads(ax, slope_data, style=None):
         slope_data: Dictionary containing slope data with 'line_loads' key
         style: optional style sheet (see xslope.style); None -> defaults.
     """
-    import numpy as np
     loads = slope_data.get('line_loads') or []
     if not loads:
         return
+    tails = _line_load_tails(slope_data)
 
-    # Arrow length scaled to the model size, not the load magnitude (a single
-    # concentrated force; magnitude shown as an annotation).
-    gs = slope_data.get('ground_surface')
-    if gs is not None and not gs.is_empty:
-        xs = [p[0] for p in gs.coords]
-        span = max(xs) - min(xs)
-    else:
-        span = 100.0
-    alen = 0.06 * span
-
-    for i, ll in enumerate(loads):
-        ang = np.radians(ll.get('angle', -90.0))
-        dxa = np.cos(ang) * alen
-        dya = np.sin(ang) * alen
+    for i, (ll, (tx, ty)) in enumerate(zip(loads, tails)):
         # tail offset opposite the force direction so the head lands on the point
-        ax.annotate('', xy=(ll['x'], ll['y']),
-                    xytext=(ll['x'] - dxa, ll['y'] - dya),
+        ax.annotate('', xy=(ll['x'], ll['y']), xytext=(tx, ty),
                     arrowprops=dict(arrowstyle='-|>', color='purple', lw=2),
                     annotation_clip=False)
-        ax.annotate(f"L={ll['P']:.0f}", (ll['x'] - dxa, ll['y'] - dya),
+        ax.annotate(f"L={ll['P']:.0f}", (tx, ty),
                     textcoords="offset points", xytext=(4, 4),
                     fontsize=8, color='purple', fontweight='bold')
+        # annotations don't autoscale: an invisible data point at the tail
+        # makes the axes grow to keep the arrow (and its label) in view
+        ax.plot([tx], [ty], linestyle='None')
         if i == 0:
             ax.plot([], [], color='purple', lw=2, label='Line Load')
 

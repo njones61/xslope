@@ -18,6 +18,10 @@ honest rather than tight.
 <!-- test: file=../files/rocscience/vp004.xlsx, type=fem_ssrm, expected_fs=0.948, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=4000, benchmark=RS2-3 -->
 <!-- test: file=../files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.909, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=4000, benchmark=RS2-4 -->
 <!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=fem_ssrm, expected_fs=1.286, element_type=tri6, target_size=2.0, tolerance=0.01, f_min=0.9, f_max=1.6, max_iter=4000, benchmark=RS2-5 -->
+<!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=fem_ssrm, expected_fs=1.427, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.2, f_max=1.7, max_iter=4000, benchmark=RS2-10 -->
+<!-- test: file=../files/rocscience/vp015.xlsx, type=fem_ssrm, expected_fs=0.413, element_type=tri6, target_size=1.9, tolerance=0.02, f_min=0.25, f_max=0.65, max_iter=4000, benchmark=RS2-11 -->
+<!-- test: file=../files/rocscience/vp016.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.9, f_max=1.45, max_iter=4000, benchmark=RS2-12 -->
+<!-- test: file=../files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.384, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=4000, benchmark=RS2-13 -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -41,11 +45,11 @@ cross-bearings.
 | 7 | Pore pressure by digitized total head grid | VP11 family |
 | 8 | Slope stability with a pore pressure grid | VP12 family |
 | 9 | Pore pressure grid with two limit sets | VP13 family |
-| 10 | Simple slope stability assessment II | VP14 (Arai & Tagyo 1) |
-| 11 | Layered slope stability assessment | VP15 |
-| 12 | Simple slope with water table | VP16 |
-| 13 | Simple slope III | VP17 |
-| 14 | Simple slope, pore pressure by r<sub>u</sub> | VP21 |
+| 10 | Simple slope II (Arai & Tagyo ex. 1) — **built**: SSRM 1.43 vs RS2 SSR 1.40 (+2%), mesh-converged (1.428→1.434 over a 2.9× size change); LEM locks Bishop 1.404 / Spencer 1.401 vs Slide2 1.409 / 1.406 (on [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)) | VP14 (Arai & Tagyo 1) |
+| 11 | Layered slope (Arai & Tagyo ex. 2) — **built**: SSRM 0.41 vs RS2 SSR 0.39 and Greco/Kim pattern-search 0.39–0.43; LEM locks 0.419–0.422 (on [vp015.xlsx](../files/rocscience/vp015.xlsx)) | VP15 |
+| 12 | Simple slope + water table (Arai & Tagyo ex. 3) — **built** (caveat): SSRM 1.17 vs RS2 SSR 1.09 (+7%). RS2 computes u as γw × *vertical* distance to the water table; XSLOPE's FEM piezo uses closest-point projection, which reads lower u under a sloping table — under investigation as a general FEM piezo question. LEM locks 1.112/1.113 (on [vp016.xlsx](../files/rocscience/vp016.xlsx)) | VP16 |
+| 13 | Simple slope III (Yamagami & Ueta) — **built**: SSRM 1.38 vs RS2 SSR 1.33 and Greco Spencer 1.33; LEM locks Bishop 1.342 / Spencer 1.340 vs Y&U 1.348 / 1.339 (on [vp017.xlsx](../files/rocscience/vp017.xlsx)) | VP17 |
+| 14 | Simple slope, pore pressure by r<sub>u</sub> — *blocked*: RS2 SSR 0.98 vs Slide2 Spencer 1.01 / Baker 1.02; XSLOPE's FEM has no r<sub>u</sub> pore-pressure option (the LEM does — vp018.xlsx locks Spencer 1.033). This problem is Slide2 VP18, not VP21 | VP18 |
 | 15 | Layered slope II | VP19/VP20 family |
 | 16 | Layered slope and water table with weak seam | VP20 |
 | 17 | Slope with three pore pressure conditions | VP21 family |

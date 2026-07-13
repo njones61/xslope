@@ -22,11 +22,40 @@ import warnings
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+from xslope.fileio import load_slope_data  # noqa: E402
+from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
+
+
+def save_slope_data_to_xlsx(slope_data, path):
+    """Write an input file, defaulting the SSR elastic constants on any material
+    that does not carry its own.
+
+    The corpus files are LEM-first, so most builders never mention E/nu/psi — but
+    the FEM refuses to run without E > 0, and the SSR factor is insensitive to the
+    elastic constants anyway. Filling them here keeps the builders the single
+    source of truth: they used to be patched straight into the .xlsx after the
+    fact, so a plain rebuild silently wiped them and broke the SSRM tags.
+
+    The Griffiths convention is E = 10^5 kPa, nu = 0.3; gamma_water picks the unit
+    system, so imperial problems get the psf equivalent. A material that sets E
+    explicitly (e.g. the Pruska cases, which publish theirs) is left alone. psi is
+    deliberately untouched: it doubles as the modified-envelope angle for the 'cp'
+    strength option, and fileio already reads a blank cell as zero.
+    """
+    imperial = float(slope_data.get('gamma_water', 9.81) or 9.81) > 30.0
+    e_default = 2.0e6 if imperial else 1.0e5
+    for m in slope_data.get('materials', []):
+        e = m.get('E')
+        if e is None or not e or (isinstance(e, float) and math.isnan(e)):
+            m['E'] = e_default
+        nu = m.get('nu')
+        if nu is None or not nu or (isinstance(nu, float) and math.isnan(nu)):
+            m['nu'] = 0.3
+    return _write_xlsx(slope_data, path)
 
 
 def vp002():
@@ -98,7 +127,12 @@ def vp005():
     GLE 1.948, Janbu corrected 1.949; Giam reference 1.95. The minimum is a
     shallow slide parallel to the (steeper) upstream face."""
     sd = _talbingo_slope_data()
-    sd['circles'] = [{'Xo': 100.0, 'Yo': 290.0, 'Depth': 12.0, 'R': 278.0}]
+    # ACADS 2(a) asks for the CRITICAL circle, not a specified one: this is the
+    # shallow face-parallel minimum recovered by a circular search and locked at
+    # Bishop 1.955. (Do not "simplify" this to the round Xc=100, Yc=290, R=278 —
+    # that is 2(b)'s specified circle, which belongs to vp006 and reads 2.208.)
+    sd['circles'] = [{'Xo': -70.6372664912, 'Yo': 525.7912504813,
+                      'Depth': 23.7912504813, 'R': 502.0}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp005.xlsx'))
     return 'vp005.xlsx'
 
@@ -204,6 +238,18 @@ def vp009():
         [{'X': 23.0, 'Y': 27.75, 'Normal': 20.0}, {'X': 43.0, 'Y': 27.75, 'Normal': 20.0}],
         [{'X': 70.0, 'Y': 40.0, 'Normal': 20.0}, {'X': 80.0, 'Y': 40.0, 'Normal': 40.0}],
     ]
+    # The search seed matters here — this is a search-difficulty benchmark, and
+    # the non-circular result depends on where it starts. This seed drops into
+    # the inclined seam and converges to Spencer 0.724 / Janbu 0.718, mid-band
+    # against a published 0.68-0.81. Do not inherit the template's seed: it
+    # misses the seam and the search settles near 1.47, off the band entirely.
+    sd['non_circ'] = [
+        {'X': 42.5, 'Y': 27.75, 'Movement': 'Free'},
+        {'X': 46.0, 'Y': 25.86, 'Movement': 'Horiz'},
+        {'X': 72.0, 'Y': 33.14, 'Movement': 'Horiz'},
+        {'X': 80.4, 'Y': 40.0, 'Movement': 'Free'},
+    ]
+    sd['circular'] = False
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp009.xlsx'))
     return 'vp009.xlsx'
 
@@ -416,7 +462,7 @@ def vp018():
     sd = load_slope_data(ACADS_1A)
     m = sd['materials'][0]
     m.update(name='Spencer 1969 soil', c=10.8, phi=40.0, gamma=18.0,
-             option='mc', u='ru', ru=0.5)
+             option='mc', u='ru', ru=0.5, E=1e5, nu=0.3, psi=0.0)
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(0.0, 40.0), (10.0, 40.0), (70.0, 10.0), (80.0, 10.0)]},
     ]
@@ -575,7 +621,8 @@ def vp020():
     sd['materials'] = []
     for name, c, phi, gamma in props:
         m = dict(base_mat)
-        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo')
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo',
+                 E=1e5, nu=0.3, psi=0.0)
         sd['materials'].append(m)
     zones = [
         (0, [(100,40),(145,70),(240,70),(240,55),(190,55)]),
@@ -3071,26 +3118,38 @@ def vp026():
     return 'vp026.xlsx'
 
 
-def vp027():
+def _vp027_slope_data(zero_strength_cap=True):
     """Slide #27 / XSTABL v5 manual (Sharma 1996) via Malkawi et al. (2001):
     two-material slope over undulating bedrock (polygon-mode bottom), zero-
     strength cap layer, water table, soil 1 with distinct moist/saturated
     unit weights (116.4/124.2 pcf). Specified circle (59.52, 219.21,
     R=157.68): Slide Bishop 1.396 / Spencer 1.402; XSTABL 1.397 / 1.403.
-    NOTE: Slide and XSTABL apply the phreatic-inclination (Hu) correction
-    (u reduced by cos^2 of the phreatic slope); xslope uses the static
-    vertical head, so its pore pressures are slightly higher. The water
+    Slide and XSTABL apply the phreatic-inclination (Hu) correction (u reduced
+    by cos^2 of the local phreatic slope), so the piezo line is declared
+    Type='phreatic' — xslope applies it in the LEM and the FEM alike. The water
     table was pixel-traced from the labeled figure (ground-coincident to
-    x=63, then departing below the ground line)."""
+    x=63, then departing below the ground line).
+
+    zero_strength_cap=False gives the crest cap Soil 1's strength, for the SSRM
+    variant: a c=0, phi=0 Mohr-Coulomb region has a NULL yield surface, so
+    dividing its strength by any reduction factor leaves it at zero and it can
+    never carry deviatoric stress. That is a limit-equilibrium idealization
+    (the cap is dead weight riding above the failure surface) with no continuum
+    equivalent — as built, the SSRM correctly reports no equilibrium at any F.
+    """
     from shapely.geometry import Polygon
     from xslope.fileio import build_ground_surface_from_polygons
     sd = load_slope_data(LEVEE_POLY)
     base = dict(sd['materials'][0])
     m1 = dict(base); m2 = dict(base)
     m1.update(name='Soil 1', c=500.0, phi=14.0, gamma=116.4, gamma_sat=124.2,
-              option='mc', u='piezo')
-    m2.update(name='Soil 2 (zero strength)', c=0.0, phi=0.0, gamma=116.4,
-              gamma_sat=116.4, option='mc', u='piezo')
+              option='mc', u='piezo', E=2.0e6, nu=0.3, psi=0.0)
+    if zero_strength_cap:
+        m2.update(name='Soil 2 (zero strength)', c=0.0, phi=0.0)
+    else:
+        m2.update(name='Soil 2 (cap, Soil 1 strength)', c=500.0, phi=14.0)
+    m2.update(gamma=116.4, gamma_sat=116.4, option='mc', u='piezo',
+              E=2.0e6, nu=0.3, psi=0.0)
     sd['materials'] = [m1, m2]
     bedrock = [(0.0, 15.0), (29.0, 24.0), (51.0, 26.0), (78.0, 56.0),
                (94.0, 65.0), (113.0, 64.0), (133.0, 56.0), (161.0, 58.0),
@@ -3116,8 +3175,24 @@ def vp027():
     sd['circular'] = True
     sd['circles'] = [{'Xo': 59.52, 'Yo': 219.21, 'Depth': 219.21 - 157.68, 'R': 157.68}]
     sd['non_circ'] = []
+    return sd
+
+
+def vp027():
+    """Slide #27 as published — zero-strength cap. LEM only (see
+    _vp027_slope_data)."""
+    sd = _vp027_slope_data(zero_strength_cap=True)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp027.xlsx'))
     return 'vp027.xlsx'
+
+
+def vp027_fem():
+    """SSRM variant of Slide #27 (= RS2 #22, published SSR 1.52): the crest cap
+    carries Soil 1's strength so the continuum is posable. Everything else —
+    undulating bedrock, phreatic (Hu) water table, unit weights — is unchanged."""
+    sd = _vp027_slope_data(zero_strength_cap=False)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp027_fem.xlsx'))
+    return 'vp027_fem.xlsx'
 
 
 def _dw145_slope_data():
@@ -4014,7 +4089,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp029, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

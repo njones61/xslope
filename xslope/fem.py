@@ -447,6 +447,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     
     # Process pore pressures
     u = np.zeros(n_nodes)
+    sigma_v = None          # nodal vertical soil stress (ru option only)
     piezo_line_coords = None
 
     if pp_option == "piezo":
@@ -473,10 +474,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             order = np.argsort(px)
             px, py = px[order], py[order]
 
+            # Lines declared Type='phreatic' on the piezo sheet get the
+            # phreatic-inclination correction (same flag and formula as the
+            # LEM slicer): u = gamma_w * h_vertical * cos^2(local slope).
+            _phreatic = bool(slope_data.get('piezo_phreatic', False))
             for i, node in enumerate(nodes):
                 piezo_elevation = float(np.interp(node[0], px, py))
                 if node[1] < piezo_elevation:
                     u[i] = gamma_water * (piezo_elevation - node[1])
+                    if _phreatic:
+                        u[i] *= float(_piezo_cos2(node[0], px, py))
                 else:
                     u[i] = 0.0
     
@@ -493,6 +500,42 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     f"values but the FEM mesh has {n_nodes} nodes. Pore pressures default to 0, "
                     "which over-predicts the factor of safety — run the FEM on the same mesh as "
                     "the seepage solution.")
+
+    elif pp_option == "ru":
+        # Pore-pressure ratio (template v12): u = ru * sigma_v, where sigma_v
+        # is the vertical total stress of the SOIL column above the point —
+        # the same definition the LEM slicer uses (slice.py mat_u == 'ru':
+        # u = ru * sum(gamma_i * h_i); distributed loads and crack water are
+        # excluded by definition, Bishop & Morgenstern). The overburden is
+        # integrated by intersecting a vertical ray from each node with the
+        # material polygons, which handles multi-band zones exactly; moist
+        # gamma throughout, matching the LEM's no-water-table path (ru models
+        # carry no piezometric surface). ru itself is PER MATERIAL, so the
+        # shared nodal u array (ambiguous on material boundaries) stays zero
+        # here; the Gauss-point precompute applies the element material's ru
+        # to sigma_v interpolated from the nodes.
+        from shapely.geometry import LineString as _RayLS, Polygon as _RayPoly
+        from .mesh import get_material_polygons as _gmp
+        _ray_polys = []
+        for _pi, _pd in enumerate(_gmp(slope_data)):
+            _mid = _pd.get('mat_id')
+            _midx = _mid if (_mid is not None and 0 <= _mid < len(materials)) else _pi
+            _ray_polys.append((_RayPoly(_pd['coords']),
+                               float(materials[_midx].get('gamma', 0.0))))
+        _y_top = float(np.max(nodes[:, 1])) + 1.0
+        sigma_v = np.zeros(n_nodes)
+        for i, node in enumerate(nodes):
+            _x0, _y0 = float(node[0]), float(node[1])
+            _ray = _RayLS([(_x0, _y0), (_x0, _y_top)])
+            _sv = 0.0
+            for _poly, _g in _ray_polys:
+                _minx, _miny, _maxx, _maxy = _poly.bounds
+                if _x0 < _minx or _x0 > _maxx or _y0 >= _maxy:
+                    continue
+                _inter = _ray.intersection(_poly)
+                if not _inter.is_empty:
+                    _sv += _g * _inter.length
+            sigma_v[i] = _sv
     
     # Process 1D reinforcement elements
     elements_1d = np.array([]).reshape(0, 3) if 'elements_1d' not in mesh else mesh['elements_1d']
@@ -810,11 +853,44 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # Step 1: Default to free (type 0)
     # Already initialized to zeros
     
-    # Step 2: Fixed supports at bottom (type 1) - standard practice
-    # Use global minimum y as bottom
+    # Step 2: Fixed supports along the BOTTOM boundary (type 1) - standard
+    # practice. The bottom is the domain polygon's lower boundary POLYLINE,
+    # not simply y == min(y): an undulating bedrock base (max_depth absent,
+    # lowest profile line forms the bottom - e.g. vp027) must be fixed along
+    # its whole length, or the body is restrained at one low corner and
+    # never reaches equilibrium at any strength-reduction factor. The bottom
+    # polyline is every exterior segment of the domain polygon that is
+    # neither on the ground surface nor a vertical side edge at the domain's
+    # x-extremes; for a flat-bottomed domain this reproduces the old
+    # y == y_min rule node-for-node.
     tolerance = 1e-6
     y_min = float(np.min(nodes[:, 1])) if len(nodes) > 0 else 0.0
-    bottom_nodes = np.abs(nodes[:, 1] - y_min) < tolerance
+    bottom_nodes = np.abs(nodes[:, 1] - y_min) < tolerance   # fallback rule
+    _domain = slope_data.get('domain_polygon')
+    _ground = slope_data.get('ground_surface')
+    if (_domain is not None and _ground is not None and not _ground.is_empty
+            and len(nodes) > 0):
+        _ring = list(_domain.exterior.coords)
+        _rx = [c[0] for c in _ring]
+        _dx_min, _dx_max = min(_rx), max(_rx)
+        _span = max(_dx_max - _dx_min, float(np.max(nodes[:, 1]) - y_min), 1.0)
+        _geom_tol = 1e-6 * _span
+        _bottom_segs = []
+        for _a, _b in zip(_ring[:-1], _ring[1:]):
+            _mid = Point((_a[0] + _b[0]) / 2.0, (_a[1] + _b[1]) / 2.0)
+            if _ground.distance(_mid) < _geom_tol:
+                continue                       # ground-surface segment
+            if (abs(_a[0] - _b[0]) < _geom_tol and
+                    (abs(_a[0] - _dx_min) < _geom_tol or
+                     abs(_a[0] - _dx_max) < _geom_tol)):
+                continue                       # vertical side edge
+            _bottom_segs.append(LineString([_a, _b]))
+        if _bottom_segs:
+            from shapely.ops import unary_union
+            _bottom_geom = unary_union(_bottom_segs)
+            bottom_nodes = np.array(
+                [_bottom_geom.distance(Point(nd[0], nd[1])) < _geom_tol
+                 for nd in nodes], dtype=bool)
     bc_type[bottom_nodes] = 1  # Fixed (u=0, v=0)
     
     # Step 3: X-roller supports at left and right sides (type 2) - standard practice
@@ -1124,6 +1200,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "pow_cp_by_elem": pow_cp_by_elem,
         "pow_d_by_elem": pow_d_by_elem,
         "u": u,
+        "sigma_v": sigma_v,  # nodal vertical soil stress (ru option; else None)
+        "ru_by_mat": np.array([float(m.get("ru", 0.0) or 0.0) for m in materials]),
         "elements_1d": elements_1d,
         "element_types_1d": element_types_1d,
         "element_materials_1d": element_materials_1d,
@@ -1138,6 +1216,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "k_seismic": k_seismic,
         "pp_option": pp_option,
         "piezo_line_coords": piezo_line_coords,
+        "piezo_phreatic": bool(slope_data.get('piezo_phreatic', False)),
         "gamma_water": slope_data.get("gamma_water", 9.81),
         # DOF offset map (pile nodes get 3 DOFs, others get 2)
         "dof_offset": dof_offset,
@@ -1513,6 +1592,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             py = np.array([p[1] for p in piezo_line_coords], dtype=float)
             order = np.argsort(px)
             px, py = px[order], py[order]
+            _phreatic = bool(fem_data.get('piezo_phreatic', False))
             for elem_idx in range(n_elements):
                 elem_type = element_types[elem_idx]
                 elem_nodes_idx = elements[elem_idx][:elem_type]
@@ -1523,7 +1603,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     x_gp = N @ elem_coords[:, 0]
                     y_gp = N @ elem_coords[:, 1]
                     piezo_elev = float(np.interp(x_gp, px, py))
-                    gp_u_list.append(max(0.0, gamma_water * (piezo_elev - y_gp)))
+                    u_val = max(0.0, gamma_water * (piezo_elev - y_gp))
+                    if _phreatic and u_val > 0.0:
+                        u_val *= float(_piezo_cos2(x_gp, px, py))
+                    gp_u_list.append(u_val)
                 u_gp.append(gp_u_list)
         else:
             for elem_idx in range(n_elements):
@@ -1538,6 +1621,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 N = gp_data['N']
                 gp_u_list.append(max(0.0, float(N @ u_elem_nodes)))
             u_gp.append(gp_u_list)
+    elif pp_option == "ru":
+        # u = ru(element material) * sigma_v interpolated from the nodal
+        # overburden computed in build_fem_data — mirrors the LEM, where the
+        # slice-base material's ru multiplies the column overburden.
+        sigma_v_nodes = fem_data.get("sigma_v")
+        ru_by_mat = fem_data.get("ru_by_mat")
+        if sigma_v_nodes is None or ru_by_mat is None:
+            for elem_idx in range(n_elements):
+                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+        else:
+            ru_by_elem_pp = ru_by_mat[element_materials - 1]
+            for elem_idx in range(n_elements):
+                ru_e = float(ru_by_elem_pp[elem_idx])
+                elem_type = element_types[elem_idx]
+                elem_nodes_idx = elements[elem_idx][:elem_type]
+                sv_elem = sigma_v_nodes[elem_nodes_idx]
+                gp_u_list = []
+                for gp_data in elem_gp_data[elem_idx]:
+                    N = gp_data['N']
+                    gp_u_list.append(max(0.0, ru_e * float(N @ sv_elem)))
+                u_gp.append(gp_u_list)
     else:
         for elem_idx in range(n_elements):
             u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
@@ -3489,6 +3593,20 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
 
     return K_global.tocsr()
 
+
+
+def _piezo_cos2(xq, px, py):
+    """Phreatic-inclination (Hu) factor cos^2(theta) of the LOCAL piezo-line
+    segment at x = xq (XSTABL / Slide "Hu: auto"), mirroring the LEM's _cos2
+    in slice.py: 1/(1 + m^2) inside a segment, 1.0 outside the line's x-range.
+    px must be ascending; xq may be scalar or array."""
+    xq = np.asarray(xq, dtype=float)
+    k = np.clip(np.searchsorted(px, xq, side='right') - 1, 0, len(px) - 2)
+    dx = px[k + 1] - px[k]
+    m = np.where(dx > 0, (py[k + 1] - py[k]) / np.where(dx > 0, dx, 1.0), 0.0)
+    cos2 = 1.0 / (1.0 + m * m)
+    outside = (xq < px[0]) | (xq > px[-1])
+    return np.where(outside, 1.0, cos2)
 
 
 def build_gravity_loads(nodes, elements, element_types, element_materials, gamma_by_mat, k_seismic, fem_data=None):

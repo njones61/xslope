@@ -1938,6 +1938,80 @@ def vp099():
     return 'vp099.xlsx'
 
 
+def _vp106_slope_data(sd_ratio, appl='passive'):
+    """Slide #106 / Cai & Ugai (2000): slope reinforced with a row of steel
+    tube piles, Ito & Matsui lateral force. Geometry from the paper's Fig. 2
+    (manual Fig. 106.1 is identical): 10 m toe flat, 1V:1.5H slope 10 m high,
+    10 m crest flat, 10 m of soil over bedrock. Soil gamma=20, c=10, phi=20,
+    dry. Pile row at x=17.5 (mid-slope, 7.5 m from the toe), D=0.8 m,
+    embedded to bedrock; center-to-center spacing D1 = sd_ratio * D. With
+    H=None the Ito & Matsui reaction is auto-computed from D and S (per-pile
+    force divided by S inside the module). Slide applies the pile reaction in
+    the PASSIVE sense (divided by FS): passive reproduces Slide within
+    0.4-1.5% across all spacings; active overshoots and at close spacing the
+    critical surface escapes the pile entirely (contrast VP54, where Slide's
+    micro-pile shear matched the active sense)."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Soil', c=10.0, phi=20.0, gamma=20.0, option='mc', u='none')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (10.0, 0.0), (25.0, 10.0),
+                                 (35.0, 10.0)]},
+    ]
+    sd['max_depth'] = -10.0
+    sd['circles'] = [{'Xo': 17.0, 'Yo': 16.0, 'Depth': -2.0, 'R': 18.0}]
+    sd['non_circ'] = []
+    sd['circular'] = True
+    sd['dloads'] = []
+    if sd_ratio is not None:
+        sd['pile_lines'] = [{
+            'x1': 17.5, 'y1': 5.0, 'x2': 17.5, 'y2': -10.0,
+            'H': None, 'theta_p': 0.0, 'D_pile': 0.8, 'S': sd_ratio * 0.8,
+            'E': None, 'I': None, 'area': None,
+            'V_cap': None, 'M_cap': None, 'fixity': 'free',
+            'appl': appl, 'label': f'pile row D1={sd_ratio}D',
+        }]
+    return sd
+
+
+def vp106a():
+    """Slide #106, no-pile baseline. Bishop search: Slide 1.14, paper 1.13."""
+    sd = _vp106_slope_data(None)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp106a.xlsx'))
+    return 'vp106a.xlsx'
+
+
+def vp106b():
+    """Slide #106, D1/D=2. Bishop: Slide 1.54, paper 1.54 (surface avoids
+    the pile at this spacing - all three programs agree exactly)."""
+    sd = _vp106_slope_data(2)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp106b.xlsx'))
+    return 'vp106b.xlsx'
+
+
+def vp106c():
+    """Slide #106, D1/D=3. Bishop: Slide 1.43, paper 1.37 (Slide itself
+    departs the paper 4.4% here - search-method spread)."""
+    sd = _vp106_slope_data(3)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp106c.xlsx'))
+    return 'vp106c.xlsx'
+
+
+def vp106d():
+    """Slide #106, D1/D=4. Bishop: Slide 1.33, paper 1.31."""
+    sd = _vp106_slope_data(4)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp106d.xlsx'))
+    return 'vp106d.xlsx'
+
+
+def vp106e():
+    """Slide #106, D1/D=6. Bishop: Slide 1.25, paper 1.25."""
+    sd = _vp106_slope_data(6)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp106e.xlsx'))
+    return 'vp106e.xlsx'
+
+
 def vp042():
     """Slide #42: Baker & Leshchinsky (2001) safety-map dam — clay core (c'=20,
     phi'=20, gamma=20) in granular fill (0/40/21.5) on a hard base (200/45/24),

@@ -87,6 +87,11 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp094.xlsx, type=single_circle, num_slices=50, fs_bishop=1.020, benchmark=VP94 -->
 <!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
 <!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.390, benchmark=VP99 -->
+<!-- test: file=../files/rocscience/vp106a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.143, benchmark=VP106a -->
+<!-- test: file=../files/rocscience/vp106b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.540, benchmark=VP106b -->
+<!-- test: file=../files/rocscience/vp106c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.451, benchmark=VP106c -->
+<!-- test: file=../files/rocscience/vp106d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.341, benchmark=VP106d -->
+<!-- test: file=../files/rocscience/vp106e.xlsx, type=circular_search, num_slices=40, fs_bishop=1.260, benchmark=VP106e -->
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
 <!-- test: file=../files/rocscience/vp065.xlsx, type=single_circle, num_slices=60, fs_bishop=2.725, fs_spencer=2.748, benchmark=VP65 -->
@@ -237,12 +242,12 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
-| 106 | Support, Ito & Matsui pile | partial | Cai & Ugai (2000): Bishop with Ito & Matsui limit-pressure pile forces (FS 1.13-1.54 vs spacing). XSLOPE models pile resistance via Vcap/Mcap, not the Ito & Matsui pressure equation, so only the no-pile case (1.13/1.14) is directly reproducible; an Ito & Matsui capacity option would be a new feature. |
+| [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](../files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope, Ito & Matsui force auto-computed from pile diameter and spacing: Bishop search 1.143 / 1.540 / 1.451 / 1.341 / 1.260 (no pile, D1/D = 2/3/4/6) vs Slide 1.14 / 1.54 / 1.43 / 1.33 / 1.25 and the paper's 1.13 / 1.54 / 1.37 / 1.31 / 1.25. The pile reaction applies in the passive sense (divided by FS), matching Slide. |
 | 107 | Retaining walls, gabion walls, supports | planned |  |
 | 108 | Retaining walls, gabion walls, supports | planned |  |
 | 109 | Retaining walls, gabion walls, weak layers | planned |  |
 | 110 | Retaining walls, equivalent fluid pressure | planned |  |
-| 111 | Helical anchor | planned |  |
+| 111 | Helical anchor | *blocked* | Verifies Slide's helical-anchor capacity envelope (Perko 2009 plate-bearing formulas — pullout/stripping/tensile modes as a force-vs-position diagram, not an FS); XSLOPE has no helical-anchor support type. The manual's hand-calculation table is retained as the acceptance test for a future implementation. |
 
 ---
 
@@ -1639,3 +1644,34 @@ The bulk of the Slide problem is a *transient* drawdown series (factors of safet
 *Both critical surfaces are shallow wedges on the downstream face, which makes them sensitive to the toe geometry: on Slide's own printed circles XSLOPE gives 2.390 and 1.721, so the search is not the source of the difference. The steady-state case straddles the two references (−1.5% from Slide, +1.1% from Huang & Jia); the dry case sits 1.7% below Huang & Jia's strength-reduction FEM value, which is the primary reference here.*
 
 ![vp102b: inputs and representative solution](images/vp102b.png)
+
+### VP106: Support, Ito & Matsui pile {#vp106}
+
+**Input files:** [vp106a.xlsx](../files/rocscience/vp106a.xlsx) (no pile) ·
+[vp106b](../files/rocscience/vp106b.xlsx) / [c](../files/rocscience/vp106c.xlsx) /
+[d](../files/rocscience/vp106d.xlsx) / [e](../files/rocscience/vp106e.xlsx)
+(D1/D = 2, 3, 4, 6)
+
+Cai & Ugai (2000)'s pile-reinforced slope: a 10-m, 1V:1.5H dry cohesive-frictional slope
+(γ = 20, c′ = 10, φ′ = 20) with a row of 0.8-m steel-tube piles at mid-slope, embedded to
+bedrock, at center-to-center spacings of 2–6 diameters. The pile's stabilizing force is
+the Ito & Matsui (1975) theoretical limit pressure, which XSLOPE computes automatically
+from the pile diameter and spacing (the per-pile force is divided by the spacing to give
+the per-meter-width value). The reaction is applied in the passive sense — added to the
+resisting moment and divided by the factor of safety — which is how Slide applies it.
+
+| Case | XSLOPE (Bishop search) | Slide | Cai & Ugai |
+|---|---|---|---|
+| No pile | 1.143 | 1.14 | 1.13 |
+| D1/D = 2 | 1.540 | 1.54 | 1.54 |
+| D1/D = 3 | 1.451 | 1.43 | 1.37 |
+| D1/D = 4 | 1.341 | 1.33 | 1.31 |
+| D1/D = 6 | 1.260 | 1.25 | 1.25 |
+
+At the closest spacing (D1/D = 2) all three programs agree exactly: the pile force is
+large enough that the critical surface avoids the pile entirely. At D1/D = 3 the published
+values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
+manual acknowledges — and XSLOPE lands 1.5% above Slide; every other case agrees with
+Slide within 0.8%.
+
+![vp106c: inputs and representative solution](images/vp106c.png)

@@ -331,16 +331,24 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             cp_rate = material.get("cp", 0.0)
             c_by_mat[i] = cp_rate  # Store cp rate temporarily (used per-element below)
             phi_by_mat[i] = 0.0     # Undrained analysis
+        elif strength_option == "pow":
+            # Power-curve envelope tau = a*(sigma'_n + d)^b + c_p (the LEM's
+            # 'pow' option). Handled by per-Gauss-point tangent linearization
+            # of the F-reduced envelope inside the viscoplastic loop; the
+            # c/phi arrays only carry a seed tangent, assigned per element
+            # below from the overburden estimate.
+            c_by_mat[i] = 0.0
+            phi_by_mat[i] = 0.0
         else:
             # A blank option is legal on rows that never carry strength; any
-            # OTHER option (pow, ...) is not implemented in the FEM, and the
-            # material's c/phi columns would be zeros - silently running it
-            # as zero-strength soil is the failure mode this refuses.
+            # OTHER option is not implemented in the FEM, and the material's
+            # c/phi columns would be zeros - silently running it as
+            # zero-strength soil is the failure mode this refuses.
             if strength_option:
                 raise ValueError(
                     f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
                     f"strength option '{strength_option}' is not supported by the "
-                    f"FEM (supported: mc, cp).")
+                    f"FEM (supported: mc, cp, pow).")
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
 
@@ -368,7 +376,25 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # Handle c/p strength option - compute actual cohesion per element
     c_by_elem = np.zeros(n_elements)
     phi_by_elem = np.zeros(n_elements)
-    
+
+    # Power-curve (option 'pow') per-element parameters. The envelope is
+    # linearized to an instantaneous tangent (c_i, phi_i) at the current
+    # effective normal stress inside the viscoplastic loop; here we store the
+    # parameters and seed c/phi at the vertical-overburden estimate so any
+    # pre-loop consumer of the arrays sees sane values.
+    pow_flag_by_elem = np.zeros(n_elements, dtype=bool)
+    pow_a_by_elem = np.zeros(n_elements)
+    pow_b_by_elem = np.zeros(n_elements)
+    pow_cp_by_elem = np.zeros(n_elements)
+    pow_d_by_elem = np.zeros(n_elements)
+    _gs = slope_data.get('ground_surface')
+    if _gs is not None and not _gs.is_empty:
+        _gxy = np.asarray(_gs.coords)
+        _gorder = np.argsort(_gxy[:, 0])
+        _gx, _gy = _gxy[_gorder, 0], _gxy[_gorder, 1]
+    else:
+        _gx = _gy = None
+
     for elem_idx in range(n_elements):
         mat_id = element_materials[elem_idx] - 1  # Convert to 0-based
         material = materials[mat_id]
@@ -391,6 +417,30 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             depth = max(0.0, r_elev - centroid_y)
             c_by_elem[elem_idx] = c_base + cp_rate * depth
             phi_by_elem[elem_idx] = 0.0
+        elif strength_option == "pow":
+            a = material.get("pow_a", 0.0)
+            b = material.get("pow_b", 1.0)
+            cp_ = material.get("pow_c", 0.0)
+            d_ = material.get("pow_d", 0.0)
+            pow_flag_by_elem[elem_idx] = True
+            pow_a_by_elem[elem_idx] = a
+            pow_b_by_elem[elem_idx] = b
+            pow_cp_by_elem[elem_idx] = cp_
+            pow_d_by_elem[elem_idx] = d_
+            # seed tangent at gamma * depth-below-ground of the centroid
+            elem_nodes = elements[elem_idx]
+            elem_type = element_types[elem_idx]
+            elem_coords = nodes[elem_nodes[:elem_type]]
+            cx = float(np.mean(elem_coords[:, 0]))
+            cy = float(np.mean(elem_coords[:, 1]))
+            y_top = (float(np.interp(cx, _gx, _gy)) if _gx is not None
+                     else float(np.max(nodes[:, 1])))
+            s_n = max(gamma_by_mat[mat_id] * max(y_top - cy, 0.0), 0.0)
+            s_eff = max(s_n + d_, 1e-4 * max(1.0, s_n))
+            slope = a * b * s_eff ** (b - 1.0)
+            tau = a * s_eff ** b + cp_
+            c_by_elem[elem_idx] = tau - s_n * slope
+            phi_by_elem[elem_idx] = np.degrees(np.arctan(slope))
         else:
             c_by_elem[elem_idx] = c_by_mat[mat_id]
             phi_by_elem[elem_idx] = phi_by_mat[mat_id]
@@ -1068,6 +1118,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "material_names": material_names,
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
+        "pow_flag_by_elem": pow_flag_by_elem,  # power-curve elements (tangent-linearized in the VP loop)
+        "pow_a_by_elem": pow_a_by_elem,
+        "pow_b_by_elem": pow_b_by_elem,
+        "pow_cp_by_elem": pow_cp_by_elem,
+        "pow_d_by_elem": pow_d_by_elem,
         "u": u,
         "elements_1d": elements_1d,
         "element_types_1d": element_types_1d,
@@ -1219,6 +1274,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # Material properties
     c_by_elem = fem_data.get("c_by_elem", fem_data["c_by_mat"][element_materials - 1])
     phi_by_elem = fem_data.get("phi_by_elem", fem_data["phi_by_mat"][element_materials - 1])
+    pow_flag_by_elem = fem_data.get("pow_flag_by_elem")
+    if pow_flag_by_elem is None:
+        pow_flag_by_elem = np.zeros(len(elements), dtype=bool)
+    has_pow = bool(np.any(pow_flag_by_elem))
     E_by_mat = fem_data["E_by_mat"]
     nu_by_mat = fem_data["nu_by_mat"]
     gamma_by_mat = fem_data["gamma_by_mat"]
@@ -1514,6 +1573,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         }
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
+        if has_pow:
+            _pm = np.array([pow_flag_by_elem[e] for e, g in _pairs])
+            if _pm.any():
+                grp['pow_m'] = _pm
+                for _k, _key in (('pow_a', 'pow_a_by_elem'),
+                                 ('pow_b', 'pow_b_by_elem'),
+                                 ('pow_cp', 'pow_cp_by_elem'),
+                                 ('pow_d', 'pow_d_by_elem')):
+                    grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
         gp_groups.append(grp)
     n_total_gp = sum(len(g['pairs']) for g in gp_groups)
 
@@ -1616,6 +1684,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 sig_eff[:, [0, 1, 3]] += grp['u_gp'][:, None]
 
                 sx, sy, txy, sz = sig_eff.T
+
+                # Power-curve elements: re-linearize the F-reduced envelope
+                # tau_F = [a*(s+d)^b + c_p]/F at the CURRENT effective normal
+                # stress every iteration. Linearization point: the in-plane
+                # Mohr-circle center s' = -(sx+sy)/2 (compression-positive) -
+                # the failure-plane normal is implicit in phi_t, and over one
+                # circle radius the envelope curvature is small, so the
+                # center is a stable, vectorizable abscissa (the LEM uses the
+                # slice-base normal; both converge on the same reduced
+                # envelope). Guards mirror solve._pow_update_strength.
+                pm = grp.get('pow_m')
+                if pm is not None:
+                    s_n = np.maximum(-(sx[pm] + sy[pm]) * 0.5, 0.0)
+                    ref = max(1.0, float(s_n.mean()) if s_n.size else 1.0)
+                    s_ef = np.maximum(s_n + grp['pow_d'][pm], 1e-4 * ref)
+                    bb = grp['pow_b'][pm]
+                    slope_t = grp['pow_a'][pm] * bb * s_ef ** (bb - 1.0) / F
+                    tau_F = (grp['pow_a'][pm] * s_ef ** bb + grp['pow_cp'][pm]) / F
+                    phi_t = np.arctan(slope_t)
+                    grp['c_r'][pm] = tau_F - s_n * slope_t
+                    grp['snph'][pm] = np.sin(phi_t)
+                    grp['csph'][pm] = np.cos(phi_t)
+
                 sigm = (sx + sy + sz) / 3.0
                 dsbar = np.sqrt(((sx - sy)**2 + (sy - sz)**2 + (sz - sx)**2
                                  + 6.0 * txy**2) / 2.0)
@@ -1990,8 +2081,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         final_stresses[elem_idx] = [sig_x, sig_y, tau_xy, sig_vm]
 
         sigm, dsbar, theta = stress_invariants(sig_eff4)
-        f_yield = mc_yield_invariants(sigm, dsbar, theta,
-                                      c_reduced[elem_idx], phi_reduced[elem_idx])
+        _c_rep, _phi_rep = c_reduced[elem_idx], phi_reduced[elem_idx]
+        if pow_flag_by_elem[elem_idx]:
+            # reporting tangent from the final effective stress state
+            _sn = max(-(sig_eff4[0] + sig_eff4[1]) * 0.5, 0.0)
+            _sef = max(_sn + fem_data["pow_d_by_elem"][elem_idx],
+                       1e-4 * max(1.0, _sn))
+            _a = fem_data["pow_a_by_elem"][elem_idx]
+            _b = fem_data["pow_b_by_elem"][elem_idx]
+            _sl = _a * _b * _sef ** (_b - 1.0) / F
+            _c_rep = (_a * _sef ** _b + fem_data["pow_cp_by_elem"][elem_idx]) / F \
+                     - _sn * _sl
+            _phi_rep = np.arctan(_sl)
+        f_yield = mc_yield_invariants(sigm, dsbar, theta, _c_rep, _phi_rep)
         yield_function_out[elem_idx] = f_yield
         plastic_elements[elem_idx] = f_yield > 1e-8
 

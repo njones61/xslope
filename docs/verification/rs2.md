@@ -49,6 +49,10 @@ lockable rather than tuned to match.
 <!-- test: file=../files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.491, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=4000, benchmark=RS2-40 -->
 <!-- test: file=../files/rocscience/vp075.xlsx, type=fem_ssrm, expected_fs=1.249, element_type=tri6, target_size=1.85, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=4000, benchmark=RS2-42 -->
 <!-- test: file=../files/rocscience/vp082.xlsx, type=fem_ssrm, expected_fs=1.511, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=2.1, max_iter=4000, benchmark=RS2-44 -->
+<!-- test: file=../files/rocscience/vp040.xlsx, type=fem_ssrm, expected_fs=0.910, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=4000, benchmark=RS2-30 -->
+<!-- test: file=../files/rocscience/vp044a.xlsx, type=fem_ssrm, expected_fs=0.934, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=1.6, max_iter=4000, benchmark=RS2-31c -->
+<!-- test: file=../files/rocscience/vp045b.xlsx, type=fem_ssrm, expected_fs=2.732, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.8, f_max=3.6, max_iter=4000, benchmark=RS2-32b -->
+<!-- test: file=../files/rocscience/vp061a.xlsx, type=fem_ssrm, expected_fs=1.502, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=2.2, max_iter=4000, benchmark=RS2-34b -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -92,11 +96,11 @@ cross-bearings.
 | 27 | Homogeneous slope, pore pressure by r<sub>u</sub> — *blocked*: the FEM has no r<sub>u</sub> option (task, with RS2 #14); RS2's own text cites Slide2 VP36 (Li & Lumb), not VP21 | VP36 |
 | 28 | FE analysis with groundwater and stress | VP38 family |
 | 29 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002; the manual's §29/§30 headings are swapped) — **built** (sand case): SSRM 1.253 vs RS2 SSR 1.25, Spencer 1.209, Tandjiria 1.219 (on [vp039c.xlsx](../files/rocscience/vp039c.xlsx)). The clay case (RS2 SSR 0.99) is not locked: its water-filled tension crack has no FEM representation (XSLOPE reads 1.05 without it) | VP39 |
-| 30 | (heading mismatch — body is the Perry power-curve slope) — *blocked*: RS2 SRF 0.91 vs Slide2 Janbu 0.944 / Perry 0.98; the FEM has no power-curve strength (one gap blocks #30/#31/#33/#34) | VP40 |
-| 31 | M-C vs power curve (Baker 2003 ex. 1) — **built** (both M-C halves): SSRM 1.546 / 0.966 vs RS2 1.53 / 0.98 (Baker 1.50 / 0.97) on [vp044b](../files/rocscience/vp044b.xlsx) / [vp044c](../files/rocscience/vp044c.xlsx); the power-curve half (RS2 1.11) is blocked on the FEM power-curve gap | VP44 |
-| 32 | (heading mismatch — body is Baker's example 2) — **built** (MC half): SSRM 2.852 (2.861 at 1.6 m) vs RS2 SRF 2.83 (+0.8%); Baker's own MC 2.66, Slide2 Spencer 2.76 (on [vp045a.xlsx](../files/rocscience/vp045a.xlsx)). Power half blocked with #30 (RS2 SRF 2.74) | VP45 |
+| 30 | Homogeneous slope, power-curve strength (Perry 1993; swapped heading) — **built**: SSRM 0.910 vs RS2 SRF 0.91 (exact); Slide2 Janbu 0.944, Perry 0.98 (on [vp040.xlsx](../files/rocscience/vp040.xlsx); the FEM linearizes the reduced envelope at the current stress per iteration) | VP40 |
+| 31 | M-C vs power curve (Baker 2003 ex. 1) — **built**, all three halves: M-C SSRM 1.546 / 0.966 vs RS2 1.53 / 0.98; power-curve SSRM 0.934, squarely on Slide2's own published band (Janbu 0.92 / Spencer 0.96, Baker ~0.97) — RS2's 1.11 sits 15% above Slide2's LEM on the same problem and is the outlier (on [vp044a](../files/rocscience/vp044a.xlsx)/[b](../files/rocscience/vp044b.xlsx)/[c](../files/rocscience/vp044c.xlsx)) | VP44 |
+| 32 | (heading mismatch — body is Baker's example 2) — **built**, both halves: M-C SSRM 2.852 vs RS2 2.83 (+0.8%); power-curve SSRM 2.732 vs RS2 2.74 (−0.3%), Slide2 Spencer 2.662 (on [vp045a](../files/rocscience/vp045a.xlsx)/[vp045b](../files/rocscience/vp045b.xlsx)) | VP45 |
 | 33 | Homogeneous slope with tension crack and water table (P&D test slope 2; swapped heading) — **built** (caveat): SSRM 1.247 vs RS2 SSR 1.28 and an eight-program LEM table spanning 1.03–1.32; the model's dry tension crack has no FEM representation, worth ~2–3% here (on [vp056.xlsx](../files/rocscience/vp056.xlsx)) | VP56 |
-| 34 | M-C vs power curve III (Baker 2003 ex. 3, London clay) — **built** (M-C half): SSRM 1.369 vs RS2 1.38 / Spencer 1.37 / Baker 1.35 (on [vp061b.xlsx](../files/rocscience/vp061b.xlsx)); power-curve half (RS2 1.47) blocked on the FEM power-curve gap | VP61 |
+| 34 | M-C vs power curve III (Baker 2003 ex. 3, London clay) — **built**, both halves: M-C SSRM 1.369 vs RS2 1.38; power-curve SSRM 1.502 vs RS2 1.47 / Slide2 Spencer 1.47 / Baker 1.48 (+2.1%) (on [vp061a](../files/rocscience/vp061a.xlsx)/[vp061b](../files/rocscience/vp061b.xlsx)) | VP61 |
 
 ### Part II (35–58)
 

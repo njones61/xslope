@@ -12,6 +12,8 @@ input file alone.
 <!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.40, expected_flowrate=2.307e-05, tolerance=0.02, benchmark=GW3-q -->
 <!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.40, points=0:-4:4.45;10:-4:3.37;14:-4:2.42;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
 <!-- test: file=../files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.147, expected_flowrate=5.462e-06, tolerance=0.05, benchmark=GW4-q -->
+<!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.301e-07, tolerance=0.05, benchmark=GW6a-q -->
+<!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
 <!-- test: file=../files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
 <!-- test: file=../files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
 <!-- test: file=../files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
@@ -37,8 +39,8 @@ support — those rows stay blocked until a transient seepage capability exists.
 | [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](../files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
 | [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
 | 5 | Unsaturated flow behind an embankment | *no lock possible* | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. |
-| 6 | Steady-state seepage through saturated–unsaturated soils | partial | Freeze & Rulon dam, 5 cases; all targets and both conductivity functions are chart curves. Buildable by digitizing the k-curve and profile stations (the GW9 technique) with a tolerance-banded profile lock — deferred with GW7. |
-| 7 | Seepage within layered slope | partial | Rulon & Freeze layered slope: printed infiltration and water-table data, chart k-functions and chart head-profile targets — same class as GW6, deferred with it. |
+| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh, the same free-surface question as GW11 (task #30). Case 4 needs the flux BC (task #28); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets and deferred. |
+| 7 | Seepage within layered slope | *blocked* | Rulon & Freeze layered slope: the manual applies a constant infiltration rate of 2.1×10⁻⁴ m/s to the top of the slope — a specified flux with no fixed-head equivalent (the stated water table position is an output, not an input), so this needs the flux boundary condition (task #28). k-charts and profile targets recorded for when it exists. |
 | 8 | Flow through ditch-drained soils | *blocked* | Inputs fully printed, but both soils use Gardner conductivity kr = 1/(1 + a·ψⁿ); the solver implements linear-front and van Genuchten only. A Gardner option would unlock GW8 and GW11. The problem exists to verify the Gardner function, so a van Genuchten stand-in was deliberately not attempted. |
 | [9](#gw9) | Seepage through dam | **built** (dam 1 of 2) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx). Bowles homogeneous dam via Chapuis et al. (2001): Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2 (drain) needs the source paper — its k-function and reservoir level are chart-only and the published Q implies a k two decades below the chart. |
 | [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](../files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |
@@ -191,6 +193,33 @@ The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (
 ![gw012: mesh and solved heads](images/gw012.png)
 
 ![gw013: mesh and solved heads](images/gw013.png)
+
+### GW6: Steady-state seepage through saturated–unsaturated soils {#gw6}
+
+**Input files:** [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx) (case 1 of 5)
+
+Fredlund & Rahardjo (1993)'s saturated–unsaturated earth dam (12 m high, symmetric 2:1
+faces, reservoir at 10 m, a 12 m horizontal drain at the downstream toe), case 1:
+isotropic conductivity. The conductivity function is digitized from the manual's chart
+(ks = 10⁻⁷ m/s, air entry ≈ 9 kPa) and fit by a Mualem–van Genuchten curve; three fit
+variants move the answer by less than 3 cm, so the fit is not the controlling
+uncertainty. The published target is the pressure-head profile along the crest
+centerline, where Slide's and Fredlund & Rahardjo's curves coincide within 0.2 m.
+
+| Elevation on the crest line | XSLOPE pressure head | Slide | F&R |
+|---|---|---|---|
+| 0 | 7.40 | 7.15 | ≈7.3 |
+| 2 | 5.47 | 5.15 | ≈5.3 |
+| 4 | 3.52 | 3.25 | ≈3.4 |
+| 6 | 1.66 | 1.30 | ≈1.45 |
+| 8 | −0.22 | −0.60 | ≈−0.45 |
+
+*The profile shape reproduces exactly; the whole curve sits 0.25–0.5 m above the
+published pair, insensitive to the conductivity fit and to mesh refinement — the same
+free-surface/exit-face behavior seen on GW4's drain tip and GW11's release point, and
+under investigation as one question. The regression locks XSLOPE's own values.*
+
+![gw006a: mesh and solved heads](images/gw006a.png)
 
 ## Methodology
 

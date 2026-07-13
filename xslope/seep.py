@@ -757,7 +757,11 @@ def kr_frontal_vec(p, kr0, h0):
 
     p, kr0, h0 broadcast together; kr0/h0 are per-element, p may be
     (n_elements, n_sample_points)."""
-    lin = kr0 + (1.0 - kr0) * (p - h0) / (-h0)
+    # h0 = 0 occurs on materials using a different kr model (e.g. vg) whose
+    # rows still pass through here before the model mask applies - guard the
+    # division so those rows don't emit a spurious divide-by-zero warning
+    safe_h0 = np.where(h0 == 0.0, -1.0, h0)
+    lin = kr0 + (1.0 - kr0) * (p - safe_h0) / (-safe_h0)
     return np.where(p >= 0.0, 1.0, np.where(p > h0, lin, kr0))
 
 

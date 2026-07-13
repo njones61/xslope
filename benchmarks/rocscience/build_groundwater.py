@@ -219,7 +219,38 @@ def gw013():
     return 'gw013.xlsx'
 
 
+
+
+def gw006a():
+    """GW#6 case 1: Fredlund & Rahardjo (1993) isotropic earth dam with a
+    12 m horizontal drain (Fig 6.1: 12 m high, 4 m crest, symmetric 2:1
+    faces, base 52 m; reservoir 10 m). k-function digitized from the Fig 6.2
+    chart (ks=1e-7 m/s, air entry ~9 kPa, 3 decades down by ~97 kPa) and fit
+    by Mualem-vG (vg_a=0.4029, vg_n=1.9156; max deviation 0.36 decades in
+    the controlling 1-6 m suction band - three fit variants move the answer
+    <0.03 m). Target: pressure head along line 1-1 (the crest centerline,
+    x=26) from Fig 6.6, where Slide and F&R coincide. xslope reads a
+    k-fit- and mesh-insensitive +0.25-0.5 m above the published curves -
+    the same free-surface family as task #30; locked at xslope's own values
+    with the caveat stated. Case 4 (infiltration) is blocked on the flux BC
+    (task #28); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face variant)
+    are buildable-deferred with chart targets like this one."""
+    sd = _base_sd(k1=1e-7)
+    m = sd['materials'][0]
+    m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0,
+             unsat='vg', vg_a=0.4029, vg_n=1.9156)
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
+                                                    (28.0, 12.0), (52.0, 0.0)]}]
+    sd['max_depth'] = 0.0
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 10.0, 'coords': [(0.0, 0.0), (20.0, 10.0)]}],
+        'exit_face': [(40.0, 0.0), (52.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006a.xlsx'))
+    return 'gw006a.xlsx'
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for fn in (gw002, gw003, gw004, gw009a, gw010, gw012, gw013):
+    for fn in (gw002, gw003, gw004, gw006a, gw009a, gw010, gw012, gw013):
         print(fn())

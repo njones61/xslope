@@ -1078,7 +1078,8 @@ def plot_circles(ax, slope_data, style=None):
         # draws whenever the equal-aspect view reaches it, and clips otherwise.
         center_marker = Line2D([Xo], [Yo], marker='+', color=c_color,
                                linestyle='None', markersize=10, gid='CIRCLES')
-        ax.add_artist(center_marker)
+        center_marker.set_in_layout(False)  # keep tight bbox from reserving
+        ax.add_artist(center_marker)        # space for an off-view center
 
         # Arrow direction: point from center to midpoint of failure surface
         mid_idx = len(x_clip) // 2
@@ -1105,8 +1106,10 @@ def plot_circles(ax, slope_data, style=None):
                         mutation_scale=20  # head size in points
                     ))
         # Annotations default to clip_on=False; with the center allowed outside
-        # the view, the shaft must stop at the axes edge.
+        # the view, the shaft must stop at the axes edge and the annotation's
+        # full (unclipped) extent must stay out of tight-bbox layout math.
         ann.arrow_patch.set_clip_box(ax.bbox)
+        ann.set_in_layout(False)
 
 def plot_non_circ(ax, non_circ, style=None):
     """

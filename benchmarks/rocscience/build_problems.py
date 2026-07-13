@@ -767,6 +767,102 @@ def vp045b():
     return 'vp045b.xlsx'
 
 
+def _vp028_ex1_slope_data():
+    """Slide #28 Ex 1 geometry/materials (Congress St. Cut, Ireland 1954)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    # all frictionless; sand strength excluded per C&X. Sand gamma is not
+    # stated anywhere; 22 reproduces the printed deterministic FS (the manual
+    # states its own clay gammas were chosen the same way). Material 5 never
+    # carries the locked surface.
+    for name, c, sc, g in [('Sand', 0.0, 0.0, 22.0),
+                           ('Clay 1', 55.0, 20.4, 21.0),
+                           ('Clay 2', 43.0, 8.2, 22.0),
+                           ('Clay 3', 56.0, 13.2, 22.0),
+                           ('Material 5', 56.0, 0.0, 22.0)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=0.0, gamma=g, gamma_sat=g, option='mc',
+                 u='none', sigma_c=sc, sigma_phi=0.0, sigma_gamma=0.0)
+        sd['materials'].append(m)
+    face = [(-8.0, -9.0), (-7.0, -10.0), (5.0, -10.0)]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-57.0, 5.0), (-36.0, 5.0), (-31.0, 1.0),
+                                 (-28.0, -1.0), (-22.0, -3.0)] + face},
+        {'mat_id': 1, 'coords': [(-57.0, 1.0), (-31.0, 1.0), (-28.0, -1.0),
+                                 (-22.0, -3.0)] + face},
+        {'mat_id': 2, 'coords': [(-57.0, -3.0), (-22.0, -3.0)] + face},
+        {'mat_id': 3, 'coords': [(-57.0, -9.0), (-8.0, -9.0), (-7.0, -10.0),
+                                 (5.0, -10.0)]},
+        {'mat_id': 4, 'coords': [(-57.0, -12.0), (5.0, -12.0)]},
+    ]
+    sd['max_depth'] = -15.0
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['dloads'] = []
+    return sd
+
+
+def _vp028_ex5_slope_data():
+    """Slide #28 Ex 5 geometry/materials (embankment on soft clay)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, c, sc, phi, sp, g in [('Layer 1', 10.0, 2.0, 12.0, 3.0, 20.0),
+                                    ('Layer 2', 40.0, 8.0, 0.0, 0.0, 18.0),
+                                    ('Hard layer', 1000.0, 0.0, 0.0, 0.0, 20.0)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=g, gamma_sat=g, option='mc',
+                 u='none', sigma_c=sc, sigma_phi=sp, sigma_gamma=0.0)
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 15.0), (30.0, 15.0), (55.0, 25.0),
+                                 (60.0, 25.0), (80.0, 15.0), (90.0, 15.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 15.0), (90.0, 15.0)]},
+        {'mat_id': 2, 'coords': [(0.0, 5.0), (90.0, 5.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['dloads'] = []
+    return sd
+
+
+def vp028a():
+    """Slide #28 / Chowdhury & Xu (1995) Example 1, shallow mode: Congress St.
+    Cut (Ireland 1954), three frictionless clays under a strengthless sand cap,
+    critical circle tangent to the clay-2 base as printed in Slide's Figure
+    28.3. Slide Bishop 1.128 / RI_ln 0.650 / MC PF 24.6%; C&X 1.128 / PF 26.6%.
+    All Slide/C&X unit weights are calibration values (the paper states none);
+    sand gamma = 22 here on the same basis."""
+    sd = _vp028_ex1_slope_data()
+    sd['circles'] = [{'Xo': -22.151, 'Yo': 20.872, 'Depth': 20.872 - 30.012,
+                      'R': 30.012}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp028a.xlsx'))
+    return 'vp028a.xlsx'
+
+
+def vp028b():
+    """Slide #28 / Chowdhury & Xu (1995) Example 5, shallow mode: embankment on
+    soft clay, circle tangent to the interface (Slide Figure 28.11). Slide
+    Bishop 1.160 / RI_ln 0.799 / MC PF 21.2%; C&X 1.1625 / PF 20.2%. No free
+    parameters."""
+    sd = _vp028_ex5_slope_data()
+    sd['circles'] = [{'Xo': 37.369, 'Yo': 42.429, 'Depth': 15.0, 'R': 27.429}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp028b.xlsx'))
+    return 'vp028b.xlsx'
+
+
+def vp028c():
+    """Slide #28 / Chowdhury & Xu (1995) Example 5, deep mode: circle tangent
+    to the soft-foundation base (Slide Figure 28.12). Slide Bishop 1.185 /
+    RI_ln 0.820 / MC PF 19.9%; C&X 1.1479 / PF 19.7%."""
+    sd = _vp028_ex5_slope_data()
+    sd['circles'] = [{'Xo': 40.256, 'Yo': 29.437, 'Depth': 5.0, 'R': 24.437}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp028c.xlsx'))
+    return 'vp028c.xlsx'
+
+
 def vp029():
     """Slide #29 / Duncan (2000): the LASH terminal underwater slope (Port of San
     Francisco) — the canonical Taylor-series (TSPM) reliability example, which is
@@ -818,6 +914,194 @@ def vp029():
     sd['circles'] = [{'Xo': -6.589, 'Yo': 410.231, 'Depth': 410.231 - 549.583, 'R': 549.583}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp029.xlsx'))
     return 'vp029.xlsx'
+
+
+def vp033():
+    """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
+    tailings dyke (simplified probabilistic case). Cohesionless section over a
+    presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
+    surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
+    is tangent to el 270, 20 m below the model base at 290, so it truncates at
+    the base and runs flat inside the Kca band. Slide assigns three
+    piezometric lines per-material; xslope's single line uses the lower (WT4)
+    line everywhere - bracketing both lines everywhere moves FS only 1-3%.
+    Pgc is absent from the manual's material table (assumed = Pgs; no
+    competitive surface enters its zone). Targets (composite, Bishop): Slide
+    1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
+    1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
+    which a slope-scale sigma reproduces only qualitatively."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    mats = []
+    def mat(name, gamma, phi, sigma_phi=0.0):
+        m = dict(base)
+        m.update(name=name, c=0.0, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option='mc', u='piezo', sigma_c=0.0, sigma_phi=sigma_phi,
+                 sigma_gamma=0.0)
+        return m
+    mats.append(mat('Tailing sand (TS)', 20.0, 34.0))
+    mats.append(mat('Glacio-fluvial sand (Pf4)', 17.0, 34.0))
+    mats.append(mat('Sandy till (Pgs)', 17.0, 34.0, sigma_phi=2.0))
+    mats.append(mat('Clayey till (Pgc) [assumed = Pgs]', 17.0, 34.0))
+    mats.append(mat('Disturbed clay-shale (Kca)', 17.0, 7.5, sigma_phi=2.1))
+    sd['materials'] = mats
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(125.0, 347.6), (200.0, 340.0), (250.0, 335.2),
+                                 (300.0, 327.9), (330.0, 322.8), (354.0, 318.0),
+                                 (359.0, 317.3), (372.0, 317.3), (392.0, 308.0),
+                                 (475.0, 308.0)]},                      # TS
+        {'mat_id': 1, 'coords': [(125.0, 302.4), (390.0, 308.0),
+                                 (475.0, 308.0)]},                      # Pf4
+        {'mat_id': 2, 'coords': [(125.0, 300.0), (475.0, 306.3)]},      # Pgs
+        {'mat_id': 3, 'coords': [(125.0, 295.4), (236.5, 295.4),
+                                 (236.5, 290.0)]},                      # Pgc (left)
+        {'mat_id': 4, 'coords': [(236.5, 290.0), (236.5, 295.4),
+                                 (475.0, 295.4)]},                      # Kca (right)
+    ]
+    sd['max_depth'] = 290.0
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = [(125.0, 319.7), (350.0, 310.8), (392.0, 308.0),
+                        (475.0, 308.0)]
+    sd['dloads'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 327.5, 'Yo': 394.0, 'Depth': 270.0, 'R': 124.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp033.xlsx'))
+    return 'vp033.xlsx'
+
+
+def vp034():
+    """Slide #34 / Wolff & Harr (1987): Clarence Cannon Dam (MO) on the
+    W&H noncircular surface - 45 deg through the Phase II shell, horizontal
+    along the Phase I fill base (el 516), exit at the waterline on the
+    downstream face. Polygon-zone geometry (the vertical chimney drain is a
+    rectangular inclusion the profile-line stack can't represent). Geometry
+    from Figure 34.2's vertex dots (axis-calibrated); Slide's model reads a
+    few feet off the W&H figure labels (crest ~659 vs 654, WT ~557 vs 550)
+    and is the authority here since the FS targets are Slide's. gamma=150 is
+    Slide's tuned value. Targets: Slide Spencer 2.383 / GLE 2.333; W&H 2.36
+    (force equilibrium). Deterministic lock only: W&H's probability inputs
+    put sigma_phi > phi for Phase I (COV 124%), outside TSPM's domain - see
+    the docs section for the hand comparison."""
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)   # polygon-mode base
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, c, phi, gam, sc, sp in [
+            ('Phase II fill', 2901.6, 14.8, 150.0, 1079.8, 9.44),
+            ('Sand drain', 0.0, 30.0, 120.0, 0.0, 0.0),
+            ('Phase I fill', 2230.0, 6.34, 150.0, 1150.0, 7.87),
+            ('Foundation sand', 0.0, 30.0, 120.0, 0.0, 0.0)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gam, gamma_sat=gam,
+                 option='mc', u='piezo', sigma_c=sc, sigma_phi=sp)
+        sd['materials'].append(m)
+    shell = [(-365.0, 610.6), (-160.3, 659.0), (-122.7, 659.0), (22.8, 611.0),
+             (194.4, 578.0), (267.6, 578.0), (362.5, 552.8), (594.0, 552.8),
+             (594.0, 548.2), (-133.0, 548.2), (-133.0, 646.5), (-140.2, 646.5),
+             (-140.2, 548.2), (-365.0, 548.2)]
+    drain = [(-140.2, 548.2), (-133.0, 548.2), (-133.0, 646.5), (-140.2, 646.5)]
+    sand_top = [(-365.0, 515.0), (-315.0, 515.0), (-183.0, 460.0),
+                (-104.8, 460.0), (-6.0, 515.0), (594.0, 515.0)]
+    phase1 = [(-365.0, 548.2), (594.0, 548.2)] + list(reversed(sand_top))
+    # sand floor at 455, not the rock contact 460: the cutoff trench bottoms
+    # at 460, and a zero-thickness zone makes an invalid polygon
+    sand = sand_top + [(594.0, 455.0), (-365.0, 455.0)]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': i}
+                      for i, p in enumerate([shell, drain, phase1, sand])]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-365.0, 557.0), (594.0, 557.0)]
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [
+        {'X': -160.3, 'Y': 659.0, 'Movement': 'Free'},
+        {'X': -48.0, 'Y': 547.0, 'Movement': 'Free'},
+        {'X': -6.0, 'Y': 515.9, 'Movement': 'Free'},
+        {'X': 286.1, 'Y': 515.9, 'Movement': 'Free'},
+        {'X': 343.3, 'Y': 557.9, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp034.xlsx'))
+    return 'vp034.xlsx'
+
+
+def vp035():
+    """Slide #35 / Hassan & Wolff (1999): Cannon Dam, end-of-construction -
+    the minimum-beta benchmark (the surface of minimum reliability index is
+    NOT the minimum-FS surface). Geometry from Figure 35.1 (tick/scale-bar
+    calibrated pixel trace; the photocopy is ~7% anisotropic, so the
+    horizontal scale is anchored to the labeled 3H:1V faces; elevations are
+    the printed round-foot labels in meters). Materials from Table 35.1; dry.
+    H&W's Fig-7 surfaces are search products (unresolvable thumbnails), so
+    the RECIPE is reproduced, not the trace: Bishop critical search at means
+    (their surface A: xslope 2.529 vs Slide 2.551 / H&W 2.753) and a direct
+    min-beta scan (their surface B; the scan's winner is circles[0], tangent
+    el 158: beta_ln 3.353 uncorrelated, 3.50 with the c-phi correlations
+    applied as post-hoc TSPM cross-terms, vs Slide 4.351 / H&W 3.987).
+    Polygon-zone geometry (vertical filter strip + spoil wedge)."""
+    from shapely.geometry import Polygon as _P
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    def mat(name, c, phi, gamma, sc=0.0, sphi=0.0):
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option='mc', u='none', sigma_c=sc, sigma_phi=sphi,
+                 sigma_gamma=0.0)
+        return m
+    sd['materials'] = [
+        mat('Phase II clay fill', 143.64, 15.0, 22.0, sc=79.0, sphi=9.0),
+        mat('Sand filter', 0.0, 35.0, 22.0),
+        mat('Spoil fill', 5.0, 35.0, 25.0),
+        mat('Phase I clay fill', 117.79, 8.5, 22.0, sc=58.89, sphi=8.5),
+        mat('Foundation sand', 5.0, 18.0, 20.0),
+        mat('Limestone', 1000.0, 45.0, 23.0),
+    ]
+    # Explicit material-zone polygons (the 'polygon' sheet path): the vertical
+    # filter strip and the spoil wedge against the buried face don't fit the
+    # layer-stack profile representation. Shared boundaries reuse identical
+    # literal vertices.
+    yg, yi, yl, yb = 156.97, 166.12, 140.21, 121.92
+    XL, XR = 40.0, 477.5
+    B = (82.0, yg); C = (109.45, yi); D = (146.02, 178.31); E = (208.0, 184.10)
+    F = (261.4, 199.34); G = (269.4, 199.34); H = (308.7, 186.23)
+    I = (364.3, 176.17); J = (402.4, 169.16); K = (410.0, yi); L = (432.88, yg)
+    M = (XR, 167.40); N = (XR, yg)
+    P1 = (263.9, yi); P2 = (264.4, 199.0); P3 = (268.6, 199.0); P4 = (269.1, yi)
+    T1 = (220.5, yg); T2 = (254.0, yl); T3 = (282.0, yl); T4 = (307.7, yg)
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        # Phase II clay: everything above el 166.12 (the interface line spans
+        # face-to-face in Fig 35.1, so Phase I owns the toe wedges below it),
+        # with the filter notch cut out of the bottom
+        {'mat_id': 0, 'polygon': _P([C, D, E, F, G, H, I, J, K,
+                                     P4, P3, P2, P1])},
+        # Sand filter strip under the crest
+        {'mat_id': 1, 'polygon': _P([P1, P4, P3, P2])},
+        # Spoil fill wedge downstream of the buried face
+        {'mat_id': 2, 'polygon': _P([J, M, N, L, K])},
+        # Phase I clay: 156.97..166.12 band + excavated trench
+        {'mat_id': 3, 'polygon': _P([C, K, L, T4, T3, T2, T1, B])},
+        # Foundation sand, two wedges either side of the trench
+        {'mat_id': 4, 'polygon': _P([(XL, yg), T1, T2, (XL, yl)])},
+        {'mat_id': 4, 'polygon': _P([T3, (XR, yl), N, T4])},
+        # Limestone (properties immaterial per the manual note)
+        {'mat_id': 5, 'polygon': _P([(XL, yl), (XR, yl), (XR, yb), (XL, yb)])},
+    ]
+    sd['max_depth'] = None
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = []
+    sd['dloads'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # circles[0] = the minimum-beta circle from the downstream scan (entry on
+    # the crest at x=250, exit on the fill bench at x=395, tangent el 158.0):
+    # xslope's analog of H&W's surface B, for the fixed-surface reliability tag
+    sd['circles'] = [{'Xo': 340.248, 'Yo': 283.967, 'Depth': 158.0, 'R': 125.967}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp035.xlsx'))
+    return 'vp035.xlsx'
 
 
 def vp036():

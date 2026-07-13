@@ -1199,6 +1199,13 @@ def main():
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
                         help='Print details for passing tests')
+    parser.add_argument('--benchmark', default=None,
+                        help='Run only tests whose benchmark id matches the '
+                             'given comma-separated list; each entry matches '
+                             'exactly or as a family prefix (VP28 runs VP28a, '
+                             'VP28a-beta, ... but not VP280). For tag-only or '
+                             'builder-only changes, run just the new tags '
+                             'instead of the whole suite.')
     parser.add_argument('--skip-benchmarks', action='store_true',
                         help='Skip verification benchmark tests (annotations '
                              'carrying a benchmark=<ID> tag), e.g. the slow '
@@ -1395,6 +1402,25 @@ def main():
         n_skipped = n_before - len(tests)
         if n_skipped:
             print(f"Skipping {n_skipped} benchmark tests (--skip-benchmarks)")
+
+    if args.benchmark:
+        wanted = [w.strip().lower() for w in args.benchmark.split(',') if w.strip()]
+
+        def _matches(bench_id):
+            b = str(bench_id).lower()
+            for w in wanted:
+                # exact id, or a family prefix followed by a non-digit
+                # (VP28 matches VP28a and VP28-beta but not VP280; VP3 does
+                # not match VP33)
+                if b == w or (b.startswith(w) and not b[len(w):][:1].isdigit()):
+                    return True
+            return False
+
+        tests = [t for t in tests if 'benchmark' in t and _matches(t['benchmark'])]
+        print(f"Running {len(tests)} tests matching --benchmark {args.benchmark}")
+        if not tests:
+            print("No benchmark tags matched.")
+            return 1
 
     if args.quick:
         # Collapse each problem's per-method expansion to a single check

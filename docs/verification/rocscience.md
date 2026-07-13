@@ -31,9 +31,19 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
 <!-- test: file=../files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
 <!-- test: file=../files/rocscience/vp027.xlsx, type=single_circle, num_slices=50, fs_bishop=1.369, fs_spencer=1.375, fs_janbu=1.365, fs_mprice=1.371, fs_corps=1.388, fs_lowe=1.386, benchmark=VP27 -->
+<!-- test: file=../files/rocscience/vp035.xlsx, type=circular_search, num_slices=50, fs_bishop=2.529, benchmark=VP35-fs -->
+<!-- test: file=../files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.353, tolerance=0.03, benchmark=VP35-beta -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
+<!-- test: file=../files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
+<!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
+<!-- test: file=../files/rocscience/vp028b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.158, benchmark=VP28b -->
+<!-- test: file=../files/rocscience/vp028b.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.787, tolerance=0.03, benchmark=VP28b-beta -->
+<!-- test: file=../files/rocscience/vp028c.xlsx, type=single_circle, num_slices=60, fs_bishop=1.177, benchmark=VP28c -->
+<!-- test: file=../files/rocscience/vp028c.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.798, tolerance=0.03, benchmark=VP28c-beta -->
 <!-- test: file=../files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
 <!-- test: file=../files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
+<!-- test: file=../files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.299, benchmark=VP33 -->
+<!-- test: file=../files/rocscience/vp034.xlsx, type=single_noncirc, num_slices=60, fs_spencer=2.423, fs_mprice=2.384, benchmark=VP34 -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=../files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.436, fs_bishop=1.530, fs_spencer=1.572, fs_mprice=1.572, benchmark=VP42-circle -->
@@ -149,14 +159,14 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope, surface constructed analytically (45° wedge + tangent fan arc, Slide's printed exit point): Spencer 1.052 vs Slide 1.051 / Chen & Shao 1.05 (theory 1.0). |
 | 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | blocked | Prandtl bearing-capacity mechanism (weightless φ=0 soil, surface load, theoretical FS=1.0; Slide Spencer 0.940). XSLOPE's surface-validity checks reject failure surfaces whose two ends sit at equal elevation (the 'flat arc' guard) — flat-ground bearing mechanisms cannot currently be evaluated. Feature gap noted for a relaxed guard when driving comes from loads. |
 | [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 manual slope (undulating bedrock, zero-strength cap, γ/γsat split, WT). Uses the piezometric-line Type=`phreatic` flag (template v13) this problem requires: all six methods land 1.9% below Slide/XSTABL uniformly (Bishop 1.369 vs 1.396/1.397), within the ±2 ft pixel-traced water table. |
-| 28 | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | planned |  |
+| [28](#vp28) | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | **built** (3 of 10 cases) | [vp028a](../files/rocscience/vp028a.xlsx) / [b](../files/rocscience/vp028b.xlsx) / [c](../files/rocscience/vp028c.xlsx). Chowdhury & Xu (1995): Congress St. Cut + embankment on soft clay, fixed printed circles. Bishop 1.129 / 1.158 / 1.177 vs Slide 1.128 / 1.160 / 1.185; TSPM PF 22.1 / 21.6 / 21.2% vs Slide MC 24.6 / 21.2 / 19.9%. Deep Congress-St. mode and Examples 2–4 not locked — inputs underdetermined (see section). |
 | [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](../files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical TSPM problem, targeted against BOTH primary sources. Duncan's surface as a smooth least-squares arc (RMS 1.1 ft against the trace): Spencer 1.145 vs Duncan 1.17 / Slide 1.157. TSPM with Slide's published σ inputs: β_ln 0.936, **PF 17.5% vs Duncan's own 18%** (Slide's Monte Carlo: 14%); the γ term matches Duncan's table (ΔF 0.203 vs 0.20). Published PF spans 14–33% across sources — the σ-input choice dwarfs the estimator. |
 | 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | planned |  |
 | 31 | Reinforced embankment, (5) materials, geosynthetic | planned |  |
 | 32 | Reinforced embankment, (7) materials, geosynthetic | planned |  |
-| 33 | Dike, (5) materials, probabilistic analysis, water table | planned |  |
-| 34 | Dam, (3) materials, probabilistic analysis, water table | planned |  |
-| 35 | Dam, (5) materials, probabilistic analysis, reliability index | planned |  |
+| [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](../files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke: the critical surface is composite (circle truncated at the model base, running flat in the presheared clay-shale). Bishop 1.299 vs Slide 1.305 / El-Ramly 1.31 on Slide's circle; composite grid search digs to 1.253. PF not locked (see section). |
+| [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H noncircular surface, polygon-zone geometry with the chimney drain: M-P 2.384 vs Slide GLE 2.333 / W&H 2.36; Spencer 2.423 vs Slide 2.383. Deterministic lock only — W&H's σφ exceeds φ for the Phase I fill (COV 124%), outside TSPM's domain; hand comparison in the section. |
+| [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](../files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the min-β ≠ min-FS benchmark, reproduced by recipe: Bishop critical search 2.529 vs Slide 2.551 / H&W 2.753; min-β surface β_ln 3.353 (3.50 with c–φ correlation) vs Slide 4.351 / H&W 3.987, at roughly ⅓ of the FS-critical surface's β in all three programs. |
 | [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, ru=0.2). Deterministic Bishop 1.333 vs H&W 1.334 (Slide 1.340). Taylor-series β_ln on the critical surface 2.263 vs H&W (FOSM) 2.336 and Slide (Monte-Carlo) 2.482 — β estimates legitimately spread by method; xslope does not yet perturb ru (σ=0.02, minor). |
 | 37 | Slope, homogenous, distributed load, back analysis of required support force and length | planned |  |
 | 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
@@ -628,6 +638,39 @@ Slide #27 / XSTABL v5 reference manual (Sharma 1996), via Malkawi et al. (2001):
 
 ![vp027: inputs and representative solution](images/vp027.png)
 
+### VP28: Excavated slope and embankment, probabilistic analysis {#vp28}
+
+**Input files:** [vp028a.xlsx](../files/rocscience/vp028a.xlsx) (Congress St. Cut, shallow
+mode) · [vp028b.xlsx](../files/rocscience/vp028b.xlsx) (embankment, interface mode) ·
+[vp028c.xlsx](../files/rocscience/vp028c.xlsx) (embankment, deep mode)
+
+Chowdhury & Xu (1995) evaluate probabilities of failure for two slopes: the Congress
+Street Cut (Ireland 1954) — three frictionless clays under a sand cap whose strength is
+excluded — and an embankment on a soft clay foundation, each with slip circles tangent to
+two different layer boundaries. Slide's manual prints the critical circle (center and
+radius) for every case; those circles are evaluated here as fixed surfaces with Bishop's
+method, and reliability uses the Taylor-series procedure on the same surfaces.
+
+| Case | XSLOPE FS | Slide FS | C&X FS | XSLOPE β_ln / PF | Slide RI_ln / MC PF | C&X PF |
+|---|---|---|---|---|---|---|
+| Congress St., tangent clay-2 base | 1.129 | 1.128 | 1.128 | 0.768 / 22.1% | 0.650 / 24.6% | 26.6% |
+| Embankment, tangent interface | 1.158 | 1.160 | 1.1625 | 0.787 / 21.6% | 0.799 / 21.2% | 20.2% |
+| Embankment, tangent foundation base | 1.177 | 1.185 | 1.1479 | 0.798 / 21.2% | 0.820 / 19.9% | 19.7% |
+
+*Input provenance: C&X's paper states no unit weights; the manual notes Rocscience selected
+clay unit weights to reproduce the published deterministic FS, and the sand unit weight
+(never printed) is set to 22 kN/m³ here on the same basis. The embankment cases carry no
+calibrated inputs at all. The remaining manual cases are not locked: the deep Congress-St.
+circle extends 0.19 m below the clay-3 base into a layer whose properties the manual does
+not state, and the deterministic FS there is too sensitive to that layer (roughly 0.003
+per unit cohesion) for a defensible benchmark; Examples 2–4 rerun the same geometry with
+re-tuned statistics and inherit the same indeterminacy. On the probabilistic side the three
+sources' σ_F span 26% on the Congress St. problem (Taylor series 0.163, Slide's Monte
+Carlo 0.190, C&X 0.205) while the deterministic FS agrees to 0.1% — as with VP29 and VP36,
+the probabilistic inputs and estimator dominate the PF comparison, not the mechanics.*
+
+![vp028a: inputs and representative solution](images/vp028a.png)
+
 ### VP29: Duncan's LASH terminal — TSPM reliability vs Monte Carlo {#vp29}
 
 Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Francisco LASH terminal — the example the Taylor-series reliability method (TSPM) was built on, and the method XSLOPE's `reliability()` implements. San Francisco Bay Mud with depth-growing undrained strength (su = 100 psf at el. −20 + 9.8 psf/ft — XSLOPE's `cp` option; the profile is confirmed against Duncan's Fig. 2(b)/D&W Fig. 13.1 average line), γ = 100 pcf (γ′ = 37.6), fully submerged below el. 0. Probabilistic inputs: σ_γ = 3.3, σ_cp = 1.2 (Slide's Table 29.2 rendering of Duncan's ±σ envelopes). Duncan's estimated slip surface is stored as a pixel-trace of the drawn surface, validated against the printed endpoints (Slide's printed "Axis Location" is the noncircular moment axis, not a circle center — a circle built from it lies up to 17 ft off the drawn surface at mid-span, though it reads a similar FS). `reliability(search=False)`, added for this problem, evaluates the prescribed surface directly for F_MLV and every perturbation.
@@ -647,6 +690,110 @@ Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Fran
 *Surface provenance: the arc is anchored at the trench corner (138, −120) rather than Slide's printed left endpoint, which is pulled 0.25 ft below the trench floor; the drawn surface in Slide's figure is partially occluded by a coordinate label near its entry, so that span is read at the label's edges. On the probabilistic side, note that the same slope carries three published probabilities of failure — 14% (Slide MC), 18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, wider 2σ-rule envelope): two TSPM analyses by the same author differ by more than TSPM differs from Monte Carlo, so the σ-input choice, not the estimator, dominates probabilistic comparisons.*
 
 ![vp029: inputs and representative solution](images/vp029.png)
+
+### VP33: Dike, (5) materials, probabilistic analysis, water table {#vp33}
+
+**Input files:** [vp033.xlsx](../files/rocscience/vp033.xlsx)
+
+El-Ramly, Morgenstern & Cruden (2003)'s simplified probabilistic model of a Syncrude
+tailings dyke: a cohesionless section (tailing sand over glacio-fluvial sands and tills,
+all φ = 34°) resting on a presheared disturbed clay-shale with φ = 7.5° ± 2.1°. The
+critical mechanism rides the clay-shale: Slide's drawn circle (center (327.5, 394),
+R = 124) is tangent to el. 270 — twenty meters below the model base at el. 290 — so the
+surface is **composite**, truncated at the base and running flat inside the weak band.
+This is the [composite-surface option](../lem/overview.md#composite-surfaces) exercised
+on a published benchmark.
+
+| | XSLOPE (composite) | Slide | El-Ramly et al. |
+|---|---|---|---|
+| Bishop, Slide's circle | 1.299 | 1.305 | 1.31 |
+| Bishop, critical search | 1.253 | — | — |
+
+*Modeling notes: Slide assigns three piezometric lines to different materials; XSLOPE's
+single piezometric line uses the lowest (the one Slide assigns to the glacio-fluvial
+sand) everywhere — applying each of Slide's lines everywhere brackets the factor of
+safety within 1–3%, so the simplification is well inside the digitizing tolerance. The
+clayey till's properties are not printed in the manual and are taken equal to the sandy
+till's; no competitive surface enters its zone. The published probability of failure
+(1.5–1.6×10⁻³ by Monte Carlo) is reported here without a regression lock: it rests on
+the paper's spatial-averaging variance treatment, which a single slope-scale σ does not
+reproduce.*
+
+![vp033: inputs and representative solution](images/vp033.png)
+
+### VP34: Dam, (3) materials, probabilistic analysis, water table {#vp34}
+
+**Input files:** [vp034.xlsx](../files/rocscience/vp034.xlsx)
+
+Wolff & Harr (1987)'s reliability model of the Clarence Cannon Dam (Salt River,
+Missouri): Phase I fill placed to el. 548 with a cutoff trench to rock, a Phase II
+shell to the crest at el. 659, a vertical chimney drain under the crown, and a flat
+water table at el. 557. The model uses polygon zones (the drain is a rectangular
+inclusion inside the shell). Geometry is digitized from the Slide model's vertex
+dots; Slide's model reads a few feet off the labels in W&H's original figure
+(crest ~659 vs El. 654, water table ~557 vs El. 550) and is used as-built here
+since the factor-of-safety targets are Slide's. The unit weight γ = 150 pcf is
+Slide's published choice, tuned to reproduce W&H's factor of safety.
+
+The analysis evaluates W&H's prescribed noncircular surface: 45° from the crest
+edge through the shell and drain, along the base of the Phase I fill (el. 516),
+exiting the downstream face at the waterline.
+
+| | XSLOPE | Slide | Wolff & Harr |
+|---|---|---|---|
+| Spencer | 2.423 | 2.383 | — |
+| Morgenstern–Price / GLE | 2.384 | 2.333 | 2.36 |
+
+Morgenstern–Price lands within 1% of W&H's 2.36 and 2.2% of Slide's GLE, within
+the tolerance of the pixel-traced geometry.
+
+*On the probabilistic side, this problem sits outside the Taylor-series method's
+domain: W&H's inputs give the Phase I fill a φ standard deviation (7.87°) larger
+than its mean (6.34°), so the F(φ−σ) evaluation would use a negative friction
+angle, and `reliability()` declines the input. A hand Taylor series with a
+one-sided φ derivative and W&H's correlation coefficients gives β 1.54 / PF
+6.2×10⁻² under their normal-FS treatment, against W&H's point-estimate 4.55×10⁻²
+and Slide's Monte-Carlo 3.55×10⁻³ — the two published values themselves differ by
+13×, the sampling treatment of the φ ≥ 0 bound on a COV-124% variable dwarfing
+the estimator choice.*
+
+![vp034: inputs and representative solution](images/vp034.png)
+
+### VP35: Dam, (5) materials, probabilistic analysis, reliability index {#vp35}
+
+**Input files:** [vp035.xlsx](../files/rocscience/vp035.xlsx)
+
+Hassan & Wolff (1999)'s end-of-construction model of Cannon Dam, the benchmark for
+their central finding: **the surface of minimum reliability index is not the surface of
+minimum factor of safety**. Two clay fills with large strength scatter (Phase I
+φ = 8.5° ± 8.5°, Phase II c = 143.6 ± 79 kPa with ρ(c,φ) = −0.55), a vertical sand-filter
+strip under the crest, and a spoil-covered downstream toe, in polygon-zone geometry.
+
+Hassan & Wolff's published surfaces are search products (their figures do not resolve
+the individual circles), so the comparison reproduces the *procedure*: a Bishop critical
+search at mean strengths (their surface A), and a direct minimum-β scan over downstream
+circles evaluating the Taylor-series β on each fixed candidate (their surface B). The
+c–φ correlations enter as the standard Taylor-series cross-terms
+(2ρ·(ΔF_c/2)·(ΔF_φ/2)); the regression tag locks the uncorrelated β.
+
+| Quantity | XSLOPE | Slide | Hassan & Wolff |
+|---|---|---|---|
+| Critical FS at means (Bishop search) | 2.529 | 2.551 | 2.753 |
+| β_ln on that surface | 6.71 (7.29 with ρ) | 10.95 | 10.36 |
+| Minimum-β surface: β_ln | 3.353 (3.50 with ρ) | 4.351 | 3.987 |
+| FS on the minimum-β surface | 2.97 | 2.820 | 2.352 |
+
+All three programs agree on the structure: a mid-depth circle through the Phase II fill
+and upper Phase I carries roughly one-third the β of the FS-critical surface, so a
+design screened on FS alone would examine the wrong surface. The β magnitudes spread
+with the estimator at these extreme COVs — the Taylor series evaluates strength at
+φ − σ = 0° for the Phase I fill, a tail that truncated-normal Monte Carlo sampling
+rarely reaches — the same direction as VP36's spread at three times the COV. The
+manual notes its own inputs were partly inferred (its FS departs from Hassan & Wolff's
+by large margins on several of the paper's fixed surfaces C–H, which are therefore not
+reproduced here).
+
+![vp035: inputs and representative solution](images/vp035.png)
 
 ### VP36: Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index {#vp36}
 

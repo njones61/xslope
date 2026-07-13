@@ -194,7 +194,10 @@ def compute_ito_matsui_force(D_pile, S, segments):
     D1 = S - D_pile  # clear spacing between piles
 
     if D1 <= 0:
-        return 0.0, 0.0
+        raise ValueError(
+            f"Ito & Matsui requires pile spacing greater than pile diameter "
+            f"(got D_pile={D_pile}, S={S}); a continuous wall (S <= D) has no "
+            f"soil arching between piles and the theory does not apply.")
 
     F_pile = 0.0
     for seg in segments:
@@ -244,7 +247,12 @@ def compute_ito_matsui_force_and_moment_arm(D_pile, S, segments):
     """
     D1 = S - D_pile
 
-    if D1 <= 0 or not segments:
+    if D1 <= 0:
+        raise ValueError(
+            f"Ito & Matsui requires pile spacing greater than pile diameter "
+            f"(got D_pile={D_pile}, S={S}); a continuous wall (S <= D) has no "
+            f"soil arching between piles and the theory does not apply.")
+    if not segments:
         return 0.0, 0.0, 0.0
 
     F_pile = 0.0

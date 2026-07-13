@@ -256,10 +256,10 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     """
 
     if seed != 'grid' and not slope_data.get('circles'):
-        print("\nERROR: Circular search requires at least one circle defined in the input.")
-        print("       Add circle data to the 'circles' sheet in the input template.")
-        print("       (Or run with seed='grid' to generate starting circles automatically.)")
-        raise SystemExit(1)
+        raise ValueError(
+            "Circular search requires at least one circle defined in the input. "
+            "Add circle data to the 'circles' sheet in the input template, "
+            "or run with seed='grid' to generate starting circles automatically.")
 
     if rapid:
         validate_rapid_drawdown(slope_data)
@@ -578,9 +578,10 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         search_path : list of surfaces evaluated during search
     """
     if not slope_data.get('non_circ'):
-        print("\nERROR: Non-circular search requires a non-circular surface defined in the input.")
-        print("       Add surface point data to the 'circles' sheet (non-circular section) in the input template.")
-        raise SystemExit(1)
+        raise ValueError(
+            "Non-circular search requires a non-circular surface defined in the "
+            "input. Add surface point data to the 'circles' sheet (non-circular "
+            "section) in the input template.")
 
     if rapid:
         validate_rapid_drawdown(slope_data)
@@ -631,7 +632,20 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
             
         # Create non_circ format from points
         non_circ = [{'X': x, 'Y': y, 'Movement': movements[i]} for i, (x, y) in enumerate(points)]
-        
+
+        # Geometric admissibility on the surface itself: slicing breaks at
+        # every vertex, so a steep segment with real width gets judged by the
+        # per-slice alpha guard below - but generate_slices merges slices
+        # thinner than its min_width (1e-2), so a near-vertical segment
+        # narrower than that is absorbed into its neighbour and its angle
+        # diluted out of the alpha table. Reject exactly those hidden risers.
+        seg = np.diff(np.array([[p_['X'], p_['Y']] for p_ in non_circ]), axis=0)
+        seg_ang = np.degrees(np.arctan2(np.abs(seg[:, 1]),
+                                        np.maximum(np.abs(seg[:, 0]), 1e-300)))
+        hidden_riser = (np.abs(seg[:, 0]) < 1e-2) & (seg_ang > max_base_angle)
+        if hidden_riser.any():
+            return float('inf'), None, None, None, fs_cache
+
         # Generate slices and compute FS
         success, result = generate_slices(slope_data, non_circ=non_circ, num_slices=num_slices)
         if not success:

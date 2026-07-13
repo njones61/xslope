@@ -116,7 +116,8 @@ cross-bearings.
 | 44 | Seepage analysis for an earth embankment (D&W Fig 14.20-a; = Slide2 VP82, not VP76 — §39's body carries VP76) — **built**: SSRM 1.511 vs RS2 SSR 1.51 (+0.1%); Slide2 LEM 1.532/1.541, referee 1.528–1.542 (on [vp082.xlsx](../files/rocscience/vp082.xlsx)) | VP82 |
 | 45–46 | Varying undrained shear strength profiles (I, II) | VP83/VP84 |
 | 47 | Purely cohesive slope with varying thickness | VP78 family |
-| 48–54 | Multi-tiered walls (tiers, fill, length, type, foundation, seepage, surcharge) | VP85–VP94 |
+| 48–54 | Multi-tiered geotextile walls (= Slide2 VP87–VP93 one-for-one, verified; Leshchinsky & Han 2004) — *blocked*: the FEM reinforcement tensile-capacity cap is not enforced in SSRM (proven Ta-insensitive on the baseline wall: unreinforced 0.41, any Ta 1.72 vs published ≈1.0). Extraction and published tables are complete for all seven; the series unlocks together when the cap is fixed | VP87–VP93 |
+| 55 | Five 1.8-m tiers (= Slide2 VP94; belongs to the #48–54 family) — *blocked* with the series | VP94 |
 | 56–58 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (I–III) | — (multi-program SSR cross-bearing) |
 
 ### Part III (59–68)

@@ -215,11 +215,54 @@ centerline, where Slide's and Fredlund & Rahardjo's curves coincide within 0.2 m
 | 8 | −0.22 | −0.60 | ≈−0.45 |
 
 *The profile shape reproduces exactly; the whole curve sits 0.25–0.5 m above the
-published pair, insensitive to the conductivity fit and to mesh refinement — the same
-free-surface/exit-face behavior seen on GW4's drain tip and GW11's release point, and
-under investigation as one question. The regression locks XSLOPE's own values.*
+published pair, insensitive to the conductivity fit and to mesh refinement. This is a
+family difference, not a solver error: run against SEEP2D (the original USACE/WES code)
+on the identical mesh, boundary conditions and unsaturated law, XSLOPE's free surface
+daylights at the same place — see [the SEEP2D cross-check](#seep2d-crosscheck) below. The
+regression locks XSLOPE's own values.*
 
 ![gw006a: mesh and solved heads](images/gw006a.png)
+
+## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
+
+Several problems on this page reproduce a published profile in shape but sit a little
+high, and the free surface on a steep exit face looked like the common thread. The
+question is whether XSLOPE places the **release point** — the top of the saturated
+seepage face, where the phreatic surface daylights — differently from other codes.
+
+It is answerable directly, because XSLOPE's seepage solver is in the SEEP2D family. The
+original USACE/WES SEEP2D Fortran program is run on the *identical* tri3 mesh, the
+identical boundary conditions and the identical unsaturated law (SEEP2D's `iuntyp`:
+linear front, or van Genuchten — both codes use the same Mualem–van Genuchten form, so
+α and n carry straight across), and the two solutions are compared node for node. The
+harness is `benchmarks/run_seep2d_compare.py --gw`.
+
+| problem | law | release point, XSLOPE | release point, SEEP2D | head RMS | head range |
+|---|---|---|---|---|---|
+| gw004 | linear front | 0.500 | 0.500 | 0.0004 | 0–4 |
+| gw006a | van Genuchten | 0.000 | 0.000 | 0.0000 | 0–10 |
+| gw009a | van Genuchten | 8.846 | 8.462 | 0.0026 | 0–18.5 |
+| gw010 | van Genuchten | 4.872 | 4.872 | 0.0006 | 2–10 |
+| gw012 | linear front | face dry | face dry | 0.034 | 0–50 |
+| gw013 | linear front | face dry | face dry | 0.070 | 0–50 |
+
+**The release point agrees.** It is identical on gw004, gw006a and gw010; both codes
+leave the face fully drained on gw012 and gw013; and gw009a differs by 0.385 — a single
+element at that mesh. The head fields agree to a relative RMS of order 10⁻⁴ throughout.
+XSLOPE does not release low. Where this corpus sits above a published profile, the
+difference is between the SEEP2D family and the reference code's exit-face convention,
+not an XSLOPE defect — so those problems are locked on XSLOPE's own values with the
+offset reported, rather than tuned.
+
+One open item came out of the same run. On the **van Genuchten** problems the total
+discharge reads 3.5–4.7% below SEEP2D (gw009a 2.299×10⁻⁵ vs 2.412×10⁻⁵; gw010
+6.070×10⁻⁵ vs 6.294×10⁻⁵) even though the heads agree to 10⁻⁴ — while the linear-front
+problems agree on discharge to better than 0.15%. The split follows the unsaturated law
+exactly, and it is *not* XSLOPE's kr floor: dropping `kr_min` from 10⁻⁴ to zero leaves
+the discharge unchanged to six figures. Since the head field is right and only the
+integrated flux differs, the likely cause is where each code evaluates the strongly
+nonlinear kr(ψ) when it forms an element's conductivity. That is being tracked
+separately; it does not affect pore pressures or stability, which read the head field.
 
 ## Methodology
 

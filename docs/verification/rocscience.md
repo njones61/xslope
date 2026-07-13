@@ -45,6 +45,10 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.299, benchmark=VP33 -->
 <!-- test: file=../files/rocscience/vp034.xlsx, type=single_noncirc, num_slices=60, fs_spencer=2.423, fs_mprice=2.384, benchmark=VP34 -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
+<!-- test: file=../files/rocscience/vp039a.xlsx, type=single_circle, num_slices=60, fs_spencer=0.968, benchmark=VP39a -->
+<!-- test: file=../files/rocscience/vp039b.xlsx, type=single_circle, num_slices=60, fs_spencer=1.332, benchmark=VP39b -->
+<!-- test: file=../files/rocscience/vp039c.xlsx, type=single_circle, num_slices=60, fs_spencer=1.200, benchmark=VP39c -->
+<!-- test: file=../files/rocscience/vp039d.xlsx, type=single_circle, num_slices=60, fs_spencer=1.343, benchmark=VP39d -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=../files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.436, fs_bishop=1.530, fs_spencer=1.572, fs_mprice=1.572, benchmark=VP42-circle -->
 <!-- test: file=../files/rocscience/vp042.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.792, fs_mprice=1.781, benchmark=VP42-noncirc -->
@@ -166,16 +170,16 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 manual slope (undulating bedrock, zero-strength cap, γ/γsat split, WT). Uses the piezometric-line Type=`phreatic` flag (template v13) this problem requires: all six methods land 1.9% below Slide/XSTABL uniformly (Bishop 1.369 vs 1.396/1.397), within the ±2 ft pixel-traced water table. |
 | [28](#vp28) | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | **built** (3 of 10 cases) | [vp028a](../files/rocscience/vp028a.xlsx) / [b](../files/rocscience/vp028b.xlsx) / [c](../files/rocscience/vp028c.xlsx). Chowdhury & Xu (1995): Congress St. Cut + embankment on soft clay, fixed printed circles. Bishop 1.129 / 1.158 / 1.177 vs Slide 1.128 / 1.160 / 1.185; TSPM PF 22.1 / 21.6 / 21.2% vs Slide MC 24.6 / 21.2 / 19.9%. Deep Congress-St. mode and Examples 2–4 not locked — inputs underdetermined (see section). |
 | [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](../files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical TSPM problem, targeted against BOTH primary sources. Duncan's surface as a smooth least-squares arc (RMS 1.1 ft against the trace): Spencer 1.145 vs Duncan 1.17 / Slide 1.157. TSPM with Slide's published σ inputs: β_ln 0.936, **PF 17.5% vs Duncan's own 18%** (Slide's Monte Carlo: 14%); the γ term matches Duncan's table (ΔF 0.203 vs 0.20). Published PF spans 14–33% across sources — the σ-input choice dwarfs the estimator. |
-| 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | planned |  |
-| 31 | Reinforced embankment, (5) materials, geosynthetic | planned |  |
-| 32 | Reinforced embankment, (7) materials, geosynthetic | planned |  |
+| 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | *blocked* | Borges & Cardoso (2002) case 1. Inputs and the target circle fully extracted (center (10.99, 6.00), R 5.24, confirmed by the figure's axis marker and the printed moment table); needs reverse-curvature circle exits (Slide applies an automatic tension crack where the circle curves back over its center) and the noncircular reinforcement generalization. |
+| 31 | Reinforced embankment, (5) materials, geosynthetic | *blocked* | Borges & Cardoso (2002) case 2. Geometry and materials extracted; same blockers as VP30. |
+| 32 | Reinforced embankment, (7) materials, geosynthetic | *blocked* | Borges & Cardoso (2002) case 3. Figures unlabeled — needs the source paper (Geotextiles & Geomembranes 20(6)) for geometry and circles, plus the VP30 blockers. |
 | [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](../files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke: the critical surface is composite (circle truncated at the model base, running flat in the presheared clay-shale). Bishop 1.299 vs Slide 1.305 / El-Ramly 1.31 on Slide's circle; composite grid search digs to 1.253. PF not locked (see section). |
 | [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H noncircular surface, polygon-zone geometry with the chimney drain: M-P 2.384 vs Slide GLE 2.333 / W&H 2.36; Spencer 2.423 vs Slide 2.383. Deterministic lock only — W&H's σφ exceeds φ for the Phase I fill (COV 124%), outside TSPM's domain; hand comparison in the section. |
 | [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](../files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the min-β ≠ min-FS benchmark, reproduced by recipe: Bishop critical search 2.529 vs Slide 2.551 / H&W 2.753; min-β surface β_ln 3.353 (3.50 with c–φ correlation) vs Slide 4.351 / H&W 3.987, at roughly ⅓ of the FS-critical surface's β in all three programs. |
 | [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, ru=0.2). Deterministic Bishop 1.333 vs H&W 1.334 (Slide 1.340). Taylor-series β_ln on the critical surface 2.263 vs H&W (FOSM) 2.336 and Slide (Monte-Carlo) 2.482 — β estimates legitimately spread by method; xslope does not yet perturb ru (σ=0.02, minor). |
 | 37 | Slope, homogenous, distributed load, back analysis of required support force and length | planned |  |
 | 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
-| 39 | Reinforced embankment, (2) materials, tension crack, geosynthetic | planned |  |
+| [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](../files/rocscience/vp039a.xlsx)/[b](../files/rocscience/vp039b.xlsx)/[c](../files/rocscience/vp039c.xlsx)/[d](../files/rocscience/vp039d.xlsx). Tandjiria (2002): required geosynthetic force for FS=1.35. Unreinforced Spencer 0.968/1.200 (clay/sand) vs Slide 0.975/1.209; at Slide's published forces (169/44 kN/m) XSLOPE reads 1.332/1.343 vs the 1.35 target; XSLOPE's own required forces 175/46 vs Tandjiria's 170/45. Noncircular cases not locked (see section). |
 | 40 | Slope, homogenous, sensitivity analysis | planned |  |
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
 | [42](#vp42) | Dam, (3) materials, water table, ponded water, tension crack | **built** | [vp042.xlsx](../files/rocscience/vp042.xlsx). Baker & Leshchinsky (2001) safety-map dam. **Convention finding**: with rigorous total-weight + u + reservoir-load statics, Slide's printed critical circle reads Spencer 1.572 and Baker's noncircular surface 1.792; the published 1.925 / 1.91 correspond to the buoyant-weight shortcut (γ′ below the phreatic, no u, no pond), which an independent hand integral reproduces at 1.87 — the difference is the seepage forces of the inclined phreatic. XSLOPE's rigorous values are regression-locked; the published values are not comparable without adopting the shortcut convention. |
@@ -247,7 +251,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 108 | Retaining walls, gabion walls, supports | planned |  |
 | 109 | Retaining walls, gabion walls, weak layers | planned |  |
 | 110 | Retaining walls, equivalent fluid pressure | planned |  |
-| 111 | Helical anchor | *blocked* | Verifies Slide's helical-anchor capacity envelope (Perko 2009 plate-bearing formulas — pullout/stripping/tensile modes as a force-vs-position diagram, not an FS); XSLOPE has no helical-anchor support type. The manual's hand-calculation table is retained as the acceptance test for a future implementation. |
+| [111](#vp111) | Helical anchor | *no lock possible* | The problem verifies Slide's helical-anchor capacity envelope (Perko 2009 plate-bearing formulas) — a force-vs-position diagram with no slope and no factor of safety, so there is nothing for a slope-stability program to lock. Slopes supported by helical anchors can be analyzed in XSLOPE today by entering the governing capacity as a standard anchor force — see the [worked note](#vp111). |
 
 ---
 
@@ -814,6 +818,37 @@ Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18
 *β estimates legitimately spread by estimation method; xslope does not yet perturb ru (σ = 0.02, minor).*
 
 ![vp036: inputs and representative solution](images/vp036.png)
+
+### VP39: Reinforced embankment, (2) materials, tension crack, geosynthetic {#vp39}
+
+**Input files:** [vp039a.xlsx](../files/rocscience/vp039a.xlsx) (clay fill, unreinforced) ·
+[vp039b.xlsx](../files/rocscience/vp039b.xlsx) (clay, T=169) ·
+[vp039c.xlsx](../files/rocscience/vp039c.xlsx) (sand fill, unreinforced) ·
+[vp039d.xlsx](../files/rocscience/vp039d.xlsx) (sand, T=44)
+
+Tandjiria (2002)'s required-reinforcement problem: a half-embankment (centerline at
+x = 0) on soft clay, analyzed as a clay fill (c′ = 20 kPa, φ = 0, water-filled tension
+crack) and as a sand fill (φ′ = 37°, dry crack). The unreinforced critical surface is
+located first; the geosynthetic force at the embankment base that restores FS = 1.35
+on that surface is then computed (active application, force parallel to the
+reinforcement, per the source).
+
+| Case | XSLOPE | Slide | Tandjiria (2002) |
+|---|---|---|---|
+| Clay fill, unreinforced (Spencer) | 0.968 | 0.975 | 0.981 |
+| Clay fill, FS at T = 169 kN/m | 1.332 | 1.35 | — |
+| Clay fill, required T for FS = 1.35 | 175 kN/m | 169 | 170 |
+| Sand fill, unreinforced (Spencer) | 1.200 | 1.209 | 1.219 |
+| Sand fill, FS at T = 44 kN/m | 1.343 | 1.35 | — |
+| Sand fill, required T for FS = 1.35 | 46 kN/m | 44 | 45 |
+
+The regression locks the unreinforced factors of safety and the factors of safety at
+Slide's published forces, each on the stored critical circle. The source's noncircular
+variants (Slide 0.935/1.188, required T 184/56) are not locked: XSLOPE's noncircular
+search returns seed-dependent local minima on this φ = 0 problem, and the noncircular
+reinforced evaluation is pending the reinforcement generalization noted for VP30.
+
+![vp039: inputs and representative solution](images/vp039b.png)
 
 ### VP41: Slope, homogenous, ru pore pressure {#vp41}
 
@@ -1675,3 +1710,24 @@ manual acknowledges — and XSLOPE lands 1.5% above Slide; every other case agre
 Slide within 0.8%.
 
 ![vp106c: inputs and representative solution](images/vp106c.png)
+
+### VP111: Helical anchor — capacity note (no lock) {#vp111}
+
+Slide's problem 111 verifies its helical-anchor **capacity envelope**, not a slope
+analysis: for an anchor with three 0.2-m helices (1-m spacing, 0.1-m shaft), shaft
+tensile capacity 85 kN, head capacity 80 kN, in soil with c′ = 15 kPa, φ′ = 35°,
+γ = 20 kN/m³, the manual tabulates the available force as a function of where a slip
+surface crosses the anchor — the minimum of three failure modes (plate pullout behind
+the surface, stripping ahead of it, shaft tension), each from the Perko (2009)
+plate-bearing formulas. Stripping governs (80 kN) for crossings in the first ~3 m,
+plate pullout beyond (73.53 kN/m at the 3.5-m crossing for 1-m out-of-plane spacing),
+tapering to zero at the tip. There is no slope and no factor of safety, so there is
+nothing for XSLOPE to verify against.
+
+**Analyzing helically anchored slopes in XSLOPE:** compute the governing capacity at
+the expected slip-surface crossing — from the supplier's rating, an installation-torque
+correlation, or the Perko formulas as above — divide by the out-of-plane spacing, and
+enter the result as the tension capacity of a standard anchor/reinforcement line at the
+anchor's geometry. This is the same value Slide's internal model would apply; only the
+plate-bearing bookkeeping is external. The manual's Table 111.1 serves as the acceptance
+test if an internal helical capacity model is ever added.

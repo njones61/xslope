@@ -1123,6 +1123,86 @@ def vp036():
     return 'vp036.xlsx'
 
 
+def _vp039_slope_data(fill, clay, tcrack_water, circle, t_geo):
+    """Slide #39 / Tandjiria (2002) problem 1 shared geometry: half-embankment
+    (centerline x=0) on soft clay, tension crack to el 7, geosynthetic at the
+    base (el 3, x 0-20, active, parallel to reinforcement)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, (c, phi, g) in (('Fill', fill), ('Soft Clay', clay)):
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=g, gamma_sat=g, option='mc',
+                 u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 9.0), (10.0, 9.0), (20.0, 3.0), (30.0, 3.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 3.0), (30.0, 3.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['tcrack_depth'] = 2.0
+    sd['tcrack_water'] = tcrack_water
+    sd['dloads'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [dict(circle)]
+    if t_geo:
+        lines = [{'x1': 0.0, 'y1': 3.0, 'x2': 20.0, 'y2': 3.0,
+                  't_max': t_geo, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+                  'E': float('nan'), 'area': float('nan'),
+                  'label': 'geosynthetic', 'type': 'geosynthetic',
+                  'dir': 'axial', 'appl': 'active',
+                  'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
+        sd['reinforcement_lines'] = lines
+        sd['reinforce_lines'] = lines
+    return sd
+
+_VP39_CLAY_CIRCLE = {'Xo': 14.967, 'Yo': 12.276, 'Depth': 0.0, 'R': 12.276}
+_VP39_SAND_CIRCLE = {'Xo': 15.080, 'Yo': 9.339, 'Depth': 0.0, 'R': 9.339}
+
+
+def vp039a():
+    """Slide #39 / Tandjiria (2002) clay-fill case, unreinforced: c=20 phi=0
+    gamma=19.4 (fill and foundation), water-filled tension crack to el 7.
+    xslope's critical circle stored; Spencer 0.968 vs Slide 0.975 /
+    Tandjiria 0.981."""
+    sd = _vp039_slope_data((20.0, 0.0, 19.4), (20.0, 0.0, 19.4), 2.0,
+                           _VP39_CLAY_CIRCLE, 0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp039a.xlsx'))
+    return 'vp039a.xlsx'
+
+
+def vp039b():
+    """Slide #39 clay-fill case with Slide's published required force
+    T=169 kN/m on the unreinforced critical circle: Spencer 1.332 vs the
+    1.35 target (xslope's own required T is 175 vs Slide 169 /
+    Tandjiria 170)."""
+    sd = _vp039_slope_data((20.0, 0.0, 19.4), (20.0, 0.0, 19.4), 2.0,
+                           _VP39_CLAY_CIRCLE, 169.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp039b.xlsx'))
+    return 'vp039b.xlsx'
+
+
+def vp039c():
+    """Slide #39 sand-fill case, unreinforced: fill c=0 phi=37 gamma=17 on
+    soft clay c=20 gamma=20, dry tension crack. Spencer 1.200 vs Slide
+    1.209 / Tandjiria 1.219."""
+    sd = _vp039_slope_data((0.0, 37.0, 17.0), (20.0, 0.0, 20.0), 0.0,
+                           _VP39_SAND_CIRCLE, 0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp039c.xlsx'))
+    return 'vp039c.xlsx'
+
+
+def vp039d():
+    """Slide #39 sand-fill case with Slide's T=44 kN/m: Spencer 1.343 vs the
+    1.35 target (xslope's required T is 46 vs Slide 44 / Tandjiria 45)."""
+    sd = _vp039_slope_data((0.0, 37.0, 17.0), (20.0, 0.0, 20.0), 0.0,
+                           _VP39_SAND_CIRCLE, 44.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp039d.xlsx'))
+    return 'vp039d.xlsx'
+
+
 def vp050():
     """Slide #50 (SNAILZ reference manual): nail-reinforced wall, 14
     horizontal rows with per-row length/capacity/bond strength, evaluated on

@@ -50,6 +50,9 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp039b.xlsx, type=single_circle, num_slices=60, fs_spencer=1.332, benchmark=VP39b -->
 <!-- test: file=../files/rocscience/vp039c.xlsx, type=single_circle, num_slices=60, fs_spencer=1.200, benchmark=VP39c -->
 <!-- test: file=../files/rocscience/vp039d.xlsx, type=single_circle, num_slices=60, fs_spencer=1.343, benchmark=VP39d -->
+<!-- test: file=../files/rocscience/vp040.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.003, benchmark=VP40-det -->
+<!-- test: file=../files/rocscience/vp040.xlsx, type=sensitivity, param=mat:Soil:pow_a, method=janbu, search=false, num_slices=30, n=3, rel_range=0.15, expected_base=1.003, expected_low=0.853, expected_high=1.154, tolerance=0.01, benchmark=VP40-sensA -->
+<!-- test: file=../files/rocscience/vp040.xlsx, type=sensitivity, param=mat:Soil:pow_b, method=janbu, search=false, num_slices=30, n=3, rel_range=0.15, expected_base=1.003, expected_low=0.552, expected_high=1.830, tolerance=0.01, benchmark=VP40-sensB -->
 <!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
 <!-- test: file=../files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.436, fs_bishop=1.530, fs_spencer=1.572, fs_mprice=1.572, benchmark=VP42-circle -->
 <!-- test: file=../files/rocscience/vp042.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.792, fs_mprice=1.781, benchmark=VP42-noncirc -->
@@ -191,7 +194,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 37 | Slope, homogenous, distributed load, back analysis of required support force and length | planned |  |
 | 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
 | [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](../files/rocscience/vp039a.xlsx)/[b](../files/rocscience/vp039b.xlsx)/[c](../files/rocscience/vp039c.xlsx)/[d](../files/rocscience/vp039d.xlsx). Tandjiria (2002): required geosynthetic force for FS=1.35. Unreinforced Spencer 0.968/1.200 (clay/sand) vs Slide 0.975/1.209; at Slide's published forces (169/44 kN/m) XSLOPE reads 1.332/1.343 vs the 1.35 target; XSLOPE's own required forces 175/46 vs Tandjiria's 170/45. Noncircular cases not locked (see section). |
-| 40 | Slope, homogenous, sensitivity analysis | planned |  |
+| [40](#vp40) | Slope, homogenous, sensitivity analysis | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). Perry (1993) power-curve slope on the specified surface, plus the published A/b sensitivity study run with `sensitivity()`: relative ΔFS over the ±15% b range −45%/+82% vs Slide's −44%/+81%; A exactly ±15% in both (FS is linear in A). Janbu corrected 1.003 vs Perry 0.98 / Slide 0.944 — the offset is the Janbu correction-factor convention for a power-curve soil (simplified values differ by 1.5%). |
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with ru=0.3 — exercises the v12 `pow` and `ru` options together. Circular search: Bishop 1.668 / Spencer 1.670 / Janbu(corr) 1.660 vs Slide Bishop 1.656 (non-linear path search), Charles & Soares 1.66, published range 1.56-1.67. |
 | [42](#vp42) | Dam, (3) materials, water table, ponded water, tension crack | **built** | [vp042.xlsx](../files/rocscience/vp042.xlsx). Baker & Leshchinsky (2001) safety-map dam. **Convention finding**: with rigorous total-weight + u + reservoir-load statics, Slide's printed critical circle reads Spencer 1.572 and Baker's noncircular surface 1.792; the published 1.925 / 1.91 correspond to the buoyant-weight shortcut (γ′ below the phreatic, no u, no pond), which an independent hand integral reproduces at 1.87 — the difference is the seepage forces of the inclined phreatic. XSLOPE's rigorous values are regression-locked; the published values are not comparable without adopting the shortcut convention. |
 | 43 | Slope, homogenous, planar surface, RocPlane comparison | partial | [vp043.xlsx](../files/rocscience/vp043.xlsx) built from the printed table (c'=30, φ'=30, γ=20, labeled geometry). xslope Janbu = hand Culmann exactly (1.429 vs 1.430 at 49.5°), but Slide/RocPlane/Baker all report ≈1.35 — reproducible only with different inputs (γ≈21.8 or c'≈27.5), so the manual's property table appears not to be what was run. Needs Baker (2001) [same blocked source as #42] to resolve before tagging. |
@@ -889,6 +892,36 @@ reinforced evaluation is pending the reinforcement generalization noted for VP30
 ![vp039b: inputs and representative solution](images/vp039b.png)
 ![vp039c: inputs and representative solution](images/vp039c.png)
 ![vp039d: inputs and representative solution](images/vp039d.png)
+
+### VP40: Slope, homogenous, sensitivity analysis {#vp40}
+
+**Input files:** [vp040.xlsx](../files/rocscience/vp040.xlsx)
+
+Perry (1993, Fig. 10): a dry homogeneous slope with power-curve strength
+τ = A·σ′ᵇ (A = 2, b = 0.7, γ = 20) evaluated on the specified five-segment surface —
+and the corpus's first *sensitivity* benchmark: the manual sweeps A and b over ±15% of
+their means (the "Rel. max/min" values 0.3 and 0.105) and publishes the FS-vs-parameter
+curves. The XSLOPE sweep runs through `sensitivity()` on the fixed surface
+(`search=False`, since the surface is specified), and the regression tags lock the base
+case and both range endpoints for each parameter.
+
+| Quantity | XSLOPE (Janbu) | Slide | Perry |
+|---|---|---|---|
+| FS on the specified surface | 1.003 corrected / 0.930 simplified | 0.944 | 0.98 |
+| ΔFS over the A range (±15%) | −15.0% / +15.0% | −15.2% / +14.4% | ≈ ±13% |
+| ΔFS over the b range (±15%) | −45.0% / +82.5% | −44.4% / +81.1% | −38% / +82% |
+
+The relative sensitivities — the quantity this problem exists to verify — agree with
+Slide's Figure 40.3 within about a percent at every endpoint, and the A-sweep is exactly
+linear as theory requires (on a fixed dry surface every increment of strength scales
+with A). The absolute FS spread is the Janbu correction-factor convention for a
+power-curve soil: XSLOPE applies the c–φ correction curve (fo = 1.078) while Slide's
+tabulated value implies fo ≈ 1.015 on the same simplified result; the simplified
+factors themselves differ by 1.5%.
+
+![vp040: inputs and representative solution](images/vp040.png)
+
+![vp040: FS vs A and b, the published sensitivity study](images/vp040_sens.png)
 
 ### VP41: Slope, homogenous, ru pore pressure {#vp41}
 

@@ -49,7 +49,11 @@ _GLOBAL_FIELDS = ('k_seismic', 'tcrack_depth', 'tcrack_water')
 def _mat_strength_fields(material, mat_name):
     """Strength fields addressable on this material, per its option — the same
     option-awareness reliability() enforces (sweeping c on a cp material is the
-    same class of silent error as u='peizo')."""
+    same class of silent error as u='peizo'). Power-curve coefficients are
+    addressable HERE and deliberately not in reliability(): they are correlated
+    fit coefficients, and sensitivity is the designated tool for those."""
+    if material.get('option') == 'pow':
+        return ('pow_a', 'pow_b', 'pow_c', 'pow_d')
     from .advanced import _strength_param_mapping
     mapping = _strength_param_mapping(material, mat_name)   # raises on unknown option
     return tuple(k for k in mapping.keys() if k != 'gamma')

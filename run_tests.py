@@ -523,7 +523,8 @@ def run_sensitivity_test(test):
                               rel_range=float(test.get('rel_range', 0.5)),
                               n=int(test.get('n', 3)),
                               methods=(test['method'],),
-                              search=True,
+                              search=str(test.get('search', 'true')).lower()
+                                     not in ('false', '0', 'no'),
                               num_slices=int(test.get('num_slices', 30)))
     if not ok:
         return None, f"sensitivity failed: {res}"

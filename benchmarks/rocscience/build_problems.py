@@ -941,6 +941,47 @@ def vp054b():
     return 'vp054b.xlsx'
 
 
+def vp040():
+    """Slide #40 / Perry (1993) Fig. 10: homogeneous dry slope, power-curve
+    strength tau = A*sigma'^b (A=2, b=0.7, gamma=20), specified noncircular
+    surface (all vertices printed in Fig 40.1). The benchmark is BOTH the
+    fixed-surface FS and the published sensitivity study: A and b are swept
+    +-15% (Slide's "Rel. max/min" 0.3 and 0.105 are the absolute deltas =
+    15% of the means, matching Perry's Fig 40.4 axis). FS is exactly linear
+    in A on a fixed dry surface; the b-sweep is strongly nonlinear. Targets:
+    Slide Janbu 0.944, Perry 0.98; xslope Janbu corrected 1.003 (fo=1.078,
+    the c-phi correction curve; simplified 0.930 - the offset to Slide is
+    the fo convention for a power-curve soil). Relative sensitivities:
+    xslope dFS -45%/+82% over the b range vs Slide -44%/+81%; A exactly
+    +-15% in both. Locked via type=sensitivity tags (search=false: the
+    surface is specified)."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='Soil', c=0.0, phi=0.0, gamma=20.0, gamma_sat=20.0,
+             option='pow', pow_a=2.0, pow_b=0.7, pow_c=0.0, pow_d=0.0,
+             u='none')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 53.0), (4.0, 53.0), (105.0, 3.0),
+                                 (115.0, 3.0)]},
+    ]
+    sd['max_depth'] = -10.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [
+        {'X': 4.0, 'Y': 53.0, 'Movement': 'Free'},
+        {'X': 20.0, 'Y': 16.0, 'Movement': 'Free'},
+        {'X': 40.0, 'Y': 8.0, 'Movement': 'Free'},
+        {'X': 60.0, 'Y': 4.0, 'Movement': 'Free'},
+        {'X': 80.0, 'Y': 1.0, 'Movement': 'Free'},
+        {'X': 105.0, 'Y': 3.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp040.xlsx'))
+    return 'vp040.xlsx'
+
+
 def vp041():
     """Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with
     power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 - exercises the

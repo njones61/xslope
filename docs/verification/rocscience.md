@@ -595,6 +595,7 @@ Two cases: dry, and r<sub>u</sub> = 0.25 in both materials.
 *Every method agrees with Slide to within 0.004 except the Ordinary method with r<sub>u</sub>, where XSLOPE (1.037) reproduces Fredlund & Krahn's own published value (1.029) rather than Slide's (1.121). The Ordinary method has no unique treatment of pore pressure — it takes N' = W·cosα − u·Δℓ from equilibrium perpendicular to the base, which on the near-horizontal seam drives N' far down — and the published values themselves split on it. The three methods that satisfy real equilibrium all agree.*
 
 ![vp022a: inputs and representative solution](images/vp022a.png)
+![vp022b: inputs and representative solution](images/vp022b.png)
 
 ### VP23: Slope, (3) materials {#vp23}
 
@@ -688,6 +689,8 @@ Carlo 0.190, C&X 0.205) while the deterministic FS agrees to 0.1% — as with VP
 the probabilistic inputs and estimator dominate the PF comparison, not the mechanics.*
 
 ![vp028a: inputs and representative solution](images/vp028a.png)
+![vp028b: inputs and representative solution](images/vp028b.png)
+![vp028c: inputs and representative solution](images/vp028c.png)
 
 ### VP29: Duncan's LASH terminal — TSPM reliability vs Monte Carlo {#vp29}
 
@@ -857,7 +860,10 @@ variants (Slide 0.935/1.188, required T 184/56) are not locked: XSLOPE's noncirc
 search returns seed-dependent local minima on this φ = 0 problem, and the noncircular
 reinforced evaluation is pending the reinforcement generalization noted for VP30.
 
-![vp039: inputs and representative solution](images/vp039b.png)
+![vp039a: inputs and representative solution](images/vp039a.png)
+![vp039b: inputs and representative solution](images/vp039b.png)
+![vp039c: inputs and representative solution](images/vp039c.png)
+![vp039d: inputs and representative solution](images/vp039d.png)
 
 ### VP41: Slope, homogenous, ru pore pressure {#vp41}
 
@@ -1376,6 +1382,7 @@ Slide #70 / Duncan & Wright (2005) Fig. 6.27: a fully submerged homogeneous slop
 *xslope reproduces the depth-independence exactly (identical FS at both pools) — a direct check on the consistency of the pond-load and pore-pressure treatments.*
 
 ![vp070a: inputs and representative solution](images/vp070a.png)
+![vp070b: inputs and representative solution](images/vp070b.png)
 
 ### VP71: FE seepage vs. piezometric line, same slope (D&W Figs. 6.37–6.38) {#vp71}
 
@@ -1393,6 +1400,7 @@ Case 1 runs XSLOPE's own FE seepage solver on the section (specified heads of 40
 *The two pore-pressure models land within 0.0006 of each other — the same near-identity Slide reports (1.141 vs 1.142). This is the corpus's end-to-end check on the seepage → limit-equilibrium handoff: XSLOPE's phreatic surface, computed from scratch, reproduces the one Duncan & Wright drew.*
 
 ![vp071a: inputs and representative solution](images/vp071a.png)
+![vp071b: inputs and representative solution](images/vp071b.png)
 
 ### VP72: Dam on a layered foundation — underseepage and artesian uplift (D&W Fig. 6.39) {#vp72}
 
@@ -1477,6 +1485,7 @@ Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c'
 *The FE case lands within 0.6% of Slide, and XSLOPE's computed phreatic surface tracks the piezometric line Slide digitized from Duncan & Wright to better than a foot everywhere. The piezometric case sits 3% low, and the reason is that this particular problem is ill-conditioned: the critical circle is a shallow toe surface where the water table is nearly at the ground, so u/σ<sub>v</sub> ≈ 0.57 and effective stresses are small. Dropping the piezometric line by just ½ ft raises Bishop from 1.049 to 1.118 — 6% of FS per half-foot. The 3% gap is worth only about 0.3 ft of line elevation, which is finer than a raster figure can be read. Duncan & Wright's own reference values (1.19 and 1.08 for the same FE case) show the same spread.*
 
 ![vp076a: inputs and representative solution](images/vp076a.png)
+![vp076b: inputs and representative solution](images/vp076b.png)
 
 ### VP77: Thick-core dam, FE seepage vs. piezometric line (D&W Fig. 7.24) {#vp77}
 
@@ -1496,6 +1505,7 @@ Like VP71 and VP76, pore pressures are modelled two ways. Case 1 runs **XSLOPE's
 *Values on Slide's printed circles (endpoints reproduced to 0.1 ft); the free-search values in parentheses are slightly deeper circles of the same family. D&W's four-program Spencer spread for the FE case is 1.67–1.72 (UTEXAS 1.69, SLIDE 1.70, SLOPE/W 1.67); XSLOPE's 1.724 sits at its top edge, equal to Slide's own manual value. Two numerical notes from the seepage run, both documented in the builder: the unsaturated front width must scale with the dam (h0 = −5 ft ≈ one element; the VP76-style −1 ft is sub-grid here and the fixed-point iteration never converges), and the sidecar is generated on a tri3 mesh because tri6 midside kr sampling oscillates. Spencer reads 1.753/1.737/1.724/1.715 at h0 = −20/−10/−5/−2 — the h0 = −5 choice is the sharpest mesh-resolvable front, not a fit.*
 
 ![vp077a: inputs and representative solution](images/vp077a.png)
+![vp077b: inputs and representative solution](images/vp077b.png)
 
 ### VP78: Pure cohesive slope on a foundation (D&W Fig. 14.3) {#vp78}
 
@@ -1582,6 +1592,7 @@ Profile I uses XSLOPE's `cp` strength option, which is exactly this form — an 
 *With the constant profile the critical circle runs all the way down to the base of the foundation, as Slide notes; the free search finds it without being told to.*
 
 ![vp083a: inputs and representative solution](images/vp083a.png)
+![vp083b: inputs and representative solution](images/vp083b.png)
 
 ### VP84: Embankment on a foundation with four strength gradients (D&W Fig. 15.9) {#vp84}
 
@@ -1599,6 +1610,9 @@ Slide #84 / Duncan & Wright (2005) Fig. 15.9: an embankment (c' = 0, φ' = 35°,
 *Four gradients, one geometry: the whole family tracks Slide within 0.7% and D&W within 1%. Together with VP83 this exercises the depth-varying undrained strength option across five different gradients, from constant to 15 psf/ft.*
 
 ![vp084a: inputs and representative solution](images/vp084a.png)
+![vp084b: inputs and representative solution](images/vp084b.png)
+![vp084c: inputs and representative solution](images/vp084c.png)
+![vp084d: inputs and representative solution](images/vp084d.png)
 
 ### VP85: Reinforced slope, homogenous, grouted tieback {#vp85}
 
@@ -1782,6 +1796,7 @@ The bulk of the Slide problem is a *transient* drawdown series (factors of safet
 
 *Both critical surfaces are shallow wedges on the downstream face, which makes them sensitive to the toe geometry: on Slide's own printed circles XSLOPE gives 2.390 and 1.721, so the search is not the source of the difference. The steady-state case straddles the two references (−1.5% from Slide, +1.1% from Huang & Jia); the dry case sits 1.7% below Huang & Jia's strength-reduction FEM value, which is the primary reference here.*
 
+![vp102a: inputs and representative solution](images/vp102a.png)
 ![vp102b: inputs and representative solution](images/vp102b.png)
 
 ### VP106: Support, Ito & Matsui pile {#vp106}
@@ -1813,7 +1828,11 @@ values themselves spread — Slide sits 4.4% above the paper, a search-method di
 manual acknowledges — and XSLOPE lands 1.5% above Slide; every other case agrees with
 Slide within 0.8%.
 
+![vp106a: inputs and representative solution](images/vp106a.png)
+![vp106b: inputs and representative solution](images/vp106b.png)
 ![vp106c: inputs and representative solution](images/vp106c.png)
+![vp106d: inputs and representative solution](images/vp106d.png)
+![vp106e: inputs and representative solution](images/vp106e.png)
 
 ### VP107: Retaining walls, gabion walls, supports {#vp107}
 
@@ -1843,6 +1862,7 @@ search reports unfiltered minima of 1.032/1.034 for small surfaces at the wall f
 below the second limit set the manual applies to exclude them; those are not locked.
 
 ![vp107a: inputs and representative solution](images/vp107a.png)
+![vp107b: inputs and representative solution](images/vp107b.png)
 
 ### VP108: Stepped gabion wall, steps facing outwards {#vp108}
 
@@ -1873,6 +1893,7 @@ mechanics — VP87–VP94 lock those. Slide's unfiltered Cuckoo minima (1.512/1.
 small wall-face surfaces) are excluded by the manual's own limit set.
 
 ![vp108a: inputs and representative solution](images/vp108a.png)
+![vp108b: inputs and representative solution](images/vp108b.png)
 
 ### VP109: Gabion wall with weak joint layers {#vp109}
 

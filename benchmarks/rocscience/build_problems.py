@@ -3036,6 +3036,41 @@ def vp025():
     return 'vp025.xlsx'
 
 
+def vp026():
+    """Slide #26 / Prandtl bearing-capacity test prism (Chen & Shao lineage,
+    the flat-ground twin of #25): weightless c=20 phi=0 soil, UDL 102.83
+    kN/m2 over x in (-5, 5) on flat ground at el 10, evaluated on the exact
+    Prandtl mechanism (45-degree wedges + tangent arc through (5, 3.9645)).
+    Geometry from the RS2 manual's problem #21 (same problem, fully
+    specified). Targets: theory FS = 1.0, Slide2 Spencer 0.941 on this
+    surface, RS2 SSR 1.01. Elastic constants carried for the RS2-21 SSR tag
+    that shares this file (SSRM 1.011 at 0.8 m, converging on theory)."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='soil', c=20.0, phi=0.0, gamma=1e-6, gamma_sat=1e-6,
+             option='mc', u='none', E=1e5, nu=0.3, psi=0.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(-20.0, 10.0), (20.0, 10.0)]}]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = [[{'X': -5.0, 'Y': 10.0, 'Normal': 102.83},
+                     {'X': 5.0, 'Y': 10.0, 'Normal': 102.83}]]
+    sd['piezo_line'] = []
+    sd['circular'] = False
+    sd['circles'] = []
+    # end segments extended past the flat ground: endpoints exactly ON the
+    # ground line are tangents, not crossings (the vp060 lesson)
+    sd['non_circ'] = [
+        {'X': -5.05, 'Y': 10.05, 'Movement': 'Free'},
+        {'X': 0.0, 'Y': 5.0, 'Movement': 'Free'},
+        {'X': 5.0, 'Y': 3.9645, 'Movement': 'Free'},
+        {'X': 10.0, 'Y': 5.0, 'Movement': 'Free'},
+        {'X': 15.05, 'Y': 10.05, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp026.xlsx'))
+    return 'vp026.xlsx'
+
+
 def vp027():
     """Slide #27 / XSTABL v5 manual (Sharma 1996) via Malkawi et al. (2001):
     two-material slope over undulating bedrock (polygon-mode bottom), zero-

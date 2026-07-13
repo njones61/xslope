@@ -332,9 +332,18 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             c_by_mat[i] = cp_rate  # Store cp rate temporarily (used per-element below)
             phi_by_mat[i] = 0.0     # Undrained analysis
         else:
+            # A blank option is legal on rows that never carry strength; any
+            # OTHER option (pow, ...) is not implemented in the FEM, and the
+            # material's c/phi columns would be zeros - silently running it
+            # as zero-strength soil is the failure mode this refuses.
+            if strength_option:
+                raise ValueError(
+                    f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
+                    f"strength option '{strength_option}' is not supported by the "
+                    f"FEM (supported: mc, cp).")
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
-            
+
         # Require critical material properties to be explicitly specified
         if "E" not in material:
             raise ValueError(f"Material {i+1} ({material.get('name', f'Material {i+1}')}): Young's modulus (E) is required but not specified")

@@ -1,0 +1,100 @@
+"""Builders for RS2-corpus problems that have NO Slide2 counterpart file
+(docs/verification/rs2.md). Most RS2 problems run on the Slide2 corpus files;
+these are the exceptions - currently the Pruska (2003) multi-program
+cross-bearing slopes (RS2 #56-58).
+
+Run from the repo root:  python benchmarks/rocscience/build_rs2.py
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+
+OUT = os.path.join(os.path.dirname(__file__), '..', '..',
+                   'docs', 'files', 'rocscience')
+ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
+                        'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
+
+
+def _pruska_slope_data(H, gamma, c, phi, nu):
+    """RS2 #56-58 / Pruska (2003) software-comparison slopes: 15 m toe flat,
+    slope rising H over a 10 m run, 15 m crest flat, foundation 8 m below the
+    toe (fully dimensioned in each section's Figure 1). PUBLISHED elastic
+    constants (E = 5000 kPa, nu per case, psi = 0) - not the Griffiths
+    convention - since the comparison paper specifies them. Each section's
+    lock pair brackets its material family (weakest and strongest case); the
+    full 17-case tables live in the rs2.md section."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='soil', c=float(c), phi=float(phi), gamma=float(gamma),
+             gamma_sat=float(gamma), option='mc', u='none',
+             E=5000.0, nu=float(nu), psi=0.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 8.0), (15.0, 8.0),
+                                                    (25.0, 8.0 + H),
+                                                    (40.0, 8.0 + H)]}]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 20.0, 'Yo': 8.0 + H + 5.0, 'Depth': 6.0,
+                      'R': H + 7.0}]
+    return sd
+
+
+def rs2_56a():
+    """RS2 #56 case 2 (H=7, gamma=18, c=5, phi=10): SSRM 0.667 vs RS2 0.67,
+    Z-Soil 0.71, PLAXIS 0.68, GEO FEM 0.73."""
+    sd = _pruska_slope_data(7.0, 18, 5, 10, 0.35)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_56a.xlsx'))
+    return 'rs2_56a.xlsx'
+
+
+def rs2_56b():
+    """RS2 #56 case 5 (H=7, gamma=24, c=20, phi=30): SSRM 2.131 vs RS2 2.14,
+    Z-Soil 1.98, PLAXIS 2.09, GEO FEM 2.19."""
+    sd = _pruska_slope_data(7.0, 24, 20, 30, 0.3)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_56b.xlsx'))
+    return 'rs2_56b.xlsx'
+
+
+def rs2_57a():
+    """RS2 #57 case 1 (H=10.5, gamma=18, c=5, phi=10): SSRM 0.449 vs RS2
+    0.44, Z-Soil 0.46, PLAXIS 0.44, GEO FEM 0.48."""
+    sd = _pruska_slope_data(10.5, 18, 5, 10, 0.35)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_57a.xlsx'))
+    return 'rs2_57a.xlsx'
+
+
+def rs2_57b():
+    """RS2 #57 case 6 (H=10.5, gamma=24, c=20, phi=30): SSRM 1.411 vs RS2
+    1.42, Z-Soil 1.52, PLAXIS 1.45, GEO FEM 1.54."""
+    sd = _pruska_slope_data(10.5, 24, 20, 30, 0.3)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_57b.xlsx'))
+    return 'rs2_57b.xlsx'
+
+
+def rs2_58a():
+    """RS2 #58 case 1 (H=14, gamma=18, c=5, phi=10): SSRM 0.342 vs RS2 0.33,
+    Z-Soil 0.34, PLAXIS 0.35, GEO FEM 0.35."""
+    sd = _pruska_slope_data(14.0, 18, 5, 10, 0.35)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_58a.xlsx'))
+    return 'rs2_58a.xlsx'
+
+
+def rs2_58b():
+    """RS2 #58 case 6 (H=14, gamma=24, c=20, phi=30): SSRM 1.057 vs RS2 1.06,
+    Z-Soil 1.07, PLAXIS 1.06, GEO FEM 1.10."""
+    sd = _pruska_slope_data(14.0, 24, 20, 30, 0.3)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_58b.xlsx'))
+    return 'rs2_58b.xlsx'
+
+
+if __name__ == '__main__':
+    for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b):
+        print(fn())

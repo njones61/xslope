@@ -53,6 +53,19 @@ lockable rather than tuned to match.
 <!-- test: file=../files/rocscience/vp044a.xlsx, type=fem_ssrm, expected_fs=0.934, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=1.6, max_iter=4000, benchmark=RS2-31c -->
 <!-- test: file=../files/rocscience/vp045b.xlsx, type=fem_ssrm, expected_fs=2.732, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.8, f_max=3.6, max_iter=4000, benchmark=RS2-32b -->
 <!-- test: file=../files/rocscience/vp061a.xlsx, type=fem_ssrm, expected_fs=1.502, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=2.2, max_iter=4000, benchmark=RS2-34b -->
+<!-- test: file=../files/rocscience/vp083a.xlsx, type=fem_ssrm, expected_fs=1.412, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=4000, benchmark=RS2-45a -->
+<!-- test: file=../files/rocscience/vp083b.xlsx, type=fem_ssrm, expected_fs=1.365, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=4000, benchmark=RS2-45b -->
+<!-- test: file=../files/rocscience/vp084a.xlsx, type=fem_ssrm, expected_fs=0.804, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=4000, benchmark=RS2-46a -->
+<!-- test: file=../files/rocscience/vp084b.xlsx, type=fem_ssrm, expected_fs=0.947, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.5, f_max=1.4, max_iter=4000, benchmark=RS2-46b -->
+<!-- test: file=../files/rocscience/vp084c.xlsx, type=fem_ssrm, expected_fs=1.082, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.5, max_iter=4000, benchmark=RS2-46c -->
+<!-- test: file=../files/rocscience/vp084d.xlsx, type=fem_ssrm, expected_fs=1.188, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.7, f_max=1.7, max_iter=4000, benchmark=RS2-46d -->
+<!-- test: file=../files/rocscience/vp078.xlsx, type=fem_ssrm, expected_fs=1.081, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=4000, benchmark=RS2-47 -->
+<!-- test: file=../files/rocscience/rs2_56a.xlsx, type=fem_ssrm, expected_fs=0.667, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.32, f_max=1.12, max_iter=4000, benchmark=RS2-56a -->
+<!-- test: file=../files/rocscience/rs2_56b.xlsx, type=fem_ssrm, expected_fs=2.131, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.79, f_max=2.59, max_iter=4000, benchmark=RS2-56b -->
+<!-- test: file=../files/rocscience/rs2_57a.xlsx, type=fem_ssrm, expected_fs=0.449, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.89, max_iter=4000, benchmark=RS2-57a -->
+<!-- test: file=../files/rocscience/rs2_57b.xlsx, type=fem_ssrm, expected_fs=1.411, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.07, f_max=1.87, max_iter=4000, benchmark=RS2-57b -->
+<!-- test: file=../files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.342, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=4000, benchmark=RS2-58a -->
+<!-- test: file=../files/rocscience/rs2_58b.xlsx, type=fem_ssrm, expected_fs=1.057, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.71, f_max=1.51, max_iter=4000, benchmark=RS2-58b -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -114,11 +127,14 @@ cross-bearings.
 | 40 | Dam with impermeable foundation (D&W Fig 7.24) — **built** (piezo case): SSRM 1.491 vs RS2 SSR 1.53; the FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core (the documented tri3/tri6 trade) (on [vp077b.xlsx](../files/rocscience/vp077b.xlsx)) | VP77 |
 | 42 | James dike — **built**: SSRM 1.249 vs RS2 SSR 1.26 (−0.9%); Slide2 noncircular LEM 1.11–1.16, referee 1.17 (on [vp075.xlsx](../files/rocscience/vp075.xlsx)) | VP75 |
 | 44 | Seepage analysis for an earth embankment (D&W Fig 14.20-a; = Slide2 VP82, not VP76 — §39's body carries VP76) — **built**: SSRM 1.511 vs RS2 SSR 1.51 (+0.1%); Slide2 LEM 1.532/1.541, referee 1.528–1.542 (on [vp082.xlsx](../files/rocscience/vp082.xlsx)) | VP82 |
-| 45–46 | Varying undrained shear strength profiles (I, II) | VP83/VP84 |
-| 47 | Purely cohesive slope with varying thickness | VP78 family |
+| 45 | Varying undrained shear strength profiles (D&W Fig 14.20-b) — **built** (caveat): SSRM 1.41 / 1.37 vs RS2 SSR 1.32 / 1.32 (D&W referee 1.28–1.33): XSLOPE's SSRM reads high on φ=0 foundations (the RS2-19 family, under investigation); locked as regression values at the tagged mesh (on [vp083a](../files/rocscience/vp083a.xlsx)/[b](../files/rocscience/vp083b.xlsx)) | VP83 |
+| 46 | Varying undrained strength profiles II (D&W Fig 15.9, cu = 300 + cz·z) — **built**: SSRM 0.80 / 0.95 / 1.08 / 1.19 vs RS2 SSR 0.78 / 0.93 / 1.05 / 1.15 (+2–3%, the φ=0 pattern); D&W 0.75 / 0.90 / 1.03 / 1.13 (on [vp084a–d](../files/rocscience/vp084a.xlsx)) | VP84 |
+| 47 | Purely cohesive slope, varying thickness (D&W Fig 14.3) — **built** (30-ft case): SSRM 1.08 vs RS2 SSR 1.03; D&W referee 1.124–1.135. The 46.5- and 60-ft variants (RS2 1.02 / 1.02) need deepened-base builds and are deferred (on [vp078.xlsx](../files/rocscience/vp078.xlsx)) | VP78 |
 | 48–54 | Multi-tiered geotextile walls (= Slide2 VP87–VP93 one-for-one, verified; Leshchinsky & Han 2004) — *blocked*: the FEM reinforcement tensile-capacity cap is not enforced in SSRM (proven Ta-insensitive on the baseline wall: unreinforced 0.41, any Ta 1.72 vs published ≈1.0). Extraction and published tables are complete for all seven; the series unlocks together when the cap is fixed | VP87–VP93 |
 | 55 | Five 1.8-m tiers (= Slide2 VP94; belongs to the #48–54 family) — *blocked* with the series | VP94 |
-| 56–58 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (I–III) | — (multi-program SSR cross-bearing) |
+| [56](#pruska) | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) — **built**: all five within ±3.3% of RS2's M-C and inside the four-program band; locks bracket the family (0.667 / 2.131 on [rs2_56a](../files/rocscience/rs2_56a.xlsx)/[b](../files/rocscience/rs2_56b.xlsx)); full tables in the section | — (new files) |
+| [57](#pruska) | Pruska H = 10.5 m, 6 cases — **built**: all six within ±3.6% of RS2's M-C; locks 0.449 / 1.411 ([rs2_57a](../files/rocscience/rs2_57a.xlsx)/[b](../files/rocscience/rs2_57b.xlsx)) | — |
+| [58](#pruska) | Pruska H = 14 m, 6 cases — **built** (5 of 6): four within ±3.6%; case 5 (c=5, φ=30) reads 0.667 vs a tight published 0.72–0.75 cluster and is reported unlocked pending explanation; locks 0.342 / 1.057 ([rs2_58a](../files/rocscience/rs2_58a.xlsx)/[b](../files/rocscience/rs2_58b.xlsx)) | — |
 
 ### Part III (59–68)
 
@@ -143,3 +159,49 @@ problem is shared), results locked into `run_tests.py` via `fem_ssrm` test tags 
 type and runner already exist and currently guard the Griffiths & Lane anchors. SSRM runs
 are expensive (~1 min each), so this corpus will lean on coarse meshes with honest
 tolerances, the same trade documented for the FEM reliability regression.
+
+## The Pruska cross-bearing (#56–58) {#pruska}
+
+Pruska (2003) analyzed three homogeneous slopes (H = 7, 10.5, and 14 m over an 8-m
+foundation) with five or six material sets each in four SSR programs. RS2 reproduces the
+study; XSLOPE's SSRM joins it here as a fifth column — 16 of the 17 cases land within
+±4% of RS2 and inside the four-program band. (The study's Drucker-Prager columns are not
+comparable; XSLOPE, like Slide2, analyzes Mohr-Coulomb only. Elastic constants are the
+paper's published E = 5,000 kPa and per-case ν, not the corpus's usual convention.)
+
+**H = 7 m (#56):** cases (γ, c, φ) = (24,20,10), (18,5,10), (24,20,20), (18,5,20), (24,20,30)
+
+| Case | XSLOPE | RS2 | Z-Soil | PLAXIS | GEO FEM | Slide2 LEM |
+|---|---|---|---|---|---|---|
+| 1 | 1.254 | 1.22 | 1.21 | 1.22 | 1.31 | 1.22 |
+| 2 | 0.667 | 0.67 | 0.71 | 0.68 | 0.73 | 0.66 |
+| 3 | 1.689 | 1.68 | 1.64 | 1.65 | 1.71 | 1.64 |
+| 4 | 1.016 | 1.05 | 0.95 | 0.99 | 1.17 | 1.02 |
+| 5 | 2.131 | 2.14 | 1.98 | 2.09 | 2.19 | 2.08 |
+
+**H = 10.5 m (#57):** cases 1–6 = (18,5,10), (24,20,10), (18,5,20), (24,20,20), (18,5,30), (24,20,30)
+
+| Case | XSLOPE | RS2 | Z-Soil | PLAXIS | GEO FEM | Slide2 LEM |
+|---|---|---|---|---|---|---|
+| 1 | 0.449 | 0.44 | 0.46 | 0.44 | 0.48 | 0.44 |
+| 2 | 0.818 | 0.79 | 0.83 | 0.85 | 0.91 | 0.80 |
+| 3 | 0.687 | 0.69 | 0.71 | 0.71 | 0.73 | 0.69 |
+| 4 | 1.107 | 1.11 | 1.14 | 1.17 | 1.18 | 1.10 |
+| 5 | 0.944 | 0.96 | 0.98 | 0.97 | 1.03 | 0.95 |
+| 6 | 1.411 | 1.42 | 1.52 | 1.45 | 1.54 | 1.40 |
+
+**H = 14 m (#58):** same six material cases as #57
+
+| Case | XSLOPE | RS2 | Z-Soil | PLAXIS | GEO FEM | Slide2 LEM |
+|---|---|---|---|---|---|---|
+| 1 | 0.342 | 0.33 | 0.34 | 0.35 | 0.35 | 0.34 |
+| 2 | 0.606 | 0.59 | 0.61 | 0.59 | 0.63 | 0.60 |
+| 3 | 0.523 | 0.52 | 0.54 | 0.53 | 0.59 | 0.53 |
+| 4 | 0.833 | 0.83 | 0.84 | 0.82 | 0.86 | 0.84 |
+| 5 | 0.667 | 0.72 | 0.75 | 0.74 | 0.73 | 0.73 |
+| 6 | 1.057 | 1.06 | 1.07 | 1.06 | 1.10 | 1.08 |
+
+Case 5 of the H = 14 m slope is the one outlier (−7.4% against a tight published
+cluster; the same materials at H = 10.5 m agree within 1.6%) — it is reported here and
+excluded from the regression locks pending an explanation. Each slope's locks bracket
+its family (the weakest and strongest case).

@@ -3026,6 +3026,57 @@ def vp074():
     return 'vp074.xlsx'
 
 
+def vp063():
+    """Slide #63 / Loukidis, Bandini & Salgado (2003) example 2: 3-layer dry
+    slope at the paper's critical seismic coefficient kc = 0.155 (kc is
+    defined by FS = 1). Geometry from Fig 63.1's vertex dots
+    (tick-calibrated per axis; the 2:1 and 2.5:1 faces and both 22:1 layer
+    interfaces reproduce to <1%). Slide's bench is 12 m wide (x 60-72, crest
+    at 109.5 = 72 + 2.5*15); the paper figure annotates 8 m, and Slide's
+    model is the FS target here. The noncircular seed passes through the
+    layer-2/3 daylight point (35.8, 27.9), which the manual identifies as a
+    point on the critical surface and pins with search limits. Targets:
+    Loukidis (log-spiral) 1.000, Slide (path search + MC optimization)
+    0.991; xslope Spencer 1.001 / Janbu 0.999."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, c, phi, g in [('top', 4.0, 30.0, 17.0),
+                            ('middle', 25.0, 15.0, 19.0),
+                            ('bottom', 15.0, 45.0, 19.0)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=g, gamma_sat=g,
+                 option='mc', u='none')
+        sd['materials'].append(m)
+    d23 = (35.8, 27.9)     # layer-2/3 daylight on the 2:1 face
+    d12 = (74.7, 41.08)    # layer-1/2 daylight on the 2.5:1 face
+    ground = [(-30.0, 20.0), (20.0, 20.0), d23, (60.0, 40.0), (72.0, 40.0),
+              d12, (109.5, 55.0), (150.0, 55.0)]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': list(ground)},
+        {'mat_id': 1, 'coords': [(-30.0, 20.0), (20.0, 20.0), d23,
+                                 (60.0, 40.0), (72.0, 40.0), d12,
+                                 (150.0, 44.50)]},
+        {'mat_id': 2, 'coords': [(-30.0, 20.0), (20.0, 20.0), d23,
+                                 (150.0, 33.09)]},
+    ]
+    sd['max_depth'] = -25.0
+    sd['gamma_water'] = 9.81
+    sd['k_seismic'] = 0.155
+    sd['dloads'] = []
+    sd['circular'] = False
+    sd['circles'] = []
+    sd['non_circ'] = [
+        {'X': 35.8, 'Y': 27.9, 'Movement': 'Free'},
+        {'X': 55.0, 'Y': 30.0, 'Movement': 'Horiz'},
+        {'X': 75.0, 'Y': 34.0, 'Movement': 'Horiz'},
+        {'X': 95.0, 'Y': 42.0, 'Movement': 'Horiz'},
+        {'X': 118.0, 'Y': 55.0, 'Movement': 'Free'},
+    ]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp063.xlsx'))
+    return 'vp063.xlsx'
+
+
 def vp064():
     """Slide #64 / USACE EM 1110-2-1902 Figure 4-1: end-of-construction
     Spencer hand-check dam. Symmetric 50-ft embankment at 4H:1V (crest

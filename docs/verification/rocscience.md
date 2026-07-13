@@ -83,6 +83,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp061b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.367, benchmark=VP61-mc -->
 <!-- test: file=../files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
 <!-- test: file=../files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
+<!-- test: file=../files/rocscience/vp063.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.001, fs_janbu=0.999, benchmark=VP63 -->
 <!-- test: file=../files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
 <!-- test: file=../files/rocscience/vp100.xlsx, type=circular_search, num_slices=50, fs_bishop=1.201, fs_spencer=1.206, benchmark=VP100 -->
 <!-- test: file=../files/rocscience/vp101.xlsx, type=circular_search, num_slices=50, fs_bishop=1.416, fs_spencer=1.422, benchmark=VP101 -->
@@ -213,7 +214,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [60](#vp60) | Retaining wall, (2) materials, tension crack, distributed load, soil nails | **built** | [vp060.xlsx](../files/rocscience/vp060.xlsx). Pockoski & Duncan (2000) #7 nailed wall on Slide's printed circle with a 7-ft dry crack: Spencer 1.010 / Janbu simplified 1.043 vs Slide 1.009 / 1.041. |
 | [61](#vp61) | Slope, homogenous, composite surfaces | **built** | [vp061a.xlsx](../files/rocscience/vp061a.xlsx) (power), [vp061b.xlsx](../files/rocscience/vp061b.xlsx) (M-C). Baker (2003) ex. 3 (London clay) on the #44 geometry: Spencer power 1.466 vs Slide 1.468 / Baker 1.48; MC 1.367 vs Slide 1.366 / Baker 1.35. |
 | [62](#vp62) | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](../files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](../files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
-| 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (paper now in `ref_docs_lim_eq/`). Outline fully pinned from the paper's Fig. 9 (bench el 20 to x=20, 2:1 to (60,40), 8 m bench, 2.5:1 to (105.5,55), crest to 150); interfaces are 22:1 but their face anchors are not dimensioned and FS=1.0-calibration attempts with plausible anchors give 1.17-1.21 — the paper's Fig. 10 profile also appears inconsistent with Fig. 9's mesh. Needs a closer read of the paper (or the SLOPE/W .gsz) before building. |
+| [63](#vp63) | Slope, (3) materials, seismic | **built** | [vp063.xlsx](../files/rocscience/vp063.xlsx). Loukidis et al. (2003) example 2 at the paper's critical seismic coefficient kc = 0.155: noncircular Spencer search 1.001 vs Loukidis (log-spiral) 1.000 and Slide (path search) 0.991 — the search enters at the layer-boundary daylight point the manual identifies on the critical surface. |
 | [64](#vp64) | Embankment, (4) materials, water table, tension crack | **built** | [vp064.xlsx](../files/rocscience/vp064.xlsx). USACE EM 1110-2-1902 Fig. 4-1 end-of-construction dam (4 materials, core trench, WT, 7-ft crack, specified circle (102,163,R=163)): Spencer 2.488 vs Slide 2.445 / USACE 2.44 (+1.8%; crest placement pinned from USACE's slice table — figures are vertex-unlabeled). |
 | [65](#vp65) | Embankment, (4) materials, water table, ponded water | **built** | [vp065.xlsx](../files/rocscience/vp065.xlsx). USACE Fig. 4-2: the #64 dam, drained strengths, upstream low pool (el 20): Bishop 2.725 vs Slide 2.716 / USACE 2.71; Spencer 2.748 vs 2.736. |
 | [66](#vp66) | Embankment, (4) materials, water table, ponded water | **built** | [vp066.xlsx](../files/rocscience/vp066.xlsx). USACE Fig. 4-3 chart-check set; Slide's own face geometry recovered from its printed slip endpoints (toe −222, crest edge −15): Spencer 2.258 vs Slide 2.307 / USACE 2.30 (−2.1%). |
@@ -1301,6 +1302,32 @@ Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001, Bishop 0.987; Lo
 ![vp062a: inputs and representative solution](images/vp062a.png)
 
 ![vp062b: inputs and representative solution](images/vp062b.png)
+
+### VP63: Slope, (3) materials, seismic — critical seismic coefficient {#vp63}
+
+**Input files:** [vp063.xlsx](../files/rocscience/vp063.xlsx)
+
+Loukidis, Bandini & Salgado (2003)'s second example: a three-layer dry slope (a weak
+φ = 15° middle layer between a light c = 4 kPa cap and a strong φ = 45° base) loaded
+pseudo-statically at the paper's critical seismic coefficient kc = 0.155 — the
+coefficient at which the factor of safety is exactly 1. Loukidis analyzed a log-spiral
+mechanism; Slide reproduced it with a path search plus Monte-Carlo optimization; XSLOPE
+runs its noncircular search from a seed through the layer-2/3 daylight point on the
+lower slope face, which the manual identifies as a point on the critical surface.
+
+| | XSLOPE | Slide | Loukidis et al. |
+|---|---|---|---|
+| Spencer, noncircular search | 1.001 | 0.991 | 1.000 (log-spiral, by definition of kc) |
+
+The critical surface enters at the daylight point (35.8, 27.9) and exits on the crest
+at x ≈ 121. The paper's own cross-bearings bracket the same answer: rigorous limit
+analysis bounds kc between 0.148 and 0.172, finite elements give 0.161, and Sarma's
+method 0.159, against the 0.155 used here. A circular search reads 1.031 on this
+problem — the mechanism is genuinely noncircular. Geometry is calibrated from the Slide
+figure's vertex dots; Slide's bench is 12 m wide where the paper's figure annotates
+8 m, and Slide's model is the factor-of-safety target here.
+
+![vp063: inputs and representative solution](images/vp063.png)
 
 ### VP64: USACE end-of-construction dam (EM 1110-2-1902 Fig. 4-1) {#vp64}
 

@@ -403,17 +403,19 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     break
         
         if piezo_line_coords:
-            piezo_line = LineString(piezo_line_coords)
             gamma_water = slope_data.get("gamma_water", 9.81)
-            
+            # u = gamma_w * VERTICAL distance below the piezometric line at
+            # the node's x - the same convention the LEM slicer uses
+            # (slice.get_piezometric_y_coordinates) and the hand/RS2
+            # convention. Closest-point projection reads lower u under a
+            # sloping water table and was inconsistent with the LEM.
+            px = np.array([p[0] for p in piezo_line_coords], dtype=float)
+            py = np.array([p[1] for p in piezo_line_coords], dtype=float)
+            order = np.argsort(px)
+            px, py = px[order], py[order]
+
             for i, node in enumerate(nodes):
-                node_point = Point(node)
-                
-                # Find closest point on piezometric line
-                closest_point = piezo_line.interpolate(piezo_line.project(node_point))
-                piezo_elevation = closest_point.y
-                
-                # Compute pore pressure (only positive values)
+                piezo_elevation = float(np.interp(node[0], px, py))
                 if node[1] < piezo_elevation:
                     u[i] = gamma_water * (piezo_elevation - node[1])
                 else:
@@ -1444,7 +1446,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         piezo_line_coords = fem_data.get("piezo_line_coords", None)
         gamma_water = fem_data.get("gamma_water", 9.81)
         if piezo_line_coords:
-            piezo_line = LineString(piezo_line_coords)
+            # vertical-distance convention, matching the LEM slicer (see the
+            # nodal-u site in build_fem_data)
+            px = np.array([p[0] for p in piezo_line_coords], dtype=float)
+            py = np.array([p[1] for p in piezo_line_coords], dtype=float)
+            order = np.argsort(px)
+            px, py = px[order], py[order]
             for elem_idx in range(n_elements):
                 elem_type = element_types[elem_idx]
                 elem_nodes_idx = elements[elem_idx][:elem_type]
@@ -1454,9 +1461,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     N = gp_data['N']
                     x_gp = N @ elem_coords[:, 0]
                     y_gp = N @ elem_coords[:, 1]
-                    gp_point = Point(x_gp, y_gp)
-                    closest_pt = piezo_line.interpolate(piezo_line.project(gp_point))
-                    piezo_elev = closest_pt.y
+                    piezo_elev = float(np.interp(x_gp, px, py))
                     gp_u_list.append(max(0.0, gamma_water * (piezo_elev - y_gp)))
                 u_gp.append(gp_u_list)
         else:

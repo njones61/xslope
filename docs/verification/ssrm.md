@@ -101,7 +101,7 @@ Results:
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 1.91 | ~1.9 | +1% |
+| Full reservoir (free surface) | 1.89 | ~1.9 | −1% |
 | Before filling (no free surface) | 2.44 | ~2.4 | +2% |
 
 Solution for the before-filling (dry) case at the computed factor of safety (F = 2.44). The
@@ -110,7 +110,7 @@ beneath the crest and exiting on the downstream face:
 
 ![griffiths6_dry_results.png](../fem/images/griffiths6_dry_results.png){width=1000}
 
-Solution for the full-reservoir case at the computed factor of safety (F = 1.91). With the
+Solution for the full-reservoir case at the computed factor of safety (F = 1.88). With the
 free surface in place, the downstream slope is the weaker side: the shear strain band runs
 from the crest to the downstream toe, and the displacement vectors show the rotational
 sliding mass — the same surface found by Griffiths & Lane and by XSLOPE's own Spencer
@@ -134,5 +134,5 @@ the relative reservoir effect matches the paper (wet/dry = 0.78 vs 0.79). See
 the [Verification](../verification/ssrm.md) page.
 
 <!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.91, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=4000, benchmark=SSRM-2 -->
+<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.886, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=4000, benchmark=SSRM-2 -->
 

@@ -43,6 +43,9 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp028c.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.798, tolerance=0.03, benchmark=VP28c-beta -->
 <!-- test: file=../files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
 <!-- test: file=../files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
+<!-- test: file=../files/rocscience/vp032a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.218, fs_spencer=1.218, benchmark=VP32a -->
+<!-- test: file=../files/rocscience/vp032b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.216, fs_spencer=1.216, benchmark=VP32b -->
+<!-- test: file=../files/rocscience/vp032c.xlsx, type=single_circle, num_slices=60, fs_bishop=0.981, fs_spencer=0.981, benchmark=VP32c -->
 <!-- test: file=../files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.299, benchmark=VP33 -->
 <!-- test: file=../files/rocscience/vp034.xlsx, type=single_noncirc, num_slices=60, fs_spencer=2.423, fs_mprice=2.384, benchmark=VP34 -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
@@ -186,7 +189,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](../files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical TSPM problem, targeted against BOTH primary sources. Duncan's surface as a smooth least-squares arc (RMS 1.1 ft against the trace): Spencer 1.145 vs Duncan 1.17 / Slide 1.157. TSPM with Slide's published σ inputs: β_ln 0.936, **PF 17.5% vs Duncan's own 18%** (Slide's Monte Carlo: 14%); the γ term matches Duncan's table (ΔF 0.203 vs 0.20). Published PF spans 14–33% across sources — the σ-input choice dwarfs the estimator. |
 | 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | *blocked* | Borges & Cardoso (2002) case 1. Inputs and the target circle fully extracted (center (10.99, 6.00), R 5.24, confirmed by the figure's axis marker and the printed moment table); needs reverse-curvature circle exits (Slide applies an automatic tension crack where the circle curves back over its center) and the noncircular reinforcement generalization. |
 | 31 | Reinforced embankment, (5) materials, geosynthetic | *blocked* | Borges & Cardoso (2002) case 2. Geometry and materials extracted; same blockers as VP30. |
-| 32 | Reinforced embankment, (7) materials, geosynthetic | *blocked* | Borges & Cardoso (2002) case 3. Figures unlabeled — needs the source paper (Geotextiles & Geomembranes 20(6)) for geometry and circles, plus the VP30 blockers. |
+| [32](#vp32) | Reinforced embankment, (7) materials, geosynthetic | **built** | [vp032a](../files/rocscience/vp032a.xlsx) / [b](../files/rocscience/vp032b.xlsx) / [c](../files/rocscience/vp032c.xlsx). Borges & Cardoso (2002) case 3, geometry from the RS2 manual's fully labeled figures for the same problem (Slide2's own are unlabeled): on the three printed circles, Bishop/Spencer 1.218 / 1.216 / 0.981 vs Slide2 1.23 / 1.22 / 0.98 and Borges 1.25 / 1.19 / 0.99. |
 | [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](../files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke: the critical surface is composite (circle truncated at the model base, running flat in the presheared clay-shale). Bishop 1.299 vs Slide 1.305 / El-Ramly 1.31 on Slide's circle; composite grid search digs to 1.253. PF not locked (see section). |
 | [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H noncircular surface, polygon-zone geometry with the chimney drain: M-P 2.384 vs Slide GLE 2.333 / W&H 2.36; Spencer 2.423 vs Slide 2.383. Deterministic lock only — W&H's σφ exceeds φ for the Phase I fill (COV 124%), outside TSPM's domain; hand comparison in the section. |
 | [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](../files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the min-β ≠ min-FS benchmark, reproduced by recipe: Bishop critical search 2.529 vs Slide 2.551 / H&W 2.753; min-β surface β_ln 3.353 (3.50 with c–φ correlation) vs Slide 4.351 / H&W 3.987, at roughly ⅓ of the FS-critical surface's β in all three programs. |
@@ -739,6 +742,29 @@ Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Fran
 *Surface provenance: the arc is anchored at the trench corner (138, −120) rather than Slide's printed left endpoint, which is pulled 0.25 ft below the trench floor; the drawn surface in Slide's figure is partially occluded by a coordinate label near its entry, so that span is read at the label's edges. On the probabilistic side, note that the same slope carries three published probabilities of failure — 14% (Slide MC), 18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, wider 2σ-rule envelope): two TSPM analyses by the same author differ by more than TSPM differs from Monte Carlo, so the σ-input choice, not the estimator, dominates probabilistic comparisons.*
 
 ![vp029: inputs and representative solution](images/vp029.png)
+
+### VP32: Reinforced embankment, (7) materials, geosynthetic {#vp32}
+
+**Input files:** [vp032a.xlsx](../files/rocscience/vp032a.xlsx) (case 1, circle A) ·
+[vp032b.xlsx](../files/rocscience/vp032b.xlsx) (case 1, circle B) ·
+[vp032c.xlsx](../files/rocscience/vp032c.xlsx) (case 2, circle C)
+
+Borges & Cardoso (2002)'s third geosynthetic-reinforced embankment: two fill stages
+(a 7 m and an 8.75 m crest) of granular fill over five soft clay layers, with a
+T = 200 kN/m geosynthetic at the fill base (interface friction 30.96°, force parallel
+to the reinforcement). Slide2's figures for this problem carry no coordinates; the
+geometry here comes from the RS2 manual's fully labeled figures for the same problem,
+which print every vertex, the clay layer boundaries, and the three published circles.
+
+| Case | XSLOPE (Bishop = Spencer) | Slide2 | Borges & Cardoso |
+|---|---|---|---|
+| H = 7, circle A | 1.218 | 1.23 | 1.25 |
+| H = 7, circle B | 1.216 | 1.22 | 1.19 |
+| H = 8.75, circle C | 0.981 | 0.98 | 0.99 |
+
+![vp032a: inputs and representative solution](images/vp032a.png)
+
+![vp032c: inputs and representative solution](images/vp032c.png)
 
 ### VP33: Dike, (5) materials, probabilistic analysis, water table {#vp33}
 

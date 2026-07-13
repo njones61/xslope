@@ -1188,6 +1188,94 @@ def vp029():
     return 'vp029.xlsx'
 
 
+def _vp032_slope_data(case):
+    """Slide #32 / Borges & Cardoso (2002) case 3 shared geometry. Slide2's
+    own figures are unlabeled; the geometry comes from the RS2 manual's fully
+    labeled Figures for its problem #24 (Part1 p. 60), which prints every
+    vertex, the foundation layer tops (0/-1/-3/-7/-18, base -24), and all
+    three published circles. Clays Cu 43/31/30/32/32 (phi=0), embankment
+    upper (el>=1) 0/35/21.9 over lower 0/33/17.2. Geosynthetic at el 0.9
+    spanning the fill base, T=200, interface friction 30.96 deg -> pullout
+    1.3 m, axial/passive per B&C. Elastic constants carried for the RS2 SSR
+    tags that share these files."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    def mat(name, c, phi, g):
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=g, gamma_sat=g, option='mc',
+                 u='none', E=1e5, nu=0.3, psi=0.0)
+        return m
+    sd['materials'] = [
+        mat('Upper embankment', 0.0, 35.0, 21.9),
+        mat('Lower embankment', 0.0, 33.0, 17.2),
+        mat('Clay 1', 43.0, 0.0, 18.0),
+        mat('Clay 2', 31.0, 0.0, 16.6),
+        mat('Clay 3', 30.0, 0.0, 13.5),
+        mat('Clay 4', 32.0, 0.0, 17.0),
+        mat('Clay 5', 32.0, 0.0, 17.5),
+    ]
+    def x_at(y, pt, q):
+        return pt[0] + (q[0] - pt[0]) * (y - pt[1]) / (q[1] - pt[1])
+    if case == 1:
+        ground = [(-50.0, 4.0), (-35.605, 4.0), (-31.915, 7.0), (-8.61, 7.0),
+                  (-1.23, 1.0), (-1.107, 0.9), (0.0, 0.0), (40.0, 0.0)]
+        xr1 = x_at(1.0, (-8.61, 7.0), (-1.23, 1.0))
+    else:
+        ground = [(-50.0, 4.0), (-35.605, 4.0), (-29.7625, 8.75),
+                  (-10.7625, 8.75), (0.0, 0.0), (40.0, 0.0)]
+        xr1 = x_at(1.0, (-10.7625, 8.75), (0.0, 0.0))
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': ground},
+        {'mat_id': 1, 'coords': [(-50.0, 1.0), (xr1, 1.0), (0.0, 0.0),
+                                 (40.0, 0.0)]},
+        {'mat_id': 2, 'coords': [(-50.0, 0.0), (40.0, 0.0)]},
+        {'mat_id': 3, 'coords': [(-50.0, -1.0), (40.0, -1.0)]},
+        {'mat_id': 4, 'coords': [(-50.0, -3.0), (40.0, -3.0)]},
+        {'mat_id': 5, 'coords': [(-50.0, -7.0), (40.0, -7.0)]},
+        {'mat_id': 6, 'coords': [(-50.0, -18.0), (40.0, -18.0)]},
+    ]
+    sd['max_depth'] = -24.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    lines = [{'x1': -35.605, 'y1': 0.9, 'x2': -1.107, 'y2': 0.9,
+              't_max': 200.0, 't_res': 0.0, 'lp1': 1.3, 'lp2': 1.3,
+              'E': 2e4, 'area': 0.1, 'label': 'geosynthetic',
+              'type': 'geosynthetic', 'dir': 'axial', 'appl': 'passive',
+              'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    return sd
+
+
+def vp032a():
+    """Slide #32 case 1 (H=7), circle A (printed: (-4.8, 8) R 21.83):
+    Bishop/Spencer 1.218 vs Slide2 1.23 / Borges & Cardoso 1.25."""
+    sd = _vp032_slope_data(1)
+    sd['circles'] = [{'Xo': -4.8, 'Yo': 8.0, 'Depth': 8.0 - 21.83, 'R': 21.83}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a.xlsx'))
+    return 'vp032a.xlsx'
+
+
+def vp032b():
+    """Slide #32 case 1 (H=7), circle B (printed: (-3.8, 15) R 31.47):
+    Bishop/Spencer 1.216 vs Slide2 1.22 / Borges & Cardoso 1.19."""
+    sd = _vp032_slope_data(1)
+    sd['circles'] = [{'Xo': -3.8, 'Yo': 15.0, 'Depth': 15.0 - 31.47, 'R': 31.47}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032b.xlsx'))
+    return 'vp032b.xlsx'
+
+
+def vp032c():
+    """Slide #32 case 2 (H=8.75), circle C (printed: (-4.8, 14) R 28.8):
+    Bishop/Spencer 0.981 vs Slide2 0.98 / Borges & Cardoso 0.99."""
+    sd = _vp032_slope_data(2)
+    sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c.xlsx'))
+    return 'vp032c.xlsx'
+
+
 def vp033():
     """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
     tailings dyke (simplified probabilistic case). Cohesionless section over a

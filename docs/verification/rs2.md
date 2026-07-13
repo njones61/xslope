@@ -31,6 +31,9 @@ lockable rather than tuned to match.
 <!-- test: file=../files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.336, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=4000, benchmark=RS2-18 -->
 <!-- test: file=../files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.507, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=4000, benchmark=RS2-19 -->
 <!-- test: file=../files/rocscience/vp025.xlsx, type=fem_ssrm, expected_fs=1.003, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=4000, benchmark=RS2-20 -->
+<!-- test: file=../files/rocscience/vp032a.xlsx, type=fem_ssrm, expected_fs=1.196, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=4000, benchmark=RS2-24a -->
+<!-- test: file=../files/rocscience/vp032c.xlsx, type=fem_ssrm, expected_fs=0.991, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=0.7, f_max=1.4, max_iter=4000, benchmark=RS2-24b -->
+<!-- test: file=../files/rocscience/vp045a.xlsx, type=fem_ssrm, expected_fs=2.852, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=2.3, f_max=3.4, max_iter=4000, benchmark=RS2-32 -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -68,16 +71,16 @@ cross-bearings.
 | 21 | Bearing capacity test prism (Prandtl II) — planned: RS2 SSR 1.01 vs theory 1.0; the same setup as #20 on the VP26 prism, expected equally clean | VP26 |
 | 22 | Layered slope with undulating bedrock — *blocked*: RS2 SSR 1.52. Two gaps: the FEM fixes displacements only along a flat base (an undulating bedrock bottom never reaches equilibrium), and the problem specifies phreatic-inclination-corrected pore pressures, which the FEM does not yet apply (the LEM does, via Type=phreatic — vp027's LEM locks stand) | VP27 |
 | 23 | Underwater slope with linearly varying cohesion — *no lock possible*: RS2's published SSR (1.12) depends on a "can't fail" elastic region whose boundary its text and figure draw differently; stand-ins for the two readings give 0.87 and 0.92, and without the patch the true SSR minimum is the shallow skin above el. −20 (FS 0.21) that the artifice suppresses. The comparison would test where the patch is drawn, not the mechanics — this slope's anchor remains the LEM lock (VP29, Spencer 1.145 on Duncan's surface) | VP29 |
-| 24 | Layered slope with geosynthetic reinforcement | VP30–32 family |
+| 24 | Layered slope with geosynthetic reinforcement — **built**: SSRM 1.196 (H=7 case; mesh-stable 1.202 at 2.2 m) and 0.991 (H=8.75) vs RS2 SSR 1.15 / 0.95 (+4%, within the corpus SSR scatter; geotextile as an FEM truss with EA = 2×10³ kN/m stated as convention). RS2's fully labeled figures also supplied the geometry that unlocked Slide2's VP32 — LEM locks on the three printed circles live there (on [vp032a](../files/rocscience/vp032a.xlsx)/[c](../files/rocscience/vp032c.xlsx)) | VP32 |
 | 25 | Syncrude tailings dyke, multiple phreatic surfaces | VP33 family |
 | 26 | Clarence Cannon dam | VP34 family |
 | 27 | Homogeneous slope, pore pressure by r<sub>u</sub> | VP21 |
 | 28 | FE analysis with groundwater and stress | VP38 family |
-| 29 | Power-curve strength criterion | VP44 (Baker) |
-| 30 | Geosynthetic-reinforced embankment on soft soil | VP39 |
-| 31 | Mohr-Coulomb vs power curve | VP44/VP45 |
-| 32 | Tension crack and water table | VP56/VP57 family |
-| 33–34 | Mohr-Coulomb vs power curve (II, III) | VP61 (Baker 2003) |
+| 29 | (heading mismatch — body is the Tandjiria reinforced embankment) — *blocked*: the FEM has no tension-crack input, and the problem's LEM values depend on the crack (without it SSRM reads 1.053 vs the crack-included LEM lock 0.968); waits on the FEM tension-crack gap | VP39 |
+| 30 | (heading mismatch — body is the Perry power-curve slope) — *blocked*: RS2 SRF 0.91 vs Slide2 Janbu 0.944 / Perry 0.98; the FEM has no power-curve strength (one gap blocks #30/#31/#33/#34) | VP40 |
+| 31 | Mohr-Coulomb vs power curve — *blocked* (power half): FEM power-curve strength missing; the MC halves live under #32 | VP44/VP45 |
+| 32 | (heading mismatch — body is Baker's example 2) — **built** (MC half): SSRM 2.852 (2.861 at 1.6 m) vs RS2 SRF 2.83 (+0.8%); Baker's own MC 2.66, Slide2 Spencer 2.76 (on [vp045a.xlsx](../files/rocscience/vp045a.xlsx)). Power half blocked with #30 (RS2 SRF 2.74) | VP45 |
+| 33–34 | Mohr-Coulomb vs power curve (II, III) — *blocked*: FEM power-curve strength missing (same gap as #30/#31) | VP61 (Baker 2003) |
 
 ### Part II (35–58)
 

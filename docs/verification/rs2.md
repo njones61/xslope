@@ -22,6 +22,10 @@ honest rather than tight.
 <!-- test: file=../files/rocscience/vp015.xlsx, type=fem_ssrm, expected_fs=0.413, element_type=tri6, target_size=1.9, tolerance=0.02, f_min=0.25, f_max=0.65, max_iter=4000, benchmark=RS2-11 -->
 <!-- test: file=../files/rocscience/vp016.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.9, f_max=1.45, max_iter=4000, benchmark=RS2-12 -->
 <!-- test: file=../files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.384, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=4000, benchmark=RS2-13 -->
+<!-- test: file=../files/rocscience/vp019.xlsx, type=fem_ssrm, expected_fs=1.386, element_type=tri6, target_size=4.33, tolerance=0.02, f_min=1.1, f_max=1.7, max_iter=4000, benchmark=RS2-15 -->
+<!-- test: file=../files/rocscience/vp021a.xlsx, type=fem_ssrm, expected_fs=2.018, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.6, f_max=2.5, max_iter=4000, benchmark=RS2-17 -->
+<!-- test: file=../files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.336, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=4000, benchmark=RS2-18 -->
+<!-- test: file=../files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.507, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=4000, benchmark=RS2-19 -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -50,11 +54,11 @@ cross-bearings.
 | 12 | Simple slope + water table (Arai & Tagyo ex. 3) — **built**: SSRM 1.12 vs RS2 SSR 1.09 (+2.3%); LEM locks Bishop 1.112 / Spencer 1.113 (on [vp016.xlsx](../files/rocscience/vp016.xlsx)). The FEM piezo pore pressure uses the vertical-distance convention, consistent with the LEM slicer and the published analyses | VP16 |
 | 13 | Simple slope III (Yamagami & Ueta) — **built**: SSRM 1.38 vs RS2 SSR 1.33 and Greco Spencer 1.33; LEM locks Bishop 1.342 / Spencer 1.340 vs Y&U 1.348 / 1.339 (on [vp017.xlsx](../files/rocscience/vp017.xlsx)) | VP17 |
 | 14 | Simple slope, pore pressure by r<sub>u</sub> — *blocked*: RS2 SSR 0.98 vs Slide2 Spencer 1.01 / Baker 1.02; XSLOPE's FEM has no r<sub>u</sub> pore-pressure option (the LEM does — vp018.xlsx locks Spencer 1.033). This problem is Slide2 VP18, not VP21 | VP18 |
-| 15 | Layered slope II | VP19/VP20 family |
-| 16 | Layered slope and water table with weak seam | VP20 |
-| 17 | Slope with three pore pressure conditions | VP21 family |
-| 18 | Three pore pressure conditions and a weak seam | VP22 |
-| 19 | Undrained layered slope | VP23/VP24 |
+| 15 | Layered slope II (Greco ex. 4 / Yamagami & Ueta) — **built**: SSRM 1.39 vs RS2 SSR 1.39, Slide2 Spencer 1.398, Greco 1.40–1.42; mesh-converged (1.386→1.377 over a 1.7× size change) (on [vp019.xlsx](../files/rocscience/vp019.xlsx)) | VP19 |
+| 16 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) — *blocked*: RS2 SSR 1.02 vs Slide2 Spencer 1.093 circular / 1.007 noncircular; XSLOPE's SSRM does not reach equilibrium on this polygon-zone + sloping-water-table model (under investigation; the LEM locks 1.086–1.091 on the same file) | VP20 |
+| 17 | Slope with three pore pressure conditions (Fredlund & Krahn) — **built** (dry case): SSRM 2.02 vs RS2 SSR 2.0, Slide2 M-P 2.075, F&K 2.076 (on [vp021a.xlsx](../files/rocscience/vp021a.xlsx)). The r<sub>u</sub> case awaits FEM r<sub>u</sub> support; the water-table case awaits the VP21 case-3 input file | VP21 |
+| 18 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) — **built** (dry case): SSRM 1.34 vs RS2 SSR 1.34, Slide2 Bishop 1.382 (on [vp022a.xlsx](../files/rocscience/vp022a.xlsx)). Same r<sub>u</sub>/water-table status as #17 | VP22 |
+| 19 | Undrained layered slope (Low 1989) — **built** (caveat): SSRM 1.51 at the tagged mesh (1.48 at 0.6 m) vs RS2 SSR 1.41, Slide2 LEM 1.439, Low 1.44 — the SSR values straddle the LEM from opposite sides on this φ = 0 slope, and the XSLOPE factor drifts −2% with refinement; quoted at the tagged mesh per the page convention. This problem is Slide2 VP24 | VP24 |
 | 20 | Slope with vertical load (Prandtl's wedge) | VP25/VP26 |
 | 22 | Layered slope with undulating bedrock | VP27 |
 | 23 | Underwater slope with linearly varying cohesion | VP29 family |

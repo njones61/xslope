@@ -30,6 +30,14 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 
 
+# NOTE ON t_res: none of the manual problems publish a RESIDUAL tensile capacity
+# for their reinforcement, so every builder leaves t_res unset (NaN). Unset means
+# "no post-peak drop": the bar is elastic-perfectly-plastic and holds t_max once
+# it yields, which is what the published analyses assume. Do NOT write 0.0 there —
+# zero is a real, and very aggressive, value meaning the bar ruptures brittly and
+# carries nothing afterwards.
+
+
 def save_slope_data_to_xlsx(slope_data, path):
     """Write an input file, defaulting the SSR elastic constants on any material
     that does not carry its own.
@@ -739,7 +747,7 @@ def _dw634_slope_data(appl):
     sd['circles'] = [{'Xo': 30.0, 'Yo': 40.0, 'Depth': 12.0, 'R': 28.0}]
     sd['reinforcement_lines'] = [{
         'x1': 20.0, 'y1': 20.0, 'x2': 57.0, 'y2': 20.0,
-        't_max': 9000.0, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+        't_max': 9000.0, 't_res': float('nan'), 'lp1': 0.0, 'lp2': 0.0,
         'E': float('nan'), 'area': float('nan'), 'label': 'Tieback',
         'type': 'anchor', 'dir': 'axial', 'appl': appl,
         'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0,
@@ -801,7 +809,7 @@ def vp058():
     for hy in (104.0, 89.5, 75.0):
         lines.append({'x1': 200.0, 'y1': hy, 'x2': 200.0 + 88.0 * c20,
                       'y2': hy - 88.0 * s20,
-                      't_max': 4000.0 * 40.0 / 4.0, 't_res': 0.0, 'lp1': 0.0,
+                      't_max': 4000.0 * 40.0 / 4.0, 't_res': float('nan'), 'lp1': 0.0,
                       'lp2': 40.0, 'E': float('nan'), 'area': float('nan'),
                       'label': f'tieback y={hy:g}', 'type': 'anchor',
                       'dir': 'axial', 'appl': 'active',
@@ -855,7 +863,7 @@ def vp059():
     sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in pts]
     c10, s10 = math.cos(math.radians(10)), math.sin(math.radians(10))
     lines = [{'x1': 0.0, 'y1': 9.0, 'x2': 31.7 * c10, 'y2': 9.0 - 31.7 * s10,
-              't_max': 5000.0 * 22.0 / 8.0, 't_res': 0.0, 'lp1': 0.0,
+              't_max': 5000.0 * 22.0 / 8.0, 't_res': float('nan'), 'lp1': 0.0,
               'lp2': 22.0, 'E': float('nan'), 'area': float('nan'),
               'label': 'tieback', 'type': 'anchor', 'dir': 'axial',
               'appl': 'active', 'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
@@ -922,7 +930,7 @@ def vp060():
     for k, L in enumerate((40.0, 40.0, 40.0, 33.0, 25.5)):
         hy = 23.0 - 5.0 * k
         lines.append({'x1': 0.0, 'y1': hy, 'x2': L * c15, 'y2': hy - L * s15,
-                      't_max': 25918.14 / 5.0, 't_res': 0.0, 'lp1': 0.0,
+                      't_max': 25918.14 / 5.0, 't_res': float('nan'), 'lp1': 0.0,
                       'lp2': 25918.14 / 1508.0, 'E': float('nan'),
                       'area': float('nan'), 'label': f'nail {k+1}',
                       'type': 'nail', 'dir': 'axial', 'appl': 'passive',
@@ -1287,7 +1295,7 @@ def _vp032_slope_data(case):
     sd['circular'] = True
     sd['non_circ'] = []
     lines = [{'x1': -35.605, 'y1': 0.9, 'x2': -1.107, 'y2': 0.9,
-              't_max': 200.0, 't_res': 0.0, 'lp1': 1.3, 'lp2': 1.3,
+              't_max': 200.0, 't_res': float('nan'), 'lp1': 1.3, 'lp2': 1.3,
               'E': 2e4, 'area': 0.1, 'label': 'geosynthetic',
               'type': 'geosynthetic', 'dir': 'axial', 'appl': 'passive',
               'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
@@ -1556,7 +1564,7 @@ def _vp039_slope_data(fill, clay, tcrack_water, circle, t_geo):
     sd['circles'] = [dict(circle)]
     if t_geo:
         lines = [{'x1': 0.0, 'y1': 3.0, 'x2': 20.0, 'y2': 3.0,
-                  't_max': t_geo, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+                  't_max': t_geo, 't_res': float('nan'), 'lp1': 0.0, 'lp2': 0.0,
                   'E': float('nan'), 'area': float('nan'),
                   'label': 'geosynthetic', 'type': 'geosynthetic',
                   'dir': 'axial', 'appl': 'active',
@@ -1652,7 +1660,7 @@ def vp050():
         x_face = 14.0 * y / 25.0
         lines.append({
             'x1': x_face, 'y1': y, 'x2': x_face + lengths[r], 'y2': y,
-            't_max': tmax[r], 't_res': 0.0,
+            't_max': tmax[r], 't_res': float('nan'),
             'lp1': 0.0,                              # plate = tensile -> anchored
             'lp2': tmax[r] / bond[r],
             'E': float('nan'), 'area': float('nan'), 'label': f'Row {r}',
@@ -1688,7 +1696,7 @@ def vp086():
         xf = 1.25 * y
         lines.append({
             'x1': xf, 'y1': y, 'x2': xf + 20.0, 'y2': y,
-            't_max': 800.0, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+            't_max': 800.0, 't_res': float('nan'), 'lp1': 0.0, 'lp2': 0.0,
             'E': float('nan'), 'area': float('nan'), 'label': f'geogrid y={y:g}',
             'type': 'geosynthetic', 'dir': 'axial', 'appl': 'active',
             'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0,
@@ -1953,7 +1961,7 @@ def _sheahan_nail(x_head, y_head, into_x_sign, length, decl_deg, t_max, tend_hea
     t_max, tend1, tend2 = t_max / spacing, tend1 / spacing, tend2 / spacing
     return {
         'x1': x_head, 'y1': y_head, 'x2': x2, 'y2': y2,
-        't_max': t_max, 't_res': 0.0, 'lp1': lp1, 'lp2': lp2,
+        't_max': t_max, 't_res': float('nan'), 'lp1': lp1, 'lp2': lp2,
         'E': float('nan'), 'area': float('nan'), 'label': label,
         'type': 'nail', 'dir': 'axial', 'appl': 'passive',
         'tend1': tend1, 'tend2': tend2, 'spacing': spacing,
@@ -2096,7 +2104,7 @@ def vp049():
     lines = []
     for hy, L, tens in [(20.0, 35.0, 120344.9), (8.0, 33.0, 164217.3)]:
         lines.append({'x1': 0.0, 'y1': hy, 'x2': L * c25, 'y2': hy - L * s25,
-                      't_max': tens / 8.0, 't_res': 0.0, 'lp1': 0.0,
+                      't_max': tens / 8.0, 't_res': float('nan'), 'lp1': 0.0,
                       'lp2': tens / 13571.68, 'E': float('nan'),
                       'area': float('nan'), 'label': f'tieback y={hy:g}',
                       'type': 'anchor', 'dir': 'axial', 'appl': 'active',
@@ -2227,7 +2235,7 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
             d2 = max(gelev(faces[t] + L) - y, 0.3)
             po = 2 * 0.8 * _math.tan(phi_f) * 18.0
             rows.append({'x1': faces[t] + 0.05, 'y1': y, 'x2': faces[t] + L, 'y2': y,
-                         't_max': ta, 't_res': 0.0,
+                         't_max': ta, 't_res': float('nan'),
                          'lp1': ta / (po * d1), 'lp2': ta / (po * d2),
                          'E': float('nan'), 'area': float('nan'),
                          'label': f'T{t + 1}L{k + 1}', 'type': 'geosynthetic',
@@ -2611,7 +2619,7 @@ def _vp107_slope_data(variant):
         for k, w in [(1, 3), (2, 3), (3, 2), (4, 2), (5, 1)]:
             (x1, y1), (x2, y2) = P(k, 0), P(k, w)
             lines.append({'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
-                          't_max': 71.0, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+                          't_max': 71.0, 't_res': float('nan'), 'lp1': 0.0, 'lp2': 0.0,
                           'E': float('nan'), 'area': float('nan'),
                           'label': f'Mesh {k}', 'type': 'geosynthetic',
                           'dir': 'tangent', 'appl': 'active',
@@ -2718,7 +2726,7 @@ def _vp108_slope_data(variant, weak_joints=False):
         for k, w in [(1, 3), (2, 2), (3, 1)]:
             (x1, y1), (x2, y2) = P(k, w), P(k, 0)
             lines.append({'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
-                          't_max': 100.0, 't_res': 0.0, 'lp1': 0.0,
+                          't_max': 100.0, 't_res': float('nan'), 'lp1': 0.0,
                           'lp2': 0.0, 'E': float('nan'),
                           'area': float('nan'), 'label': f'Mesh {k}',
                           'type': 'geosynthetic', 'dir': 'tangent',
@@ -4089,7 +4097,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

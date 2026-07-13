@@ -326,13 +326,17 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
     # semantics: the material residual where the full capacity is available,
     # zero inside a friction ramp (sudden pullout) unless the governing end is
     # anchored, in which case the anchor hardware survives up to min(Tres, Tend).
+    # An UNSET Tres (NaN) stays unset everywhere along the line — no post-peak
+    # drop anywhere — rather than collapsing to a number through min().
     tol = max(1e-9, 1e-9 * line_length)
     line_points = []
     for s in sorted(cands):
         if line_points and abs(s - line_points[-1]["_s"]) < tol:
             continue
         T = T_at(s)
-        if T >= Tmax - 1e-12:
+        if Tres != Tres:                      # NaN: unset, no post-peak drop
+            tres_pt = float('nan')
+        elif T >= Tmax - 1e-12:
             tres_pt = Tres
         else:
             governing_tend = tend_g = 0.0
@@ -1052,7 +1056,16 @@ def load_slope_data(filepath):
                 "x1": float(row['x1']), "y1": float(row['y1']),
                 "x2": float(row['x2']), "y2": float(row['y2']),
                 "t_max": float(row['tmax']) / spacing,
-                "t_res": (float(row['tres']) if pd.notna(row.get('tres')) else 0.0) / spacing,
+                # A BLANK Tres means "no post-peak drop" — the bar is elastic-
+                # perfectly-plastic and holds its capacity once it yields. It does
+                # NOT mean zero. Zero is a legitimate, and very aggressive, entry:
+                # it says the bar ruptures brittly and carries nothing afterwards.
+                # Defaulting a blank cell to 0.0 silently made brittle rupture the
+                # behaviour of every file that never mentions Tres. NaN carries the
+                # "unset" sense through to the FEM, which softens only where t_res
+                # is finite.
+                "t_res": (float(row['tres']) / spacing
+                          if pd.notna(row.get('tres')) else float('nan')),
                 "lp1": float(row['lp1']) if not pd.isna(row['lp1']) else 0.0,
                 "lp2": float(row['lp2']) if not pd.isna(row['lp2']) else 0.0,
                 "E": float(row['e']) if pd.notna(row.get('e')) else float('nan'),
@@ -1627,6 +1640,15 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     def _f(v):
         return float(v)
 
+    def _isnan(v):
+        """True for an unset numeric field (NaN or None) — written as a blank cell."""
+        if v is None:
+            return True
+        try:
+            return float(v) != float(v)
+        except (TypeError, ValueError):
+            return False
+
     updates = {}
 
     # === main ===
@@ -1797,7 +1819,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             cell_ref(row, 13): _f(r.get('tend1', 0.0)) * sp,
             cell_ref(row, 14): _f(r.get('tend2', 0.0)) * sp,
             cell_ref(row, 15): sp,
-            cell_ref(row, 16): _f(r.get('t_res', 0.0)) * sp,
+            # unset Tres round-trips as a BLANK cell, not a literal NaN
+            cell_ref(row, 16): (None if _isnan(r.get('t_res'))
+                                else _f(r.get('t_res', 0.0)) * sp),
             cell_ref(row, 17): _f(r['E']), cell_ref(row, 18): _f(r['area']) * sp,
         })
         rtype = str(r.get('type', '') or '')

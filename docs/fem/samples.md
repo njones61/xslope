@@ -48,15 +48,20 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.67**, in good agreement with the
-companion LEM analysis (fixed reinforcement forces), which gives **FS = 1.59** by Spencer's
-method (see [LEM sample problem 9](../lem/samples.md)) — the FEM reads ~5% above the LEM,
-typical of reinforced systems where the FE solution mobilizes reinforcement through
-deformation rather than assuming fixed forces. Long-run equilibrium verification confirms a
-genuine failure boundary: at F = 1.6 the viscoplastic field settles to true equilibrium
-(displacement constant to six digits), while at F = 1.75 it creeps indefinitely.
+SSRM results. The computed factor of safety is **FS = 1.43**. The companion LEM analysis
+gives **FS = 1.59** by Spencer's method (see [LEM sample problem 9](../lem/samples.md)),
+and the FEM reads below it — as it should for this model, because this is a *peak-residual*
+run: $T_{res}$ = 600 lb/ft is filled in, so reinforcement elements that yield shed down to
+their residual capacity, while the LEM has no strain compatibility and simply applies the
+full envelope value at each crossing (it ignores $T_{res}$ entirely — see
+[LEM Reinforcement](../lem/reinforcement.md)).
 
-The plots below show the solution at the computed factor of safety (**F = 1.67**). The
+That gap is the post-peak behavior, not a discrepancy between the methods. Blank out
+$T_{res}$ and the same model runs elastic-perfectly-plastic at **FS = 1.58**, within 1% of
+the LEM — the two engines then agree closely, because they are finally assuming the same
+thing about the reinforcement.
+
+The plots below show the solution at the computed factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
 middle plot shows the viscoplastic shear strain concentration with reinforcement elements
 colored by axial force (blue = low, red = high); green elements are inactive (no tension)
@@ -65,31 +70,27 @@ vectors. The reinforcement summary table is shown below.
 
 ![reinforce_fem_results.png](images/reinforce_fem_results.png){width=1000}
 
-Reinforcement summary:
+The `print_reinforcement_summary()` function reports the state of each line — how many
+elements are carrying tension, how many sit inside a pullout ramp, how many have yielded,
+and how many have dropped to the residual capacity — together with a status for the line:
 
-```bash
-=== Reinforcement Summary ===
-Line  Elems     Max T     Avg T  Tension  In Lp  At Tres  Broken  Status
---------------------------------------------------------------------------------
-   1      9     722.8     497.9        7      4        3       2  YIELDED
-   2      9     663.1     569.0        6      4        4       2  YIELDED
-   3      9     644.0     489.4        7      4        4       2  YIELDED
-   4      9     774.7     524.2        7      4        4       2  YIELDED
-   5      9     696.1     523.8        7      4        4       2  YIELDED
-   6      9     725.5     596.4        7      4        0       1  PULLOUT
---------------------------------------------------------------------------------
+| Status | Meaning |
+|--------|---------|
+| OK | All elements below capacity |
+| NEAR CAPACITY | Peak force within 5% of $T_{max}$ |
+| PULLOUT | Elements near the ends have reached their embedment-limited capacity |
+| YIELDED | Elements away from the ends are at $T_{max}$ and holding it (perfectly plastic) |
+| SOFTENED | Elements yielded and then dropped to $T_{res}$ |
+| INACTIVE | No elements carrying tension |
 
-  PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.
-  YIELDED: One or more elements have exceeded Tallow and dropped to residual capacity Tres. The line is still carrying load at reduced strength.
-```
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.432, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=4000 -->
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.67, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.2, f_max=1.9, max_iter=4000 -->
-
-At the factor of safety, the reinforcement is heavily mobilized: lines 1-5 have yielded
-(interior elements at residual capacity $T_{res}$ = 600 lb/ft) and line 6 shows end pullout,
-with peak forces of 644-775 lb/ft approaching $T_{max}$ = 800 lb/ft. This is the expected
-state at incipient failure — the system fails when the soil's reduced strength and the
-reinforcement's residual capacity can no longer balance the driving forces together.
+At the factor of safety the reinforcement is heavily mobilized: interior elements have
+reached $T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, and elements inside the
+pullout ramps ($L_p$ = 4 ft from each end) are limited by embedment rather than by material
+strength. This is the expected state at incipient failure — the slope fails when the soil's
+reduced strength and the reinforcement's *residual* capacity can no longer balance the
+driving forces together.
 
 ### 2. Slope Stabilized with Drilled Shaft Piles
 

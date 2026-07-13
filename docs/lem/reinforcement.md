@@ -140,8 +140,9 @@ The same reinforcement lines drive both engines, but the mechanics differ:
   factored per Appl. The residual strength $T_{res}$ is not used — LEM has no strain compatibility, so there is no
   notion of an element loading past peak.
 - **FEM** models each line as tension-only truss elements whose force *emerges* from displacement compatibility;
-  the same capacity envelope caps each element's allowable force, and elements that exceed it drop to a residual
-  (governed by $T_{res}$, and by the end anchorage in anchored zones). Dir and Appl have no meaning in the FEM.
+  the same capacity envelope caps each element's allowable force. An element that reaches it yields and holds that
+  force (elastic-perfectly-plastic) — unless $T_{res}$ has been filled in, in which case it drops to that residual
+  (bounded by the end anchorage in anchored zones). Dir and Appl have no meaning in the FEM.
   See [Soil Reinforcement in FEM](../fem/reinforcement.md).
 
 For typical stiffness values ($E$, $Area$) and guidance on pullout lengths by reinforcement type, see the

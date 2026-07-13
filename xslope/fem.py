@@ -545,7 +545,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     n_1d_elements = len(elements_1d)
     
     t_allow_by_1d_elem = np.zeros(n_1d_elements)
-    t_res_by_1d_elem = np.zeros(n_1d_elements)
+    # NaN = "no post-peak drop" (see the t_res handling below). Zero would mean
+    # brittle rupture, which must not be the default for an unset field.
+    t_res_by_1d_elem = np.full(n_1d_elements, np.nan)
     k_by_1d_elem = np.zeros(n_1d_elements)
     cos_theta_1d = np.zeros(n_1d_elements)
     sin_theta_1d = np.zeros(n_1d_elements)
@@ -594,7 +596,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
                     # Get reinforcement properties
                     t_max = line_data.get("t_max", 0.0)
-                    t_res = line_data.get("t_res", 0.0)
+                    # NaN = unset: no post-peak drop (elastic-perfectly-plastic).
+                    # An explicit 0.0 is different — it means brittle rupture.
+                    t_res = line_data.get("t_res", float('nan'))
+                    if t_res is None:
+                        t_res = float('nan')
                     lp1 = line_data.get("lp1", 0.0)   # Pullout length left end
                     lp2 = line_data.get("lp2", 0.0)   # Pullout length right end
                     tend1 = line_data.get("tend1", 0.0)  # End anchorage capacities
@@ -612,7 +618,10 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                         dist_to_left, dist_to_right, t_max, lp1, lp2, tend1, tend2)
                     t_allow_by_1d_elem[elem_idx] = t_allow
 
-                    if t_allow >= t_max - 1e-12:
+                    if t_res != t_res:
+                        # Unset: this line never softens, anywhere along its length.
+                        t_res_by_1d_elem[elem_idx] = float('nan')
+                    elif t_allow >= t_max - 1e-12:
                         # Beyond the pullout zones - full capacity, material residual
                         t_res_by_1d_elem[elem_idx] = t_res
                     else:
@@ -626,9 +635,27 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                         tend_g = tend1 if cap1 <= cap2 else tend2
                         t_res_by_1d_elem[elem_idx] = min(t_res, tend_g)
 
-                    # Compute axial stiffness
-                    E = line_data.get("E", 2e11)  # Steel default
-                    A = line_data.get("area", 1e-4)  # Default area
+                    # Compute axial stiffness. E and Area are OPTIONAL in the
+                    # input (the LEM needs neither — it applies the capacity
+                    # envelope directly), so a perfectly valid LEM file can
+                    # arrive here with them blank, which load_slope_data turns
+                    # into NaN. Left alone, that poisons k, then K_global, and
+                    # the solve dies with an opaque "Factor is exactly singular".
+                    # Fail here instead, naming the line and what to supply.
+                    E = line_data.get("E")
+                    A = line_data.get("area")
+                    if (E is None or A is None
+                            or not np.isfinite(E) or not np.isfinite(A)
+                            or E <= 0 or A <= 0):
+                        label = line_data.get("label") or f"line {line_id + 1}"
+                        raise ValueError(
+                            f"Reinforcement '{label}' has no usable axial stiffness "
+                            f"(E={E}, Area={A}). The FEM models reinforcement as a bar "
+                            f"element, so it needs E and Area (the axial rigidity "
+                            f"EA = E*Area per unit width) on the 'reinforce' sheet. "
+                            f"The LEM does not — it applies the tensile capacity "
+                            f"envelope (Tmax/Lp) directly — so this file can run in the "
+                            f"LEM but not the FEM until E and Area are filled in.")
                     k_val = E * A / elem_length
                     k_by_1d_elem[elem_idx] = k_val
 
@@ -1399,6 +1426,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # Tracking arrays for 1D element status
         forces_1d = np.zeros(n_1d_elements)
         failed_1d = np.zeros(n_1d_elements, dtype=bool)
+        # Post-peak set. A bar drops from t_allow to t_res ONLY by entering this
+        # set, and it is only ever updated on a CONVERGED state (see the
+        # softening fixed point at the convergence break). Never mid-iteration:
+        # the first viscoplastic iterate is the elastic predictor, whose bar
+        # forces overshoot wildly before the soil sheds load into them, so a
+        # force-triggered latch inside the loop condemns bars for a transient
+        # that never physically existed. Softening is possible only where t_res
+        # is FINITE — an unset (NaN) t_res means the bar is
+        # elastic-perfectly-plastic and holds t_allow forever.
+        softened_1d = np.zeros(n_1d_elements, dtype=bool)
+        can_soften_1d = (np.isfinite(t_res_by_1d_elem)
+                         & (t_res_by_1d_elem < t_allow_by_1d_elem - 1e-12))
+        n_soften_rounds = 0
 
         if debug_level >= 1:
             print(f"  1D truss elements: {n_1d_elements}")
@@ -1884,32 +1924,58 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     T = k * delta
                     forces_1d[elem_idx_1d] = T
 
-                    # Determine effective capacity
-                    if failed_1d[elem_idx_1d]:
-                        T_cap = t_res_by_1d_elem[elem_idx_1d]
-                    else:
-                        T_cap = t_allow_by_1d_elem[elem_idx_1d]
-
-                    # Check violations and compute correction
-                    correction_T = 0.0
+                    # Bar constitutive law: tension-only, elastic-PERFECTLY-
+                    # PLASTIC. The yield force is t_allow — the SAME capacity
+                    # envelope the LEM applies at a reinforcement crossing
+                    # (fileio.reinforce_available_tension: tensile strength
+                    # tapered by the pullout ramps at both ends). The force the
+                    # bar can actually deliver is the elastic k*delta clipped
+                    # into [0, t_allow]; beyond that the bar yields and holds
+                    # t_allow while the soil around it keeps straining.
+                    #
+                    # NOTE 1 (strength reduction): t_allow is NOT divided by F.
+                    # Only the SOIL strength is reduced (see the note at the top
+                    # of solve_fem). The reinforcement keeps its full structural
+                    # capacity, so the reported FS is the factor on soil strength
+                    # at which the *supported* slope fails. This is the RS2/Slide
+                    # convention and is what the LEM does (it applies the full
+                    # available tension as a resisting force, independent of FS).
+                    #
+                    # NOTE 2 (post-peak): a bar that has entered the softened set
+                    # yields at t_res instead of t_allow. Membership in that set is
+                    # decided ONLY on a converged state, by the fixed point at the
+                    # convergence break below — never here, mid-iteration. See the
+                    # comment at softened_1d for why.
+                    T_cap = (t_res_by_1d_elem[elem_idx_1d]
+                             if softened_1d[elem_idx_1d]
+                             else t_allow_by_1d_elem[elem_idx_1d])
+                    T_true = min(max(T, 0.0), T_cap)
 
                     if T < 0:
-                        # Compression: cancel it entirely
-                        correction_T = -T
                         n_1d_compression += 1
                     elif T > T_cap:
-                        if not failed_1d[elem_idx_1d]:
-                            # First time exceeding T_allow: mark as failed
-                            failed_1d[elem_idx_1d] = True
-                            T_cap = t_res_by_1d_elem[elem_idx_1d]
-                        # Reduce force to T_cap
-                        correction_T = T_cap - T
+                        failed_1d[elem_idx_1d] = True   # "has yielded", for reporting
                         n_1d_exceeded += 1
 
+                    # Viscoplastic body-load correction. The global stiffness
+                    # carries the bar's FULL elastic stiffness, so K*u contains
+                    # the (uncapped) elastic bar force T. Exactly as for the 2D
+                    # soil, where loads += B^T*D*evp so that the true internal
+                    # force is K*u - loads_body, the bar's body load must be the
+                    # part of the elastic force the bar cannot actually carry:
+                    #
+                    #     f_body = (T - T_true) * [-cos, -sin, +cos, +sin]
+                    #
+                    # Then K*u - f_body leaves T_true in the bar. Adding the
+                    # OPPOSITE sign (T_true - T) — as this code did — turns the
+                    # cap into an anti-cap: the bar ends up carrying 2T - T_true,
+                    # i.e. it gets *stiffer* the more it is overloaded, so the
+                    # reinforced slope can never be driven to failure and the SSR
+                    # factor is insensitive to T_allow.
+                    correction_T = T - T_true
+
                     if abs(correction_T) > 1e-30:
-                        # Convert axial correction to nodal forces:
                         # Internal force pattern for tension T: [-cos, -sin, +cos, +sin]
-                        # correction_T acts as additional axial force along element
                         loads[dof_idx[0]] += correction_T * (-cos_t)
                         loads[dof_idx[1]] += correction_T * (-sin_t)
                         loads[dof_idx[2]] += correction_T * cos_t
@@ -2116,6 +2182,40 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     break
 
             if relative_change < tolerance and plastic_settled:
+                # --- post-peak softening fixed point -------------------------
+                # The state is in equilibrium. NOW, and only now, ask which bars
+                # have actually yielded: their elastic demand k*delta (forces_1d,
+                # which is the UNCAPPED force) exceeds the capacity they were
+                # allowed to carry. Those with a finite t_res drop to it, and we
+                # keep iterating; shedding their load can push neighbours over,
+                # so the process repeats until the softened set stops growing —
+                # a genuine progressive-failure fixed point. It terminates: the
+                # set only ever grows, and it is bounded by the element count.
+                #
+                # Deciding this on a converged state (rather than on whichever
+                # iterate first overshot) is what makes the result independent of
+                # the path the solver took to get here.
+                if has_1d_elements and can_soften_1d.any():
+                    demand = forces_1d
+                    newly = (~softened_1d & can_soften_1d
+                             & (demand > t_allow_by_1d_elem + 1e-9))
+                    if newly.any() and n_soften_rounds < n_1d_elements:
+                        softened_1d |= newly
+                        n_soften_rounds += 1
+                        if debug_level >= 1:
+                            print(f"  Softening round {n_soften_rounds}: "
+                                  f"{int(newly.sum())} bar element(s) dropped to "
+                                  f"t_res ({int(softened_1d.sum())} total); "
+                                  f"re-solving")
+                        # reopen the iteration: reset the settling trackers so the
+                        # new equilibrium is judged on its own decay history
+                        ufr_prev = unbalanced_force_ratio
+                        ufr_rate_peak = 0.0
+                        ufr_rate_best = np.inf
+                        last_progress_iter = iteration
+                        u = u_new
+                        continue
+                # -------------------------------------------------------------
                 converged = True
                 u = u_new
                 if debug_level >= 1:
@@ -2229,14 +2329,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             delta = du_x * cos_t + du_y * sin_t
             T = k * delta
 
-            # Apply constraints to final reported force
-            if failed_1d[elem_idx_1d]:
-                T = min(T, t_res_by_1d_elem[elem_idx_1d])
-            else:
-                T = min(T, t_allow_by_1d_elem[elem_idx_1d])
-            T = max(T, 0.0)  # No compression
-
-            forces_1d[elem_idx_1d] = T
+            # Report the force the bar actually delivers, under the same law that
+            # was enforced in the viscoplastic loop: tension-only, yielding at
+            # t_allow — or at t_res if the bar ended up in the softened set.
+            cap = (t_res_by_1d_elem[elem_idx_1d] if softened_1d[elem_idx_1d]
+                   else t_allow_by_1d_elem[elem_idx_1d])
+            forces_1d[elem_idx_1d] = min(max(T, 0.0), cap)
 
     # ---- Step 10c: Compute final pile beam element forces (capped at capacity) ----
     if has_pile_elements:
@@ -2331,6 +2429,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         "plastic_fraction": n_plastic / n_elements if n_elements > 0 else 0.0,
         "forces_1d": forces_1d if has_1d_elements else np.array([]),
         "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
+        # bars that dropped to their residual capacity (converged-state fixed point)
+        "softened_1d_elements": softened_1d if has_1d_elements else np.array([], dtype=bool),
         "forces_pile_axial": forces_pile_axial if has_pile_elements else np.array([]),
         "forces_pile_lateral": forces_pile_lateral if has_pile_elements else np.array([]),
         "forces_pile_moment": forces_pile_moment if has_pile_elements else np.zeros((0, 2)),
@@ -2358,6 +2458,9 @@ def print_reinforcement_summary(fem_data, solution):
     t_res_by_elem = fem_data["t_res_by_1d_elem"]
     forces = solution.get("forces_1d", np.zeros(n_1d))
     failed = solution.get("failed_1d_elements", np.zeros(n_1d, dtype=bool))
+    softened = solution.get("softened_1d_elements", np.zeros(n_1d, dtype=bool))
+    if len(softened) != n_1d:
+        softened = np.zeros(n_1d, dtype=bool)
 
     # Filter out pile elements — reinforcement reported separately
     reinf_mask = ~pile_elem_mask
@@ -2370,7 +2473,7 @@ def print_reinforcement_summary(fem_data, solution):
 
     print("\n=== Reinforcement Summary ===")
     print(f"{'Line':>4}  {'Elems':>5}  {'Max T':>8}  {'Avg T':>8}  "
-          f"{'Tension':>7}  {'In Lp':>5}  {'At Tres':>7}  {'Broken':>6}  {'Status'}")
+          f"{'Tension':>7}  {'In Lp':>5}  {'Yielded':>7}  {'Pullout':>7}  {'Status'}")
     print("-" * 80)
 
     statuses_seen = set()
@@ -2379,6 +2482,7 @@ def print_reinforcement_summary(fem_data, solution):
         n_elem = int(mask.sum())
         line_forces = forces[mask]
         line_failed = failed[mask]
+        line_softened = softened[mask]
         line_t_allow = t_allow_by_elem[mask]
         line_t_res = t_res_by_elem[mask]
 
@@ -2391,33 +2495,32 @@ def print_reinforcement_summary(fem_data, solution):
         # Pullout zone: elements where T_allow < T_max (reduced by proximity to end)
         n_pullout = int(((line_t_allow < t_max_line - 1e-6) & (line_t_allow > 1e-6)).sum())
 
-        # At Tres: failed elements still carrying residual force
-        n_at_tres = int((line_failed & (line_t_res > 1e-6)).sum())
+        # Yielded: elements that reached their allowable capacity and are now
+        # holding it (elastic-perfectly-plastic bar — see solve_fem; there is no
+        # rupture, so a yielded element still carries T_allow).
+        yielded_mask = line_failed
 
-        # Broken: failed elements with zero residual (complete failure)
-        broken_mask = line_failed & (line_t_res < 1e-6)
-        n_broken = int(broken_mask.sum())
-
-        # Determine if broken elements are in Lp zone or outside
+        # Elements inside a pullout ramp carry less than the line's full Tmax
         in_lp_mask = (line_t_allow < t_max_line - 1e-6) & (line_t_allow > 1e-6)
-        # Elements at the very end (t_allow ~ 0) are also in Lp zone
-        at_end_mask = line_t_allow < 1e-6
+        at_end_mask = line_t_allow < 1e-6   # the very ends develop no tension
         lp_zone_mask = in_lp_mask | at_end_mask
-        n_broken_in_lp = int((broken_mask & lp_zone_mask).sum())
-        n_broken_outside_lp = n_broken - n_broken_in_lp
+
+        # Yielded at the pullout (embedment-limited) capacity vs. at full Tmax
+        n_yield_in_lp = int((yielded_mask & lp_zone_mask).sum())
+        n_yield_outside_lp = int((yielded_mask & ~lp_zone_mask).sum())
 
         max_t = line_forces.max() if n_elem > 0 else 0.0
         active_forces = line_forces[line_forces > 0]
         avg_t = active_forces.mean() if len(active_forces) > 0 else 0.0
 
-        # Status
-        if n_broken == n_elem:
-            status = "RUPTURED"
-        elif n_broken_outside_lp > 0:
-            status = "RUPTURED"
-        elif n_at_tres > 0:
+        # Status. A line that has actually shed capacity (dropped to Tres) is the
+        # most serious state and outranks a merely-yielded one.
+        n_softened = int(line_softened.sum())
+        if n_softened > 0:
+            status = "SOFTENED"
+        elif n_yield_outside_lp > 0:
             status = "YIELDED"
-        elif n_broken_in_lp > 0:
+        elif n_yield_in_lp > 0:
             status = "PULLOUT"
         elif max_t > 0.95 * t_max_line and t_max_line > 0:
             status = "NEAR CAPACITY"
@@ -2429,20 +2532,22 @@ def print_reinforcement_summary(fem_data, solution):
         statuses_seen.add(status)
 
         print(f"{line_id:>4}  {n_elem:>5}  {max_t:>8.1f}  {avg_t:>8.1f}  "
-              f"{n_active:>7}  {n_pullout:>5}  {n_at_tres:>7}  {n_broken:>6}  {status}")
+              f"{n_active:>7}  {n_pullout:>5}  {n_yield_outside_lp:>7}  "
+              f"{n_yield_in_lp:>7}  {status}")
 
     print("-" * 80)
 
     # Print notes for statuses that appeared
     status_notes = {
-        "OK": "OK: All elements within allowable capacity, no failures.",
+        "OK": "OK: All elements within allowable capacity, none yielding.",
         "NEAR CAPACITY": "NEAR CAPACITY: Maximum force exceeds 95% of Tmax. Close to yielding.",
-        "PULLOUT": "PULLOUT: Elements near the reinforcement ends (within Lp) have failed due to insufficient embedment length. Interior elements are intact.",
-        "YIELDED": "YIELDED: One or more elements have exceeded Tallow and dropped to residual capacity Tres. The line is still carrying load at reduced strength.",
-        "RUPTURED": "RUPTURED: One or more elements outside the pullout zone have broken (T exceeded Tallow with Tres=0). The reinforcement line has lost structural continuity.",
+        "PULLOUT": "PULLOUT: Elements near the reinforcement ends have reached their embedment-limited (pullout) capacity and are slipping at that force. Interior elements are below capacity.",
+        "YIELDED": "YIELDED: One or more elements away from the ends are at the full tensile capacity Tmax and holding it (perfectly plastic). The line is fully mobilized.",
+        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to the residual capacity Tres entered for this line (Tres = 0 means brittle rupture). Post-peak behaviour is OFF unless Tres is filled in.",
         "INACTIVE": "INACTIVE: No elements are carrying tension. The reinforcement is not engaged.",
     }
-    notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED", "RUPTURED", "INACTIVE"] if s in statuses_seen]
+    notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED",
+                                       "SOFTENED", "INACTIVE"] if s in statuses_seen]
     if notes:
         print()
         for note in notes:
@@ -2612,17 +2717,14 @@ def print_detailed_element_summary(fem_data, solution):
             t_res = t_res_by_elem[i]
             is_failed = failed[i]
 
-            if is_failed and t_res < 1e-6:
-                # Distinguish pullout (near ends, reduced t_allow) from rupture (full capacity exceeded)
-                # Get max t_allow for this line to determine if element is in pullout zone
+            if is_failed:
+                # The bar is at its allowable capacity and holding it. Whether
+                # that capacity is the full tensile strength or an
+                # embedment-limited (pullout) value depends on where the element
+                # sits along the line.
                 line_mask = element_materials_1d == line_id
                 t_max_line = t_allow_by_elem[line_mask].max()
-                if t_allow < t_max_line - 1e-6:
-                    status = "PULLOUT"
-                else:
-                    status = "BROKEN"
-            elif is_failed:
-                status = "AT TRES"
+                status = "PULLOUT" if t_allow < t_max_line - 1e-6 else "YIELDED"
             elif force < -1e-6:
                 status = "COMPRESS"
             elif force < 1e-6:

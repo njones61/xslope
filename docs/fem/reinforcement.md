@@ -60,24 +60,57 @@ For a truss element oriented at angle $\theta$ to the horizontal:
 
 ## Force Behavior and Failure Modes
 
-The forces and failure modes in 1D truss elements are analyzed in an iterative fashion. In general, each truss element
-has a maximum allowable tensile capacity $T_{allow}$ and a residual tensile capacity $T_{res}$ derived from the
-user-specified reinforcement parameter inputs. The axial force in each element is calculated as $T = (AE/L) \cdot \delta$, where $\delta$ is the element elongation (the component of relative nodal displacement along the element axis). When the tensile force meets or exceeds $T_{allow}$, the element's effective capacity drops to $T_{res}$. These two parameters can be adapted to simulate a variety of behaviors and failure modes, depending on the reinforcement material and loading conditions:
+The forces and failure modes in 1D truss elements are analyzed in an iterative fashion. Each truss element
+has a maximum allowable tensile capacity $T_{allow}$, derived from the user-specified reinforcement parameters,
+and optionally a residual tensile capacity $T_{res}$. The axial force in each element is calculated as
+$T = (AE/L) \cdot \delta$, where $\delta$ is the element elongation (the component of relative nodal displacement
+along the element axis).
 
-**Complete Failure Model:**
+The global stiffness matrix carries each bar's *full elastic* stiffness, so $K u$ always contains the uncapped
+elastic force. The capacity is imposed the same way plasticity is imposed on the soil — through a viscoplastic
+body load equal to the part of the elastic force the element **cannot** carry:
 
-A complete failure model is appropriate for brittle materials (some steel cables, fiber reinforcement).
+>>$f_{body} = (T - T_{true}) \cdot [-\cos\theta,\; -\sin\theta,\; +\cos\theta,\; +\sin\theta]$
 
-- When $T > T_{allow}$, the element's effective force is capped at zero via body-force corrections<br>
-- This is simulated by setting $T_{res} = 0$ in the input for the reinforcement line
+where $T_{true}$ is the force the bar can actually deliver: the elastic $T$ clipped into $[0, T_{cap}]$. Because
+equilibrium is solved as $K u - f_{body}$, this leaves exactly $T_{true}$ in the bar. (The sign matters. Adding
+the *opposite* correction makes an overloaded bar carry $2T - T_{cap}$ — it gets **stiffer** the more it is
+overloaded, an "anti-cap" under which a reinforced slope can never be driven to failure and the SSR factor is
+insensitive to $T_{allow}$ altogether.)
+
+**Elastic-Perfectly-Plastic Model (the default):**
+
+If $T_{res}$ is left **blank**, the bar yields at $T_{allow}$ and holds it indefinitely while the surrounding soil
+keeps straining. This is the default because it is what the mainstream FEM codes do (PLAXIS geogrids and anchors
+are elastoplastic with a maximum axial force), and it is what published reinforced-slope analyses assume.
+
+A blank $T_{res}$ means *no post-peak drop* — it does **not** mean zero.
 
 **Peak-Residual Model:**
 
-This model is appropriate for ductile materials (geotextiles, some geosynthetics) and is the most common scenario.
+Entering a value for $T_{res}$ turns on post-peak behavior: an element that yields drops from $T_{allow}$ to
+$T_{res}$. Appropriate for ductile materials where the published capacity is a peak rather than a plateau; typical
+residual ratios for geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
 
-- When $T > T_{allow}$, the element's effective force is capped at $T_{res}$ via body-force corrections<br>
-- The element remains in the stiffness matrix at full elastic stiffness, but corrective forces prevent it from carrying more than $T_{res}$<br>
-- Typical residual strength ratios for geosynthetics: $T_{residual}/T_{allow} = 0.3-0.7$
+The drop is decided **only on a converged equilibrium state**, never inside the viscoplastic iteration. This
+matters: the first iterate of a viscoplastic solve is the elastic predictor, whose bar forces overshoot badly
+before the soil sheds load into them, so a mid-iteration trigger would condemn bars for a transient that never
+physically existed, and the answer would depend on the path the solver happened to take. Instead the solver
+converges with the bars capped at $T_{allow}$, then drops any bar whose elastic demand exceeded its capacity to
+$T_{res}$ and re-solves. Shedding that load can push neighbors over, so the process repeats until the softened set
+stops growing — a genuine progressive-failure fixed point, and one that is independent of the solution path.
+
+**Complete (Brittle) Failure Model:**
+
+Setting $T_{res} = 0$ explicitly is the brittle case: a yielding element ruptures and carries nothing afterwards.
+Appropriate for brittle materials (some steel cables, fiber reinforcement).
+
+!!! warning "Post-peak behavior makes the SSR factor mesh-sensitive"
+    Once $T_{res} < T_{allow}$ actually engages, the reinforcement is strain-**softening**. A softening system in
+    an unregularized continuum has no length scale to arrest localization, so the computed factor of safety can
+    drift with mesh refinement instead of converging, and the SSRM bracket becomes less crisp. This is physics, not
+    a numerical defect — but it means $T_{res}$ is best treated as a forensics/back-analysis parameter rather than
+    a design default. Leave it blank unless you specifically intend to model post-peak strength loss.
 
 **Pullout Failure Model:**
 
@@ -153,7 +186,7 @@ In the Excel input template used by XSLOPE, the user can define up to 20 reinfor
 | x1, y1 | The x and y coordinates of the left end of the line |
 | x2, y2 | The x and y coordinates of the right end of the line |
 | Tmax | Maximum allowable tensile force |
-| Tres | Residual tensile force |
+| Tres | Residual tensile force after yield. **Leave blank for no post-peak drop** (elastic-perfectly-plastic — the usual choice, and the default). An explicit `0` means brittle rupture. Used by the FEM only. |
 | Lp1  | The pullout length on the left side |
 | Lp2  | The pullout length on the right side |
 | E    | The modulus of elasticity of reinforcement material  |
@@ -186,11 +219,14 @@ T_{max} & \text{if } d \geq L_p
 
 >>
 >>$T_{res} = \begin{cases}
+\text{unset (no post-peak drop)} & \text{if } T_{res}\ \text{is blank in the input} \\
 0 & \text{if } d < L_p \\
 T_{residual} & \text{if } d \geq L_p
 \end{cases}$
 
-This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid. For the residual capacity, if $d < L_p$, the residual capacity is set to zero because it is assumed that a pullout failure is sudden and complete and there is no residual capacity. If $d \geq L_p$, the residual strength specified by the user for the element is used.
+This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid.
+
+The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, an element inside a pullout ramp ($d < L_p$) takes a residual of zero, because pullout failure is assumed to be sudden and complete; beyond the ramp ($d \geq L_p$) the element takes the user's residual strength. If the line has end anchorage, the hardware survives soil/grout failure up to its own capacity, so the residual there is $\min(T_{res}, T_{end})$ for the governing end.
 
 ### Axial Stiffness (EA)
 

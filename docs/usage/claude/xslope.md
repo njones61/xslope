@@ -664,6 +664,34 @@ Method notes:
 `FS`, `Xo`, `Yo`, `Depth` (tangent elevation), plus `slices`, `failure_surface`,
 `solver_result`. There is no `R` key — compute `R = Yo - Depth`.
 
+### Sensitivity sweeps
+
+```python
+from xslope.sensitivity import sensitivity, tornado
+from xslope.plot import plot_sensitivity, plot_tornado
+
+ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
+                      methods=("bishop",), search=True)   # res['df'] is tidy long-format
+ok, res = tornado(slope_data, ["mat:Clay:c", "mat:Clay:phi", "mat:Clay:gamma"],
+                  rel_range=0.25, method="bishop")
+```
+
+- Param refs are `"kind:name:field"`: `mat` (strength fields valid for the material's
+  `option`, plus `gamma`/`gamma_sat`/`ru`/`d`/`psi`), `reinforce` (by line label:
+  `t_max`, `lp1`, ...), `piles` (by label: `H`, `S`, ...), `global` (`k_seismic`,
+  `tcrack_depth`, `tcrack_water`), `seep` (`k1`, ...), and `geom:piezo:dy` (vertical
+  water-table shift; the value is a DELTA). Bad refs raise naming what exists — do not
+  guess field names, read the error.
+- For geometry or anything else, pass `modify=fn, label="..."` where
+  `fn(slope_data, value) -> slope_data` and MUST rebuild derived geometry itself
+  (polygons + `build_ground_surface_from_polygons`) if it moves profile points.
+- `search=True` (default) re-searches the critical surface per point — the honest
+  setting, since the critical surface moves; `search=False` re-solves `circles[0]` /
+  `non_circ` (~50x faster, for prescribed-surface questions).
+- A failed point is a `success=False` ROW in the DataFrame, not an exception.
+- Sweeping `gamma` co-moves `gamma_sat` by the same absolute delta (same coupling as
+  reliability); sweep `gamma_sat` directly when that is what you mean.
+
 ---
 
 ## Seepage Analysis Code

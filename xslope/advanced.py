@@ -698,14 +698,15 @@ def _perturbed_slope_data(slope_data, materials, param, sign):
     gamma shifts gamma_sat by the SAME ABSOLUTE delta — there is deliberately no
     independent sigma_gamma_sat, which could otherwise produce moist soil
     heavier than saturated soil inside the FS derivative."""
+    from .sensitivity import _set_material_field
     sd = slope_data.copy()
     sd['materials'] = [m.copy() for m in materials]
     idx = param['material_id'] - 1
     if idx < len(sd['materials']):
-        sd['materials'][idx][param['param']] = param['mlv'] + sign * param['std']
-        if param['param'] == 'gamma' and sd['materials'][idx].get('gamma_sat') is not None:
-            sd['materials'][idx]['gamma_sat'] = (
-                sd['materials'][idx]['gamma_sat'] + sign * param['std'])
+        # single shared mutation path with sensitivity()'s set_param — the
+        # gamma/gamma_sat coupling lives there and only there
+        _set_material_field(sd, idx, param['param'],
+                            param['mlv'] + sign * param['std'])
     return sd
 
 

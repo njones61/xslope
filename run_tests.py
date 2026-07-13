@@ -504,6 +504,42 @@ def run_fem_elements_test(test):
     return 0.0, None
 
 
+def run_sensitivity_test(test):
+    """Run a sensitivity-sweep regression (docs/lem/sensitivity.md tags).
+
+    Tag keys: file, param, method, num_slices, n, rel_range, fs_base, fs_low,
+    fs_high, tolerance. Runs sensitivity() with a searched sweep and checks
+    the base row and the two range endpoints. Returns (fs_base, None) on pass
+    so the table shows the base FS; a mismatch anywhere returns an error."""
+    import io, contextlib
+    from xslope.fileio import load_slope_data
+    from xslope.sensitivity import sensitivity
+
+    slope_data = load_slope_data(test['file'])
+    tol = float(test.get('tolerance', 0.01))
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        ok, res = sensitivity(slope_data, param=test['param'],
+                              rel_range=float(test.get('rel_range', 0.5)),
+                              n=int(test.get('n', 3)),
+                              methods=(test['method'],),
+                              search=True,
+                              num_slices=int(test.get('num_slices', 30)))
+    if not ok:
+        return None, f"sensitivity failed: {res}"
+    df = res['df']
+    swept = df.loc[~df['is_base']].sort_values('value')
+    checks = [('expected_base', float(df.loc[df['is_base'], 'fs'].iloc[0])),
+              ('expected_low', float(swept['fs'].iloc[0])),
+              ('expected_high', float(swept['fs'].iloc[-1]))]
+    if not bool(swept['success'].all()):
+        return None, f"sweep had failed points: {swept.loc[~swept['success'], 'msg'].tolist()}"
+    for key, got in checks:
+        if key in test and abs(got - float(test[key])) > tol:
+            return None, f"{key}: expected {float(test[key]):.3f}, got {got:.3f}"
+    return checks[0][1], None
+
+
 def run_reliability_test(test):
     """Run a single reliability analysis, returning the lognormal reliability index beta."""
     from xslope.fileio import load_slope_data
@@ -1136,6 +1172,8 @@ def run_test(test):
         return run_reliability_test(test)
     elif test_type == 'design_search':
         return run_design_test(test)
+    elif test_type == 'sensitivity':
+        return run_sensitivity_test(test)
     else:
         return run_lem_test(test)
 
@@ -1149,6 +1187,11 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('reliability', 'fem_reliability'):
         expected = test.get('expected_beta')
         tol = test.get('tolerance', 0.02)
+    elif test_type == 'sensitivity':
+        # the runner checks base/low/high internally; the framework-level
+        # comparison re-checks the base row
+        expected = float(test['expected_base']) if 'expected_base' in test else None
+        tol = float(test.get('tolerance', 0.01))
     elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -1240,6 +1283,9 @@ def main():
         lem_design = Path('docs/lem/design.md')
         if lem_design.exists():
             tests.extend(parse_test_tags(lem_design))
+        lem_sens = Path('docs/lem/sensitivity.md')
+        if lem_sens.exists():
+            tests.extend(parse_test_tags(lem_sens))
 
     if run_fem:
         fem_samples = Path('docs/fem/samples.md')

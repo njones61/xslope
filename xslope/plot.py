@@ -3211,3 +3211,105 @@ def get_plot_elements_bounds(ax, slope_data):
                 bounds.append((min(xs), max(xs), min(ys), max(ys)))
     
     return bounds
+
+def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
+                     dpi=300, fig=None, style=None):
+    """Plot a sensitivity() sweep: FS vs parameter value, one line per method.
+
+    The base case is marked, FS = 1 gets a horizontal guide (plus an optional
+    target), and if the sweep re-searched the critical surface, points where
+    the surface JUMPED between neighbours (a different failure mode taking
+    over) are drawn open — the Xo/Yo/R columns make the jump detectable in the
+    data, not just suspected.
+
+    Parameters:
+        df: the DataFrame from sensitivity() (result['df']).
+        target_fs: optional design FS to draw as a second guide line.
+    """
+    import numpy as np
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+
+    param = df['param'].iloc[0]
+    for method, g in df.groupby('method'):
+        pts = g.loc[~g['is_base'] & g['success']].sort_values('value')
+        ax.plot(pts['value'], pts['fs'], marker='o', label=method)
+        # surface-jump detection: a step in (Xo, Yo, R) far larger than its
+        # neighbours' median step means a different critical surface took over
+        if pts[['Xo', 'Yo', 'R']].notna().all().all() and len(pts) >= 3:
+            geo = pts[['Xo', 'Yo', 'R']].to_numpy()
+            steps = np.linalg.norm(np.diff(geo, axis=0), axis=1)
+            med = np.median(steps)
+            if med > 0:
+                for k in np.nonzero(steps > 5 * med)[0]:
+                    ax.plot(pts['value'].iloc[k + 1], pts['fs'].iloc[k + 1],
+                            marker='o', mfc='white', mec='C3', ms=10, zorder=5,
+                            linestyle='None')
+        base = g.loc[g['is_base'] & g['success']]
+        if not base.empty and np.isfinite(base['value'].iloc[0]):
+            ax.plot(base['value'].iloc[0], base['fs'].iloc[0], 's', color='k',
+                    ms=8, zorder=6)
+    ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
+    if target_fs is not None:
+        ax.axhline(target_fs, color='gray', linestyle='--', linewidth=0.8,
+                   label=f'FS = {target_fs}')
+    ax.set_xlabel(param)
+    ax.set_ylabel('Factor of Safety')
+    ax.set_title(f'Sensitivity: FS vs {param}')
+    ax.legend()
+    ax.grid(True, alpha=0.4)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig(f"sensitivity_{param.replace(':', '_')}.png", dpi=dpi,
+                    bbox_inches='tight')
+    return fig
+
+
+def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
+                 style=None):
+    """Duncan-style tornado diagram from tornado(): horizontal bars of the FS
+    swing between each parameter's low and high bound, sorted by span, with
+    the base-case FS as the vertical reference.
+
+    Parameters:
+        result: the dict from tornado() (carries 'df', 'base_fs', 'method').
+    """
+    import numpy as np
+    df, base_fs = result['df'], result['base_fs']
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+
+    bars = []
+    for param, g in df.loc[~df['is_base']].groupby('param'):
+        ok = g.loc[g['success']].sort_values('value')
+        if ok.empty:
+            continue
+        lo_fs, hi_fs = ok['fs'].iloc[0], ok['fs'].iloc[-1]
+        bars.append((param, lo_fs, hi_fs, abs(hi_fs - lo_fs)))
+    bars.sort(key=lambda b: b[3])          # widest on top
+
+    for k, (param, lo_fs, hi_fs, _span) in enumerate(bars):
+        left, width = min(lo_fs, hi_fs), abs(hi_fs - lo_fs)
+        ax.barh(k, width, left=left, height=0.55, color='C0', alpha=0.75)
+        ax.annotate(f'{lo_fs:.2f}', (lo_fs, k), textcoords='offset points',
+                    xytext=(-6, 0), ha='right', va='center', fontsize=8)
+        ax.annotate(f'{hi_fs:.2f}', (hi_fs, k), textcoords='offset points',
+                    xytext=(6, 0), ha='left', va='center', fontsize=8)
+    ax.set_yticks(range(len(bars)))
+    ax.set_yticklabels([b[0] for b in bars])
+    ax.margins(x=0.12)   # room for the low/high value labels beside the bars
+    if base_fs is not None and np.isfinite(base_fs):
+        ax.axvline(base_fs, color='k', linewidth=1.0,
+                   label=f'base FS = {base_fs:.3f}')
+        ax.legend()
+    ax.set_xlabel(f"Factor of Safety ({result.get('method', '')})")
+    ax.set_title('Tornado: FS swing per parameter')
+    ax.grid(True, axis='x', alpha=0.4)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig('tornado.png', dpi=dpi, bbox_inches='tight')
+    return fig

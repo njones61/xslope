@@ -237,7 +237,49 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
     return True, "", pruned
 
 
-def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None, tcrack_depth=0):
+def _reverse_curvature_end(Xo, Yo, R, ground_surface, msg):
+    """Rescue for circles that exit the ground ABOVE their center.
+
+    The failure surface is the circle's bottom half-arc; when the uphill
+    ground lies above the circle's equator (el Yo), the half-arc never comes
+    back to the ground on that side and the analytic intersection finds one
+    crossing instead of two. A slip surface cannot overhang, so the standard
+    treatment (Slide applies it automatically) is a vertical tension crack at
+    the vertical-tangent point x = Xo +/- R: the surface ends there at el Yo
+    with a vertical face up to the ground - the same buried-end contract the
+    tcrack_depth clip already produces. Synthesizes that end point when
+    exactly one arc end is buried and the found crossing is on the opposite
+    side; anything else keeps the original error."""
+    pts = circle_polyline_intersections(Xo, Yo, R, ground_surface)
+    if len(pts) != 1:
+        return False, msg, None
+
+    xs = [c[0] for c in ground_surface.coords]
+
+    def ground_y_at(x):
+        if not (min(xs) <= x <= max(xs)):
+            return None
+        vert = LineString([(x, -1e9), (x, 1e9)])
+        return get_y_from_intersection(ground_surface.intersection(vert))
+
+    buried = []
+    for xe in (Xo - R, Xo + R):
+        gy = ground_y_at(xe)
+        if gy is not None and gy > Yo + 1e-9:
+            buried.append(Point(xe, Yo))
+    if len(buried) != 1:
+        return False, msg, None
+    end, other = buried[0], pts[0]
+    if (end.x - Xo) * (other.x - Xo) > 0:  # must flank the center
+        return False, msg, None
+    points = sorted([other, end], key=lambda p: p.x)
+    if abs(points[0].y - points[1].y) < 1e-6:
+        return False, msg, None
+    return True, "", points
+
+
+def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None, tcrack_depth=0,
+                             allow_reverse_curvature=True):
     """
     Generates a failure surface based on either a circular or non-circular definition.
 
@@ -271,6 +313,11 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     # --- Step 2: Intersect with original ground surface to determine slope facing and toe ---
     if circular and circle:
         success, msg, points = get_sorted_intersections(failure_surface, ground_surface, circle_params=circle)
+        if not success and allow_reverse_curvature:
+            # Only for explicitly prescribed circles: searches keep rejecting
+            # these candidates (they pass allow_reverse_curvature=False), so a
+            # free vertical crack face can't undercut a search minimum.
+            success, msg, points = _reverse_curvature_end(Xo, Yo, R, ground_surface, msg)
     else:
         success, msg, points = get_sorted_intersections(failure_surface, ground_surface)
     if not success:
@@ -722,7 +769,7 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
 
 
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
-                    composite=False):
+                    composite=False, allow_reverse_curvature=True):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -851,7 +898,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
     # Generate failure surface
-    success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ, tcrack_depth=tcrack_depth)
+    success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ,
+                                               tcrack_depth=tcrack_depth,
+                                               allow_reverse_curvature=allow_reverse_curvature)
     if success:
         x_min, x_max, y_left, y_right, clipped_surface = result
     else:

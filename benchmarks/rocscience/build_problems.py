@@ -152,8 +152,12 @@ def vp003():
 def vp004():
     """ACADS 1(d): problem #3 plus horizontal seismic coefficient 0.15.
     Slide2: Bishop 1.016, Spencer 0.991, GLE 0.989, Janbu corrected 0.965;
-    SLOPE/W: Bishop 1.02, M-P 0.989; ACADS reference 1.00."""
-    sd = _acads_nonhom_slope_data(k_seismic=0.15)
+    SLOPE/W: Bishop 1.02, M-P 0.989; ACADS reference 1.00. k is entered
+    NEGATIVE per the FEM sign convention (this is a left-facing slope, so
+    the pseudo-static force acts in -x; see the FEM overview page) - the
+    LEM takes abs(k) and gets the direction from the failure surface, so
+    its locks are unaffected. The RS2-3 SSR tag runs on this file."""
+    sd = _acads_nonhom_slope_data(k_seismic=-0.15)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp004.xlsx'))
     return 'vp004.xlsx'
 

@@ -800,28 +800,22 @@ def vp029():
            (283.0,-17.0),(350.0,-8.0),(360.4,0.0)]
     sd['dloads'] = [[{'X': x, 'Y': y, 'Normal': gw*max(0.0, -y)} for x, y in pts]]
     sd['circular'] = True
-    # Duncan's estimated surface, traced from Figure 29.1 (bright-red isolation,
-    # axis-tick calibration; trace ends validate against the printed endpoints
-    # (137.767,-120.245)/(350.168,-7.761) within line thickness). phi=0, so FS
-    # is set by the surface geometry alone.
-    sd['non_circ'] = [
-        # construction point above the trench floor: Slide prints the entry
-        # pulled 0.25 ft below it, so the polyline must re-cross the ground
-        {'X': 136.0, 'Y': -119.6, 'Movement': 'Free'},
-        {'X': 137.767, 'Y': -120.245, 'Movement': 'Horiz'},
-        {'X': 160.0, 'Y': -106.9, 'Movement': 'Horiz'},
-        {'X': 180.0, 'Y': -104.6, 'Movement': 'Horiz'},
-        {'X': 200.0, 'Y': -97.1, 'Movement': 'Horiz'},
-        {'X': 220.0, 'Y': -89.7, 'Movement': 'Horiz'},
-        {'X': 240.0, 'Y': -79.9, 'Movement': 'Horiz'},
-        {'X': 260.0, 'Y': -71.5, 'Movement': 'Horiz'},
-        {'X': 280.0, 'Y': -59.0, 'Movement': 'Horiz'},
-        {'X': 300.0, 'Y': -47.9, 'Movement': 'Horiz'},
-        {'X': 320.0, 'Y': -33.1, 'Movement': 'Horiz'},
-        {'X': 340.0, 'Y': -16.0, 'Movement': 'Horiz'},
-        {'X': 350.168, 'Y': -7.761, 'Movement': 'Free'},
-    ]
-    sd['circles'] = [{'Xo': 131.484, 'Yo': 148.399, 'Depth': 148.399 - 268.72, 'R': 268.72}]
+    # Duncan's estimated surface as a SMOOTH ARC: least-squares circle through
+    # the pixel trace of Slide's Figure 29.1 (the "(138,-120)" label box
+    # occludes the drawn line near its entry; that span was re-read at the
+    # label's edges) plus the printed endpoints weighted 5x. Fit quality: RMS
+    # 1.1 ft, max 2.0 ft — faithful within drawing accuracy, and both sources
+    # describe the surface as nearly circular; the raw trace's wiggles were
+    # digitization noise. Slide's printed "Axis Location" (131.484, 148.399) is
+    # the noncircular moment axis, NOT this geometric center. The lower end
+    # connects to Slide's model floor at el. -120 (design depth); the book's
+    # figure exits at the shallower depth-at-time-of-failure floor, a geometry
+    # Slide did not model.
+    sd['non_circ'] = []
+    # (fit anchored at the trench corner (138,-120) — Slide's printed endpoint
+    # is inside-pulled 0.25 ft below the floor and an arc through it grazes
+    # under the corner without crossing the ground)
+    sd['circles'] = [{'Xo': -6.589, 'Yo': 410.231, 'Depth': 410.231 - 549.583, 'R': 549.583}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp029.xlsx'))
     return 'vp029.xlsx'
 

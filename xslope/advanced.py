@@ -507,18 +507,14 @@ def reliability(slope_data, method, rapid=False, circular=True, debug_level=0,
             print(f"\nProcessing parameter {i+1}/{len(param_info)}: Material {param['material_id']}, {param['param']}")
         
         # Create modified slope_data copies
-        slope_data_plus = slope_data.copy()
-        slope_data_minus = slope_data.copy()
-        slope_data_plus['materials'] = [mat.copy() for mat in materials]
-        slope_data_minus['materials'] = [mat.copy() for mat in materials]
-        
-        # Find the material and modify the parameter (use 0-based index)
-        mat_index = param['material_id'] - 1
-        if mat_index < len(slope_data_plus['materials']):
-            slope_data_plus['materials'][mat_index][param['param']] = param['mlv'] + param['std']
-        
-        if mat_index < len(slope_data_minus['materials']):
-            slope_data_minus['materials'][mat_index][param['param']] = param['mlv'] - param['std']
+        # Shared with the FEM path: shifts the target parameter by +/- sigma AND
+        # keeps gamma_sat coupled to gamma (same soil weighed two ways). The old
+        # inline copy here perturbed only 'gamma', so for materials with
+        # gamma_sat defined the unit-weight derivative silently evaluated to
+        # ZERO wherever the slice weight came from gamma_sat (any submerged
+        # mass) — found by VP29, where Duncan's gamma term is a fifth of sigma_F.
+        slope_data_plus = _perturbed_slope_data(slope_data, materials, param, +1)
+        slope_data_minus = _perturbed_slope_data(slope_data, materials, param, -1)
         
         # Calculate F+ and F-
         if not search:

@@ -96,6 +96,11 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp106c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.451, benchmark=VP106c -->
 <!-- test: file=../files/rocscience/vp106d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.341, benchmark=VP106d -->
 <!-- test: file=../files/rocscience/vp106e.xlsx, type=circular_search, num_slices=40, fs_bishop=1.260, benchmark=VP106e -->
+<!-- test: file=../files/rocscience/vp107a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, fs_spencer=1.398, benchmark=VP107a -->
+<!-- test: file=../files/rocscience/vp107b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, benchmark=VP107b -->
+<!-- test: file=../files/rocscience/vp108a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP108a -->
+<!-- test: file=../files/rocscience/vp108b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.830, fs_spencer=1.835, benchmark=VP108b -->
+<!-- test: file=../files/rocscience/vp109.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP109 -->
 <!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
 <!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
 <!-- test: file=../files/rocscience/vp065.xlsx, type=single_circle, num_slices=60, fs_bishop=2.725, fs_spencer=2.748, benchmark=VP65 -->
@@ -247,10 +252,10 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
 | [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](../files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope, Ito & Matsui force auto-computed from pile diameter and spacing: Bishop search 1.143 / 1.540 / 1.451 / 1.341 / 1.260 (no pile, D1/D = 2/3/4/6) vs Slide 1.14 / 1.54 / 1.43 / 1.33 / 1.25 and the paper's 1.13 / 1.54 / 1.37 / 1.31 / 1.25. The pile reaction applies in the passive sense (divided by FS), matching Slide. |
-| 107 | Retaining walls, gabion walls, supports | planned |  |
-| 108 | Retaining walls, gabion walls, supports | planned |  |
-| 109 | Retaining walls, gabion walls, weak layers | planned |  |
-| 110 | Retaining walls, equivalent fluid pressure | planned |  |
+| [107](#vp107) | Retaining walls, gabion walls, supports | **built** | [vp107a](../files/rocscience/vp107a.xlsx) / [b](../files/rocscience/vp107b.xlsx). Cao et al. (2016) Vancouver gabion wall on Slide's printed critical circle: equivalent-cohesion Bishop 1.382 vs Slide 1.373; mesh-method 1.382 vs 1.378 — the two representations coincide on the governing deep surface, which is the manual's point. Unconstrained XSLOPE search agrees at 1.366. |
+| [108](#vp108) | Retaining walls, gabion walls, supports | **built** | [vp108a](../files/rocscience/vp108a.xlsx) / [b](../files/rocscience/vp108b.xlsx). Stepped gabion wall (steps out) on Slide's printed critical circles: equivalent-cohesion Bishop 1.790 vs Slide 1.787; mesh 1.830 vs 1.835. Spencer within 0.3% on both. |
+| [109](#vp109) | Retaining walls, gabion walls, weak layers | **built** | [vp109.xlsx](../files/rocscience/vp109.xlsx). The VP108 wall with weak joint bands (c=20.4, φ=37.8) between courses: Bishop 1.790 / Spencer 1.797 on the deep circle vs Slide's block search along the joints 1.799 / 1.803 — the joints don't govern overall stability. |
+| 110 | Retaining walls, equivalent fluid pressure | *blocked* | Verifies Slide's EFP support type against a triangular distributed load (Spencer 2.566 both ways). The manual prints neither soil properties nor coordinates (the model is Slide's tutorial file), so there is nothing independent to lock; the equivalence it demonstrates — wall restraint as a boundary pressure — is how XSLOPE models EFP walls directly (`dloads`). |
 | [111](#vp111) | Helical anchor | *no lock possible* | The problem verifies Slide's helical-anchor capacity envelope (Perko 2009 plate-bearing formulas) — a force-vs-position diagram with no slope and no factor of safety, so there is nothing for a slope-stability program to lock. Slopes supported by helical anchors can be analyzed in XSLOPE today by entering the governing capacity as a standard anchor force — see the [worked note](#vp111). |
 
 ---
@@ -1710,6 +1715,89 @@ manual acknowledges — and XSLOPE lands 1.5% above Slide; every other case agre
 Slide within 0.8%.
 
 ![vp106c: inputs and representative solution](images/vp106c.png)
+
+### VP107: Retaining walls, gabion walls, supports {#vp107}
+
+**Input files:** [vp107a.xlsx](../files/rocscience/vp107a.xlsx) (equivalent cohesion) ·
+[vp107b.xlsx](../files/rocscience/vp107b.xlsx) (mesh method)
+
+Cao et al. (2016)'s case study of a Vancouver gabion-wall failure: a 6 m battered wall
+of 1 m gabions (courses 4–3–3–2–2–1 wide) retaining a 30° backfill with a 12 kN/m²
+crest surcharge and a water table rising into the retained slope. Slide models the
+steel mesh two ways — an equivalent gabion cohesion (c = 100 kPa, from Grodecki 2017)
+or explicit geosynthetic supports at every course interface (T = 71 kN/m, tangent,
+active, anchored both ends) — and reports overall (external) stability only. Both
+variants are evaluated on Slide's drawn critical circle, which passes about a metre
+beneath the wall base.
+
+| Variant | XSLOPE Bishop | Slide Bishop | XSLOPE Spencer | Slide Spencer |
+|---|---|---|---|---|
+| Equivalent cohesion | 1.382 | 1.373 | 1.398 | 1.386 |
+| Mesh (geosynthetic supports) | 1.382 | 1.378 | 1.398 | 1.392 |
+
+XSLOPE's unconstrained grid search finds the same deep basin at 1.366, within 0.5% of
+Slide's limit-filtered search. The governing surface passes under the wall, so it
+never crosses the mesh supports and the two representations coincide exactly on it —
+the manual's own conclusion. (The mesh-variant file exercises the geosynthetic input
+path; reinforcement mechanics are locked by VP87–VP94.) Slide's non-circular Cuckoo
+search reports unfiltered minima of 1.032/1.034 for small surfaces at the wall face,
+below the second limit set the manual applies to exclude them; those are not locked.
+
+![vp107a: inputs and representative solution](images/vp107a.png)
+
+### VP108: Stepped gabion wall, steps facing outwards {#vp108}
+
+**Input files:** [vp108a.xlsx](../files/rocscience/vp108a.xlsx) (equivalent cohesion) ·
+[vp108b.xlsx](../files/rocscience/vp108b.xlsx) (mesh method)
+
+A 4 m gabion wall of 1 m cubes (courses 4–3–2–1, staircase exposed on the outward
+face, back face straight and partly embedded) on a sloping soil-1 over soil-2
+profile, dry. As in VP107, Slide represents the steel mesh either as an equivalent
+gabion cohesion (c = 59.7 kPa, Grodecki 2017 with f_t = 100 kN/m) or as explicit
+geosynthetic supports (T = 100 kN/m) at the course interfaces. Both variants are
+evaluated on Slide's drawn critical circles, which enter the crest behind the wall
+and pass just beneath its base. The labeled points (16.453, 5.178) and
+(18.573, 5.89) pin where the soil-1/soil-2 interface meets the wall base and
+re-emerges one course up the back face — the bottom course's back is embedded in
+soil 2.
+
+| Variant | XSLOPE Bishop | Slide Bishop | XSLOPE Spencer | Slide Spencer |
+|---|---|---|---|---|
+| Equivalent cohesion | 1.790 | 1.787 | 1.797 | 1.791 |
+| Mesh (geosynthetic supports) | 1.830 | 1.835 | 1.835 | 1.839 |
+
+XSLOPE's unconstrained grid search finds 1.761 in the same basin, 1.5% below Slide's
+limit-filtered grid search. The governing circles do not cross the mesh supports
+(the two variants differ only through their slightly different critical circles), so
+the mesh file's tag guards the geosynthetic input path rather than reinforcement
+mechanics — VP87–VP94 lock those. Slide's unfiltered Cuckoo minima (1.512/1.522,
+small wall-face surfaces) are excluded by the manual's own limit set.
+
+![vp108a: inputs and representative solution](images/vp108a.png)
+
+### VP109: Gabion wall with weak joint layers {#vp109}
+
+**Input files:** [vp109.xlsx](../files/rocscience/vp109.xlsx)
+
+The VP108 wall with thin weak layers between the gabion courses representing
+potential joint or shear failure through the wall: friction 90% of the gabion fill
+(φ = 37.8°) and cohesion from the 20.4 kN/m joint tensile strength across the 1 m
+gabion width (c = 20.4 kPa), modeled here as 6 cm bands carved from the wall at the
+three course interfaces. Slide runs a block search along the layers with endpoint
+limits that exclude small wall-hugging surfaces.
+
+| | XSLOPE (Fig 108.3 circle) | Slide (block search along joints) |
+|---|---|---|
+| Bishop | 1.790 | 1.799 |
+| Spencer | 1.797 | 1.803 |
+
+The joint layers do not govern overall stability: Slide's constrained block search
+lands within 0.7% of the plain VP108 deep circle, which passes beneath wall and
+bands alike, and XSLOPE's unconstrained circular search on the weak-layer model
+agrees at 1.761. Slide's figure also reports an unfiltered block minimum of 1.516
+for a small surface at the wall face, excluded by its limit set and not locked here.
+
+![vp109: inputs and representative solution](images/vp109.png)
 
 ### VP111: Helical anchor — capacity note (no lock) {#vp111}
 

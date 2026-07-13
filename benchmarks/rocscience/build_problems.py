@@ -2092,6 +2092,208 @@ def vp106e():
     return 'vp106e.xlsx'
 
 
+def _vp107_slope_data(variant):
+    """Slide #107 / Cao et al. (2016): Vancouver gabion wall. Battered wall
+    (~9.5 deg), 6 courses of 1 m gabions, widths bottom->top [4,3,3,2,2,1],
+    front face straight, steps on the back; frame reproduces every labeled
+    vertex in Fig 107.3 exactly. WT flat at 95.33 then rising to (30,101);
+    12 kN/m2 surcharge on (16.85..25.85). variant: 'equiv' (gabion c=100) or
+    'mesh' (gabion c=0 + T=71 geosynthetic at each course interface)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+
+    def mat(name, c, phi, gamma):
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option='mc', u='piezo')
+        return m
+
+    def P(ku, kv):   # wall frame: base origin + ku up the batter + kv across
+        x = 11.84 + ku * (0.99 / 6.0) + kv * (3.945 / 4.0)
+        y = 94.342 + ku * (5.918 / 6.0) + kv * (-0.66 / 4.0)
+        return (round(x, 4), round(y, 4))
+
+    sd['materials'] = [mat('Soil #1', 0.0, 32.0, 21.0),
+                       mat('Soil #2', 0.0, 30.0, 20.0),
+                       mat('Gabion wall',
+                           100.0 if variant == 'equiv' else 0.0, 45.0, 20.0)]
+    from shapely.geometry import Polygon
+    # front face carries an explicit vertex at P(1,0) = the labeled (12,95.33)
+    # ground point (T-junction with the soil-2 boundary -> shared vertex)
+    wall = [P(0, 0), P(1, 0), P(6, 0), P(6, 1), P(5, 1), P(5, 2), P(3, 2),
+            P(3, 3), P(1, 3), P(1, 4), P(0, 4)]
+    soil1 = [(13.816, 100.095), (16.85, 101.813), (30.0, 101.813),
+             (30.0, 93.682), (15.785, 93.682), P(1, 4), P(1, 3), P(3, 3),
+             P(3, 2), P(5, 2), P(5, 1), P(6, 1)]
+    soil2 = [(0.0, 95.33), P(1, 0), (11.84, 94.342), (15.785, 93.682),
+             (30.0, 93.682), (30.0, 89.0), (0.0, 89.0)]
+    sd['profile_lines'] = []
+    sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(soil1)},
+                      {'mat_id': 1, 'polygon': Polygon(soil2)},
+                      {'mat_id': 2, 'polygon': Polygon(wall)}]
+    sd['max_depth'] = None
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = [(0.0, 95.33), (15.68, 95.33), (30.0, 101.0)]
+    sd['dloads'] = [[{'X': 16.85, 'Y': 101.813, 'Normal': 12.0},
+                     {'X': 25.85, 'Y': 101.813, 'Normal': 12.0}]]
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # Slide's Fig 107.5 critical circle (pixel fit, rms 0.017 m)
+    sd['circles'] = [{'Xo': 11.203, 'Yo': 102.816,
+                      'Depth': 102.816 - 10.339, 'R': 10.339}]
+    if variant == 'mesh':
+        lines = []
+        for k, w in [(1, 3), (2, 3), (3, 2), (4, 2), (5, 1)]:
+            (x1, y1), (x2, y2) = P(k, 0), P(k, w)
+            lines.append({'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
+                          't_max': 71.0, 't_res': 0.0, 'lp1': 0.0, 'lp2': 0.0,
+                          'E': float('nan'), 'area': float('nan'),
+                          'label': f'Mesh {k}', 'type': 'geosynthetic',
+                          'dir': 'tangent', 'appl': 'active',
+                          'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
+        sd['reinforcement_lines'] = lines
+        sd['reinforce_lines'] = lines
+    return sd
+
+
+def vp107a():
+    """Slide #107, equivalent-cohesion method, on Slide's Fig 107.5 critical
+    circle: Bishop 1.382 / Spencer 1.398 vs Slide 1.373 / 1.386. xslope's own
+    unconstrained grid search agrees at 1.366."""
+    sd = _vp107_slope_data('equiv')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp107a.xlsx'))
+    return 'vp107a.xlsx'
+
+
+def vp107b():
+    """Slide #107, mesh method (gabion c=0 + 71 kN/m geosynthetics at the
+    course interfaces), same circle: Bishop 1.382 vs Slide 1.378. The deep
+    surface never crosses the mesh, so the two variants coincide on it -
+    which is the manual's own point."""
+    sd = _vp107_slope_data('mesh')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp107b.xlsx'))
+    return 'vp107b.xlsx'
+
+
+def _vp108_slope_data(variant, weak_joints=False):
+    """Slide #108 (and #109 with weak_joints=True): stepped gabion wall,
+    steps facing outwards. Frame from Fig 108.1's labels: base B=(18.434,4.9)
+    to toe (14.473,5.456), back face straight ((18.573,5.89)=B+u and
+    (18,9)=B+4u-v are labeled); courses bottom->top [4,3,2,1] right-aligned.
+    The soil1/soil2 interface meets the wall at the labeled (16.453,5.178) on
+    the base and re-emerges at (18.573,5.89) one course up the back face -
+    the bottom course's back is embedded in soil 2. Dry. variant: 'equiv'
+    (gabion c=59.7) or 'mesh' (c=0 + T=100 geosynthetics). weak_joints adds
+    VP109's 0.06 m weak bands (c=20.4, phi=37.8) at the course interfaces."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+
+    def mat(name, c, phi, gamma):
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, gamma_sat=gamma,
+                 option='mc', u='none')
+        return m
+
+    def P(ku, kv):   # B + ku*u - kv*v (kv counted leftward from the back)
+        x = 18.434 + ku * 0.139 - kv * 0.9905
+        y = 4.9 + ku * 0.9905 + kv * 0.139
+        return (round(x, 4), round(y, 4))
+
+    c_gab = 59.7 if variant == 'equiv' else 0.0
+    sd['materials'] = [mat('Soil #1', 5.0, 30.0, 21.0),
+                       mat('Soil #2', 0.0, 25.0, 20.0),
+                       mat('Gabion wall', c_gab, 42.0, 23.0)]
+    from shapely.geometry import Polygon
+    T = 0.06
+    soil1_left = [(0.0, 5.456), P(0, 4), (16.453, 5.178), (0.0, 0.0)]
+    if weak_joints:
+        # weak-band corners land on the back face mid-edge: the soil
+        # polygons carry explicit vertices at every corner they touch
+        soil1_right = [P(4, 1), (30.0, 9.0), (30.0, 7.0), P(1, 0),
+                       P(2 - T, 0), P(2, 0), P(3 - T, 0), P(3, 0), P(4, 0)]
+        soil2 = [(0.0, 0.0), (16.453, 5.178), P(0, 0), P(1 - T, 0), P(1, 0),
+                 (30.0, 7.0), (30.0, 0.0)]
+    else:
+        soil1_right = [P(4, 1), (30.0, 9.0), (30.0, 7.0), P(1, 0), P(4, 0)]
+        soil2 = [(0.0, 0.0), (16.453, 5.178), P(0, 0), P(1, 0), (30.0, 7.0),
+                 (30.0, 0.0)]
+    wall = Polygon([P(0, 4), P(1, 4), P(1, 3), P(2, 3), P(2, 2), P(3, 2),
+                    P(3, 1), P(4, 1), P(4, 0), P(1, 0), P(0, 0),
+                    (16.453, 5.178)])
+    polys = [{'mat_id': 0, 'polygon': Polygon(soil1_left)},
+             {'mat_id': 0, 'polygon': Polygon(soil1_right)},
+             {'mat_id': 1, 'polygon': Polygon(soil2)}]
+    if weak_joints:
+        sd['materials'].append(mat('Weak joint', 20.4, 37.8, 23.0))
+        bands = [Polygon([P(k, w), P(k, 0), P(k - T, 0), P(k - T, w)])
+                 for k, w in [(1, 3), (2, 2), (3, 1)]]
+        for bnd in bands:
+            wall = wall.difference(bnd)
+        parts = (list(wall.geoms) if wall.geom_type == 'MultiPolygon'
+                 else [wall])
+        polys += [{'mat_id': 2, 'polygon': g} for g in parts]
+        polys += [{'mat_id': 3, 'polygon': bnd} for bnd in bands]
+    else:
+        polys.append({'mat_id': 2, 'polygon': wall})
+    sd['profile_lines'] = []
+    sd['polygons'] = polys
+    sd['max_depth'] = None
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = []
+    sd['dloads'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    if variant == 'equiv':
+        sd['circles'] = [{'Xo': 15.956, 'Yo': 10.016,
+                          'Depth': 10.016 - 5.722, 'R': 5.722}]
+    else:
+        sd['circles'] = [{'Xo': 16.087, 'Yo': 10.358,
+                          'Depth': 10.358 - 6.052, 'R': 6.052}]
+        lines = []
+        for k, w in [(1, 3), (2, 2), (3, 1)]:
+            (x1, y1), (x2, y2) = P(k, w), P(k, 0)
+            lines.append({'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
+                          't_max': 100.0, 't_res': 0.0, 'lp1': 0.0,
+                          'lp2': 0.0, 'E': float('nan'),
+                          'area': float('nan'), 'label': f'Mesh {k}',
+                          'type': 'geosynthetic', 'dir': 'tangent',
+                          'appl': 'active', 'tend1': 0.0, 'tend2': 0.0,
+                          'spacing': 1.0})
+        sd['reinforcement_lines'] = lines
+        sd['reinforce_lines'] = lines
+    return sd
+
+
+def vp108a():
+    """Slide #108, equivalent cohesion, on Slide's Fig 108.3 circle: Bishop
+    1.790 / Spencer 1.797 vs Slide 1.787 / 1.791."""
+    sd = _vp108_slope_data('equiv')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp108a.xlsx'))
+    return 'vp108a.xlsx'
+
+
+def vp108b():
+    """Slide #108, mesh method, on Slide's Fig 108.5 circle: Bishop 1.830 /
+    Spencer 1.835 vs Slide 1.835 / 1.839."""
+    sd = _vp108_slope_data('mesh')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp108b.xlsx'))
+    return 'vp108b.xlsx'
+
+
+def vp109():
+    """Slide #109: the #108 wall with 0.06 m weak joint bands (c=20.4 kPa =
+    1 m x the 20.4 kN/m joint tensile strength, phi=0.9x42=37.8) between the
+    gabion courses, evaluated on the Fig 108.3 deep circle: Bishop 1.790 /
+    Spencer 1.797 vs Slide's limit-filtered block search along the joints
+    1.799 / 1.803 - the joints don't govern overall stability (the governing
+    surface passes beneath wall and bands alike; xslope's unconstrained
+    search agrees at 1.761). Slide's unfiltered block minimum 1.516 (a small
+    wall-hugging surface) is excluded by its limits and is not locked."""
+    sd = _vp108_slope_data('equiv', weak_joints=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp109.xlsx'))
+    return 'vp109.xlsx'
+
+
 def vp042():
     """Slide #42: Baker & Leshchinsky (2001) safety-map dam — clay core (c'=20,
     phi'=20, gamma=20) in granular fill (0/40/21.5) on a hard base (200/45/24),

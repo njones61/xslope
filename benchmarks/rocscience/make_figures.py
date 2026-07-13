@@ -33,7 +33,7 @@ SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocs
 # Talbingo (vp005/vp006) has 26 vertices, half of them within a few metres at
 # the crest - no readable label layout exists at panel size, so those two
 # figures skip the coordinate labels (the manual's Table 5.2 carries them).
-NO_COORD_LABELS = {'vp005', 'vp006'}
+NO_COORD_LABELS = {'vp005', 'vp006', 'vp109'}
 # Geometries with tight vertex clusters where the leader-line layout helps;
 # everywhere else labels sit plainly beside their vertices (coord_arrows=False).
 COORD_ARROWS = {'vp051'}
@@ -74,6 +74,9 @@ CASES = [
     ('vp035', 'csearch', 'bishop'),
     ('vp039b', 'circle', 'spencer'),
     ('vp106c', 'csearch', 'bishop'),
+    ('vp107a', 'circle', 'bishop'),
+    ('vp108a', 'circle', 'bishop'),
+    ('vp109', 'circle', 'bishop'),
     ('vp036', 'csearch', 'bishop'),
     ('vp041', 'csearch', 'bishop'),
     ('vp042', 'circle', 'spencer'),

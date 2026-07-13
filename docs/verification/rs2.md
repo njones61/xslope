@@ -11,7 +11,11 @@ the **same corpus input file** — the extraction is already validated there. SS
 use the Griffiths elastic convention (E = 10⁵ kPa, ν = 0.3, ψ = 0; SSR factors are
 insensitive to these), stored as inert values in the shared files. SSR factors are quoted
 at the tagged mesh size: SSRM drifts a percent or two with refinement, so tolerances are
-honest rather than tight.
+honest rather than tight. A recurring pattern on this corpus: fine-mesh SSRM finds
+shallow-skin mechanisms that published coarse-mesh SSR analyses miss or deliberately
+suppress with "can't fail" elastic regions (#22, #23) — where the published value
+depends on such an artifice rather than the mechanics, the problem is recorded as not
+lockable rather than tuned to match.
 
 <!-- test: file=../lem/files/xslope_acads_simple.xlsx, type=fem_ssrm, expected_fs=0.986, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=4000, benchmark=RS2-1 -->
 <!-- test: file=../files/rocscience/vp003.xlsx, type=fem_ssrm, expected_fs=1.375, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.7, max_iter=4000, benchmark=RS2-2 -->
@@ -26,6 +30,7 @@ honest rather than tight.
 <!-- test: file=../files/rocscience/vp021a.xlsx, type=fem_ssrm, expected_fs=2.018, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.6, f_max=2.5, max_iter=4000, benchmark=RS2-17 -->
 <!-- test: file=../files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.336, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=4000, benchmark=RS2-18 -->
 <!-- test: file=../files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.507, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=4000, benchmark=RS2-19 -->
+<!-- test: file=../files/rocscience/vp025.xlsx, type=fem_ssrm, expected_fs=1.003, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=4000, benchmark=RS2-20 -->
 
 The RS2 manual is unusually cheap to build against: a large fraction of its problems are
 **SSR renditions of the same problems as the Slide2 LEM manual**, so the geometry and
@@ -59,9 +64,10 @@ cross-bearings.
 | 17 | Slope with three pore pressure conditions (Fredlund & Krahn) — **built** (dry case): SSRM 2.02 vs RS2 SSR 2.0, Slide2 M-P 2.075, F&K 2.076 (on [vp021a.xlsx](../files/rocscience/vp021a.xlsx)). The r<sub>u</sub> case awaits FEM r<sub>u</sub> support; the water-table case awaits the VP21 case-3 input file | VP21 |
 | 18 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) — **built** (dry case): SSRM 1.34 vs RS2 SSR 1.34, Slide2 Bishop 1.382 (on [vp022a.xlsx](../files/rocscience/vp022a.xlsx)). Same r<sub>u</sub>/water-table status as #17 | VP22 |
 | 19 | Undrained layered slope (Low 1989) — **built** (caveat): SSRM 1.51 at the tagged mesh (1.48 at 0.6 m) vs RS2 SSR 1.41, Slide2 LEM 1.439, Low 1.44 — the SSR values straddle the LEM from opposite sides on this φ = 0 slope, and the XSLOPE factor drifts −2% with refinement; quoted at the tagged mesh per the page convention. This problem is Slide2 VP24 | VP24 |
-| 20 | Slope with vertical load (Prandtl's wedge) | VP25/VP26 |
-| 22 | Layered slope with undulating bedrock | VP27 |
-| 23 | Underwater slope with linearly varying cohesion | VP29 family |
+| 20 | Slope with vertical load (Prandtl's wedge) — **built**: SSRM 1.00 vs Prandtl theory 1.0 and RS2 SSR 1.0 (mesh pair 1.011→1.003); Slide2 Spencer reads 1.051 on the specified surface (on [vp025.xlsx](../files/rocscience/vp025.xlsx)) | VP25 |
+| 21 | Bearing capacity test prism (Prandtl II) — planned: RS2 SSR 1.01 vs theory 1.0; the same setup as #20 on the VP26 prism, expected equally clean | VP26 |
+| 22 | Layered slope with undulating bedrock — *blocked*: RS2 SSR 1.52. Two gaps: the FEM fixes displacements only along a flat base (an undulating bedrock bottom never reaches equilibrium), and the problem specifies phreatic-inclination-corrected pore pressures, which the FEM does not yet apply (the LEM does, via Type=phreatic — vp027's LEM locks stand) | VP27 |
+| 23 | Underwater slope with linearly varying cohesion — *no lock possible*: RS2's published SSR (1.12) depends on a "can't fail" elastic region whose boundary its text and figure draw differently; stand-ins for the two readings give 0.87 and 0.92, and without the patch the true SSR minimum is the shallow skin above el. −20 (FS 0.21) that the artifice suppresses. The comparison would test where the patch is drawn, not the mechanics — this slope's anchor remains the LEM lock (VP29, Spencer 1.145 on Duncan's surface) | VP29 |
 | 24 | Layered slope with geosynthetic reinforcement | VP30–32 family |
 | 25 | Syncrude tailings dyke, multiple phreatic surfaces | VP33 family |
 | 26 | Clarence Cannon dam | VP34 family |

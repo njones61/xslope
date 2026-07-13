@@ -59,6 +59,10 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
 <!-- test: file=../files/rocscience/vp047.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.899, benchmark=VP47 -->
 <!-- test: file=../files/rocscience/vp048.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.991, fs_spencer=0.991, benchmark=VP48 -->
+<!-- test: file=../files/rocscience/vp049.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.469, fs_spencer=1.439, benchmark=VP49 -->
+<!-- test: file=../files/rocscience/vp058.xlsx, type=single_circle, num_slices=60, fs_bishop=1.142, fs_spencer=1.140, fs_oms=1.119, benchmark=VP58 -->
+<!-- test: file=../files/rocscience/vp059.xlsx, type=single_noncirc, num_slices=60, fs_janbu=0.579, fs_corps=0.577, benchmark=VP59 -->
+<!-- test: file=../files/rocscience/vp060.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.010, fs_janbu=1.073, benchmark=VP60 -->
 <!-- test: file=../files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
 <!-- test: file=../files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.205, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
 <!-- test: file=../files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
@@ -194,7 +198,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | partial | Baker (1993) three-stage dam (dry / steady-state seep / rapid drawdown). The manual itself calls this a validation problem: permeabilities were estimated by Rocscience and the stage-3 undrained strengths live in discrete .fn6 functions. Stage 1 (dry, Spencer 2.534 / Baker 2.41 / theory 2.5) buildable once Figure 46.1 coordinates are read; stages 2-3 map onto xslope's seep + rapid-drawdown pipeline but need those source functions. |
 | [47](#vp47) | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | **built** | [vp047.xlsx](../files/rocscience/vp047.xlsx). Sheahan & Ho (2003) Amherst test wall: 6 m undrained cut, 2 nail rows (FHWA capacity envelope) + shotcrete line load. Critical 44.5° plane: Janbu 0.899 vs Slide 0.890 / Sheahan 0.887. |
 | [48](#vp48) | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | **built** | [vp048.xlsx](../files/rocscience/vp048.xlsx). Clouterre full-scale test wall: 7 nail rows (constant 15 kN tension), planar surfaces through the toe at 45–70°; Janbu/Spencer within 0.3% of Slide at 55–70°. |
-| 49 | Retaining wall, (2) materials, grouted tiebacks, soldier piles | planned |  |
+| [49](#vp49) | Retaining wall, (2) materials, grouted tiebacks, soldier piles | **built** | [vp049.xlsx](../files/rocscience/vp049.xlsx). SNAILZ soldier-pile tieback wall on the given wedge: Janbu simplified 1.434 / corrected 1.469 vs Slide 1.446 / 1.479 (SNAILZ 1.52). Two tieback rows + the soldier pile as a 5,900 lb/ft shear micro-pile at the face. |
 | [50](#vp50) | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](../files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 rows with per-row length/tensile/bond values, evaluated on the printed deep wedge (-15.8,0)-(0,-5)-(41.7,25). With Slide's nail defaults (tangent orientation, force factored by FS): Janbu(corr) 1.448 vs SNAILZ 1.46 and Slide 1.417. The capacity envelope reproduces the hand-computed available tension at every crossing (Σ 10.6 kip). The shallow (0,0) surface's kink is not printed — only the deep case is tagged. |
 | [51](#vp51) | Slope, (4) materials, water table, tension crack, seismic | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx). Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86). Seven methods vs Slide/Zhu: Bishop 1.278 vs 1.278/1.278 and M-P 1.304 vs 1.304/1.303 — exact; Spencer 1.294 vs 1.293; Lowe 1.296 vs 1.288/1.290; Corps 1.404 vs 1.422/1.377 (in-band); OMS 1.069 vs Zhu 1.066 (Slide's 1.145 is the outlier); Janbu(corr) 1.205 ≡ simplified 1.112 × fo. Phreatic line calibrated against the two independently agreeing published Bishop/Spencer values (±1 m bracket spans them). |
 | [52](#vp52) | Slope, (4) materials, water table, tension crack | **built** | [vp052a.xlsx](../files/rocscience/vp052a.xlsx) (dry), [vp052b.xlsx](../files/rocscience/vp052b.xlsx) (wet). Zhu & Lee (2002), heterogeneous benched slope; water table from the manual's Table 52.2. Unconstrained circular search lands in the governing deep (surface 3) family: wet Spencer 1.189 and Bishop 1.176 vs Slide 1.189 / 1.176 — exact; dry 1.797 / 1.796 vs Slide 1.804. Zhu's own values on his specified circle: 1.211 / 1.836 (the manual shows a wide Slide-Zhu spread on this family). The shallow/noncircular cases (surfaces 1, 2, 4) use constrained/block searches xslope does not yet expose — noted, not tagged. Paper in `ref_docs_lim_eq/`. |
@@ -203,9 +207,9 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [55](#vp55) | Slope, homogenous, water table | **built** | [vp055.xlsx](../files/rocscience/vp055.xlsx). Pockoski & Duncan (2000) test slope 1. On Slide's printed critical circle: Bishop 1.290 / Spencer 1.297 / Lowe 1.321 vs Slide 1.293 / 1.300 / 1.318; search confirms. The water table (ground at the lower plateau, 10 ft below the crest) is validated by that three-method 0.003 agreement. |
 | [56](#vp56) | Slope, homogenous, water table, tension crack | **built** | [vp056.xlsx](../files/rocscience/vp056.xlsx). P&D test slope 2: slope 1 plus a dry 5.5-ft tension crack (depth from Slide's slip-endpoint/intercept pair). Bishop 1.283 / Spencer 1.288 / Lowe 1.307 vs Slide 1.285 / 1.290 / 1.304. |
 | [57](#vp57) | Slope, (2) materials, water table, tension crack, composite surfaces | **built** | [vp057.xlsx](../files/rocscience/vp057.xlsx). Pockoski & Duncan (2000) test slope 3. The manual analyzes it with and without composite surfaces, and XSLOPE reproduces both: composite Bishop 1.389 / Spencer 1.396 vs Slide 1.392 / 1.400; circles-only search 1.411 / 1.416 vs Slide 1.417 / 1.422. The composite search finds the truncated critical on its own. |
-| 58 | Retaining wall, (8) materials, water table, grouted tieback | planned |  |
-| 59 | Retaining wall, homogenous, water table, grouted tieback | planned |  |
-| 60 | Retaining wall, (2) materials, tension crack, distributed load, soil nails | planned |  |
+| [58](#vp58) | Retaining wall, (8) materials, water table, grouted tieback | **built** | [vp058.xlsx](../files/rocscience/vp058.xlsx). Pockoski & Duncan (2000) #4 on Slide's printed circle: Bishop 1.142 / Spencer 1.140 / Ordinary 1.119 vs Slide 1.147 / 1.145 / 1.129 and UTEXAS4 1.14 / 1.14. |
+| [59](#vp59) | Retaining wall, homogenous, water table, grouted tieback | **built** (Janbu/Corps) | [vp059.xlsx](../files/rocscience/vp059.xlsx). Pockoski & Duncan (2000) #5, FS<1 by design, phreatic (Hu) pore-pressure correction: Janbu 0.566 vs Slide 0.583; Corps 0.577 vs L-K 0.588. Spencer/M-P report inadmissible interslice solutions here; published Bishop values themselves span 0.56–0.74 (see section). |
+| [60](#vp60) | Retaining wall, (2) materials, tension crack, distributed load, soil nails | **built** | [vp060.xlsx](../files/rocscience/vp060.xlsx). Pockoski & Duncan (2000) #7 nailed wall on Slide's printed circle with a 7-ft dry crack: Spencer 1.010 / Janbu simplified 1.043 vs Slide 1.009 / 1.041. |
 | [61](#vp61) | Slope, homogenous, composite surfaces | **built** | [vp061a.xlsx](../files/rocscience/vp061a.xlsx) (power), [vp061b.xlsx](../files/rocscience/vp061b.xlsx) (M-C). Baker (2003) ex. 3 (London clay) on the #44 geometry: Spencer power 1.466 vs Slide 1.468 / Baker 1.48; MC 1.367 vs Slide 1.366 / Baker 1.35. |
 | [62](#vp62) | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](../files/rocscience/vp062a.xlsx) (dry, kc=0.432), [vp062b.xlsx](../files/rocscience/vp062b.xlsx) (ru=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Circular search: Spencer 1.001 / 1.001 and Bishop 0.991 / 0.986 vs Slide 1.001 / 1.001 and 0.991 / 0.987 — exact. |
 | 63 | Slope, (3) materials, seismic | partial | Loukidis et al. (2003) ex. 2 (paper now in `ref_docs_lim_eq/`). Outline fully pinned from the paper's Fig. 9 (bench el 20 to x=20, 2:1 to (60,40), 8 m bench, 2.5:1 to (105.5,55), crest to 150); interfaces are 22:1 but their face anchors are not dimensioned and FS=1.0-calibration attempts with plausible anchors give 1.17-1.21 — the paper's Fig. 10 profile also appears inconsistent with Fig. 9's mesh. Needs a closer read of the paper (or the SLOPE/W .gsz) before building. |
@@ -974,6 +978,29 @@ Slide #48 / Sheahan & Ho (2003): the CEBTP Clouterre full-scale wall — 7 m cut
 
 ![vp048: inputs and representative solution](images/vp048.png)
 
+### VP49: Retaining wall, grouted tiebacks, soldier piles {#vp49}
+
+**Input files:** [vp049.xlsx](../files/rocscience/vp049.xlsx)
+
+From the Caltrans SNAILZ reference manual: a two-layer slope cut by a soldier-pile
+tieback wall, evaluated on the manual's given bilinear wedge from the wall toe (Slide
+prints its endpoints; the interior kink is digitized from the figure at (37.0, 33.6)).
+The two tieback rows carry different bar capacities (Table 49.2, tensile = plate, bond
+13,571.68 lb/ft, 8-ft spacing); the soldier pile is modeled as Slide models it — a
+micro-pile at the wall face contributing 5,900 lb/ft of shear where the surface passes.
+
+| | XSLOPE | Slide | SNAILZ |
+|---|---|---|---|
+| Janbu simplified | 1.434 | 1.446 | — |
+| Janbu corrected | 1.469 | 1.479 | 1.52 |
+
+*Both tiebacks are tensile-governed at the given surface (bond capacity behind the
+crossing exceeds the bar capacity), so the digitized tieback lengths carry no
+factor-of-safety sensitivity. Spencer reads 1.439 on the same wedge (no published
+counterpart).*
+
+![vp049: inputs and representative solution](images/vp049.png)
+
 ### VP50: Reinforced slope, (2) materials, predefined slip surface, geosynthetic {#vp50}
 
 Slide #50 (SNAILZ reference manual): nail-reinforced wall, 14 horizontal rows with per-row length/capacity/bond strength, evaluated on the printed deep wedge (-15.813,0)-(0,-5)-(41.722,25). Slide Janbu corrected 1.417; SNAILZ 1.46. Plate strength equals tensile strength, so the wall end is fully anchored (lp1=0); the embedded end tapers at the bond strength (lp2 = T/bond). Active application, imperial units.
@@ -1129,6 +1156,78 @@ Slide's printed composite critical (center (37.547, 191.192), R = 108.668) botto
 *Bishop, Spencer and Lowe agree with Slide to 0.008 in both modes, and `circular_search(composite=True)` finds the truncated critical unaided (1.388 / 1.396). The Ordinary method is the outlier by design, not by error: the manual's own table shows the published OMS values spanning 0.85 (SLOPE/W) to 1.257 (Slide) on the composite surface — the same pore-pressure pathology documented on [VP22](#vp22) — and XSLOPE's 1.086 sits inside that spread. Janbu simplified spans 1.21–1.34 across the published codes; XSLOPE's uncorrected 1.240 is in range and its corrected value (1.336) matches XSTABL.*
 
 ![vp057: inputs and representative solution](images/vp057.png)
+
+### VP58: Tied-back wall in layered soil {#vp58}
+
+**Input files:** [vp058.xlsx](../files/rocscience/vp058.xlsx)
+
+Pockoski & Duncan (2000)'s fourth test slope, from their eight-program comparison of
+reinforced-slope analysis: a 44-ft tied-back excavation wall in eight horizontal layers
+(granular and cohesive fills over organic silt, an over-consolidated crust, three marine
+clays, and glaciomarine deposits), water table at grade in front of the wall and el.
+102.5 behind it. Three identical tieback rows at 20° (88 ft, 40-ft bond; capacity is
+bond-governed at 40,000 lb/ft of wall). Evaluated on Slide's printed critical circle,
+tangent to the glaciomarine contact.
+
+| Method | XSLOPE | Slide | UTEXAS4 | SLOPE/W | WINSTABL |
+|---|---|---|---|---|---|
+| Bishop simplified | 1.142 | 1.147 | 1.14 | 1.14 | 1.16 |
+| Spencer | 1.140 | 1.145 | 1.14 | 1.14 | 1.20 |
+| Ordinary | 1.119 | 1.129 | — | 1.12 | — |
+| Janbu simplified | 1.059 | 1.061 | 1.13 | 1.05 | 1.12 |
+
+![vp058: inputs and representative solution](images/vp058.png)
+
+### VP59: Tieback wall in sand, drawdown water table {#vp59}
+
+**Input files:** [vp059.xlsx](../files/rocscience/vp059.xlsx)
+
+Pockoski & Duncan (2000)'s fifth test slope: a single-row tieback wall in homogeneous
+sand (c′ = 0, φ′ = 30°) with a water table drawn down to the wall face — under-designed
+on purpose (every published factor of safety is below 1). The critical circle is
+prescribed from Slide's printout, running from the wall toe (the manual pins it with a
+focus point) to the upper ground. The water table enters with the phreatic-inclination
+(Hu) pore-pressure correction that Slide and XSTABL apply on steeply inclined water
+tables.
+
+| Method | XSLOPE | Slide | UTEXAS4 | SLOPE/W | WINSTABL |
+|---|---|---|---|---|---|
+| Janbu simplified | 0.566 | 0.583 | 0.64 | 0.61 | 0.76 |
+| Corps / Lowe-Karafiath | 0.577 | 0.588 | 0.76 | — | — |
+| Bishop simplified | — | 0.582 | 0.56 | 0.60 | 0.74 |
+| Spencer | — | 0.596 | 0.65 | 0.59 | — |
+
+*This problem was built to stress reinforced-slope codes and it shows: the published
+Bishop values alone span 0.56–0.74, and Slide's own Ordinary result (0.859) sits 44%
+above its Spencer. On this surface XSLOPE's Spencer and Morgenstern–Price refuse the
+solution as inadmissible (base normals near the wall go into tension), and Bishop/OMS
+do not apply to a non-circular polyline, so the force-equilibrium family carries the
+lock; both values sit 2–3% below Slide's and within every published pairing.*
+
+![vp059: inputs and representative solution](images/vp059.png)
+
+### VP60: Soil-nailed wall with tension crack and surcharges {#vp60}
+
+**Input files:** [vp060.xlsx](../files/rocscience/vp060.xlsx)
+
+Pockoski & Duncan (2000)'s seventh test slope: a 25-ft soil-nailed wall in undrained
+sandy clay (c = 800 psf, φ = 0) carrying a 250-psf surcharge across the whole crest plus
+a 500-psf strip over the first 7.3 ft, with a dry 7-ft tension crack. Five passive nail
+rows at 15° (25,918 lb tensile at 5-ft spacing, bond 1,508 lb/ft). Evaluated on Slide's
+printed critical circle, truncated by the crack at its printed endpoint (17.157,
+18.003); at the printed geometry the top nail row passes above the truncated surface
+and does not participate.
+
+| Method | XSLOPE | Slide | UTEXAS4 | SLOPE/W | WINSTABL |
+|---|---|---|---|---|---|
+| Spencer | 1.010 | 1.009 | 1.02 | 1.02 | 0.99 |
+| Janbu simplified | 1.043 | 1.041 | 1.08 | 1.07 | 1.10 |
+
+*GOLD-NAIL reads 0.91 and SNAIL 0.84 (wedge) on their own mechanisms — the nailed-wall
+codes and the LEM codes disagree more with each other than the LEM codes do among
+themselves.*
+
+![vp060: inputs and representative solution](images/vp060.png)
 
 ### VP61: London clay, linear vs non-linear envelope (Baker ex. 3) {#vp61}
 

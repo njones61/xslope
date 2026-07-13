@@ -655,6 +655,191 @@ def _dw634_slope_data(appl):
     return sd
 
 
+def vp058():
+    """Slide #58 / Pockoski & Duncan (2000) test slope 4: tied-back wall in
+    8 horizontal layers, evaluated on Slide's printed critical circle
+    (center (208.313, 148.638), R 124.638, tangent to the glaciomarine
+    contact at el 24). Layer elevations from the figure's vertex dots
+    anchored on the printed grade (69.000) and domain base; the LM/GD
+    contact is 24.0, confirmed by the tangency. WT at grade in front,
+    el 102.5 behind the wall, stepped at the face. Three identical tieback
+    rows (Table 58.2): heads (200,104)/(200,89.5)/(200,75), 20 deg, 88 ft
+    (48 free + 40 bond); bond-governed capacity 4000*40/4 = 40,000 lb/ft,
+    lp2 = 40. Targets: Slide Bishop 1.147 / Spencer 1.145 / Ordinary 1.129;
+    UTEXAS4 1.14 / 1.14. xslope 1.142 / 1.140 / 1.119."""
+    import math
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    mats = []
+    for name, c, phi, gam in [
+            ('Granular Fill', 0.0, 30.0, 120.4),
+            ('Cohesive Fill', 0.0, 30.0, 114.7),
+            ('Organic Silt', 900.0, 0.0, 110.2),
+            ('OC Crust', 2485.0, 0.0, 117.8),
+            ('Upper Marine Clay', 1670.0, 0.0, 117.8),
+            ('Middle Marine Clay', 960.0, 0.0, 117.8),
+            ('Lower Marine Clay', 1085.0, 0.0, 117.8),
+            ('Glaciomarine Deposits', 1500.0, 0.0, 147.1)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gam, gamma_sat=gam,
+                 option='mc', u='piezo')
+        mats.append(m)
+    sd['materials'] = mats
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(200.0, 113.0), (350.0, 113.0)]},
+        {'mat_id': 1, 'coords': [(200.0, 109.0), (350.0, 109.0)]},
+        {'mat_id': 2, 'coords': [(200.0, 93.0), (350.0, 93.0)]},
+        {'mat_id': 3, 'coords': [(200.0, 86.0), (350.0, 86.0)]},
+        {'mat_id': 4, 'coords': [(200.0, 82.5), (350.0, 82.5)]},
+        {'mat_id': 5, 'coords': [(50.0, 69.0), (200.0, 69.0), (350.0, 69.0)]},
+        {'mat_id': 6, 'coords': [(50.0, 40.0), (350.0, 40.0)]},
+        {'mat_id': 7, 'coords': [(50.0, 24.0), (350.0, 24.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(50.0, 69.0), (200.0, 69.0), (200.0, 102.5),
+                        (350.0, 102.5)]
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 208.313, 'Yo': 148.638, 'Depth': 24.0,
+                      'R': 124.638}]
+    c20, s20 = math.cos(math.radians(20)), math.sin(math.radians(20))
+    lines = []
+    for hy in (104.0, 89.5, 75.0):
+        lines.append({'x1': 200.0, 'y1': hy, 'x2': 200.0 + 88.0 * c20,
+                      'y2': hy - 88.0 * s20,
+                      't_max': 4000.0 * 40.0 / 4.0, 't_res': 0.0, 'lp1': 0.0,
+                      'lp2': 40.0, 'E': float('nan'), 'area': float('nan'),
+                      'label': f'tieback y={hy:g}', 'type': 'anchor',
+                      'dir': 'axial', 'appl': 'active',
+                      'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp058.xlsx'))
+    return 'vp058.xlsx'
+
+
+def vp059():
+    """Slide #59 / Pockoski & Duncan (2000) test slope 5: one-row tieback
+    wall in homogeneous sand with a drawdown water table, FS < 1 by design.
+    Slide's printed circle (center (-30.872, 31.315), R 43.975) daylights on
+    the lower slope as well as at the toe (the manual pins the toe with a
+    focus point), so the toe-to-exit arc is stored as a non_circ polyline
+    (endpoints printed: (0,0) -> (12.583, 24.580)). WT: at ground in front,
+    tick-calibrated drawdown trace behind the wall, Type=phreatic (the
+    Slide/XSTABL Hu inclination correction; with vertical-head u the
+    near-wall slice bases go into tension). Tieback head (0,9), 10 deg,
+    31.7 ft, bond-governed 5000*22/8 = 13,750 lb/ft, lp2=22. Published
+    spread is wide (Bishop 0.56-0.74 across four programs; Slide's own
+    Ordinary reads 0.859 vs its Spencer 0.596). Targets: Slide Janbu
+    simplified 0.583 / L-K 0.588. xslope: Janbu 0.566 simplified / 0.579
+    corrected, Corps 0.577; Spencer and M-P report inadmissible interslice
+    solutions on this surface."""
+    import math
+    import numpy as np
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Sand', c=0.0, phi=30.0, gamma=120.0, gamma_sat=120.0,
+             option='mc', u='piezo')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-50.0, -15.0), (-10.0, 0.0), (0.0, 0.0),
+                                 (0.0, 20.0), (40.0, 35.0)]},
+    ]
+    sd['max_depth'] = -30.0
+    sd['gamma_water'] = 62.4
+    sd['piezo_line'] = [(-50.0, -15.0), (-10.0, 0.0), (0.0, 0.0), (0.0, 16.6),
+                        (8.0, 22.7), (20.0, 27.1), (40.0, 34.4)]
+    sd['piezo_phreatic'] = True
+    sd['circular'] = False
+    sd['circles'] = []
+    Xo, Yo, R = -30.872, 31.315, 43.975
+    a1 = math.atan2(0.0 - Yo, 0.0 - Xo)
+    a2 = math.atan2(28.3 - Yo, 13.0 - Xo)  # past ground; Slide exit (12.583, 24.58)
+    pts = [(Xo + R * math.cos(t), Yo + R * math.sin(t))
+           for t in np.linspace(a1, a2, 40)]
+    pts[0] = (0.0, 0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in pts]
+    c10, s10 = math.cos(math.radians(10)), math.sin(math.radians(10))
+    lines = [{'x1': 0.0, 'y1': 9.0, 'x2': 31.7 * c10, 'y2': 9.0 - 31.7 * s10,
+              't_max': 5000.0 * 22.0 / 8.0, 't_res': 0.0, 'lp1': 0.0,
+              'lp2': 22.0, 'E': float('nan'), 'area': float('nan'),
+              'label': 'tieback', 'type': 'anchor', 'dir': 'axial',
+              'appl': 'active', 'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp059.xlsx'))
+    return 'vp059.xlsx'
+
+
+def vp060():
+    """Slide #60 / Pockoski & Duncan (2000) test slope 7: soil-nailed wall in
+    undrained sandy clay (c=800, phi=0), dry 7-ft tension crack (printed
+    right endpoint (17.157, 18.003) vs crest 25), and OVERLAPPING crest
+    surcharges: 250 psf across the whole crest plus 500 psf over the first
+    7.3 ft (the overlapping reading reproduces Slide's Spencer and Janbu
+    simultaneously to 0.2%; adjacent strips read +4%). Slide's printed
+    circle (center (-38.803, 54.156), R 66.622) also daylights on the front
+    bench, so the toe arc is stored as non_circ, extended to ground and
+    truncated by tcrack_depth. Five nail rows: heads (0,23)..(0,3) at 5-ft
+    spacing, 15 deg, axial+passive (Slide's nail default); at these
+    positions the top nail passes above the truncated surface and does not
+    act. t_max = 25918.14/5 = 5183.6 lb/ft, lp2 = 17.19 ft (bond 1508/5).
+    Targets: Slide Spencer 1.009 / Janbu simplified 1.041 (UTEXAS4 1.02 /
+    1.08). xslope 1.010 / 1.043."""
+    import math
+    import numpy as np
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, c, phi, gam in [('Sandy clay', 800.0, 0.0, 120.0),
+                              ('Firm soil', 5000.0, 35.0, 130.0)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gam, gamma_sat=gam,
+                 option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-14.0, 0.0), (0.0, 0.0), (0.0, 25.0),
+                                 (50.0, 25.0)]},
+        {'mat_id': 1, 'coords': [(-14.0, 0.0), (50.0, 0.0)]},
+    ]
+    sd['max_depth'] = -10.0
+    sd['gamma_water'] = 62.4
+    sd['tcrack_depth'] = 7.0
+    sd['dloads'] = [
+        [{'X': 0.0, 'Y': 25.0, 'Normal': 500.0},
+         {'X': 7.3, 'Y': 25.0, 'Normal': 500.0}],
+        [{'X': 0.0, 'Y': 25.0, 'Normal': 250.0},
+         {'X': 50.0, 'Y': 25.0, 'Normal': 250.0}],
+    ]
+    sd['circular'] = False
+    sd['circles'] = []
+    Xo, Yo, R = -38.803, 54.156, 66.622
+    a1 = math.atan2(0.0 - Yo, 0.0 - Xo)
+    # aim past the crest so the polyline CROSSES ground (a tail ending on
+    # y=25 exactly is a tangent, not an intersection); the tension-crack
+    # truncation discards everything beyond (17.157, 18.003) regardless
+    a2 = math.atan2(26.0 - Yo, 21.5 - Xo)
+    pts = [(Xo + R * math.cos(t), Yo + R * math.sin(t))
+           for t in np.linspace(a1, a2, 40)]
+    pts[0] = (0.0, 0.0)
+    sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in pts]
+    c15, s15 = math.cos(math.radians(15)), math.sin(math.radians(15))
+    lines = []
+    for k, L in enumerate((40.0, 40.0, 40.0, 33.0, 25.5)):
+        hy = 23.0 - 5.0 * k
+        lines.append({'x1': 0.0, 'y1': hy, 'x2': L * c15, 'y2': hy - L * s15,
+                      't_max': 25918.14 / 5.0, 't_res': 0.0, 'lp1': 0.0,
+                      'lp2': 25918.14 / 1508.0, 'E': float('nan'),
+                      'area': float('nan'), 'label': f'nail {k+1}',
+                      'type': 'nail', 'dir': 'axial', 'appl': 'passive',
+                      'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp060.xlsx'))
+    return 'vp060.xlsx'
+
+
 def vp085a():
     """Slide #85 case 1 (active). D&W reference 1.51; Slide circular Bishop
     1.531."""
@@ -1646,6 +1831,64 @@ def _baker1_slope_data():
     sd['circles'] = [{'Xo': 3.0, 'Yo': 10.0, 'Depth': -1.0, 'R': 11.0}]
     sd['circular'] = True
     return sd
+
+
+def vp049():
+    """Slide #49 (SNAILZ reference manual): soldier-pile tieback wall, 2
+    materials, evaluated on the given wedge (0,0)-(37,33.6)-(59.959,65.619)
+    (kink pixel-fit; endpoints printed in Slide's info box). Two grouted
+    tieback rows (heads (0,20)/(0,8), 25 deg, 8-ft spacing, plate=tensile so
+    lp1=0, lp2=tensile/bond) and the soldier pile as a micro-pile: 5900 lb
+    shear at 1-ft spacing, applied directly (H), standing at the wall face -
+    x=0.5 keeps its crossing inside the first slice rather than exactly on
+    the surface's left endpoint, where no slice owns it. Targets: Slide Janbu
+    simplified 1.446 / corrected 1.479; SNAILZ 1.52. xslope 1.434 / 1.469."""
+    import math
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, c, phi, gam in [('Layer 1', 600.0, 24.0, 120.0),
+                              ('Layer 2', 300.0, 34.0, 130.0)]:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gam, gamma_sat=gam,
+                 option='mc', u='none')
+        sd['materials'].append(m)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(33.0, 53.0), (60.0, 66.0), (70.0, 71.0),
+                                 (178.0, 80.0), (195.0, 80.0)]},
+        {'mat_id': 1, 'coords': [(-20.0, 0.0), (0.0, 0.0), (0.0, 30.0),
+                                 (29.0, 51.0), (33.0, 53.0), (195.0, 26.0)]},
+    ]
+    sd['max_depth'] = -20.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = False
+    sd['circles'] = []
+    # last point extended past ground; Slide prints the endpoint
+    # inside-pulled at (59.959, 65.619)
+    sd['non_circ'] = [
+        {'X': 0.0, 'Y': 0.0, 'Movement': 'Free'},
+        {'X': 37.0, 'Y': 33.6, 'Movement': 'Free'},
+        {'X': 61.0, 'Y': 67.069, 'Movement': 'Free'},
+    ]
+    c25, s25 = math.cos(math.radians(25)), math.sin(math.radians(25))
+    lines = []
+    for hy, L, tens in [(20.0, 35.0, 120344.9), (8.0, 33.0, 164217.3)]:
+        lines.append({'x1': 0.0, 'y1': hy, 'x2': L * c25, 'y2': hy - L * s25,
+                      't_max': tens / 8.0, 't_res': 0.0, 'lp1': 0.0,
+                      'lp2': tens / 13571.68, 'E': float('nan'),
+                      'area': float('nan'), 'label': f'tieback y={hy:g}',
+                      'type': 'anchor', 'dir': 'axial', 'appl': 'active',
+                      'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    sd['pile_lines'] = [{
+        'x1': 0.5, 'y1': 30.0, 'x2': 0.5, 'y2': -7.0,
+        'H': 5900.0, 'theta_p': 0.0, 'D_pile': 0.5, 'S': 1.0,
+        'E': None, 'I': None, 'area': None,
+        'V_cap': None, 'M_cap': None, 'fixity': 'free',
+        'appl': 'active', 'label': 'soldier pile'}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp049.xlsx'))
+    return 'vp049.xlsx'
 
 
 def vp044a():

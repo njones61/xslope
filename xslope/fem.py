@@ -1031,6 +1031,19 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # Get other parameters
     unit_weight = slope_data.get("gamma_water", 9.81)
     k_seismic = slope_data.get("k_seismic", 0.0)
+    # The pseudo-static force acts in the downslope direction. Resolve the
+    # sign HERE from the slope facing (the LEM convention: ground higher on
+    # the left faces right, mass slides +x) so every load-assembly site can
+    # apply the stored value unchanged; an unsigned k on a left-facing slope
+    # would push the mass INTO the hill and inflate the SSRM factor.
+    if k_seismic:
+        gs = slope_data.get('ground_surface')
+        if gs is not None and not gs.is_empty:
+            coords = list(gs.coords)
+            if coords[0][1] < coords[-1][1]:      # left-facing slope
+                k_seismic = -abs(k_seismic)
+            else:
+                k_seismic = abs(k_seismic)
     
     # Construct fem_data dictionary
     fem_data = {

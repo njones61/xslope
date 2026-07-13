@@ -399,11 +399,59 @@ def run_seep_test(test):
     mesh = build_mesh_from_polygons(polygons, target_size, element_type)
 
     seep_data = build_seep_data(mesh, slope_data)
-    solution = run_seepage_analysis(seep_data, tol=1e-4)
+    solution = run_seepage_analysis(seep_data, tol=1e-4,
+                                    max_iter=int(test.get('max_iter', 400)))
 
     if not solution.get('converged', True):
         return None, "seepage solution did not converge (flowrate unreliable)"
     return solution['flowrate'], None
+
+
+def run_seep_head_test(test):
+    """Check solved total head at named points (groundwater-corpus tags).
+
+    Tag keys: file, points="x:y:h;x:y:h;...", tolerance (m, absolute),
+    optional target_size / element_type. Meshes and solves live like
+    run_seep_test, then interpolates head at each point by inverse-distance
+    over the four nearest nodes. Pass/fail: returns 0.0 on success."""
+    import numpy as np
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    slope_data = load_slope_data(test['file'])
+    polygons = get_material_polygons(slope_data)
+    target_size = test.get('target_size')
+    if target_size is None:
+        xs = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(xs) - min(xs)) / 120
+    mesh = build_mesh_from_polygons(polygons, float(target_size),
+                                    test.get('element_type', 'tri3'))
+    seep_data = build_seep_data(mesh, slope_data)
+    solution = run_seepage_analysis(seep_data, tol=1e-5,
+                                    max_iter=int(test.get('max_iter', 400)))
+    if not solution.get('converged', True):
+        return None, "seepage solution did not converge"
+
+    nodes = seep_data['nodes']
+    h = np.asarray(solution['head'])
+
+    def head_at(xq, yq):
+        d2 = (nodes[:, 0] - xq) ** 2 + (nodes[:, 1] - yq) ** 2
+        idx = np.argsort(d2)[:4]
+        w = 1.0 / np.maximum(d2[idx], 1e-12)
+        return float(np.sum(w * h[idx]) / np.sum(w))
+
+    tol = float(test.get('tolerance', 0.01))
+    errs = []
+    for triplet in str(test['points']).split(';'):
+        xs_, ys_, hs_ = (float(v) for v in triplet.split(':'))
+        got = head_at(xs_, ys_)
+        if abs(got - hs_) > tol:
+            errs.append(f"({xs_:g},{ys_:g}): expected {hs_:.3f}, got {got:.3f}")
+    if errs:
+        return None, "head mismatch: " + "; ".join(errs)
+    return 0.0, None
 
 
 def run_seep_elements_test(test):
@@ -1169,6 +1217,8 @@ def run_test(test):
         return run_fem_reliability_test(test)
     elif test_type == 'seep':
         return run_seep_test(test)
+    elif test_type == 'seep_head':
+        return run_seep_head_test(test)
     elif test_type == 'reliability':
         return run_reliability_test(test)
     elif test_type == 'design_search':
@@ -1196,7 +1246,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                       'gsat_pair'):
+                       'gsat_pair', 'seep_head'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -1300,7 +1350,7 @@ def main():
             if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
-            elif ttype in ('seep', 'seep_elements'):
+            elif ttype in ('seep', 'seep_elements', 'seep_head'):
                 if run_seep:
                     tests.append(t)
             elif run_lem:

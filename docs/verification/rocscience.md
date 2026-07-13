@@ -20,6 +20,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 <!-- test: file=../files/rocscience/vp006.xlsx, type=single_circle, num_slices=60, fs_bishop=2.206, fs_spencer=2.290, fs_janbu=2.073, fs_mprice=2.299, benchmark=VP6 -->
 <!-- test: file=../files/rocscience/vp008.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.276, fs_janbu=1.294, fs_mprice=1.260, benchmark=VP8 -->
 <!-- test: file=../files/rocscience/vp009.xlsx, type=noncircular_search, num_slices=50, fs_spencer=0.724, fs_janbu=0.718, benchmark=VP9 -->
+<!-- test: file=../files/rocscience/vp010.xlsx, type=circular_search, num_slices=40, fs_bishop=1.500, fs_spencer=1.501, fs_janbu=1.440, benchmark=VP10 -->
 <!-- test: file=../files/rocscience/vp015.xlsx, type=circular_search, num_slices=40, fs_bishop=0.419, fs_spencer=0.422, fs_janbu=0.436, fs_mprice=0.420, benchmark=VP15 -->
 <!-- test: file=../files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.122, fs_mprice=1.111, benchmark=VP16 -->
 <!-- test: file=../files/rocscience/vp017.xlsx, type=circular_search, num_slices=50, fs_oms=1.274, fs_bishop=1.342, fs_spencer=1.340, benchmark=VP17 -->
@@ -159,7 +160,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | 7 | Slope, (2) materials, weak layer | covered | [LEM sample 13](../lem/samples.md#verification-acads-weak-layer) (`xslope_acads_weak_layer.xlsx`) is this exact problem (ACADS 3(a)). Non-circular search: Spencer 1.258 / M-P 1.248 vs Slide 1.246 / 1.275; Giam reference 1.24-1.27. |
 | [8](#vp8) | Slope, (2) materials, weak layer, predefined slip surface | **built** | [vp008.xlsx](../files/rocscience/vp008.xlsx). Specified 4-point surface (Table 8.2). Spencer 1.276 / Janbu(corr) 1.294 / M-P 1.260 vs Slide 1.277 / 1.294 / 1.262 (exact to ±0.002); SLOPE/W M-P 1.261; Giam reference 1.34. |
 | [9](#vp9) | Slope, (2) materials, weak layer, water table, distributed load | **built** | [vp009.xlsx](../files/rocscience/vp009.xlsx). ACADS 4: inclined 0.6 m seam (geometry from the labeled GeoStudio figure), 8-point piezometric line, two surcharge strips. Non-circular search: Spencer 0.724 / Janbu(corr) 0.718 (M-P reaches 0.707 from a wider seed but does not solve the stored seed, so it is not tagged) vs Slide 0.760/0.720/0.734 (block search) and 0.707/0.683/0.699 (optimized); SLOPE/W 0.699-0.689; ACADS references 0.78 [Giam], 0.6878 [Slope 2000], 20-program mean 0.808. Published spread is wide; XSLOPE sits mid-band. |
-| 10 | Slope, homogenous, pore pressure grid, ponded water | planned (via FE seepage) | ACADS #5: the manual states pore pressures "may be derived from the given boundary conditions or from the approximate flow net" — a homogeneous steady-seepage problem whose head field is independent of k, so XSLOPE's FE seepage reproduces it from the figure's pond level and water-table boundary heads. XSLOPE has no pore-pressure-grid input; the grid here is a stand-in for the flow solution itself. Targets: Bishop 1.498 (Slide), ACADS consensus 1.53. |
+| [10](#vp10) | Slope, homogenous, pore pressure grid, ponded water | **built** (via FE seepage) | [vp010.xlsx](../files/rocscience/vp010.xlsx). ACADS #5: XSLOPE solves the seepage the manual's grid encodes (head field is k-independent; solved phreatic matches the Fig 10.2 flow net within ~0.1 m). Bishop 1.500 / Spencer 1.501 / Janbu corr 1.440 vs Slide 1.498 / 1.500 / 1.457; ACADS reference 1.53, survey mean 1.464. |
 | 11 | Embankment, (2) materials, pore pressure grid | *no lock possible* | Saint-Alban test embankment (built to failure, Pilot et al. 1982): the grid encodes construction-induced excess pore pressures interpolated from the paper's isobars — there is no seepage problem behind them, so a flow solution cannot reproduce them, and XSLOPE deliberately has no pore-pressure-grid input (water enters as piezometric lines, r<sub>u</sub>, or FE seepage). |
 | 12 | Embankment, (4) materials, tension crack, pore pressure grid | *no lock possible* | Lanester test embankment: same situation as VP11 — the printed 22-point grid is measured loading-induced pressure, not a flow field. |
 | 13 | Embankment, (3) materials, pore pressure grid | *no lock possible* | Cubzac-les-Ponts test embankment: same situation as VP11/12. |
@@ -482,6 +483,29 @@ also SLOPE/W Verification Manual sec. 2.11.
 <!-- /fs-table -->
 
 <!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=circular_search, num_slices=50, fs_oms=1.344, fs_bishop=1.404, fs_janbu=1.411, fs_corps=1.476, fs_lowe=1.438, fs_spencer=1.401, fs_mprice=1.400, benchmark=LEM-2b -->
+
+### VP10: Slope, homogenous, pore pressure grid, ponded water {#vp10}
+
+**Input files:** [vp010.xlsx](../files/rocscience/vp010.xlsx) (+ seepage sidecars)
+
+ACADS problem #5 (Giam & Donald 1989): a slope excavated at 1:2 below initially
+horizontal ground, analyzed for the long-term condition with 1 m of ponded water over
+the excavation floor. The survey supplied pore pressures either as boundary conditions
+or as an approximate flow net; Slide interpolates a pore-pressure grid digitized from
+the net, while XSLOPE solves the seepage problem itself (specified head 26 on the
+submerged boundary, the labeled far-field water table as head 32 on the right edge, a
+seepage exit face above the waterline). The head field in a homogeneous steady problem
+is independent of conductivity, so the solution is fully determined by the figure's
+boundary conditions; the solved phreatic surface matches the manual's flow net within
+about 0.1 m across the section.
+
+| Method | XSLOPE (FE seepage) | Slide (grid) | ACADS |
+|---|---|---|---|
+| Bishop | 1.500 | 1.498 | reference 1.53, survey mean 1.464 |
+| Spencer | 1.501 | 1.500 | — |
+| Janbu corrected | 1.440 | 1.457 | — |
+
+![vp010: inputs and representative solution](images/vp010.png)
 
 ### VP15: Slope, (3) materials, weak layer {#vp15}
 

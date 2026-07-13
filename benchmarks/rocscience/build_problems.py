@@ -430,6 +430,48 @@ def vp018():
     return 'vp018.xlsx'
 
 
+def vp010():
+    """Slide #10 / ACADS #5 (Giam & Donald 1989): slope excavated 1:2 below
+    initially horizontal ground, long-term steady seepage, 1 m pond over the
+    excavation floor. Slide interpolates a pore-pressure grid; the manual
+    says the pressures may equally come from the given boundary conditions
+    (Fig 10.2 flow net), so xslope solves the seepage directly (u='seep',
+    sidecars vp010_mesh.json/vp010_seep.csv; head 26 on the submerged
+    boundary, head 32 on the right edge = the labeled far-field WT, exit
+    face above the waterline; homogeneous k, so the head field is
+    k-independent). Solved phreatic matches the Fig 10.2 flow net within
+    ~0.1 m. Targets: Slide Bishop 1.498 / Spencer 1.500 / Janbu corr 1.457;
+    ACADS reference 1.53, survey mean 1.464. xslope 1.500/1.501/1.440."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='Soil', c=11.0, phi=28.0, gamma=20.0, gamma_sat=20.0,
+             option='mc', u='seep', k1=1.0, k2=1.0, alpha=0.0, kr0=0.001,
+             h0=-1.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(15.0, 25.0), (30.0, 25.0), (50.0, 35.0),
+                                 (65.0, 35.0)]},
+    ]
+    sd['max_depth'] = 20.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = [[{'X': 15.0, 'Y': 25.0, 'Normal': 9.81},
+                     {'X': 30.0, 'Y': 25.0, 'Normal': 9.81},
+                     {'X': 32.0, 'Y': 26.0, 'Normal': 0.0}]]
+    sd['piezo_line'] = []
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 26.0, 'coords': [(15.0, 25.0), (30.0, 25.0), (32.0, 26.0)]},
+            {'head': 32.0, 'coords': [(65.0, 20.0), (65.0, 32.0)]},
+        ],
+        'exit_face': [(32.0, 26.0), (50.0, 35.0)],
+    }
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 38.0, 'Yo': 42.0, 'Depth': 24.0, 'R': 18.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp010.xlsx'))
+    return 'vp010.xlsx'
+
+
 def vp015():
     """Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak
     (c=9.8, phi=5) middle band, no water. Circular search. Slide2 (auto

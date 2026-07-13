@@ -163,3 +163,8 @@ radius growing as cohesion falls), and at c = 4.5 the slope crosses FS = 1.
 A `geom:piezo:dy` sweep on any of the water-table samples answers the most common
 geometry question — "how sensitive is this slope to the water table?" — without writing
 a setter: the reference shifts the piezometric line vertically by the swept delta.
+
+For a published benchmark of the sweep itself, see
+[verification problem VP40](../verification/rocscience.md#vp40) — Perry (1993)'s
+power-curve sensitivity study, where the swept ΔFS matches Slide's published curves
+within about a percent at every range endpoint.

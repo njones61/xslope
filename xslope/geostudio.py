@@ -41,6 +41,7 @@ unsupported pore-pressure options, reinforcement, and distributed loads.
 import csv
 import datetime
 import io
+import math
 import os
 import re
 import zipfile
@@ -625,6 +626,80 @@ def ponded_water_dload(ground_surface, piezo_line, gamma_water):
     material above the ground being water.
     """
     return material_above_ground_dload(ground_surface, piezo_line, gamma_water)
+
+
+_REINF_TYPE_OUT = {x: g for g, (x, _, _) in _REINF_TYPE.items()}   # xslope type -> GeoStudio
+
+
+def _reinforcement_out(r, gamma_water):
+    """One xslope reinforcement line -> a GeoStudio product, as the inverse of the import.
+
+    xslope stores everything PER UNIT WIDTH already, so the product is written with
+    ``Spacing`` 1 and the values unscaled. The bond length runs the other way:
+    ``lp = t_max / rate`` on the way in, so ``rate = t_max / lp`` on the way out. An
+    ``lp`` of zero means "fully anchored at once", which GeoStudio expresses as a pullout
+    resistance so large it is never the limit.
+
+    Returns (product_dict, [caveat, ...]) -- the caveats being everything the GeoStudio
+    model cannot hold.
+    """
+    notes = []
+    t_max = float(r.get("t_max") or 0.0)
+    lp1, lp2 = float(r.get("lp1") or 0.0), float(r.get("lp2") or 0.0)
+    tend1, tend2 = float(r.get("tend1") or 0.0), float(r.get("tend2") or 0.0)
+
+    lp = max(lp1, lp2)
+    if lp1 > 0 and lp2 > 0 and abs(lp1 - lp2) > 1e-9 * max(lp1, lp2):
+        notes.append(
+            f"reinforcement {r.get('label') or ''!r} has a different bond length at each "
+            f"end ({lp1:g} and {lp2:g}); GeoStudio has ONE pullout resistance per product, "
+            f"so the longer was written — its capacity develops more slowly than xslope's")
+    rate = (t_max / lp) if lp > 0 else t_max * 1.0e6      # 0 => never the limit
+
+    plate = max(tend1, tend2)
+    if tend1 > 0 and tend2 > 0:
+        notes.append(
+            f"reinforcement {r.get('label') or ''!r} has an end capacity at BOTH ends "
+            f"({tend1:g} and {tend2:g}); GeoStudio has one plate capacity, so the larger "
+            f"was written")
+
+    xtype = (r.get("type") or "").lower()
+    gtype = _REINF_TYPE_OUT.get(xtype)
+    if gtype is None:
+        gtype = "Nail"
+        notes.append(
+            f"reinforcement {r.get('label') or ''!r} has type {r.get('type')!r}, which "
+            f"GeoStudio does not have — written as a Nail, which is axial and unfactored; "
+            f"check the force it develops")
+
+    # GeoStudio does not STORE a direction or an F-of-S dependence: it implies both from
+    # the type. So a line whose dir/appl disagree with the convention for its type cannot
+    # be expressed, and would behave differently in GeoStudio without saying so.
+    want_dir, want_appl = _REINF_TYPE.get(gtype, (None, "axial", "active"))[1:]
+    have_dir = (r.get("dir") or want_dir).lower()
+    have_appl = (r.get("appl") or want_appl).lower()
+    if (have_dir, have_appl) != (want_dir, want_appl):
+        notes.append(
+            f"reinforcement {r.get('label') or ''!r} is {have_dir}/{have_appl} in xslope, "
+            f"but GeoStudio has no field for either — it infers {want_dir}/{want_appl} "
+            f"from the type '{gtype}'. THE FORCE WILL DIFFER; re-check it in GeoStudio")
+
+    return {"type": gtype, "name": str(r.get("label") or gtype), "spacing": 1.0,
+            "tensile": t_max, "plate": plate, "pullout": rate}, notes
+
+
+def _line_load_out(ll):
+    """xslope line-load angle (CCW from +x) -> GeoStudio trend/plunge.
+
+    Plunge is the angle BELOW horizontal; trend picks which way along x. The inverse of
+    what the reader does, and anchored to a real file: the Amherst wall's facing load is
+    Trend=0 / Plunge=90, i.e. straight down, which is xslope's -90.
+    """
+    ang = math.radians(float(ll.get("angle", -90.0)))
+    dx, dy = math.cos(ang), math.sin(ang)
+    plunge = math.degrees(math.atan2(-dy, abs(dx)))     # >0 is downward
+    trend = 0.0 if dx >= 0 else 180.0
+    return trend, plunge
 
 
 def _dload_pressure_at(blocks, x):
@@ -1264,8 +1339,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f"a non-Mohr-Coulomb model is not the same strength")
 
     for key, label in [("circles", "failure circles"), ("non_circ", "non-circular surface"),
-                       ("reinforce_lines", "reinforcement"), ("pile_lines", "piles"),
-                       ("line_loads", "line loads")]:
+                       ("pile_lines", "piles")]:
         if slope_data.get(key):
             caveats.append(f"{label} not written — no .gsz mapping; re-create in GeoStudio")
 
@@ -1318,6 +1392,57 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     per_inch = 39.3701 if unit_system == "Metric" else 12.0
     # Pick a round scale that lands the model on a page about 10 inches wide.
     scale = max(1.0, round((x1 - x0) * per_inch / 10.0, -1)) if (x1 - x0) else 200.0
+
+    # The analysis-local point list. The piezometric surface AND the surcharges both index
+    # into it, so it has to be built before either is written. A surcharge is a wedge of
+    # fill of unit weight gamma between its line and the ground, so a pressure profile
+    # p(x) becomes the line y_ground(x) + p(x)/gamma. Any gamma reproduces p exactly; the
+    # unit weight of water is used because it is already in the file and unit-consistent.
+    local_pts = list(piezo_line)                        # numbered 1..n
+    sc_ids = []
+    gamma_s = gamma_water or 1.0
+    for block in surcharges:
+        ids = []
+        for p in block:
+            yg = _y_on(ground_surface, p["X"])
+            if yg is None:
+                continue
+            local_pts.append((p["X"], yg + p["Normal"] / gamma_s))
+            ids.append(len(local_pts))
+        if len(ids) >= 2:
+            sc_ids.append(ids)
+
+    # Reinforcement. The products live at the top level and are shared; the LINES live on
+    # the analysis and index the local point list, like everything else under <Entry>.
+    products, reinf_lines = [], []
+    for r in (slope_data.get("reinforcement_lines") or []):
+        product, notes = _reinforcement_out(r, gamma_water)
+        caveats.extend(notes)
+        products.append(product)
+        local_pts.append((float(r["x1"]), float(r["y1"])))
+        p1 = len(local_pts)
+        local_pts.append((float(r["x2"]), float(r["y2"])))
+        reinf_lines.append((len(products), p1, len(local_pts)))
+    if reinf_lines:
+        caveats.append(
+            f"{len(reinf_lines)} reinforcement line(s) written. GeoStudio quotes capacity "
+            f"per element with an out-of-plane spacing; xslope's are already per unit "
+            f"width, so they are written with a spacing of 1")
+
+    # Line loads. The point is a local DataPoint; the direction is a trend/plunge pair.
+    load_pts = []
+    for ll in (slope_data.get("line_loads") or []):
+        local_pts.append((float(ll["x"]), float(ll["y"])))
+        trend, plunge = _line_load_out(ll)
+        load_pts.append((len(local_pts), float(ll.get("P") or 0.0), trend, plunge))
+        if plunge < 0:
+            caveats.append(
+                f"line load {ll.get('label') or ''!r} points UPWARD "
+                f"({ll.get('angle')} degrees); GeoStudio's plunge is measured below "
+                f"horizontal, so it was written as {plunge:g} — check it")
+    if load_pts:
+        caveats.append(f"{len(load_pts)} line load(s) written")
+
 
     now = datetime.datetime.now()
 
@@ -1423,6 +1548,23 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f'</StressStrain></Material>')
     L.append('  </Materials>')
 
+    # The reinforcement PRODUCT library, shared across analyses (the lines that use it
+    # live on the StabilityItem). GeoStudio stores no direction and no F-of-S dependence
+    # here -- it infers both from <Type> -- so the type is the only thing carrying them.
+    if products:
+        L.append(f'  <Reinforcements Len="{len(products)}">')
+        for i, p in enumerate(products, start=1):
+            L.append(f'    <Reinforcement><ID>{i}</ID>'
+                     f'<Name>{_xml_escape(p["name"])}</Name>'
+                     f'<Type>{p["type"]}</Type>'
+                     f'<Color>RGB=(85,0,192)</Color>'
+                     f'<Spacing>{p["spacing"]:.10g}</Spacing>'
+                     f'<Tensile>{p["tensile"]:.10g}</Tensile>'
+                     f'<PlateCapacity>{p["plate"]:.10g}</PlateCapacity>'
+                     f'<PulloutResistance>{p["pullout"]:.10g}</PulloutResistance>'
+                     f'</Reinforcement>')
+        L.append('  </Reinforcements>')
+
     # Region -> material, per analysis (GeoStudio keeps it here, not on the region).
     L.append('  <Contexts Len="1">')
     L.append('    <Context><AnalysisID>1</AnalysisID>')
@@ -1450,25 +1592,6 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     # materials that draw pore pressure from it are named in <MaterialUsesPiezs>.
     k = float(slope_data.get("k_seismic") or 0.0)
 
-    # The analysis-local point list. The piezometric surface AND the surcharges both index
-    # into it, so it has to be built before either is written. A surcharge is a wedge of
-    # fill of unit weight gamma between its line and the ground, so a pressure profile
-    # p(x) becomes the line y_ground(x) + p(x)/gamma. Any gamma reproduces p exactly; the
-    # unit weight of water is used because it is already in the file and unit-consistent.
-    local_pts = list(piezo_line)                        # numbered 1..n
-    sc_ids = []
-    gamma_s = gamma_water or 1.0
-    for block in surcharges:
-        ids = []
-        for p in block:
-            yg = _y_on(ground_surface, p["X"])
-            if yg is None:
-                continue
-            local_pts.append((p["X"], yg + p["Normal"] / gamma_s))
-            ids.append(len(local_pts))
-        if len(ids) >= 2:
-            sc_ids.append(ids)
-
     L.append('  <StabilityItems Len="1">')
     L.append('    <StabilityItem><AnalysisID>1</AnalysisID><Entry>')
     if local_pts:
@@ -1490,6 +1613,20 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f"{len(sc_ids)} distributed load(s) written as GeoStudio surcharges — a "
             f"surcharge there is a wedge of fill, so they appear as fill of unit weight "
             f"{gamma_s:g} whose depth reproduces the pressure exactly")
+    if reinf_lines:
+        L.append(f'      <ReinforcementLines Len="{len(reinf_lines)}">')
+        for i, (pid, a, b) in enumerate(reinf_lines, start=1):
+            L.append(f'        <ReinforcementLine ID="{i}" Reinforcement="{pid}" '
+                     f'Point1Id="{a}" Point2Id="{b}" />')
+        L.append('      </ReinforcementLines>')
+    if load_pts:
+        L.append(f'      <LineLoadPoints Len="{len(load_pts)}">')
+        for pid, value, trend, plunge in load_pts:
+            L.append(f'        <LineLoadPoint><ID>{pid}</ID><LineLoad>'
+                     f'<Value>{value:.10g}</Value>'
+                     f'<Direction Trend="{trend:.10g}" Plunge="{plunge:.10g}" />'
+                     f'</LineLoad></LineLoadPoint>')
+        L.append('      </LineLoadPoints>')
     if piezo_ids:
         L.append('      <PiezometricSurfaces Len="1">')
         L.append('        <PiezometricSurface><ID>1</ID>'

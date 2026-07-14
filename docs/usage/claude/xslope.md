@@ -70,6 +70,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
    - **Always include**: one circle that passes through the toe of the slope. Circles are stored in Depth form (`Xo`, `Yo`, `Depth` = elevation of the lowest point), so compute the toe circle as `R = distance((Xo, Yo), toe)`, `Depth = Yo - R` — see the circles section below.
    - **Always include**: one circle tangent to the base (bottom) of each distinct material layer (set `Depth` = that layer's base elevation).
+   - **If the material at the slope face is cohesionless (`c = 0`), also include a large-radius circle that just skims the face.** A purely frictional slope has FS = tan φ / tan β *independent of depth*, so its critical surface is a **shallow face-parallel slide**, not a deep circle — and toe/base circles will not find it. See the circles section below for how to build one.
    - For single-material slopes, define at least one toe circle and one base circle.
 
 5. **Build the `slope_data` dict and save it** with `save_slope_data_to_xlsx()` using the pattern below.
@@ -398,6 +399,60 @@ Choosing circles:
   (`Depth` = that layer's base elevation).
 - Make sure trial circles **daylight inside the model** (see the extent rule). A surface
   clipped by a vertical domain edge is not the true critical surface — widen and re-run.
+
+**Cohesionless face → add a skimming circle.** If the material exposed at the slope face has
+`c = 0`, the Mohr-Coulomb envelope passes through the origin, so the shear strength of a slice
+is proportional to its own weight and **FS = tan φ / tan β is independent of depth**. The
+critical surface is therefore an arbitrarily **shallow, face-parallel slide**, and a search
+seeded only with toe and base circles will converge to a deep local minimum and report an FS
+that is **non-conservatively high**. (Measured on the Talbingo dam: the true minimum on the
+steepest bench face is 1.669, but a toe/base-seeded search returns 1.948.)
+
+A circle *can* represent this — a large radius approximates a plane — you just have to seed it.
+Add one skimming circle **per face segment** cut in the cohesionless zone (at minimum, the
+**steepest** one — that is the one that governs):
+
+```python
+import numpy as np
+
+def skimming_circle(A, B, k=15.0):
+    """Large-R circle whose arc skims just under the face segment A->B.
+    k = R / L; 15-20 works. Below ~10 the arc is too curved and returns a
+    deep-ish FS; above ~25 generate_slices rejects it as a flat arc."""
+    A, B = np.asarray(A, float), np.asarray(B, float)
+    M = (A + B) / 2.0
+    chord = B - A
+    L = float(np.linalg.norm(chord))
+    n = np.array([-chord[1], chord[0]]) / L      # unit normal
+    if n[1] < 0:                                 # must point OUT of the slope (upward)
+        n = -n
+    R = k * L
+    C = M + np.sqrt(R**2 - (L / 2.0)**2) * n     # centre on the OUTWARD side -> arc sags in
+    return {'Xo': float(C[0]), 'Yo': float(C[1]),
+            'R': float(R), 'Depth': float(C[1] - R)}
+
+circles.append(skimming_circle(seg_start, seg_end))   # steepest c=0 face segment
+```
+
+Two things that will bite you:
+
+- **Use the steepest *segment*, not the whole face.** On a benched face, chording crest-to-toe
+  just averages the benches away. (Talbingo: the steepest bench segment gives the true 1.669;
+  a crest-to-toe chord returns 1.95 and misses the mechanism entirely.)
+- **The centre lands far outside the model.** That is expected and correct — it is what makes
+  the arc nearly planar. Do not "fix" it.
+
+**Sanity check the result:** a cohesionless face-parallel minimum should come back at
+≈ `tan(phi)/tan(beta)` for the steepest face, and Bishop / Spencer / GLE / Janbu should all agree
+on it to ~3 decimals — because for a purely frictional slope they all collapse to the same
+infinite-slope answer. If your search returns something well above that, it missed the skin.
+
+If the face is **submerged or has seepage exiting it**, the skin is weaker still — use
+`FS = (gamma - gamma_w)/gamma * tan(phi)/tan(beta)` as the expected value.
+
+Whether such a surficial "skin" failure is the answer you *want* is an engineering judgement —
+it is often surface ravelling rather than a stability concern — but the search should find it
+and you should decide consciously, not miss it by accident.
 
 Even a **FEM-only** run needs at least one nominal circle here so `load_slope_data` validates;
 the FEM solver does not use it, but the loader requires a failure surface to exist.

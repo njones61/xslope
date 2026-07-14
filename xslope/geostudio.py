@@ -39,6 +39,7 @@ unsupported pore-pressure options, reinforcement, and distributed loads.
 """
 
 import csv
+import datetime
 import io
 import os
 import re
@@ -1271,14 +1272,39 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     # Pick a round scale that lands the model on a page about 10 inches wide.
     scale = max(1.0, round((x1 - x0) * per_inch / 10.0, -1)) if (x1 - x0) else 200.0
 
+    now = datetime.datetime.now()
+
     L = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
          '<GSIData Version="11.11" AppVersion="25.2.1.4">',
-         f'  <FileInfo Title="{_xml_escape(analysis_name)}" '
-         f'Comments="Exported by xslope." />',
+         f'  <FileInfo FileVersion="11.11" AppVersion="25.2.1.4" '
+         f'Title="{_xml_escape(analysis_name)}" Comments="Exported by xslope." '
+         f'Author="xslope" LastAuthor="xslope" RevNumber="1" '
+         f'Date="{now:%d/%m/%Y}" Time="{now:%I:%M:%S %p}" />',
          '  <Analyses Len="1">',
-         f'    <Analysis><ID>1</ID><Name>{_xml_escape(analysis_name)}</Name>'
-         f'<Kind>SLOPE/W</Kind><Method>{_xml_escape(method)}</Method>'
-         '<GeometryId>1</GeometryId></Analysis>',
+         '    <Analysis>',
+         '      <ID>1</ID>',
+         f'      <Name>{_xml_escape(analysis_name)}</Name>',
+         '      <Kind>SLOPE/W</Kind>',
+         f'      <Method>{_xml_escape(method)}</Method>',
+         '      <GeometryId>1</GeometryId>',
+         # GeoStudio writes all three of these on every analysis. They are not decoration:
+         # <ComputedPhysics> is how it knows this analysis SOLVES slope stability. Without
+         # it the file opens, the geometry draws and the materials are named and coloured
+         # -- but there is no physics attached to them, so the material Properties button
+         # is greyed out and the strengths cannot be seen or edited. It looks like the
+         # strengths were lost, and nothing says otherwise.
+         '      <TimeIncrements>',
+         '        <Duration Missing="true" />',
+         '        <TimeSteps Len="1"><TimeStep Save="true" /></TimeSteps>',
+         '      </TimeIncrements>',
+         '      <IterationControls Len="1">',
+         '        <IterationControl>',
+         '          <Key>SlopeStability</Key>',
+         '          <Entry MaxIterations="100" MaxReviewIterations="10" />',
+         '        </IterationControl>',
+         '      </IterationControls>',
+         '      <ComputedPhysics SlopeStability="true" />',
+         '    </Analysis>',
          '  </Analyses>',
          # The view window, in engineering coordinates, and the declared unit system.
          # Without these GeoStudio has no canvas extent to draw the model into.
@@ -1327,13 +1353,26 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             r8, g8, b8 = (int(round(255 * c)) for c in rgb[:3])
         except Exception:
             r8 = g8 = b8 = 200
+        # Shaped exactly like one GeoStudio writes. The Missing="true" placeholders are
+        # how it records "this parameter is not set" -- they are part of a well-formed
+        # StressStrain block, not noise, and it writes them on every material.
         L.append(
             f'    <Material><ID>{i}</ID><Color>RGB=({r8},{g8},{b8})</Color>'
             f'<Name>{_xml_escape(m.get("name") or f"material {i}")}</Name>'
-            f'<SlopeModel>MohrCoulomb</SlopeModel><StressStrain>'
+            f'<SlopeModel>MohrCoulomb</SlopeModel>'
+            f'<StressModel>MohrCoulomb</StressModel>'
+            f'<StressStrain>'
+            f'<JointEffectiveCohesion Missing="true" />'
+            f'<IntactRockParam Missing="true" />'
+            f'<GeologicalStrengthIndex Missing="true" />'
+            f'<DisturbanceFactor Missing="true" />'
+            f'<MaxConfiningStress Missing="true" />'
+            f'<UseTensileStrength>false</UseTensileStrength>'
             f'<UnitWeight>{float(m.get("gamma") or 0.0):.10g}</UnitWeight>'
             f'<CohesionPrime>{float(m.get("c") or 0.0):.10g}</CohesionPrime>'
             f'<PhiPrime>{float(m.get("phi") or 0.0):.10g}</PhiPrime>'
+            f'<TensileStrength Missing="true" />'
+            f'<OCRatio Missing="true" />'
             f'</StressStrain></Material>')
     L.append('  </Materials>')
 
@@ -1347,11 +1386,16 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     L.append('      <IsDefined>true</IsDefined></Context>')
     L.append('  </Contexts>')
 
+    # GeoStudio writes the bulk modulus of water on every WaterItem. It is a constant
+    # (SLOPE/W never uses it -- it is there for the coupled products), but it is quoted in
+    # the file's own pressure unit, so it has to follow the unit system.
+    bulk = 2.08333333e6 if unit_system == "Metric" else 4.351132120308411e7
     L.append('  <WaterItems Len="1">')
     L.append('    <WaterItem><AnalysisID>1</AnalysisID><Entry>'
              + ('<ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>'
                 if piezo_ids else '')
              + f'<UnitWaterWeight>{gamma_water:.10g}</UnitWaterWeight>'
+             + f'<WaterBulkMod>{bulk:.9g}</WaterBulkMod>'
              '</Entry></WaterItem>')
     L.append('  </WaterItems>')
 

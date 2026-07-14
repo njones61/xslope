@@ -1175,6 +1175,14 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Materials/Material/StressStrain/CohesionPrime",
     "/GSIData/Materials/Material/StressStrain/PhiPrime",
     "/GSIData/Materials/Material/StressStrain/UnitWeight",
+    "/GSIData/Materials/Material/StressModel",
+    "/GSIData/Materials/Material/StressStrain/JointEffectiveCohesion",
+    "/GSIData/Materials/Material/StressStrain/JointEffectiveCohesion@Missing",
+    "/GSIData/Materials/Material/StressStrain/OCRatio",
+    "/GSIData/Materials/Material/StressStrain/OCRatio@Missing",
+    "/GSIData/Materials/Material/StressStrain/TensileStrength",
+    "/GSIData/Materials/Material/StressStrain/TensileStrength@Missing",
+    "/GSIData/Materials/Material/StressStrain/UseTensileStrength",
     "/GSIData/Materials@Len",
     "/GSIData/StabilityItems",
     "/GSIData/StabilityItems/StabilityItem",
@@ -1217,6 +1225,150 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData@AppVersion",
     "/GSIData@Version",
 }
+
+
+# The OTHER half of the conformance check, and the one that matters more.
+#
+# GSZ_SCHEMA_PATHS above says "every tag we write must be one GeoStudio writes". That
+# can only catch a tag we invent. It CANNOT catch one we leave out -- and an omission is
+# the more dangerous bug, because the file still opens and still draws. We shipped a
+# .gsz with no <ComputedPhysics>, so GeoStudio did not know the analysis solved slope
+# stability: the geometry rendered, the materials arrived named and correctly coloured,
+# and their strengths were simply unreachable -- the Properties button greyed out, with
+# nothing said. Only opening it in GeoStudio revealed that.
+#
+# These are the tag paths GeoStudio writes in EVERY file of a real corpus, minus the ones
+# xslope consciously does not write (search definitions, solved results, the saved window
+# scroll state, SEEP/W physics -- see tools/gsz_export_diff.py, which regenerates this).
+# Like the vocabulary above, a list of tag names is a fact about the format and commits
+# cleanly even though the vendor files themselves never can.
+GSZ_REQUIRED_PATHS = {
+    "/GSIData",
+    "/GSIData/Analyses",
+    "/GSIData/Analyses/Analysis",
+    "/GSIData/Analyses/Analysis/ComputedPhysics",
+    "/GSIData/Analyses/Analysis/ComputedPhysics@SlopeStability",
+    "/GSIData/Analyses/Analysis/GeometryId",
+    "/GSIData/Analyses/Analysis/ID",
+    "/GSIData/Analyses/Analysis/IterationControls",
+    "/GSIData/Analyses/Analysis/IterationControls/IterationControl",
+    "/GSIData/Analyses/Analysis/IterationControls/IterationControl/Entry",
+    "/GSIData/Analyses/Analysis/IterationControls/IterationControl/Entry@MaxIterations",
+    "/GSIData/Analyses/Analysis/IterationControls/IterationControl/Entry@MaxReviewIterations",
+    "/GSIData/Analyses/Analysis/IterationControls/IterationControl/Key",
+    "/GSIData/Analyses/Analysis/IterationControls@Len",
+    "/GSIData/Analyses/Analysis/Kind",
+    "/GSIData/Analyses/Analysis/Method",
+    "/GSIData/Analyses/Analysis/Name",
+    "/GSIData/Analyses/Analysis/TimeIncrements",
+    "/GSIData/Analyses/Analysis/TimeIncrements/Duration",
+    "/GSIData/Analyses/Analysis/TimeIncrements/Duration@Missing",
+    "/GSIData/Analyses/Analysis/TimeIncrements/TimeSteps",
+    "/GSIData/Analyses/Analysis/TimeIncrements/TimeSteps/TimeStep",
+    "/GSIData/Analyses/Analysis/TimeIncrements/TimeSteps/TimeStep@Save",
+    "/GSIData/Analyses/Analysis/TimeIncrements/TimeSteps@Len",
+    "/GSIData/Analyses@Len",
+    "/GSIData/Contexts",
+    "/GSIData/Contexts/Context",
+    "/GSIData/Contexts/Context/AnalysisID",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials/GeometryUsesMaterial",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials/GeometryUsesMaterial@Entry",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials/GeometryUsesMaterial@ID",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials@Len",
+    "/GSIData/Contexts/Context/IsDefined",
+    "/GSIData/Contexts@Len",
+    "/GSIData/Coordinates",
+    "/GSIData/Coordinates/EngCoords",
+    "/GSIData/Coordinates/EngCoords@HorzScale",
+    "/GSIData/Coordinates/EngCoords@LockScales",
+    "/GSIData/Coordinates/EngCoords@MaxSnapDist",
+    "/GSIData/Coordinates/EngCoords@UnitSystem",
+    "/GSIData/Coordinates/EngCoords@VertScale",
+    "/GSIData/Coordinates/EngCoords@XPageLeft",
+    "/GSIData/Coordinates/EngCoords@XPageOrg",
+    "/GSIData/Coordinates/EngCoords@XPageRight",
+    "/GSIData/Coordinates/EngCoords@YPageBottom",
+    "/GSIData/Coordinates/EngCoords@YPageOrg",
+    "/GSIData/Coordinates/EngCoords@YPageTop",
+    "/GSIData/Coordinates/PageCoords",
+    "/GSIData/Coordinates/PageCoords@PageHeight",
+    "/GSIData/Coordinates/PageCoords@PageWidth",
+    "/GSIData/Coordinates/PageCoords@PageXOrg",
+    "/GSIData/Coordinates/PageCoords@PageYOrg",
+    "/GSIData/Coordinates/PageCoords@Units",
+    "/GSIData/FileInfo",
+    "/GSIData/FileInfo@AppVersion",
+    "/GSIData/FileInfo@Author",
+    "/GSIData/FileInfo@Comments",
+    "/GSIData/FileInfo@Date",
+    "/GSIData/FileInfo@FileVersion",
+    "/GSIData/FileInfo@LastAuthor",
+    "/GSIData/FileInfo@RevNumber",
+    "/GSIData/FileInfo@Time",
+    "/GSIData/Geometries",
+    "/GSIData/Geometries/Geometry",
+    "/GSIData/Geometries/Geometry/Lines",
+    "/GSIData/Geometries/Geometry/Lines/Line",
+    "/GSIData/Geometries/Geometry/Lines/Line/ID",
+    "/GSIData/Geometries/Geometry/Lines/Line/PointID1",
+    "/GSIData/Geometries/Geometry/Lines/Line/PointID2",
+    "/GSIData/Geometries/Geometry/Lines@Len",
+    "/GSIData/Geometries/Geometry/Name",
+    "/GSIData/Geometries/Geometry/Points",
+    "/GSIData/Geometries/Geometry/Points/Point",
+    "/GSIData/Geometries/Geometry/Points/Point@ID",
+    "/GSIData/Geometries/Geometry/Points/Point@X",
+    "/GSIData/Geometries/Geometry/Points/Point@Y",
+    "/GSIData/Geometries/Geometry/Points@Len",
+    "/GSIData/Geometries/Geometry/Regions",
+    "/GSIData/Geometries/Geometry/Regions/Region",
+    "/GSIData/Geometries/Geometry/Regions/Region/ID",
+    "/GSIData/Geometries/Geometry/Regions/Region/PointIDs",
+    "/GSIData/Geometries/Geometry/Regions@Len",
+    "/GSIData/Geometries@Len",
+    "/GSIData/Materials",
+    "/GSIData/Materials/Material",
+    "/GSIData/Materials/Material/Color",
+    "/GSIData/Materials/Material/ID",
+    "/GSIData/Materials/Material/Name",
+    "/GSIData/Materials/Material/SlopeModel",
+    "/GSIData/Materials/Material/StressStrain",
+    "/GSIData/Materials/Material/StressStrain/CohesionPrime",
+    "/GSIData/Materials/Material/StressStrain/DisturbanceFactor",
+    "/GSIData/Materials/Material/StressStrain/DisturbanceFactor@Missing",
+    "/GSIData/Materials/Material/StressStrain/GeologicalStrengthIndex",
+    "/GSIData/Materials/Material/StressStrain/GeologicalStrengthIndex@Missing",
+    "/GSIData/Materials/Material/StressStrain/IntactRockParam",
+    "/GSIData/Materials/Material/StressStrain/IntactRockParam@Missing",
+    "/GSIData/Materials/Material/StressStrain/MaxConfiningStress",
+    "/GSIData/Materials/Material/StressStrain/MaxConfiningStress@Missing",
+    "/GSIData/Materials/Material/StressStrain/UnitWeight",
+    "/GSIData/Materials@Len",
+    "/GSIData/StabilityItems",
+    "/GSIData/StabilityItems/StabilityItem",
+    "/GSIData/StabilityItems/StabilityItem/AnalysisID",
+    "/GSIData/StabilityItems/StabilityItem/Entry",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Seismic",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Horizontal",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Vertical",
+    "/GSIData/StabilityItems@Len",
+    "/GSIData/WaterItems",
+    "/GSIData/WaterItems/WaterItem",
+    "/GSIData/WaterItems/WaterItem/AnalysisID",
+    "/GSIData/WaterItems/WaterItem/Entry",
+    "/GSIData/WaterItems/WaterItem/Entry/UnitWaterWeight",
+    "/GSIData/WaterItems/WaterItem/Entry/WaterBulkMod",
+    "/GSIData/WaterItems@Len",
+    "/GSIData@AppVersion",
+    "/GSIData@Version",
+}
+
+# Every REQUIRED path is by construction a path GeoStudio writes, so the vocabulary
+# must contain it. Keeping the two in sync here means a new required path can never
+# be rejected by the allow-list it belongs to.
+GSZ_SCHEMA_PATHS |= GSZ_REQUIRED_PATHS
+
 
 
 def _write_synthetic_gsz(path):
@@ -1549,6 +1701,23 @@ def run_gsz_import_test(test):
         if unknown:
             problems.append("export writes tag(s) GeoStudio does not use: "
                             + ", ".join(unknown[:3]))
+
+        # THE OTHER DIRECTION, and the one that actually bites. The check above can only
+        # catch a tag we write that GeoStudio does not; it is structurally incapable of
+        # catching one we FAIL to write. Everything GeoStudio needs and we omitted got
+        # through it — and the file then opens, draws, and looks fine while quietly
+        # missing its physics. GeoStudio was the only thing that could tell us.
+        #
+        # So: every path GeoStudio writes in EVERY vendor file must be one we write too,
+        # unless it is on the list of things we consciously do not write (a search
+        # definition, solved results, the window scroll state, SEEP/W). Anything else
+        # missing is a defect. This is what would have caught <ComputedPhysics> — without
+        # it GeoStudio does not know the analysis solves slope stability, so the materials
+        # arrive named and coloured with their strengths unreachable and nothing said.
+        missing = sorted(GSZ_REQUIRED_PATHS - emitted)
+        if missing:
+            problems.append("export OMITS path(s) GeoStudio always writes: "
+                            + ", ".join(missing[:3]))
         # And the structural facts a wrong-schema writer gets wrong:
         if not root.findall("./Geometries/Geometry/Lines/Line"):
             problems.append("export wrote no <Lines> — GeoStudio draws regions from them")

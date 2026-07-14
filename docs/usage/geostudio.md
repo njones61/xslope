@@ -158,17 +158,39 @@ Material zones become regions, materials become Mohr-Coulomb materials, and a pi
 becomes a piezometric surface. Export requires a **polygon-based** model: a profile-line
 model has no regions to map onto, and is rejected rather than approximated.
 
-A `.gsz` cannot carry everything XSLOPE models. Failure surfaces, reinforcement, piles,
-distributed and line loads, and non-Mohr-Coulomb strengths are **not written**, and each
-is reported as a caveat so you know what to re-create on the GeoStudio side.
+Material zones become regions, materials become Mohr-Coulomb materials with their
+strengths, a piezo line becomes a piezometric surface, and **distributed loads become
+surcharges** — GeoStudio's surcharge is a wedge of fill, so an XSLOPE pressure profile is
+written as fill whose *depth* reproduces the pressure exactly.
 
-!!! note "Check exported files in GeoStudio"
-    Export is checked two ways: the file round-trips through XSLOPE's own reader with no
-    loss, and every XML tag it writes is one that GeoStudio's own files use (a schema
-    conformance test, so a tag in the wrong place fails the suite). A round-trip through
-    our own reader alone proves nothing — reader and writer can share the same wrong
-    assumption — which is why the conformance check exists. Still, GeoStudio is the only
-    authority on its own format: open an exported file there before relying on it.
+!!! warning "Do not re-create the ponded water"
+    Ponded water is the one distributed load that is deliberately **not** written, and it
+    must not be added by hand. GeoStudio has no ponded-water object: it *derives* the
+    reservoir, and the pressure it puts on the slope, from the **piezometric surface** —
+    which is written. Re-creating it as a surcharge would count the water twice. Export
+    says so explicitly when it happens.
+
+A `.gsz` still cannot carry everything XSLOPE models. Failure surfaces, reinforcement,
+piles, line loads and non-Mohr-Coulomb strengths are **not written**, and each is reported
+as a caveat so you know what to re-create on the GeoStudio side.
+
+!!! note "How export is checked"
+    A round-trip through XSLOPE's own reader proves **nothing** — reader and writer share
+    the same idea of the schema, agree perfectly with each other, and pass while GeoStudio
+    quietly refuses half the file. So export is checked against GeoStudio's own documents
+    instead, in both directions:
+
+    - **Every tag we write is one GeoStudio writes.** Catches an invented tag.
+    - **Every tag GeoStudio *always* writes, we write too** — unless it is on an explicit
+      list of things XSLOPE consciously omits, each with a reason. This is the direction
+      that matters, and the one that is easy to forget: the first check cannot catch an
+      **omission**, and an omission is worse, because the file still opens and still looks
+      right. An export missing `<ComputedPhysics>` drew perfectly, named and coloured its
+      materials correctly, and left their strengths unreachable, saying nothing.
+
+    Both are locked in the test suite, so a regression fails locally rather than in
+    GeoStudio. `tools/gsz_export_diff.py` regenerates them: it imports a real `.gsz`,
+    exports it straight back out, and diffs XSLOPE's XML against the vendor's.
 
 ## Notes and limitations
 

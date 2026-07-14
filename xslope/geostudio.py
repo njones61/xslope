@@ -627,6 +627,22 @@ def ponded_water_dload(ground_surface, piezo_line, gamma_water):
     return material_above_ground_dload(ground_surface, piezo_line, gamma_water)
 
 
+def _dload_pressure_at(blocks, x):
+    """The pressure a set of dload blocks applies at x (0 outside them)."""
+    for b in blocks:
+        xs = [p["X"] for p in b]
+        if not xs or x < min(xs) - 1e-9 or x > max(xs) + 1e-9:
+            continue
+        for p, q in zip(b, b[1:]):
+            lo, hi = sorted((p["X"], q["X"]))
+            if lo - 1e-9 <= x <= hi + 1e-9:
+                if abs(q["X"] - p["X"]) < 1e-12:
+                    return max(p["Normal"], q["Normal"])
+                t = (x - p["X"]) / (q["X"] - p["X"])
+                return p["Normal"] + t * (q["Normal"] - p["Normal"])
+    return 0.0
+
+
 def _blank_material(name):
     """A material with xslope's full key set, everything zeroed but the name —
     the same shape ``load_slope_data`` produces."""
@@ -1228,6 +1244,12 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         caveats.append("a piezo line is defined but no material uses it — written as "
                        "a piezometric surface anyway")
 
+    # Needed to tell ponded water (which the piezo line already carries) from a real
+    # surcharge, and to sit a surcharge's fill wedge on top of the ground.
+    ground_surface = slope_data.get("ground_surface")
+    if ground_surface is None or getattr(ground_surface, "is_empty", True):
+        ground_surface = build_ground_surface_from_polygons(polygons)
+
     other_u = sorted({(m.get("u") or "none") for m in materials} - {"none", "piezo"})
     if other_u:
         caveats.append(
@@ -1243,9 +1265,34 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
 
     for key, label in [("circles", "failure circles"), ("non_circ", "non-circular surface"),
                        ("reinforce_lines", "reinforcement"), ("pile_lines", "piles"),
-                       ("dloads", "distributed loads"), ("line_loads", "line loads")]:
+                       ("line_loads", "line loads")]:
         if slope_data.get(key):
             caveats.append(f"{label} not written — no .gsz mapping; re-create in GeoStudio")
+
+    # Distributed loads. Two very different cases hide behind one xslope key, and telling
+    # the user to "re-create them in GeoStudio" was wrong for the common one:
+    #
+    #  * PONDED WATER. GeoStudio has no ponded-water object -- it DERIVES the reservoir,
+    #    and the load it puts on the slope, from the piezometric surface itself. So the
+    #    load is already carried by the piezo line we wrote. Re-creating it by hand would
+    #    DOUBLE-COUNT the water.
+    #  * A REAL SURCHARGE. That we can now write: GeoStudio's <Surcharge> is a wedge of
+    #    fill between a drawn line and the ground, and its <Pressure> is the fill's unit
+    #    weight. Any pressure profile p(x) is therefore exactly a wedge of unit weight
+    #    gamma whose upper line sits at y_ground(x) + p(x)/gamma.
+    ponded = material_above_ground_dload(ground_surface, piezo_line, gamma_water)
+    surcharges = []
+    for block in (slope_data.get("dloads") or []):
+        if all(abs(p["Normal"] - _dload_pressure_at(ponded, p["X"])) <= 1e-6 *
+               max(1.0, abs(p["Normal"])) for p in block):
+            continue                      # the piezo surface already carries this
+        surcharges.append(block)
+    if ponded and len(surcharges) < len(slope_data.get("dloads") or []):
+        caveats.append(
+            "the ponded water was NOT written as a load, and must not be re-created: "
+            "GeoStudio derives the reservoir and its pressure on the slope from the "
+            "piezometric surface, which was written. Adding it by hand would count the "
+            "water twice")
 
     # Edges. GeoStudio draws a region from its <Lines>, not from its point list, so a
     # file without them opens with nothing visible. Each region ring contributes its
@@ -1402,15 +1449,47 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     # The piezometric surface belongs to the StabilityItem, NOT the geometry, and the
     # materials that draw pore pressure from it are named in <MaterialUsesPiezs>.
     k = float(slope_data.get("k_seismic") or 0.0)
+
+    # The analysis-local point list. The piezometric surface AND the surcharges both index
+    # into it, so it has to be built before either is written. A surcharge is a wedge of
+    # fill of unit weight gamma between its line and the ground, so a pressure profile
+    # p(x) becomes the line y_ground(x) + p(x)/gamma. Any gamma reproduces p exactly; the
+    # unit weight of water is used because it is already in the file and unit-consistent.
+    local_pts = list(piezo_line)                        # numbered 1..n
+    sc_ids = []
+    gamma_s = gamma_water or 1.0
+    for block in surcharges:
+        ids = []
+        for p in block:
+            yg = _y_on(ground_surface, p["X"])
+            if yg is None:
+                continue
+            local_pts.append((p["X"], yg + p["Normal"] / gamma_s))
+            ids.append(len(local_pts))
+        if len(ids) >= 2:
+            sc_ids.append(ids)
+
     L.append('  <StabilityItems Len="1">')
     L.append('    <StabilityItem><AnalysisID>1</AnalysisID><Entry>')
-    if piezo_line:
-        L.append(f'      <DataPoints Len="{len(piezo_line)}">')
-        for i, (x, y) in zip(piezo_ids, piezo_line):
+    if local_pts:
+        L.append(f'      <DataPoints Len="{len(local_pts)}">')
+        for i, (x, y) in enumerate(local_pts, start=1):
             L.append(f'        <DataPoint Number="{i}" X="{x:.10g}" Y="{y:.10g}" />')
         L.append('      </DataPoints>')
     L.append(f'      <Seismic Horizontal="{k:.10g}" Vertical="" />' if k else
              '      <Seismic Horizontal="" Vertical="" />')
+    if sc_ids:
+        L.append(f'      <Surcharges Len="{len(sc_ids)}">')
+        for i, ids in enumerate(sc_ids, start=1):
+            L.append(f'        <Surcharge><ID>{i}</ID>'
+                     f'<DataPoints Len="{len(ids)}">'
+                     + "".join(f'<DataPoint>{j}</DataPoint>' for j in ids)
+                     + f'</DataPoints><Pressure>{gamma_s:.10g}</Pressure></Surcharge>')
+        L.append('      </Surcharges>')
+        caveats.append(
+            f"{len(sc_ids)} distributed load(s) written as GeoStudio surcharges — a "
+            f"surcharge there is a wedge of fill, so they appear as fill of unit weight "
+            f"{gamma_s:g} whose depth reproduces the pressure exactly")
     if piezo_ids:
         L.append('      <PiezometricSurfaces Len="1">')
         L.append('        <PiezometricSurface><ID>1</ID>'

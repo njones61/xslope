@@ -1326,7 +1326,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
-              pp_formulation='effective', force_tol=1e-3,
+              pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
@@ -1373,11 +1373,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             force_tol, which has no such dependence. The default SSRM path disables it.
         force_tol (float): Force-equilibrium tolerance (default 1e-3, the value used by
             Dawson, Roth & Drescher 1999). The state is in equilibrium when the maximum
-            over all nodes of |nodal out-of-balance force| / |nodal gravity force| falls
-            below this. Both quantities are consistent nodal loads over the same tributary
-            patch, so the ratio is dimensionless and independent of the unit system, the
-            element size, and — crucially — the size of the domain and of the yielding
-            zone.
+            over all nodes of |nodal out-of-balance force| / |nodal body force| falls below
+            this. The denominator is a LUMPED tributary weight (sum over the adjacent
+            elements of gamma_e * A_e / n_e), NOT the consistent nodal gravity load — the
+            consistent load is exactly zero at a tri6 corner, which makes the ratio there
+            meaningless. Being a force over a force at the same node, the ratio is
+            dimensionless and independent of the unit system and — the property this test
+            exists for — of the size of the domain and of the yielding zone. It is NOT
+            independent of element size: it goes roughly as 1/h, so a coarser mesh narrows
+            the margin to this tolerance.
+        oob_window (int): Number of iterations the plastic-flow increment is averaged over
+            before the per-node maximum is taken (default 10). Must be >= 2. A one-iteration
+            increment does NOT decay on a settled slope — Gauss points resting on the yield
+            surface flip flow direction every iteration, giving a period-2 limit cycle whose
+            amplitude scales with dt but never vanishes — so with oob_window=1 a stable slope
+            can never converge. Averaging cancels that mode exactly and leaves genuine
+            plastic drift untouched. The verdict is insensitive to the width (10, 50 and 200
+            agree), so this is not a tuning parameter.
         pp_formulation (str): How pore pressures enter the analysis.
             'effective' (default): u is moved into the load vector
             (K du = F_ext + int B^T m u dV) and the elastic stresses are
@@ -1813,6 +1825,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     else:
         vp_disp_limit = None
 
+    # A one-iteration increment never decays on a settled slope (period-2 yield-surface
+    # flicker), so a window of 1 would make convergence unreachable. Refuse it loudly rather
+    # than silently returning a factor of safety driven by a numerical artifact.
+    if int(oob_window) < 2:
+        raise ValueError(
+            f"oob_window must be >= 2 (got {oob_window}). A single-iteration increment does "
+            "not decay on a settled slope: Gauss points on the yield surface flip flow "
+            "direction every iteration, and that period-2 mode never vanishes at any dt or "
+            "iteration count, so a stable slope would be reported as failing.")
+    oob_window = int(oob_window)
+
     # ---- Step 7b: per-node out-of-balance setup (Dawson, Roth & Drescher 1999) ----
     # Dawson et al. (Geotechnique 49(6), 835-840) normalize EACH node's unbalanced
     # force by the gravitational body force acting on THAT node, and call the state
@@ -1853,10 +1876,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     _elem_w = np.zeros(n_nodes)
     _k_fac = float(np.sqrt(1.0 + k_seismic ** 2))   # driving body force incl. seismic
     for _e in range(n_elements):
-        _en = [int(v) for v in elements[_e] if v >= 0]
+        # Slice to the element's node count. Do NOT filter on `v >= 0`: the connectivity
+        # array is padded to width 9 with ZERO (mesh.py), and node indices are 0-based, so
+        # a `>= 0` filter keeps every pad entry. That made len(_en) == 9 for every element
+        # — the weight was divided by 9 instead of n_e (an element-type-dependent gate:
+        # 3x tight on tri3, 1.5x on tri6, 1.125x on quad8) and node 0 absorbed a pad share
+        # from every element in the mesh, which buried it ~1000x deep and made it
+        # permanently invisible to the maximum.
+        _et = int(element_types[_e])
+        _en = [int(v) for v in elements[_e][:_et]]
         if not _en:
             continue
-        _et = int(element_types[_e])
         _corners = _en[:3] if _et in (3, 6) else _en[:4]
         _xy = nodes[_corners]
         # shoelace on the corner nodes (curved-edge area differs negligibly, and this
@@ -1868,10 +1898,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         for _nd in _en:
             _elem_w[_nd] += _w
     g_node = _elem_w
-    # Guard the divide for a genuinely weightless material (gamma = 0 — the corpus has
-    # one, a bearing-capacity prism driven by a surcharge rather than by self-weight).
-    # There is no gravity scale to normalize by, so fall back to the largest applied
-    # external nodal load, which IS the driving force in that problem.
+    # Guard the divide for a NEAR-weightless material (the corpus's surcharge-driven
+    # bearing-capacity prisms use gamma = 1e-6; gamma <= 0 is rejected outright in
+    # build_fem_data). Their nodal body force is negligible, so there is no gravity scale
+    # worth normalizing by, and the floor instead pins the denominator to a fraction of the
+    # largest nodal force in F_gravity — which by this point includes the applied boundary
+    # forces, i.e. the surcharge, which IS the driving force in those problems.
     _g_typ = float(np.median(g_node[g_node > 0])) if np.any(g_node > 0) else 0.0
     _f_ext_max = float(np.max(np.sqrt(F_gravity[node_dof_x] ** 2
                                       + F_gravity[node_dof_y] ** 2))) if n_nodes else 0.0
@@ -1948,6 +1980,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # body load), so iteration 0 measures the first plastic correction against
         # nothing, which is exactly what it is.
         loads_prev = base_loads.copy()
+        # Reset per STAGE: base_loads changes at a stage boundary, so a history carried
+        # across it would measure a load step, not a residual.
+        loads_hist = [base_loads.copy()]
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
 
@@ -2289,7 +2324,25 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # each normalized by that node's own weight, therefore measures the
             # failure mechanism against itself, and inert material added to the mesh
             # cannot dilute it.
-            d_load = (loads - loads_prev) * free_dof_mask
+            # The increment is AVERAGED OVER A WINDOW of `oob_window` iterations rather than
+            # taken between consecutive ones. A one-iteration increment does not decay on a
+            # settled slope: Gauss points sitting exactly on the yield surface flip their
+            # flow direction every iteration, and the resulting body-load flicker is a clean
+            # PERIOD-2 limit cycle — measured cos(dL_n, dL_n-1) = -1.0000 with |dL| pinned at
+            # a constant, on a model whose displacements were frozen to four decimals and
+            # whose accumulated body load was frozen to seven significant figures. Damping dt
+            # only scales its amplitude (it is proportional to dt); it never removes it, so no
+            # iteration budget can clear it. Averaging over the window cancels it exactly,
+            # while genuine plastic drift (cos = +1) passes through untouched. The result is
+            # insensitive to the width — 10, 50 and 200 converge on the same F at the same
+            # iteration — so this rejects a specific numerical mode, it is not a tuning knob.
+            # Locality, and hence padding immunity, is unaffected: elastic material contributes
+            # exactly zero over any window.
+            loads_hist.append(loads.copy())
+            if len(loads_hist) > oob_window + 1:
+                loads_hist.pop(0)
+            d_load = ((loads - loads_hist[0])
+                      / min(oob_window, len(loads_hist) - 1)) * free_dof_mask
             loads_prev = loads.copy()
             r_node = np.sqrt(d_load[node_dof_x] ** 2 + d_load[node_dof_y] ** 2)
             oob_node = (r_node / g_node_den)[node_has_free]
@@ -3274,6 +3327,7 @@ def _ssrm_bisect_steps(width, tolerance):
 
 
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
+               oob_window=10,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
@@ -3321,9 +3375,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         failure_criterion (str): How to determine failure.
             "non_convergence" (default) - Bisection on TRUE viscoplastic
                 equilibrium: a trial converges only if both the CHECON
-                displacement test and the plastic-flow-stopped test (dUFR
-                below 1% of its per-solve peak) are satisfied. Scale-free and
-                insensitive to dt/tolerance/ceiling. Use for problems without
+                displacement test and the force-equilibrium test are satisfied
+                — the latter being the maximum over nodes of |out-of-balance
+                force| / |nodal body force|, below `force_tol` (Dawson, Roth &
+                Drescher 1999). Being per-node, it cannot be diluted by padding
+                the mesh with inert foundation or runout. It is NOT independent
+                of element size (it goes as ~1/h), and it needs roughly 3x the
+                iterations the old rate-based test did, because it demands real
+                equilibrium rather than a decayed rate. Use for problems without
                 reservoir loading.
             "displacement_limit" - Bisection on whether the max VP displacement
                 exceeds max_disp_factor x mesh height within the iteration
@@ -3367,6 +3426,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     if failure_criterion == "non_convergence":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
@@ -3376,6 +3436,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
@@ -3385,6 +3446,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
@@ -3407,6 +3469,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
 
 
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
+                              oob_window=10,
                               debug_level=0, max_iterations=500,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
@@ -3456,6 +3519,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
 
     def _solve_at(F, step, prefix):
         return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1), force_tol=force_tol,
+                         oob_window=oob_window,
                          dt_scale=dt_scale, pp_formulation=pp_formulation,
                          max_iterations=max_iterations, tolerance=convergence_tol,
                          max_disp_factor=max_disp_factor, staged=staged,
@@ -3628,6 +3692,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
 
 
 def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
+                                 oob_window=10,
                                  debug_level=0, max_iterations=500,
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
@@ -3695,6 +3760,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
         """Run solve_fem; return the displacement measure (characteristic-point
         VP displacement, or global max before the point is selected)."""
         sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation, force_tol=force_tol,
+                        oob_window=oob_window,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)

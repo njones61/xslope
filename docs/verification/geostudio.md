@@ -1,14 +1,30 @@
 # GeoStudio (SLOPE/W) Verification Corpus
 
-The [GeoStudio slope stability verification manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
-(Seequent, Oct 2022; a copy lives in `xslope_private/ref_docs/ref_docs_geostudio/`) contains 47 verification
-problems solved with SLOPE/W. Many are the same published benchmarks as the Rocscience corpus above, which makes
-the manual doubly useful: its geometry figures are coordinate-labeled where Slide's sometimes are not (it supplied
-the ACADS 1(c) interfaces and the inclined ACADS 4 seam above), and its SLOPE/W numbers give an independent
-second program to compare against. Where a problem coincides with a built Rocscience entry, the row below points
-at the **same XSLOPE input file** — those files are already regression-tagged in the table above, so no tags are
-duplicated here. XSLOPE's Janbu carries the fo correction; SLOPE/W's "Janbu" column is the uncorrected force
-solution, so those columns are compared via the correction factor where noted.
+The [GeoStudio slope stability verification manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf)
+(Seequent) contains 47 verification problems solved with SLOPE/W. Many are the same published benchmarks as the
+Rocscience corpus above, which makes the manual doubly useful: its geometry figures are coordinate-labeled where
+Slide's sometimes are not (it supplied the ACADS 1(c) interfaces and the inclined ACADS 4 seam above), and its
+SLOPE/W numbers give an independent second program to compare against. Where a problem coincides with a built
+Rocscience entry, the row below points at the **same XSLOPE input file** — those files are already
+regression-tagged in the table above, so no tags are duplicated here. XSLOPE's Janbu carries the fo correction;
+SLOPE/W's "Janbu" column is the uncorrected force solution, so those columns are compared via the correction
+factor where noted.
+
+## Building these problems
+
+Most of the entries below were built by transcribing the manual's geometry figures by hand — which is why several
+rows are still `planned` or `partial`, blocked on a figure that is ambiguous or a source paper we do not have.
+
+That is no longer the only route. Seequent publishes the **models** behind the manual, not just the figures, and
+XSLOPE can now read them directly — see [GeoStudio Import/Export](../usage/geostudio.md). Importing a problem's
+`.gsz` gives its exact geometry and material properties with no transcription step, which removes the ambiguity
+that blocks the remaining rows. Better still, a solved `.gsz` carries **SLOPE/W's own trial surfaces and their
+factors of safety**, so XSLOPE can be run on the *identical circle* and the two programs compared with no
+difference in search to explain away.
+
+The XSLOPE `.xlsx` inputs linked below are our own files and are published here. The GeoStudio files they were
+derived from are Seequent's, and are not redistributed — import them yourself from the manual's companion
+downloads if you want to reproduce this work.
 
 | § | Problem | Status | XSLOPE file / results vs SLOPE/W |
 |---:|---|---|---|
@@ -42,7 +58,7 @@ solution, so those columns are compared via the correction factor where noted.
 | 2.28 | Sheahan – Clouterre Test Wall | planned | Nail-wall case history. |
 | 2.29 | Snailz – Reinforced Slope | planned | SNAILZ nail example (companion to 2.30). |
 | 2.30 | Snailz – Geotextile Layers | **built** | [vp050.xlsx](../files/rocscience/vp050.xlsx) (Rocscience #50, same SNAILZ model): Janbu(corr) 1.448 vs SLOPE/W force 1.354 (×fo ≈ 1.44) and SNAILZ 1.46; M-P/Spencer 1.576 vs SLOPE/W M-P 1.606. — [details](rocscience.md#vp50) |
-| 2.31 | Zhu – Four Layer Slope | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx) (Rocscience #51): Bishop 1.278 vs SLOPE/W 1.284; Spencer 1.294 vs 1.299; M-P 1.304 vs 1.310; Lowe 1.296 vs 1.283; Corps 1.404 vs 1.368. Zhu paper source in `ref_docs_lim_eq/`. — [details](rocscience.md#vp51) |
+| 2.31 | Zhu – Four Layer Slope | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx) (Rocscience #51): Bishop 1.278 vs SLOPE/W 1.284; Spencer 1.294 vs 1.299; M-P 1.304 vs 1.310; Lowe 1.296 vs 1.283; Corps 1.404 vs 1.368. — [details](rocscience.md#vp51) |
 | 2.32 | Zhu & Lee – Heterogeneous Slope | **built** | [vp052a/b.xlsx](../files/rocscience/vp052a.xlsx) (Rocscience #52): wet deep-family Spencer 1.189 matches Slide exactly; see that row. — [details](rocscience.md#vp52) |
 | 2.33 | Priest – Rigid Blocks | planned | Block-mechanism comparison. |
 | 2.34 | Yamagami – Stabilizing Piles | **built** | [vp054a/b.xlsx](../files/rocscience/vp054a.xlsx) (Rocscience #54): no-pile Bishop 1.100 vs SLOPE/W 1.102 — exact; with-pile 1.185 vs SLOPE/W 1.223, Slide 1.193, Yamagami 1.20 (pile-force conventions differ program-to-program). — [details](rocscience.md#vp54) |
@@ -65,7 +81,7 @@ solution, so those columns are compared via the correction factor where noted.
 ### ACADS weak-layer slope (non-circular) {#acads-weak-layer}
 
 The ACADS weak-layer case
-([SLOPE/W Verification Manual](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf)
+([SLOPE/W Verification Manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf)
 sec. 2.7): a 2:1 slope
 crossed by a thin low-strength interlayer with a piezometric line at its base.
 The critical surface is non-circular, sliding along the weak layer with a back
@@ -106,7 +122,7 @@ with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
 [Force Equilibrium Methods](../lem/force_eq.md)). This benchmark also appears on the
 [Verification](../verification/lem.md) page.
 
-**Sources:** GeoStudio [SLOPE/W Verification Manual (Oct 2022)](https://files.seequent.com/PDFs/Geostudio-Slope%20Stability%20Verification%20Manual-Oct2022.pdf),
+**Sources:** GeoStudio [SLOPE/W Verification Manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf),
 sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
 
 <!-- fs-table -->

@@ -189,3 +189,31 @@ it and Save As.
     Reading and writing DXF uses the **ezdxf** package (installed with the `gui`
     extra). If it's missing, the import/export actions show an actionable install
     message.
+
+---
+
+## GeoStudio (SLOPE/W) import and export
+
+Studio also exchanges whole models — not just geometry — with GeoStudio SLOPE/W.
+
+**Import** — **File → Import GeoStudio (SLOPE/W)…** reads a `.gsz`. Unlike DXF, there
+is no mapping wizard to work through: a `.gsz` already knows what its geometry means, so
+material zones, strengths, water conditions and the seismic coefficient all arrive
+identified. The one prompt is **which analysis** to import, because a GeoStudio file
+usually holds several over the same geometry — and they can differ in *materials*, not
+just in slip surface, so the choice changes the model you get.
+
+**Export** — **File → Export to GeoStudio (SLOPE/W)…** writes the current model out as a
+`.gsz`. It needs a polygon-based model (material zones), since a profile-line model has
+no regions to map onto.
+
+Both directions replace nothing silently: whatever cannot cross the format boundary —
+SLOPE/W's search definition, reinforcement, piles, loads, non-Mohr-Coulomb strengths — is
+listed in a notes dialog and in the Log pane, so you know exactly what to re-create by
+hand.
+
+!!! info "Units and what survives the trip"
+    A `.gsz` carries no unit-system field, so XSLOPE infers it from the unit weight of
+    water and refuses to guess when it's neither metric nor imperial. See
+    [GeoStudio Import/Export](../usage/geostudio.md) for the full mapping table, the
+    per-analysis materials wrinkle, and the limits of export.

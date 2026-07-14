@@ -28,7 +28,7 @@ from xslope.fileio import default_template_path
 
 from .canvas import MplCanvas
 from .dialogs import (
-    BuildMeshDialog, DxfImportDialog, RunFemDialog, RunLemDialog, RunSeepDialog,
+    BuildMeshDialog, DxfImportDialog, GszImportDialog, RunFemDialog, RunLemDialog, RunSeepDialog,
 )
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
@@ -372,8 +372,12 @@ class MainWindow(QMainWindow):
                                 triggered=self.open_dialog)
         self.act_import_dxf = QAction("&Import DXF…", self,
                                       triggered=self.import_dxf_dialog)
+        self.act_import_gsz = QAction("Import &GeoStudio (SLOPE/W)…", self,
+                                      triggered=self.import_gsz_dialog)
         self.act_export_dxf = QAction("&Export Geometry (DXF)…", self, enabled=False,
                                       triggered=self.export_dxf_dialog)
+        self.act_export_gsz = QAction("Export to GeoStudio (SLOPE/&W)…", self,
+                                      enabled=False, triggered=self.export_gsz_dialog)
         self.act_quit = QAction("&Quit", self, shortcut=QKeySequence.Quit,
                                 triggered=self.close)
         self.act_undo = QAction("&Undo", self, shortcut=QKeySequence.Undo,
@@ -397,7 +401,9 @@ class MainWindow(QMainWindow):
         self.recent_menu = m_file.addMenu("Open &Recent")
         m_file.addSeparator()
         m_file.addAction(self.act_import_dxf)
+        m_file.addAction(self.act_import_gsz)
         m_file.addAction(self.act_export_dxf)
+        m_file.addAction(self.act_export_gsz)
         m_file.addSeparator()
         m_file.addAction(self.act_save)
         m_file.addAction(self.act_save_as)
@@ -599,6 +605,96 @@ class MainWindow(QMainWindow):
                 "Imported with notes:\n\n• " + "\n• ".join(allnotes) +
                 "\n\nSee the Log pane for details.")
 
+    def import_gsz_dialog(self):
+        """Import a GeoStudio SLOPE/W model (.gsz) into a fresh project (confirm
+        discard first, like Open).
+
+        A .gsz needs no mapping wizard — its geometry, materials and water conditions
+        are already identified — so the only prompt is which analysis to import, since
+        a file usually holds several and they can differ in materials. Whatever xslope
+        cannot represent (reinforcement, loads, SLOPE/W's search definition) comes back
+        as caveats and is shown, not dropped quietly. Left unsaved so the user reviews
+        it and Saves As."""
+        if not self._confirm_discard():
+            return
+        start = os.path.dirname(self._recent[0]) if self._recent else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import GeoStudio", start,
+            "GeoStudio projects (*.gsz);;All files (*)")
+        if not path:
+            return
+        try:
+            gsz, analyses = self.doc.read_gsz_analyses(path)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import GeoStudio file",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+
+        if len(analyses) == 1:
+            analysis_id = analyses[0]["id"]        # nothing to choose
+        else:
+            picker = GszImportDialog(analyses, self)
+            if not picker.exec():
+                return
+            analysis_id = picker.result()
+
+        try:
+            caveats = self.doc.build_from_gsz(gsz, analysis_id)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import GeoStudio file",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+
+        d = self.doc.slope_data
+        for c in caveats:                          # surface to the Log pane
+            print(f"GeoStudio import note: {c}")
+        self.statusBar().showMessage(
+            f"Imported {os.path.basename(path)} — "
+            f"{len(d.get('materials') or [])} material(s), "
+            f"{len(d.get('polygons') or [])} zone(s), "
+            f"{len(d.get('circles') or [])} circle(s). Review, then Save As.")
+        if caveats:
+            QMessageBox.information(
+                self, "GeoStudio imported",
+                "Imported with notes:\n\n• " + "\n• ".join(caveats) +
+                "\n\nSee the Log pane for details.")
+
+    def export_gsz_dialog(self):
+        """Export the current model to a GeoStudio SLOPE/W project (.gsz) — material
+        zones become regions, materials become Mohr-Coulomb materials, and a piezo
+        line becomes a piezometric surface.
+
+        A .gsz cannot carry everything xslope models: failure surfaces, reinforcement,
+        piles and loads have no mapping. Those come back as caveats and are shown, so
+        the user knows what to re-create on the GeoStudio side."""
+        from xslope.geostudio import export_gsz
+        stem = (os.path.splitext(os.path.basename(self.doc.path))[0]
+                if self.doc.path else "model")
+        start = (os.path.join(os.path.dirname(self.doc.path), stem + ".gsz")
+                 if self.doc.path else stem + ".gsz")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export to GeoStudio", start, "GeoStudio projects (*.gsz)")
+        if not path:
+            return
+        if not path.lower().endswith(".gsz"):
+            path += ".gsz"
+        try:
+            caveats = export_gsz(self.doc.slope_data, path, analysis_name=stem)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not export to GeoStudio", f"{exc}")
+            return
+        for c in caveats:
+            print(f"GeoStudio export note: {c}")
+        self.statusBar().showMessage(f"Exported {os.path.basename(path)}")
+        if caveats:
+            QMessageBox.information(
+                self, "Exported to GeoStudio",
+                "Exported with notes:\n\n• " + "\n• ".join(caveats) +
+                "\n\nSee the Log pane for details.")
+
     def export_dxf_dialog(self):
         """Export the current model's geometry to a structured (layered) DXF via
         the engine's ``export_dxf`` — material zones on per-material layers, and
@@ -654,6 +750,7 @@ class MainWindow(QMainWindow):
         self.act_save.setEnabled(True)
         self.act_save_as.setEnabled(True)
         self.act_export_dxf.setEnabled(True)
+        self.act_export_gsz.setEnabled(True)
         self.styles_btn.setEnabled(True)
         self.assistant.reset()        # new project -> fresh conversation
         self._clear_result_tabs()

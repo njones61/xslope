@@ -318,6 +318,48 @@ class ProjectDocument(QObject):
         self.dirty_changed.emit(True)
         return notes
 
+    def read_gsz_analyses(self, gsz_path):
+        """Open a GeoStudio .gsz and list the analyses it holds, without mutating
+        the project (the engine's ``read_gsz``). A .gsz routinely bundles several
+        analyses over one geometry, and they can differ in materials as well as in
+        slip surface — so the import dialog shows them and the user picks one, then
+        calls ``build_from_gsz``.
+
+        Returns ``(gsz, analyses)``; the opaque ``gsz`` is passed straight back."""
+        from xslope.geostudio import read_gsz, list_analyses
+        gsz = read_gsz(str(gsz_path))
+        analyses = list_analyses(gsz)
+        if not analyses:
+            raise ValueError("This GeoStudio file defines no analyses.")
+        return gsz, analyses
+
+    def build_from_gsz(self, gsz, analysis_id):
+        """Build a fresh project from one analysis of a parsed GeoStudio .gsz.
+
+        Unlike DXF, a .gsz is semantically complete — material zones, strengths and
+        water conditions arrive already identified, so there is nothing to map. What
+        SLOPE/W models and xslope cannot is returned as caveats rather than dropped
+        in silence. REPLACES the current project (callers confirm discard); result is
+        unsaved. Returns caveat strings."""
+        from xslope.geostudio import gsz_to_slope_data
+        from studio.editors import _resync_geometry
+
+        sd, caveats = gsz_to_slope_data(gsz, analysis_id)
+        _resync_geometry(sd)               # ground surface / domain / t-crack
+
+        self.slope_data = sd
+        self.path = None
+        self.results.clear()
+        self.style = {}
+        self._undo.clear()
+        self._redo.clear()
+        self._clean_index = None      # freshly imported, never saved -> dirty
+        self._style_dirty = False
+        self._dirty = True
+        self.loaded.emit()
+        self.dirty_changed.emit(True)
+        return caveats
+
     # --- editing / snapshot undo ----------------------------------------
     # Cap on the undo/redo depth: each snapshot deep-copies slope_data (the mesh is
     # shared, not copied — see _snapshot), so an unbounded stack would still grow on

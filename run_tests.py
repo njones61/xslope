@@ -368,6 +368,13 @@ def run_fem_test(test):
         kwargs['failure_criterion'] = test['criterion']
     if 'max_iter' in test:
         kwargs['max_iterations'] = int(test['max_iter'])
+    # TEMP (#50): the Dawson per-node criterion needs ~3x the iterations the old rate-based
+    # test did (displacement settles ~5k, the per-node max only ~11k). Let the experiment
+    # raise the floor without editing 64 tags.
+    import os as _os
+    _floor = int(_os.environ.get('XSLOPE_MIN_MAX_ITER', '0'))
+    if _floor:
+        kwargs['max_iterations'] = max(kwargs.get('max_iterations', 0), _floor)
     if test.get('cutoff', '').lower() in ('true', '1', 'yes'):
         kwargs['tension_cutoff'] = True
     if 'char_x' in test and 'char_y' in test:
@@ -1077,6 +1084,166 @@ def run_dxf_roundtrip_test(test):
     return 0.0, None
 
 
+def _write_synthetic_gsz(path):
+    """Author a minimal GeoStudio .gsz — a two-analysis, two-material model over one
+    region — to exercise the importer.
+
+    The fixture is written here rather than shipped because GeoStudio's own sample and
+    verification files are Seequent's copyrighted Materials and must not be committed
+    to this repository. Authoring the XML also pins the exact schema the importer
+    relies on: material assignment lives in <Contexts> per analysis (NOT on the
+    region), and the piezometric surface indexes the shared <Points> table by ID.
+    """
+    import zipfile
+    xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<GSIData Version="11.11" AppVersion="25.2.1.4">
+  <FileInfo Title="synthetic" />
+  <Analyses Len="2">
+    <Analysis><ID>1</ID><Name>dry</Name><Kind>SLOPE/W</Kind>
+      <Method>Morgenstern-Price</Method></Analysis>
+    <Analysis><ID>2</ID><Name>wet</Name><Kind>SLOPE/W</Kind>
+      <Method>Spencer</Method></Analysis>
+  </Analyses>
+  <Geometries Len="1">
+    <Geometry><Name>2D</Name>
+      <Points Len="8">
+        <Point ID="1" X="0"  Y="0" /><Point ID="2" X="60" Y="0" />
+        <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
+        <Point ID="5" X="20" Y="10" /><Point ID="6" X="0"  Y="10" />
+        <Point ID="7" X="0"  Y="8" /><Point ID="8" X="60" Y="24" />
+      </Points>
+      <Regions Len="1">
+        <Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region>
+      </Regions>
+      <PiezometricSurfaces Len="1">
+        <PiezometricSurface><ID>1</ID>
+          <DataPoints Len="2"><DataPoint>7</DataPoint><DataPoint>8</DataPoint></DataPoints>
+        </PiezometricSurface>
+      </PiezometricSurfaces>
+    </Geometry>
+  </Geometries>
+  <Materials Len="2">
+    <Material><ID>1</ID><Name>strong</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>25</CohesionPrime>
+        <PhiPrime>30</PhiPrime></StressStrain></Material>
+    <Material><ID>2</ID><Name>weak</Name><SlopeModel>MohrCoulomb</SlopeModel>
+      <StressStrain><UnitWeight>18</UnitWeight><CohesionPrime>5</CohesionPrime>
+        <PhiPrime>20</PhiPrime></StressStrain></Material>
+  </Materials>
+  <Contexts Len="2">
+    <Context><AnalysisID>1</AnalysisID>
+      <GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" />
+      </GeometryUsesMaterials></Context>
+    <Context><AnalysisID>2</AnalysisID>
+      <GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="2" />
+      </GeometryUsesMaterials></Context>
+  </Contexts>
+  <WaterItems Len="2">
+    <WaterItem><AnalysisID>1</AnalysisID>
+      <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>2</AnalysisID>
+      <Entry><ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>
+        <UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+  </WaterItems>
+  <StabilityItems Len="2">
+    <StabilityItem><AnalysisID>1</AnalysisID>
+      <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
+    <StabilityItem><AnalysisID>2</AnalysisID>
+      <Entry><Seismic Horizontal="0.15" Vertical="" /></Entry></StabilityItem>
+  </StabilityItems>
+</GSIData>
+"""
+    with zipfile.ZipFile(path, 'w') as zf:
+        zf.writestr("synthetic.xml", xml)
+
+
+def run_gsz_import_test(test):
+    """Import a synthetic GeoStudio .gsz and check the model that comes out.
+
+    Guards the three schema facts the importer depends on, each of which is easy to
+    get wrong and silent when wrong:
+      - material assignment is per ANALYSIS (<Contexts>), not per region, so the two
+        analyses must yield different materials over the same geometry;
+      - a piezometric surface indexes the shared <Points> table by ID;
+      - the seismic coefficient rides on the analysis's <StabilityItem>.
+    Also checks that an unsolved file reports the missing failure surface as a caveat
+    rather than importing a wrong one. Returns (0.0, None) or (None, message).
+    """
+    import tempfile
+    from xslope.geostudio import read_gsz, list_analyses, gsz_to_slope_data
+
+    problems = []
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "synthetic.gsz")
+        _write_synthetic_gsz(path)
+        gsz = read_gsz(path)
+
+        analyses = list_analyses(gsz)
+        if len(analyses) != 2:
+            return None, f"GeoStudio import: {len(analyses)} analyses, expected 2"
+
+        sd1, cav1 = gsz_to_slope_data(gsz, 1)
+        sd2, cav2 = gsz_to_slope_data(gsz, 2)
+
+        # Per-analysis material assignment: same geometry, different soil.
+        m1 = sd1['materials'][0]
+        m2 = sd2['materials'][0]
+        if (m1['name'], m1['c'], m1['phi'], m1['gamma']) != ('strong', 25.0, 30.0, 20.0):
+            problems.append(f"analysis 1 material {m1['name']}/{m1['c']}/{m1['phi']}")
+        if (m2['name'], m2['c'], m2['phi'], m2['gamma']) != ('weak', 5.0, 20.0, 18.0):
+            problems.append(f"analysis 2 material {m2['name']}/{m2['c']}/{m2['phi']}")
+
+        # Geometry: the region's 6 points become one zone.
+        if len(sd1['polygons']) != 1:
+            problems.append(f"{len(sd1['polygons'])} polygons, expected 1")
+        elif len(sd1['polygons'][0]['polygon'].exterior.coords) != 7:   # ring closes
+            problems.append("zone ring did not round-trip")
+        if not sd1['ground_surface'] or sd1['ground_surface'].is_empty:
+            problems.append("no ground surface derived")
+
+        # Pore pressure: analysis 1 dry, analysis 2 on the piezo surface (points 7-8).
+        if sd1['piezo_line'] or sd1['materials'][0]['u'] != 'none':
+            problems.append("analysis 1 should be dry")
+        if sd2['piezo_line'] != [(0.0, 8.0), (60.0, 24.0)]:
+            problems.append(f"piezo line {sd2['piezo_line']}")
+        if sd2['materials'][0]['u'] != 'piezo':
+            problems.append(f"analysis 2 u={sd2['materials'][0]['u']}, expected piezo")
+
+        # Seismic coefficient rides on the analysis.
+        if sd1['k_seismic'] != 0.0 or sd2['k_seismic'] != 0.15:
+            problems.append(f"k_seismic {sd1['k_seismic']}/{sd2['k_seismic']}")
+
+        # Unsolved file: no surface invented, and the gap is reported.
+        if sd1['circles'] or sd1['non_circ']:
+            problems.append("invented a failure surface for an unsolved file")
+        if not any('no failure surface' in c for c in cav1):
+            problems.append("missing failure surface not reported as a caveat")
+
+        # Export round-trip: slope_data -> .gsz -> slope_data must preserve the
+        # geometry, the materials, and the piezo line.
+        from xslope.geostudio import export_gsz
+        out = os.path.join(td, "exported.gsz")
+        export_gsz(sd2, out, analysis_name="rt")
+        back, _ = gsz_to_slope_data(read_gsz(out), 1)
+        b = back['materials'][0]
+        if (b['name'], b['c'], b['phi'], b['gamma']) != ('weak', 5.0, 20.0, 18.0):
+            problems.append(f"export round-trip material {b['name']}/{b['c']}/{b['phi']}")
+        a0 = round(sd2['polygons'][0]['polygon'].area, 6)
+        a1 = round(back['polygons'][0]['polygon'].area, 6)
+        if a0 != a1:
+            problems.append(f"export round-trip zone area {a1} vs {a0}")
+        if back['piezo_line'] != sd2['piezo_line']:
+            problems.append(f"export round-trip piezo {back['piezo_line']}")
+        if back['k_seismic'] != sd2['k_seismic']:
+            problems.append(f"export round-trip k_seismic {back['k_seismic']}")
+
+    if problems:
+        return None, "GeoStudio import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_vg_kr_test(test):
     """Unit check for the van Genuchten relative-permeability function and the
     kr-model dispatch (xslope.seep). Verifies kr_vg_vec against an independent
@@ -1195,6 +1362,8 @@ def run_test(test):
         return run_roundtrip_test(test)
     if test_type == 'dxf':
         return run_dxf_roundtrip_test(test)
+    if test_type == 'gsz':
+        return run_gsz_import_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'gsat_pair':
@@ -1243,7 +1412,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'vg_kr',
+    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'gsz', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -1289,6 +1458,8 @@ def main():
     parser.add_argument('--dxf', action='store_true',
                         help='Run only the structured DXF export/import round-trip '
                              'tests (needs ezdxf + PySide6)')
+    parser.add_argument('--gsz', action='store_true',
+                        help='Run only the GeoStudio (.gsz) import test')
     parser.add_argument('--tolerance', type=float, default=0.01,
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
@@ -1316,12 +1487,14 @@ def main():
     args = parser.parse_args()
 
     # If no specific flags, run all
-    run_all = not (args.lem or args.fem or args.seep or args.roundtrip or args.dxf)
+    run_all = not (args.lem or args.fem or args.seep or args.roundtrip or args.dxf
+                   or args.gsz)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
     run_roundtrip = args.roundtrip or run_all
     run_dxf = args.dxf or run_all
+    run_gsz = args.gsz or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -1492,6 +1665,15 @@ def main():
                     n_dxf += 1
             if n_dxf and not run_all:
                 print(f"Including {n_dxf} DXF round-trip tests")
+
+    # The GeoStudio import test authors its own .gsz fixture (GeoStudio's own sample
+    # files are Seequent's copyrighted Materials and are not in this repository), so it
+    # needs no input file and no GUI — engine-only, always runnable.
+    if run_gsz:
+        tests.append({'type': 'gsz', 'file': '(synthetic .gsz)',
+                      'method': '-', 'source': 'gsz'})
+        if not run_all:
+            print("Including 1 GeoStudio import test")
 
     if args.skip_benchmarks:
         n_before = len(tests)

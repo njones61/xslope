@@ -36,6 +36,7 @@ nav:
     - Colab Notebooks: usage/notebooks.md
     - Claude Code Skill: usage/claude/index.md
     - DXF Import/Export: usage/dxf.md
+    - GeoStudio Import/Export: usage/geostudio.md
   - XSlope Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md

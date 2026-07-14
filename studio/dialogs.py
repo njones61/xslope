@@ -566,3 +566,62 @@ class DxfImportDialog(QDialog):
                 mat = (edit.text() or "").strip() or name
             out[name] = {"target": target, "material": mat}
         return out
+
+
+class GszImportDialog(QDialog):
+    """GeoStudio (.gsz) import: choose which analysis to import.
+
+    A .gsz needs no layer-mapping wizard — unlike a DXF, it already knows what its
+    geometry means. The one thing it cannot decide for us is *which* analysis: a
+    GeoStudio file routinely holds several over the same geometry, and they differ
+    in more than the slip surface (materials are assigned per analysis, so the same
+    slope can be a different soil in each). So this dialog just lists them.
+
+    ``result()`` returns the chosen analysis ID.
+    """
+
+    def __init__(self, analyses, parent=None):
+        # analyses: [{'id','name','kind','method'}, ...] from geostudio.list_analyses
+        super().__init__(parent)
+        self.setWindowTitle("Import GeoStudio — choose an analysis")
+        self.resize(620, 360)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "This GeoStudio file contains the analyses below. Choose one to import.\n"
+            "• Material zones, strengths and water conditions import automatically.\n"
+            "• Analyses can use different materials over the same geometry, so the "
+            "choice matters.\n"
+            "• Reinforcement, loads and SLOPE/W's search are not imported — you will "
+            "get a list of what was left out."))
+
+        self.table = QTableWidget(len(analyses), 3, self)
+        self.table.setHorizontalHeaderLabels(["Analysis", "Type", "Method"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+
+        self._ids = []
+        for row, a in enumerate(analyses):
+            self._ids.append(a["id"])
+            self.table.setItem(row, 0, QTableWidgetItem(a.get("name") or ""))
+            self.table.setItem(row, 1, QTableWidgetItem(a.get("kind") or ""))
+            self.table.setItem(row, 2, QTableWidgetItem(a.get("method") or ""))
+        self.table.selectRow(0)
+
+        layout.addWidget(self.table, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        # Double-clicking a row is the natural "pick this one".
+        self.table.doubleClicked.connect(self.accept)
+
+    def result(self):
+        """The chosen analysis ID."""
+        row = self.table.currentRow()
+        return self._ids[row if row >= 0 else 0]

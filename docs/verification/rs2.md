@@ -49,9 +49,10 @@ shear strain contours at the critical SRF.
 
 ## Status
 
+### Part I (1–34)
+
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
-| **Part I (1–34)** | | | |
 | [1](#rs2-1) | Simple slope stability assessment | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx). SSRM 0.986 vs RS2 SSRM 0.99, Slide Bishop 0.987, ACADS referee 1.00. |
 | [2](#rs2-2) | Non-homogeneous slope | **built** | [vp003.xlsx](../files/rocscience/vp003.xlsx). SSRM 1.375 vs RS2 1.36, Slide Spencer 1.375, referee 1.39. |
 | [3](#rs2-3) | Non-homogeneous slope with seismic load (0.15g) | **built** | [vp004.xlsx](../files/rocscience/vp004.xlsx). SSRM 0.948 vs RS2 0.97, Slide Spencer 0.991, referee 1.00. |
@@ -86,7 +87,11 @@ shear strain contours at the critical SRF.
 | [32](#rs2-32) | Heading mismatch — body is Baker's example 2 | **built** (both halves) | [vp045a](../files/rocscience/vp045a.xlsx) / [vp045b](../files/rocscience/vp045b.xlsx). M-C SSRM 2.852 vs RS2 2.83 (+0.8%); power-curve SSRM 2.732 vs RS2 2.74 (−0.3%), Slide2 Spencer 2.662. |
 | [33](#rs2-33) | Homogeneous slope with tension crack and water table (P&D test slope 2) | **built** (caveat) | [vp056.xlsx](../files/rocscience/vp056.xlsx). SSRM 1.247 vs RS2 SSRM 1.28 and an eight-program LEM table spanning 1.03–1.32. |
 | [34](#rs2-34) | M-C vs power curve III (Baker 2003 ex. 3, London clay) | **built** (both halves) | [vp061a](../files/rocscience/vp061a.xlsx) / [vp061b](../files/rocscience/vp061b.xlsx). M-C SSRM 1.369 vs RS2 1.38; power-curve SSRM 1.502 vs RS2 1.47 / Slide2 Spencer 1.47 / Baker 1.48 (+2.1%). |
-| **Part II (35–58)** | | | |
+
+### Part II (35–58)
+
+| # | Problem | Status | XSLOPE file / results |
+|---:|---|---|---|
 | 35 | Submerged slope | *planned* | Slide2 [VP64](rocscience.md#vp64) family. |
 | [36](#rs2-36) | Seepage analysis, homogeneous slope (D&W Fig 6.37) | **built** (both cases) | [vp071a](../files/rocscience/vp071a.xlsx) / [b](../files/rocscience/vp071b.xlsx). SSRM 1.118 on the FE-seepage model and 1.118 on the piezo approximation vs RS2 SSRM 1.12 / 1.12; referee 1.138/1.141; XSLOPE LEM locks 1.132. |
 | [37](#rs2-37) | Embankment with layered foundation (D&W Fig 6.39) | *reported, no lock* | RS2's SSRM is the artesian downstream-toe slide (0.95 in its table, 1.1 in its own convergence graph); XSLOPE's SSRM finds the deep mechanism at 1.31. |
@@ -103,7 +108,11 @@ shear strain contours at the critical SRF.
 | [56](#rs2-56) | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | **built** | [rs2_56a](../files/rocscience/rs2_56a.xlsx) / [b](../files/rocscience/rs2_56b.xlsx). All five within ±3.3% of RS2's M-C and inside the four-program band; locks bracket the family (0.667 / 2.131). Full tables in [the Pruska section](#pruska). |
 | [57](#rs2-57) | Pruska H = 10.5 m, 6 cases | **built** | [rs2_57a](../files/rocscience/rs2_57a.xlsx) / [b](../files/rocscience/rs2_57b.xlsx). All six within ±3.6% of RS2's M-C; locks 0.449 / 1.411. Full tables in [the Pruska section](#pruska). |
 | [58](#rs2-58) | Pruska H = 14 m, 6 cases | **built** (5 of 6) | [rs2_58a](../files/rocscience/rs2_58a.xlsx) / [b](../files/rocscience/rs2_58b.xlsx). Four within ±3.6%; case 5 reads 0.667 vs a published 0.72–0.75 cluster and is unlocked pending explanation; locks 0.342 / 1.057. |
-| **Part III (59–68)** | | | |
+
+### Part III (59–68)
+
+| # | Problem | Status | XSLOPE file / results |
+|---:|---|---|---|
 | 59 | Three-layered soil slope | *planned* | Görög & Török (2007), vs Slide2 + PLAXIS. |
 | 60 | Generalized Hoek–Brown, homogeneous slope | *blocked* | XSLOPE supports Hoek–Brown (`hb`) and it is [verified independently](#hoek-brown). This problem is blocked on the source charts, not the criterion: its target values come from Li, Merifield & Lyamin (2008), whose σ<sub>ci</sub>/(γH) at FS = 1 must be read off before it can be built. |
 | 61 | Local and global minima, homogeneous slope | *planned* | |

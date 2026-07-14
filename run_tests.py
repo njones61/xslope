@@ -1167,6 +1167,7 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Geometries@Len",
     "/GSIData/Materials",
     "/GSIData/Materials/Material",
+    "/GSIData/Materials/Material/Color",
     "/GSIData/Materials/Material/ID",
     "/GSIData/Materials/Material/Name",
     "/GSIData/Materials/Material/SlopeModel",
@@ -1381,6 +1382,19 @@ def run_gsz_import_test(test):
             problems.append("export put the piezometric surface outside the StabilityItem")
         if root.find("./Coordinates/EngCoords") is None:
             problems.append("export declared no unit system / view extent")
+        # GeoStudio wants a piezometric surface's point IDs to ascend along the
+        # polyline. Reusing a coincident region vertex hands it a low ID out of
+        # sequence and it reports the surface as corrupt — so the surface gets its
+        # own points, in order.
+        pz = [int(d.text) for d in root.findall(
+            "./StabilityItems/StabilityItem/Entry/PiezometricSurfaces/"
+            "PiezometricSurface/DataPoints/DataPoint")]
+        if pz != sorted(pz):
+            problems.append(f"piezo surface point IDs not ascending: {pz}")
+        # Materials must be visually distinguishable, not all on GeoStudio's default.
+        cols = [m.findtext("Color") for m in root.findall("./Materials/Material")]
+        if len(cols) > 1 and len(set(cols)) != len(cols):
+            problems.append("materials exported without distinct colours")
 
         back, _ = gsz_to_slope_data(read_gsz(out), 1)
         b = back['materials'][0]

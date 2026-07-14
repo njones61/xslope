@@ -582,15 +582,21 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         regions.append({"ids": [_point(xy) for xy in ring],
                         "mat": int(poly["mat_id"]) + 1})       # GeoStudio is 1-based
 
+    # The piezometric surface gets its OWN points, allocated in the order the line
+    # runs, rather than reusing coincident region vertices. GeoStudio expects a
+    # surface's point IDs to ascend along the polyline; reusing a region corner hands
+    # it a low ID out of sequence, and it reports the surface as corrupt.
     piezo_ids = []
     piezo_line = slope_data.get("piezo_line") or []
     uses_piezo = any((m.get("u") or "none") == "piezo" for m in materials)
-    if piezo_line and uses_piezo:
-        piezo_ids = [_point(xy) for xy in piezo_line]
-    elif piezo_line:
+    if piezo_line and not uses_piezo:
         caveats.append("a piezo line is defined but no material uses it — written as "
                        "a piezometric surface anyway")
-        piezo_ids = [_point(xy) for xy in piezo_line]
+    for xy in piezo_line:
+        pid = len(point_id) + 1
+        point_id[("piezo", len(piezo_ids))] = pid     # keyed so it never dedups
+        points[pid] = (round(xy[0], 9), round(xy[1], 9))
+        piezo_ids.append(pid)
 
     other_u = sorted({(m.get("u") or "none") for m in materials} - {"none", "piezo"})
     if other_u:
@@ -629,10 +635,12 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     my = max((max(ys) - min(ys)) * 0.1, 1.0)
     x0, x1 = min(xs) - mx, max(xs) + mx
     y0, y1 = min(ys) - my, max(ys) + my
-    # A round scale that fits the model on a page ~0.4 m wide, as GeoStudio's own
-    # files do (they sit at 200 for models tens-to-hundreds of units across).
-    scale = max(1.0, round((x1 - x0) / 0.4, -1)) if (x1 - x0) else 200.0
     unit_system = "Metric" if abs(gamma_water - _GAMMA_W_METRIC) < 1.0 else "Imperial"
+    # The drawing scale relates model units to the printed page. GeoStudio's page is in
+    # inches, so the model unit -> inch factor differs by system (m: 39.37, ft: 12).
+    per_inch = 39.3701 if unit_system == "Metric" else 12.0
+    # Pick a round scale that lands the model on a page about 10 inches wide.
+    scale = max(1.0, round((x1 - x0) * per_inch / 10.0, -1)) if (x1 - x0) else 200.0
 
     L = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
          '<GSIData Version="11.11" AppVersion="25.2.1.4">',
@@ -651,8 +659,8 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
          f'YPageBottom="{y0:.6g}" YPageTop="{y1:.6g}" '
          f'XPageOrg="{-x0:.6g}" YPageOrg="{-y0:.6g}" '
          f'MaxSnapDist="20" UnitSystem="{unit_system}" LockScales="false" />',
-         f'    <PageCoords Units="in" PageWidth="{(x1-x0)/scale*39.37:.6g}" '
-         f'PageHeight="{(y1-y0)/scale*39.37:.6g}" PageXOrg="0" PageYOrg="0" />',
+         f'    <PageCoords Units="in" PageWidth="{(x1-x0)/scale*per_inch:.6g}" '
+         f'PageHeight="{(y1-y0)/scale*per_inch:.6g}" PageXOrg="0" PageYOrg="0" />',
          '  </Coordinates>',
          '  <Geometries Len="1">',
          '    <Geometry><Name>2D Geometry</Name>',
@@ -673,17 +681,25 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
                  f'<PointIDs>{",".join(str(j) for j in r["ids"])}</PointIDs>'
                  f'<Mesh Pattern="Unstructured Mixed Elements" /></Region>')
     L.append('      </Regions>')
-    L.append('      <Window>')
-    L.append(f'        <Base X="{x0:.6g}" Y="{-y1:.6g}" />')
-    L.append('        <Zoom>1</Zoom>')
-    L.append('      </Window>')
+    # No <Window>: Base/Zoom are GeoStudio's saved scroll position in its own screen
+    # units, which we cannot compute from a model. Omitting it lets GeoStudio pick its
+    # own view; writing a guess left the model off-centre with the axes in shot.
     L.append('    </Geometry>')
     L.append('  </Geometries>')
 
+    # Carry xslope's own material colours across, so the zones are visually
+    # distinguishable in GeoStudio instead of all landing on its default yellow.
+    from .plot import get_material_color
+
     L.append(f'  <Materials Len="{len(materials)}">')
     for i, m in enumerate(materials, start=1):
+        try:
+            rgb = get_material_color(i - 1)                 # tab10, 0-based mat_id
+            r8, g8, b8 = (int(round(255 * c)) for c in rgb[:3])
+        except Exception:
+            r8 = g8 = b8 = 200
         L.append(
-            f'    <Material><ID>{i}</ID>'
+            f'    <Material><ID>{i}</ID><Color>RGB=({r8},{g8},{b8})</Color>'
             f'<Name>{_xml_escape(m.get("name") or f"material {i}")}</Name>'
             f'<SlopeModel>MohrCoulomb</SlopeModel><StressStrain>'
             f'<UnitWeight>{float(m.get("gamma") or 0.0):.10g}</UnitWeight>'

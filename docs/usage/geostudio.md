@@ -78,13 +78,14 @@ Import reports these rather than dropping them quietly — read the caveats it r
   finite-element pore pressures have no direct mapping and import as zero.
 - **Reinforcement, piles, and loads.**
 
-!!! warning "Units are implicit"
-    A `.gsz` carries no unit-system field — the numbers are just numbers, and the format
-    holds both metric and imperial models. XSLOPE infers the system from the unit weight
-    of water (≈9.807 → kN/m³, m, kPa; ≈62.4 → lb/ft³, ft, psf) and **refuses to guess**
-    on anything else, because silently assuming the wrong system would rescale the whole
-    model. The unit system is reported as a caveat on every import — confirm it matches
-    your template.
+!!! warning "Check the units"
+    The same `.gsz` schema holds both metric and imperial models. GeoStudio declares
+    which, in `<Coordinates><EngCoords UnitSystem="…">`, and XSLOPE reads that. For a
+    file that omits the attribute, XSLOPE falls back to inferring the system from the
+    unit weight of water (≈9.807 → kN/m³, m, kPa; ≈62.4 → lb/ft³, ft, psf) and **refuses
+    to guess** on anything else, since silently assuming the wrong system would rescale
+    the whole model. Either way the unit system is reported as a caveat on every import —
+    confirm it matches your template, because XSLOPE does not convert between systems.
 
 ## Exporting to GeoStudio
 
@@ -110,11 +111,13 @@ A `.gsz` cannot carry everything XSLOPE models. Failure surfaces, reinforcement,
 distributed and line loads, and non-Mohr-Coulomb strengths are **not written**, and each
 is reported as a caveat so you know what to re-create on the GeoStudio side.
 
-!!! note "Export is verified against XSLOPE's reader, not against GeoStudio"
-    The exported file round-trips faithfully through XSLOPE's own `.gsz` reader —
-    geometry, materials, water and seismic coefficient all survive unchanged. Whether
-    GeoStudio itself opens the file has not been verified against the application.
-    Treat export as a convenience, and check the result in GeoStudio before relying on it.
+!!! note "Check exported files in GeoStudio"
+    Export is checked two ways: the file round-trips through XSLOPE's own reader with no
+    loss, and every XML tag it writes is one that GeoStudio's own files use (a schema
+    conformance test, so a tag in the wrong place fails the suite). A round-trip through
+    our own reader alone proves nothing — reader and writer can share the same wrong
+    assumption — which is why the conformance check exists. Still, GeoStudio is the only
+    authority on its own format: open an exported file there before relying on it.
 
 ## Notes and limitations
 

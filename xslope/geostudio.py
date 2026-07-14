@@ -59,23 +59,30 @@ _GAMMA_W_METRIC = 9.807      # kN/m3
 _GAMMA_W_IMPERIAL = 62.4     # lb/ft3
 
 
-def _detect_units(gamma_water):
-    """Infer the unit system from the unit weight of water.
+def _detect_units(gamma_water, declared=None):
+    """The file's unit system.
 
-    A .gsz carries no explicit unit-system field — the numbers are just numbers,
-    and the same file format holds both metric and imperial models. The unit
-    weight of water is the one quantity whose value is fixed by physics, so it
-    identifies the system. Refuse to guess on anything else: silently assuming
-    the wrong system would rescale an entire model.
+    GeoStudio states it outright, in ``<Coordinates><EngCoords UnitSystem="...">``,
+    so use that when it is there. Fall back to inferring it from the unit weight of
+    water — the one quantity whose value is fixed by physics — for files that omit
+    the attribute, and refuse to guess on anything else: silently assuming the wrong
+    system would rescale an entire model.
     """
+    if declared:
+        d = declared.strip().lower()
+        if d == "metric":
+            return "metric"                   # kN/m3, m, kPa
+        if d == "imperial":
+            return "imperial"                 # lb/ft3, ft, psf
+        raise ValueError(f"Unrecognized GeoStudio unit system {declared!r}.")
     if abs(gamma_water - _GAMMA_W_METRIC) < 0.15:
-        return "metric"                       # kN/m3, m, kPa
+        return "metric"
     if abs(gamma_water - _GAMMA_W_IMPERIAL) < 1.0:
-        return "imperial"                     # lb/ft3, ft, psf
+        return "imperial"
     raise ValueError(
-        f"Cannot determine the unit system of this file: it gives the unit weight "
-        f"of water as {gamma_water:g}, which is neither {_GAMMA_W_METRIC:g} (kN/m3) "
-        f"nor {_GAMMA_W_IMPERIAL:g} (lb/ft3)."
+        f"Cannot determine the unit system of this file: it declares none, and gives "
+        f"the unit weight of water as {gamma_water:g}, which is neither "
+        f"{_GAMMA_W_METRIC:g} (kN/m3) nor {_GAMMA_W_IMPERIAL:g} (lb/ft3)."
     )
 
 
@@ -139,7 +146,7 @@ def read_gsz(path):
             "method": _text(a, "Method", ""),
         })
 
-    points, regions = {}, {}
+    points, regions, glines = {}, {}, {}
     for g in root.findall("./Geometries/Geometry"):
         for p in g.findall("./Points/Point"):
             points[int(p.get("ID"))] = (float(p.get("X")), float(p.get("Y")))
@@ -147,21 +154,54 @@ def read_gsz(path):
             ids = _text(r, "PointIDs")
             if ids:
                 regions[int(_text(r, "ID"))] = [int(i) for i in ids.split(",")]
+        for ln in g.findall("./Lines/Line"):
+            p1, p2 = _text(ln, "PointID1"), _text(ln, "PointID2")
+            if p1 and p2:
+                glines[int(_text(ln, "ID"))] = (int(p1), int(p2))
 
     materials = {}
     for m in root.findall("./Materials/Material"):
         ss = m.find("StressStrain")
+        hyd = m.find("Hydraulic")
         materials[int(_text(m, "ID"))] = {
             "name": _text(m, "Name", "material"),
             "model": _text(m, "SlopeModel", ""),
             "gamma": _num(ss, "UnitWeight", 0.0),
             "c": _num(ss, "CohesionPrime", 0.0),
             "phi": _num(ss, "PhiPrime", 0.0),
+            # SEEP/W side. The hydraulic model is a reference into <Functions>, not
+            # inline: <Hydraulic KFnNum="1" VolWCFnNum="1"/>.
+            "seep_model": _text(m, "SeepModel", ""),
+            "kfn": int(hyd.get("KFnNum")) if (hyd is not None and hyd.get("KFnNum"))
+                   else None,
         }
+
+    # Conductivity functions: a shared library keyed by ID, each a table of
+    # (matric suction, k) points. See _fit_vg for how they become xslope's model.
+    kfns = {}
+    for kfn in root.findall("./Functions/Material/Hydraulic/KFns/KFn"):
+        kid = _text(kfn, "ID")
+        if kid is None:
+            continue
+        pts = [(float(p.get("X")), float(p.get("Y")))
+               for p in kfn.findall("./Points/Point")]
+        if pts:
+            kfns[int(kid)] = {"name": _text(kfn, "Name", ""), "points": pts}
+
+    # Boundary-condition library. The hydraulic ones encode their type in an
+    # expression string, e.g. HydHeadvsTime(Variability=Constant,Value=8) or
+    # HydTotalFlux(Variability=Constant,Value=0,Review=true).
+    bcs = {}
+    for bc in root.findall("./BCs/BC"):
+        expr = bc.get("Hydraulic")
+        if not expr:
+            continue                       # displacement/air/contaminant BC — not ours
+        bcs[int(bc.get("ID"))] = {"name": bc.get("Name", ""), "expr": expr}
 
     # Region -> material is defined PER ANALYSIS, in <Contexts>, not on the region.
     # The same geometry can therefore carry different soils in different analyses.
-    contexts = {}
+    # Hydraulic BCs are attached the same way, keyed by geometry item.
+    contexts, hyd_bcs = {}, {}
     for c in root.findall("./Contexts/Context"):
         aid = int(_text(c, "AnalysisID"))
         assign = {}
@@ -170,6 +210,12 @@ def read_gsz(path):
             if m and gum.get("Entry"):
                 assign[int(m.group(1))] = int(gum.get("Entry"))
         contexts[aid] = assign
+        applied = []
+        for g in c.findall("./GeometryUsesHydraulicBCs/GeometryUsesHydraulicBC"):
+            gid, entry = g.get("ID", ""), g.get("Entry")
+            if entry:
+                applied.append((gid, int(entry)))
+        hyd_bcs[aid] = applied
 
     water = {}
     for w in root.findall("./WaterItems/WaterItem"):
@@ -179,8 +225,10 @@ def read_gsz(path):
             "option": _text(entry.find("ResultInputInfo"), "Option", "None"),
         }
 
-    # Piezometric surfaces are polylines through the shared Points table — they
-    # store point IDs, not coordinates.
+    # Piezometric surfaces live on the StabilityItem, not the geometry, and are
+    # polylines through the shared Points table — they store point IDs, not
+    # coordinates. <MaterialUsesPiezs> says which materials actually draw pore
+    # pressure from which surface.
     piezo = {}
     for ps in root.iter("PiezometricSurface"):
         pid = _text(ps, "ID")
@@ -194,14 +242,25 @@ def read_gsz(path):
         entry = s.find("Entry")
         seis = entry.find("Seismic") if entry is not None else None
         kh = seis.get("Horizontal") if seis is not None else ""
+        uses = {}
+        for mu in s.findall("./Entry/MaterialUsesPiezs/MaterialUsesPiez"):
+            if mu.get("ID") and mu.get("UsesID"):
+                uses[int(mu.get("ID"))] = int(mu.get("UsesID"))
         stability[int(_text(s, "AnalysisID"))] = {
             "k_seismic": float(kh) if kh else 0.0,
+            "material_piezo": uses,          # material ID -> piezometric surface ID
         }
+
+    # GeoStudio declares its unit system rather than leaving it to be inferred.
+    eng = root.find("./Coordinates/EngCoords")
+    unit_system = eng.get("UnitSystem") if eng is not None else None
 
     return {
         "path": str(path), "zip": zf, "analyses": analyses, "points": points,
-        "regions": regions, "materials": materials, "contexts": contexts,
-        "water": water, "piezo": piezo, "stability": stability,
+        "regions": regions, "lines": glines, "materials": materials,
+        "contexts": contexts, "water": water, "piezo": piezo,
+        "stability": stability, "kfns": kfns, "bcs": bcs, "hyd_bcs": hyd_bcs,
+        "unit_system": unit_system,
     }
 
 
@@ -278,7 +337,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
 
     water = gsz["water"].get(analysis_id, {})
     gamma_water = water.get("gamma_water", _GAMMA_W_METRIC)
-    units = _detect_units(gamma_water)
+    units = _detect_units(gamma_water, gsz.get("unit_system"))
 
     # Import only the materials this analysis actually uses, renumbered 0-based.
     used = sorted(set(assign.values()))
@@ -312,15 +371,25 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
         raise ValueError("This analysis has no material regions to import.")
 
     # Pore pressure. SLOPE/W names the option on the analysis; only a piezometric
-    # surface maps onto xslope's piezo line.
+    # surface maps onto xslope's piezo line. <MaterialUsesPiezs> says WHICH materials
+    # draw from it — a material not listed there is dry even when a surface exists.
     piezo_line = []
     option = water.get("option") or "None"
+    uses = gsz["stability"].get(analysis_id, {}).get("material_piezo", {})
     if option == "PiezoSurface":
         if gsz["piezo"]:
             ids = next(iter(gsz["piezo"].values()))
             piezo_line = [pts[i] for i in ids if i in pts]
-            for mat in materials:
-                mat["u"] = "piezo"
+            for mid, mat in zip(used, materials):
+                # No MaterialUsesPiezs at all -> the surface applies to everything.
+                if not uses or mid in uses:
+                    mat["u"] = "piezo"
+            dry = [gsz["materials"][m]["name"] for m in used if uses and m not in uses]
+            if dry:
+                caveats.append(
+                    f"material(s) {', '.join(repr(d) for d in dry)} are not connected "
+                    f"to the piezometric surface in GeoStudio — imported with no pore "
+                    f"pressure")
             if len(gsz["piezo"]) > 1:
                 caveats.append(
                     f"the file defines {len(gsz['piezo'])} piezometric surfaces; "
@@ -472,9 +541,11 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     non-Mohr-Coulomb strengths (c/phi models, power curves, Hoek-Brown). Each is
     reported rather than dropped in silence.
 
-    Verified to round-trip through this module's own reader. Whether GeoStudio
-    itself opens the file has not been verified against the application — check
-    before relying on it.
+    Checked two ways: the file round-trips through this module's reader, and every
+    tag path it writes is one that GeoStudio's own files use. The round-trip alone
+    proves nothing — a reader and writer sharing the same wrong idea of the schema
+    agree perfectly with each other — so the conformance check is the load-bearing
+    one. GeoStudio remains the only authority on its own format.
     """
     caveats = []
     polygons = slope_data.get("polygons") or []
@@ -540,81 +611,133 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         if slope_data.get(key):
             caveats.append(f"{label} not written — no .gsz mapping; re-create in GeoStudio")
 
-    lines = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-             '<GSIData Version="11.11" AppVersion="25.2.1.4">',
-             f'  <FileInfo Title="{_xml_escape(analysis_name)}" '
-             f'Comments="Exported by xslope." />',
-             '  <Analyses Len="1">',
-             '    <Analysis><ID>1</ID>'
-             f'<Name>{_xml_escape(analysis_name)}</Name>'
-             '<Kind>SLOPE/W</Kind>'
-             f'<Method>{_xml_escape(method)}</Method>'
-             '<GeometryId>1</GeometryId></Analysis>',
-             '  </Analyses>',
-             '  <Geometries Len="1">',
-             '    <Geometry><Name>2D Geometry</Name>',
-             f'      <Points Len="{len(points)}">']
+    # Edges. GeoStudio draws a region from its <Lines>, not from its point list, so a
+    # file without them opens with nothing visible. Each region ring contributes its
+    # consecutive pairs; an edge shared by two regions is written once.
+    edges, edge_id = {}, {}
+    for r in regions:
+        ring = r["ids"]
+        for a, b in zip(ring, ring[1:] + ring[:1]):
+            key = (min(a, b), max(a, b))
+            if key not in edge_id:
+                edge_id[key] = len(edge_id) + 1
+                edges[edge_id[key]] = (a, b)
+
+    xs = [p[0] for p in points.values()]
+    ys = [p[1] for p in points.values()]
+    mx = max((max(xs) - min(xs)) * 0.1, 1.0)
+    my = max((max(ys) - min(ys)) * 0.1, 1.0)
+    x0, x1 = min(xs) - mx, max(xs) + mx
+    y0, y1 = min(ys) - my, max(ys) + my
+    # A round scale that fits the model on a page ~0.4 m wide, as GeoStudio's own
+    # files do (they sit at 200 for models tens-to-hundreds of units across).
+    scale = max(1.0, round((x1 - x0) / 0.4, -1)) if (x1 - x0) else 200.0
+    unit_system = "Metric" if abs(gamma_water - _GAMMA_W_METRIC) < 1.0 else "Imperial"
+
+    L = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+         '<GSIData Version="11.11" AppVersion="25.2.1.4">',
+         f'  <FileInfo Title="{_xml_escape(analysis_name)}" '
+         f'Comments="Exported by xslope." />',
+         '  <Analyses Len="1">',
+         f'    <Analysis><ID>1</ID><Name>{_xml_escape(analysis_name)}</Name>'
+         f'<Kind>SLOPE/W</Kind><Method>{_xml_escape(method)}</Method>'
+         '<GeometryId>1</GeometryId></Analysis>',
+         '  </Analyses>',
+         # The view window, in engineering coordinates, and the declared unit system.
+         # Without these GeoStudio has no canvas extent to draw the model into.
+         '  <Coordinates>',
+         f'    <EngCoords HorzScale="{scale:.6g}" VertScale="{scale:.6g}" '
+         f'XPageLeft="{x0:.6g}" XPageRight="{x1:.6g}" '
+         f'YPageBottom="{y0:.6g}" YPageTop="{y1:.6g}" '
+         f'XPageOrg="{-x0:.6g}" YPageOrg="{-y0:.6g}" '
+         f'MaxSnapDist="20" UnitSystem="{unit_system}" LockScales="false" />',
+         f'    <PageCoords Units="in" PageWidth="{(x1-x0)/scale*39.37:.6g}" '
+         f'PageHeight="{(y1-y0)/scale*39.37:.6g}" PageXOrg="0" PageYOrg="0" />',
+         '  </Coordinates>',
+         '  <Geometries Len="1">',
+         '    <Geometry><Name>2D Geometry</Name>',
+         f'      <Points Len="{len(points)}">']
     for pid in sorted(points):
         x, y = points[pid]
-        lines.append(f'        <Point ID="{pid}" X="{x:.10g}" Y="{y:.10g}" Pinned="true" />')
-    lines.append('      </Points>')
-    lines.append(f'      <Regions Len="{len(regions)}">')
+        L.append(f'        <Point ID="{pid}" X="{x:.10g}" Y="{y:.10g}" Pinned="true" />')
+    L.append('      </Points>')
+    L.append(f'      <Lines Len="{len(edges)}">')
+    for lid in sorted(edges):
+        a, b = edges[lid]
+        L.append(f'        <Line><ID>{lid}</ID><PointID1>{a}</PointID1>'
+                 f'<PointID2>{b}</PointID2></Line>')
+    L.append('      </Lines>')
+    L.append(f'      <Regions Len="{len(regions)}">')
     for i, r in enumerate(regions, start=1):
-        lines.append(f'        <Region><ID>{i}</ID>'
-                     f'<PointIDs>{",".join(str(j) for j in r["ids"])}</PointIDs></Region>')
-    lines.append('      </Regions>')
-    if piezo_ids:
-        lines.append('      <PiezometricSurfaces Len="1">')
-        lines.append('        <PiezometricSurface><ID>1</ID>'
-                     f'<DataPoints Len="{len(piezo_ids)}">'
-                     + "".join(f'<DataPoint>{i}</DataPoint>' for i in piezo_ids)
-                     + '</DataPoints></PiezometricSurface>')
-        lines.append('      </PiezometricSurfaces>')
-    lines.append('    </Geometry>')
-    lines.append('  </Geometries>')
+        L.append(f'        <Region><ID>{i}</ID>'
+                 f'<PointIDs>{",".join(str(j) for j in r["ids"])}</PointIDs>'
+                 f'<Mesh Pattern="Unstructured Mixed Elements" /></Region>')
+    L.append('      </Regions>')
+    L.append('      <Window>')
+    L.append(f'        <Base X="{x0:.6g}" Y="{-y1:.6g}" />')
+    L.append('        <Zoom>1</Zoom>')
+    L.append('      </Window>')
+    L.append('    </Geometry>')
+    L.append('  </Geometries>')
 
-    lines.append(f'  <Materials Len="{len(materials)}">')
+    L.append(f'  <Materials Len="{len(materials)}">')
     for i, m in enumerate(materials, start=1):
-        lines.append(
-            f'    <Material><ID>{i}</ID><Name>{_xml_escape(m.get("name") or f"material {i}")}</Name>'
+        L.append(
+            f'    <Material><ID>{i}</ID>'
+            f'<Name>{_xml_escape(m.get("name") or f"material {i}")}</Name>'
             f'<SlopeModel>MohrCoulomb</SlopeModel><StressStrain>'
             f'<UnitWeight>{float(m.get("gamma") or 0.0):.10g}</UnitWeight>'
             f'<CohesionPrime>{float(m.get("c") or 0.0):.10g}</CohesionPrime>'
             f'<PhiPrime>{float(m.get("phi") or 0.0):.10g}</PhiPrime>'
             f'</StressStrain></Material>')
-    lines.append('  </Materials>')
+    L.append('  </Materials>')
 
     # Region -> material, per analysis (GeoStudio keeps it here, not on the region).
-    lines.append('  <Contexts Len="1">')
-    lines.append('    <Context><AnalysisID>1</AnalysisID>')
-    lines.append(f'      <GeometryUsesMaterials Len="{len(regions)}">')
+    L.append('  <Contexts Len="1">')
+    L.append('    <Context><AnalysisID>1</AnalysisID>')
+    L.append(f'      <GeometryUsesMaterials Len="{len(regions)}">')
     for i, r in enumerate(regions, start=1):
-        lines.append(f'        <GeometryUsesMaterial ID="Regions-{i}" Entry="{r["mat"]}" />')
-    lines.append('      </GeometryUsesMaterials>')
-    lines.append('      <IsDefined>true</IsDefined></Context>')
-    lines.append('  </Contexts>')
+        L.append(f'        <GeometryUsesMaterial ID="Regions-{i}" Entry="{r["mat"]}" />')
+    L.append('      </GeometryUsesMaterials>')
+    L.append('      <IsDefined>true</IsDefined></Context>')
+    L.append('  </Contexts>')
 
-    lines.append('  <WaterItems Len="1">')
-    lines.append('    <WaterItem><AnalysisID>1</AnalysisID><Entry>'
-                 + ('<ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>'
-                    if piezo_ids else '')
-                 + f'<UnitWaterWeight>{gamma_water:.10g}</UnitWaterWeight>'
-                 '</Entry></WaterItem>')
-    lines.append('  </WaterItems>')
+    L.append('  <WaterItems Len="1">')
+    L.append('    <WaterItem><AnalysisID>1</AnalysisID><Entry>'
+             + ('<ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>'
+                if piezo_ids else '')
+             + f'<UnitWaterWeight>{gamma_water:.10g}</UnitWaterWeight>'
+             '</Entry></WaterItem>')
+    L.append('  </WaterItems>')
 
+    # The piezometric surface belongs to the StabilityItem, NOT the geometry, and the
+    # materials that draw pore pressure from it are named in <MaterialUsesPiezs>.
     k = float(slope_data.get("k_seismic") or 0.0)
-    lines.append('  <StabilityItems Len="1">')
-    lines.append('    <StabilityItem><AnalysisID>1</AnalysisID><Entry>'
-                 f'<Seismic Horizontal="{k:.10g}" Vertical="" />' if k else
-                 '    <StabilityItem><AnalysisID>1</AnalysisID><Entry>'
-                 '<Seismic Horizontal="" Vertical="" />')
-    lines.append('    </Entry></StabilityItem>')
-    lines.append('  </StabilityItems>')
-    lines.append('</GSIData>')
+    L.append('  <StabilityItems Len="1">')
+    L.append('    <StabilityItem><AnalysisID>1</AnalysisID><Entry>')
+    L.append(f'      <Seismic Horizontal="{k:.10g}" Vertical="" />' if k else
+             '      <Seismic Horizontal="" Vertical="" />')
+    if piezo_ids:
+        L.append('      <PiezometricSurfaces Len="1">')
+        L.append('        <PiezometricSurface><ID>1</ID>'
+                 f'<DataPoints Len="{len(piezo_ids)}">'
+                 + "".join(f'<DataPoint>{i}</DataPoint>' for i in piezo_ids)
+                 + '</DataPoints><CapSuction>false</CapSuction>'
+                 '<MaxSuction>0</MaxSuction></PiezometricSurface>')
+        L.append('      </PiezometricSurfaces>')
+        wet = [i for i, m in enumerate(materials, start=1)
+               if (m.get("u") or "none") == "piezo"] or list(range(1, len(materials) + 1))
+        L.append(f'      <MaterialUsesPiezs Len="{len(wet)}">')
+        for i in wet:
+            L.append(f'        <MaterialUsesPiez ID="{i}" UsesID="1" />')
+        L.append('      </MaterialUsesPiezs>')
+    L.append('    </Entry></StabilityItem>')
+    L.append('  </StabilityItems>')
+    L.append('</GSIData>')
 
     stem = os.path.splitext(os.path.basename(gsz_path))[0]
     with zipfile.ZipFile(gsz_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{stem}.xml", "\n".join(lines) + "\n")
+        zf.writestr(f"{stem}.xml", "\n".join(L) + "\n")
     return caveats
 
 

@@ -1084,6 +1084,132 @@ def run_dxf_roundtrip_test(test):
     return 0.0, None
 
 
+# Every XML tag path (and attribute) that GeoStudio itself writes, among those
+# export_gsz emits. Harvested from Seequent-authored .gsz files; the FILES are
+# their copyrighted Materials and are not in this repo, but the tag vocabulary is
+# a fact about the format, not a copy of their content.
+#
+# This guards the failure that a round-trip test CANNOT catch: a reader and writer
+# that share the same wrong idea of the schema agree perfectly with each other and
+# produce a file GeoStudio rejects. (That is exactly what happened — the first
+# exporter put PiezometricSurfaces under <Geometry> instead of the StabilityItem,
+# and omitted <Lines> entirely, and the round-trip test passed regardless.)
+GSZ_SCHEMA_PATHS = {
+    "/GSIData",
+    "/GSIData/Analyses",
+    "/GSIData/Analyses/Analysis",
+    "/GSIData/Analyses/Analysis/GeometryId",
+    "/GSIData/Analyses/Analysis/ID",
+    "/GSIData/Analyses/Analysis/Kind",
+    "/GSIData/Analyses/Analysis/Method",
+    "/GSIData/Analyses/Analysis/Name",
+    "/GSIData/Analyses@Len",
+    "/GSIData/Contexts",
+    "/GSIData/Contexts/Context",
+    "/GSIData/Contexts/Context/AnalysisID",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials/GeometryUsesMaterial",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials/GeometryUsesMaterial@Entry",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials/GeometryUsesMaterial@ID",
+    "/GSIData/Contexts/Context/GeometryUsesMaterials@Len",
+    "/GSIData/Contexts/Context/IsDefined",
+    "/GSIData/Contexts@Len",
+    "/GSIData/Coordinates",
+    "/GSIData/Coordinates/EngCoords",
+    "/GSIData/Coordinates/EngCoords@HorzScale",
+    "/GSIData/Coordinates/EngCoords@LockScales",
+    "/GSIData/Coordinates/EngCoords@MaxSnapDist",
+    "/GSIData/Coordinates/EngCoords@UnitSystem",
+    "/GSIData/Coordinates/EngCoords@VertScale",
+    "/GSIData/Coordinates/EngCoords@XPageLeft",
+    "/GSIData/Coordinates/EngCoords@XPageOrg",
+    "/GSIData/Coordinates/EngCoords@XPageRight",
+    "/GSIData/Coordinates/EngCoords@YPageBottom",
+    "/GSIData/Coordinates/EngCoords@YPageOrg",
+    "/GSIData/Coordinates/EngCoords@YPageTop",
+    "/GSIData/Coordinates/PageCoords",
+    "/GSIData/Coordinates/PageCoords@PageHeight",
+    "/GSIData/Coordinates/PageCoords@PageWidth",
+    "/GSIData/Coordinates/PageCoords@PageXOrg",
+    "/GSIData/Coordinates/PageCoords@PageYOrg",
+    "/GSIData/Coordinates/PageCoords@Units",
+    "/GSIData/FileInfo",
+    "/GSIData/FileInfo@Comments",
+    "/GSIData/FileInfo@Title",
+    "/GSIData/Geometries",
+    "/GSIData/Geometries/Geometry",
+    "/GSIData/Geometries/Geometry/Lines",
+    "/GSIData/Geometries/Geometry/Lines/Line",
+    "/GSIData/Geometries/Geometry/Lines/Line/ID",
+    "/GSIData/Geometries/Geometry/Lines/Line/PointID1",
+    "/GSIData/Geometries/Geometry/Lines/Line/PointID2",
+    "/GSIData/Geometries/Geometry/Lines@Len",
+    "/GSIData/Geometries/Geometry/Name",
+    "/GSIData/Geometries/Geometry/Points",
+    "/GSIData/Geometries/Geometry/Points/Point",
+    "/GSIData/Geometries/Geometry/Points/Point@ID",
+    "/GSIData/Geometries/Geometry/Points/Point@Pinned",
+    "/GSIData/Geometries/Geometry/Points/Point@X",
+    "/GSIData/Geometries/Geometry/Points/Point@Y",
+    "/GSIData/Geometries/Geometry/Points@Len",
+    "/GSIData/Geometries/Geometry/Regions",
+    "/GSIData/Geometries/Geometry/Regions/Region",
+    "/GSIData/Geometries/Geometry/Regions/Region/ID",
+    "/GSIData/Geometries/Geometry/Regions/Region/Mesh",
+    "/GSIData/Geometries/Geometry/Regions/Region/Mesh@Pattern",
+    "/GSIData/Geometries/Geometry/Regions/Region/PointIDs",
+    "/GSIData/Geometries/Geometry/Regions@Len",
+    "/GSIData/Geometries/Geometry/Window",
+    "/GSIData/Geometries/Geometry/Window/Base",
+    "/GSIData/Geometries/Geometry/Window/Base@X",
+    "/GSIData/Geometries/Geometry/Window/Base@Y",
+    "/GSIData/Geometries/Geometry/Window/Zoom",
+    "/GSIData/Geometries@Len",
+    "/GSIData/Materials",
+    "/GSIData/Materials/Material",
+    "/GSIData/Materials/Material/ID",
+    "/GSIData/Materials/Material/Name",
+    "/GSIData/Materials/Material/SlopeModel",
+    "/GSIData/Materials/Material/StressStrain",
+    "/GSIData/Materials/Material/StressStrain/CohesionPrime",
+    "/GSIData/Materials/Material/StressStrain/PhiPrime",
+    "/GSIData/Materials/Material/StressStrain/UnitWeight",
+    "/GSIData/Materials@Len",
+    "/GSIData/StabilityItems",
+    "/GSIData/StabilityItems/StabilityItem",
+    "/GSIData/StabilityItems/StabilityItem/AnalysisID",
+    "/GSIData/StabilityItems/StabilityItem/Entry",
+    "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs",
+    "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs/MaterialUsesPiez",
+    "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs/MaterialUsesPiez@ID",
+    "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs/MaterialUsesPiez@UsesID",
+    "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface/CapSuction",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface/DataPoints",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface/DataPoints/DataPoint",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface/DataPoints@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface/ID",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces/PiezometricSurface/MaxSuction",
+    "/GSIData/StabilityItems/StabilityItem/Entry/PiezometricSurfaces@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Seismic",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Horizontal",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Seismic@Vertical",
+    "/GSIData/StabilityItems@Len",
+    "/GSIData/WaterItems",
+    "/GSIData/WaterItems/WaterItem",
+    "/GSIData/WaterItems/WaterItem/AnalysisID",
+    "/GSIData/WaterItems/WaterItem/Entry",
+    "/GSIData/WaterItems/WaterItem/Entry/ResultInputInfo",
+    "/GSIData/WaterItems/WaterItem/Entry/ResultInputInfo/Option",
+    "/GSIData/WaterItems/WaterItem/Entry/UnitWaterWeight",
+    "/GSIData/WaterItems@Len",
+    "/GSIData@AppVersion",
+    "/GSIData@Version",
+}
+
+
 def _write_synthetic_gsz(path):
     """Author a minimal GeoStudio .gsz — a two-analysis, two-material model over one
     region — to exercise the importer.
@@ -1226,6 +1352,36 @@ def run_gsz_import_test(test):
         from xslope.geostudio import export_gsz
         out = os.path.join(td, "exported.gsz")
         export_gsz(sd2, out, analysis_name="rt")
+
+        # SCHEMA CONFORMANCE — the check the round-trip cannot make. Every tag path we
+        # write must be one GeoStudio itself writes; otherwise the file round-trips
+        # through our own reader perfectly and GeoStudio still refuses it.
+        import zipfile as _zip, xml.etree.ElementTree as _ET
+        zf = _zip.ZipFile(out)
+        root = _ET.fromstring(zf.read(zf.namelist()[0]))
+        emitted = set()
+
+        def _walk(e, p=""):
+            q = f"{p}/{e.tag}"
+            emitted.add(q)
+            for a in e.attrib:
+                emitted.add(f"{q}@{a}")
+            for c in e:
+                _walk(c, q)
+        _walk(root)
+        unknown = sorted(emitted - GSZ_SCHEMA_PATHS)
+        if unknown:
+            problems.append("export writes tag(s) GeoStudio does not use: "
+                            + ", ".join(unknown[:3]))
+        # And the structural facts a wrong-schema writer gets wrong:
+        if not root.findall("./Geometries/Geometry/Lines/Line"):
+            problems.append("export wrote no <Lines> — GeoStudio draws regions from them")
+        if not root.findall("./StabilityItems/StabilityItem/Entry/"
+                            "PiezometricSurfaces/PiezometricSurface"):
+            problems.append("export put the piezometric surface outside the StabilityItem")
+        if root.find("./Coordinates/EngCoords") is None:
+            problems.append("export declared no unit system / view extent")
+
         back, _ = gsz_to_slope_data(read_gsz(out), 1)
         b = back['materials'][0]
         if (b['name'], b['c'], b['phi'], b['gamma']) != ('weak', 5.0, 20.0, 18.0):

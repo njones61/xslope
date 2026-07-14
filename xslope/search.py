@@ -170,8 +170,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 circle = {'Xo': float(xc), 'Yo': float(yc), 'Depth': float(yt), 'R': float(R)}
                 success, result = generate_slices(slope_data, circle=circle,
                                                   num_slices=sweep_slices,
-                                                  composite=composite,
-                                                  allow_reverse_curvature=False)
+                                                  composite=composite)
                 if not success:
                     continue
                 df_slices, failure_surface = result
@@ -340,8 +339,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             for d in depths:
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
                 success, result = generate_slices(slope_data, circle=test_circle,
-                                                  num_slices=num_slices, composite=composite,
-                                                  allow_reverse_curvature=False)
+                                                  num_slices=num_slices, composite=composite)
                 if not success:
                     FS = fs_fail
                     df_slices = None

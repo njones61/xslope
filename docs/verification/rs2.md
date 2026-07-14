@@ -114,7 +114,7 @@ shear strain contours at the critical SRF.
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
 | 59 | Three-layered soil slope | *planned* | Görög & Török (2007), vs Slide2 + PLAXIS. |
-| 60 | Generalized Hoek–Brown, homogeneous slope | *blocked* | XSLOPE supports Hoek–Brown (`hb`) and it is [verified independently](#hoek-brown). This problem is blocked on the source charts, not the criterion: its target values come from Li, Merifield & Lyamin (2008), whose σ<sub>ci</sub>/(γH) at FS = 1 must be read off before it can be built. |
+| [60](#rs2-60) | Generalized Hoek–Brown, homogeneous slope | **built** (LEM) | [rs2_60a.xlsx](../files/rocscience/rs2_60a.xlsx) / [b](../files/rocscience/rs2_60b.xlsx) / [c](../files/rocscience/rs2_60c.xlsx). Three slope angles from Li, Merifield & Lyamin (2008) at GSI = 70, the strong-rock end of the criterion. Bishop/Spencer 1.009 / 1.017 / 1.008 against Li's F = 1.0. SSRM is not locked on this problem. |
 | 61 | Local and global minima, homogeneous slope | *planned* | |
 | 62 | Three-layered slope with a soft band | *planned* | |
 | 63 | Homogeneous slope assessment | *planned* | |
@@ -1045,12 +1045,66 @@ cluster; the same materials at H = 10.5 m agree within 1.6%) — it is reported 
 excluded from the regression locks pending an explanation. Each slope's locks bracket
 its family (the weakest and strongest case).
 
+### RS2-60: Generalized Hoek-Brown, homogeneous slope (Li et al. 2008) {#rs2-60}
+
+**Input files:** [rs2_60a.xlsx](../files/rocscience/rs2_60a.xlsx) (β = 15°) ·
+[rs2_60b.xlsx](../files/rocscience/rs2_60b.xlsx) (β = 30°) ·
+[rs2_60c.xlsx](../files/rocscience/rs2_60c.xlsx) (β = 45°)
+
+A homogeneous rock slope at three angles, after
+
+> Li, A.J., Merifield, R.S., & Lyamin, A.V. (2008). "Stability charts for rock slopes based
+> on the Hoek-Brown failure criterion." *International Journal of Rock Mechanics and Mining
+> Sciences* 45(5), 689–700.
+
+GSI = 70, $m_i$ = 15, $D$ = 0, γ = 23 kN/m³, ν = 0.3, $H$ = 1 m. This is the companion to the
+[Hammah benchmark](#hoek-brown) at the opposite end of the criterion: GSI = 70 is a strong,
+lightly-jointed rock mass ($a$ = 0.501, essentially the classical exponent), where Hammah's
+GSI = 5 is a badly broken one ($a$ = 0.619).
+
+The manual does not state σ<sub>ci</sub>. Li's Table 1 tabulates the *critical* ratio
+σ<sub>ci</sub>/(γH) — the value at which collapse has just occurred — so σ<sub>ci</sub> is
+recovered by multiplying it by γH, and **the verification target is FS = 1.0 by
+construction** rather than an independently computed factor of safety:
+
+| case | β | σ<sub>ci</sub>/(γH) | σ<sub>ci</sub> |
+|---|---:|---:|---:|
+| a | 15° | 0.026 | 0.598 kPa |
+| b | 30° | 0.075 | 1.725 kPa |
+| c | 45° | 0.176 | 4.048 kPa |
+
+Those magnitudes look wrong for rock and are the trap in this problem. $H$ = 1 m makes
+γH = 23 kPa, and the critical ratio is *less than one*, so σ<sub>ci</sub> is a fraction of
+γH — sub-kPa to a few kPa. The problem is normalized: only the ratio matters, and a 1 m
+slope in 0.6 kPa rock is the same problem as a 100 m slope in 60 kPa rock. Entering
+σ<sub>ci</sub> in MPa, as Hoek-Brown convention would invite, overstates the strength a
+thousandfold and the slope becomes trivially stable.
+
+**Factors of safety:**
+
+| case | Bishop | Spencer | Li (limit analysis) | Slide2 Spencer |
+|---|---|---|---|---|
+| a (β = 15°) | 1.009 | 1.009 | 1.0 | 1.011 |
+| b (β = 30°) | 1.015 | 1.017 | 1.0 | 0.992 |
+| c (β = 45°) | 1.003 | 1.008 | 1.0 | 1.035 |
+
+*All three land within 1.7% of limiting equilibrium, confirming the Hoek-Brown
+implementation at high GSI. SSRM is not locked on this problem.*
+
+Li's Table 1 prints its last block as β = 10°, but the body text and the charts (Fig. 5 is
+β = 15°; no β = 10° chart exists) both say 15° — a typographical error in the paper. RS2 read
+it as 15° as well: its Slide2 value for case a (1.011) reproduces Li's own F for that row.
+
+<!-- test: file=../files/rocscience/rs2_60a.xlsx, type=circular_search, method=spencer, expected_fs=1.009, num_slices=40, benchmark=RS2-60a -->
+<!-- test: file=../files/rocscience/rs2_60b.xlsx, type=circular_search, method=spencer, expected_fs=1.017, num_slices=40, benchmark=RS2-60b -->
+<!-- test: file=../files/rocscience/rs2_60c.xlsx, type=circular_search, method=spencer, expected_fs=1.008, num_slices=40, benchmark=RS2-60c -->
+
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 
-The RS2 manual's own Hoek-Brown problem (#60) is built from stability charts and is still
-blocked pending Li et al. (2008). In its place, the `hb` strength option is verified
-end-to-end — LEM *and* SSRM — against Example 1 of the Rocscience method paper that
-introduced Hoek-Brown shear-strength reduction:
+The `hb` strength option is verified end-to-end — LEM *and* SSRM — against Example 1 of the
+Rocscience method paper that introduced Hoek-Brown shear-strength reduction. It is the
+low-GSI counterpart to [RS2-60](#rs2-60) above, which exercises the same criterion at
+GSI = 70:
 
 > Hammah, R.E., Yacoub, T.E., Corkum, B., & Curran, J.H. (2005). "The shear strength
 > reduction method for the generalized Hoek-Brown criterion." *Proc. 40th U.S. Symposium

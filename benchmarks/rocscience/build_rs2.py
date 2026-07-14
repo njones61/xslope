@@ -136,6 +136,91 @@ def hammah_hb1():
     return 'hammah_hb1.xlsx'
 
 
+def _rs2_60_slope_data(beta_deg, sci, H=1.0, dfound=2.0, flat=4.0):
+    """RS2 #60 -- generalized Hoek-Brown, homogeneous slope, after Li, Merifield &
+    Lyamin (2008), "Stability charts for rock slopes based on the Hoek-Brown failure
+    criterion", IJRMMS 45, 689-700.
+
+    THE MANUAL DOES NOT STATE sigma_ci. RS2's Table 1 gives only H = 1 m,
+    gamma = 23 kN/m3, nu = 0.3, GSI = 70, mi = 15 (and D = 0 comes from Li's text).
+    sigma_ci is back-computed from Li's Table 1, which tabulates the CRITICAL ratio
+    (sigma_ci / gamma H)_crit -- the value at which collapse has just occurred, i.e.
+    F = 1. So sigma_ci is *chosen* to put the slope at limiting equilibrium, and
+
+        THE VERIFICATION TARGET IS FS = 1.0 BY CONSTRUCTION.
+
+    It is not an independently computed reference factor of safety.
+
+        beta = 15 deg -> (sci/gH)crit = 0.026 -> sci = 0.598 kPa
+        beta = 30 deg -> (sci/gH)crit = 0.075 -> sci = 1.725 kPa
+        beta = 45 deg -> (sci/gH)crit = 0.176 -> sci = 4.048 kPa
+
+    UNITS. These look absurd for rock, and that is the trap. H = 1 m makes
+    gamma*H = 23 kPa, and the critical ratio is LESS THAN ONE, so sigma_ci is a
+    fraction of gamma*H -- sub-kPa to a few kPa. The problem is normalized (only the
+    ratio sigma_ci/(gamma H) matters); a 1 m slope in 0.6 kPa rock is the same problem
+    as a 100 m slope in 60 kPa rock. Entering sigma_ci in MPa, as Hoek-Brown convention
+    would invite, overstates the strength by 1000x and the slope becomes trivially
+    stable.
+
+    Li's Table 1 prints its last block as "beta = 10", but the body text, the charts
+    (Fig. 5 is beta = 15, there is no beta = 10 chart) and the base-failure discussion
+    all say 15 -- it is a typo in the paper. RS2 evidently read it as 15 too: its Slide2
+    value for case 1 (1.011) reproduces Li's own F1 for that row (1.010).
+
+    Published: RS2 SSRM 1.02 / 1.02 / 1.10 (its figure reads 1.11 for the 45 deg case);
+    Slide2 Spencer 1.011 / 0.992 / 1.035; Li's reference F = 1 in all three.
+
+    Domain: Li reports the depth factor d/H is insignificant and RS2 says the figure's
+    overall extents "were shown to be insignificant", so neither is dimensioned. The
+    foundation still has to be deep enough to let the mechanism form: beta = 15 deg is
+    the one case Li reports as a BASE failure rather than a toe failure.
+    """
+    import math
+    run = H / math.tan(math.radians(beta_deg))
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='rock', option='hb', hb_sci=float(sci), hb_gsi=70.0, hb_mi=15.0,
+             hb_d=0.0, gamma=23.0, gamma_sat=23.0, u='none',
+             E=1.0e5, nu=0.3, psi=0.0)
+    sd['materials'] = [m]
+    y0 = dfound
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [
+        (0.0, y0), (flat, y0), (flat + run, y0 + H), (flat + run + flat, y0 + H)]}]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    Xo, Yo = flat + run / 2.0, y0 + H + 0.8 * H
+    Depth = y0 - 0.5 * H
+    sd['circles'] = [{'Xo': Xo, 'Yo': Yo, 'Depth': Depth, 'R': Yo - Depth}]
+    return sd
+
+
+def rs2_60a():
+    """RS2 #60 case 1: beta = 15 deg, sigma_ci = 0.598 kPa. Base failure (Li)."""
+    sd = _rs2_60_slope_data(15.0, 0.026 * 23.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_60a.xlsx'))
+    return 'rs2_60a.xlsx'
+
+
+def rs2_60b():
+    """RS2 #60 case 2: beta = 30 deg, sigma_ci = 1.725 kPa."""
+    sd = _rs2_60_slope_data(30.0, 0.075 * 23.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_60b.xlsx'))
+    return 'rs2_60b.xlsx'
+
+
+def rs2_60c():
+    """RS2 #60 case 3: beta = 45 deg, sigma_ci = 4.048 kPa."""
+    sd = _rs2_60_slope_data(45.0, 0.176 * 23.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_60c.xlsx'))
+    return 'rs2_60c.xlsx'
+
+
 if __name__ == '__main__':
-    for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1):
+    for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
+               rs2_60a, rs2_60b, rs2_60c):
         print(fn())

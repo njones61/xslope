@@ -1920,6 +1920,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 # over-strong yield surface. Measured on Hammah et al. (2005) Example 1
                 # this cost +6% in FS; the failure-plane abscissa reproduces their
                 # published SSR 1.15 to +0.7%.
+                # The circle is the IN-PLANE one (sx, sy, txy); the out-of-plane sz is not
+                # folded in. That was checked, not assumed: on the Hammah benchmark sz is
+                # below the in-plane minor principal at 0.0% of points (and 0.0% of
+                # YIELDING points), so the in-plane circle is the critical one wherever
+                # the linearization actually matters. It cannot be otherwise in the
+                # yielding band -- plane strain gives sz ~ nu(sx+sy), which can only drop
+                # below the in-plane minor where the deviatoric radius is small, i.e. in
+                # deep near-hydrostatic material that is not yielding. Building the circle
+                # from the true 3D major/minor instead moved the SSRM factor of safety by
+                # less than the bracket tolerance (1.161 either way).
                 hm = grp.get('hb_m')
                 if hm is not None:
                     ctr_t = (sx[hm] + sy[hm]) * 0.5

@@ -74,11 +74,11 @@ shear strain contours at the critical SRF.
 | [20](#rs2-20) | Slope with vertical load (Prandtl's wedge) | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). SSRM 1.00 vs Prandtl theory 1.0 and RS2 SSRM 1.0; Slide2 Spencer 1.051 on the specified surface. |
 | [21](#rs2-21) | Bearing capacity test prism (Prandtl II) | **built** | [vp026.xlsx](../files/rocscience/vp026.xlsx). SSRM 1.011 (1.020 at 1.2 m), converging on theory 1.0; RS2 SSRM 1.01; Slide2 Spencer 0.941 on the specified surface. |
 | [22](#rs2-22) | Layered slope with undulating bedrock | **built** (SSRM variant) | [vp027_fem.xlsx](../files/rocscience/vp027_fem.xlsx). SSRM 1.558 (1.536 at 1.8 m, converging) vs RS2 SSRM **1.52** — +2.5% at the tagged mesh, +1.1% at the finer one. |
-| [23](#rs2-23) | Underwater slope with linearly varying cohesion | *no lock possible* | RS2's published SSRM (1.12) depends on a "can't fail" elastic region; this slope's anchor remains the LEM lock (VP29, Spencer 1.145 on Duncan's surface). |
+| [23](#rs2-23) | Underwater slope with linearly varying cohesion | *no lock possible* | RS2's published SSRM (1.12) depends on a "can't fail" elastic region; this slope's anchor remains the LEM lock ([VP29](rocscience.md#vp29), Spencer 1.145 on Duncan's surface). |
 | [24](#rs2-24) | Layered slope with geosynthetic reinforcement | **built** | [vp032a](../files/rocscience/vp032a.xlsx) / [vp032c](../files/rocscience/vp032c.xlsx). SSRM 1.196 (H=7) and 0.991 (H=8.75) vs RS2 SSRM 1.15 / 0.95 (+4%, within the corpus SSRM scatter). |
 | [25](#rs2-25) | Syncrude tailings dyke (El-Ramly et al. 2003) | **built** (caveat) | [vp033.xlsx](../files/rocscience/vp033.xlsx). SSRM 1.20 (mesh-converged) vs RS2 SSRM 1.29, Slide2 Bishop 1.305, El-Ramly 1.31. |
 | [26](#rs2-26) | Clarence Cannon dam (Wolff & Harr 1987) | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). SSRM 2.28 vs RS2 SSRM 2.29 (−0.4%); Slide2 GLE 2.333 / Spencer 2.383, W&H 2.36, XSLOPE LEM M-P 2.384. |
-| [27](#rs2-27) | Homogeneous slope, pore pressure by r<sub>u</sub> | *blocked* | The FEM has no r<sub>u</sub> option (task, with RS2 #14); RS2's own text cites Slide2 VP36 (Li & Lumb), not VP21. |
+| [27](#rs2-27) | Homogeneous slope, pore pressure by r<sub>u</sub> | *blocked* | The FEM has no r<sub>u</sub> option (task, with RS2 #14); RS2's own text cites Slide2 [VP36](rocscience.md#vp36) (Li & Lumb), not VP21. |
 | 28 | FE analysis with groundwater and stress | *planned* | Slide2 VP38 family. |
 | [29](#rs2-29) | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | **built** (sand case) | [vp039c.xlsx](../files/rocscience/vp039c.xlsx). SSRM 1.253 vs RS2 SSRM 1.25, Spencer 1.209, Tandjiria 1.219. The clay case is not locked. |
 | [30](#rs2-30) | Homogeneous slope, power-curve strength (Perry 1993) | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). SSRM 0.910 vs RS2 SRF 0.91 (exact); Slide2 Janbu 0.944, Perry 0.98. |
@@ -87,18 +87,18 @@ shear strain contours at the critical SRF.
 | [33](#rs2-33) | Homogeneous slope with tension crack and water table (P&D test slope 2) | **built** (caveat) | [vp056.xlsx](../files/rocscience/vp056.xlsx). SSRM 1.247 vs RS2 SSRM 1.28 and an eight-program LEM table spanning 1.03–1.32. |
 | [34](#rs2-34) | M-C vs power curve III (Baker 2003 ex. 3, London clay) | **built** (both halves) | [vp061a](../files/rocscience/vp061a.xlsx) / [vp061b](../files/rocscience/vp061b.xlsx). M-C SSRM 1.369 vs RS2 1.38; power-curve SSRM 1.502 vs RS2 1.47 / Slide2 Spencer 1.47 / Baker 1.48 (+2.1%). |
 | **Part II (35–58)** | | | |
-| 35 | Submerged slope | *planned* | Slide2 VP64 family. |
+| 35 | Submerged slope | *planned* | Slide2 [VP64](rocscience.md#vp64) family. |
 | [36](#rs2-36) | Seepage analysis, homogeneous slope (D&W Fig 6.37) | **built** (both cases) | [vp071a](../files/rocscience/vp071a.xlsx) / [b](../files/rocscience/vp071b.xlsx). SSRM 1.118 on the FE-seepage model and 1.118 on the piezo approximation vs RS2 SSRM 1.12 / 1.12; referee 1.138/1.141; XSLOPE LEM locks 1.132. |
 | [37](#rs2-37) | Embankment with layered foundation (D&W Fig 6.39) | *reported, no lock* | RS2's SSRM is the artesian downstream-toe slide (0.95 in its table, 1.1 in its own convergence graph); XSLOPE's SSRM finds the deep mechanism at 1.31. |
-| 38 | Cohesionless embankment on saturated clay foundation | *planned* | Slide2 VP73/VP74 family. |
-| 39, 41, 43 | Earth embankment, infinite-slope mechanism (I–III) | *planned* | Slide2 VP69 family. |
+| 38 | Cohesionless embankment on saturated clay foundation | *planned* | Slide2 [VP73](rocscience.md#vp73)/[VP74](rocscience.md#vp74) family. |
+| 39, 41, 43 | Earth embankment, infinite-slope mechanism (I–III) | *planned* | Slide2 [VP69](rocscience.md#vp69) family. |
 | [40](#rs2-40) | Dam with impermeable foundation (D&W Fig 7.24) | **built** (piezo case) | [vp077b.xlsx](../files/rocscience/vp077b.xlsx). SSRM 1.491 vs RS2 SSRM 1.53; the FE-seepage case is blocked. |
 | [42](#rs2-42) | James dike | **built** | [vp075.xlsx](../files/rocscience/vp075.xlsx). SSRM 1.249 vs RS2 SSRM 1.26 (−0.9%); Slide2 noncircular LEM 1.11–1.16, referee 1.17. |
 | [44](#rs2-44) | Seepage analysis for an earth embankment (D&W Fig 14.20-a) | **built** | [vp082.xlsx](../files/rocscience/vp082.xlsx). SSRM 1.511 vs RS2 SSRM 1.51 (+0.1%); Slide2 LEM 1.532/1.541, referee 1.528–1.542. |
 | [45](#rs2-45) | Varying undrained shear strength profiles (D&W Fig 14.20-b) | **built** (caveat) | [vp083a](../files/rocscience/vp083a.xlsx) / [b](../files/rocscience/vp083b.xlsx). SSRM 1.41 / 1.37 vs RS2 SSRM 1.32 / 1.32 (D&W referee 1.28–1.33). |
 | [46](#rs2-46) | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | **built** | [vp084a–d](../files/rocscience/vp084a.xlsx). SSRM 0.80 / 0.95 / 1.08 / 1.19 vs RS2 SSRM 0.78 / 0.93 / 1.05 / 1.15 (+2–3%); D&W 0.75 / 0.90 / 1.03 / 1.13. |
 | [47](#rs2-47) | Purely cohesive slope, varying thickness (D&W Fig 14.3) | **built** (30-ft case) | [vp078.xlsx](../files/rocscience/vp078.xlsx). SSRM 1.08 vs RS2 SSRM 1.03; D&W referee 1.124–1.135. The 46.5- and 60-ft variants are deferred. |
-| [48–54](#rs2-48) | Multi-tiered geotextile walls (Leshchinsky & Han 2004) | *blocked* | The FEM reinforcement tensile-capacity cap is not enforced in SSRM. Extraction and published tables are complete for all seven; the series unlocks together when the cap is fixed. |
+| [48–54](#rs2-48) | Multi-tiered geotextile walls (Leshchinsky & Han 2004) | *blocked* | Slide2 [VP87](rocscience.md#vp87)–VP93. The FEM reinforcement tensile-capacity cap is not enforced in SSRM. Extraction and published tables are complete for all seven; the series unlocks together when the cap is fixed. |
 | 55 | Five 1.8-m tiers | *blocked* | Slide2 VP94; belongs to the #48–54 family — blocked with the series. |
 | [56](#rs2-56) | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | **built** | [rs2_56a](../files/rocscience/rs2_56a.xlsx) / [b](../files/rocscience/rs2_56b.xlsx). All five within ±3.3% of RS2's M-C and inside the four-program band; locks bracket the family (0.667 / 2.131). Full tables in [the Pruska section](#pruska). |
 | [57](#rs2-57) | Pruska H = 10.5 m, 6 cases | **built** | [rs2_57a](../files/rocscience/rs2_57a.xlsx) / [b](../files/rocscience/rs2_57b.xlsx). All six within ±3.6% of RS2's M-C; locks 0.449 / 1.411. Full tables in [the Pruska section](#pruska). |
@@ -121,11 +121,17 @@ shear strain contours at the critical SRF.
 
 ### RS2-1: Simple slope stability assessment {#rs2-1}
 
-Slide2 counterpart: **VP1** (ACADS 1a). SSRM 0.986 vs RS2 SSRM 0.99, Slide Bishop 0.987,
-ACADS referee 1.00. FS reads 0.967 at half the element size — SSRM values are quoted at the
-tagged mesh.
+Slide2 counterpart: [VP1](rocscience.md#vp1) (ACADS 1a).
 
-Input file: [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx)
+**Input files:** [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 0.986 | RS2 SSRM 0.99 |
+
+*Cross-bearings: Slide2 Bishop 0.987 (LEM); ACADS referee 1.00.*
+
+FS reads 0.967 at half the element size — SSRM values are quoted at the tagged mesh.
 
 <!-- test: file=../lem/files/xslope_acads_simple.xlsx, type=fem_ssrm, expected_fs=0.986, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=4000, benchmark=RS2-1 -->
 
@@ -133,9 +139,15 @@ Input file: [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx)
 
 ### RS2-2: Non-homogeneous slope {#rs2-2}
 
-Slide2 counterpart: **VP3**. SSRM 1.375 vs RS2 1.36, Slide Spencer 1.375, referee 1.39.
+Slide2 counterpart: [VP3](rocscience.md#vp3).
 
-Input file: [vp003.xlsx](../files/rocscience/vp003.xlsx)
+**Input files:** [vp003.xlsx](../files/rocscience/vp003.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.375 | RS2 SSRM 1.36 |
+
+*Cross-bearings: Slide2 Spencer 1.375 (LEM); ACADS referee 1.39.*
 
 <!-- test: file=../files/rocscience/vp003.xlsx, type=fem_ssrm, expected_fs=1.375, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.7, max_iter=4000, benchmark=RS2-2 -->
 
@@ -143,12 +155,19 @@ Input file: [vp003.xlsx](../files/rocscience/vp003.xlsx)
 
 ### RS2-3: Non-homogeneous slope with seismic load (0.15g) {#rs2-3}
 
-Slide2 counterpart: **VP4**. SSRM 0.948 vs RS2 0.97, Slide Spencer 0.991, referee 1.00.
+Slide2 counterpart: [VP4](rocscience.md#vp4).
+
+**Input files:** [vp004.xlsx](../files/rocscience/vp004.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 0.948 | RS2 SSRM 0.97 |
+
+*Cross-bearings: Slide2 Spencer 0.991 (LEM); ACADS referee 1.00.*
+
 k is entered negative per the FEM sign convention — this is a left-facing slope, so the
 pseudo-static force acts in −x, while the LEM takes the magnitude and directs it from the
 failure surface.
-
-Input file: [vp004.xlsx](../files/rocscience/vp004.xlsx)
 
 <!-- test: file=../files/rocscience/vp004.xlsx, type=fem_ssrm, expected_fs=0.948, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=4000, benchmark=RS2-3 -->
 
@@ -156,9 +175,15 @@ Input file: [vp004.xlsx](../files/rocscience/vp004.xlsx)
 
 ### RS2-4: Dry Talbingo dam {#rs2-4}
 
-Slide2 counterpart: **VP5**. SSRM 1.909 vs RS2 1.88, Slide 1.948, referee 1.95.
+Slide2 counterpart: [VP5](rocscience.md#vp5).
 
-Input file: [vp005.xlsx](../files/rocscience/vp005.xlsx)
+**Input files:** [vp005.xlsx](../files/rocscience/vp005.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.909 | RS2 SSRM 1.88 |
+
+*Cross-bearings: Slide2 1.948 (LEM); ACADS referee 1.95.*
 
 <!-- test: file=../files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.909, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=4000, benchmark=RS2-4 -->
 
@@ -166,10 +191,15 @@ Input file: [vp005.xlsx](../files/rocscience/vp005.xlsx)
 
 ### RS2-5: Water table with weak seam {#rs2-5}
 
-Slide2 counterpart: **VP7**. SSRM 1.286 (mesh-stable: 1.280 at 1.2 m) vs RS2 1.26, Slide
-Spencer 1.258, referee 1.24–1.27. This problem is Slide VP7.
+Slide2 counterpart: **VP7** (inventory-only on the LEM page — no detail section to link).
 
-Input file: [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx)
+**Input files:** [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.286 | RS2 SSRM 1.26 |
+
+*Mesh-stable: 1.280 at 1.2 m. Cross-bearings: Slide2 Spencer 1.258 (LEM); ACADS referee 1.24–1.27.*
 
 <!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=fem_ssrm, expected_fs=1.286, element_type=tri6, target_size=2.0, tolerance=0.01, f_min=0.9, f_max=1.6, max_iter=4000, benchmark=RS2-5 -->
 
@@ -177,12 +207,19 @@ Input file: [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.
 
 ### RS2-6: Slope with load and pore pressure by water table (ACADS 4) {#rs2-6}
 
-Slide2 counterpart: **VP9**. Built with a caveat: SSRM 0.81, mesh-stable, vs ACADS survey
-mean 0.808 and referee 0.78 — but +18% above RS2's SSRM 0.69 and Slide2's MC-optimized LEM
-0.68–0.71 (XSLOPE's own LEM locks 0.724). The published values themselves span 0.68–0.81
-on this thin-weak-seam problem; under the same investigation as [#16](#rs2-16).
+Slide2 counterpart: [VP9](rocscience.md#vp9). Built with a caveat.
 
-Input file: [vp009.xlsx](../files/rocscience/vp009.xlsx)
+**Input files:** [vp009.xlsx](../files/rocscience/vp009.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 0.81 (mesh-stable) | RS2 SSRM 0.69 |
+
+*Cross-bearings: ACADS survey mean 0.808 and referee 0.78; Slide2's MC-optimized LEM 0.68–0.71; XSLOPE's own LEM locks 0.724.*
+
+XSLOPE's SSRM lands on the ACADS survey mean but sits +18% above RS2's SSRM and Slide2's LEM.
+The published values themselves span 0.68–0.81 on this thin-weak-seam problem; under the same
+investigation as [#16](#rs2-16).
 
 <!-- test: file=../files/rocscience/vp009.xlsx, type=fem_ssrm, expected_fs=0.812, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.3, f_max=1.3, max_iter=4000, benchmark=RS2-6 -->
 
@@ -190,12 +227,19 @@ Input file: [vp009.xlsx](../files/rocscience/vp009.xlsx)
 
 ### RS2-7: Pore pressure by digitized total head grid (ACADS 5) {#rs2-7}
 
-Slide2 counterpart: **VP10**. SSRM 1.483 vs RS2 SSRM 1.48 (+0.2%), on the FE-seepage model
-XSLOPE built for Slide2 VP10 (the grid is a stand-in for the flow solution; sidecars are
-tri6 so the SSRM plasticity is not volumetrically locked). Slide2 LEM 1.498–1.501, Giam
-1.53.
+Slide2 counterpart: [VP10](rocscience.md#vp10).
 
-Input file: [vp010.xlsx](../files/rocscience/vp010.xlsx)
+**Input files:** [vp010.xlsx](../files/rocscience/vp010.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.483 | RS2 SSRM 1.48 (+0.2%) |
+
+*Cross-bearings: Slide2 LEM 1.498–1.501; Giam 1.53.*
+
+The SSRM runs on the FE-seepage model XSLOPE built for Slide2 [VP10](rocscience.md#vp10) (the
+grid is a stand-in for the flow solution; sidecars are tri6 so the SSRM plasticity is not
+volumetrically locked).
 
 <!-- test: file=../files/rocscience/vp010.xlsx, type=fem_ssrm, expected_fs=1.483, tolerance=0.01, f_min=1.0, f_max=2.2, max_iter=4000, benchmark=RS2-7 -->
 
@@ -203,23 +247,41 @@ Input file: [vp010.xlsx](../files/rocscience/vp010.xlsx)
 
 ### RS2-8: Saint-Alban test embankment {#rs2-8}
 
-Slide2 counterpart: **VP11**. *No lock possible*: the grid encodes measured
-construction-induced pressures (see the Slide2 corpus VP11 row); RS2 SSRM 0.96 vs Pilot
-1.04 recorded.
+Slide2 counterpart: **VP11** (inventory-only on the LEM page — no detail section to link).
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | *no lock possible* | RS2 SSRM 0.96 |
+
+*Cross-bearings: Pilot 1.04 recorded.*
+
+The grid encodes measured construction-induced pressures (see the Slide2 corpus VP11 row), so
+there is nothing here XSLOPE can reproduce as a lock.
 
 ### RS2-9: Cubzac-les-Ponts test embankment {#rs2-9}
 
-Slide2 counterpart: **VP13**. *No lock possible*: measured pore-pressure grid plus a
-"can't fail" elastic face layer suppressing the true face failure (FS 1.11 per RS2's own
-text); RS2 SSRM 1.31 vs Pilot 1.24 recorded.
+Slide2 counterpart: **VP13** (inventory-only on the LEM page — no detail section to link).
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | *no lock possible* | RS2 SSRM 1.31 |
+
+*Cross-bearings: Pilot 1.24 recorded.*
+
+Measured pore-pressure grid plus a "can't fail" elastic face layer suppressing the true face
+failure (FS 1.11 per RS2's own text).
 
 ### RS2-10: Simple slope II (Arai & Tagyo ex. 1) {#rs2-10}
 
-Slide2 counterpart: **VP14** (Arai & Tagyo 1). SSRM 1.43 vs RS2 SSRM 1.40 (+2%),
-mesh-converged (1.428→1.434 over a 2.9× size change); LEM locks Bishop 1.404 / Spencer
-1.401 vs Slide2 1.409 / 1.406.
+Slide2 counterpart: [VP14](rocscience.md#vp14) (Arai & Tagyo 1).
 
-Input file: [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)
+**Input files:** [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.43 | RS2 SSRM 1.40 (+2%) |
+
+*Mesh-converged (1.428→1.434 over a 2.9× size change). Cross-bearings: XSLOPE LEM locks Bishop 1.404 / Spencer 1.401 vs Slide2 1.409 / 1.406.*
 
 <!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=fem_ssrm, expected_fs=1.427, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.2, f_max=1.7, max_iter=4000, benchmark=RS2-10 -->
 
@@ -227,10 +289,15 @@ Input file: [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)
 
 ### RS2-11: Layered slope (Arai & Tagyo ex. 2) {#rs2-11}
 
-Slide2 counterpart: **VP15**. SSRM 0.41 vs RS2 SSRM 0.39 and Greco/Kim pattern-search
-0.39–0.43; LEM locks 0.419–0.422.
+Slide2 counterpart: [VP15](rocscience.md#vp15).
 
-Input file: [vp015.xlsx](../files/rocscience/vp015.xlsx)
+**Input files:** [vp015.xlsx](../files/rocscience/vp015.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 0.41 | RS2 SSRM 0.39 |
+
+*Cross-bearings: Greco/Kim pattern-search 0.39–0.43; XSLOPE LEM locks 0.419–0.422.*
 
 <!-- test: file=../files/rocscience/vp015.xlsx, type=fem_ssrm, expected_fs=0.413, element_type=tri6, target_size=1.9, tolerance=0.02, f_min=0.25, f_max=0.65, max_iter=4000, benchmark=RS2-11 -->
 
@@ -238,11 +305,18 @@ Input file: [vp015.xlsx](../files/rocscience/vp015.xlsx)
 
 ### RS2-12: Simple slope + water table (Arai & Tagyo ex. 3) {#rs2-12}
 
-Slide2 counterpart: **VP16**. SSRM 1.12 vs RS2 SSRM 1.09 (+2.3%); LEM locks Bishop 1.112 /
-Spencer 1.113. The FEM piezo pore pressure uses the vertical-distance convention,
-consistent with the LEM slicer and the published analyses.
+Slide2 counterpart: [VP16](rocscience.md#vp16).
 
-Input file: [vp016.xlsx](../files/rocscience/vp016.xlsx)
+**Input files:** [vp016.xlsx](../files/rocscience/vp016.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.12 | RS2 SSRM 1.09 (+2.3%) |
+
+*Cross-bearings: XSLOPE LEM locks Bishop 1.112 / Spencer 1.113.*
+
+The FEM piezo pore pressure uses the vertical-distance convention, consistent with the LEM
+slicer and the published analyses.
 
 <!-- test: file=../files/rocscience/vp016.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.9, f_max=1.45, max_iter=4000, benchmark=RS2-12 -->
 
@@ -250,10 +324,15 @@ Input file: [vp016.xlsx](../files/rocscience/vp016.xlsx)
 
 ### RS2-13: Simple slope III (Yamagami & Ueta) {#rs2-13}
 
-Slide2 counterpart: **VP17**. SSRM 1.38 vs RS2 SSRM 1.33 and Greco Spencer 1.33; LEM locks
-Bishop 1.342 / Spencer 1.340 vs Y&U 1.348 / 1.339.
+Slide2 counterpart: [VP17](rocscience.md#vp17).
 
-Input file: [vp017.xlsx](../files/rocscience/vp017.xlsx)
+**Input files:** [vp017.xlsx](../files/rocscience/vp017.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.38 | RS2 SSRM 1.33 |
+
+*Cross-bearings: Greco Spencer 1.33; XSLOPE LEM locks Bishop 1.342 / Spencer 1.340 vs Y&U 1.348 / 1.339.*
 
 <!-- test: file=../files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.384, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=4000, benchmark=RS2-13 -->
 
@@ -261,8 +340,18 @@ Input file: [vp017.xlsx](../files/rocscience/vp017.xlsx)
 
 ### RS2-14: Simple slope, pore pressure by r<sub>u</sub> {#rs2-14}
 
-Slide2 counterpart: **VP18** (this problem is Slide2 VP18, not VP21). Built with a caveat:
-the FEM now carries the r<sub>u</sub> option, but the SSRM factor on *this* model does not
+Slide2 counterpart: [VP18](rocscience.md#vp18) (this problem is Slide2 VP18, not VP21). Built
+with a caveat.
+
+**Input files:** [vp018.xlsx](../files/rocscience/vp018.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (regression lock at the 2.0 m mesh) | 0.948 | RS2 SSRM 0.98 |
+
+*Cross-bearings: Slide2 Spencer 1.01; Baker 1.02; XSLOPE LEM locks Spencer 1.033 on the same file.*
+
+The FEM now carries the r<sub>u</sub> option, but the SSRM factor on *this* model does not
 become mesh-independent: 0.986 → 0.948 → 0.902 → 0.873 as the target size goes 2.8 → 2.0 →
 1.4 → 1.0 m, with no plateau. The tag pins 2.0 m (0.948) as a regression lock, chosen
 mid-sweep rather than at the coarse end that happens to sit on RS2's 0.98 — the honest
@@ -276,18 +365,21 @@ localizing as the elements shrink — unregularized Mohr-Coulomb has no length s
 it, and a tension cutoff changes nothing (0.987/0.948/0.901/0.870). LEM locks Spencer 1.033
 on the same file.
 
-Input file: [vp018.xlsx](../files/rocscience/vp018.xlsx)
-
 <!-- test: file=../files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.948, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=4000, benchmark=RS2-14 -->
 
 ![RS2-14: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-14.png)
 
 ### RS2-15: Layered slope II (Greco ex. 4 / Yamagami & Ueta) {#rs2-15}
 
-Slide2 counterpart: **VP19**. SSRM 1.39 vs RS2 SSRM 1.39, Slide2 Spencer 1.398, Greco
-1.40–1.42; mesh-converged (1.386→1.377 over a 1.7× size change).
+Slide2 counterpart: [VP19](rocscience.md#vp19).
 
-Input file: [vp019.xlsx](../files/rocscience/vp019.xlsx)
+**Input files:** [vp019.xlsx](../files/rocscience/vp019.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.39 | RS2 SSRM 1.39 |
+
+*Mesh-converged (1.386→1.377 over a 1.7× size change). Cross-bearings: Slide2 Spencer 1.398; Greco 1.40–1.42.*
 
 <!-- test: file=../files/rocscience/vp019.xlsx, type=fem_ssrm, expected_fs=1.386, element_type=tri6, target_size=4.33, tolerance=0.02, f_min=1.1, f_max=1.7, max_iter=4000, benchmark=RS2-15 -->
 
@@ -295,16 +387,20 @@ Input file: [vp019.xlsx](../files/rocscience/vp019.xlsx)
 
 ### RS2-16: Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) {#rs2-16}
 
-Slide2 counterpart: **VP20**. SSRM 0.972 (0.983 at 4.0 m, 0.961 at 2.2 m) vs RS2 SSRM 1.02,
-Slide2 Spencer 1.093 circular / 1.007 noncircular, Greco 0.973–1.1; LEM locks 1.086–1.091
-on the same file.
+Slide2 counterpart: [VP20](rocscience.md#vp20).
+
+**Input files:** [vp020.xlsx](../files/rocscience/vp020.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 0.972 | RS2 SSRM 1.02 |
+
+*Mesh sweep: 0.983 at 4.0 m, 0.961 at 2.2 m. Cross-bearings: Slide2 Spencer 1.093 circular / 1.007 noncircular; Greco 0.973–1.1; XSLOPE LEM locks 1.086–1.091 on the same file.*
 
 The SSRM used to fall through its bracket here: the model's base is an *inclined* polygon
 boundary, and the FEM fixed displacements only along the nodes at the single lowest
 elevation, so the body hung from one corner and never reached equilibrium at any F. Fixing
 the whole bottom polyline (see [#22](#rs2-22)) resolved it.
-
-Input file: [vp020.xlsx](../files/rocscience/vp020.xlsx)
 
 <!-- test: file=../files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.972, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=4000, benchmark=RS2-16 -->
 
@@ -312,13 +408,21 @@ Input file: [vp020.xlsx](../files/rocscience/vp020.xlsx)
 
 ### RS2-17: Slope with three pore pressure conditions (Fredlund & Krahn) {#rs2-17}
 
-Slide2 counterpart: **VP21**. Built for the dry and r<sub>u</sub> cases: dry SSRM 2.02 vs
-RS2 SSRM 2.0, Slide2 M-P 2.075, F&K 2.076 (on [vp021a.xlsx](../files/rocscience/vp021a.xlsx));
-r<sub>u</sub> = 0.25 SSRM 1.704, mesh-stable (1.696 at 2.0 m), against F&K's LEM 1.761–1.766
-and Slide2's 1.760–1.763 (on [vp021b.xlsx](../files/rocscience/vp021b.xlsx)) — the usual few
-percent of SSRM-under-LEM. This table does not record RS2's own SSRM for the r<sub>u</sub>
-sub-case, so that cross-check is still open. The water-table case awaits the VP21 case-3
-input file.
+Slide2 counterpart: **VP21** (inventory-only on the LEM page — no detail section to link).
+Built for the dry and r<sub>u</sub> cases.
+
+**Input files:** [vp021a.xlsx](../files/rocscience/vp021a.xlsx),
+[vp021b.xlsx](../files/rocscience/vp021b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp021a, dry) | 2.02 | RS2 SSRM 2.0 |
+| SSRM (vp021b, r<sub>u</sub> = 0.25) | 1.704 | — (RS2's table records no SSRM for this sub-case) |
+
+*Cross-bearings — dry: Slide2 M-P 2.075, F&K 2.076. r<sub>u</sub> = 0.25: F&K's LEM 1.761–1.766 and Slide2's 1.760–1.763; mesh-stable (1.696 at 2.0 m) — the usual few percent of SSRM-under-LEM.*
+
+Because RS2's table does not record its own SSRM for the r<sub>u</sub> sub-case, that
+cross-check is still open. The water-table case awaits the VP21 case-3 input file.
 
 <!-- test: file=../files/rocscience/vp021a.xlsx, type=fem_ssrm, expected_fs=2.018, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.6, f_max=2.5, max_iter=4000, benchmark=RS2-17 -->
 <!-- test: file=../files/rocscience/vp021b.xlsx, type=fem_ssrm, expected_fs=1.704, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.2, max_iter=4000, benchmark=RS2-17b -->
@@ -329,10 +433,17 @@ input file.
 
 ### RS2-18: Three pore pressure conditions and a weak seam (Fredlund & Krahn) {#rs2-18}
 
-Slide2 counterpart: **VP22**. Built for the dry and r<sub>u</sub> cases: dry SSRM 1.34 vs
-RS2 SSRM 1.34, Slide2 Bishop 1.382 (on [vp022a.xlsx](../files/rocscience/vp022a.xlsx));
-r<sub>u</sub> = 0.25 SSRM 1.054 against Slide2 1.124 and F&K 1.124 (on
-[vp022b.xlsx](../files/rocscience/vp022b.xlsx)).
+Slide2 counterpart: [VP22](rocscience.md#vp22). Built for the dry and r<sub>u</sub> cases.
+
+**Input files:** [vp022a.xlsx](../files/rocscience/vp022a.xlsx),
+[vp022b.xlsx](../files/rocscience/vp022b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp022a, dry) | 1.34 | RS2 SSRM 1.34 |
+| SSRM (vp022b, r<sub>u</sub> = 0.25) | 1.054 | — (RS2's table records no SSRM for this sub-case) |
+
+*Cross-bearings — dry: Slide2 Bishop 1.382. r<sub>u</sub> = 0.25: Slide2 1.124 and F&K 1.124.*
 
 This one returns the *same* factor at 3.0 m and 2.0 m — the mechanism is pinned by the weak
 seam, a geometric feature, so it cannot migrate with refinement. The contrast with
@@ -348,12 +459,19 @@ cross-check as [#17](#rs2-17); water-table case likewise pending.
 
 ### RS2-19: Undrained layered slope (Low 1989) {#rs2-19}
 
-Slide2 counterpart: **VP24** (this problem is Slide2 VP24). Built with a caveat: SSRM 1.51
-at the tagged mesh (1.48 at 0.6 m) vs RS2 SSRM 1.41, Slide2 LEM 1.439, Low 1.44 — the SSRM
-values straddle the LEM from opposite sides on this φ = 0 slope, and the XSLOPE factor
-drifts −2% with refinement; quoted at the tagged mesh per the page convention.
+Slide2 counterpart: [VP24](rocscience.md#vp24) (this problem is Slide2 VP24). Built with a
+caveat.
 
-Input file: [vp024.xlsx](../files/rocscience/vp024.xlsx)
+**Input files:** [vp024.xlsx](../files/rocscience/vp024.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.51 at the tagged mesh (1.48 at 0.6 m) | RS2 SSRM 1.41 |
+
+*Cross-bearings: Slide2 LEM 1.439; Low 1.44.*
+
+The two SSRM values straddle the LEM from opposite sides on this φ = 0 slope, and the XSLOPE
+factor drifts −2% with refinement; quoted at the tagged mesh per the page convention.
 
 <!-- test: file=../files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.507, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=4000, benchmark=RS2-19 -->
 
@@ -361,10 +479,15 @@ Input file: [vp024.xlsx](../files/rocscience/vp024.xlsx)
 
 ### RS2-20: Slope with vertical load (Prandtl's wedge) {#rs2-20}
 
-Slide2 counterpart: **VP25**. SSRM 1.00 vs Prandtl theory 1.0 and RS2 SSRM 1.0 (mesh pair
-1.011→1.003); Slide2 Spencer reads 1.051 on the specified surface.
+Slide2 counterpart: [VP25](rocscience.md#vp25).
 
-Input file: [vp025.xlsx](../files/rocscience/vp025.xlsx)
+**Input files:** [vp025.xlsx](../files/rocscience/vp025.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.00 (mesh pair 1.011→1.003) | RS2 SSRM 1.0 |
+
+*Cross-bearings: Prandtl theory 1.0; Slide2 Spencer reads 1.051 on the specified surface.*
 
 <!-- test: file=../files/rocscience/vp025.xlsx, type=fem_ssrm, expected_fs=1.003, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=4000, benchmark=RS2-20 -->
 
@@ -372,11 +495,17 @@ Input file: [vp025.xlsx](../files/rocscience/vp025.xlsx)
 
 ### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}
 
-Slide2 counterpart: **VP26**. SSRM 1.011 (1.020 at 1.2 m), converging on theory 1.0; RS2
-SSRM 1.01; Slide2 Spencer 0.941 on the specified surface. The input file was extracted for
-this problem.
+Slide2 counterpart: **VP26** (inventory-only on the LEM page — no detail section to link).
 
-Input file: [vp026.xlsx](../files/rocscience/vp026.xlsx)
+**Input files:** [vp026.xlsx](../files/rocscience/vp026.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.011 (1.020 at 1.2 m) | RS2 SSRM 1.01 |
+
+*Converging on Prandtl theory 1.0. Cross-bearings: Slide2 Spencer 0.941 on the specified surface.*
+
+The input file was extracted for this problem.
 
 <!-- test: file=../files/rocscience/vp026.xlsx, type=fem_ssrm, expected_fs=1.011, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=4000, benchmark=RS2-21 -->
 
@@ -384,8 +513,15 @@ Input file: [vp026.xlsx](../files/rocscience/vp026.xlsx)
 
 ### RS2-22: Layered slope with undulating bedrock {#rs2-22}
 
-Slide2 counterpart: **VP27**. Built on an SSRM variant: SSRM 1.558 (1.536 at 1.8 m,
-converging) vs RS2 SSRM **1.52** — +2.5% at the tagged mesh, +1.1% at the finer one.
+Slide2 counterpart: [VP27](rocscience.md#vp27). Built on an SSRM variant.
+
+**Input files:** [vp027_fem.xlsx](../files/rocscience/vp027_fem.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.558 (1.536 at 1.8 m, converging) | RS2 SSRM 1.52 |
+
+*+2.5% at the tagged mesh, +1.1% at the finer one.*
 
 Two FEM gaps had to close first: displacements are now fixed along the whole bottom
 *polyline* of the domain rather than only the nodes at the lowest elevation (an undulating
@@ -408,23 +544,35 @@ stand on the as-published file.
 
 ### RS2-23: Underwater slope with linearly varying cohesion {#rs2-23}
 
-Slide2 counterpart: **VP29**. *No lock possible*: RS2's published SSRM (1.12) depends on a
-"can't fail" elastic region whose boundary its text and figure draw differently; stand-ins
-for the two readings give 0.87 and 0.92, and without the patch the true SSRM minimum is the
-shallow skin above el. −20 (FS 0.21) that the artifice suppresses. The comparison would test
-where the patch is drawn, not the mechanics — this slope's anchor remains the LEM lock
-(VP29, Spencer 1.145 on Duncan's surface).
+Slide2 counterpart: [VP29](rocscience.md#vp29).
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | *no lock possible* | RS2 SSRM 1.12 |
+
+*Stand-ins for the two readings of the "can't fail" region give 0.87 and 0.92; the unsuppressed SSRM minimum is 0.21. The slope's anchor remains the LEM lock ([VP29](rocscience.md#vp29), Spencer 1.145 on Duncan's surface).*
+
+RS2's published SSRM depends on a "can't fail" elastic region whose boundary its text and
+figure draw differently; without the patch the true SSRM minimum is the shallow skin above
+el. −20 (FS 0.21) that the artifice suppresses. The comparison would test where the patch is
+drawn, not the mechanics.
 
 ### RS2-24: Layered slope with geosynthetic reinforcement {#rs2-24}
 
-Slide2 counterpart: **VP32**. SSRM 1.196 (H=7 case; mesh-stable 1.202 at 2.2 m) and 0.991
-(H=8.75) vs RS2 SSRM 1.15 / 0.95 (+4%, within the corpus SSRM scatter; geotextile as an FEM
-truss with EA = 2×10³ kN/m stated as convention). RS2's fully labeled figures also supplied
-the geometry that unlocked Slide2's VP32 — LEM locks on the three printed circles live
-there.
+Slide2 counterpart: [VP32](rocscience.md#vp32).
 
-Input files: [vp032a.xlsx](../files/rocscience/vp032a.xlsx),
+**Input files:** [vp032a.xlsx](../files/rocscience/vp032a.xlsx),
 [vp032c.xlsx](../files/rocscience/vp032c.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp032a, H = 7) | 1.196 (mesh-stable 1.202 at 2.2 m) | RS2 SSRM 1.15 |
+| SSRM (vp032c, H = 8.75) | 0.991 | RS2 SSRM 0.95 |
+
+*+4%, within the corpus SSRM scatter; geotextile as an FEM truss with EA = 2×10³ kN/m stated as convention.*
+
+RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
+[VP32](rocscience.md#vp32) — LEM locks on the three printed circles live there.
 
 <!-- test: file=../files/rocscience/vp032a.xlsx, type=fem_ssrm, expected_fs=1.196, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=4000, benchmark=RS2-24a -->
 <!-- test: file=../files/rocscience/vp032c.xlsx, type=fem_ssrm, expected_fs=0.991, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=0.7, f_max=1.4, max_iter=4000, benchmark=RS2-24b -->
@@ -435,12 +583,18 @@ Input files: [vp032a.xlsx](../files/rocscience/vp032a.xlsx),
 
 ### RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
 
-Slide2 counterpart: **VP33**. Built with a caveat: SSRM 1.20 (mesh-converged) vs RS2 SSRM
-1.29, Slide2 Bishop 1.305, El-Ramly 1.31 — the weak presheared clay-shale rewards
-less-constrained searches (XSLOPE's own LEM: 1.299 on Slide's circle, 1.253 free composite
-search, SSRM 1.20); locked at the tagged mesh.
+Slide2 counterpart: [VP33](rocscience.md#vp33). Built with a caveat.
 
-Input file: [vp033.xlsx](../files/rocscience/vp033.xlsx)
+**Input files:** [vp033.xlsx](../files/rocscience/vp033.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.20 (mesh-converged) | RS2 SSRM 1.29 |
+
+*Cross-bearings: Slide2 Bishop 1.305; El-Ramly 1.31; XSLOPE's own LEM 1.299 on Slide's circle and 1.253 on a free composite search.*
+
+The weak presheared clay-shale rewards less-constrained searches (XSLOPE's own LEM: 1.299 on
+Slide's circle, 1.253 free composite search, SSRM 1.20); locked at the tagged mesh.
 
 <!-- test: file=../files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.199, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=4000, benchmark=RS2-25 -->
 
@@ -448,10 +602,17 @@ Input file: [vp033.xlsx](../files/rocscience/vp033.xlsx)
 
 ### RS2-26: Clarence Cannon dam (Wolff & Harr 1987) {#rs2-26}
 
-Slide2 counterpart: **VP34**. SSRM 2.28 vs RS2 SSRM 2.29 (−0.4%); Slide2 GLE 2.333 / Spencer
-2.383, W&H 2.36, XSLOPE LEM M-P 2.384. Polygon zones with the chimney drain.
+Slide2 counterpart: [VP34](rocscience.md#vp34).
 
-Input file: [vp034.xlsx](../files/rocscience/vp034.xlsx)
+**Input files:** [vp034.xlsx](../files/rocscience/vp034.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 2.28 | RS2 SSRM 2.29 (−0.4%) |
+
+*Cross-bearings: Slide2 GLE 2.333 / Spencer 2.383; W&H 2.36; XSLOPE LEM M-P 2.384.*
+
+Polygon zones with the chimney drain.
 
 <!-- test: file=../files/rocscience/vp034.xlsx, type=fem_ssrm, expected_fs=2.281, element_type=tri6, target_size=15.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=4000, benchmark=RS2-26 -->
 
@@ -459,17 +620,25 @@ Input file: [vp034.xlsx](../files/rocscience/vp034.xlsx)
 
 ### RS2-27: Homogeneous slope, pore pressure by r<sub>u</sub> {#rs2-27}
 
-Slide2 counterpart: **VP36**. *Blocked*: the FEM has no r<sub>u</sub> option (task, with RS2
-[#14](#rs2-14)); RS2's own text cites Slide2 VP36 (Li & Lumb), not VP21.
+Slide2 counterpart: [VP36](rocscience.md#vp36). *Blocked*: the FEM has no r<sub>u</sub> option
+(task, with RS2 [#14](#rs2-14)); RS2's own text cites Slide2 [VP36](rocscience.md#vp36)
+(Li & Lumb), not VP21. No published/XSLOPE FS pair to tabulate.
 
 ### RS2-29: Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) {#rs2-29}
 
-Slide2 counterpart: **VP39**. The manual's §29/§30 headings are swapped. Built for the sand
-case: SSRM 1.253 vs RS2 SSRM 1.25, Spencer 1.209, Tandjiria 1.219. The clay case (RS2 SSRM
-0.99) is not locked: its water-filled tension crack has no FEM representation (XSLOPE reads
-1.05 without it).
+Slide2 counterpart: [VP39](rocscience.md#vp39). The manual's §29/§30 headings are swapped.
+Built for the sand case.
 
-Input file: [vp039c.xlsx](../files/rocscience/vp039c.xlsx)
+**Input files:** [vp039c.xlsx](../files/rocscience/vp039c.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (sand case, vp039c) | 1.253 | RS2 SSRM 1.25 |
+
+*Cross-bearings: Spencer 1.209; Tandjiria 1.219.*
+
+The clay case (RS2 SSRM 0.99) is not locked: its water-filled tension crack has no FEM
+representation (XSLOPE reads 1.05 without it).
 
 <!-- test: file=../files/rocscience/vp039c.xlsx, type=fem_ssrm, expected_fs=1.253, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=4000, benchmark=RS2-29 -->
 
@@ -477,11 +646,17 @@ Input file: [vp039c.xlsx](../files/rocscience/vp039c.xlsx)
 
 ### RS2-30: Homogeneous slope, power-curve strength (Perry 1993) {#rs2-30}
 
-Slide2 counterpart: **VP40**. Swapped heading (see [#29](#rs2-29)). SSRM 0.910 vs RS2 SRF
-0.91 (exact); Slide2 Janbu 0.944, Perry 0.98. The FEM linearizes the reduced envelope at the
-current stress per iteration.
+Slide2 counterpart: [VP40](rocscience.md#vp40). Swapped heading (see [#29](#rs2-29)).
 
-Input file: [vp040.xlsx](../files/rocscience/vp040.xlsx)
+**Input files:** [vp040.xlsx](../files/rocscience/vp040.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 0.910 | RS2 SRF 0.91 (exact) |
+
+*Cross-bearings: Slide2 Janbu 0.944; Perry 0.98.*
+
+The FEM linearizes the reduced envelope at the current stress per iteration.
 
 <!-- test: file=../files/rocscience/vp040.xlsx, type=fem_ssrm, expected_fs=0.910, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=4000, benchmark=RS2-30 -->
 
@@ -489,14 +664,22 @@ Input file: [vp040.xlsx](../files/rocscience/vp040.xlsx)
 
 ### RS2-31: M-C vs power curve (Baker 2003 ex. 1) {#rs2-31}
 
-Slide2 counterpart: **VP44**. Built, all three halves: M-C SSRM 1.546 / 0.966 vs RS2 1.53 /
-0.98; power-curve SSRM 0.934, squarely on Slide2's own published band (Janbu 0.92 / Spencer
-0.96, Baker ~0.97) — RS2's 1.11 sits 15% above Slide2's LEM on the same problem and is the
-outlier.
+Slide2 counterpart: [VP44](rocscience.md#vp44). Built, all three halves.
 
-Input files: [vp044a.xlsx](../files/rocscience/vp044a.xlsx),
+**Input files:** [vp044a.xlsx](../files/rocscience/vp044a.xlsx),
 [vp044b.xlsx](../files/rocscience/vp044b.xlsx),
 [vp044c.xlsx](../files/rocscience/vp044c.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp044b, M-C) | 1.546 | RS2 SSRM 1.53 |
+| SSRM (vp044c, M-C) | 0.966 | RS2 SSRM 0.98 |
+| SSRM (vp044a, power curve) | 0.934 | RS2 SSRM 1.11 |
+
+*Cross-bearings on the power-curve case: Slide2's own published band is Janbu 0.92 / Spencer 0.96, Baker ~0.97.*
+
+XSLOPE's power-curve SSRM sits squarely on Slide2's band; RS2's 1.11 sits 15% above Slide2's
+LEM on the same problem and is the outlier.
 
 <!-- test: file=../files/rocscience/vp044b.xlsx, type=fem_ssrm, expected_fs=1.546, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=2.0, max_iter=4000, benchmark=RS2-31a -->
 <!-- test: file=../files/rocscience/vp044c.xlsx, type=fem_ssrm, expected_fs=0.966, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.6, f_max=1.4, max_iter=4000, benchmark=RS2-31b -->
@@ -510,11 +693,17 @@ Input files: [vp044a.xlsx](../files/rocscience/vp044a.xlsx),
 
 ### RS2-32: Heading mismatch — body is Baker's example 2 {#rs2-32}
 
-Slide2 counterpart: **VP45**. Built, both halves: M-C SSRM 2.852 vs RS2 2.83 (+0.8%);
-power-curve SSRM 2.732 vs RS2 2.74 (−0.3%), Slide2 Spencer 2.662.
+Slide2 counterpart: [VP45](rocscience.md#vp45). Built, both halves.
 
-Input files: [vp045a.xlsx](../files/rocscience/vp045a.xlsx),
+**Input files:** [vp045a.xlsx](../files/rocscience/vp045a.xlsx),
 [vp045b.xlsx](../files/rocscience/vp045b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp045a, M-C) | 2.852 | RS2 SSRM 2.83 (+0.8%) |
+| SSRM (vp045b, power curve) | 2.732 | RS2 SSRM 2.74 (−0.3%) |
+
+*Cross-bearings: Slide2 Spencer 2.662.*
 
 <!-- test: file=../files/rocscience/vp045a.xlsx, type=fem_ssrm, expected_fs=2.852, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=2.3, f_max=3.4, max_iter=4000, benchmark=RS2-32 -->
 <!-- test: file=../files/rocscience/vp045b.xlsx, type=fem_ssrm, expected_fs=2.732, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.8, f_max=3.6, max_iter=4000, benchmark=RS2-32b -->
@@ -525,11 +714,17 @@ Input files: [vp045a.xlsx](../files/rocscience/vp045a.xlsx),
 
 ### RS2-33: Homogeneous slope with tension crack and water table (P&D test slope 2) {#rs2-33}
 
-Slide2 counterpart: **VP56**. Swapped heading. Built with a caveat: SSRM 1.247 vs RS2 SSRM
-1.28 and an eight-program LEM table spanning 1.03–1.32; the model's dry tension crack has no
-FEM representation, worth ~2–3% here.
+Slide2 counterpart: [VP56](rocscience.md#vp56). Swapped heading. Built with a caveat.
 
-Input file: [vp056.xlsx](../files/rocscience/vp056.xlsx)
+**Input files:** [vp056.xlsx](../files/rocscience/vp056.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.247 | RS2 SSRM 1.28 |
+
+*Cross-bearings: an eight-program LEM table spanning 1.03–1.32.*
+
+The model's dry tension crack has no FEM representation, worth ~2–3% here.
 
 <!-- test: file=../files/rocscience/vp056.xlsx, type=fem_ssrm, expected_fs=1.247, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=4000, benchmark=RS2-33 -->
 
@@ -537,11 +732,17 @@ Input file: [vp056.xlsx](../files/rocscience/vp056.xlsx)
 
 ### RS2-34: M-C vs power curve III (Baker 2003 ex. 3, London clay) {#rs2-34}
 
-Slide2 counterpart: **VP61**. Built, both halves: M-C SSRM 1.369 vs RS2 1.38; power-curve
-SSRM 1.502 vs RS2 1.47 / Slide2 Spencer 1.47 / Baker 1.48 (+2.1%).
+Slide2 counterpart: [VP61](rocscience.md#vp61). Built, both halves.
 
-Input files: [vp061a.xlsx](../files/rocscience/vp061a.xlsx),
+**Input files:** [vp061a.xlsx](../files/rocscience/vp061a.xlsx),
 [vp061b.xlsx](../files/rocscience/vp061b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp061b, M-C) | 1.369 | RS2 SSRM 1.38 |
+| SSRM (vp061a, power curve) | 1.502 | RS2 SSRM 1.47 (+2.1%) |
+
+*Cross-bearings on the power-curve case: Slide2 Spencer 1.47; Baker 1.48.*
 
 <!-- test: file=../files/rocscience/vp061b.xlsx, type=fem_ssrm, expected_fs=1.369, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=1.9, max_iter=4000, benchmark=RS2-34 -->
 <!-- test: file=../files/rocscience/vp061a.xlsx, type=fem_ssrm, expected_fs=1.502, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=2.2, max_iter=4000, benchmark=RS2-34b -->
@@ -552,12 +753,20 @@ Input files: [vp061a.xlsx](../files/rocscience/vp061a.xlsx),
 
 ### RS2-36: Seepage analysis, homogeneous slope (D&W Fig 6.37) {#rs2-36}
 
-Slide2 counterpart: **VP71** (= Slide2 VP71, not VP70). Built, both cases: SSRM 1.118 on the
-FE-seepage model and 1.118 on the piezo approximation vs RS2 SSRM 1.12 / 1.12; referee
-1.138/1.141; XSLOPE LEM locks 1.132. The seep case runs on tri6 sidecars.
+Slide2 counterpart: [VP71](rocscience.md#vp71) (= Slide2 VP71, not
+[VP70](rocscience.md#vp70)). Built, both cases.
 
-Input files: [vp071a.xlsx](../files/rocscience/vp071a.xlsx),
+**Input files:** [vp071a.xlsx](../files/rocscience/vp071a.xlsx),
 [vp071b.xlsx](../files/rocscience/vp071b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp071a, FE seepage) | 1.118 | RS2 SSRM 1.12 |
+| SSRM (vp071b, piezo approximation) | 1.118 | RS2 SSRM 1.12 |
+
+*Cross-bearings: referee 1.138/1.141; XSLOPE LEM locks 1.132.*
+
+The seep case runs on tri6 sidecars.
 
 <!-- test: file=../files/rocscience/vp071a.xlsx, type=fem_ssrm, expected_fs=1.118, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=4000, benchmark=RS2-36a -->
 <!-- test: file=../files/rocscience/vp071b.xlsx, type=fem_ssrm, expected_fs=1.118, element_type=tri6, target_size=4.4, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=4000, benchmark=RS2-36b -->
@@ -568,19 +777,29 @@ Input files: [vp071a.xlsx](../files/rocscience/vp071a.xlsx),
 
 ### RS2-37: Embankment with layered foundation (D&W Fig 6.39) {#rs2-37}
 
-Slide2 counterpart: **VP72**. Reported, no lock: RS2's SSRM is the artesian downstream-toe
-slide, quoted as 0.95 in its table and 1.1 in its own convergence graph; XSLOPE's SSRM finds
-the deep mechanism at 1.31 (LEM on the tangent circle 1.339, Slide2 1.15/1.16, referee
-1.11). Reproducing the toe mechanism needs toe-refined meshing — noted with the artesian-toe
-discussion in the Slide2 VP72 section.
+Slide2 counterpart: [VP72](rocscience.md#vp72). Reported, no lock.
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.31 (deep mechanism) | RS2 SSRM 0.95 in its table, 1.1 in its own convergence graph (artesian downstream-toe slide) |
+
+*Cross-bearings: XSLOPE LEM on the tangent circle 1.339; Slide2 1.15/1.16; referee 1.11.*
+
+The two programs are not finding the same mechanism. Reproducing the toe mechanism needs
+toe-refined meshing — noted with the artesian-toe discussion in the Slide2
+[VP72](rocscience.md#vp72) section.
 
 ### RS2-40: Dam with impermeable foundation (D&W Fig 7.24) {#rs2-40}
 
-Slide2 counterpart: **VP77**. Built for the piezo case: SSRM 1.491 vs RS2 SSRM 1.53; the
-FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core
-(the documented tri3/tri6 trade).
+Slide2 counterpart: [VP77](rocscience.md#vp77). Built for the piezo case.
 
-Input file: [vp077b.xlsx](../files/rocscience/vp077b.xlsx)
+**Input files:** [vp077b.xlsx](../files/rocscience/vp077b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp077b, piezo case) | 1.491 | RS2 SSRM 1.53 |
+
+*The FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core (the documented tri3/tri6 trade).*
 
 <!-- test: file=../files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.491, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=4000, benchmark=RS2-40 -->
 
@@ -588,10 +807,15 @@ Input file: [vp077b.xlsx](../files/rocscience/vp077b.xlsx)
 
 ### RS2-42: James dike {#rs2-42}
 
-Slide2 counterpart: **VP75**. SSRM 1.249 vs RS2 SSRM 1.26 (−0.9%); Slide2 noncircular LEM
-1.11–1.16, referee 1.17.
+Slide2 counterpart: [VP75](rocscience.md#vp75).
 
-Input file: [vp075.xlsx](../files/rocscience/vp075.xlsx)
+**Input files:** [vp075.xlsx](../files/rocscience/vp075.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.249 | RS2 SSRM 1.26 (−0.9%) |
+
+*Cross-bearings: Slide2 noncircular LEM 1.11–1.16; referee 1.17.*
 
 <!-- test: file=../files/rocscience/vp075.xlsx, type=fem_ssrm, expected_fs=1.249, element_type=tri6, target_size=1.85, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=4000, benchmark=RS2-42 -->
 
@@ -599,10 +823,16 @@ Input file: [vp075.xlsx](../files/rocscience/vp075.xlsx)
 
 ### RS2-44: Seepage analysis for an earth embankment (D&W Fig 14.20-a) {#rs2-44}
 
-Slide2 counterpart: **VP82** (= Slide2 VP82, not VP76 — §39's body carries VP76). SSRM 1.511
-vs RS2 SSRM 1.51 (+0.1%); Slide2 LEM 1.532/1.541, referee 1.528–1.542.
+Slide2 counterpart: [VP82](rocscience.md#vp82) (= Slide2 VP82, not
+[VP76](rocscience.md#vp76) — §39's body carries VP76).
 
-Input file: [vp082.xlsx](../files/rocscience/vp082.xlsx)
+**Input files:** [vp082.xlsx](../files/rocscience/vp082.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM | 1.511 | RS2 SSRM 1.51 (+0.1%) |
+
+*Cross-bearings: Slide2 LEM 1.532/1.541; referee 1.528–1.542.*
 
 <!-- test: file=../files/rocscience/vp082.xlsx, type=fem_ssrm, expected_fs=1.511, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=2.1, max_iter=4000, benchmark=RS2-44 -->
 
@@ -610,12 +840,20 @@ Input file: [vp082.xlsx](../files/rocscience/vp082.xlsx)
 
 ### RS2-45: Varying undrained shear strength profiles (D&W Fig 14.20-b) {#rs2-45}
 
-Slide2 counterpart: **VP83**. Built with a caveat: SSRM 1.41 / 1.37 vs RS2 SSRM 1.32 / 1.32
-(D&W referee 1.28–1.33): XSLOPE's SSRM reads high on φ=0 foundations (the [RS2-19](#rs2-19)
-family, under investigation); locked as regression values at the tagged mesh.
+Slide2 counterpart: [VP83](rocscience.md#vp83). Built with a caveat.
 
-Input files: [vp083a.xlsx](../files/rocscience/vp083a.xlsx),
+**Input files:** [vp083a.xlsx](../files/rocscience/vp083a.xlsx),
 [vp083b.xlsx](../files/rocscience/vp083b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp083a) | 1.41 | RS2 SSRM 1.32 |
+| SSRM (vp083b) | 1.37 | RS2 SSRM 1.32 |
+
+*Cross-bearings: D&W referee 1.28–1.33.*
+
+XSLOPE's SSRM reads high on φ=0 foundations (the [RS2-19](#rs2-19) family, under
+investigation); locked as regression values at the tagged mesh.
 
 <!-- test: file=../files/rocscience/vp083a.xlsx, type=fem_ssrm, expected_fs=1.412, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=4000, benchmark=RS2-45a -->
 <!-- test: file=../files/rocscience/vp083b.xlsx, type=fem_ssrm, expected_fs=1.365, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=4000, benchmark=RS2-45b -->
@@ -626,10 +864,18 @@ Input files: [vp083a.xlsx](../files/rocscience/vp083a.xlsx),
 
 ### RS2-46: Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) {#rs2-46}
 
-Slide2 counterpart: **VP84**. SSRM 0.80 / 0.95 / 1.08 / 1.19 vs RS2 SSRM 0.78 / 0.93 / 1.05 /
-1.15 (+2–3%, the φ=0 pattern); D&W 0.75 / 0.90 / 1.03 / 1.13.
+Slide2 counterpart: [VP84](rocscience.md#vp84).
 
-Input files: [vp084a–d](../files/rocscience/vp084a.xlsx)
+**Input files:** [vp084a–d](../files/rocscience/vp084a.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (vp084a) | 0.80 | RS2 SSRM 0.78 |
+| SSRM (vp084b) | 0.95 | RS2 SSRM 0.93 |
+| SSRM (vp084c) | 1.08 | RS2 SSRM 1.05 |
+| SSRM (vp084d) | 1.19 | RS2 SSRM 1.15 |
+
+*+2–3%, the φ=0 pattern. Cross-bearings: D&W 0.75 / 0.90 / 1.03 / 1.13 for the four cases in the same order.*
 
 <!-- test: file=../files/rocscience/vp084a.xlsx, type=fem_ssrm, expected_fs=0.804, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=4000, benchmark=RS2-46a -->
 <!-- test: file=../files/rocscience/vp084b.xlsx, type=fem_ssrm, expected_fs=0.947, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.5, f_max=1.4, max_iter=4000, benchmark=RS2-46b -->
@@ -646,11 +892,17 @@ Input files: [vp084a–d](../files/rocscience/vp084a.xlsx)
 
 ### RS2-47: Purely cohesive slope, varying thickness (D&W Fig 14.3) {#rs2-47}
 
-Slide2 counterpart: **VP78**. Built for the 30-ft case: SSRM 1.08 vs RS2 SSRM 1.03; D&W
-referee 1.124–1.135. The 46.5- and 60-ft variants (RS2 1.02 / 1.02) need deepened-base
-builds and are deferred.
+Slide2 counterpart: [VP78](rocscience.md#vp78). Built for the 30-ft case.
 
-Input file: [vp078.xlsx](../files/rocscience/vp078.xlsx)
+**Input files:** [vp078.xlsx](../files/rocscience/vp078.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (30-ft case) | 1.08 | RS2 SSRM 1.03 |
+
+*Cross-bearings: D&W referee 1.124–1.135.*
+
+The 46.5- and 60-ft variants (RS2 1.02 / 1.02) need deepened-base builds and are deferred.
 
 <!-- test: file=../files/rocscience/vp078.xlsx, type=fem_ssrm, expected_fs=1.081, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=4000, benchmark=RS2-47 -->
 
@@ -658,20 +910,33 @@ Input file: [vp078.xlsx](../files/rocscience/vp078.xlsx)
 
 ### RS2-48–54: Multi-tiered geotextile walls (Leshchinsky & Han 2004) {#rs2-48}
 
-Slide2 counterparts: **VP87–VP93** (one-for-one, verified). *Blocked*: the FEM reinforcement
-tensile-capacity cap is not enforced in SSRM (proven Ta-insensitive on the baseline wall:
-unreinforced 0.41, any Ta 1.72 vs published ≈1.0). Extraction and published tables are
-complete for all seven; the series unlocks together when the cap is fixed. Problem 55 (five
-1.8-m tiers, Slide2 VP94) belongs to this family and is blocked with the series.
+Slide2 counterparts: [VP87](rocscience.md#vp87)–VP93 (one-for-one, verified; only VP87 has a
+detail section on the LEM page). *Blocked*.
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (baseline wall, reinforced — any T<sub>a</sub>) | 1.72 | ≈1.0 |
+| SSRM (baseline wall, unreinforced) | 0.41 | — |
+
+*The FEM reinforcement tensile-capacity cap is not enforced in SSRM, which is why the SSRM is provably T<sub>a</sub>-insensitive on the baseline wall.*
+
+Extraction and published tables are complete for all seven; the series unlocks together when
+the cap is fixed. Problem 55 (five 1.8-m tiers, Slide2 VP94) belongs to this family and is
+blocked with the series.
 
 ### RS2-56: Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) {#rs2-56}
 
-New corpus files (no Slide2 counterpart). Built: all five within ±3.3% of RS2's M-C and
-inside the four-program band; locks bracket the family (0.667 / 2.131). Full case-by-case
-tables are in [the Pruska cross-bearing section](#pruska).
+New corpus files (no Slide2 counterpart). Built: all five cases run.
 
-Input files: [rs2_56a.xlsx](../files/rocscience/rs2_56a.xlsx),
+**Input files:** [rs2_56a.xlsx](../files/rocscience/rs2_56a.xlsx),
 [rs2_56b.xlsx](../files/rocscience/rs2_56b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (rs2_56a — case 2, weakest; lock) | 0.667 | RS2 SSRM 0.67 |
+| SSRM (rs2_56b — case 5, strongest; lock) | 2.131 | RS2 SSRM 2.14 |
+
+*All five cases land within ±3.3% of RS2's M-C and inside the four-program band (Z-Soil, PLAXIS, GEO FEM); the two locks bracket the family. Full case-by-case tables — including the Z-Soil / PLAXIS / GEO FEM / Slide2 columns — are in [the Pruska cross-bearing section](#pruska).*
 
 <!-- test: file=../files/rocscience/rs2_56a.xlsx, type=fem_ssrm, expected_fs=0.667, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.32, f_max=1.12, max_iter=4000, benchmark=RS2-56a -->
 <!-- test: file=../files/rocscience/rs2_56b.xlsx, type=fem_ssrm, expected_fs=2.131, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.79, f_max=2.59, max_iter=4000, benchmark=RS2-56b -->
@@ -682,11 +947,17 @@ Input files: [rs2_56a.xlsx](../files/rocscience/rs2_56a.xlsx),
 
 ### RS2-57: Pruska H = 10.5 m, 6 cases {#rs2-57}
 
-New corpus files. Built: all six within ±3.6% of RS2's M-C; locks 0.449 / 1.411. Full tables
-in [the Pruska cross-bearing section](#pruska).
+New corpus files. Built: all six cases run.
 
-Input files: [rs2_57a.xlsx](../files/rocscience/rs2_57a.xlsx),
+**Input files:** [rs2_57a.xlsx](../files/rocscience/rs2_57a.xlsx),
 [rs2_57b.xlsx](../files/rocscience/rs2_57b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (rs2_57a — case 1, weakest; lock) | 0.449 | RS2 SSRM 0.44 |
+| SSRM (rs2_57b — case 6, strongest; lock) | 1.411 | RS2 SSRM 1.42 |
+
+*All six cases land within ±3.6% of RS2's M-C; the two locks bracket the family. Full case-by-case tables — including the Z-Soil / PLAXIS / GEO FEM / Slide2 columns — are in [the Pruska cross-bearing section](#pruska).*
 
 <!-- test: file=../files/rocscience/rs2_57a.xlsx, type=fem_ssrm, expected_fs=0.449, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.89, max_iter=4000, benchmark=RS2-57a -->
 <!-- test: file=../files/rocscience/rs2_57b.xlsx, type=fem_ssrm, expected_fs=1.411, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.07, f_max=1.87, max_iter=4000, benchmark=RS2-57b -->
@@ -697,12 +968,18 @@ Input files: [rs2_57a.xlsx](../files/rocscience/rs2_57a.xlsx),
 
 ### RS2-58: Pruska H = 14 m, 6 cases {#rs2-58}
 
-New corpus files. Built (5 of 6): four within ±3.6%; case 5 (c=5, φ=30) reads 0.667 vs a
-tight published 0.72–0.75 cluster and is reported unlocked pending explanation; locks 0.342
-/ 1.057. Full tables in [the Pruska cross-bearing section](#pruska).
+New corpus files. Built (5 of 6).
 
-Input files: [rs2_58a.xlsx](../files/rocscience/rs2_58a.xlsx),
+**Input files:** [rs2_58a.xlsx](../files/rocscience/rs2_58a.xlsx),
 [rs2_58b.xlsx](../files/rocscience/rs2_58b.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (rs2_58a — case 1, weakest; lock) | 0.342 | RS2 SSRM 0.33 |
+| SSRM (rs2_58b — case 6, strongest; lock) | 1.057 | RS2 SSRM 1.06 |
+| SSRM (case 5, c = 5, φ = 30; unlocked) | 0.667 | RS2 SSRM 0.72 |
+
+*Four of the six land within ±3.6%; the two locks bracket the family. Case 5 reads 0.667 against a tight published 0.72–0.75 cluster (RS2 0.72, Z-Soil 0.75, PLAXIS 0.74, GEO FEM 0.73, Slide2 0.73) and is reported unlocked pending explanation. Full case-by-case tables in [the Pruska cross-bearing section](#pruska).*
 
 <!-- test: file=../files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.342, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=4000, benchmark=RS2-58a -->
 <!-- test: file=../files/rocscience/rs2_58b.xlsx, type=fem_ssrm, expected_fs=1.057, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.71, f_max=1.51, max_iter=4000, benchmark=RS2-58b -->

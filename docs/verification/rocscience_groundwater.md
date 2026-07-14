@@ -257,19 +257,8 @@ a head rise of 0.016252 m against the one-dimensional hand calculation
 *q*·(0.4/*k*<sub>B</sub> + 0.1/*k*<sub>A</sub>) = 0.016252 m, agreeing to six figures; and the
 computed suction in the unsaturated zone lands on the Gardner gravity asymptote — with
 *k<sub>r</sub>* = *q*/*k<sub>s</sub>* = 0.0396, the law gives ψ\* = 0.323 m, against a computed
-−0.315 m. Reversing the sign of *q* inverts the response antisymmetrically.
-
-The *reported* flowrate is slightly less than the applied *q*·*L* — 4.3436×10⁻⁶ against
-4.4000×10⁻⁶ at the locked mesh size, 1.3% low — and that difference is physical, not lost water.
-The infiltration boundary and the seepage face meet at the top of the ditch, and that shared
-corner node belongs to the seepage face, where the head is prescribed. The half-edge of rainfall
-load sitting on it is therefore discarded by the solve, exactly as it should be: at a node whose
-head is fixed, the flow is whatever the boundary demands, and rain falling on the open ditch runs
-straight out of it. XSLOPE reports the inflow that actually entered the mesh rather than the
-inflow that was nominally specified. The gap is the corner load to every printed digit and halves
-each time the element size halves (1.16×10⁻⁷ → 5.64×10⁻⁸ → 2.78×10⁻⁸ → 1.38×10⁻⁸ over four
-refinements), converging on *q*·*L* as the corner shrinks to the measure-zero point it is in the
-continuum.
+−0.315 m. Reversing the sign of *q* inverts the response antisymmetrically. The reported flowrate
+is *q*·*L* = 4.400000×10⁻⁶ to six figures at every mesh size tested, from 243 to 14 867 nodes.
 
 **The published contours, however, do not follow from the printed inputs.**
 
@@ -292,7 +281,7 @@ Only the flowrate is locked, on tri3: the total inflow is the one quantity here 
 construction. No head lock is taken, because locking XSLOPE's own head field would enshrine
 numbers the manual contradicts.
 
-<!-- test: file=../files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.344e-06, tolerance=0.02, benchmark=GW8-q -->
+<!-- test: file=../files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.400e-06, tolerance=0.02, benchmark=GW8-q -->
 
 ### GW11: Earth/rock-fill dam, Gardner permeability function {#gw11}
 

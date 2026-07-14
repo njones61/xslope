@@ -134,6 +134,25 @@ def assemble_flux_nodal(nodes, elements, element_types, specified_fluxes, tolera
             logger.warning("Flux BC #%d matched no boundary edges (flux=%g)", i + 1, q)
             continue
 
+        # A PARTIAL match silently delivers less water than the user asked for: an
+        # edge is loaded only when BOTH its corners lie on the polyline, so
+        # endpoints landing mid-edge drop whole edges and q*L quietly shrinks. Warn
+        # whenever the matched length misses the specified length by more than one
+        # element, which is the most a correct match can lose to endpoint rounding.
+        matched_len = float(np.sum(lengths[on]))
+        spec_len = float(np.sum(np.linalg.norm(np.diff(coords, axis=0), axis=1)))
+        h_typ = matched_len / max(int(np.count_nonzero(on)), 1)
+        if spec_len - matched_len > h_typ:
+            warnings.warn(
+                f"Flux BC #{i + 1} (flux={q:g}) matched {matched_len:.4g} of its "
+                f"{spec_len:.4g} specified length, so only "
+                f"{matched_len / spec_len:.1%} of the intended inflow is applied. "
+                "An edge is loaded only when both of its corner nodes lie on the "
+                "polyline; check that the polyline endpoints fall on mesh nodes and "
+                "that it follows the mesh boundary.",
+                stacklevel=2,
+            )
+
         qL = q * lengths[on]
         e_on = edges[on]
         m_on = mids[on]
@@ -148,17 +167,22 @@ def assemble_flux_nodal(nodes, elements, element_types, specified_fluxes, tolera
     return flux_nodal
 
 
-def _flux_inflow(flux_nodal, bc_type):
-    """Inflow entering through specified-flux nodes (positive loads at free nodes).
+def _flux_inflow(flux_nodal, free_mask):
+    """Inflow that specified-flux loads actually deliver into the mesh.
 
-    Loads at Dirichlet nodes are discarded by the solve (the fixed head wins), so
-    they must not be counted in the flowrate either.
+    `_dirichlet_system` seeds the RHS with the loads and then OVERWRITES the
+    Dirichlet rows, so a load sitting on a Dirichlet node never enters the solve
+    and must not be counted. The mask therefore has to be the RUNTIME Dirichlet
+    set — for an unconfined problem that is the specified heads plus the ACTIVE
+    exit-face nodes, which changes from iteration to iteration. Passing
+    `bc_type == 0` instead would miss the loads on INACTIVE exit-face nodes,
+    whose rows stay free and whose loads are real inflow (rain landing on the
+    unsaturated part of a seepage face does infiltrate).
     """
     if flux_nodal is None:
         return 0.0
     f = np.asarray(flux_nodal, dtype=float)
-    free = np.asarray(bc_type) == 0
-    return float(np.sum(f[free & (f > 0)]))
+    return float(np.sum(f[np.asarray(free_mask) & (f > 0)]))
 
 
 def build_seep_data(mesh, slope_data, seep_bc=1):
@@ -551,11 +575,22 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
     head = spsolve(A, b)
     q = A_full @ head
 
-    # Inflow = positive q at specified-head nodes plus the inflow applied at
-    # flux nodes (where the free-row residual makes q equal the applied load).
-    bc_type = np.asarray(bc_type)
-    total_flow = float(np.sum(q[(bc_type == 1) & (q > 0)]))
-    total_flow += _flux_inflow(flux_nodal, bc_type)
+    # Inflow = what the Dirichlet boundaries supply, plus what the flux loads
+    # deliver at the free nodes.
+    #
+    # Only the loads on FREE rows are ever applied: `_dirichlet_system` seeds b with
+    # f_ext and then overwrites the Dirichlet rows, so a load on a Dirichlet node is
+    # dropped from the system entirely. `f_eff` is therefore the load the solve
+    # actually saw, and A.h - f_eff is the boundary reaction — zero on free rows (the
+    # equation just solved) and the full external supply on Dirichlet rows. Summing
+    # the positive reactions and the free-node inflow then closes exactly, because A
+    # has zero row sums and so the two sides of sum(A.h) = 0 must balance.
+    f_ext = (np.zeros(n_nodes) if flux_nodal is None
+             else np.asarray(flux_nodal, dtype=float))
+    f_eff = np.where(dir_mask, 0.0, f_ext)
+    reaction = q - f_eff
+    total_flow = float(np.sum(reaction[dir_mask & (reaction > 0)]))
+    total_flow += _flux_inflow(f_ext, ~dir_mask)
 
     return head, A, q, total_flow
 
@@ -706,8 +741,23 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # Apply relaxation
         h_new = relax * h_solved + (1 - relax) * h_last
 
-        # Compute flows at all nodes (not used for closure, but for exit face logic)
-        q = _coo_matvec(asm, data, h_new)
+        # Nodal REACTION, for the exit-face switch below (not used for closure).
+        #
+        # The switch asks whether the BOUNDARY would have to push water into the
+        # domain — unphysical, since a free-draining face can only let water out —
+        # so it must test the reaction, not A.h. Only the loads on free rows were
+        # ever applied (the Dirichlet rows of b get overwritten), so the reaction is
+        # A.h - f_eff:
+        #   inactive exit node (free row): the solve enforces (A.h)_i = f_ext_i, so
+        #     the reaction is ~0 and `turn_on` falls back to the pressure test, which
+        #     is the pre-flux behaviour. Testing raw A.h here would compare the
+        #     applied load against ITSELF, always read "inflow", and lock the node
+        #     out of the seepage face however positive its pressure grew.
+        #   active exit node (Dirichlet row): its load was dropped, so the whole of
+        #     A.h is the drain reaction and nothing may be subtracted.
+        # Without a flux BC f_eff is zero and this is bit-for-bit the old test.
+        f_eff = np.where(dir_mask, 0.0, f_ext)
+        q = _coo_matvec(asm, data, h_new) - f_eff
 
         # Update exit face boundary conditions with hysteresis
         n_active_before = np.sum(exit_face_active)
@@ -717,6 +767,18 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # (matching SEEP2D). Quadratic exit-face sides are then updated from
         # these corner candidates plus the midside candidate so the whole side
         # remains edge-consistent.
+        # SEEP2D (seep2d.f:2137-2147) activates an inactive node on pressure alone and
+        # deactivates an active one on inflow. We keep an extra `q <= 0` term on
+        # activation: on a free row q is the previous iterate's residual scaled by
+        # (1 - relax), and requiring it to be non-positive damps the activation of
+        # nodes the last sweep was still pushing water into. It is load-bearing —
+        # dropping it costs convergence on the quadratic earth-dam meshes.
+        #
+        # What that term must NOT see is the applied flux. An inactive node's row is
+        # free, so the solve enforces (A.h)_i = f_ext_i there; testing raw A.h would
+        # compare the applied load against ITSELF, read "inflow" for any q > 0, and
+        # pin the node out of the seepage face forever, however high its pressure
+        # climbed. Subtracting f_eff restores the residual the term is meant to test.
         corner_candidate = np.zeros(n_nodes, dtype=bool)
         is_corner = (bc_type == 2) & _exit_is_corner
         stay = is_corner & exit_face_active & ~((h_new < y - hyst) | (q > 0))
@@ -760,9 +822,15 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # applied flux must be subtracted or a flux node reads as pure imbalance.
         data_chk = _assembly_data(asm, p_nodes=h_solved - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
         q_chk = _coo_matvec(asm, data_chk, h_solved)
+        # One runtime Dirichlet mask for BOTH sides of the ratio. The numerator sums
+        # the residual over the free rows, so the denominator must count the flux
+        # delivered on those same free rows — masking it by bc_type instead would
+        # drop the loads on inactive exit-face nodes and inflate the ratio. Note the
+        # mask is rebuilt from the CURRENT active set, which the switch above may
+        # have just changed, so it is not necessarily the one used for this solve.
         free_mask = ~((bc_type == 1) | ((bc_type == 2) & exit_face_active))
         inflow_pos = (float(np.sum(q_chk[(bc_type == 1) & (q_chk > 0)]))
-                      + _flux_inflow(f_ext, bc_type))
+                      + _flux_inflow(f_ext, free_mask))
         rel_closure = (float(np.sum(np.abs(q_chk[free_mask] - f_ext[free_mask]))) / inflow_pos
                        if inflow_pos > 1e-30 else 0.0)
         set_stable = bool(np.array_equal(exit_face_active, _prev_active))
@@ -808,17 +876,27 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     h_new = spsolve(A_final, b_final)
     q_final = _coo_matvec(asm, data, h_new)
 
-    # Flowrate: positive q at specified-head nodes plus the applied flux inflow
-    total_inflow = float(np.sum(q_final[(bc_type == 1) & (q_final > 0)]))
-    total_inflow += _flux_inflow(f_ext, bc_type)
+    # Flowrate: the reaction at the specified-head boundaries, plus the flux
+    # delivered on the free rows. "Free" is the runtime Dirichlet complement, so it
+    # includes the INACTIVE exit-face nodes — their rows stay free, so their loads
+    # do enter the solve and are real inflow (rain landing on the unsaturated part
+    # of a seepage face infiltrates). Loads on ACTIVE exit nodes were dropped by the
+    # solve, so f_eff zeroes them and they are counted nowhere: rain falling on a
+    # saturated, free-draining face simply runs off.
+    free_final = ~dir_mask
+    f_eff = np.where(dir_mask, 0.0, f_ext)
+    react_final = q_final - f_eff
+    total_inflow = float(np.sum(react_final[(bc_type == 1) & (react_final > 0)]))
+    total_inflow += _flux_inflow(f_ext, free_final)
 
     # Closure report: kr-consistent imbalance at the converged state
     data_chk = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
     q_chk = _coo_matvec(asm, data_chk, h_new)
-    _free_flux = (bc_type == 0)
-    net_inflow = float(np.sum(q_chk[bc_type == 1])) + _flux_inflow(f_ext, bc_type)
-    net_outflow = (-float(np.sum(q_chk[bc_type == 2]))
-                   - float(np.sum(f_ext[_free_flux & (f_ext < 0)])))
+    react_chk = q_chk - f_eff
+    net_inflow = (float(np.sum(react_chk[bc_type == 1]))
+                  + _flux_inflow(f_ext, free_final))
+    net_outflow = (-float(np.sum(react_chk[dir_mask & (bc_type == 2)]))
+                   - float(np.sum(f_ext[free_final & (f_ext < 0)])))
     closure_error = abs(net_inflow - net_outflow)
     print(f"Flow closure check: inflow = {net_inflow:.6e}, outflow = {net_outflow:.6e}, error = {closure_error:.6e}")
 
@@ -3217,7 +3295,13 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     # Only meaningful on an unconfined problem: a confined domain is saturated by
     # construction and positive pressure there says nothing about ponding.
     if has_flux and is_unconfined:
-        ponded = np.where((flux_nodal > 0) & (bc_type == 0) & (u > 0))[0]
+        # Test the free nodes of the RUNTIME Dirichlet set, not bc_type == 0. An
+        # INACTIVE exit-face node is free, still carries its load, and is exactly
+        # where an over-specified inflow shows up — filtering on bc_type would skip
+        # the nodes the check exists to catch. (Loads on ACTIVE exit nodes are
+        # discarded by the solve, and a prescribed p = 0 there cannot pond anyway.)
+        _dir_now = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
+        ponded = np.where((flux_nodal > 0) & ~_dir_now & (u > 0))[0]
         if len(ponded) > 0:
             warnings.warn(
                 f"{len(ponded)} specified-flux node(s) finished with positive pore "

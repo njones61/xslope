@@ -280,6 +280,22 @@ model that runoff, but it does warn when any flux node finishes with $\psi > 0$ 
 unconfined problem, which is the signal that the specified rate exceeds what the soil can
 accept and the result should not be trusted.
 
+**A flux boundary may overlap an exit face**, which is the natural way to pose rain falling on a
+slope face that also seeps. The two conditions then interact node by node, according to whether
+that part of the face is currently saturated. Where the exit face is *inactive* — the face is
+unsaturated there, above the exit point — the node is still a free unknown, so the rain lands on
+it and infiltrates, and it counts toward the reported inflow. Where the exit face is *active* —
+saturated, held at atmospheric pressure — the head is prescribed and the applied load is
+discarded: rain falling on an already-draining face simply runs off, and is counted neither as
+inflow nor as outflow. As the water table rises, nodes cross from the first regime to the second,
+and the exit point migrates up the face.
+
+The one posing XSLOPE will not resolve is an inflow onto a seepage face that *exceeds* what the
+face can drain. Such a node has no steady answer under either condition — it floods while free,
+and sheds the water while prescribed — so the iteration oscillates rather than converging. That is
+the switching boundary condition described above, which XSLOPE does not model; the run will report
+`converged = False` and warn about ponding rather than return a plausible-looking number.
+
 Zero flux is the natural (do-nothing) condition and is already what an unspecified boundary
 carries, so a flux boundary only needs to be defined where the flux is non-zero.
 

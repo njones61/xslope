@@ -53,30 +53,61 @@ choice is not cosmetic, which is why XSLOPE makes you make it rather than guessi
 | GeoStudio | XSLOPE |
 |---|---|
 | Regions (`Points` + `PointIDs`) | Material zones (`polygons`) |
-| Materials — Mohr-Coulomb `UnitWeight`, `CohesionPrime`, `PhiPrime` | Materials — γ, c′, φ′ |
 | Region→material assignment (per analysis) | `mat_id` |
-| Piezometric surface | Piezo line, with materials set to `piezo` |
+| Mohr-Coulomb materials (`CohesionPrime`, `PhiPrime`) | `option='mc'` with c′, φ′ |
+| **Undrained materials** (`UndrainedPhiZero`, strength in `Cohesion`) | `option='mc'` with c = Su, φ = 0 |
+| **Bedrock** (impenetrable) | **Excluded from the domain** — see below |
+| Material colour | The zone colour in Studio |
+| Piezometric surface + `MaterialUsesPiezs` | Piezo line, on the materials that use it |
+| **Piezo line above the ground surface** | **A distributed load** — see below |
+| **Surcharges** (`Pressure` over a run of ground) | `dloads` |
+| **Tension crack** (+ `PctFilledWithWater`) | `tcrack_depth`, `tcrack_water` |
 | Unit weight of water | `gamma_water` |
-| Seismic coefficient | `k_seismic` |
-| SLOPE/W's critical circle, if the file was solved | A single trial circle |
+| Horizontal seismic coefficient | `k_seismic` |
+| SLOPE/W's critical circle, if the file was solved and it fits | A single trial circle |
 
-The ground surface and domain are derived from the zones, as they are for any
-polygon-based model.
+The ground surface and domain are derived from the zones, as for any polygon-based model.
 
-### What does not, and why
+!!! info "Bedrock becomes geometry, not a material"
+    GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE has no
+    such material: its impenetrable boundary is the **domain** itself. So bedrock regions
+    are *excluded* from the imported model, and the domain floor lands on the top of the
+    bedrock. That reproduces SLOPE/W exactly. Importing bedrock as ordinary soil would let
+    trial surfaces cut straight through it.
 
-Import reports these rather than dropping them quietly — read the caveats it returns.
+!!! info "Ponded water is synthesised"
+    GeoStudio stores no ponded-water object: where the piezometric line rises **above** the
+    ground surface, SLOPE/W simply carries the water's weight implicitly. XSLOPE needs that
+    weight to exist explicitly, so the import **creates a distributed load** of γ_w × depth,
+    normal to the ground and tapering to zero at the waterline. Without it, the weight of
+    the reservoir would silently vanish.
+
+### What does not come across, and why
+
+Import **reports every one of these** — it never drops something that changes the answer
+without telling you. Read the caveats it returns.
 
 - **The search definition.** SLOPE/W searches with an entry/exit range or a
   grid-and-radius; neither is an XSLOPE search, and a wrong surface is worse than none.
   If the file was saved *solved*, XSLOPE imports **SLOPE/W's critical circle** instead —
   which makes the model complete, and lets you compare the two programs on identical
-  geometry. Run a search afterwards to find XSLOPE's own critical surface.
-- **Non-Mohr-Coulomb strengths.** Anything else (undrained, Hoek-Brown, curved
-  envelopes) is imported with its c and φ and flagged. Check it before solving.
+  geometry. Run a search afterwards to find XSLOPE's own critical surface. If that circle
+  will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
+  along a bedrock boundary), no surface is imported and you are told so.
+- **Reinforcement — nails, geosynthetics, anchors.** Deliberately not guessed at:
+  GeoStudio's pullout law, out-of-plane spacing and force distribution do not line up with
+  XSLOPE's model one-to-one, and a *wrong* reinforcement force is far worse than an
+  obviously absent one. **A reinforced model imports unreinforced, and says so loudly** —
+  re-enter the reinforcement, or its factor of safety will be wrong.
+- **Line loads.**
+- **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
+  sits at a varying depth, the deepest is taken (conservative) and the difference reported.
+- **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
 - **Pore pressure other than a piezometric surface.** Ru, pressure grids and
-  finite-element pore pressures have no direct mapping and import as zero.
-- **Reinforcement, piles, and loads.**
+  finite-element pore pressures import as zero.
+- **Anything XSLOPE has never seen.** Unrecognised GeoStudio elements are reported by
+  name rather than ignored, so a feature added in a future version cannot silently change
+  someone's factor of safety.
 
 !!! warning "Check the units"
     The same `.gsz` schema holds both metric and imperial models. GeoStudio declares

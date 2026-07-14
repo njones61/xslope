@@ -1225,10 +1225,12 @@ def _write_synthetic_gsz(path):
     xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <GSIData Version="11.11" AppVersion="25.2.1.4">
   <FileInfo Title="synthetic" />
-  <Analyses Len="2">
+  <Analyses Len="3">
     <Analysis><ID>1</ID><Name>dry</Name><Kind>SLOPE/W</Kind>
       <Method>Morgenstern-Price</Method></Analysis>
     <Analysis><ID>2</ID><Name>wet</Name><Kind>SLOPE/W</Kind>
+      <Method>Spencer</Method></Analysis>
+    <Analysis><ID>3</ID><Name>loaded</Name><Kind>SLOPE/W</Kind>
       <Method>Spencer</Method></Analysis>
   </Analyses>
   <Geometries Len="1">
@@ -1249,15 +1251,17 @@ def _write_synthetic_gsz(path):
       </PiezometricSurfaces>
     </Geometry>
   </Geometries>
-  <Materials Len="2">
+  <Materials Len="3">
     <Material><ID>1</ID><Name>strong</Name><SlopeModel>MohrCoulomb</SlopeModel>
       <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>25</CohesionPrime>
         <PhiPrime>30</PhiPrime></StressStrain></Material>
     <Material><ID>2</ID><Name>weak</Name><SlopeModel>MohrCoulomb</SlopeModel>
       <StressStrain><UnitWeight>18</UnitWeight><CohesionPrime>5</CohesionPrime>
         <PhiPrime>20</PhiPrime></StressStrain></Material>
+    <Material><ID>3</ID><Name>undrained</Name><SlopeModel>UndrainedPhiZero</SlopeModel>
+      <StressStrain><UnitWeight>19</UnitWeight><Cohesion>40</Cohesion></StressStrain></Material>
   </Materials>
-  <Contexts Len="2">
+  <Contexts Len="3">
     <Context><AnalysisID>1</AnalysisID>
       <GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" />
@@ -1266,19 +1270,46 @@ def _write_synthetic_gsz(path):
       <GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="2" />
       </GeometryUsesMaterials></Context>
+    <Context><AnalysisID>3</AnalysisID>
+      <GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="3" />
+      </GeometryUsesMaterials></Context>
   </Contexts>
-  <WaterItems Len="2">
+  <WaterItems Len="3">
     <WaterItem><AnalysisID>1</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>2</AnalysisID>
       <Entry><ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>
         <UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>3</AnalysisID>
+      <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
   </WaterItems>
-  <StabilityItems Len="2">
+  <StabilityItems Len="3">
     <StabilityItem><AnalysisID>1</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
     <StabilityItem><AnalysisID>2</AnalysisID>
       <Entry><Seismic Horizontal="0.15" Vertical="" /></Entry></StabilityItem>
+    <StabilityItem><AnalysisID>3</AnalysisID>
+      <Entry>
+        <Seismic Horizontal="" Vertical="" />
+        <DataPoints Len="4">
+          <DataPoint Number="1" X="40" Y="26" />
+          <DataPoint Number="2" X="60" Y="26" />
+          <DataPoint Number="3" X="42" Y="30" />
+          <DataPoint Number="4" X="58" Y="30" />
+        </DataPoints>
+        <TensionCrack>
+          <PctFilledWithWater>0.5</PctFilledWithWater>
+          <DataPoints Len="2"><DataPoint>1</DataPoint><DataPoint>2</DataPoint></DataPoints>
+        </TensionCrack>
+        <Surcharges Len="1">
+          <Surcharge><ID>1</ID>
+            <DataPoints Len="2"><DataPoint>3</DataPoint><DataPoint>4</DataPoint></DataPoints>
+            <Pressure>35</Pressure>
+          </Surcharge>
+        </Surcharges>
+        <SomeFutureGeoStudioFeature>whatever</SomeFutureGeoStudioFeature>
+      </Entry></StabilityItem>
   </StabilityItems>
 </GSIData>
 """
@@ -1308,11 +1339,37 @@ def run_gsz_import_test(test):
         gsz = read_gsz(path)
 
         analyses = list_analyses(gsz)
-        if len(analyses) != 2:
-            return None, f"GeoStudio import: {len(analyses)} analyses, expected 2"
+        if len(analyses) != 3:
+            return None, f"GeoStudio import: {len(analyses)} analyses, expected 3"
 
         sd1, cav1 = gsz_to_slope_data(gsz, 1)
         sd2, cav2 = gsz_to_slope_data(gsz, 2)
+        sd3, cav3 = gsz_to_slope_data(gsz, 3)
+
+        # An UNDRAINED material keeps its strength in <Cohesion>, not <CohesionPrime>.
+        # Reading only the drained field gave c = 0, phi = 0 — a soil with no strength
+        # and a meaningless factor of safety, with nothing said about it.
+        m3 = sd3['materials'][0]
+        if (m3['name'], m3['c'], m3['phi']) != ('undrained', 40.0, 0.0):
+            problems.append(f"undrained material -> c={m3['c']}, phi={m3['phi']}, "
+                            f"expected c=40 (from <Cohesion>), phi=0")
+
+        # Tension crack: depth below ground, and water DEPTH in the crack (not a %).
+        # The crest is at y=30 over x=40..60 and the crack line sits at y=26, so the
+        # crack is 4 deep and — at PctFilledWithWater=0.5 — holds 2 of water.
+        if abs(sd3['tcrack_depth'] - 4.0) > 1e-6:
+            problems.append(f"tcrack_depth {sd3['tcrack_depth']}, expected 4")
+        if abs(sd3['tcrack_water'] - 2.0) > 1e-6:
+            problems.append(f"tcrack_water {sd3['tcrack_water']}, expected 2 "
+                            f"(a DEPTH, = 50% of the crack depth, not a fraction)")
+
+        # Surcharge -> distributed load, pressure preserved.
+        if len(sd3['dloads']) != 1 or sd3['dloads'][0][0]['Normal'] != 35.0:
+            problems.append(f"surcharge -> dloads {sd3['dloads']}")
+
+        # FAIL LOUD: an element we do not recognise must be reported, never ignored.
+        if not any('SomeFutureGeoStudioFeature' in c for c in cav3):
+            problems.append("an unrecognised GeoStudio element was silently ignored")
 
         # Per-analysis material assignment: same geometry, different soil.
         m1 = sd1['materials'][0]

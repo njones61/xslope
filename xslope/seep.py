@@ -14,6 +14,8 @@
 
 import logging
 import time
+import warnings
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,6 +57,110 @@ def _min_distance_to_polyline(points, polyline):
     return dists
 
 
+def _boundary_edge_map(elements, element_types):
+    """Boundary edges of the mesh, keyed by the sorted CORNER-node pair.
+
+    Returns (boundary_edges, midside_map): boundary_edges maps each boundary
+    edge (a corner pair owned by exactly one element) to that element index;
+    midside_map maps a corner pair to its midside node for quadratic elements
+    (absent for linear ones).
+    """
+    edge_counts = defaultdict(list)
+    midside_map = {}
+    for idx, en in enumerate(elements):
+        et = element_types[idx]
+        if et == 3:
+            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[0])]
+        elif et == 6:
+            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[0])]
+            midside_map[tuple(sorted((en[0], en[1])))] = en[3]
+            midside_map[tuple(sorted((en[1], en[2])))] = en[4]
+            midside_map[tuple(sorted((en[2], en[0])))] = en[5]
+        elif et == 4:
+            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[3]), (en[3], en[0])]
+        elif et in (8, 9):
+            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[3]), (en[3], en[0])]
+            midside_map[tuple(sorted((en[0], en[1])))] = en[4]
+            midside_map[tuple(sorted((en[1], en[2])))] = en[5]
+            midside_map[tuple(sorted((en[2], en[3])))] = en[6]
+            midside_map[tuple(sorted((en[3], en[0])))] = en[7]
+        else:
+            continue
+        for a, b in corners:
+            edge_counts[tuple(sorted((a, b)))].append(idx)
+
+    boundary_edges = {e: elems[0] for e, elems in edge_counts.items() if len(elems) == 1}
+    return boundary_edges, midside_map
+
+
+def assemble_flux_nodal(nodes, elements, element_types, specified_fluxes, tolerance):
+    """Consistent nodal loads for the Neumann (specified-flux) boundary condition.
+
+    Each flux BC is a polyline carrying a uniform normal Darcy velocity q
+    (positive = inflow). The load lives on the boundary EDGES that lie on that
+    polyline, not on the nodes: a boundary edge belongs to the BC when both of
+    its corner nodes are within `tolerance` of the polyline. The consistent
+    load vector for the integral of N_i*q along a straight edge of length L is
+    q*L/2 at each end for a linear edge, and (q*L/6, q*L/6, 2*q*L/3) for a
+    quadratic (corner, corner, midside) edge — each set sums to q*L.
+
+    Returns a (n_nodes,) vector to be ADDED to the RHS.
+    """
+    flux_nodal = np.zeros(len(nodes))
+    if not specified_fluxes:
+        return flux_nodal
+
+    boundary_edges, midside_map = _boundary_edge_map(elements, element_types)
+    if not boundary_edges:
+        return flux_nodal
+
+    edges = np.array(list(boundary_edges.keys()), dtype=int)   # (m, 2) corner pairs
+    mids = np.array([midside_map.get(tuple(e), -1) for e in map(tuple, edges)], dtype=int)
+    lengths = np.linalg.norm(nodes[edges[:, 1]] - nodes[edges[:, 0]], axis=1)
+
+    for i, bc in enumerate(specified_fluxes):
+        coords = np.asarray(bc["coords"], dtype=float)
+        if len(coords) < 2:
+            raise SeepInputError(
+                f"Flux BC #{i + 1} has {len(coords)} coordinate(s); a flux BC is "
+                "applied over the edges of a polyline and needs at least 2 points."
+            )
+        q = float(bc["flux"])
+
+        d1 = _min_distance_to_polyline(nodes[edges[:, 0]], coords)
+        d2 = _min_distance_to_polyline(nodes[edges[:, 1]], coords)
+        on = (d1 <= tolerance) & (d2 <= tolerance)
+        if not np.any(on):
+            logger.warning("Flux BC #%d matched no boundary edges (flux=%g)", i + 1, q)
+            continue
+
+        qL = q * lengths[on]
+        e_on = edges[on]
+        m_on = mids[on]
+        lin = m_on < 0
+        quad = ~lin
+        np.add.at(flux_nodal, e_on[lin, 0], 0.5 * qL[lin])
+        np.add.at(flux_nodal, e_on[lin, 1], 0.5 * qL[lin])
+        np.add.at(flux_nodal, e_on[quad, 0], qL[quad] / 6.0)
+        np.add.at(flux_nodal, e_on[quad, 1], qL[quad] / 6.0)
+        np.add.at(flux_nodal, m_on[quad], qL[quad] * 2.0 / 3.0)
+
+    return flux_nodal
+
+
+def _flux_inflow(flux_nodal, bc_type):
+    """Inflow entering through specified-flux nodes (positive loads at free nodes).
+
+    Loads at Dirichlet nodes are discarded by the solve (the fixed head wins), so
+    they must not be counted in the flowrate either.
+    """
+    if flux_nodal is None:
+        return 0.0
+    f = np.asarray(flux_nodal, dtype=float)
+    free = np.asarray(bc_type) == 0
+    return float(np.sum(f[free & (f > 0)]))
+
+
 def build_seep_data(mesh, slope_data, seep_bc=1):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
@@ -87,6 +193,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
             - element_materials: np.ndarray (n_elements,) of material IDs (1-based)
             - bc_type: np.ndarray (n_nodes,) of boundary condition flags (0=free, 1=fixed head, 2=exit face)
             - bc_values: np.ndarray (n_nodes,) of boundary condition values
+            - flux_nodal: np.ndarray (n_nodes,) of consistent nodal loads from the
+              specified-flux (Neumann) BCs, zero elsewhere (+ = inflow)
             - k1_by_mat: np.ndarray (n_materials,) of major conductivity values
             - k2_by_mat: np.ndarray (n_materials,) of minor conductivity values
             - angle_by_mat: np.ndarray (n_materials,) of angle values (degrees)
@@ -179,7 +287,22 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         mask = (dists <= tolerance) & (bc_type != 1)
         bc_type[mask] = 2
         bc_values[mask] = nodes[mask, 1]  # Use node's y-coordinate as elevation
-    
+
+    # Specified-flux (Neumann) BCs. These are NOT Dirichlet: they stay bc_type 0
+    # and enter the system only through the RHS, as consistent nodal loads
+    # assembled over the boundary edges lying on each flux polyline.
+    specified_fluxes = seepage_bc.get("specified_fluxes", [])
+    flux_nodal = assemble_flux_nodal(nodes, elements, element_types,
+                                     specified_fluxes, tolerance)
+    if len(specified_fluxes) > 0 and not np.any(bc_type > 0):
+        raise SeepInputError(
+            "Seepage problem has specified-flux boundary conditions but no "
+            "Dirichlet boundary (no specified head and no exit face). With only "
+            "Neumann conditions the head is defined solely up to an additive "
+            "constant and the system is singular. Add a specified-head or "
+            "exit-face boundary condition."
+        )
+
     # Check for missing unsaturated parameters when exit face BCs are present
     has_exit_face = np.any(bc_type == 2)
     missing_unsat_params = False
@@ -229,6 +352,7 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         "element_materials": element_materials,
         "bc_type": bc_type,
         "bc_values": bc_values,
+        "flux_nodal": flux_nodal,
         "k1_by_mat": k1_by_mat,
         "k2_by_mat": k2_by_mat,
         "angle_by_mat": angle_by_mat,
@@ -384,7 +508,8 @@ def import_seep2d(filepath):
     }
 
 
-def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, angles=None, element_types=None):
+def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, angles=None,
+                   element_types=None, flux_nodal=None):
     """
     FEM solver for confined seep with anisotropic conductivity.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
@@ -421,14 +546,16 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
     for node, value in dirichlet_bcs:
         dir_mask[node] = True
         dir_values[node] = value
-    A, b = _dirichlet_system(asm, data, dir_mask, dir_values)
+    A, b = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=flux_nodal)
 
     head = spsolve(A, b)
     q = A_full @ head
 
-    # Sum only positive q at specified-head nodes (inflow)
+    # Inflow = positive q at specified-head nodes plus the inflow applied at
+    # flux nodes (where the free-row residual makes q equal the applied load).
     bc_type = np.asarray(bc_type)
     total_flow = float(np.sum(q[(bc_type == 1) & (q > 0)]))
+    total_flow += _flux_inflow(flux_nodal, bc_type)
 
     return head, A, q, total_flow
 
@@ -436,7 +563,8 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
                       max_iter=400, tol=1e-6, element_types=None,
-                      closure_tol=1e-3, vg_a=None, vg_n=None, model=None):
+                      closure_tol=1e-3, vg_a=None, vg_n=None, model=None,
+                      flux_nodal=None):
     """
     Iterative FEM solver for unconfined flow using linear kr frontal function.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
@@ -464,6 +592,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     n_nodes = nodes.shape[0]
     y = nodes[:, 1]
+    f_ext = (np.zeros(n_nodes) if flux_nodal is None
+             else np.asarray(flux_nodal, dtype=float))
 
     # Initialize heads
     fixed_heads = bc_values[bc_type == 1]
@@ -554,7 +684,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # Apply boundary conditions: fixed heads plus the active exit-face set
         dir_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
         dir_values = np.where(bc_type == 1, bc_values, y)
-        A, b = _dirichlet_system(asm, data, dir_mask, dir_values)
+        A, b = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=f_ext)
 
         h_solved = spsolve(A, b)
         h_new = h_solved
@@ -626,11 +756,14 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # Closure is the UNSIGNED nodal residual at free nodes (interior +
         # inactive exit face) relative to the inflow; signed in/out sums
         # cancel to ~0 at any head field (zero row sums) and are useless.
+        # The free-node residual is A.h - f_ext (zero without flux BCs), so the
+        # applied flux must be subtracted or a flux node reads as pure imbalance.
         data_chk = _assembly_data(asm, p_nodes=h_solved - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
         q_chk = _coo_matvec(asm, data_chk, h_solved)
         free_mask = ~((bc_type == 1) | ((bc_type == 2) & exit_face_active))
-        inflow_pos = float(np.sum(q_chk[(bc_type == 1) & (q_chk > 0)]))
-        rel_closure = (float(np.sum(np.abs(q_chk[free_mask]))) / inflow_pos
+        inflow_pos = (float(np.sum(q_chk[(bc_type == 1) & (q_chk > 0)]))
+                      + _flux_inflow(f_ext, bc_type))
+        rel_closure = (float(np.sum(np.abs(q_chk[free_mask] - f_ext[free_mask]))) / inflow_pos
                        if inflow_pos > 1e-30 else 0.0)
         set_stable = bool(np.array_equal(exit_face_active, _prev_active))
         _prev_active = exit_face_active.copy()
@@ -671,18 +804,21 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     # (inactive nodes become free → q ≈ 0), and report the flowrate from it.
     dir_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
     dir_values = np.where(bc_type == 1, bc_values, y)
-    A_final, b_final = _dirichlet_system(asm, data, dir_mask, dir_values)
+    A_final, b_final = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=f_ext)
     h_new = spsolve(A_final, b_final)
     q_final = _coo_matvec(asm, data, h_new)
 
-    # Flowrate: sum of positive q at specified-head nodes
+    # Flowrate: positive q at specified-head nodes plus the applied flux inflow
     total_inflow = float(np.sum(q_final[(bc_type == 1) & (q_final > 0)]))
+    total_inflow += _flux_inflow(f_ext, bc_type)
 
     # Closure report: kr-consistent imbalance at the converged state
     data_chk = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
     q_chk = _coo_matvec(asm, data_chk, h_new)
-    net_inflow = float(np.sum(q_chk[bc_type == 1]))
-    net_outflow = -float(np.sum(q_chk[bc_type == 2]))
+    _free_flux = (bc_type == 0)
+    net_inflow = float(np.sum(q_chk[bc_type == 1])) + _flux_inflow(f_ext, bc_type)
+    net_outflow = (-float(np.sum(q_chk[bc_type == 2]))
+                   - float(np.sum(f_ext[_free_flux & (f_ext < 0)])))
     closure_error = abs(net_inflow - net_outflow)
     print(f"Flow closure check: inflow = {net_inflow:.6e}, outflow = {net_outflow:.6e}, error = {closure_error:.6e}")
 
@@ -1100,12 +1236,14 @@ def _csr_from_data(asm, data):
                       shape=(asm['n_nodes'], asm['n_nodes'])).tocsr()
 
 
-def _dirichlet_system(asm, data, dir_mask, dir_values):
+def _dirichlet_system(asm, data, dir_mask, dir_values, neumann=None):
     """BC-applied system (A, b): Dirichlet rows replaced by identity.
 
     Equivalent to the previous LIL row-zeroing, built directly from the COO
     arrays (entries in Dirichlet rows are dropped, then unit diagonals are
-    appended)."""
+    appended). `neumann` is the (n_nodes,) vector of consistent nodal loads
+    from specified-flux BCs; it seeds b, and Dirichlet rows then overwrite it —
+    a node cannot be both."""
     n = asm['n_nodes']
     keep = ~dir_mask[asm['rows']]
     di = np.where(dir_mask)[0]
@@ -1113,7 +1251,7 @@ def _dirichlet_system(asm, data, dir_mask, dir_values):
     cols = np.concatenate([asm['cols'][keep], di])
     vals = np.concatenate([data[keep], np.ones(len(di))])
     A = coo_matrix((vals, (rows, cols)), shape=(n, n)).tocsr()
-    b = np.zeros(n)
+    b = np.zeros(n) if neumann is None else np.asarray(neumann, dtype=float).copy()
     b[di] = dir_values[di]
     return A, b
 
@@ -1420,31 +1558,7 @@ def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
     p_nodes = head - y
 
     # Step 1: Build corner-only boundary edges, midside map, and edge→element map
-    edge_counts = defaultdict(list)
-    midside_map = {}
-    for idx, en in enumerate(elements):
-        et = element_types[idx]
-        if et == 3:
-            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[0])]
-        elif et == 6:
-            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[0])]
-            midside_map[tuple(sorted((en[0], en[1])))] = en[3]
-            midside_map[tuple(sorted((en[1], en[2])))] = en[4]
-            midside_map[tuple(sorted((en[2], en[0])))] = en[5]
-        elif et == 4:
-            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[3]), (en[3], en[0])]
-        elif et in (8, 9):
-            corners = [(en[0], en[1]), (en[1], en[2]), (en[2], en[3]), (en[3], en[0])]
-            midside_map[tuple(sorted((en[0], en[1])))] = en[4]
-            midside_map[tuple(sorted((en[1], en[2])))] = en[5]
-            midside_map[tuple(sorted((en[2], en[3])))] = en[6]
-            midside_map[tuple(sorted((en[3], en[0])))] = en[7]
-        else:
-            continue
-        for a, b in corners:
-            edge_counts[tuple(sorted((a, b)))].append(idx)
-
-    boundary_edges = {e: elems[0] for e, elems in edge_counts.items() if len(elems) == 1}
+    boundary_edges, midside_map = _boundary_edge_map(elements, element_types)
 
     # Step 2: Walk boundary (corner nodes only)
     neighbor_map = defaultdict(list)
@@ -2965,6 +3079,8 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         - 'q': numpy array of nodal flow vector
         - 'phi': numpy array of stream function/flow potential values at each node
         - 'flowrate': scalar total flow rate
+        - 'flux_nodal': numpy array of consistent nodal loads applied by the
+          specified-flux (Neumann) BCs (+ = inflow), zero without flux BCs
     """
     start_time = time.time()
 
@@ -2989,6 +3105,21 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     elements = seep_data["elements"]
     bc_type = seep_data["bc_type"]
     bc_values = seep_data["bc_values"]
+    # Consistent nodal loads from specified-flux BCs (absent on seep_data built by
+    # import_seep2d or older callers -> no flux).
+    flux_nodal = seep_data.get("flux_nodal")
+    if flux_nodal is None:
+        flux_nodal = np.zeros(len(bc_type))
+    else:
+        flux_nodal = np.asarray(flux_nodal, dtype=float)
+    has_flux = bool(np.any(flux_nodal != 0.0))
+    if has_flux and not np.any(bc_type > 0):
+        raise SeepInputError(
+            "Seepage problem has specified-flux boundary conditions but no "
+            "Dirichlet boundary (no specified head and no exit face); the head is "
+            "then defined only up to an additive constant and the system is "
+            "singular. Add a specified-head or exit-face boundary condition."
+        )
     element_materials = seep_data["element_materials"]
     element_types = seep_data.get("element_types", None)  # New field for element types
     k1_by_mat = seep_data["k1_by_mat"]
@@ -3045,6 +3176,7 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             vg_a=vg_a_per_element,
             vg_n=vg_n_per_element,
             model=model_per_element,
+            flux_nodal=flux_nodal,
         )
         # Compute phi BCs from element-level boundary flux
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
@@ -3060,7 +3192,8 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     else:
         # Confined analysis is a single direct linear solve — always "converged".
         converged, closure_error = True, 0.0
-        head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle, element_types)
+        head, A, q, total_flow = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle,
+                                                element_types, flux_nodal=flux_nodal)
         dirichlet_phi_bcs = create_flow_potential_bc_from_elements(
             nodes, elements, element_types, head, k1, k2, angle,
             total_flow=total_flow, bc_type=bc_type)
@@ -3078,6 +3211,23 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     gamma_w = unit_weight
     u = gamma_w * (head - nodes[:, 1])
 
+    # Ponding check. A specified inflow the soil cannot accept drives the surface
+    # pressure positive; the physical response is ponding (the BC would switch to a
+    # specified head), which is not modelled here — warn that the result is suspect.
+    # Only meaningful on an unconfined problem: a confined domain is saturated by
+    # construction and positive pressure there says nothing about ponding.
+    if has_flux and is_unconfined:
+        ponded = np.where((flux_nodal > 0) & (bc_type == 0) & (u > 0))[0]
+        if len(ponded) > 0:
+            warnings.warn(
+                f"{len(ponded)} specified-flux node(s) finished with positive pore "
+                "pressure (max u = "
+                f"{float(np.max(u[ponded])):.4g}): the specified inflow exceeds what "
+                "the soil can accept there, so in reality the surface would pond and "
+                "the boundary would become a specified head. This solution is suspect.",
+                stacklevel=2,
+            )
+
     solution = {
         "head": head,
         "u": u,
@@ -3088,6 +3238,8 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         "q": q,
         "phi": phi,
         "flowrate": total_flow,
+        # Consistent nodal loads applied by the specified-flux BCs (+ = inflow).
+        "flux_nodal": flux_nodal,
         "converged": converged,
         "closure_error": closure_error,
         # Which branch produced this solution. Consumers need it: a confined solve is

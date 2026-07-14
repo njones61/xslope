@@ -25,7 +25,7 @@ open its editor:
 | **Distributed loads** | The two distributed-load sets. |
 | **Reinforcement** | Reinforcement lines (rebuilt into the engine's display format). |
 | **Piles** | Pile lines. |
-| **Seepage BC** | Specified-head lines and exit faces (two BC sets). |
+| **Seepage BC** | Specified-head lines and exit faces (two BC sets). Specified-flux lines are preserved on save but are not yet editable here — set them in the Excel **seep bc** sheet. |
 
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows.
@@ -65,7 +65,7 @@ this works on:
 - profile and polygon lines (opens the geometry editor at that line),
 - the max-depth line, piezometric lines, distributed loads, reinforcement, piles,
 - failure circles and non-circular points,
-- seepage boundary conditions (specified-head lines and exit faces),
+- seepage boundary conditions (specified-head lines and exit faces; specified-flux lines round-trip untouched),
 - a material-zone interior (falls back to the materials editor).
 
 The hit-test is **mode-aware** — seepage BCs are only pickable in Seepage mode,

@@ -221,6 +221,38 @@ def gw013():
 
 
 
+def gw011():
+    """GW#11 case 1: uniform earth/rock-fill dam with the Gardner
+    kr = 1/(1 + a*psi^n) conductivity law, after Zhang, Xu & Chen (2001).
+    Geometry from Fig 11.1 (p.45, printed dimensions): 45 m high, 17 m crest,
+    upstream run 89.10 (1:1.98), downstream run 76.90 -> base 183.0 m. (The
+    text's "1:1.171" downstream is a typo: 76.90/45 = 1.709, and the printed
+    76.90 governs.) Reservoir at el 40 (upstream elevation head 40, downstream
+    0); exit face on the whole downstream slope; impermeable base.
+    Gardner a = 0.15, n = 6 exactly as printed on p.45. ks is not printed for
+    the uniform dam and does not matter: the dam is homogeneous, so the free
+    surface (the published target) is k-independent - 1e-7 m/s is the dam value
+    from Table 11.1 (p.46) for the companion non-homogeneous case.
+    Target: release point on the downstream face - Slide 19.397 m,
+    ABAQUS/Zhang 19.64 m (p.46)."""
+    sd = _base_sd(k1=1e-7)
+    sd['materials'][0].update(name='Dam fill', kr0=0.0, h0=0.0,
+                              unsat='gard', vg_a=0.15, vg_n=6.0)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (89.10, 45.0), (106.10, 45.0),
+                                 (183.0, 0.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 40.0, 'coords': [(0.0, 0.0), (79.20, 40.0)]},
+        ],
+        'exit_face': [(106.10, 45.0), (183.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw011.xlsx'))
+    return 'gw011.xlsx'
+
+
 def gw006a():
     """GW#6 case 1: Fredlund & Rahardjo (1993) isotropic earth dam with a
     12 m horizontal drain (Fig 6.1: 12 m high, 4 m crest, symmetric 2:1
@@ -250,7 +282,47 @@ def gw006a():
     return 'gw006a.xlsx'
 
 
+def gw008():
+    """GW#8: flow through ditch-drained soils (Gureghian 1981), the corpus'
+    first specified-flux (Neumann) problem. Fig 8.1 (p.34): half-drain
+    spacing 1.0 m wide, 0.5 m deep to the impermeable base, two layers -
+    Soil A is the LOWER 0.1 m (coarse, k = 1.11e-3 m/s, Gardner a = 1000,
+    n = 4.5) and Soil B the upper 0.4 m (fine, k = 1.11e-4 m/s, a = 2777.7,
+    n = 4.2), both from Table 8.1 (p.34). Rainfall infiltration 4.4e-6 m/s
+    on the top boundary as a specified flux (positive = inflow, Fig 8.2
+    p.35). The water-free ditch is the left wall: exit face over its full
+    height, so the invert node carries zero head when active (Slide draws
+    the same thing as "seepage face" + "zero head" at the invert). Base and
+    right-hand symmetry edge are no-flow, i.e. simply unspecified.
+    Targets are chart-only (the manual prints no point value and no
+    discharge): pressure head -0.10 to -0.20 m in the unsaturated zone
+    (Fig 8.3) and total head 0.05 to 0.29 m (Fig 8.4)."""
+    sd = _base_sd()
+    soil_b = dict(sd['materials'][0])
+    soil_b.update(name='Soil B', k1=1.11e-4, k2=1.11e-4, alpha=0.0,
+                  kr0=0.0, h0=0.0, unsat='gard', vg_a=2777.7, vg_n=4.2)
+    soil_a = dict(soil_b)
+    soil_a.update(name='Soil A', k1=1.11e-3, k2=1.11e-3,
+                  unsat='gard', vg_a=1000.0, vg_n=4.5)
+    sd['materials'] = [soil_b, soil_a]          # mat 0 = upper, mat 1 = lower
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 0.5), (1.0, 0.5)]},
+        {'mat_id': 1, 'coords': [(0.0, 0.1), (1.0, 0.1)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['seepage_bc'] = {
+        'specified_heads': [],
+        'specified_fluxes': [
+            {'flux': 4.4e-6, 'coords': [(0.0, 0.5), (1.0, 0.5)]},
+        ],
+        'exit_face': [(0.0, 0.0), (0.0, 0.5)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw008.xlsx'))
+    return 'gw008.xlsx'
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for fn in (gw002, gw003, gw004, gw006a, gw009a, gw010, gw012, gw013):
+    for fn in (gw002, gw003, gw004, gw006a, gw008, gw009a, gw010, gw011,
+               gw012, gw013):
         print(fn())

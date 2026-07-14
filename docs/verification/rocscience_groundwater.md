@@ -30,7 +30,7 @@ Problems 1–13 are steady-state and analyzable with the current solver. Problem
 **transient** (and 15–16 are consolidation), which XSLOPE's steady-state solver does not
 support.
 
-Two capabilities are deliberately out of scope, so the rows that depend on them are blocked by
+One capability is deliberately out of scope, so the rows that depend on it are blocked by
 design rather than pending work:
 
 - **Transient seepage.** XSLOPE's seepage analysis exists to supply pore pressures to a stability
@@ -40,29 +40,30 @@ design rather than pending work:
   of how the water table moves. Rapid drawdown, the other classic transient case, is already covered
   by the staged Duncan & Wright procedure that is standard of practice. Problems 16–21 are blocked
   on this.
-- **Specified-flux (Neumann) boundary conditions.** The solver's boundary conditions are fixed-head
-  and exit-face only. Problems 1, 7, 8 and 14 apply a uniform infiltration rate to the ground surface,
-  which has no fixed-head equivalent, so they are blocked on this. Their inputs and published answers
-  are recorded below for whenever it is added.
+
+Problems 1, 7, 8 and 14 apply a uniform infiltration rate to the ground surface, which has no
+fixed-head equivalent. These require a
+[specified-flux (Neumann) boundary condition](../seep/overview.md#specified-flux-boundary-conditions-neumann),
+which the solver now supports; the four are buildable and are queued rather than blocked.
 
 ## Status
 
 | # | Problem | Status | Notes |
 |---|---|---|---|
-| 1 | Shallow unconfined flow with rainfall | *blocked* | Uniform infiltration (P = 2.5×10⁻⁶ m/s) across the top boundary needs a specified-flux (Neumann) boundary condition, which the seepage solver does not have (BCs are fixed-head and exit-face only). Inputs and both published answers (x_a = 4.06/3.98, h_max = 4.49/4.25) are recorded for when it exists. |
+| 1 | Shallow unconfined flow with rainfall | *queued* | Uniform infiltration (P = 2.5×10⁻⁶ m/s) across the top boundary, applied as a specified flux. Published targets: x_a = 4.06 / 3.98, h_max = 4.49 / 4.25. |
 | [2](#gw2) | Flow around cylinder | **built** | [gw002.xlsx](../files/rocscience_gw/gw002.xlsx). Confined potential flow: solved heads match Slide within 0.0013 m at every printed point and the closed form within its own idealization error. |
 | [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](../files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
 | [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
 | 5 | Unsaturated flow behind an embankment | *no lock possible* | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. |
-| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh. Case 4 needs the flux BC (out of scope, see above); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets and deferred. |
-| 7 | Seepage within layered slope | *blocked* | Rulon & Freeze layered slope: the manual applies a constant infiltration rate of 2.1×10⁻⁴ m/s to the top of the slope — a specified flux with no fixed-head equivalent (the stated water table position is an output, not an input), so this needs the flux boundary condition, which is out of scope (see above). k-charts and profile targets recorded for when it exists. |
-| 8 | Flow through ditch-drained soils | *blocked* | Gureghian (1981) ditch-drained aquifer. Gardner conductivity kr = 1/(1 + a·ψⁿ) now exists (`unsat=gard`), but it was never the only gap: the problem is driven **entirely** by a uniform rainfall infiltration of 4.4×10⁻⁶ m/s on the top boundary, a specified flux with no fixed-head equivalent. Posed with fixed-head and exit-face BCs alone, the domain simply drains to h ≡ 0 with zero flow — there is no flow to verify — so GW8 is blocked on the flux BC (see above), not on Gardner. Inputs are fully printed and recorded for when it exists: half-drain spacing 1.0 m, depth to the impermeable base 0.5 m; lower layer Soil A 0.1 m thick, k = 1.11×10⁻³ m/s, Gardner a = 1000, n = 4.5; upper layer Soil B 0.4 m thick, k = 1.11×10⁻⁴ m/s, Gardner a = 2777.7, n = 4.2; the water-free ditch is the left wall (seepage face, zero head at its invert), with the base and the right-hand symmetry edge no-flow. Published results are contour figures only — pressure head −0.10 to −0.20 m in the unsaturated zone (Fig 8.3), total head 0.05–0.29 m (Fig 8.4) — with no printed point values and no discharge, so the targets would be chart reads. |
+| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh. Case 4 needs the flux BC (now supported); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets. All four are deferred. |
+| 7 | Seepage within layered slope | *queued* | Rulon & Freeze layered slope: a constant infiltration rate of 2.1×10⁻⁴ m/s on the top of the slope, applied as a specified flux (the stated water table position is an output, not an input). k-charts and profile targets recorded. |
+| [8](#gw8) | Flow through ditch-drained soils | **built** (discrepancy) | [gw008.xlsx](../files/rocscience_gw/gw008.xlsx). Gureghian (1981) ditch-drained aquifer — the corpus' exercise of the [specified-flux boundary](#flux-crosscheck), since the problem is driven entirely by rainfall infiltration on the top surface. The flux boundary itself is verified exactly (total inflow = *q*·*L*; the confined response matches the closed form to six figures). **The published contours cannot be reproduced from the manual's printed inputs**: the recharge mound comes out ≈10× too small, and two independent hand calculations confirm the printed numbers cannot produce the published figure. Only the flowrate is locked. |
 | [9](#gw9) | Seepage through dam | **built** (dam 1 of 2) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx). Bowles homogeneous dam via Chapuis et al. (2001): Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2 (drain) needs the source paper — its k-function and reservoir level are chart-only and the published Q implies a k two decades below the chart. |
 | [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](../files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |
-| 11 | Earth/rock-fill dam, Gardner permeability function | *not built* | Zhang et al. (2001) dam. An earlier round reported that a van Genuchten fit, a low-suction-weighted fit and a linear front all give the same release point (el. 17.4) against Slide 19.40 / ABAQUS 19.64, and read that as evidence about the exit-face treatment. Those inputs were never captured in the builder, so that result is not reproducible and is not carried forward here. Two things have changed since and both bear on it: the Gardner law now exists (`gard`, template v14), so the conductivity model can be posed directly from Zhang's published *a* and *n* instead of by proxy fit; and the [SEEP2D cross-check](#seep2d-crosscheck) finds XSLOPE's release point identical to SEEP2D's on every other exit-face problem in this panel. The problem needs re-extracting from the manual before it can be locked. |
+| [11](#gw11) | Earth/rock-fill dam, Gardner permeability function | **built** (case 1 of 2, discrepancy) | [gw011.xlsx](../files/rocscience_gw/gw011.xlsx). Zhang et al. (2001) homogeneous dam with the Gardner law (`unsat=gard`, *a* = 0.15, *n* = 6 as published). The free-surface **release point comes out at el. 17.8 ± 0.15 against Slide 19.40 / ABAQUS 19.64 — about 1.6 m low**, and the cause is not the conductivity model: the real Gardner law reproduces what van Genuchten and linear-front stand-ins gave (17.4). Mesh refinement (1.3k → 14.6k nodes) and the kr floor (1e-4 → 1e-8) both leave it unmoved. This is the one exit-face problem in the panel where XSLOPE releases low — the [SEEP2D cross-check](#seep2d-crosscheck) puts it on the same release point as SEEP2D everywhere else. Only the flowrate is locked; the release point is reported, not locked. Case 2 (zoned dam with foundation and toe drain) is not built. |
 | [12](#gw12) | Seepage from a trapezoidal ditch into a deep drainage layer | **built** | [gw012.xlsx](../files/rocscience_gw/gw012.xlsx). Vedernikov: Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) / theory 4.0×10⁻⁴; flow-bulb half-width ≈42 vs Slide 41 / theory 40. |
 | [13](#gw12) | Seepage from a triangular ditch into a deep drainage layer | **built** | [gw013.xlsx](../files/rocscience_gw/gw013.xlsx). Vedernikov: Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) / theory 2.0×10⁻². |
-| 14 | Unsaturated soil column | *blocked* | Steady (Gardner 1958 capillary profile under constant infiltration), but needs BOTH a Gardner-exponential conductivity k = ks·e^(−αψ) and a specified-flux surface boundary condition; neither exists. Belongs with GW1 on the flux-BC gap, not the transient tier. |
+| 14 | Unsaturated soil column | *queued* | Steady (Gardner 1958 capillary profile under constant infiltration). Needs a specified-flux surface boundary (now supported) and a Gardner-exponential conductivity k = ks·e^(−αψ) — note this is the *exponential* Gardner form, not the kr = 1/(1 + a·ψⁿ) form the `gard` option implements, so the conductivity law still has to be confirmed before this can be locked. Belongs with GW1, not the transient tier. |
 | 15 | 1-D consolidation, uniform initial excess pore pressure | blocked | Transient/consolidation — no transient solver |
 | 16 | Pore pressure dissipation of stratified soil | blocked | Transient/consolidation |
 | 17 | Transient seepage, earth fill dam with toe drain | blocked | Transient |
@@ -238,6 +239,111 @@ regression locks XSLOPE's own values.*
 
 ![gw006a: mesh and solved heads](images/gw006a.png)
 
+### GW8: Flow through ditch-drained soils {#gw8}
+
+**Input file:** [gw008.xlsx](../files/rocscience_gw/gw008.xlsx)
+
+A ditch-drained two-layer aquifer after Gureghian (1981), and the corpus' exercise of the
+[specified-flux boundary](#flux-crosscheck) — the whole problem is driven by rainfall
+infiltration on the ground surface, so it cannot be posed at all without one. A half-drain
+spacing of 1.0 m over an impermeable base at 0.5 m depth; a coarse Soil A in the lowest 0.1 m
+(*k* = 1.11×10⁻³ m/s, Gardner *a* = 1000, *n* = 4.5) beneath a finer Soil B (*k* = 1.11×10⁻⁴ m/s,
+*a* = 2777.7, *n* = 4.2); a uniform infiltration of 4.4×10⁻⁶ m/s on the top; the water-free
+ditch as a seepage face on the left wall; base and right-hand symmetry edge no-flow.
+
+**The flux boundary behaves exactly.** Total applied inflow is *q*·*L* = 4.400000×10⁻⁶ at every
+mesh size; the confined form of the same model (fix the base, remove the seepage face) produces
+a head rise of 0.016252 m against the one-dimensional hand calculation
+*q*·(0.4/*k*<sub>B</sub> + 0.1/*k*<sub>A</sub>) = 0.016252 m, agreeing to six figures; and the
+computed suction in the unsaturated zone lands on the Gardner gravity asymptote — with
+*k<sub>r</sub>* = *q*/*k<sub>s</sub>* = 0.0396, the law gives ψ\* = 0.323 m, against a computed
+−0.315 m. Reversing the sign of *q* inverts the response antisymmetrically.
+
+The *reported* flowrate is slightly less than the applied *q*·*L* — 4.3436×10⁻⁶ against
+4.4000×10⁻⁶ at the locked mesh size, 1.3% low — and that difference is physical, not lost water.
+The infiltration boundary and the seepage face meet at the top of the ditch, and that shared
+corner node belongs to the seepage face, where the head is prescribed. The half-edge of rainfall
+load sitting on it is therefore discarded by the solve, exactly as it should be: at a node whose
+head is fixed, the flow is whatever the boundary demands, and rain falling on the open ditch runs
+straight out of it. XSLOPE reports the inflow that actually entered the mesh rather than the
+inflow that was nominally specified. The gap is the corner load to every printed digit and halves
+each time the element size halves (1.16×10⁻⁷ → 5.64×10⁻⁸ → 2.78×10⁻⁸ → 1.38×10⁻⁸ over four
+refinements), converging on *q*·*L* as the corner shrinks to the measure-zero point it is in the
+continuum.
+
+**The published contours, however, do not follow from the printed inputs.**
+
+| | XSLOPE | Slide / Gureghian (Figs 8.3, 8.4) |
+|---|---|---|
+| total head | 0.000 – 0.186 m | 0.05 – 0.29 m |
+| pressure head, unsaturated zone | to −0.315 m | −0.10 to −0.20 m |
+| water table at the symmetry edge | 0.025 m | ≈0.25 m |
+
+The mound is about ten times too small, and this is not a solver error. A Dupuit calculation on
+the layered aquifer gives an *upper bound* on the mound of √(*q*/*k*<sub>A</sub>) = 0.063 m —
+generous, because it credits only the saturated transmissivity — which is already four times
+below the published 0.25 m. The printed infiltration and the printed conductivities cannot
+produce the published water table, whatever code solves them. Scaling *q*/*k* by ten reproduces
+the charts closely (water table 0.256 m, minimum pressure head −0.162 m), which suggests the
+manual's "4.4×10⁻⁶" may be a *per-node* discharge on its own mesh rather than a distributed
+flux — but that is a conjecture, and the input file carries the printed values, untuned.
+
+Only the flowrate is locked, on tri3: the total inflow is the one quantity here that is exact by
+construction. No head lock is taken, because locking XSLOPE's own head field would enshrine
+numbers the manual contradicts.
+
+<!-- test: file=../files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.344e-06, tolerance=0.02, benchmark=GW8-q -->
+
+### GW11: Earth/rock-fill dam, Gardner permeability function {#gw11}
+
+**Input file:** [gw011.xlsx](../files/rocscience_gw/gw011.xlsx)
+
+A 45 m homogeneous earth/rock-fill dam after Zhang et al. (2001), and the manual's dedicated
+test of the **Gardner** relative-conductivity function, $k_r = 1/(1 + a\,\psi^n)$, with the
+published $a$ = 0.15 and $n$ = 6. Crest 17 m, upstream run 89.1 m, downstream run 76.9 m,
+impermeable base; reservoir at el. 40 m, no tailwater; the whole downstream slope is an exit
+face. The published quantity is the **release point** — the elevation at which the free surface
+daylights on the downstream face.
+
+| | release point |
+|---|---|
+| XSLOPE (Gardner, `target_size` = 1.0) | 17.90 m |
+| Slide | 19.397 m |
+| ABAQUS (Zhang et al.) | 19.64 m |
+
+*XSLOPE releases about 1.6 m low, and this is an open discrepancy rather than a resolved one.*
+
+The unsaturated conductivity model is not the cause. This problem exists to test Gardner, and
+the real Gardner law reproduces what van Genuchten and linear-front stand-ins gave (≈17.4 m)
+before it was implemented. Nor is it discretization or the relative-conductivity floor:
+
+| `target_size` | nodes | release point |
+|---|---|---|
+| 2.0 | 1,338 | 17.79 m |
+| 1.0 | 5,317 | 17.90 m |
+| 0.6 | 14,621 | 17.76 m |
+
+There is no trend with refinement, and at the finest mesh the next face node *above* the
+release point sits at 18.06 m — still 1.3 m below Slide, so the gap is not a nodal-resolution
+artifact. The release point is identical to three decimals for $k_{r,\min}$ = 10⁻⁴, 10⁻⁶ and
+10⁻⁸.
+
+Two notes on reading the manual. Its text gives the downstream slope as 1:1.171, but the
+printed dimensions on Fig. 11.1 give 76.9/45 = 1.709 — a digit transposition. The figure's
+dimensions are used here (they also agree with a direct measurement of the plate), and they are
+the *more favourable* read: the text's slope releases at 16.54 m, lower still. Separately,
+$k_s$ is not printed for this case; because the dam is homogeneous the free-surface position is
+independent of $k_s$, so it does not affect the published target, but it does set the discharge —
+which is why the regression tag below locks XSLOPE's own flowrate rather than a published one.
+
+GW11 is the single exit-face problem in this panel where XSLOPE releases low. The
+[SEEP2D cross-check](#seep2d-crosscheck) below puts XSLOPE on the *same* release point as the
+original USACE code on every other exit-face problem, which is what makes this one worth
+flagging rather than filing as a family-wide convention difference. Case 2 of the manual's
+problem (the zoned dam with a foundation and toe drain) is not built.
+
+<!-- test: file=../files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
+
 ## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
 
 Several problems on this page reproduce a published profile in shape but sit a little
@@ -278,6 +384,36 @@ the discharge unchanged to six figures. Since the head field is right and only t
 integrated flux differs, the likely cause is where each code evaluates the strongly
 nonlinear kr(ψ) when it forms an element's conductivity. That is being tracked
 separately; it does not affect pore pressures or stability, which read the head field.
+
+### The specified-flux boundary, against SEEP2D {#flux-crosscheck}
+
+The same harness verifies the
+[specified-flux (Neumann) boundary](../seep/overview.md#specified-flux-boundary-conditions-neumann),
+because SEEP2D supports one natively. It is entered as *flowrate cards* — a boundary segment
+and a flux — and SEEP2D forms its own consistent nodal loads from them (`seep2d.f`, the
+`nflcd` block: `fx(i) += ½·L·q` at each end of the segment, and it sets the flux flags itself).
+So SEEP2D is handed the raw segment and flux, never XSLOPE's assembled vector, and the two
+codes' assemblies are compared rather than one being fed the other's answer.
+
+The test problem is a confined rectangle, 10 × 4, isotropic *k* = 2, with a fixed head on one
+side and a uniform inflow *q* on the other, no-flow above and below. One-dimensional Darcy
+gives the head exactly: *h*(*x*) = *q*(*L* − *x*)/*k*, with total inflow *q*·*H*.
+
+| | XSLOPE | SEEP2D |
+|---|---|---|
+| max abs. error vs the exact solution | **2.5×10⁻¹⁹** | 5.0×10⁻⁹ |
+| total inflow (exact: 1.760000×10⁻⁵) | **1.760000×10⁻⁵** | 1.759800×10⁻⁵ |
+| max abs. difference, XSLOPE − SEEP2D | \-- | **5.0×10⁻⁹** (2.3×10⁻⁴ of the head range) |
+
+*XSLOPE reproduces the closed form to machine precision, and matches SEEP2D to that code's own
+iteration tolerance.*
+
+Machine-precision agreement on the *head field* — not merely on the total — is the check that
+matters. A linear head field only satisfies **A**·**h** = **f** when **f** is the *consistent*
+load vector, so an incorrect distribution along an edge (½, ½, 0 across a quadratic edge, say)
+would still sum to *q·L* and pass a total-flux check while breaking the solution. It does not.
+The quadratic weights (⅙, ⅙, ⅔ at corner, corner and midside) are verified the same way, and a
+zero flux reproduces the no-flux answer bitwise.
 
 ## Methodology
 

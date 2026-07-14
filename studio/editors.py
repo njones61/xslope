@@ -626,6 +626,11 @@ class _SeepBcSetWidget(QWidget):
                         "coords": [tuple(c) for c in h.get("coords", [])]}
                        for h in (bc.get("specified_heads") or [])]
         self._exit = [tuple(c) for c in (bc.get("exit_face") or [])]
+        # Flux BCs are not editable here yet, but they must survive a round trip
+        # through this dialog: without this they would be silently dropped on save.
+        self._fluxes = [{"flux": f.get("flux", 0.0),
+                         "coords": [tuple(c) for c in f.get("coords", [])]}
+                        for f in (bc.get("specified_fluxes") or [])]
         self._cur = -1
         self.table = None
 
@@ -724,6 +729,8 @@ class _SeepBcSetWidget(QWidget):
         self._commit()
         return {"specified_heads": [{"head": h["head"], "coords": list(h["coords"])}
                                     for h in self._heads],
+                "specified_fluxes": [{"flux": f["flux"], "coords": list(f["coords"])}
+                                     for f in self._fluxes],
                 "exit_face": list(self._exit)}
 
 

@@ -46,7 +46,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
     # Material colors (style overrides → palette default). Mesh material IDs are
     # 1-based (gmsh); the style sheet / inputs key by 0-based mat_id, so map mat-1
     # — this also aligns the zone colors with the Inputs view.
-    from .style import resolve_style, material_style
+    from .style import resolve_style, material_style, feature_style
     _st = resolve_style(style)
     mat_to_color = {mat: material_style(_st, int(mat) - 1)["color"] for mat in materials}
 
@@ -198,6 +198,24 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
         if len(bc2) > 0:
             h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)", gid='SEEP_EXIT_FACE')
             legend_handles.append(h2)
+        # Flux nodes are NOT Dirichlet, so they carry bc_type 0 and have to be found from
+        # the assembled nodal loads instead. Inflow and outflow get opposite-pointing
+        # markers: a flipped sign is the classic way to get a flux boundary wrong, and
+        # this makes it visible rather than something you infer from the head field.
+        flux_nodal = seep_data.get("flux_nodal")
+        if flux_nodal is not None:
+            fn = np.asarray(flux_nodal, dtype=float)
+            fs = feature_style(_st, "seep_flux")
+            fcolor = fs.get("color", "darkgreen")
+            for mask, marker, what, gid in (
+                    (fn > 0, '^', 'in', 'SEEP_FLUX_IN'),
+                    (fn < 0, 'v', 'out', 'SEEP_FLUX_OUT')):
+                pts = nodes[mask]
+                if len(pts) > 0:
+                    hf, = ax.plot(pts[:, 0], pts[:, 1], marker=marker, linestyle='none',
+                                  color=fcolor, markeredgecolor='k', markeredgewidth=0.4,
+                                  label=f"Specified Flux ({what}flow)", gid=gid)
+                    legend_handles.append(hf)
 
     from .plot import _legend_below
     # Box-adjust (not datalim): seepage domains are typically wide and thin, so
@@ -210,9 +228,11 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
         pad = 0.05 * (y1 - y0)
         ax.set_ylim(y0, y1 + pad)
 
-    # Count element types for title
-    num_triangles = np.sum(element_types == 3)
-    num_quads = np.sum(element_types == 4)
+    # Count element types for title. element_types holds the NODE COUNT, so the
+    # quadratic families are 6 (tri6) and 8/9 (quad8/quad9) — counting only 3 and 4
+    # reported "0 triangles" on every higher-order mesh.
+    num_triangles = int(np.sum(np.isin(element_types, (3, 6))))
+    num_quads = int(np.sum(np.isin(element_types, (4, 8, 9))))
     if num_triangles > 0 and num_quads > 0:
         title = f"Finite Element Mesh with Material Zones ({num_triangles} triangles, {num_quads} quads)"
     elif num_quads > 0:

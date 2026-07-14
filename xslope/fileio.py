@@ -370,7 +370,70 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 14
+SUPPORTED_TEMPLATE_VERSION = 15
+
+
+def _read_seep_bc_sheet(seep_df, sheet_name):
+    """Parse one ``seep bc`` sheet into specified heads, fluxes, and the exit face.
+
+    Layout (v15): exit face in B/C from row 5 down; then up to 5 BC blocks in
+    E/F, H/I, K/L, N/O, Q/R. Row 3 of a block holds the TYPE cell (x column) and
+    the VALUE (y column); coordinates start at row 5. A block ends the scan when
+    its VALUE cell is empty.
+
+    Backward compatibility: templates v14 and earlier put the literal label
+    "Head:" in the type cell, so a block is a flux BC only when the type text
+    starts with "flux" — every older file therefore still loads as a head BC.
+    """
+    bc = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+
+    def _read_coords(x_col, y_col, start_row=4):
+        coords = []
+        row = start_row
+        while row < seep_df.shape[0]:
+            try:
+                x_val = seep_df.iloc[row, x_col]
+                y_val = seep_df.iloc[row, y_col]
+                if pd.isna(x_val):
+                    break
+                if pd.notna(x_val) and pd.notna(y_val):
+                    coords.append((float(x_val), float(y_val)))
+            except Exception:
+                break
+            row += 1
+        return coords
+
+    bc["exit_face"] = _read_coords(1, 2)
+
+    type_row = 2  # Excel row 3 (0-indexed)
+    col = 4       # column E
+    while col + 1 < seep_df.shape[1]:
+        if seep_df.shape[0] <= type_row:
+            break
+        value = seep_df.iloc[type_row, col + 1]
+        if pd.isna(value):
+            break  # empty VALUE cell ends the block scan
+
+        type_cell = seep_df.iloc[type_row, col]
+        is_flux = (pd.notna(type_cell)
+                   and str(type_cell).strip().lower().startswith("flux"))
+
+        coords = _read_coords(col, col + 1)
+        if is_flux:
+            block = (col - 4) // 3 + 1
+            if len(coords) < 2:
+                raise ValueError(
+                    f"Flux BC #{block} on sheet '{sheet_name}' has "
+                    f"{len(coords)} coordinate(s). A flux BC is applied over the "
+                    "edges of a polyline and needs at least 2 points."
+                )
+            bc["specified_fluxes"].append({"flux": float(value), "coords": coords})
+        elif coords:
+            bc["specified_heads"].append({"head": float(value), "coords": coords})
+
+        col += 3  # E -> H -> K -> ...
+
+    return bc
 
 
 def load_slope_data(filepath):
@@ -1268,150 +1331,21 @@ def load_slope_data(filepath):
 
 
     # === SEEPAGE ANALYSIS BOUNDARY CONDITIONS ===
-    # Read first set from "seep bc" sheet
-    seep_df = xls.parse('seep bc', header=None)
-    seepage_bc = {"specified_heads": [], "exit_face": []}
-    
-    # Exit Face BC: starts at B5 (row 4, columns 1 and 2), continues down until empty x value
-    exit_coords = []
-    exit_start_row = 4  # Excel row 5 (0-indexed row 4)
-    exit_x_col = 1  # Column B
-    exit_y_col = 2  # Column C
-    
-    row = exit_start_row
-    while row < seep_df.shape[0]:
-        try:
-            x_val = seep_df.iloc[row, exit_x_col]
-            y_val = seep_df.iloc[row, exit_y_col]
-            
-            # Stop at first empty x value
-            if pd.isna(x_val):
-                break
-            
-            # If x is present, try to convert (y can be empty but we'll still add the point)
-            if pd.notna(x_val) and pd.notna(y_val):
-                exit_coords.append((float(x_val), float(y_val)))
-        except:
-            break
-        row += 1
-    seepage_bc["exit_face"] = exit_coords
-    
-    # Specified Head BCs: start at columns E:F, then H:I, etc.
-    # Head value is in row 3 (index 2), XY values start at row 5 (index 4)
-    # Keep reading to the right until head value in row 3 is empty
-    head_row = 2  # Excel row 3 (0-indexed row 2)
-    data_start_row = 4  # Excel row 5 (0-indexed row 4)
-    col = 4  # Start with column E (index 4)
-    
-    while col < seep_df.shape[1]:
-        x_col = col
-        y_col = col + 1
-        head_col = col + 1  # Head value is in the Y column (F, I, L, etc.)
-        
-        # Check if head value in row 3 is empty - stop reading if empty
-        if seep_df.shape[0] <= head_row:
-            break
-        head_val = seep_df.iloc[head_row, head_col]
-        if pd.isna(head_val):
-            break  # Stop reading when head value is empty
-        
-        # Read XY coordinates starting from row 5, continue down until empty
-        coords = []
-        row = data_start_row
-        while row < seep_df.shape[0]:
-            try:
-                x_val = seep_df.iloc[row, x_col]
-                y_val = seep_df.iloc[row, y_col]
-                
-                # Stop at first empty x value
-                if pd.isna(x_val):
-                    break
-                
-                # If x is present, try to convert
-                if pd.notna(x_val) and pd.notna(y_val):
-                    coords.append((float(x_val), float(y_val)))
-            except:
-                break
-            row += 1
-        
-        if coords:  # Only add if we have coordinates
-            seepage_bc["specified_heads"].append({"head": float(head_val), "coords": coords})
-        
-        # Move to next specified head BC (skip 3 columns: E->H, H->K, etc.)
-        col += 3
-    
-    # Read second set from "seep bc (2)" sheet
-    seepage_bc2 = {"specified_heads": [], "exit_face": []}
+    seepage_bc = _read_seep_bc_sheet(xls.parse('seep bc', header=None), 'seep bc')
     try:
-        seep_df2 = xls.parse('seep bc (2)', header=None)
-        
-        # Exit Face BC: starts at B5 (row 4, columns 1 and 2), continues down until empty x value
-        exit_coords2 = []
-        row = exit_start_row
-        while row < seep_df2.shape[0]:
-            try:
-                x_val = seep_df2.iloc[row, exit_x_col]
-                y_val = seep_df2.iloc[row, exit_y_col]
-                
-                # Stop at first empty x value
-                if pd.isna(x_val):
-                    break
-                
-                # If x is present, try to convert
-                if pd.notna(x_val) and pd.notna(y_val):
-                    exit_coords2.append((float(x_val), float(y_val)))
-            except:
-                break
-            row += 1
-        seepage_bc2["exit_face"] = exit_coords2
-        
-        # Specified Head BCs: same structure as first sheet
-        col = 4  # Start with column E (index 4)
-        while col < seep_df2.shape[1]:
-            x_col = col
-            y_col = col + 1
-            head_col = col + 1  # Head value is in the Y column
-            
-            # Check if head value in row 3 is empty - stop reading if empty
-            if seep_df2.shape[0] <= head_row:
-                break
-            head_val = seep_df2.iloc[head_row, head_col]
-            if pd.isna(head_val):
-                break  # Stop reading when head value is empty
-            
-            # Read XY coordinates starting from row 5, continue down until empty
-            coords = []
-            row = data_start_row
-            while row < seep_df2.shape[0]:
-                try:
-                    x_val = seep_df2.iloc[row, x_col]
-                    y_val = seep_df2.iloc[row, y_col]
-                    
-                    # Stop at first empty x value
-                    if pd.isna(x_val):
-                        break
-                    
-                    # If x is present, try to convert
-                    if pd.notna(x_val) and pd.notna(y_val):
-                        coords.append((float(x_val), float(y_val)))
-                except:
-                    break
-                row += 1
-            
-            if coords:  # Only add if we have coordinates
-                seepage_bc2["specified_heads"].append({"head": float(head_val), "coords": coords})
-            
-            # Move to next specified head BC (skip 3 columns: E->H, H->K, etc.)
-            col += 3
-    except (ValueError, KeyError):
-        # If "seep bc (2)" sheet doesn't exist, just leave seepage_bc2 as empty
-        pass
+        seepage_bc2 = _read_seep_bc_sheet(xls.parse('seep bc (2)', header=None), 'seep bc (2)')
+    except (ValueError, KeyError) as e:
+        if isinstance(e, ValueError) and 'Flux BC' in str(e):
+            raise
+        # Sheet absent (older workbook) -> no second BC set.
+        seepage_bc2 = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
 
     # === VALIDATION ===
  
     circular = len(circles) > 0
     # Check if this is a seep-only analysis (has seep BCs but no slope stability surfaces)
-    has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or 
+    has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or
+                     len(seepage_bc.get("specified_fluxes", [])) > 0 or
                      len(seepage_bc.get("exit_face", [])) > 0)
     is_seepage_only = has_seepage_bc and not circular and len(non_circ) == 0
     # A mesh-based run with no LEM surfaces is a seepage or FEM (SSRM) analysis;
@@ -1479,7 +1413,9 @@ def load_slope_data(filepath):
     globals_data["line_loads"] = line_loads
     globals_data["seepage_bc"] = seepage_bc
     globals_data["seepage_bc2"] = seepage_bc2
-    globals_data["has_seepage_bc2"] = bool(seepage_bc2.get("specified_heads") or seepage_bc2.get("exit_face"))
+    globals_data["has_seepage_bc2"] = bool(seepage_bc2.get("specified_heads")
+                                           or seepage_bc2.get("specified_fluxes")
+                                           or seepage_bc2.get("exit_face"))
     
     # Add mesh if available (used by both seep and fem workflows)
     globals_data["mesh"] = mesh
@@ -1941,11 +1877,16 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         for i, (x, y) in enumerate(bc.get('exit_face') or []):
             u[cell_ref(5 + i, 2)] = _f(x)                     # B
             u[cell_ref(5 + i, 3)] = _f(y)                     # C
-        for k, head in enumerate(bc.get('specified_heads') or []):
+        blocks = [('head', b['head'], b['coords'])
+                  for b in bc.get('specified_heads') or []]
+        blocks += [('flux', b['flux'], b['coords'])
+                   for b in bc.get('specified_fluxes') or []]
+        for k, (kind, value, coords) in enumerate(blocks):
             x_col = 5 + k * 3                                 # E, H, K, ...
             y_col = x_col + 1
-            u[cell_ref(3, y_col)] = _f(head['head'])         # head value in row 3
-            for i, (x, y) in enumerate(head['coords']):
+            u[cell_ref(3, x_col)] = kind                      # type cell (head/flux)
+            u[cell_ref(3, y_col)] = _f(value)                 # head or flux value
+            for i, (x, y) in enumerate(coords):
                 u[cell_ref(5 + i, x_col)] = _f(x)
                 u[cell_ref(5 + i, y_col)] = _f(y)
         return u

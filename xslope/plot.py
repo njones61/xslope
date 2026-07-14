@@ -615,9 +615,11 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
 
     def _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
                          head_line_color, water_level_color, exit_face_color, label_suffix="",
-                         head_lw=3, head_ls="--", water_lw=2, exit_lw=3, exit_ls="--"):
+                         head_lw=3, head_ls="--", water_lw=2, exit_lw=3, exit_ls="--",
+                         flux_color="darkgreen", flux_lw=3, flux_ls="-."):
         """Plot a single set of seepage boundary conditions."""
         specified_heads = seepage_bc.get("specified_heads") or []
+        specified_fluxes = seepage_bc.get("specified_fluxes") or []
         exit_face = seepage_bc.get("exit_face") or []
 
         for i, sh in enumerate(specified_heads):
@@ -680,6 +682,32 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                 except Exception:
                     pass
 
+        for i, sf in enumerate(specified_fluxes):
+            coords = sf.get("coords") or []
+            if len(coords) < 2:
+                continue
+            fx_xs, fx_ys = zip(*coords)
+            ax.plot(
+                fx_xs, fx_ys,
+                color=flux_color, linewidth=flux_lw, linestyle=flux_ls,
+                label=f"Specified Flux{label_suffix}" if i == 0 else "",
+            )
+            try:
+                q_val = float(sf.get("flux"))
+            except (TypeError, ValueError):
+                continue
+            mid = len(coords) // 2
+            if len(coords) % 2 == 0:
+                lx = 0.5 * (coords[mid - 1][0] + coords[mid][0])
+                ly = 0.5 * (coords[mid - 1][1] + coords[mid][1])
+            else:
+                lx, ly = coords[mid]
+            ax.annotate(
+                f"q = {q_val:g}", xy=(lx, ly), xytext=(0, 6),
+                textcoords="offset points", ha="center", va="bottom",
+                color=flux_color, fontsize=8,
+            )
+
         if len(exit_face) >= 2:
             ex_xs, ex_ys = zip(*exit_face)
             ax.plot(
@@ -710,20 +738,24 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
     fh = feature_style(style, "seep_bc")
     fw = feature_style(style, "seep_water_level")
     fe = feature_style(style, "seep_exit_face")
+    ff = feature_style(style, "seep_flux")
     _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
                      head_line_color=fh.get("color", "darkblue"),
                      water_level_color=fw.get("color", "lightskyblue"),
                      exit_face_color=fe.get("color", "red"), label_suffix=label_suffix,
                      head_lw=fh.get("linewidth", 3), head_ls=fh.get("linestyle", "--"),
                      water_lw=fw.get("linewidth", 2),
-                     exit_lw=fe.get("linewidth", 3), exit_ls=fe.get("linestyle", "--"))
+                     exit_lw=fe.get("linewidth", 3), exit_ls=fe.get("linestyle", "--"),
+                     flux_color=ff.get("color", "darkgreen"),
+                     flux_lw=ff.get("linewidth", 3), flux_ls=ff.get("linestyle", "-."))
 
     # Plot second set of BCs if present
     if has_bc2:
         seepage_bc2 = slope_data.get("seepage_bc2") or {}
         _plot_one_bc_set(ax, seepage_bc2, geom_width, x_min_geom, x_max_geom,
                          head_line_color="steelblue", water_level_color="powderblue",
-                         exit_face_color="orangered", label_suffix=" (BC 2)")
+                         exit_face_color="orangered", label_suffix=" (BC 2)",
+                         flux_color="seagreen")
 
 def plot_tcrack_surface(ax, slope_data, style=None):
     """

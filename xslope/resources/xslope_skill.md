@@ -24,7 +24,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - Loads: distributed surface loads, water loads
    - Reinforcement: geogrid/nail lines with Tmax, pullout lengths
    - Piles: locations, diameter, spacing, capacity
-   - Boundary conditions for seepage: specified heads, exit faces
+   - Boundary conditions for seepage: specified heads, specified fluxes, exit faces
    - Units (English: psf/pcf/ft or Metric: kPa/kN-m3/m)
 
 2. **Check for missing information.** Before building the template, verify you have all required data. If anything is missing or ambiguous, **STOP and ask the user** before proceeding. Common missing items include:
@@ -41,7 +41,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
    **Required for seepage:**
    - Hydraulic conductivity (k1, k2) for every material
-   - At least one specified head boundary condition
+   - At least one specified head boundary condition or exit face (a model with only flux boundaries is singular)
    - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, `unsat="vg"` (van Genuchten) with vg_a/vg_n, or `unsat="gard"` (Gardner power form) reusing the same vg_a/vg_n pair
 
    **Required for reliability:**
@@ -102,6 +102,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    Boundary Conditions: (for seepage)
      - Upstream head = ... at (coords)
      - Exit face from (coords) to (coords)
+     - Specified flux q = ... along (coords)   # normal Darcy velocity, + = inflow
 
    Piezometric Line: (if applicable)
      - N points from (x1,y1) to (xN,yN)
@@ -520,8 +521,8 @@ slope_data['line_loads'] = [
 
 #### Seepage boundary conditions (`seepage_bc`, `seepage_bc2`)
 
-A dict with an optional exit face and a list of specified-head segments. `seepage_bc2` is the
-second BC set for rapid drawdown.
+A dict with an optional exit face, a list of specified-head segments, and a list of
+specified-flux segments. `seepage_bc2` is the second BC set for rapid drawdown.
 
 ```python
 slope_data['seepage_bc'] = {
@@ -530,9 +531,19 @@ slope_data['seepage_bc'] = {
         {'head': 18, 'coords': [(0, 0), (42, 18)]},    # upstream: total head = 18 along this line
         {'head': 2,  'coords': [(105, 2), (110, 0)]},  # downstream: total head = 2
     ],
+    'specified_fluxes': [                       # optional; Neumann boundaries
+        # q is the NORMAL DARCY VELOCITY (length/time), POSITIVE INTO the domain.
+        # It is a flow per unit area of boundary, not a total discharge over the segment.
+        # The coords define a polyline whose EDGES carry the load, so it needs >= 2 points.
+        {'flux': 2.5e-6, 'coords': [(42, 18), (59, 22)]},   # rainfall infiltration on the crest
+    ],
 }
 # slope_data['seepage_bc2'] = { ... }   # rapid drawdown only
 ```
+
+Zero flux is the natural condition on any unspecified boundary, so only non-zero fluxes need
+a segment. A model with flux boundaries but no specified head and no exit face anywhere is
+singular (head is defined only up to a constant) and will raise.
 
 ### Saving
 

@@ -606,12 +606,17 @@ at the top of the slice rather than at the failure surface).
 
 ## Worksheet: seep bc
 
+<!-- TODO(Norm): re-shoot images/sheet_seepbc.png for template v15. The current screenshot
+     still shows the v14 sheet ("Specified Head #1..#5", a "Head:" label in E3) and does not
+     show the new Head/Flux BC blocks: the head/flux type dropdown in E3/H3/K3/N3/Q3, or the
+     "BC Option:" legend in T3:U5. Same for the seep bc (2) sheet if it is shown anywhere. -->
+
 ![sheet_seepbc.png](images/sheet_seepbc.png)
 
 The **seep bc** and **seep bc (2)** worksheets define boundary conditions for finite element seepage analysis. 
 Boundary conditions 
-specify where water enters or exits the domain and the magnitude of hydraulic head on the boundary. There are two 
-types of boundary conditions: specified head and exit face. **Specified head** boundaries correspond to free water on 
+specify where water enters or exits the domain and the magnitude of hydraulic head on the boundary. There are three 
+types of boundary conditions: specified head, specified flux, and exit face. **Specified head** boundaries correspond to free water on 
 the face of the slope and the magnitude of the head is the height of water above the datum defined for the problem. 
 **Exit face** boundaries conditions are used for unconfined problems are applied to the "downstream" side of the slope 
 where water exits the slope. In the unconfined seepage solution, the phreatic surface intersects the exit face at 
@@ -619,11 +624,38 @@ some point (exit point) that is determined as part of an iterative solution proc
 the exit point, a head = elevation (zero pressure) condition is applied. For points on the exit face above the exit 
 point, the head is determined by the pore pressure equation. 
 
+Each of the five **Head/Flux BC** tables carries a **type** cell (a dropdown reading either
+`head` or `flux`) above its value cell. The type determines how the value directly to its
+right is interpreted:
+
+| type | value is | units |
+|---|---|---|
+| `head` | specified head (total head, i.e. height of water above the datum) | length |
+| `flux` | specified flux — the **normal Darcy velocity**, **positive into the domain** | length/time |
+
+A **specified flux** (Neumann) boundary prescribes the *rate* at which water crosses the
+boundary instead of the head on it. The usual use is rainfall infiltration or recharge applied
+to the ground surface, where the water table position is a result of the analysis and so
+cannot be entered as a head. Two points to be careful about:
+
+- The flux is a flow per unit *area* of boundary, not a total discharge spread over the
+  boundary — a rate of 1×10⁻⁶ m/s applied along a 40 m surface admits 4×10⁻⁵ m³/s per metre of
+  slope, not 1×10⁻⁶.
+- The sign matters and is easy to get backwards. **Positive is inflow** (infiltration,
+  recharge). A negative value withdraws water.
+
+Unlike a head boundary, whose points are simply pinned, a flux boundary's points define a
+**polyline whose edges carry the load**, so it needs at least two points and they must run
+along the boundary of the mesh. Zero flux is the default condition on any boundary that is not
+otherwise specified, so a flux boundary only needs to be defined where the flux is non-zero. A
+model with no specified-head boundary and no exit face anywhere is singular — head would be
+determined only up to an additive constant — and xslope will refuse to solve it.
+
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
 exit face. For confined problems, there is typically one upstream and one downstream specified head boundary 
-condition. Additional specified head boundary conditions can be defined to represent the water level in an 
-excavation, etc. The sheet is formatted for one exit face and up to 5 specified head boundaries. Additional 
-specified head boundary 
+condition. Additional boundary conditions can be defined to represent the water level in an 
+excavation, infiltration on the ground surface, etc. The sheet is formatted for one exit face and up to 5 head or flux boundaries. Additional 
+boundary 
 conditions can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, 
 but additional rows can be added below the end of table if necessary.
 
@@ -635,9 +667,10 @@ During seepage analysis, xslope:
 
 1. Builds a finite element mesh from the **profile** geometry
 2. Applies specified head values at nodes on the specified head boundaries
-3. Applies exit face conditions where water exits
-4. Solves the Laplace equation (∇·(k∇h) = 0) for hydraulic head at all nodes
-5. Computes pore pressures (u = γw(h - y)) and flow velocities
+3. Integrates any specified flux over the boundary edges it covers, into consistent nodal inflows
+4. Applies exit face conditions where water exits
+5. Solves the Laplace equation (∇·(k∇h) = 0) for hydraulic head at all nodes
+6. Computes pore pressures (u = γw(h - y)) and flow velocities
 
 For coupled seepage-LEM analysis, the computed pore pressures can be exported and later interpolated onto slice bases using the "seep" option in the **mat** worksheet.
 

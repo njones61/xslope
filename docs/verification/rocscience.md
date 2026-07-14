@@ -164,7 +164,7 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 | [4](#vp4) | Slope, (3) materials, seismic | **built** | [vp004.xlsx](../files/rocscience/vp004.xlsx). Problem #3 + k=0.15g. Bishop 1.013 / Spencer 0.989 / Janbu(corr) 0.963 / M-P 0.987 vs Slide 1.016 / 0.991 / 0.965 / 0.989 (±0.3%); ACADS reference 1.00. |
 | [5](#vp5) | Dam, (4) materials | **built** | [vp005.xlsx](../files/rocscience/vp005.xlsx). Talbingo Dam, end of construction (polygon-zone geometry). Critical mechanism is the infinite-slope limit on the upstream face: stored shallow circle gives 1.955 (all methods) vs Slide 1.948-1.949 and the tan φ/tan β limit 1.9475. |
 | [6](#vp6) | Dam, (4) materials, predefined slip surface | **built** | [vp006.xlsx](../files/rocscience/vp006.xlsx). Specified circle (100.3, 291, R=278.8) through the inclined core. Bishop 2.206 / Spencer 2.290 / Janbu(corr) 2.073 / M-P 2.299 vs Slide 2.208 / 2.292 / 2.073 / 2.301 (±0.1%); ACADS reference 2.29. |
-| 7 | Slope, (2) materials, weak layer | covered | [LEM sample 13](../lem/samples.md#verification-acads-weak-layer) (`xslope_acads_weak_layer.xlsx`) is this exact problem (ACADS 3(a)). Non-circular search: Spencer 1.258 / M-P 1.248 vs Slide 1.246 / 1.275; Giam reference 1.24-1.27. |
+| 7 | Slope, (2) materials, weak layer | covered | [LEM sample 7](../lem/samples.md#7-non-circular-failure-surface) (`xslope_acads_weak_layer.xlsx`) is this exact problem (ACADS 3(a)). Non-circular search: Spencer 1.258 / M-P 1.248 vs Slide 1.246 / 1.275; Giam reference 1.24-1.27. |
 | [8](#vp8) | Slope, (2) materials, weak layer, predefined slip surface | **built** | [vp008.xlsx](../files/rocscience/vp008.xlsx). Specified 4-point surface (Table 8.2). Spencer 1.276 / Janbu(corr) 1.294 / M-P 1.260 vs Slide 1.277 / 1.294 / 1.262 (exact to ±0.002); SLOPE/W M-P 1.261; Giam reference 1.34. |
 | [9](#vp9) | Slope, (2) materials, weak layer, water table, distributed load | **built** | [vp009.xlsx](../files/rocscience/vp009.xlsx). ACADS 4: inclined 0.6 m seam (geometry from the labeled GeoStudio figure), 8-point piezometric line, two surcharge strips. Non-circular search: Spencer 0.724 / Janbu(corr) 0.718 (M-P reaches 0.707 from a wider seed but does not solve the stored seed, so it is not tagged) vs Slide 0.760/0.720/0.734 (block search) and 0.707/0.683/0.699 (optimized); SLOPE/W 0.699-0.689; ACADS references 0.78 [Giam], 0.6878 [Slope 2000], 20-program mean 0.808. Published spread is wide; XSLOPE sits mid-band. |
 | [10](#vp10) | Slope, homogenous, pore pressure grid, ponded water | **built** (via FE seepage) | [vp010.xlsx](../files/rocscience/vp010.xlsx). ACADS #5: XSLOPE solves the seepage the manual's grid encodes (head field is k-independent; solved phreatic matches the Fig 10.2 flow net within ~0.1 m). Bishop 1.500 / Spencer 1.501 / Janbu corr 1.440 vs Slide 1.498 / 1.500 / 1.457; ACADS reference 1.53, survey mean 1.464. |
@@ -776,7 +776,7 @@ all φ = 34°) resting on a presheared disturbed clay-shale with φ = 7.5° ± 2
 critical mechanism rides the clay-shale: Slide's drawn circle (center (327.5, 394),
 R = 124) is tangent to el. 270 — twenty meters below the model base at el. 290 — so the
 surface is **composite**, truncated at the base and running flat inside the weak band.
-This is the [composite-surface option](../lem/overview.md#composite-surfaces) exercised
+This is the [composite-surface option](../lem/overview.md#composite-failure-surfaces) exercised
 on a published benchmark.
 
 | | XSLOPE (composite) | Slide | El-Ramly et al. |

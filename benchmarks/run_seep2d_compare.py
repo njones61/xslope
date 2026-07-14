@@ -105,6 +105,9 @@ def rcm_renumber(seep):
     out["nodes"] = nodes[perm]
     out["bc_type"] = np.asarray(seep["bc_type"])[perm]
     out["bc_values"] = np.asarray(seep["bc_values"])[perm]
+    if seep.get("flux_nodal") is not None:
+        # Must be permuted with everything else, or the nodal flows land on the wrong nodes.
+        out["flux_nodal"] = np.asarray(seep["flux_nodal"], dtype=float)[perm]
     new_el = elements.copy()
     for k, (e, et) in enumerate(zip(elements, etypes)):
         new_el[k, :et] = inv[e[:et]]
@@ -119,7 +122,26 @@ def rcm_renumber(seep):
     return out, bw
 
 
-def write_s2d(seep, gamma_w, path, iuntyp=1, title="xslope export for SEEP2D cross-check"):
+def write_s2d(seep, gamma_w, path, iuntyp=1, title="xslope export for SEEP2D cross-check",
+              flux_edges=None):
+    """flux_edges: optional list of (i, j, q) — a boundary EDGE (0-based node pair) carrying
+    a uniform normal Darcy velocity q, positive into the domain.
+
+    SEEP2D expresses a Neumann BC as "flowrate cards" read after the element cards, with
+    their count in the header's 4th field (nflcd). It does its OWN consistent-load assembly
+    (seep2d.f:2023):
+
+        sij   = |x_j - x_i|                       ! edge length
+        fx(i) += 0.5 * sij * flrt                 ! q*L/2 at each end
+        fx(j) += 0.5 * sij * flrt
+        nbc(i) = -1 ;  nbc(j) = -1                ! and sets the flags itself
+
+    which is the same formula XSLOPE uses. So handing SEEP2D the RAW (edge, q) — rather than
+    our own assembled nodal vector — makes the comparison a genuine test of one assembly
+    against the other. It also picks up SEEP2D's internal `flrt / sck` scaling (sck = max k),
+    which a hand-written nbc=-1 node card does NOT get: writing fx directly on the node card
+    silently produces a head field ~1/sck too small.
+    """
     nodes = np.asarray(seep["nodes"])
     elements = np.asarray(seep["elements"])
     etypes = np.asarray(seep["element_types"])
@@ -135,23 +157,36 @@ def write_s2d(seep, gamma_w, path, iuntyp=1, title="xslope export for SEEP2D cro
     else:
         us1 = np.asarray(seep["kr0_by_mat"]); us2 = np.asarray(seep["h0_by_mat"])
     nmat = len(k1)
+    fedges = list(flux_edges or [])
     with open(path, "w") as f:
         f.write(f"{title}\n")
-        # format(4i5, 1x, a4, f10.0, 4x, a1, f10.0, i5) — trailing field is iuntyp
-        f.write(f"{len(nodes):5d}{len(elements):5d}{nmat:5d}{0:5d} PLNE"
+        # format(4i5, 1x, a4, f10.0, 4x, a1, f10.0, i5) — 4th int is nflcd (flow-card count),
+        # trailing field is iuntyp
+        f.write(f"{len(nodes):5d}{len(elements):5d}{nmat:5d}{len(fedges):5d} PLNE"
                 f"{0.0:10.1f}    F{gamma_w:10.2f}{iuntyp:5d}\n")
         for m in range(nmat):                            # format(i5, 5f15.0)
             f.write(f"{m+1:5d}{k1[m]:15.6f}{k2[m]:15.6f}{ang[m]:15.6f}"
                     f"{us1[m]:15.6f}{us2[m]:15.6f}\n")
+        # Node cards carry ONLY the Dirichlet conditions (nbc 1 = fixed head, 2 = exit face).
+        # Flux nodes stay nbc = 0 here: the flow cards below set nbc = -1 themselves.
+        # Do NOT hand-write nbc = -1 with a nodal load on the node card — that path skips
+        # SEEP2D's `flrt / sck` scaling and yields a head field ~1/max(k) too small.
         for i, (x, y) in enumerate(nodes):               # format(i5, i2, i3, 3f15.0)
             nbc = int(bc_type[i])
             fx = float(bc_val[i]) if nbc == 1 else (float(y) if nbc == 2 else 0.0)
+            # Not %15.6f: heads and flows can be far below 1e-6 and six decimals would
+            # silently truncate them to zero. Fortran's F descriptor accepts E-notation.
             f.write(f"{i+1:5d}{0:2d}{nbc:3d}{float(x):15.6f}{float(y):15.6f}"
-                    f"{fx:15.6f}\n")
+                    f"{fx:15.7E}\n")
         for k, (e, et) in enumerate(zip(elements, etypes)):  # format(6i5)
             n1, n2, n3 = (int(v) + 1 for v in e[:3])
             n4 = n3 if et == 3 else int(e[3]) + 1
             f.write(f"{k+1:5d}{n1:5d}{n2:5d}{n3:5d}{n4:5d}{int(emats[k]):5d}\n")
+        for (i, j, q) in fedges:
+            # format(2i5, f10.0) — the flowrate field is EXACTLY 10 columns. %10.3E is the
+            # widest E-form that still fits with a leading minus sign ("-4.400E-06"); a wider
+            # one overruns into the node numbers and SEEP2D silently reads garbage.
+            f.write(f"{int(i)+1:5d}{int(j)+1:5d}{float(q):10.3E}\n")
 
 
 def run_seep2d(s2d_path, workdir):

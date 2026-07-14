@@ -57,6 +57,8 @@ def default_style_sheet():
             "seep_bc": {"color": "darkblue", "linestyle": "--", "linewidth": 3.0},
             "seep_water_level": {"color": "lightskyblue", "linewidth": 2.0},
             "seep_exit_face": {"color": "red", "linestyle": "--", "linewidth": 3.0},
+            # Specified-flux (Neumann) BC — distinct from the head/exit-face lines.
+            "seep_flux": {"color": "darkgreen", "linestyle": "-.", "linewidth": 3.0},
             # No linestyle — structural elements (reinforcement, piles), drawn solid.
             "reinforcement": {"color": "darkgray", "linewidth": 3.0, "alpha": 0.8},
             "piles": {"color": "green", "linewidth": 4.0},

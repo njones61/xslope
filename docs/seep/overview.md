@@ -236,6 +236,53 @@ This iterative approach ensures that the final solution satisfies the correct bo
 
 For higher-order boundary elements (`tri6`, `quad8`, and `quad9`), XSLOPE applies the seepage-face active set on a **boundary-edge basis** rather than activating midside nodes independently. Corner nodes are still checked with the usual head/flow criteria, but a quadratic boundary side is only treated as an active seepage edge when both corner nodes and the midside node satisfy the active criterion. This prevents partially active quadratic edges, keeps the seepage transition at element corners, and improves compatibility between the higher-order head solution and the resulting flow net near exit-face corners.
 
+### Specified Flux Boundary Conditions (Neumann)
+
+A specified-flux boundary prescribes the rate at which water crosses a boundary rather than
+the head on it. The typical use is rainfall infiltration or recharge applied to the ground
+surface, where the water table position is an *output* of the analysis and so cannot be
+imposed as a head.
+
+On a flux boundary,
+
+>>$-k \dfrac{\partial h}{\partial n} = q$
+
+where $q$ is the **normal Darcy velocity** (length/time), taken **positive into the domain**.
+Note that $q$ is a flow per unit area of boundary, not a total discharge over the boundary
+segment; the two differ by the length of the segment.
+
+The flux enters the finite element system as a boundary load rather than a prescribed value.
+Its consistent nodal loads are obtained by integrating the flux against the element shape
+functions along each boundary edge lying on the flux line,
+
+>>$f_i = \displaystyle\int_\Gamma N_i \, q \, ds$
+
+which for a straight edge of length $L$ carrying a uniform $q$ gives $qL/2$ at each node of a
+linear (`tri3`) edge, and $qL/6$, $qL/6$, $2qL/3$ at the two corners and the midside node of a
+quadratic (`tri6`, `quad8`, `quad9`) edge. Each set sums to $qL$, so the total water entering
+through the edge is exactly $qL$ regardless of element order. Because a flux boundary is a
+*natural* boundary condition, its nodes remain unknowns in the solve — unlike specified-head
+nodes, which are eliminated.
+
+Two consequences are worth noting:
+
+**A model with only flux boundaries is singular.** The flux condition constrains the gradient
+of the head, not the head itself, so head is determined only up to an additive constant. At
+least one specified-head boundary or exit face must be present, and XSLOPE raises an error if
+none is.
+
+**A flux boundary can be over-specified.** Nothing in the mathematics prevents a user from
+forcing in more water than the material can transmit away; the solver simply raises the
+pressure at that boundary until the flow balances, which produces positive pore pressure at
+the ground surface. Physically the surface would pond to a small depth and the excess would
+run off, so the true infiltration would be *less* than the value entered. XSLOPE does not
+model that runoff, but it does warn when any flux node finishes with $\psi > 0$ on an
+unconfined problem, which is the signal that the specified rate exceeds what the soil can
+accept and the result should not be trusted.
+
+Zero flux is the natural (do-nothing) condition and is already what an unspecified boundary
+carries, so a flux boundary only needs to be defined where the flux is non-zero.
+
 ## Solution Process
 
 ### Finite Element Formulation

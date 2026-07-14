@@ -9,10 +9,10 @@ input file alone.
 
 <!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep, target_size=0.10, expected_flowrate=4.534e-06, tolerance=0.02, benchmark=GW2-q -->
 <!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep_head, target_size=0.10, points=4:1:0.500;4.5:0.866:0.381;5:0:0.263;6:0:0.202, tolerance=0.01, benchmark=GW2-h -->
-<!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.40, expected_flowrate=2.307e-05, tolerance=0.02, benchmark=GW3-q -->
-<!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.40, points=0:-4:4.45;10:-4:3.37;14:-4:2.42;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
+<!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.10, expected_flowrate=2.351e-05, tolerance=0.02, benchmark=GW3-q -->
+<!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.10, points=0:-4:4.47;10:-4:3.40;14:-4:2.44;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
 <!-- test: file=../files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.147, expected_flowrate=5.462e-06, tolerance=0.05, benchmark=GW4-q -->
-<!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.301e-07, tolerance=0.05, benchmark=GW6a-q -->
+<!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.437e-07, tolerance=0.05, benchmark=GW6a-q -->
 <!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
 <!-- test: file=../files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
 <!-- test: file=../files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
@@ -109,16 +109,23 @@ the dam base impervious between them.
 
 | Station (line 1-1, y = −4) | XSLOPE | Rushton & Redshaw / Slide |
 |---|---|---|
-| x = 0 | 4.45 | 4.50 |
-| x = 10 | 3.37 | 3.45 |
-| x = 14 | 2.42 | 2.47 |
+| x = 0 | 4.47 | 4.50 |
+| x = 10 | 3.40 | 3.45 |
+| x = 14 | 2.44 | 2.47 |
 | x = 20 | 1.05 | 1.05 |
 | x = 30 | 0.19 | 0.20 |
 | x = 40 | 0.08 | 0.07 |
 
 Heads along both published profile lines fall within 0.08 m of the chart everywhere
-(Slide's markers coincide with Rushton & Redshaw's); the vertical profile under the dam
-heel spans 0.24–1.30 m, matching the published range endpoint for endpoint.
+(Slide's markers coincide with Rushton & Redshaw's); the vertical profile on line 2-2
+(x = 20) spans 0.17–1.30 m against the published 0.24–1.30 m.
+
+This problem is solved on a finer mesh than the rest of the panel (`target_size` 0.1
+rather than 0.4) because of the singularity at (20, 0), where the impervious dam base
+meets the zero-head boundary. The head gradient is unbounded at that corner, so the
+solution converges slowly in its immediate neighbourhood — the top of line 2-2 sits
+right on top of it — while the rest of the domain is well resolved at any mesh size.
+A coarse mesh reports a plausible number there for the wrong reason.
 
 ![gw003: mesh and solved heads](images/gw003.png)
 

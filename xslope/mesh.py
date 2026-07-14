@@ -1997,6 +1997,11 @@ def get_material_polygons(slope_data, reinf_lines=None):
     element edges align to the loaded span. Without this, the consistent edge-load
     integrator in fem.py (Pass 2a) drops the element edges that straddle a load end
     and under-applies the load (~one element edge of traction at each end).
+
+    Seepage BC polyline vertices are inserted the same way and for the same reason:
+    a specified-flux BC loads a boundary edge only when both its corner nodes lie on
+    the polyline, so an endpoint straddling an edge would silently drop it and apply
+    less water than specified. See add_seep_bc_points_to_polygons.
     """
     if slope_data.get('profile_lines'):
         polygons = build_polygons(slope_data, reinf_lines=reinf_lines)
@@ -2010,7 +2015,8 @@ def get_material_polygons(slope_data, reinf_lines=None):
         # the constraint-line edges and silently produces an empty mesh.
         if reinf_lines:
             polygons = add_intersection_points_to_polygons(polygons, reinf_lines)
-    return add_dload_points_to_polygons(_clean_pinchouts(polygons), slope_data)
+    polygons = add_dload_points_to_polygons(_clean_pinchouts(polygons), slope_data)
+    return add_seep_bc_points_to_polygons(polygons, slope_data)
 
 
 def _clean_pinchouts(polygons):
@@ -2070,48 +2076,86 @@ def add_dload_points_to_polygons(polygons, slope_data):
                 for point in load_line['xy']:
                     points_to_check.append(point)
     
+    return _add_points_to_polygons(polygons, points_to_check, tol)
+
+
+def _add_points_to_polygons(polygons, points_to_check, tol=1e-8):
+    """Insert each point as a polygon vertex on whichever edge it falls on, so the
+    mesher puts a node exactly there and element edges align to it. Points already
+    coincident with a vertex, or not on any edge, are left alone. Shared by the
+    distributed-load and seepage-BC inserters."""
     if not points_to_check:
         return polygons
-    
+
     # Process each polygon
     updated_polygons = []
     for poly in polygons:
         coords = poly.get("coords", []) if isinstance(poly, dict) else poly
         updated_poly = list(coords)  # Make a copy
-        
+
         # Check each point against polygon edges
         for check_point in points_to_check:
             x_check, y_check = check_point
-            
+
             # Check if point is already a vertex
             is_vertex = False
             for vertex in updated_poly:
                 if abs(vertex[0] - x_check) < tol and abs(vertex[1] - y_check) < tol:
                     is_vertex = True
                     break
-            
+
             if is_vertex:
                 continue
-            
+
             # Check if point lies on any edge
             for i in range(len(updated_poly)):
                 x1, y1 = updated_poly[i]
                 x2, y2 = updated_poly[(i + 1) % len(updated_poly)]
-                
+
                 # Check if point lies on edge segment
                 if is_point_on_edge((x_check, y_check), (x1, y1), (x2, y2), tol):
                     # Insert point after vertex i
                     updated_poly.insert(i + 1, (round(x_check, 6), round(y_check, 6)))
                     break  # Only insert once per point
-        
+
         if isinstance(poly, dict):
             updated_entry = dict(poly)
             updated_entry["coords"] = updated_poly
             updated_polygons.append(updated_entry)
         else:
             updated_polygons.append(updated_poly)
-    
+
     return updated_polygons
+
+
+def add_seep_bc_points_to_polygons(polygons, slope_data):
+    """Insert the vertices of every seepage BC polyline as polygon vertices.
+
+    Exactly the same need the distributed loads have. A specified-flux BC is applied
+    EDGE-wise — a boundary edge carries load only when BOTH its corner nodes lie on
+    the polyline — so an endpoint landing part-way along an element edge drops that
+    whole edge and silently applies less water than the user asked for, the same way a
+    dload end that straddles an edge under-applies its traction. Pinning a node at
+    each vertex makes the loaded length equal the specified length exactly.
+
+    Head and exit-face BCs are matched node-wise rather than edge-wise, so a stray
+    endpoint only rounds their extent to the nearest node. Pinning their vertices
+    makes those extents exact too, which matters most for an exit face: its endpoints
+    decide where the phreatic surface is allowed to emerge.
+
+    Interior vertices are pinned as well as endpoints — a polyline can kink at a point
+    that is not a corner of the material polygons, and an edge spanning that kink would
+    otherwise cut across it.
+    """
+    pts = []
+    for key in ('seepage_bc', 'seepage_bc2'):
+        bc = slope_data.get(key) or {}
+        for block in ((bc.get('specified_heads') or [])
+                      + (bc.get('specified_fluxes') or [])):
+            pts.extend(tuple(c) for c in (block.get('coords') or []))
+        pts.extend(tuple(c) for c in (bc.get('exit_face') or []))
+    return _add_points_to_polygons(polygons, pts)
+
 
 def is_point_on_edge(point, edge_start, edge_end, tol=1e-8):
     """
@@ -3534,7 +3578,11 @@ def extract_point_constraints(slope_data):
     """Mesh point constraints from slope_data: currently the line-load
     application points (a node must land exactly at each so the load can be
     applied as a nodal force). Returns a list of (x, y) tuples for
-    build_mesh_from_polygons(point_constraints=...)."""
+    build_mesh_from_polygons(point_constraints=...).
+
+    Seepage BC vertices are NOT here: they are inserted as polygon vertices inside
+    get_material_polygons(), the same way distributed-load points are, so that every
+    caller gets them without having to opt in."""
     return [(ll['x'], ll['y']) for ll in (slope_data.get('line_loads') or [])]
 
 

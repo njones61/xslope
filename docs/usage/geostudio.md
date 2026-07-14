@@ -59,7 +59,8 @@ choice is not cosmetic, which is why XSLOPE makes you make it rather than guessi
 | **Bedrock** (impenetrable) | **Excluded from the domain** — see below |
 | Material colour | The zone colour in Studio |
 | Piezometric surface + `MaterialUsesPiezs` | Piezo line, on the materials that use it |
-| **Piezo line above the ground surface** | **A distributed load** — see below |
+| **Water above the ground surface** | **A distributed load** — see below |
+| **A parent SEEP/W analysis's pore-pressure field** | The `seep` option, on SEEP/W's own mesh — see below |
 | **Surcharges** (a wedge of fill above the ground — `Pressure` is its *unit weight*) | `dloads`, varying with the depth of fill |
 | **Reinforcement** — nails, geosynthetics, anchors, tiebacks | `reinforcement_lines` — see below |
 | **Line loads** (`Value` + trend/plunge) | `line_loads` |
@@ -78,11 +79,58 @@ The ground surface and domain are derived from the zones, as for any polygon-bas
     trial surfaces cut straight through it.
 
 !!! info "Ponded water is synthesised"
-    GeoStudio stores no ponded-water object: where the piezometric line rises **above** the
-    ground surface, SLOPE/W simply carries the water's weight implicitly. XSLOPE needs that
-    weight to exist explicitly, so the import **creates a distributed load** of γ_w × depth,
-    normal to the ground and tapering to zero at the waterline. Without it, the weight of
-    the reservoir would silently vanish.
+    GeoStudio stores no ponded-water object: where the water rises **above** the ground
+    surface, SLOPE/W simply carries its weight implicitly. XSLOPE needs that weight to
+    exist explicitly, so the import **creates a distributed load** of γ_w × depth, normal
+    to the ground and tapering to zero at the waterline. Without it, the weight of the
+    reservoir would silently vanish.
+
+    Where the water comes from a piezometric line, the waterline is drawn. Where it comes
+    from a SEEP/W field, **nothing in the file says where the water is** — and SLOPE/W
+    still loads the submerged face. See below.
+
+### Pore pressure from a SEEP/W analysis
+
+A SLOPE/W analysis can take its pore pressure from a **parent SEEP/W run** rather than a
+piezometric line — a whole finite-element head field, which is the point of using SEEP/W
+at all (a piezo line *means* hydrostatic pressure beneath it, and a drawdown or a
+transient seepage problem is precisely where that assumption fails).
+
+XSLOPE imports that field. A solved `.gsz` carries the transferred pore pressure in the
+stability analysis's **own** result folder, on the mesh SEEP/W solved on, so nothing has
+to be re-solved: the mesh becomes XSLOPE's mesh and the nodal pressures become its
+`seep_u`, with every material set to the `seep` option. The file must have been saved
+**solved** — an unsolved one holds no field, and XSLOPE cannot run SEEP/W's analysis for
+it. That is said loudly rather than assumed away.
+
+!!! info "The reservoir is derived from the head field"
+    A SEEP/W-fed analysis records **no water surface anywhere** — and yet SLOPE/W still
+    puts the weight of the reservoir on the submerged face. It can only be deriving it
+    from the head field itself, and it is: at any point on the ground surface, water
+    stands to elevation `y + u/γ_w`.
+
+    That single rule reproduces both cases exactly. Under a reservoir the ground is a
+    specified-head boundary, so `u = γ_w (H − y)` and the implied level comes out at the
+    reservoir level *H*, to the millimetre, at every submerged point. On a drained or
+    seepage face `u = 0`, the implied level collapses onto the ground, and no load is
+    produced. On GeoStudio's own rapid-drawdown example this puts water on the face at
+    the full-reservoir step and none at any drawn-down step — which is exactly what
+    SLOPE/W's own per-slice surcharge forces do.
+
+    It is worth stressing how much this matters: of the 13% of factor of safety that was
+    being lost on that example, **most was the missing reservoir, not the missing pore
+    pressures.**
+
+!!! warning "A transient analysis is many models, and XSLOPE is one"
+    A SEEP/W run that marches in time saves a result set per time step, and SLOPE/W
+    solves the slope at **every one** — the factor of safety in a drawdown problem can
+    swing by 50% across them. An XSLOPE model is a single state in time, so the import
+    must choose.
+
+    It chooses the **governing** step: the one where SLOPE/W's own factor of safety is
+    lowest, which is the condition a drawdown analysis exists to find. The choice, the
+    full list of steps and their factors of safety are all reported, and `step='NNN'`
+    takes any other.
 
 !!! info "Reinforcement: GeoStudio implies the direction, XSLOPE states it"
     A GeoStudio reinforcement carries a capacity, a plate capacity, a pullout resistance
@@ -121,8 +169,12 @@ without telling you. Read the caveats it returns.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
 - **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
-- **Pore pressure other than a piezometric surface.** Ru, pressure grids and
-  finite-element pore pressures import as zero.
+- **Pore pressure that is neither a piezometric surface nor a SEEP/W field.** Ru and
+  pressure grids import as zero, and say so.
+- **The SEEP/W analysis itself** — its mesh is imported, but its conductivity functions
+  and boundary conditions are not, so XSLOPE cannot *re-solve* the seepage problem, only
+  read the answer SEEP/W already computed. An **unsolved** SEEP/W-fed file therefore
+  arrives with no pore pressure at all, and is flagged.
 - **Anything XSLOPE has never seen.** Unrecognised GeoStudio elements are reported by
   name rather than ignored, so a feature added in a future version cannot silently change
   someone's factor of safety.
@@ -170,9 +222,22 @@ written as fill whose *depth* reproduces the pressure exactly.
     which is written. Re-creating it as a surcharge would count the water twice. Export
     says so explicitly when it happens.
 
-A `.gsz` still cannot carry everything XSLOPE models. Failure surfaces, reinforcement,
-piles, line loads and non-Mohr-Coulomb strengths are **not written**, and each is reported
-as a caveat so you know what to re-create on the GeoStudio side.
+A `.gsz` still cannot carry everything XSLOPE models. Failure surfaces, piles and
+non-Mohr-Coulomb strengths are **not written**, and each is reported as a caveat so you
+know what to re-create on the GeoStudio side.
+
+!!! warning "A seepage field cannot be exported"
+    If the model's pore pressure is a finite-element **seepage field**, the exported
+    `.gsz` has **no pore pressure at all**. A `.gsz` can only carry one as a SEEP/W
+    analysis — a mesh, hydraulic functions, boundary conditions and a solved head field —
+    and XSLOPE does not write those. A piezometric line is *not* a substitute: it means
+    hydrostatic pressure below it, which is the very assumption a seepage analysis is run
+    to avoid, so XSLOPE will not quietly swap one for the other. Export says so.
+
+    Ponded water in such a model **is** written, as a surcharge: it is a real load and
+    dropping it would be worse. But if you then add a piezometric surface in GeoStudio,
+    delete that surcharge — GeoStudio derives the reservoir from the water surface itself
+    and would otherwise carry the water twice.
 
 !!! note "How export is checked"
     A round-trip through XSLOPE's own reader proves **nothing** — reader and writer share
@@ -194,21 +259,13 @@ as a caveat so you know what to re-create on the GeoStudio side.
 
 ## Notes and limitations
 
-- **SLOPE/W only, for now.** A `.gsz` can also hold SEEP/W, SIGMA/W and other GeoStudio
-  analyses; XSLOPE currently reads only the SLOPE/W ones. This is a gap, not a limit of
-  the format — see below.
+- **Stability analyses only.** A `.gsz` can hold SEEP/W, SIGMA/W and other GeoStudio
+  analyses. XSLOPE imports the SLOPE/W ones, and reads a SEEP/W analysis's **solved
+  pore-pressure field** where a stability analysis depends on it — but it does not import
+  a seepage *problem* to re-solve, and writes no analysis but SLOPE/W.
 - Only one piezometric surface is imported; a file defining several uses the first.
 - Import replaces the current project. In Studio you are prompted to discard unsaved
   changes first, exactly as when opening a file; the imported model is then left unsaved
   so you can review it and **Save As**.
-- No third-party package is needed — `.gsz` is a ZIP of XML, both handled by the
-  standard library.
-
-### SEEP/W is a natural next step
-
-Nothing about a SEEP/W analysis is unreadable — it sits in the same XML, and a solved
-`.gsz` carries its mesh and nodal pore pressures. Those map onto XSLOPE's own seepage
-inputs directly: hydraulic conductivities and boundary conditions onto `seepage_bc`, and
-a solved head field onto the `seep` pore-pressure option. It simply isn't implemented
-yet. If you have SEEP/W models you want to bring over, that is worth knowing — the work
-is scoped, not speculative.
+- No third-party package is needed — `.gsz` is a ZIP of XML and a binary PLY mesh, both
+  handled by the standard library.

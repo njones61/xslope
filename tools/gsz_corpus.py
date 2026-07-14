@@ -33,7 +33,8 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from xslope.geostudio import read_gsz, gsz_to_slope_data, read_gsz_results  # noqa: E402
+from xslope.geostudio import (read_gsz, gsz_to_slope_data, read_gsz_results,  # noqa: E402
+                              gsz_seep_steps)
 from xslope.slice import generate_slices  # noqa: E402
 from xslope import solve  # noqa: E402
 
@@ -54,59 +55,72 @@ METHODS = {
 
 
 def score_analysis(gsz, analysis, slices):
-    """xslope vs SLOPE/W on every circle SLOPE/W scored. Returns a result dict."""
+    """xslope vs SLOPE/W on every circle SLOPE/W scored. Returns a result dict.
+
+    A transient analysis -- one whose water comes from a SEEP/W run that marched in time
+    -- is scored at EVERY saved time step, with the pore-pressure field of that step and
+    the surfaces SLOPE/W solved at that step. Scoring one step against another's water
+    would compare two different problems.
+    """
     name, method = analysis["name"], (analysis["method"] or "")
     out = {"analysis": name, "method": method, "n": 0, "skipped": 0, "noncirc": 0,
-           "median": None, "worst": None, "wmedian": None, "note": ""}
+           "median": None, "worst": None, "wmedian": None, "note": "", "steps": 1}
 
     solver = METHODS.get(method)
     if solver is None:
         out["note"] = f"no xslope equivalent of '{method}'"
         return out
 
-    try:
-        slope_data, caveats = gsz_to_slope_data(gsz, analysis["id"], critical_surface=False)
-    except Exception as e:
-        out["note"] = f"import failed: {e}"
-        return out
-    out["caveats"] = caveats
-
-    rows = read_gsz_results(gsz, name)
-    if not rows:
-        out["note"] = "not solved (no trial surfaces saved)"
-        return out
+    # No seepage field -> one state, imported as-is (step stays None).
+    steps = [s["step"] for s in gsz_seep_steps(gsz, name)] or [None]
+    out["steps"] = len(steps)
 
     errs, werrs = [], []
-    for row in rows:
-        if not row["circular"]:
-            out["noncirc"] += 1           # a block/specified surface: not a circle at all
-            continue
-        circle = {"Xo": row["xo"], "Yo": row["yo"], "R": row["r"], "Depth": None,
-                  "Y": None, "Option": "Depth", "Movement": "Left to Right"}
+    for step in steps:
         try:
-            ok, res = generate_slices(slope_data, circle=circle, num_slices=slices,
-                                      debug=False)
-            if not ok:
-                out["skipped"] += 1
+            slope_data, caveats = gsz_to_slope_data(gsz, analysis["id"],
+                                                    critical_surface=False, step=step)
+        except Exception as e:
+            out["note"] = f"import failed: {e}"
+            return out
+        out["caveats"] = caveats
+
+        rows = read_gsz_results(gsz, name, step)
+        if not rows:
+            continue
+
+        for row in rows:
+            if not row["circular"]:
+                out["noncirc"] += 1       # a block/specified surface: not a circle at all
                 continue
-            df = res[0]
-            # Does the mass we built weigh what SLOPE/W says it weighs? This checks the
-            # imported polygons and unit weights with the solver taken out of the way --
-            # and it is what tells a genuine circle from a circle *fitted* to a block.
-            if row["weight"] > 0:
-                w = float(df["w"].sum())
-                werrs.append(100.0 * (w - row["weight"]) / row["weight"])
-            success, r = solver(df)
-            if not success:
+            circle = {"Xo": row["xo"], "Yo": row["yo"], "R": row["r"], "Depth": None,
+                      "Y": None, "Option": "Depth", "Movement": "Left to Right"}
+            try:
+                ok, res = generate_slices(slope_data, circle=circle, num_slices=slices,
+                                          debug=False)
+                if not ok:
+                    out["skipped"] += 1
+                    continue
+                df = res[0]
+                # Does the mass we built weigh what SLOPE/W says it weighs? This checks
+                # the imported polygons and unit weights with the solver taken out of the
+                # way -- and it tells a genuine circle from one *fitted* to a block.
+                if row["weight"] > 0:
+                    w = float(df["w"].sum())
+                    werrs.append(100.0 * (w - row["weight"]) / row["weight"])
+                success, r = solver(df)
+                if not success:
+                    out["skipped"] += 1
+                    continue
+                errs.append(100.0 * (r["FS"] - row["fs"]) / row["fs"])
+            except Exception:
                 out["skipped"] += 1
-                continue
-            errs.append(100.0 * (r["FS"] - row["fs"]) / row["fs"])
-        except Exception:
-            out["skipped"] += 1
 
     if not errs:
-        out["note"] = (f"{out['noncirc']} non-circular surfaces (not rebuildable)"
-                       if out["noncirc"] else "no comparable circles")
+        if out["noncirc"]:
+            out["note"] = f"{out['noncirc']} non-circular surfaces (not rebuildable)"
+        else:
+            out["note"] = "not solved (no trial surfaces saved)"
         return out
 
     out["n"] = len(errs)

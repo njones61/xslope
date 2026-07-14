@@ -80,17 +80,16 @@ A geometry bug moves both. A strength, water or load bug moves only the second.
 | Tandjiria | Sand – circular | 338 | +0.19% | −0.07% | 99% |
 | Tandjiria | Clay – circular – **reinforced** | 1 | +0.17% | −0.27% | 100% |
 | Tandjiria | Sand – circular – **reinforced** | 1 | +0.45% | −0.64% | 100% |
-| Rapid drawdown (SEEP/W-coupled) | 2a, 3a | 242 ea. | +0.16% | **−13.2%** | 0% |
+| Rapid drawdown | 2a – after rapid drawdown (SEEP/W) | 2576 | +0.16% | −0.13% | 98% |
+| Rapid drawdown | 3a – during slow drawdown (SEEP/W) | 2536 | +0.15% | −0.11% | 97% |
 
-**7 of 9 scorable analyses agree with SLOPE/W to within 1%** (median 0.27%) over 1657 slip surfaces. Every
-model's geometry and unit weights import correctly — the weight column never exceeds +0.5%, *including* on the
-two that fail.
+**All 9 scorable analyses agree with SLOPE/W to within 1%** (median 0.12%) over 6285 slip surfaces. Every model's
+geometry and unit weights import correctly too — the weight column never exceeds +0.5% anywhere.
 
-The two that fail are the rapid-drawdown analyses, and they fail for a stated reason: they take their pore
-pressure from a **parent SEEP/W analysis**, which XSLOPE does not yet import. SLOPE/W also raises the reservoir
-standing against the slope from that same head field — worth about 35% of the sliding mass here — so both halves
-of the water are absent. The import says so, in those words, rather than quietly handing back a model that is
-13% wrong. (SEEP/W import is a scoped gap, not a limit of the format.)
+The two drawdown analyses are the SEEP/W-coupled ones, and they are scored at **every one of their 11 saved time
+steps**, against the pore-pressure field and the trial surfaces SLOPE/W solved at that step. They were −13.2%
+until the [SEEP/W field and the reservoir it implies](../usage/geostudio.md#pore-pressure-from-a-seepw-analysis)
+were both imported.
 
 Non-circular analyses are reported as not comparable rather than scored. SLOPE/W writes a centre and a radius even
 for a block or fully-specified surface, but that circle is *fitted* to the surface, not the surface it solved —
@@ -113,6 +112,13 @@ not the importer).
       only because the test wedge happened to be exactly 1 m deep, where the two readings coincide.
     - **Reinforcement acts along the bar (axial), not tangent to the slip surface.** Measured, not reasoned:
       axial reproduces SLOPE/W to 0.2% on Tandjiria's reinforced clay, where tangent fails to converge at all.
+    - **SLOPE/W derives the reservoir from the SEEP/W head field.** A SEEP/W-coupled analysis records **no water
+      surface anywhere** — and still loads the submerged face. The rule it must be using, and is: water stands to
+      `y + u/γ_w` at the ground surface. That reproduces SLOPE/W's own per-slice surcharge forces at every time
+      step of the drawdown example, receding 627 → 566 → 480 → 363 → 217 → 67 → 0 kN and vanishing at exactly the
+      step SLOPE/W's does. Worth **−13.2%** together with the pore pressures — and *most of it was the reservoir,
+      not the pressures*. The corpus is what made the split visible: the pore-pressure-only fix left a −7% bias
+      that lived only in the partially-submerged steps of the *slow* drawdown, where the water is still receding.
 
 ## Corpus status
 

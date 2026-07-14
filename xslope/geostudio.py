@@ -26,6 +26,8 @@ This module reads that XML and builds an xslope ``slope_data``:
     xslope .xlsx input file.
   - read_gsz_results(gsz, analysis_name): SLOPE/W's solved trial surfaces, when
     the file carries them. Not part of the model; used to compare answers.
+  - read_gsz_seep(gsz, analysis_name): the pore-pressure field a parent SEEP/W
+    analysis computed, as an xslope mesh + nodal u.
 
 Unlike DXF, a .gsz is *semantically complete* — regions, materials and water
 conditions already know what they are, so no layer-mapping wizard is needed. The
@@ -44,12 +46,15 @@ import io
 import math
 import os
 import re
+import struct
 import zipfile
 import xml.etree.ElementTree as ET
 
+import numpy as np
 from shapely.geometry import Polygon
 
 from .fileio import build_ground_surface_from_polygons
+from .mesh import ensure_ccw_elements, interpolate_at_point
 
 
 # Strength models SLOPE/W offers that xslope can represent. Anything else is
@@ -141,11 +146,21 @@ def read_gsz(path):
         aid = _text(a, "ID")
         if aid is None:
             continue
+        parent = _text(a, "ParentID")
+        # A transient analysis saves a result set per time step. Its SLOPE/W child
+        # solves the slope at every one of them, so an imported model has to say WHICH.
+        # Step 0 is the initial condition (inherited, t = 0); the listed steps follow it.
+        times = [0.0]
+        for ts in a.findall("./TimeIncrements/TimeSteps/TimeStep"):
+            if ts.get("Save") == "true" and ts.get("ElapsedTime"):
+                times.append(float(ts.get("ElapsedTime")))
         analyses.append({
             "id": int(aid),
             "name": _text(a, "Name", f"Analysis {aid}"),
             "kind": _text(a, "Kind", ""),
             "method": _text(a, "Method", ""),
+            "parent": int(parent) if parent else None,
+            "times": times,
         })
 
     points, regions, glines = {}, {}, {}
@@ -731,7 +746,48 @@ def _blank_material(name):
     }
 
 
-def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
+def _import_seep(gsz, analysis, step, caveats, polygons):
+    """Pick a time step and read its SEEP/W field. Returns (mesh, u, step) or None."""
+    name = analysis["name"]
+    steps = gsz_seep_steps(gsz, name)
+    if not steps:
+        return None
+
+    if step is None and len(steps) > 1:
+        # An xslope model is ONE state in time; SLOPE/W solved every step, and the
+        # factor of safety differs at each. Default to the step SLOPE/W itself found
+        # most critical -- the condition a drawdown analysis exists to find. Picking
+        # first or last instead would be arbitrary, and would quietly answer a
+        # different question than the one the file was built to ask.
+        scored = []
+        for s in steps:
+            trials = read_gsz_results(gsz, name, s["step"])
+            if trials:
+                scored.append((min(t["fs"] for t in trials), s))
+        if scored:
+            worst_fs, worst = min(scored, key=lambda p: p[0])
+            step = worst["step"]
+            table = ", ".join(f"{s['step']}={fs:.3f}" for fs, s in scored)
+            caveats.append(
+                f"this analysis is transient: SLOPE/W solved it at {len(steps)} saved "
+                f"time steps, with factors of safety {table}. An xslope model is one "
+                f"state in time, so step {step} was imported — the GOVERNING one, where "
+                f"SLOPE/W's own factor of safety is lowest ({worst_fs:.3f}) at t = "
+                f"{worst['time']:g}. Re-import with step='NNN' for any of the others")
+
+    got = read_gsz_seep(gsz, name, step, polygons)
+    if got is None:
+        return None
+    mesh, u, chosen = got
+    caveats.append(
+        f"pore pressure came from the parent SEEP/W analysis as a finite element field "
+        f"({len(mesh['nodes'])} nodes, step {chosen}) — imported onto the mesh SEEP/W "
+        f"solved on, with every material set to the 'seep' option. It is SLOPE/W's own "
+        f"pore pressure, not a re-solve: xslope did not run the seepage analysis")
+    return mesh, u, chosen
+
+
+def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     """Build an xslope ``slope_data`` for one analysis of a parsed .gsz.
 
     Parameters
@@ -748,6 +804,14 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
         definition — it is imported because it makes the model complete and lets
         the two programs be compared on identical geometry. Set False to import
         no surface and define your own search.
+    step : str, optional
+        For an analysis whose water comes from a *transient* SEEP/W run: which
+        saved time step to import ('000', '001', …). An xslope model is one state
+        in time, but SLOPE/W solves the slope at every step and the factor of
+        safety differs at each — in a drawdown problem, by a lot. The default is
+        the **governing step**, the one where SLOPE/W's own factor of safety is
+        lowest, which is the condition the analysis exists to find. The choice is
+        always reported. See :func:`gsz_seep_steps` for what is on offer.
 
     Returns
     -------
@@ -770,7 +834,8 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
         raise ValueError("This .gsz defines no analyses.")
     if analysis_id is None:
         analysis_id = gsz["analyses"][0]["id"]
-    if not any(a["id"] == analysis_id for a in gsz["analyses"]):
+    analysis = next((a for a in gsz["analyses"] if a["id"] == analysis_id), None)
+    if analysis is None:
         raise ValueError(f"This .gsz has no analysis with ID {analysis_id}.")
 
     assign = gsz["contexts"].get(analysis_id, {})
@@ -846,6 +911,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
     # surface maps onto xslope's piezo line. <MaterialUsesPiezs> says WHICH materials
     # draw from it — a material not listed there is dry even when a surface exists.
     piezo_line = []
+    seep = None
     option = water.get("option") or "None"
     uses = stab.get("material_piezo", {})
     surfaces = stab.get("piezo", {})
@@ -871,15 +937,26 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
                            "defines none — pore pressure imported as zero")
     elif option == "Parent":
         # The water condition is a whole head field computed by a parent SEEP/W run.
-        # It is not just pore pressure: SLOPE/W also raises the water standing against
-        # the slope from that same field, and that load is often the bigger half. In
-        # GeoStudio's own rapid-drawdown example, dropping both costs 13% of the FS.
-        caveats.append(
-            "THE FACTOR OF SAFETY WILL BE WRONG: this analysis takes its water from a "
-            "parent SEEP/W analysis, and xslope imports neither the pore pressure nor "
-            "the weight of the water standing against the slope. The soil and geometry "
-            "are right; the water is simply absent. Set a piezo line or a seepage "
-            "solution before you trust any number this model produces")
+        # SLOPE/W writes the TRANSFERRED field into this analysis's own result folder,
+        # so the parent never has to be traversed or re-solved — the pore pressure
+        # xslope needs is already in the file, on the mesh SEEP/W solved it on.
+        #
+        # It is not just pore pressure, either: SLOPE/W also raises the water standing
+        # against the slope from that same field, and in a drawdown problem that load is
+        # the bigger half of the answer. seep_ponded_dload recovers it. Dropping both
+        # cost 13% of the factor of safety on GeoStudio's own rapid-drawdown example.
+        seep = _import_seep(gsz, analysis, step, caveats, polygons)
+        if seep:
+            for mat in materials:
+                mat["u"] = "seep"
+        else:
+            caveats.append(
+                "THE FACTOR OF SAFETY WILL BE WRONG: this analysis takes its water from "
+                "a parent SEEP/W analysis, but the file was saved UNSOLVED, so it holds "
+                "no pore-pressure field to import — and xslope cannot re-solve the "
+                "seepage problem from a .gsz. The soil and geometry are right; the water "
+                "is simply absent. Solve the file in GeoStudio and re-import, or set a "
+                "piezo line, before you trust any number this model produces")
     elif option not in ("None", "", None):
         caveats.append(
             f"THE FACTOR OF SAFETY WILL BE WRONG: pore pressure comes from SLOPE/W's "
@@ -920,11 +997,28 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
         "mesh": None,
     }
 
+    # The SEEP/W head field, and the reservoir it implies. Both need the ground surface,
+    # so they land here rather than up in the pore-pressure section.
+    if seep:
+        mesh, seep_u, seep_step = seep
+        slope_data["mesh"] = mesh
+        slope_data["seep_u"] = seep_u
+        step = seep_step
+
+        mx0, my0, mx1, my1 = (mesh["nodes"][:, 0].min(), mesh["nodes"][:, 1].min(),
+                              mesh["nodes"][:, 0].max(), mesh["nodes"][:, 1].max())
+        dx0, dy0, dx1, dy1 = domain_polygon.bounds
+        if mx0 > dx0 + 1e-6 or mx1 < dx1 - 1e-6 or my0 > dy0 + 1e-6 or my1 < dy1 - 1e-6:
+            caveats.append(
+                f"the SEEP/W mesh ({mx0:g}..{mx1:g}, {my0:g}..{my1:g}) does not cover "
+                f"the whole slope model ({dx0:g}..{dx1:g}, {dy0:g}..{dy1:g}) — a slice "
+                f"base outside the mesh gets NO pore pressure, which is not the same as "
+                f"zero pore pressure being correct there. Check the uncovered ground")
+
     # Failure surface. SLOPE/W's search definition has no xslope equivalent, but a
     # solved file records every trial surface it evaluated — take the critical one,
     # so the model arrives complete and directly comparable.
-    analysis = next(a for a in gsz["analyses"] if a["id"] == analysis_id)
-    trials = read_gsz_results(gsz, analysis["name"]) if critical_surface else []
+    trials = read_gsz_results(gsz, analysis["name"], step) if critical_surface else []
     # Only circular trials. SLOPE/W writes a centre and radius even for block and
     # fully-specified surfaces, but they describe a circle FITTED to the surface, not
     # the surface it solved -- importing one would silently swap the mechanism.
@@ -1004,19 +1098,28 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
                        f"GeoStudio's surcharge is a wedge of fill above the ground, so "
                        f"the load varies with its depth")
 
-    # Ponded water. GeoStudio stores no such object — where the piezometric line rises
-    # above the ground, SLOPE/W just takes the water's weight as a surcharge. xslope
-    # needs it explicitly, so synthesize it, or the weight of the reservoir is lost.
+    # Ponded water. GeoStudio stores no such object — where the water rises above the
+    # ground, SLOPE/W just takes its weight as a surcharge. xslope needs it explicitly,
+    # so synthesize it, or the weight of the reservoir is lost. WHERE the water surface
+    # is depends on how the analysis defines its water: a piezometric line gives it
+    # directly, and a SEEP/W field implies it (see seep_ponded_dload).
+    ponded = []
     if piezo_line:
         ponded = ponded_water_dload(ground_surface, piezo_line, gamma_water)
-        if ponded:
-            deepest = max(p["Normal"] for b in ponded for p in b) / (gamma_water or 1.0)
-            dloads.extend(ponded)
-            caveats.append(
-                f"the piezometric line runs above the ground surface — that is ponded "
-                f"water, and GeoStudio carries its weight implicitly. It has been added "
-                f"as {len(ponded)} distributed load(s), up to {deepest:.2f} deep "
-                f"({gamma_water * deepest:.1f} pressure at the deepest point)")
+        source = "the piezometric line runs above the ground surface"
+    elif seep:
+        ponded = seep_ponded_dload(ground_surface, seep[0], seep[1], gamma_water)
+        source = ("water stands against the slope in the SEEP/W field — SLOPE/W stores "
+                  "no water surface here at all, and derives the reservoir from the "
+                  "head field itself")
+    if ponded:
+        deepest = max(p["Normal"] for b in ponded for p in b) / (gamma_water or 1.0)
+        dloads.extend(ponded)
+        caveats.append(
+            f"{source} — that is ponded water, and GeoStudio carries its weight "
+            f"implicitly. It has been added as {len(ponded)} distributed load(s), up to "
+            f"{deepest:.2f} deep ({gamma_water * deepest:.1f} pressure at the deepest "
+            f"point). Do not re-create it by hand")
     slope_data["dloads"] = dloads
 
     # --- tension crack -----------------------------------------------------------
@@ -1181,12 +1284,16 @@ def _parse_rgb(text):
     return r, g, b
 
 
-def read_gsz_results(gsz, analysis_name):
+def read_gsz_results(gsz, analysis_name, step=None):
     """SLOPE/W's own solved trial slip surfaces for an analysis, if the file has them.
 
     Returns ``[{'fs','xo','yo','r','weight','circular'}, ...]`` — one entry per trial
     surface SLOPE/W evaluated, with the factor of safety it computed. Empty if the file
     was saved unsolved.
+
+    ``step`` names a saved time step ('000', '001', …) for a transient analysis, which
+    has a whole result set — and a different factor of safety on every surface — at each
+    one. The default is the first. See :func:`gsz_seep_steps`.
 
     ``weight`` is SLOPE/W's own weight of the sliding mass, which is worth as much as the
     factor of safety: it checks the imported geometry and unit weights on their own,
@@ -1203,7 +1310,9 @@ def read_gsz_results(gsz, analysis_name):
     """
     zf = gsz["zip"]
     folder = analysis_name.lower() + "/"
-    name = next((n for n in zf.namelist()
+    if step is not None:
+        folder += step.lower() + "/"
+    name = next((n for n in sorted(zf.namelist())
                  if n.lower().startswith(folder) and n.endswith("slip_surface.csv")), None)
     if name is None:
         return []
@@ -1226,6 +1335,277 @@ def read_gsz_results(gsz, analysis_name):
         out.append({"fs": fs, "xo": xo, "yo": yo, "r": radius, "weight": weight,
                     "circular": row.get("SlipOrigSearchMethod") in _CIRCULAR_SEARCHES})
     return out
+
+
+# --------------------------------------------------------------------------------------
+# SEEP/W: the pore-pressure field a parent seepage analysis computed.
+#
+# A stability analysis whose water option is "Parent" takes its pore pressure from a
+# SEEP/W run, and SLOPE/W writes the *transferred* field into the stability analysis's
+# own result folder. So there is no need to traverse to the parent, and no need to
+# re-solve anything: the head field xslope needs is already sitting in the file, on the
+# mesh SEEP/W solved it on.
+# --------------------------------------------------------------------------------------
+
+# PLY scalar types -> struct codes. GeoStudio writes binary_little_endian.
+_PLY_TYPES = {"char": "b", "uchar": "B", "short": "h", "ushort": "H", "int": "i",
+              "uint": "I", "float": "f", "double": "d",
+              "int8": "b", "uint8": "B", "int16": "h", "uint16": "H",
+              "int32": "i", "uint32": "I", "float32": "f", "float64": "d"}
+
+# Node counts xslope's element library knows. Anything else is reported, not guessed at.
+_MESH_ELEMENT_SIZES = {3, 4, 6, 8, 9}
+
+
+def _read_ply(raw):
+    """Parse a binary PLY into ``{element name: [{property: value}, ...]}``.
+
+    Generic over the header rather than hard-coded to the layout GeoStudio happens to
+    write today: offsets come from the declared property types, so a reordered or
+    extended element block still reads correctly instead of silently misaligning.
+    """
+    marker = raw.find(b"end_header")
+    if marker < 0:
+        raise ValueError("mesh file is not a PLY (no end_header)")
+    header = raw[:marker].decode("ascii", "replace").splitlines()
+    off = marker + len("end_header")
+    while raw[off:off + 1] in (b"\r", b"\n"):
+        off += 1
+
+    if not any(l.startswith("format binary_little_endian") for l in header):
+        raise ValueError("only binary little-endian PLY meshes are supported; this one "
+                         "declares: " + next((l for l in header if l.startswith("format")),
+                                             "no format at all"))
+
+    blocks, cur = [], None
+    for line in header:
+        w = line.split()
+        if not w:
+            continue
+        if w[0] == "element":
+            cur = {"name": w[1], "count": int(w[2]), "props": []}
+            blocks.append(cur)
+        elif w[0] == "property" and cur is not None:
+            if w[1] == "list":
+                cur["props"].append(("list", w[2], w[3], w[4]))
+            else:
+                cur["props"].append(("scalar", w[1], w[2]))
+
+    out = {}
+    for b in blocks:
+        rows = []
+        for _ in range(b["count"]):
+            row = {}
+            for p in b["props"]:
+                if p[0] == "scalar":
+                    _, ty, name = p
+                    fmt = _PLY_TYPES[ty]
+                    row[name], = struct.unpack_from("<" + fmt, raw, off)
+                    off += struct.calcsize(fmt)
+                else:
+                    _, count_ty, item_ty, name = p
+                    cf, itf = _PLY_TYPES[count_ty], _PLY_TYPES[item_ty]
+                    n, = struct.unpack_from("<" + cf, raw, off)
+                    off += struct.calcsize(cf)
+                    row[name] = list(struct.unpack_from(f"<{n}{itf}", raw, off))
+                    off += struct.calcsize(itf) * n
+            rows.append(row)
+        out[b["name"]] = rows
+    return out
+
+
+def gsz_mesh(gsz, analysis_name, polygons=None):
+    """The finite element mesh an analysis was solved on, in xslope's mesh form.
+
+    Returns ``{'nodes': (N,2), 'elements': (M,8), 'element_types': (M,),
+    'element_materials': (M,)}`` — node indices 0-based and padded to 8 columns, exactly
+    as ``xslope.mesh`` wants them — or None if the analysis carries no mesh.
+
+    ``polygons`` are the imported material zones. They are what ``element_materials``
+    comes from (by which zone each element's centroid falls in), since GeoStudio's mesh
+    records the region an element belongs to, not xslope's material index. Without it the
+    mesh is missing a key that ``fem.py`` and ``seep.py`` both require.
+
+    A GeoStudio mesh block also holds the *line* and *point* entities that mark region
+    edges and vertices. Those are not domain elements and are dropped; taking them for
+    elements would leave degenerate zero-area cells that no point ever falls inside.
+    """
+    zf = gsz["zip"]
+    want = (analysis_name + "/Mesh.ply").lower()
+    name = next((n for n in zf.namelist() if n.lower() == want), None)
+    if name is None:
+        return None
+
+    ply = _read_ply(zf.read(name))
+    if "node" not in ply or "element" not in ply:
+        raise ValueError(f"the mesh in '{analysis_name}' has no node/element blocks")
+
+    nodes = np.array([[r["x"], r["y"]] for r in ply["node"]], dtype=float)
+
+    rows, sizes, odd = [], [], set()
+    for r in ply["element"]:
+        ids = r.get("id") or []
+        if len(ids) < 3:
+            continue                       # a line or point entity, not a domain element
+        if len(ids) not in _MESH_ELEMENT_SIZES:
+            odd.add(len(ids))
+            continue
+        rows.append([i - 1 for i in ids] + [0] * (8 - len(ids)))   # PLY ids are 1-based
+        sizes.append(len(ids))
+    if odd:
+        raise ValueError(
+            f"the mesh in '{analysis_name}' contains element(s) with "
+            f"{sorted(odd)} nodes, which xslope's element library does not have. "
+            f"Importing them as anything else would fabricate pore pressures.")
+    if not rows:
+        return None
+
+    elements = np.array(rows, dtype=int)
+    element_types = np.array(sizes, dtype=int)
+    ensure_ccw_elements(nodes, elements, element_types)
+
+    # element_materials is 1-based, and every element must have one: fem.py and seep.py
+    # index straight into it. An element whose centroid lands in no zone (the mesh edge
+    # rounding outside a polygon) falls back to the first material rather than 0, which
+    # would index the wrong soil.
+    mats = np.ones(len(elements), dtype=int)
+    if polygons:
+        from shapely.geometry import Point
+        for i, (elem, k) in enumerate(zip(elements, element_types)):
+            cx = float(np.mean(nodes[elem[:k], 0]))
+            cy = float(np.mean(nodes[elem[:k], 1]))
+            c = Point(cx, cy)
+            for p in polygons:
+                if p["polygon"].contains(c):
+                    mats[i] = p["mat_id"] + 1
+                    break
+
+    return {"nodes": nodes, "elements": elements, "element_types": element_types,
+            "element_materials": mats}
+
+
+def gsz_seep_steps(gsz, analysis_name):
+    """The saved time steps of an analysis that carry a pore-pressure field.
+
+    Returns ``[{'step': '000', 'time': 0.0}, ...]``, oldest first. A steady-state run
+    has one; a transient one has a result set per saved step, and a stability analysis
+    on top of it has a *different factor of safety at every one*. Empty if the file was
+    saved unsolved — in which case there is no head field to import at all.
+    """
+    zf = gsz["zip"]
+    prefix = (analysis_name + "/").lower()
+    steps = sorted({n[len(prefix):].split("/")[0]
+                    for n in zf.namelist()
+                    if n.lower().startswith(prefix) and n.lower().endswith("/node.csv")})
+    times = next((a["times"] for a in gsz["analyses"] if a["name"] == analysis_name), [])
+    out = []
+    for i, s in enumerate(steps):
+        out.append({"step": s, "time": times[i] if i < len(times) else None})
+    return out
+
+
+def read_gsz_seep(gsz, analysis_name, step=None, polygons=None):
+    """The pore-pressure field a parent SEEP/W analysis computed, on its own mesh.
+
+    Returns ``(mesh, u, step)`` where ``mesh`` is :func:`gsz_mesh`'s dict and ``u`` is
+    the pore pressure at each node — together, exactly xslope's ``seep`` inputs. Returns
+    None if the analysis has no solved field.
+
+    ``step`` selects a saved time step by its folder name ('000', '001', ...); the
+    default is the *last*. Note that SLOPE/W stores the transferred field alongside the
+    stability results, so this reads the stability analysis's own folder — the parent
+    SEEP/W analysis never has to be re-solved, or even looked at.
+    """
+    steps = gsz_seep_steps(gsz, analysis_name)
+    if not steps:
+        return None
+    chosen = step if step is not None else steps[-1]["step"]
+    if not any(s["step"] == chosen for s in steps):
+        raise ValueError(f"'{analysis_name}' has no time step '{chosen}' "
+                         f"(it has {', '.join(s['step'] for s in steps)})")
+
+    mesh = gsz_mesh(gsz, analysis_name, polygons)
+    if mesh is None:
+        return None
+
+    zf = gsz["zip"]
+    want = f"{analysis_name}/{chosen}/node.csv".lower()
+    name = next((n for n in zf.namelist() if n.lower() == want), None)
+    if name is None:
+        return None
+
+    text = zf.read(name).decode("utf-8-sig")
+    rows = list(csv.DictReader(io.StringIO(text)))
+    n = len(mesh["nodes"])
+    # Guard the count BEFORE indexing: a field on a different mesh must fail with a clear
+    # message, not an IndexError from u[i] when a stray row's node number runs past n.
+    if len(rows) != n:
+        raise ValueError(
+            f"the pore-pressure field for '{analysis_name}' step {chosen} has "
+            f"{len(rows)} values but the mesh has {n} nodes — they do not describe the "
+            f"same problem, and interpolating one onto the other would invent pressures")
+    u = np.zeros(n, dtype=float)
+    for row in rows:
+        try:
+            i = int(row["Node"]) - 1                       # 1-based, as in the mesh
+            if 0 <= i < n:
+                u[i] = float(row["PoreWaterPressure"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return mesh, u, chosen
+
+
+def seep_ponded_dload(ground_surface, mesh, u, gamma_water, n=200):
+    """The water standing against the slope, derived from a seepage pore-pressure field.
+
+    GeoStudio stores no ponded-water object *and* no water surface when the pore
+    pressure comes from SEEP/W — yet SLOPE/W still puts the weight of the reservoir on
+    the submerged face, and in a drawdown problem that load is the bigger half of the
+    answer. It can only be coming from the head field itself, and it is: at any point on
+    the ground surface, water stands to elevation ``y + u/gamma_w``.
+
+    That one rule reproduces both cases exactly. Under a reservoir the surface is a
+    specified-head boundary, so ``u = gamma_w (H - y)`` and the implied level comes out
+    at the reservoir level H, to the millimetre, at every submerged point. On a drained
+    or seepage face ``u = 0``, the implied level collapses onto the ground, and no load
+    is produced. Measured against GeoStudio's own rapid-drawdown example, this puts
+    water on the face at the full-reservoir step and none at any drawn-down step, which
+    is what SLOPE/W's own per-slice surcharge forces do.
+
+    Returns dload blocks in xslope's form, or [] if nothing is submerged.
+    """
+    x0, _, x1, _ = ground_surface.bounds
+    d = max(1e-6, 1e-3 * (x1 - x0))       # sample just inside the mesh; the offset cancels
+    tol = 1e-3 * (x1 - x0)                # below this, it is round-off, not a reservoir
+
+    # Sample at the ground's OWN vertices as well as on an even grid. Without them the
+    # two polylines have different breakpoints, and across a downward kink in the ground
+    # the water line's straight chord rides above the corner -- inventing a puddle a few
+    # centimetres deep at every convex bend, out of nothing but the sampling.
+    xs = sorted(set(np.linspace(x0, x1, n)) |
+                {x for x, _ in ground_surface.coords if x0 <= x <= x1})
+
+    water, wet = [], False
+    for x in xs:
+        yg = _y_on(ground_surface, x)
+        if yg is None:
+            continue
+        ys = yg - d
+        val, found = interpolate_at_point(mesh["nodes"], mesh["elements"],
+                                          mesh["element_types"], u, (x, ys),
+                                          return_found=True)
+        # The water surface implied here. Taking it from the SAMPLE elevation rather
+        # than the ground is what makes the inward offset cancel out of the answer.
+        level = ys + val / gamma_water if found else yg
+        if level - yg <= tol:
+            level = yg                     # dry face, or too shallow to be real water
+        else:
+            wet = True
+        water.append((x, level))
+
+    if not wet:
+        return []
+    return material_above_ground_dload(ground_surface, water, gamma_water)
 
 
 def _xml_escape(text):
@@ -1326,6 +1706,27 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         ground_surface = build_ground_surface_from_polygons(polygons)
 
     other_u = sorted({(m.get("u") or "none") for m in materials} - {"none", "piezo"})
+    if "seep" in other_u:
+        # A .gsz can only carry a seepage field as a SEEP/W analysis -- a mesh, hydraulic
+        # functions, boundary conditions and a solved head field, none of which xslope
+        # writes. It is NOT the same as a piezometric line (which means hydrostatic
+        # pressure below it), and quietly substituting one would throw away the very
+        # thing a seepage analysis was run to get. So say so, and write nothing.
+        caveats.append(
+            "THE FACTOR OF SAFETY WILL DIFFER: this model's pore pressure is a finite "
+            "element SEEPAGE FIELD, and a .gsz can only hold one as a SEEP/W analysis, "
+            "which xslope does not write — GeoStudio will open the model with NO pore "
+            "pressure. A piezometric line is not a substitute: it means hydrostatic "
+            "pressure below it, which is exactly what a seepage analysis is run to avoid "
+            "assuming. Re-create the seepage analysis in SEEP/W, or accept a dry model")
+        if slope_data.get("dloads"):
+            caveats.append(
+                "any ponded water in this model IS written, as a surcharge — it is a "
+                "real load and dropping it would be worse. But if you then add a "
+                "piezometric surface in GeoStudio, DELETE that surcharge: GeoStudio "
+                "derives the reservoir from the water surface itself, and would "
+                "otherwise carry the water twice")
+    other_u = [u for u in other_u if u != "seep"]
     if other_u:
         caveats.append(
             f"pore pressure from {', '.join(repr(u) for u in other_u)} is not written "
@@ -1651,19 +2052,39 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     return caveats
 
 
-def import_gsz(gsz_path, template, out_path, analysis_id=None):
+def import_gsz(gsz_path, template, out_path, analysis_id=None, step=None):
     """Read a .gsz and write it to an xslope .xlsx input file.
 
     The script-level route, mirroring :func:`xslope.cad.import_dxf`: parse the
     GeoStudio model, convert one analysis to ``slope_data``, and write it through
     a copy of an input template.
 
+    A pore-pressure FIELD from a parent SEEP/W analysis does not fit in a spreadsheet,
+    so it is written beside the .xlsx as the two sidecar files xslope reads it from:
+    ``<name>_mesh.json`` and ``<name>_seep.csv``. Without them the .xlsx would say every
+    material takes its pore pressure from a seepage solution, and there would be none —
+    a dry model that looks like a wet one.
+
     Returns the caveat list from :func:`gsz_to_slope_data`. Read it — a clean
     return does not mean a complete model (no failure surface is ever imported).
     """
     from .fileio import save_slope_data_to_xlsx
+    from .mesh import export_mesh_to_json
+    from .seep import export_seep_u
 
     gsz = read_gsz(gsz_path)
-    slope_data, caveats = gsz_to_slope_data(gsz, analysis_id)
+    slope_data, caveats = gsz_to_slope_data(gsz, analysis_id, step=step)
     save_slope_data_to_xlsx(slope_data, out_path, template=template)
+
+    mesh, u = slope_data.get("mesh"), slope_data.get("seep_u")
+    if mesh is not None and u is not None:
+        base = os.path.splitext(out_path)[0]
+        export_mesh_to_json(mesh, f"{base}_mesh.json")
+        export_seep_u(mesh["nodes"], u, f"{base}_seep.csv",
+                      slope_data.get("gamma_water") or _GAMMA_W_METRIC)
+        caveats.append(
+            f"the SEEP/W pore-pressure field was written beside the input file as "
+            f"{os.path.basename(base)}_mesh.json and {os.path.basename(base)}_seep.csv "
+            f"— xslope reads a seepage solution from those, so keep all three together "
+            f"or the model reverts to dry")
     return caveats

@@ -1390,14 +1390,18 @@ def _write_synthetic_gsz(path):
         crack's geometry, so the points alone mean nothing (2% of FS);
       * a <Surcharge>'s <Pressure> is a UNIT WEIGHT, and the load is the weight of the
         fill between the drawn line and the ground -- not a uniform pressure (4% of FS);
-      * reinforcement carries no direction: it is implied by <Type>.
+      * reinforcement carries no direction: it is implied by <Type>;
+      * a stability analysis whose water <Option> is "Parent" takes a whole pore-pressure
+        FIELD from a SEEP/W run, on a binary PLY mesh -- and SLOPE/W raises the reservoir
+        standing on the slope from that same field, storing no water surface at all
+        (13% of FS, and most of it in the missing reservoir rather than the pressures).
     """
     import zipfile
     xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <GSIData Version="11.11" AppVersion="25.2.1.4">
   <FileInfo Title="synthetic" />
   <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
-  <Analyses Len="5">
+  <Analyses Len="7">
     <Analysis><ID>1</ID><Name>dry</Name><Kind>SLOPE/W</Kind>
       <Method>Morgenstern-Price</Method></Analysis>
     <Analysis><ID>2</ID><Name>wet</Name><Kind>SLOPE/W</Kind>
@@ -1408,6 +1412,10 @@ def _write_synthetic_gsz(path):
       <Method>Spencer</Method></Analysis>
     <Analysis><ID>5</ID><Name>nailed</Name><Kind>SLOPE/W</Kind>
       <Method>Spencer</Method></Analysis>
+    <Analysis><ID>6</ID><Name>seepage</Name><Kind>SEEP/W</Kind>
+      <Method>SteadyState</Method></Analysis>
+    <Analysis><ID>7</ID><Name>seep stability</Name><Kind>SLOPE/W</Kind>
+      <ParentID>6</ParentID><Method>Spencer</Method></Analysis>
   </Analyses>
   <Geometries Len="1">
     <Geometry><Name>2D</Name>
@@ -1438,7 +1446,7 @@ def _write_synthetic_gsz(path):
       <Spacing>2</Spacing><Tensile>100</Tensile><PlateCapacity>60</PlateCapacity>
       <PulloutResistance>10</PulloutResistance></Reinforcement>
   </Reinforcements>
-  <Contexts Len="5">
+  <Contexts Len="6">
     <Context><AnalysisID>1</AnalysisID><GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
     <Context><AnalysisID>2</AnalysisID><GeometryUsesMaterials Len="1">
@@ -1449,8 +1457,10 @@ def _write_synthetic_gsz(path):
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
     <Context><AnalysisID>5</AnalysisID><GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>7</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
   </Contexts>
-  <WaterItems Len="5">
+  <WaterItems Len="6">
     <WaterItem><AnalysisID>1</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>2</AnalysisID>
@@ -1462,8 +1472,11 @@ def _write_synthetic_gsz(path):
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>5</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>7</AnalysisID>
+      <Entry><ResultInputInfo><Option>Parent</Option></ResultInputInfo>
+        <UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
   </WaterItems>
-  <StabilityItems Len="5">
+  <StabilityItems Len="6">
     <StabilityItem><AnalysisID>1</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
 
@@ -1530,11 +1543,110 @@ def _write_synthetic_gsz(path):
           <ReinforcementLine ID="1" Reinforcement="1" Point1Id="1" Point2Id="2" />
         </ReinforcementLines>
       </Entry></StabilityItem>
+
+    <StabilityItem><AnalysisID>7</AnalysisID>
+      <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
   </StabilityItems>
 </GSIData>
 """
+    nodes, elements, u = _synthetic_seep_field()
     with zipfile.ZipFile(path, 'w') as zf:
         zf.writestr("synthetic.xml", xml)
+        # A SEEP/W-fed stability analysis keeps the TRANSFERRED field in its own result
+        # folder, on the mesh SEEP/W solved on. Both are written the way GeoStudio writes
+        # them -- a binary PLY, and a node.csv numbered from 1.
+        zf.writestr("seep stability/Mesh.ply", _synthetic_ply(nodes, elements))
+        zf.writestr("seep stability/000/node.csv",
+                    "Node,PoreWaterPressure,XTotalStress\n" +
+                    "".join(f"{i + 1},{v}\n" for i, v in enumerate(u)))
+
+
+# The synthetic seepage model: a flat water table at elevation 15 over the fixture's
+# slope, which rises from y=10 at x=20 to y=30 at x=40. So the reservoir stands 5 deep on
+# the flat ground left of x=20 and tapers to nothing at x=25, where the face reaches
+# elevation 15. Every number the importer must produce is hand-checkable from that.
+_SEEP_WATER_LEVEL = 15.0
+_SEEP_GAMMA_W = 9.807
+_SEEP_COLUMNS = [(0.0, 10.0), (10.0, 10.0), (20.0, 10.0), (25.0, 15.0),
+                 (30.0, 20.0), (40.0, 30.0), (50.0, 30.0), (60.0, 30.0)]
+_SEEP_ROWS = 5
+
+
+def _synthetic_seep_field():
+    """Nodes, elements and nodal pore pressure for the fixture's SEEP/W analysis.
+
+    The mesh CONFORMS to the slope: its top row of nodes is the ground surface itself,
+    so a point sampled just below the ground always lands inside an element. (A mesh that
+    merely covered the bounding box would leave the face outside it, and the reservoir
+    would silently not be found.)
+    """
+    nodes, u = [], []
+    for x, yg in _SEEP_COLUMNS:
+        for r in range(_SEEP_ROWS):
+            y = yg * r / (_SEEP_ROWS - 1)
+            nodes.append((x, y))
+            u.append(_SEEP_GAMMA_W * (_SEEP_WATER_LEVEL - y))    # hydrostatic; <0 above
+
+    def nid(c, r):
+        return c * _SEEP_ROWS + r + 1                            # PLY ids are 1-based
+
+    elements = []                                                # (shape_kind, [ids])
+    for c in range(len(_SEEP_COLUMNS) - 1):
+        for r in range(_SEEP_ROWS - 1):
+            quad = [nid(c, r), nid(c + 1, r), nid(c + 1, r + 1), nid(c, r + 1)]
+            if c == 0 and r == 0:
+                # One quad split into two triangles, so the fixture carries BOTH element
+                # types and the importer's element_types has to come out right.
+                elements.append((2, [quad[0], quad[1], quad[2]]))
+                elements.append((2, [quad[0], quad[2], quad[3]]))
+            else:
+                elements.append((3, quad))
+
+    # GeoStudio also writes the region's edges and corners into the same block. They are
+    # not domain elements; importing them would leave zero-area cells in the mesh.
+    elements.append((1, [nid(0, 0), nid(1, 0)]))                 # a line entity
+    elements.append((0, [nid(0, 0)]))                            # a point entity
+    return nodes, elements, u
+
+
+def _synthetic_ply(nodes, elements):
+    """Write nodes/elements as the binary PLY GeoStudio writes.
+
+    The layout is copied from a real GeoStudio mesh, including the ``version`` block that
+    precedes the nodes: a reader that skips it reads every coordinate 4 bytes out of step
+    and produces plausible garbage. Writing it here is what pins that.
+    """
+    import struct
+    header = (
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element version 1\n"
+        "property ushort major\n"
+        "property ushort minor\n"
+        f"element node {len(nodes)}\n"
+        "property double x\n"
+        "property double y\n"
+        "property double z\n"
+        f"element element {len(elements)}\n"
+        "property uchar shape_kind\n"
+        "property uchar integration_order\n"
+        "property uchar category\n"
+        "property uint owner\n"
+        "property list uchar uint id\n"
+        "element element_line_association 0\n"
+        "property uint owner\n"
+        "property uint id\n"
+        "end_header\n"
+    ).encode("ascii")
+
+    body = bytearray(struct.pack("<HH", 1, 0))                   # version major/minor
+    for x, y in nodes:
+        body += struct.pack("<ddd", x, y, 0.0)
+    for shape_kind, ids in elements:
+        body += struct.pack("<BBBI", shape_kind, 2, 0, 1)
+        body += struct.pack("<B", len(ids))
+        body += struct.pack(f"<{len(ids)}I", *ids)
+    return bytes(header + body)
 
 
 def run_gsz_import_test(test):
@@ -1559,14 +1671,77 @@ def run_gsz_import_test(test):
         gsz = read_gsz(path)
 
         analyses = list_analyses(gsz)
-        if len(analyses) != 5:
-            return None, f"GeoStudio import: {len(analyses)} analyses, expected 5"
+        if len(analyses) != 7:
+            return None, f"GeoStudio import: {len(analyses)} analyses, expected 7"
 
         sd1, cav1 = gsz_to_slope_data(gsz, 1)
         sd2, cav2 = gsz_to_slope_data(gsz, 2)
         sd3, cav3 = gsz_to_slope_data(gsz, 3)
         sd4, cav4 = gsz_to_slope_data(gsz, 4)
         sd5, cav5 = gsz_to_slope_data(gsz, 5)
+        sd7, cav7 = gsz_to_slope_data(gsz, 7)
+
+        # --- a stability analysis fed by a parent SEEP/W run -------------------------
+        # Its water <Option> is "Parent": pore pressure is a whole finite element FIELD,
+        # which SLOPE/W stores on a binary PLY mesh in this analysis's own result folder.
+        mesh = sd7.get('mesh')
+        n_nodes = len(_SEEP_COLUMNS) * _SEEP_ROWS                    # 8 x 5 = 40
+        n_elems = (len(_SEEP_COLUMNS) - 1) * (_SEEP_ROWS - 1) + 1    # 28 quads, one split
+        if mesh is None:
+            problems.append("the SEEP/W pore-pressure field did not import: no mesh")
+        else:
+            if len(mesh['nodes']) != n_nodes:
+                problems.append(f"SEEP/W mesh has {len(mesh['nodes'])} nodes, expected "
+                                f"{n_nodes} — the PLY was misread")
+            # The line and point entities in the same PLY block are NOT domain elements.
+            if len(mesh['elements']) != n_elems:
+                problems.append(f"SEEP/W mesh has {len(mesh['elements'])} elements, "
+                                f"expected {n_elems} — GeoStudio writes region edges and "
+                                f"corners into the same block, and they are not elements")
+            types = sorted(set(int(t) for t in mesh['element_types']))
+            if types != [3, 4]:
+                problems.append(f"SEEP/W element types {types}, expected [3, 4]")
+            # The coordinates themselves: a reader that skips the PLY's <version> block
+            # is 4 bytes out of step and returns plausible garbage.
+            xs = [float(p[0]) for p in mesh['nodes']]
+            ys = [float(p[1]) for p in mesh['nodes']]
+            if (min(xs), max(xs), min(ys), max(ys)) != (0.0, 60.0, 0.0, 30.0):
+                problems.append(f"SEEP/W mesh spans x {min(xs)}..{max(xs)}, y {min(ys)}.."
+                                f"{max(ys)}, expected 0..60 and 0..30 — the binary PLY "
+                                f"was decoded at the wrong offset")
+
+        u = sd7.get('seep_u')
+        if u is None or len(u) != n_nodes:
+            problems.append(f"seep_u is {None if u is None else len(u)}, expected "
+                            f"{n_nodes} nodal pore pressures")
+        if [m['u'] for m in sd7['materials']] != ['seep']:
+            problems.append(f"materials take u={[m['u'] for m in sd7['materials']]}, "
+                            f"expected ['seep'] — a Parent water option is a seepage field")
+
+        # THE RESERVOIR. GeoStudio stores no ponded-water object and, with a SEEP/W
+        # field, no water surface either — yet SLOPE/W still puts the weight of the water
+        # on the submerged face. It can only be deriving it from the head field, and it
+        # is: water stands to y + u/gamma_w at the ground. Here that is a flat table at
+        # elevation 15 over ground at elevation 10, so 5 deep (49.035) out to x=20, then
+        # tapering to zero at x=25 where the slope face reaches 15. Missing this cost 13%
+        # of the factor of safety on GeoStudio's own rapid-drawdown example — MORE than
+        # the pore pressures did.
+        dl7 = sd7['dloads']
+        if len(dl7) != 1:
+            problems.append(f"the reservoir implied by the SEEP/W field gave {len(dl7)} "
+                            f"dload blocks, expected 1")
+        else:
+            deep = max(p['Normal'] for p in dl7[0])
+            xmax = max(p['X'] for p in dl7[0])
+            if abs(deep - _SEEP_GAMMA_W * 5.0) > 0.05:
+                problems.append(f"ponded water from the SEEP/W field is {deep:.2f} at its "
+                                f"deepest, expected {_SEEP_GAMMA_W * 5.0:.2f} (5 deep)")
+            if abs(xmax - 25.0) > 0.3:
+                problems.append(f"ponded water from the SEEP/W field reaches x={xmax:.2f}, "
+                                f"expected 25 — where the face rises to the water level")
+            if abs(min(p['Normal'] for p in dl7[0])) > 1e-6:
+                problems.append("ponded water must taper to zero pressure at the "
+                                "waterline, not stop at full depth")
 
         # An UNDRAINED material keeps its strength in <Cohesion>, not <CohesionPrime>.
         # Reading only the drained field gave c = 0, phi = 0 — a soil with no strength
@@ -1674,6 +1849,54 @@ def run_gsz_import_test(test):
             problems.append("invented a failure surface for an unsolved file")
         if not any('no failure surface' in c for c in cav1):
             problems.append("missing failure surface not reported as a caveat")
+
+        # A SEEP/W field does not fit in a spreadsheet, so import_gsz writes it BESIDE
+        # the .xlsx as _mesh.json + _seep.csv, and load_slope_data reads it back. If it
+        # did not, the .xlsx would say every material takes its pore pressure from a
+        # seepage solution and there would be none -- a dry model wearing a wet one's
+        # clothes. Prove the whole product path: .gsz -> .xlsx (+ sidecars) -> reload.
+        from xslope.geostudio import import_gsz
+        from xslope.fileio import load_slope_data, default_template_path
+        xlsx = os.path.join(td, "seep_roundtrip.xlsx")
+        rcav = import_gsz(path, default_template_path(), xlsx, analysis_id=7)
+        side = {os.path.basename(p) for p in os.listdir(td)}
+        missing_side = {"seep_roundtrip_mesh.json", "seep_roundtrip_seep.csv"} - side
+        if missing_side:
+            problems.append(f"import_gsz did not write the SEEP/W sidecar(s) "
+                            f"{sorted(missing_side)} — the .xlsx alone cannot carry a "
+                            f"pore-pressure field, so the model would reload dry")
+        try:
+            reload = load_slope_data(xlsx)
+        except Exception as e:
+            # load_slope_data waives the failure-surface requirement only when a mesh is
+            # present; if the sidecar was not written, it raises here instead. Report that
+            # as the sidecar loss it is, rather than letting it read as an unrelated crash.
+            reload = None
+            problems.append(f"a SEEP/W field imported to .xlsx would not reload ({e}) — "
+                            f"most likely its mesh/seep sidecar was not written beside it")
+        if reload is not None:
+            if reload.get("mesh") is None or reload.get("seep_u") is None:
+                problems.append("a SEEP/W field imported to .xlsx did not reload — the "
+                                "mesh or the pore pressure was lost between save and open")
+            elif len(reload["seep_u"]) != n_nodes:
+                problems.append(f"reloaded seep_u has {len(reload['seep_u'])} values, "
+                                f"expected {n_nodes}")
+            elif [m['u'] for m in reload['materials']] != ['seep']:
+                problems.append(f"reloaded material u={[m['u'] for m in reload['materials']]}"
+                                f", expected ['seep'] — the field reloaded but nothing reads it")
+            else:
+                # export_seep_u writes head+u only. import_seep_solution must load u as
+                # real and the flow-net columns as NaN (not zeros), so a flow-net plot
+                # fails visibly rather than drawing a field that was never solved.
+                from xslope.seep import build_seep_data, import_seep_solution
+                import numpy as _np
+                sday = build_seep_data(reload["mesh"], reload, seep_bc=1)
+                sol = import_seep_solution(sday, os.path.join(td, "seep_roundtrip_seep.csv"))
+                if _np.any(_np.isnan(sol["u"])):
+                    problems.append("imported seepage field lost its pore pressure to NaN")
+                if not _np.all(_np.isnan(sol["phi"])):
+                    problems.append("a field with no flow net came back with fabricated "
+                                    "phi instead of NaN — a flow-net plot would draw a lie")
 
         # Export round-trip: slope_data -> .gsz -> slope_data must preserve the
         # geometry, the materials, and the piezo line.

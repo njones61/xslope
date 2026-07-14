@@ -3383,6 +3383,33 @@ def export_seep_solution(seep_data, solution, filename):
     print(f"Exported solution to {filename}")
 
 
+def export_seep_u(nodes, u, filename, gamma_water=9.807):
+    """Write a bare nodal pore-pressure field in the same CSV format, for a solution
+    xslope did not compute.
+
+    A pore-pressure field can arrive from outside — GeoStudio's importer lifts one
+    straight out of a solved SEEP/W analysis. It carries pressures and nothing else: no
+    velocities, no gradients, no stream function. Those columns are therefore OMITTED
+    rather than filled with zeros, which would render as a flow net that is flat
+    everywhere and belongs to nobody. ``load_slope_data`` reads only ``u``, so the file
+    is complete for stability analysis; a flow-net plot will fail loudly on the missing
+    columns instead of drawing a lie.
+
+    ``head`` is the total head implied by the pressure: elevation + u / gamma_w.
+    """
+    import pandas as pd
+    df = pd.DataFrame({
+        "node_id": np.arange(1, len(nodes) + 1),
+        "head": np.asarray(nodes)[:, 1] + np.asarray(u, dtype=float) / gamma_water,
+        "u": np.asarray(u, dtype=float),
+    })
+    with open(filename, "w") as f:
+        df.to_csv(f, index=False)
+        # load_slope_data drops the final row -- the solver writes its total-flowrate
+        # footer there. Without a footer of our own, a real node would be dropped.
+        f.write("# Total Flowrate: not computed (field imported, not solved)\n")
+
+
 def import_seep_solution(seep_data, filename):
     """Reconstruct a seepage ``solution`` dict from a CSV written by
     :func:`export_seep_solution` — the inverse operation. Lets a previously
@@ -3396,7 +3423,11 @@ def import_seep_solution(seep_data, filename):
 
     Returns:
         dict: solution with the keys ``plot_seep_solution`` expects — head, u,
-        velocity, v_mag, gradient, i_mag, q, phi, flowrate.
+        velocity, v_mag, gradient, i_mag, q, phi, flowrate. For a pressure-only file
+        (one written by :func:`export_seep_u`, e.g. a field imported from SEEP/W), the
+        flow-net columns are filled with NaN: head and u are real, and a flow-net plot
+        fails visibly on the NaNs rather than drawing a flat field that is not the
+        solution.
 
     Raises:
         ValueError: if the file's node count does not match the mesh.
@@ -3419,15 +3450,23 @@ def import_seep_solution(seep_data, filename):
                 except ValueError:
                     pass
 
+    # A field imported from outside (export_seep_u) carries head and u only. Fill the
+    # flow-net quantities with NaN rather than inventing zeros -- a plot then fails on
+    # the NaN instead of drawing a flat, wrong flow net, while stability, which uses only
+    # u, is unaffected.
+    nan = np.full(n_nodes, np.nan)
+    def col(name):
+        return df[name].to_numpy() if name in df.columns else nan.copy()
+
     return {
         "head": df["head"].to_numpy(),
         "u": df["u"].to_numpy(),
-        "velocity": df[["v_x", "v_y"]].to_numpy(),
-        "v_mag": df["v_mag"].to_numpy(),
-        "gradient": df[["i_x", "i_y"]].to_numpy(),
-        "i_mag": df["i_mag"].to_numpy(),
-        "q": df["q"].to_numpy(),
-        "phi": df["phi"].to_numpy(),
+        "velocity": np.column_stack([col("v_x"), col("v_y")]),
+        "v_mag": col("v_mag"),
+        "gradient": np.column_stack([col("i_x"), col("i_y")]),
+        "i_mag": col("i_mag"),
+        "q": col("q"),
+        "phi": col("phi"),
         "flowrate": flowrate,
     }
 

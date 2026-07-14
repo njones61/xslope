@@ -1740,13 +1740,26 @@ class MainWindow(QMainWindow):
 
         # Seepage solutions, per BC set ({stem}_seep.csv / _seep2.csv).
         seep = results.get("seep_solutions", {})
-        for bc, suffix in ((1, "_seep.csv"), (2, "_seep2.csv")):
+        for bc, suffix, key in ((1, "_seep.csv", "seep_u"), (2, "_seep2.csv", "seep_u2")):
             path = stem + suffix
             bundle = seep.get(bc)
+            imported = sd.get(key)
             if bundle:
                 try:
                     from xslope.seep import export_seep_solution
                     export_seep_solution(bundle["seep_data"], bundle["solution"], path)
+                except Exception:
+                    traceback.print_exc()
+            elif mesh is not None and imported is not None and len(imported):
+                # A pore-pressure field xslope did not solve for -- lifted out of a solved
+                # SEEP/W analysis by the GeoStudio importer. There is no solver bundle
+                # behind it, and deleting the file on that basis would silently strip the
+                # water out of the model: it would reload dry, with every material still
+                # asking for a seepage solution that no longer existed.
+                try:
+                    from xslope.seep import export_seep_u
+                    export_seep_u(mesh["nodes"], imported, path,
+                                  sd.get("gamma_water") or 9.807)
                 except Exception:
                     traceback.print_exc()
             else:

@@ -60,7 +60,9 @@ choice is not cosmetic, which is why XSLOPE makes you make it rather than guessi
 | Material colour | The zone colour in Studio |
 | Piezometric surface + `MaterialUsesPiezs` | Piezo line, on the materials that use it |
 | **Piezo line above the ground surface** | **A distributed load** — see below |
-| **Surcharges** (`Pressure` over a run of ground) | `dloads` |
+| **Surcharges** (a wedge of fill above the ground — `Pressure` is its *unit weight*) | `dloads`, varying with the depth of fill |
+| **Reinforcement** — nails, geosynthetics, anchors, tiebacks | `reinforcement_lines` — see below |
+| **Line loads** (`Value` + trend/plunge) | `line_loads` |
 | **Tension crack** (+ `PctFilledWithWater`) | `tcrack_depth`, `tcrack_water` |
 | Unit weight of water | `gamma_water` |
 | Horizontal seismic coefficient | `k_seismic` |
@@ -82,6 +84,26 @@ The ground surface and domain are derived from the zones, as for any polygon-bas
     normal to the ground and tapering to zero at the waterline. Without it, the weight of
     the reservoir would silently vanish.
 
+!!! info "Reinforcement: GeoStudio implies the direction, XSLOPE states it"
+    A GeoStudio reinforcement carries a capacity, a plate capacity, a pullout resistance
+    and an out-of-plane spacing — but **no direction and no F-of-S dependence**. Both are
+    implied by the `Type`. XSLOPE stores them explicitly, so the import has to supply them,
+    and the mapping is *measured against SLOPE/W's own factors of safety* rather than
+    reasoned about: reinforcement acts **along the bar** (`dir='axial'`), as a known load
+    (`appl='active'`). On the manual's reinforced-embankment benchmark this reproduces
+    SLOPE/W to within 0.3%, where applying the force tangent to the slip surface does not
+    converge at all.
+
+    Everything is converted to XSLOPE's **per unit width** convention by dividing through
+    by the spacing, and GeoStudio's "pullout resistance per unit length" becomes the bond
+    length that develops full capacity (`lp = t_max / rate`), which is the same law written
+    the other way round. The plate capacity becomes the end capacity at whichever end sits
+    at the face.
+
+    Where a geosynthetic defines its pullout through **interface adhesion and friction**
+    rather than a constant resistance, XSLOPE's constant-rate bond length is an
+    approximation of a stress-dependent law, and the import says so.
+
 ### What does not come across, and why
 
 Import **reports every one of these** — it never drops something that changes the answer
@@ -94,12 +116,8 @@ without telling you. Read the caveats it returns.
   geometry. Run a search afterwards to find XSLOPE's own critical surface. If that circle
   will not build on the model (SLOPE/W may have scored a *composite* surface, truncated
   along a bedrock boundary), no surface is imported and you are told so.
-- **Reinforcement — nails, geosynthetics, anchors.** Deliberately not guessed at:
-  GeoStudio's pullout law, out-of-plane spacing and force distribution do not line up with
-  XSLOPE's model one-to-one, and a *wrong* reinforcement force is far worse than an
-  obviously absent one. **A reinforced model imports unreinforced, and says so loudly** —
-  re-enter the reinforcement, or its factor of safety will be wrong.
-- **Line loads.**
+- **Reinforcement *sets*** — GeoStudio's out-of-plane staging groups. The reinforcement
+  itself imports; the grouping does not.
 - **Inclined tension cracks.** XSLOPE's crack is vertical. Where GeoStudio's crack line
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
 - **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
@@ -109,14 +127,16 @@ without telling you. Read the caveats it returns.
   name rather than ignored, so a feature added in a future version cannot silently change
   someone's factor of safety.
 
-!!! warning "Check the units"
-    The same `.gsz` schema holds both metric and imperial models. GeoStudio declares
-    which, in `<Coordinates><EngCoords UnitSystem="…">`, and XSLOPE reads that. For a
-    file that omits the attribute, XSLOPE falls back to inferring the system from the
-    unit weight of water (≈9.807 → kN/m³, m, kPa; ≈62.4 → lb/ft³, ft, psf) and **refuses
-    to guess** on anything else, since silently assuming the wrong system would rescale
-    the whole model. Either way the unit system is reported as a caveat on every import —
-    confirm it matches your template, because XSLOPE does not convert between systems.
+!!! info "Units need no conversion"
+    The same `.gsz` schema holds both metric and imperial models, and GeoStudio declares
+    which in `<Coordinates><EngCoords UnitSystem="…">`. XSLOPE reads that and **reports
+    it**, but there is nothing to convert: XSLOPE has no unit setting anywhere. It is
+    unit-agnostic — consistent units in, the same units out. An import builds a whole new
+    project whose geometry, strengths and unit weight of water all come from the same
+    file, so they are consistent with each other by construction. The caveat exists only
+    to tell you which system the numbers you are about to read are in. (Where a file omits
+    the attribute, the system is inferred from the unit weight of water: ≈9.807 → kN/m³,
+    m, kPa; ≈62.4 → lb/ft³, ft, psf.)
 
 ## Exporting to GeoStudio
 

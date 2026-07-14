@@ -246,6 +246,11 @@ def read_gsz(path):
             "pullout": _num(rf, "PulloutResistance", 0.0),
             "spacing": _num(rf, "Spacing", None),          # out-of-plane, None = per metre
             "distribution": _text(rf, "ForceDistribution", ""),
+            # An ALTERNATIVE pullout law: bond from soil adhesion + friction on the
+            # interface, which grows with the normal stress on the bar. xslope's bond is a
+            # constant rate, so this one cannot be reproduced -- it is reported instead.
+            "adhesion": _num(rf, "InterfaceAdhesion", None),
+            "shear_angle": _num(rf, "InterfaceShearAngle", None),
         }
 
     stability = {}
@@ -979,10 +984,32 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
         slope_data["reinforce_lines"] = build_reinforce_lines(rlines)
         kinds = sorted({r["type"] or "generic" for r in rlines})
         caveats.append(
-            f"{len(rlines)} reinforcement line(s) imported ({', '.join(kinds)}). "
-            f"GeoStudio's pullout resistance became xslope's bond length "
-            f"(Lp = Tmax / pullout rate) and its plate capacity the end capacity at the "
-            f"face — CHECK THE FORCES against GeoStudio before relying on the result")
+            f"{len(rlines)} reinforcement line(s) imported ({', '.join(kinds)}), acting "
+            f"along the bar as a known load — the convention that reproduces SLOPE/W's "
+            f"own factor of safety. GeoStudio's pullout resistance became xslope's bond "
+            f"length (Lp = Tmax / pullout rate), and its plate capacity the end capacity "
+            f"at the face")
+
+        # A pullout law xslope cannot reproduce: bond that grows with the normal stress on
+        # the bar. Silence here would hand back a plausible force computed the wrong way.
+        used = [gsz["reinforcements"][rl["reinforcement"]] for rl in stab["reinf_lines"]
+                if rl["reinforcement"] in gsz["reinforcements"]]
+        interface = sorted({p["name"] for p in used
+                            if p.get("adhesion") or p.get("shear_angle")})
+        if interface:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in interface)} takes its pullout "
+                f"from the soil INTERFACE (adhesion + friction), which grows with the "
+                f"normal stress on the bar. xslope's bond is a constant rate, so the "
+                f"imported bond length is an approximation — check the developed forces "
+                f"against GeoStudio if the bars are not fully anchored")
+        spread = sorted({p["name"] for p in used
+                         if (p.get("distribution") or "Concentrated") != "Concentrated"})
+        if spread:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in spread)} spreads its force "
+                f"over the bar in GeoStudio rather than applying it at the slip surface; "
+                f"xslope applies it where the bar crosses the surface")
 
     # --- line loads --------------------------------------------------------------
     lloads = []

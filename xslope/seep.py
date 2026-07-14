@@ -126,7 +126,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         angle_by_mat[i] = material.get("alpha", 0.0)
         kr0_by_mat[i] = material.get("kr0", 0.001)
         h0_by_mat[i] = material.get("h0", -1.0)
-        unsat_by_mat[i] = KR_VG if str(material.get("unsat", "lf")).strip().lower() == "vg" else KR_LF
+        _u = str(material.get("unsat", "lf")).strip().lower()
+        unsat_by_mat[i] = {"vg": KR_VG, "gard": KR_GARD}.get(_u, KR_LF)
         vg_a_by_mat[i] = material.get("vg_a", 0.0)
         vg_n_by_mat[i] = material.get("vg_n", 0.0)
         material_names.append(material.get("name", f"Material {i+1}"))
@@ -192,7 +193,13 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
                 # van Genuchten needs alpha > 0 and n > 1.
                 a, nn = material.get("vg_a", 0), material.get("vg_n", 0)
                 if _bad(a) or nn is None or (isinstance(nn, (int, float)) and nn <= 1):
-                    bad_mats.append(f"  Material {i+1} ({name}, unsat=vg): vg_a={a}, vg_n={nn} (need vg_a>0, vg_n>1)")
+                    bad_mats.append(f"  Material {i+1} ({name}, unsat=vg): a={a}, n={nn} (need a>0, n>1)")
+            elif unsat_by_mat[i] == KR_GARD:
+                # Gardner kr = 1/(1 + a*psi^n) needs a > 0 and n > 0. (Unlike van
+                # Genuchten, n is not required to exceed 1 — there is no m = 1-1/n.)
+                a, nn = material.get("vg_a", 0), material.get("vg_n", 0)
+                if _bad(a) or _bad(nn) or (isinstance(nn, (int, float)) and nn <= 0):
+                    bad_mats.append(f"  Material {i+1} ({name}, unsat=gard): a={a}, n={nn} (need a>0, n>0)")
             else:
                 # Linear front needs kr0 (>0) and h0 (<0).
                 mat_kr0, mat_h0 = material.get("kr0", 0), material.get("h0", 0)
@@ -205,9 +212,10 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
             print("materials are missing valid unsaturated parameters:")
             for line in bad_mats:
                 print(line)
-            print("\nThe unsaturated seepage solver requires, per material, either")
-            print("valid kr0 (>0) and h0 (<0) for the linear-front model, or vg_a (>0)")
-            print("and vg_n (>1) for the van Genuchten model. Set these in the input file.")
+            print("\nThe unsaturated seepage solver requires, per material, valid")
+            print("kr0 (>0) and h0 (<0) for the linear-front model, a (>0) and n (>1)")
+            print("for van Genuchten, or a (>0) and n (>0) for Gardner. Set these in")
+            print("the input file.")
             print("="*70 + "\n")
 
     # Get unit weight of water
@@ -767,7 +775,29 @@ def kr_frontal_vec(p, kr0, h0):
 
 # Per-material unsaturated relative-permeability model codes.
 KR_LF = 0    # linear front  (parameters kr0, h0)
-KR_VG = 1    # van Genuchten (parameters vg_a = alpha, vg_n = n)
+KR_VG = 1    # van Genuchten (parameters a = alpha, n)
+KR_GARD = 2  # Gardner       (parameters a, n — the SAME two template columns)
+
+
+def kr_gardner_vec(p, a, n, kr_min=1e-4):
+    """Vectorized Gardner (1958) relative permeability.
+
+        kr = 1 / (1 + a * psi^n),   psi = -p (suction, positive when unsaturated)
+
+    This is the POWER form of Gardner, the one carried as a legacy option by
+    SEEP/W and Slide — not Gardner's exponential form kr = exp(alpha*psi), which
+    is a different function used mainly to linearize Richards' equation for
+    analytical work. Saturated (p >= 0) gives kr = 1.
+
+    Shares the a/n parameter columns with van Genuchten: the two laws never apply
+    to the same material, and the template selects between them with `unsat`.
+    """
+    a = np.asarray(a, dtype=float)
+    n = np.asarray(n, dtype=float)
+    psi = np.abs(np.minimum(p, 0.0))          # suction; 0 in the saturated zone
+    kr = 1.0 / (1.0 + a * psi ** n)
+    kr = np.where(p >= 0.0, 1.0, kr)
+    return np.clip(kr, kr_min, 1.0)
 
 
 def kr_vg_vec(p, vg_a, vg_n, kr_min=1e-4):
@@ -795,22 +825,30 @@ def kr_vg_vec(p, vg_a, vg_n, kr_min=1e-4):
 def kr_relative_vec(p, kr0, h0, vg_a=None, vg_n=None, model=None, kr_min=1e-4):
     """Per-element relative permeability dispatching on the unsaturated model.
 
-    ``model`` is a per-element code array (``KR_LF``/``KR_VG``) broadcasting with
-    ``p``. With ``model`` None or all linear-front this returns exactly
-    ``kr_frontal_vec`` — so the linear-front path is bit-identical to before."""
+    ``model`` is a per-element code array (``KR_LF``/``KR_VG``/``KR_GARD``)
+    broadcasting with ``p``. With ``model`` None or all linear-front this returns
+    exactly ``kr_frontal_vec`` — so the linear-front path is bit-identical to
+    before."""
     lf = kr_frontal_vec(p, kr0, h0)
     if model is None or not np.any(model):
         return lf
-    vg = kr_vg_vec(p, vg_a, vg_n, kr_min)
-    return np.where(model != KR_LF, vg, lf)
+    out = lf
+    model = np.asarray(model)
+    if np.any(model == KR_VG):
+        out = np.where(model == KR_VG, kr_vg_vec(p, vg_a, vg_n, kr_min), out)
+    if np.any(model == KR_GARD):
+        out = np.where(model == KR_GARD, kr_gardner_vec(p, vg_a, vg_n, kr_min), out)
+    return out
 
 
 def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, model=KR_LF, kr_min=1e-4):
-    """Scalar relative permeability with model dispatch (linear front or van
-    Genuchten), for the per-edge flow-potential integration."""
-    if not model:        # linear front
-        return kr_frontal(p, kr0, h0)
-    return float(kr_vg_vec(float(p), vg_a, vg_n, kr_min))
+    """Scalar relative permeability with model dispatch (linear front, van
+    Genuchten or Gardner), for the per-edge flow-potential integration."""
+    if model == KR_VG:
+        return float(kr_vg_vec(float(p), vg_a, vg_n, kr_min))
+    if model == KR_GARD:
+        return float(kr_gardner_vec(float(p), vg_a, vg_n, kr_min))
+    return kr_frontal(p, kr0, h0)
 
 
 def _idx_or_none(arr, idx):
@@ -3052,6 +3090,10 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         "flowrate": total_flow,
         "converged": converged,
         "closure_error": closure_error,
+        # Which branch produced this solution. Consumers need it: a confined solve is
+        # fully saturated with kr never evaluated, so its negative pore pressures carry
+        # no phreatic surface (see plot_seep_solution).
+        "unconfined": bool(is_unconfined),
     }
 
     if not converged:

@@ -69,11 +69,15 @@ def rapid_drawdown(df, method_name, debug_level=1):
     Returns:
         Tuple(bool, dict): (True, result_dict) or (False, error_message)
     """
-    # Power-curve materials are incompatible with the staged strength overrides
-    # of the drawdown procedure (both mutate per-slice c/phi); refuse clearly.
-    if 'pow_flag' in df.columns and bool(df['pow_flag'].any()):
-        return False, ("One or more slices use the power-curve strength option "
-                       "(option='pow'), which is not supported in rapid drawdown analysis.")
+    # Curved-envelope materials are incompatible with the staged strength
+    # overrides of the drawdown procedure (both mutate per-slice c/phi); refuse
+    # clearly rather than silently letting one clobber the other.
+    for _flag, _opt, _name in (('pow_flag', 'pow', 'power-curve'),
+                               ('hb_flag', 'hb', 'Hoek-Brown')):
+        if _flag in df.columns and bool(df[_flag].any()):
+            return False, (f"One or more slices use the {_name} strength option "
+                           f"(option='{_opt}'), which is not supported in rapid "
+                           "drawdown analysis.")
 
     # Import solve module and get the method function
     from . import solve

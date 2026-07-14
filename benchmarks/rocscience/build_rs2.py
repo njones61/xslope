@@ -95,6 +95,47 @@ def rs2_58b():
     return 'rs2_58b.xlsx'
 
 
+def hammah_hb1():
+    """Hammah, Yacoub, Corkum & Curran (2005), ARMA/USRMS 05-810, Example 1 — the
+    verification case for the Hoek-Brown ('hb') strength option, in BOTH the LEM and
+    the SSRM. A 10 m high homogeneous 45 deg rock slope in a very weak rock mass.
+
+    Published (their Tables 1-2):
+        E = 5000 MPa, nu = 0.3, gamma = 0.025 MN/m3, sigma_ci = 30 MPa,
+        GSI = 5, mi = 2, D = 0   ->   mb = 0.067, s = 2.5e-5, a = 0.619
+        FE SSR (generalized Hoek-Brown) 1.15 | FE SSR (equivalent Mohr-Coulomb) 1.15
+        Bishop simplified 1.153             | Spencer 1.152
+
+    Units are kPa / kN/m3 here (sigma_ci = 30 MPa = 30000 kPa, gamma = 25 kN/m3).
+
+    The paper dimensions only the slope itself (10 m high, 10 m run); the foundation
+    depth below the toe and the lateral extents are not given. The answer turns out not
+    to care -- the mechanism is toe-exiting, and foundation depths of 2, 4, 6 and 10 m
+    all return Bishop 1.150 / Spencer 1.152 -- so 5 m is used and the LEM lock is
+    unconditional.
+    """
+    H, y0, L1, L2 = 10.0, 5.0, 20.0, 20.0
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='rock', option='hb', hb_sci=30000.0, hb_gsi=5.0, hb_mi=2.0,
+             hb_d=0.0, gamma=25.0, gamma_sat=25.0, u='none',
+             E=5.0e6, nu=0.3, psi=0.0)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [
+        (0.0, y0), (L1, y0), (L1 + H, y0 + H), (L1 + H + L2, y0 + H)]}]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # 'Depth' is the ELEVATION of the circle's lowest point; R must satisfy R = Yo - Depth.
+    Xo, Yo, Depth = L1 + H / 2, y0 + H + 6.0, y0 - 1.0
+    sd['circles'] = [{'Xo': Xo, 'Yo': Yo, 'Depth': Depth, 'R': Yo - Depth}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'hammah_hb1.xlsx'))
+    return 'hammah_hb1.xlsx'
+
+
 if __name__ == '__main__':
-    for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b):
+    for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1):
         print(fn())

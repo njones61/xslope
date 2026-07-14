@@ -21,6 +21,7 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 
 from .mesh import find_element_containing_point, interpolate_at_point
+from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
 
@@ -1740,10 +1741,26 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             d = 0       # not used in rapid drawdown, but must be defined
             psi = 0     # not used in rapid drawdown, but must be defined
             pow_flag = False
+            hb_flag = False
         else:
             pow_flag = False
+            hb_flag = False
             mat_option = materials[base_material_idx]['option']
-            if mat_option == 'pow':
+            if mat_option == 'hb':
+                # Generalized Hoek-Brown. Like 'pow' this is a curved envelope, so
+                # the strength depends on the base normal stress, which depends on
+                # FS: solve._with_nonlinear_strength re-linearizes it into an
+                # instantaneous tangent (c_i, phi_i) each outer iteration. Seed
+                # that iteration here with a no-FS normal-stress estimate.
+                mat = materials[base_material_idx]
+                sigma0 = max(0.0, sum_gam_h - u)
+                c_arr, phi_arr = hb_tangent(sigma0, mat['hb_sci'], mat['hb_gsi'],
+                                            mat['hb_mi'], mat['hb_d'])
+                c = float(c_arr)
+                phi = float(phi_arr)
+                c1 = 0; phi1 = 0; d = 0; psi = 0
+                hb_flag = True
+            elif mat_option == 'pow':
                 # Power-curve envelope tau = a*(sigma'_n + d)^b + c_p. Strength
                 # depends on the base normal stress, which depends on FS, so the
                 # solvers iterate: each method carries an outer loop (see
@@ -1856,7 +1873,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'pow_a': (materials[base_material_idx]['pow_a'] if pow_flag else 0.0),
             'pow_b': (materials[base_material_idx]['pow_b'] if pow_flag else 0.0),
             'pow_c': (materials[base_material_idx]['pow_c'] if pow_flag else 0.0),
-            'pow_d': (materials[base_material_idx]['pow_d'] if pow_flag else 0.0),  # friction angle of the base material in degrees
+            'pow_d': (materials[base_material_idx]['pow_d'] if pow_flag else 0.0),
+            'hb_flag': hb_flag,  # Hoek-Brown strength: iterate tangent (c,phi) on sigma'_n
+            'hb_sci': (materials[base_material_idx]['hb_sci'] if hb_flag else 0.0),
+            'hb_gsi': (materials[base_material_idx]['hb_gsi'] if hb_flag else 0.0),
+            'hb_mi': (materials[base_material_idx]['hb_mi'] if hb_flag else 0.0),
+            'hb_d': (materials[base_material_idx]['hb_d'] if hb_flag else 0.0),
             'c1': c1,    # cohesion of the base material for rapid drawdown
             'phi1': phi1,  # friction angle of the base material for rapid drawdown
             'd': d,       # d cohesion of the base material for rapid drawdown

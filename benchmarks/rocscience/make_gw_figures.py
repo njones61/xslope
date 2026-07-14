@@ -1,7 +1,15 @@
 """Render figures for the Groundwater corpus (docs/verification/rocscience_groundwater.md):
-one two-panel PNG per problem — the mesh with boundary conditions on the left, solved
-total-head contours with the phreatic surface on the right. Solves live (same pipeline
-as the type=seep tags).
+one two-panel PNG per problem — the inputs (geometry, material zones, seepage boundary
+conditions) on the left, and the solved seepage solution (total-head fill contours, the
+phreatic surface, flow lines) on the right. Solves live, on the same pipeline as the
+type=seep test tags.
+
+Both panels come from XSLOPE's own plotting stack — plot_inputs(mode='seep') and
+plot_seep_solution — NOT from hand-rolled matplotlib. That matters: those functions
+already handle the material fills, the BC symbols, the phreatic surface, the flow net
+and the colorbar, and they keep these figures looking like the ones a user gets from
+the package. (An earlier version of this script drew its own triplot/tricontour and
+drifted away from the package style.)
 
 Run from the repo root:  python benchmarks/rocscience/make_gw_figures.py [gwNNN ...]
 """
@@ -18,18 +26,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.tri as mtri
-import numpy as np
 from PIL import Image
 
 from xslope.fileio import load_slope_data
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons
 from xslope.seep import build_seep_data, run_seepage_analysis
+from xslope.plot import plot_inputs
+from xslope.plot_seep import plot_seep_solution
 
 SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience_gw')
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'images')
 
-# (stem, target_size or None for span/120, max_iter)
+# (stem, target_size or None for span/120, max_iter) — mesh sizes match the test tags
 CASES = [
     ('gw002', 0.10, 400),
     ('gw003', 0.40, 400),
@@ -51,57 +59,39 @@ def make_figure(stem, target_size, max_iter, panel_size=(8.0, 5.0), dpi=150):
     mesh = build_mesh_from_polygons(polygons, target_size, 'tri3')
     seep_data = build_seep_data(mesh, sd)
     with contextlib.redirect_stdout(io.StringIO()):
-        sol = run_seepage_analysis(seep_data, tol=1e-5, max_iter=max_iter)
+        solution = run_seepage_analysis(seep_data, tol=1e-5, max_iter=max_iter)
 
-    nodes = seep_data['nodes']
-    elems = np.asarray(mesh['elements'])[:, :3]
-    triang = mtri.Triangulation(nodes[:, 0], nodes[:, 1], elems)
-    head = np.asarray(sol['head'])
-    u = head - nodes[:, 1]          # pressure head, for the phreatic contour
-
+    q = solution.get('flowrate')
     paths = []
-    for which in ('mesh', 'solution'):
-        fig, ax = plt.subplots(figsize=panel_size)
-        if which == 'mesh':
-            ax.triplot(triang, color='0.6', lw=0.3)
-            bc = sd.get('seepage_bc') or {}
-            for spec in bc.get('specified_heads', []):
-                xs_, ys_ = zip(*spec['coords'])
-                ax.plot(xs_, ys_, color='b', lw=2.5,
-                        label=f"head = {spec['head']:g}")
-            if bc.get('exit_face'):
-                xs_, ys_ = zip(*bc['exit_face'])
-                ax.plot(xs_, ys_, color='r', lw=2.5, label='exit face')
-            ax.set_title(f'{stem} — mesh and boundary conditions')
-            ax.legend(loc='best', fontsize=8)
+    for which in ('inputs', 'solution'):
+        fig = plt.figure(figsize=panel_size)
+        if which == 'inputs':
+            # mode='seep' draws the specified-head and exit-face BC lines
+            plot_inputs(sd, fig=fig, mode='seep', mat_table=False,
+                        show_title=True, title=f'{stem} — inputs')
         else:
-            levels = np.linspace(head.min(), head.max(), 12)
-            cs = ax.tricontour(triang, head, levels=levels, colors='k',
-                               linewidths=0.6)
-            ax.clabel(cs, fontsize=6, fmt='%.2f')
-            try:
-                ax.tricontour(triang, u, levels=[0.0], colors='b', linewidths=2.0)
-            except ValueError:
-                pass                        # fully confined: no phreatic line
-            ax.triplot(triang, color='0.85', lw=0.2, zorder=0)
-            q = sol.get('flowrate')
-            ax.set_title(f'{stem} — total head'
-                         + (f'  (Q = {q:.3e})' if q is not None else ''))
-        ax.set_aspect('equal')
-        fig.tight_layout()
+            plot_seep_solution(seep_data, solution, fig=fig, show_title=True,
+                               fill_contours=True, phreatic=True, flowlines=True,
+                               mesh=False)
+            if q is not None:
+                fig.axes[0].set_title(f'{stem} — total head  (Q = {q:.3e})')
         p = os.path.join(OUT, f'_{stem}_{which}.png')
-        fig.savefig(p, dpi=dpi, bbox_inches='tight')
+        # NO bbox_inches='tight': it crops each panel by its own ink extent, and the
+        # two panels have very different ink (the solution carries a colorbar and a
+        # legend). Cropping them independently and then scaling to a common height
+        # shrinks the inputs panel to a sliver. Saving both at the same figsize/dpi
+        # gives two identically-sized images that paste straight together.
+        fig.savefig(p, dpi=dpi)
         plt.close(fig)
         paths.append(p)
 
     imgs = [Image.open(p) for p in paths]
-    h = min(im.height for im in imgs)
-    imgs = [im.resize((int(im.width * h / im.height), h)) for im in imgs]
-    combo = Image.new('RGB', (sum(im.width for im in imgs) + 20, h), 'white')
+    h = max(im.height for im in imgs)
+    combo = Image.new('RGB', (sum(im.width for im in imgs), h), 'white')
     x = 0
     for im in imgs:
-        combo.paste(im, (x, 0))
-        x += im.width + 20
+        combo.paste(im, (x, (h - im.height) // 2))   # vertically centred
+        x += im.width
     out = os.path.join(OUT, f'{stem}.png')
     combo.save(out)
     for p in paths:
@@ -116,6 +106,6 @@ if __name__ == '__main__':
             continue
         try:
             make_figure(stem, ts, mi)
-            print('ok ', stem)
+            print('ok  ', stem, flush=True)
         except Exception as e:                      # noqa: BLE001
-            print('FAIL', stem, ':', repr(e)[:100])
+            print('FAIL', stem, ':', repr(e)[:140], flush=True)

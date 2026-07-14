@@ -59,11 +59,11 @@ The following sections describe each worksheet in detail, including the data str
 
 ![sheet_main.png](images/sheet_main.png)
 
-**⚠ FIGURE NEEDS UPDATE (v12): screenshot shows template version 11; current version is 12.**
+**⚠ FIGURE NEEDS UPDATE: screenshot shows template version 11; current version is 14.**
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **12**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates.
+- **Template version**: Tracks template format for compatibility. The current version is **14**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates.
 - **Unit weight of water** (γw): Used in pore pressure calculations
 - **Tension crack parameters**: Depth and water level within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh): Horizontal seismic acceleration coefficient for pseudo-static earthquake analysis
@@ -105,7 +105,7 @@ the horizontal scale.
 
 ![sheet_mat1.png](images/sheet_mat1.png)
 
-**⚠ FIGURE NEEDS UPDATE (v12): new γ_sat, pow_a–pow_d, and r_u columns; new blank spacer row above the table (headers moved down one row); new `pow` and `ru` legend entries.**
+**⚠ FIGURE NEEDS UPDATE: new γ_sat, pow_a–pow_d, r_u and hb_sci–hb_d columns; new blank spacer row above the table (headers moved down one row); new `pow`, `hb` and `ru` legend entries.**
 
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
@@ -114,19 +114,33 @@ The **mat** worksheet defines material properties for the soil layer defined by 
 - **$\gamma$**: Unit weight of the soil. This is the *total* unit weight — moist above the water table. It is used to calculate the weight of the soil in each slice.
 - **$\gamma_{sat}$**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
-  with depth below a reference elevation; `pow` = nonlinear power-curve envelope.
+  with depth below a reference elevation; `pow` = nonlinear power-curve envelope; `hb` = generalized Hoek-Brown
+  (rock).
 - **c** (cohesion) and **φ** (friction angle): Mohr-Coulomb shear strength parameters (option = `mc`).
 - **c**, **cp**, and **r-elev** (option = `cp`): undrained strength that increases linearly below a reference
   elevation — see the formula below.
 - **d**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — see the formula below.
+- **hb_sci**, **hb_gsi**, **hb_mi**, **hb_d** (option = `hb`): generalized Hoek-Brown parameters — see the
+  formula below.
 - **u**: pore pressure option
 - **$r_u$**: pore pressure ratio (u = `ru`) — see below.
 
+For the **mc** strength option — the Mohr-Coulomb envelope, and the option you will use most of the time — the
+shear strength is a straight line in terms of the effective normal stress $\sigma'_n$ on the failure surface:
+
+>>$\tau = c + \sigma'_n \tan\phi = c + (\sigma_n - u)\tan\phi   \qquad (1)$
+
+where **c** is the cohesion (the intercept), **φ** is the effective friction angle (the slope of the line), and $u$
+is the pore pressure from the selected **u** option. Setting $\phi = 0$ gives a constant undrained strength
+$\tau = c = S_u$; setting $c = 0$ gives a purely frictional material. Every other strength option below is
+ultimately reduced to this same form — the curved envelopes are linearized into an equivalent local $(c, \phi)$
+before they are solved.
+
 For the **cp** strength option, the undrained shear strength at elevation $y$ is:
 
->>$S_u = c + c_p \cdot \max(0,\; r_{elev} - y)   \qquad (1)$
+>>$S_u = c + c_p \cdot \max(0,\; r_{elev} - y)   \qquad (2)$
 
 where **c** is the strength at the reference elevation **r-elev** and **cp** is the *rate* of strength increase per
 unit elevation below it (e.g. psf/ft). At or above **r-elev** the strength equals **c**. This behaves like a
@@ -136,11 +150,34 @@ slope-stability problems.
 For the **pow** strength option, the shear strength is a curved envelope in terms of the effective normal stress
 $\sigma'_n$ on the failure surface:
 
->>$\tau = pow_a \cdot (\sigma'_n + pow_d)^{pow_b} + pow_c   \qquad (2)$
+>>$\tau = pow_a \cdot (\sigma'_n + pow_d)^{pow_b} + pow_c   \qquad (3)$
 
 With $pow_b = 1$ this collapses to Mohr-Coulomb. Curved envelopes are appropriate for rockfill, waste rock,
 weathered rock, and heavily overconsolidated clays, where a straight-line fit over a wide stress range
 overestimates strength at one end and underestimates it at the other.
+
+For the **hb** strength option, strength follows the generalized Hoek-Brown criterion (Hoek, Carranza-Torres &
+Corkum, 2002), written in principal stresses:
+
+>>$\sigma'_1 = \sigma'_3 + \sigma_{ci}\left(m_b \dfrac{\sigma'_3}{\sigma_{ci}} + s\right)^{a}   \qquad (4)$
+
+The four inputs are the ones a geologist actually records; the rock-mass constants $m_b$, $s$ and $a$ are
+*derived* from them and are never entered directly:
+
+- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock (stress units).
+- **hb_gsi** — GSI, the Geological Strength Index, from 0 (completely broken) to 100 (intact). Must be in (0, 100].
+- **hb_mi** — $m_i$, the intact Hoek-Brown constant, a rock-type property (≈ 4 for claystone, ≈ 10 for sandstone,
+  ≈ 25 for granite).
+- **hb_d** — $D$, the disturbance factor, from 0 (undisturbed) to 1 (heavily blast-damaged). Must be in [0, 1].
+
+>>$m_b = m_i \exp\!\left(\dfrac{GSI - 100}{28 - 14D}\right), \quad
+   s = \exp\!\left(\dfrac{GSI - 100}{9 - 3D}\right), \quad
+   a = \tfrac12 + \tfrac16\!\left(e^{-GSI/15} - e^{-20/3}\right)   \qquad (5)$
+
+Slope stability needs shear strength as a function of the normal stress on the failure plane, not a relationship
+between principal stresses, so XSLOPE converts Eq. (3) to an equivalent Mohr envelope using Balmer's (1952)
+transformation and linearizes it at the operative normal stress into an instantaneous $(c_i, \phi_i)$ tangent.
+This happens automatically and iteratively — see [Hoek-Brown strength](../lem/overview.md#hoek-brown-strength).
 
 **Pore Pressure Options** (column labeled **u**):
 
@@ -157,19 +194,25 @@ overestimates strength at one end and underestimates it at the other.
 
 ![sheet_mat2.png](images/sheet_mat2.png)
 
-**⚠ FIGURE NEEDS UPDATE (v12): seepage/stiffness columns shifted right by the new strength columns; headers moved down one row.**
+**⚠ FIGURE NEEDS UPDATE: seepage/stiffness columns shifted right by the new strength columns; headers moved down one row; the van Genuchten `vg_a`/`vg_n` columns are now the law-agnostic `a`/`n` pair shared with the new `gard` option.**
 
 **Permeability** (for seepage analysis):
 
 - **k1**, **k2**: Major and minor hydraulic conductivity (can be anisotropic)
 - **alpha**: Orientation angle of permeability tensor
-- **unsat**: Unsaturated relative-permeability model — `lf` (linear front, the default) or `vg` (van Genuchten). Selects which parameter pair below applies.
+- **unsat**: Unsaturated relative-permeability model — `lf` (linear front, the default), `vg` (van Genuchten), or
+  `gard` (Gardner power form). Selects which parameter pair below applies.
 - **kr0**, **h0**: Linear-front (`unsat = lf`) parameters — relative conductivity and suction head at which K = kr0.
-- **vg_a**, **vg_n**: van Genuchten (`unsat = vg`) parameters — α (1/length) and n. (For steady-state flow only α and n are needed; residual/saturated water contents are not required.)
+- **a**, **n**: the curve parameters for the *other two* models. Their meaning depends on **unsat**:
+    - `vg` (van Genuchten): $a = \alpha$ (1/length) and $n$. (For steady-state flow only α and n are needed;
+      residual/saturated water contents are not required.)
+    - `gard` (Gardner): $a$ and $n$ of the power form $k_r = 1/(1 + a\,\psi^{\,n})$.
+
+  The columns are deliberately law-agnostic — one pair serves both models rather than two near-duplicate pairs.
 
 Typically, alpha = 0 and K1 = Kx and K2 = Ky. Leave **unsat** blank or `lf` to use the
-linear-front model (the established default); set it to `vg` only when van Genuchten
-properties are wanted (e.g. imported from another package). Typical `vg_a`/`vg_n`
+linear-front model (the established default); set it to `vg` or `gard` only when those
+properties are wanted (e.g. imported from another package). Typical `a`/`n`
 values by soil texture, and the unit convention for α, are tabulated in the
 [seepage overview](../seep/overview.md#van-genuchten-model).
 
@@ -461,34 +504,31 @@ tiebacks) enter the per-element capacity and provide **Spacing**, and xslope div
 >>Tend2: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
 >>Spacing: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
 already per unit width.<br>
-- **Stiffness / Residual** (for FEM analysis):<br>
->>Tres: Residual tensile force (for post-peak behavior)<br>
+- **Stiffness / Residual** (FEM only):<br>
+>>Tres: Residual tensile force *after* the element yields — its post-peak strength. **Leave it blank** for the
+usual elastic-perfectly-plastic bar, which simply holds its capacity once it yields; a blank is not the same as a
+zero. Entering **0** means brittle rupture: the element drops to carrying nothing at all. Anything in between models
+a bar that sheds part of its load and retains the rest.<br>
 >>E: Elastic modulus of reinforcement<br>
 >>Area: Cross-sectional area<br>
 
-The available tensile force at any point along the line is governed by a capacity envelope combining the tensile
-strength, the frictional pullout development from each end, and any end anchorage:
+The available tensile force varies *along* the line: it is limited by the tendon's own capacity in the middle, and
+tapers off toward each end as there is progressively less bond length available to develop it. That capacity
+envelope is what `Tmax`, `Lp1`, `Lp2`, `Tend1` and `Tend2` describe between them, and it is the same in LEM and
+FEM. The envelope, the end-condition cases, and how to convert a bond strength into an `Lp`, are all set out in
+**[Soil Reinforcement in LEM](../lem/reinforcement.md#capacity-envelope)** — the figures there are the quickest way
+to see what a given combination of columns actually produces.
 
->>$T(x) = \min\left(T_{max},\;\; T_{end1} + T_{max}\dfrac{d_1}{L_{p1}},\;\; T_{end2} + T_{max}\dfrac{d_2}{L_{p2}}\right)$
+How the force is then *used* differs by analysis:
 
-where $d_1$, $d_2$ are the distances from each end. Consequently:
-
-- If Lp = 0, the end is fully anchored (immediate maximum tension)
-- If Lp > 0 and Tend = 0, tension develops linearly from zero over the pullout length (the classical friction-only
-  taper)
-- If Tend > 0, the end starts with the anchorage capacity (a bearing plate, connection, or end anchor) and the
-  frictional contribution adds to it
-- If the total line length < Lp1 + Lp2 (with no end anchorage), only partial tension is mobilized
-
-For limit equilibrium analysis, the direction the force is applied depends on **Dir** (tangent to the slice base for
-flexible reinforcement, along the reinforcement axis for rigid supports) and whether it is factored by FS depends on
-**Appl**, as described above. With the defaults (Tangent, Active) the behavior is identical to earlier versions of
-xslope. Only the capacity envelope above is used in LEM (Tres is ignored).
-
-For the finite element method, the reinforcement is modeled as a 1D line element with a constant Young's modulus and 
-cross-sectional area; Dir and Appl have no effect (the element force emerges from the analysis along the element
-axis). At any point along the line, if the force applied to the line exceeds the capacity envelope, the line is 
-considered to be in failure and the tension in the line is limited to the residual tension Tres.
+- **LEM** applies the envelope force at the point where the line crosses the slip surface, in the direction set by
+  **Dir**, factored (or not) by **Appl**. `Tres`, `E` and `Area` are ignored. See
+  [Force Direction](../lem/reinforcement.md#force-direction-dir) and
+  [Force Application](../lem/reinforcement.md#force-application-appl).
+- **FEM** models the line as a 1D truss element with stiffness `E`·`Area`, so the force is an *output* of the
+  analysis rather than an input — the bar carries whatever the deforming soil pushes into it, capped by the
+  envelope, and dropping to `Tres` once it yields. **Dir** and **Appl** have no effect. See
+  [Soil Reinforcement in FEM](../fem/reinforcement.md#force-behavior-and-failure-modes).
 
 ---
 

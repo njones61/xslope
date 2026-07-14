@@ -10,7 +10,11 @@ Taylor-series method perturbs parameters by ±σ to estimate the *distribution* 
 which requires the parameters to be independent. A sensitivity sweep asserts nothing
 statistical — it simply evaluates the model across a range — which also makes it the
 right tool for **correlated fit coefficients** (the power-curve `A` and `b`, for
-example) that the reliability method must not treat as independent.
+example) that the reliability method must not treat as independent. The Hoek-Brown
+inputs are in the same category: `hb_sci`, `hb_gsi`, `hb_mi` and `hb_d` are all
+sweepable here, but they carry no standard-deviation columns and reliability rejects
+them, because $m_b$, $s$ and $a$ are all *derived* from GSI, $m_i$ and $D$ — perturbing
+them independently would be meaningless.
 
 Sweeps are configured entirely through the API — sensitivity describes an analysis you
 run, not a property of the model, so nothing is added to the Excel input template.

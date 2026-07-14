@@ -320,7 +320,13 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         depth_step = min(10.0, depth_step_init)
         best_depth = max(depth_guess, search_floor)
         best_fs = fs_fail
-        best_result = None
+        # These three are only rebound inside the loop below, so they must be seeded
+        # here: a degenerate depth_step (<= depth_tol on entry) skips the loop
+        # entirely, and the return would otherwise raise UnboundLocalError instead of
+        # reporting an honest fs_fail.
+        best_df = None
+        best_surface = None
+        best_solver_result = None
         depth_tol = depth_step * tol_frac
         iterations = 0
 

@@ -127,6 +127,51 @@ This principal stress formulation allows direct evaluation of the yield function
 
 The implementation of this failure criterion within the finite element framework will be discussed after the basic finite element formulation is presented.
 
+### Curved Failure Envelopes
+
+Two of XSLOPE's strength options are not straight lines in $\tau$–$\sigma'_n$ space: the power curve (`pow`) and the
+generalized Hoek-Brown criterion (`hb`), both described in the
+[LEM overview](../lem/overview.md#hoek-brown-strength). The FEM does not carry a separate yield function for
+either one. Instead it keeps the Mohr-Coulomb machinery above and **re-linearizes the curve into an instantaneous
+tangent $(c_i, \phi_i)$ at every Gauss point on every viscoplastic iteration**, using that iteration's own stress
+state as the linearization point. Because the viscoplastic algorithm is already iterating the stress field to
+convergence, the tangent converges along with it, and at equilibrium every yielding Gauss point sits on the true
+curved envelope at its own normal stress — no separate outer loop is needed.
+
+**Where the curve is linearized matters.** For the power curve the abscissa is the in-plane Mohr-circle centre,
+$s' = -(\sigma_x + \sigma_y)/2$ (compression-positive): the `pow` envelope is mild enough that the centre is a
+stable, fully vectorizable choice. Hoek-Brown is far more sharply curved, and it uses the normal stress on the
+**failure plane**,
+
+$$\sigma_n = s'\cos^2\phi - c\,\sin\phi\,\cos\phi$$
+
+evaluated from the previous iteration's *reduced* tangent. That expression is exactly the point at which a Mohr
+circle touches its tangent line, so it closes as a fixed point inside the viscoplastic loop at no extra cost: at
+convergence the Mohr circle, the tangent line, and the reduced envelope all meet at the same $\sigma_n$. It is
+also the abscissa the LEM uses (the slice-base normal stress), so both solvers linearize the same curve in the
+same place.
+
+Strength reduction needs care here. Dividing the *shear strength* by $F$ divides both the instantaneous cohesion
+and $\tan\phi_i$ by $F$, so it is the **tangent** that gets reduced, once per iteration, after it is computed.
+The curve's own constants are never reduced — $\sigma_{ci}/F$ is a different envelope entirely, because of the
+exponent $a$, and would silently give the wrong factor of safety.
+
+The reduction also explains why the minor principal stress $\sigma'_3$ — Balmer's own parameter, and the obvious
+candidate — is *not* used as the abscissa. Balmer's $\sigma'_3 \rightarrow$ tangency mapping is derived for the
+**unreduced** envelope, so it names the right point only at $F = 1$. Under strength reduction the Mohr circle is
+roughly $F$ times smaller and touches the reduced envelope at a much lower normal stress; because the Hoek-Brown
+envelope is *concave*, a tangent taken at the stale abscissa lies strictly above the true envelope, giving a
+one-sided, over-strong yield surface that inflates the factor of safety.
+
+!!! note "Verification"
+    The Hoek-Brown implementation is verified end-to-end against Example 1 of Hammah, R.E., Yacoub, T.E.,
+    Corkum, B., & Curran, J.H. (2005), *The shear strength reduction method for the generalized Hoek-Brown
+    criterion*, Proc. 40th U.S. Symposium on Rock Mechanics (ARMA/USRMS), Paper 05-810 — a 10 m, 45° slope in
+    a weak rock mass ($\sigma_{ci}$ = 30 MPa, GSI = 5, $m_i$ = 2, $D$ = 0). XSLOPE returns Spencer **1.152**
+    and Bishop **1.150** against the paper's 1.152 and 1.153, and SSRM **1.158** against its published SSRM
+    value of 1.15. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce the paper's
+    Table 1 exactly.
+
 ## Finite Element Formulation
 
 ### Discretization

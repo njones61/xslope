@@ -42,7 +42,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    **Required for seepage:**
    - Hydraulic conductivity (k1, k2) for every material
    - At least one specified head boundary condition
-   - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, or `unsat="vg"` (van Genuchten) with vg_a/vg_n
+   - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, `unsat="vg"` (van Genuchten) with vg_a/vg_n, or `unsat="gard"` (Gardner power form) reusing the same vg_a/vg_n pair
 
    **Required for reliability:**
    - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns L-Q). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
@@ -214,21 +214,32 @@ slope_data['materials'] = [
     {
         'name':  'clay',
         'gamma': 120.0,
-        'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi) or 'cp' (c/p ratio)
+        'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),
+                                 #   'pow' (power curve), or 'hb' (generalized Hoek-Brown)
         'c':     200.0,          # cohesion
         'phi':   28.0,           # friction angle (degrees)
         'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
         # --- option='cp' only ---
         'cp':    0.0,            # c/p ratio
         'r_elev':0.0,            # reference elevation for c/p
+        # --- option='pow' only: tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c ---
+        'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0,
+        # --- option='hb' only: generalized Hoek-Brown (mb/s/a are derived, not entered) ---
+        'hb_sci': 0.0,           # intact uniaxial compressive strength (stress units)
+        'hb_gsi': 0.0,           # Geological Strength Index, in (0, 100]
+        'hb_mi':  0.0,           # intact Hoek-Brown constant (rock type)
+        'hb_d':   0.0,           # disturbance factor, in [0, 1]
         # --- rapid drawdown only (Kc=1 envelope) ---
         'd':     0.0,            # cohesion intercept
         'psi':   0.0,            # friction angle
         # --- seepage ---
         'k1':    0.5, 'k2': 0.2, 'alpha': 0.0,   # conductivities + tensor angle
-        'unsat': 'lf',           # unsaturated model: 'lf' (linear front, default) or 'vg' (van Genuchten)
+        'unsat': 'lf',           # unsaturated model: 'lf' (linear front, default),
+                                 #   'vg' (van Genuchten), or 'gard' (Gardner power form)
         'kr0':   0.001, 'h0': -1.0,              # linear-front params (unsat='lf')
-        'vg_a':  0.0,  'vg_n': 0.0,              # van Genuchten params (unsat='vg')
+        'vg_a':  0.0,  'vg_n': 0.0,              # curve params for BOTH 'vg' and 'gard'
+                                                 #   (vg: alpha & n; gard: a & n in kr=1/(1+a*psi^n))
+                                                 #   these are the 'a'/'n' columns on the mat sheet
         # --- FEM ---
         'E':     1_000_000.0, 'nu': 0.3,
         # --- reliability std deviations (only when running reliability) ---
@@ -948,7 +959,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
 
 10. **Always validate** by plotting inputs before running analysis. If geometry looks wrong, fix the template first.
 
-11. **Seepage material properties**: For fully saturated problems, the unsaturated parameters are ignored but must still have placeholder values. For partially saturated (unconfined) problems, set the `unsat` model per material: `unsat="lf"` (linear front — the default and recommended model) with typical kr0=0.001 to 0.01 and h0=-1; or `unsat="vg"` (van Genuchten) with vg_a (α, 1/length) and vg_n. Use "vg" only when van Genuchten properties are specifically wanted.
+11. **Seepage material properties**: For fully saturated problems, the unsaturated parameters are ignored but must still have placeholder values. For partially saturated (unconfined) problems, set the `unsat` model per material: `unsat="lf"` (linear front — the default and recommended model) with typical kr0=0.001 to 0.01 and h0=-1; `unsat="vg"` (van Genuchten) with vg_a (α, 1/length) and vg_n; or `unsat="gard"` (Gardner power form, kr = 1/(1 + a·ψⁿ)) reusing the same vg_a/vg_n pair. Use "vg" or "gard" only when those properties are specifically wanted.
 
 12. **Internal no-flow barriers (sheetpiles, cutoff walls)** have no dedicated input. Model a thin wall as a narrow notch in the profile line (or polygon boundary) that follows the wall: down one face, across the tip, back up the other face, with a small gap (~0.1-0.5 length units) between the two faces so the mesh has a physical crack — both crack faces become natural no-flow boundaries. End any specified-head BC at the wall (never span across it).
 

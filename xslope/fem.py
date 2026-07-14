@@ -22,6 +22,8 @@ from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import splu
 from shapely.geometry import LineString, Point
 
+from .hoekbrown import hb_constants, hb_tangent_const
+
 
 def _extract_nodal_uv(disp, fem_data):
     """Extract per-node translational displacements from a mixed-DOF vector."""
@@ -331,12 +333,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             cp_rate = material.get("cp", 0.0)
             c_by_mat[i] = cp_rate  # Store cp rate temporarily (used per-element below)
             phi_by_mat[i] = 0.0     # Undrained analysis
-        elif strength_option == "pow":
-            # Power-curve envelope tau = a*(sigma'_n + d)^b + c_p (the LEM's
-            # 'pow' option). Handled by per-Gauss-point tangent linearization
-            # of the F-reduced envelope inside the viscoplastic loop; the
-            # c/phi arrays only carry a seed tangent, assigned per element
-            # below from the overburden estimate.
+        elif strength_option in ("pow", "hb"):
+            # Curved envelopes: the power curve tau = a*(sigma'_n + d)^b + c_p
+            # and generalized Hoek-Brown. Both are handled by per-Gauss-point
+            # tangent linearization of the F-reduced envelope inside the
+            # viscoplastic loop; the c/phi arrays only carry a seed tangent,
+            # assigned per element below from the overburden estimate.
             c_by_mat[i] = 0.0
             phi_by_mat[i] = 0.0
         else:
@@ -348,7 +350,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 raise ValueError(
                     f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
                     f"strength option '{strength_option}' is not supported by the "
-                    f"FEM (supported: mc, cp, pow).")
+                    f"FEM (supported: mc, cp, pow, hb).")
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
 
@@ -387,6 +389,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     pow_b_by_elem = np.zeros(n_elements)
     pow_cp_by_elem = np.zeros(n_elements)
     pow_d_by_elem = np.zeros(n_elements)
+
+    # Hoek-Brown (option 'hb'), same treatment. mb/s/a are derived once here
+    # from GSI/mi/D and carried per element; the VP loop only inverts Balmer's
+    # curve for the tangent.
+    hb_flag_by_elem = np.zeros(n_elements, dtype=bool)
+    hb_sci_by_elem = np.zeros(n_elements)
+    hb_mb_by_elem = np.zeros(n_elements)
+    hb_s_by_elem = np.zeros(n_elements)
+    hb_a_by_elem = np.zeros(n_elements)
     _gs = slope_data.get('ground_surface')
     if _gs is not None and not _gs.is_empty:
         _gxy = np.asarray(_gs.coords)
@@ -441,6 +452,28 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             tau = a * s_eff ** b + cp_
             c_by_elem[elem_idx] = tau - s_n * slope
             phi_by_elem[elem_idx] = np.degrees(np.arctan(slope))
+        elif strength_option == "hb":
+            sci_ = material.get("hb_sci", 0.0)
+            mb_, s_, a_ = hb_constants(material.get("hb_gsi", 0.0),
+                                       material.get("hb_mi", 0.0),
+                                       material.get("hb_d", 0.0))
+            hb_flag_by_elem[elem_idx] = True
+            hb_sci_by_elem[elem_idx] = sci_
+            hb_mb_by_elem[elem_idx] = mb_
+            hb_s_by_elem[elem_idx] = s_
+            hb_a_by_elem[elem_idx] = a_
+            # seed tangent at gamma * depth-below-ground of the centroid
+            elem_nodes = elements[elem_idx]
+            elem_type = element_types[elem_idx]
+            elem_coords = nodes[elem_nodes[:elem_type]]
+            cx = float(np.mean(elem_coords[:, 0]))
+            cy = float(np.mean(elem_coords[:, 1]))
+            y_top = (float(np.interp(cx, _gx, _gy)) if _gx is not None
+                     else float(np.max(nodes[:, 1])))
+            s_n = max(gamma_by_mat[mat_id] * max(y_top - cy, 0.0), 0.0)
+            c_seed, phi_seed = hb_tangent_const(s_n, sci_, mb_, s_, a_)
+            c_by_elem[elem_idx] = float(c_seed)
+            phi_by_elem[elem_idx] = float(phi_seed)
         else:
             c_by_elem[elem_idx] = c_by_mat[mat_id]
             phi_by_elem[elem_idx] = phi_by_mat[mat_id]
@@ -1226,6 +1259,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "pow_b_by_elem": pow_b_by_elem,
         "pow_cp_by_elem": pow_cp_by_elem,
         "pow_d_by_elem": pow_d_by_elem,
+        "hb_flag_by_elem": hb_flag_by_elem,  # Hoek-Brown elements (tangent-linearized in the VP loop)
+        "hb_sci_by_elem": hb_sci_by_elem,
+        "hb_mb_by_elem": hb_mb_by_elem,      # derived from GSI/mi/D at build time
+        "hb_s_by_elem": hb_s_by_elem,
+        "hb_a_by_elem": hb_a_by_elem,
         "u": u,
         "sigma_v": sigma_v,  # nodal vertical soil stress (ru option; else None)
         "ru_by_mat": np.array([float(m.get("ru", 0.0) or 0.0) for m in materials]),
@@ -1384,6 +1422,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     if pow_flag_by_elem is None:
         pow_flag_by_elem = np.zeros(len(elements), dtype=bool)
     has_pow = bool(np.any(pow_flag_by_elem))
+    hb_flag_by_elem = fem_data.get("hb_flag_by_elem")
+    if hb_flag_by_elem is None:
+        hb_flag_by_elem = np.zeros(len(elements), dtype=bool)
+    has_hb = bool(np.any(hb_flag_by_elem))
     E_by_mat = fem_data["E_by_mat"]
     nu_by_mat = fem_data["nu_by_mat"]
     gamma_by_mat = fem_data["gamma_by_mat"]
@@ -1726,6 +1768,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                                  ('pow_cp', 'pow_cp_by_elem'),
                                  ('pow_d', 'pow_d_by_elem')):
                     grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
+        if has_hb:
+            _hm = np.array([hb_flag_by_elem[e] for e, g in _pairs])
+            if _hm.any():
+                grp['hb_m'] = _hm
+                for _k, _key in (('hb_sci', 'hb_sci_by_elem'),
+                                 ('hb_mb', 'hb_mb_by_elem'),
+                                 ('hb_s', 'hb_s_by_elem'),
+                                 ('hb_a', 'hb_a_by_elem')):
+                    grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
         gp_groups.append(grp)
     n_total_gp = sum(len(g['pairs']) for g in gp_groups)
 
@@ -1850,6 +1901,49 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     grp['c_r'][pm] = tau_F - s_n * slope_t
                     grp['snph'][pm] = np.sin(phi_t)
                     grp['csph'][pm] = np.cos(phi_t)
+
+                # Hoek-Brown elements: linearize the envelope at the normal stress on
+                # the FAILURE PLANE, sigma_n = s'cos^2(phi) - c sin(phi)cos(phi), taken
+                # from the previous iterate's REDUCED tangent. That expression is the
+                # exact point at which a Mohr circle touches its tangent line, so it
+                # closes as a fixed point inside the VP loop: at convergence the circle,
+                # the tangent line and the reduced envelope all meet at the same
+                # sigma_n. It is also the abscissa the LEM uses (the slice-base normal
+                # stress), so the two solvers linearize the same curve at the same place.
+                #
+                # Do NOT linearize at the minor principal stress sigma3 instead. Balmer's
+                # sigma3 -> tangency mapping is derived for the UNREDUCED envelope, so it
+                # names the right point only at F = 1; under strength reduction the
+                # F-times-smaller Mohr circle contacts the reduced envelope at a much
+                # lower normal stress, and because the HB envelope is CONCAVE the tangent
+                # taken at the old abscissa lies strictly above it -- a one-sided,
+                # over-strong yield surface. Measured on Hammah et al. (2005) Example 1
+                # this cost +6% in FS; the failure-plane abscissa reproduces their
+                # published SSR 1.15 to +0.7%.
+                hm = grp.get('hb_m')
+                if hm is not None:
+                    ctr_t = (sx[hm] + sy[hm]) * 0.5
+                    s_prime = -ctr_t             # circle centre, compression-positive
+                    sn_p, cs_p = grp['snph'][hm], grp['csph'][hm]
+                    # Clamping sigma_n >= 0 bounds phi_i at its zero-normal-stress value
+                    # (~60 deg for a typical rock mass) rather than letting a Gauss point
+                    # in tension run to the tensile apex, where dsigma1/dsigma3 diverges
+                    # and phi_i -> 90 deg (i.e. effectively infinite strength).
+                    s_n = np.maximum(s_prime * cs_p ** 2
+                                     - grp['c_r'][hm] * sn_p * cs_p, 0.0)
+                    c_i, phi_i = hb_tangent_const(
+                        s_n, grp['hb_sci'][hm], grp['hb_mb'][hm],
+                        grp['hb_s'][hm], grp['hb_a'][hm], iters=40)
+                    # Strength reduction divides the SHEAR strength by F, which divides
+                    # both the instantaneous cohesion and tan(phi_i) by F -- dividing a
+                    # function by F divides its tangent's slope and intercept by F. The HB
+                    # constants themselves are NOT reduced -- sigma_ci/F is a different
+                    # envelope, because of the exponent a.
+                    slope_t = np.tan(np.radians(phi_i)) / F
+                    phi_t = np.arctan(slope_t)
+                    grp['c_r'][hm] = c_i / F
+                    grp['snph'][hm] = np.sin(phi_t)
+                    grp['csph'][hm] = np.cos(phi_t)
 
                 sigm = (sx + sy + sz) / 3.0
                 dsbar = np.sqrt(((sx - sy)**2 + (sy - sz)**2 + (sz - sx)**2
@@ -2297,6 +2391,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             _c_rep = (_a * _sef ** _b + fem_data["pow_cp_by_elem"][elem_idx]) / F \
                      - _sn * _sl
             _phi_rep = np.arctan(_sl)
+        elif hb_flag_by_elem[elem_idx]:
+            # Reporting tangent from the final effective stress state. This MUST use the
+            # same failure-plane abscissa the viscoplastic loop linearized on, or the
+            # reported yield function describes a different envelope than the one that
+            # was actually solved. The VP loop's converged (c_r, phi) are not carried out
+            # here, so recover the abscissa by iterating the same fixed point to closure.
+            _s_prime = max(-(sig_eff4[0] + sig_eff4[1]) * 0.5, 0.0)
+            _sci = fem_data["hb_sci_by_elem"][elem_idx]
+            _mb = fem_data["hb_mb_by_elem"][elem_idx]
+            _s = fem_data["hb_s_by_elem"][elem_idx]
+            _a_hb = fem_data["hb_a_by_elem"][elem_idx]
+            _c_rep, _phi_rep = 0.0, 0.0
+            _sn = _s_prime                      # seed at the circle centre
+            for _ in range(40):
+                _ci, _phii = hb_tangent_const(_sn, _sci, _mb, _s, _a_hb, iters=40)
+                _c_rep = float(_ci) / F
+                _phi_rep = np.arctan(np.tan(np.radians(float(_phii))) / F)
+                _sn_new = max(_s_prime * np.cos(_phi_rep) ** 2
+                              - _c_rep * np.sin(_phi_rep) * np.cos(_phi_rep), 0.0)
+                if abs(_sn_new - _sn) <= 1e-9 * max(1.0, abs(_sn)):
+                    _sn = _sn_new
+                    break
+                _sn = _sn_new
         f_yield = mc_yield_invariants(sigm, dsbar, theta, _c_rep, _phi_rep)
         yield_function_out[elem_idx] = f_yield
         plastic_elements[elem_idx] = f_yield > 1e-8

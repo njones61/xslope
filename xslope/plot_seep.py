@@ -481,9 +481,14 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     _cs.set_gid('HEAD_CONTOURS')
 
     # Phreatic surface (pressure head = 0)
-    # Check if phreatic surface exists (pore pressure must be negative somewhere)
+    # Only meaningful for UNCONFINED flow. A confined solve is a single saturated
+    # Laplace solve in which the head is a potential, not a water level: negative
+    # pore pressure is routine (any node above the boundary head has u < 0) and the
+    # p = 0 contour is an artifact, not a water table. Drawing it there produces a
+    # figure that contradicts its own flow net -- flow lines correctly fill the whole
+    # saturated domain while the bogus "phreatic surface" implies most of it is dry.
     has_phreatic = False
-    if phreatic:
+    if phreatic and solution.get("unconfined", True):
         # Check if pore pressure goes negative (indicating a phreatic surface exists)
         u = solution.get("u")
         if u is not None and np.min(u) < 0:

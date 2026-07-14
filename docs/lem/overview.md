@@ -29,7 +29,21 @@ where $c'$ is the effective cohesion, $\sigma'$ is the effective normal stress, 
 
 > $s = c' + (\sigma - u) \tan \phi'$
 
-where $u$ is the pore pressure.
+where $u$ is the pore pressure. This is the `mc` option in the input template, and it is what the majority of
+analyses use.
+
+**Depth-increasing undrained strength.** Normally consolidated clays gain undrained strength with depth as the
+effective overburden increases, so a single $S_u$ misrepresents them over any appreciable height. The `cp` option
+describes that trend directly:
+
+> $S_u = c + c_p \cdot \max(0,\; r_{elev} - y)$
+
+where $c$ is the undrained strength at the reference elevation `r-elev`, and $c_p$ is the *rate* of strength gain
+per unit elevation below it (e.g. psf/ft). At or above the reference elevation the strength is simply $c$. This
+plays the role of the familiar $S_u/\sigma'_v$ (c/p) ratio, but keyed to elevation rather than depth below ground —
+which is more precise for slope problems, where "depth" is ambiguous once the ground surface is no longer flat. It
+is a $\phi = 0$ model: the strength assigned to a slice base depends only on where that base sits, not on the
+normal stress acting on it.
 
 **Nonlinear (power-curve) strength.** In addition to the linear Mohr-Coulomb envelope, a material may use the
 curved power-curve envelope (option `pow` in the input template):
@@ -45,15 +59,108 @@ recomputed until the factor of safety is stationary. The linearization is exact 
 strength on every slice lies on the curve at that slice's normal stress. Power-curve materials are not supported
 in rapid drawdown analysis (both procedures override the per-slice strengths).
 
-In XSLOPE, pore pressures are defined by entering the geometry of a piezometric line and then for any point below the line, the pore pressure is calculated as:
+### Hoek-Brown strength
 
-> $u = \Delta y * \gamma_w$
+Rock masses are the other case where a straight-line envelope misleads, and they have their own standard: the
+generalized Hoek-Brown criterion (option `hb`). It is written in principal stresses rather than as a shear
+envelope,
 
-where $\Delta y$ is the distance from the piezometric line to the point in question and $\gamma_w$ is the unit weight of water. 
+> $\sigma'_1 = \sigma'_3 + \sigma_{ci}\left(m_b \dfrac{\sigma'_3}{\sigma_{ci}} + s\right)^{a}$
 
-![piezo_line.png](images/piezo_line.png){width="700px"}
+with the rock-mass constants $m_b$, $s$ and $a$ derived from the three field-observable inputs — the intact
+strength $\sigma_{ci}$ (`hb_sci`), the Geological Strength Index (`hb_gsi`), the intact constant $m_i$ (`hb_mi`),
+and the blast-disturbance factor $D$ (`hb_d`). See the
+[input template](../usage/input_template.md#worksheet-mat) for the definitions and the derivation formulas.
 
-The pore pressures can also be derived from a 2D finite element seepage analysis of the slope using the [seepage tools](../seep/overview.md) in XSLOPE. In this case, the pore pressure at a point is interpolated from the nodes of the element containing the point using the element basis functions. This is the most accurate way to obtain pore pressures.  
+The method of slices needs shear strength as a function of the normal stress on the slice base, so XSLOPE
+converts the principal-stress form into the equivalent Mohr envelope with **Balmer's (1952) transformation**.
+For a given $\sigma'_3$, with $\partial\sigma'_1/\partial\sigma'_3 = 1 + a\,m_b(m_b\sigma'_3/\sigma_{ci} + s)^{a-1}$:
+
+> $\sigma'_n = \sigma'_3 + \dfrac{\sigma'_1 - \sigma'_3}{\partial\sigma'_1/\partial\sigma'_3 + 1}, \qquad
+> \tau = (\sigma'_n - \sigma'_3)\sqrt{\partial\sigma'_1/\partial\sigma'_3}$
+
+That is a *parametric* curve in $\sigma'_3$, so the strength at a prescribed $\sigma'_n$ is found by inverting it
+numerically ($\sigma'_n$ increases monotonically with $\sigma'_3$, so the inversion is unconditionally robust).
+The instantaneous tangent follows in closed form:
+
+> $\tan\phi_i = \dfrac{\partial\sigma'_1/\partial\sigma'_3 - 1}{2\sqrt{\partial\sigma'_1/\partial\sigma'_3}},
+> \qquad c_i = \tau - \sigma'_n \tan\phi_i$
+
+From there Hoek-Brown rides exactly the same outer iteration as the power curve: linearize at the current normal
+stress, solve, update the normal stresses, re-linearize, repeat until the factor of safety is stationary. The
+same restriction applies — Hoek-Brown materials are not supported in rapid drawdown analysis.
+
+!!! note "Verification"
+    Checked against Example 1 of Hammah, R.E., Yacoub, T.E., Corkum, B., & Curran, J.H. (2005), *The shear
+    strength reduction method for the generalized Hoek-Brown criterion*, Proc. 40th U.S. Symposium on Rock
+    Mechanics (ARMA/USRMS), Paper 05-810: a 10 m, 45° slope in a weak rock mass ($\sigma_{ci}$ = 30 MPa,
+    GSI = 5, $m_i$ = 2, $D$ = 0). XSLOPE returns Spencer **1.152** and Bishop **1.150** against the paper's
+    1.152 and 1.153. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce its
+    Table 1 exactly. The same slope is solved by the FEM in
+    [SSRM](../fem/overview.md#curved-failure-envelopes).
+
+!!! note "Force-equilibrium methods on rock slopes"
+    A Hoek-Brown envelope is very steep at low confinement: the instantaneous friction angle on a shallow,
+    lightly-loaded slice near the crest routinely exceeds 60°. The Corps of Engineers and Lowe & Karafiath
+    methods, which fix the interslice-force inclination up front rather than solving for it, can fail to converge
+    at friction angles that high. This is a pre-existing property of those force-equilibrium methods, not of the
+    Hoek-Brown implementation — plain Mohr-Coulomb materials with $\phi > 55°$ fail the same way. Prefer Bishop,
+    Spencer, or Morgenstern-Price on rock slopes.
+
+!!! warning "Weak rock masses and shallow surfaces"
+    The other side of the same coin: a Hoek-Brown envelope has very little strength at *zero* confinement. The
+    unconfined strength of the rock mass is $\sigma_{ci}\,s^{\,a}$, which for a low GSI is a tiny fraction of the
+    intact strength — at GSI = 15 a 2.5 MPa intact rock has a rock-mass unconfined strength of only about 2.5 kPa,
+    i.e. it is effectively rubble. A material with essentially no cohesion has no depth scale to arrest failure,
+    so an automated search will correctly drive the critical surface toward an infinitesimally shallow sliver at
+    the crest and report a factor of safety well below 1. This is not a numerical artifact; it is the same
+    behavior a $c' = 0$ cohesionless soil shows, where the true minimum is the infinite-slope solution. For heavily
+    broken rock, constrain the search depth or model the shallow ravelling mechanism explicitly rather than reading
+    the unconstrained global minimum.
+
+### Pore pressures
+
+XSLOPE offers four ways to supply the pore pressure $u$, selected per material through the **u** column of the input
+template.
+
+**Piezometric line** (`u = piezo`, the piezo sheet's `Type` = *piezo* or blank). The line is a true piezometric
+line — the locus of pressure heads a set of piezometers would read at the slip surface. The pore pressure is the
+full static head:
+
+> $u = \Delta z \cdot \gamma_w$
+
+where $\Delta z$ is the vertical distance from the point up to the line and $\gamma_w$ is the unit weight of water
+(upper figure).
+
+**Phreatic surface** (the piezo sheet's `Type` = *phreatic*). The equation above is only strictly correct when the
+water table is horizontal. When the line is instead a genuine *phreatic surface* — the water table in a slope with
+inclined, roughly surface-parallel steady seepage — the equipotentials are no longer vertical, so the head at depth
+is *less* than the static column and taking the full vertical distance overstates $u$. The static head is reduced
+by $\cos^2\theta$, where $\theta$ is the inclination of the line segment directly above the point (lower figure):
+
+> $u = \Delta z \cdot \gamma_w \cdot \cos^2\theta$
+
+![piezo.png](images/piezo.png)
+
+This is the same correction as Slide2's "Hu: Auto" and XSTABL's phreatic-surface option, and it applies in the FEM
+as well as the LEM. It matters most on steep phreatic lines — at $\theta = 20°$ it is already a 12% reduction in
+$u$ — and on a flat line the two types are identical. Choosing between them: if the line came from piezometer
+readings, a flow net, or a seepage analysis, it is a piezometric line; if all you have is the water table position,
+*phreatic* is the appropriate shortcut.
+
+**Pore pressure ratio** (`u = ru`). The pore pressure is taken as a fixed fraction of the vertical overburden,
+$u = r_u \sigma_v$, with $r_u$ entered per material. $\sigma_v$ is the *soil-column* stress only — distributed loads
+and tension-crack water are deliberately excluded. This is a coarse idealization, but it is what many published
+benchmarks specify, so it is supported for comparison.
+
+**Finite element seepage** (`u = seep`). Pore pressures are interpolated from a 2D finite element seepage solution
+using the [seepage tools](../seep/overview.md), at the point in question, from the nodes of the containing element via
+the element basis functions. This is the most accurate option, and the only one that represents a genuinely
+two-dimensional flow field — including perched water, anisotropy, and internal drains — rather than assuming a head
+distribution up front.
+
+A note on all of them: XSLOPE always uses the *explicit* water-force formulation, never buoyant unit weights. Total
+unit weights are used for the slice weights and the pore pressure enters separately through $u$.
 
 ## Developed Shear Strength
 

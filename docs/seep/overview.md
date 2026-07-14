@@ -104,7 +104,7 @@ where $S_s$ is the specific storage coefficient. Such analysis would enable mode
 
 ### Unsaturated Flow Formulation
 
-Unsaturated flow analysis becomes necessary when analyzing slopes with significant vadose zones above the phreatic surface. XSLOPE models the relative conductivity function with a **linear front method** by default — a simplified but robust approach for partially saturated conditions — and (input template v11+) optionally with the **van Genuchten** model, selected per material through the `unsat` property (`lf` or `vg`).
+Unsaturated flow analysis becomes necessary when analyzing slopes with significant vadose zones above the phreatic surface. XSLOPE models the relative conductivity function with a **linear front method** by default — a simplified but robust approach for partially saturated conditions — and optionally with the **van Genuchten** model (v11+) or the **Gardner** power form (v14+), selected per material through the `unsat` property (`lf`, `vg`, or `gard`). The van Genuchten and Gardner models share one pair of law-agnostic input columns, `a` and `n`, whose meaning follows the selected `unsat` model.
 
 The governing equation for steady-state unsaturated flow is:
 
@@ -144,7 +144,7 @@ The iterative solution process adjusts the relative conductivity within each ele
 
 #### van Genuchten Model
 
-The van Genuchten–Mualem function is the most widely used relative-conductivity model in unsaturated soil mechanics. It is selected per material by setting `unsat = "vg"` and supplying two parameters, $\alpha$ (`vg_a`) and $n$ (`vg_n`):
+The van Genuchten–Mualem function is the most widely used relative-conductivity model in unsaturated soil mechanics. It is selected per material by setting `unsat = "vg"` and supplying two parameters, $\alpha$ (entered in the `a` column) and $n$ (the `n` column):
 
 >>$S_e = \left[\,1 + (\alpha\,|\psi|)^{\,n}\,\right]^{-m}, \qquad m = 1 - \dfrac{1}{n}$
 
@@ -154,7 +154,7 @@ Because the seepage solve is steady-state, only $\alpha$ and $n$ are needed — 
 
 **Typical parameter values.** The table below gives representative van Genuchten $\alpha$ and $n$ by USDA soil-texture class, after **Carsel & Parrish (1988)** — the standard reference dataset (the same source used by HYDRUS and most unsaturated-flow codes). Use them as starting estimates and adjust to site data.
 
-| Soil texture | `vg_a` = α (1/cm) | `vg_n` = n |
+| Soil texture | `a` = α (1/cm) | `n` |
 | --- | --- | --- |
 | Sand | 0.145 | 2.68 |
 | Loamy sand | 0.124 | 2.28 |
@@ -176,6 +176,22 @@ Because the seepage solve is steady-state, only $\alpha$ and $n$ are needed — 
     (1/cm → 1/m); for **feet** multiply by 30.48. $n$ is dimensionless. As a rule of
     thumb, larger $\alpha$ and $n$ mean a coarser, more freely-draining soil (sands),
     while small $\alpha$ and $n \to 1$ mean a fine, slowly-draining soil (clays).
+
+#### Gardner Model
+
+The Gardner (1958) power form is the third option, selected with `unsat = "gard"` and the same two `a` / `n`
+columns:
+
+>>$k_r(\psi) = \begin{cases} 1.0 & \psi \geq 0 \\ \dfrac{1}{1 + a\,|\psi|^{\,n}} & \psi < 0 \end{cases}$
+
+It is included for compatibility: this is the legacy relative-conductivity option in SEEP/W and Slide, so models
+imported from those packages carry $a$ and $n$ in exactly this form. Note that this is the **power** form of
+Gardner's function, not the exponential form $k_r = e^{\alpha\psi}$ that also carries his name — the two are
+different functions, and the $a$/$n$ pair only makes sense for the power form.
+
+Unlike van Genuchten, there is no $m = 1 - 1/n$ coupling, so $n$ is not required to exceed 1; both $a$ and $n$
+need only be positive. Like the other two models it is evaluated at the element Gauss points and floored at
+$k_{r,\min}$.
 
 ## Boundary Conditions
 

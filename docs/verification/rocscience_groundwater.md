@@ -28,7 +28,22 @@ quantities (flow rates, free-surface positions, pressure profiles).
 
 Problems 1–13 are steady-state and analyzable with the current solver. Problems 15–21 are
 **transient** (and 15–16 are consolidation), which XSLOPE's steady-state solver does not
-support — those rows stay blocked until a transient seepage capability exists.
+support.
+
+Two capabilities are deliberately out of scope, so the rows that depend on them are blocked by
+design rather than pending work:
+
+- **Transient seepage.** XSLOPE's seepage analysis exists to supply pore pressures to a stability
+  analysis, and a transient head field does not change a factor of safety on its own — capturing
+  rainfall-induced failure would additionally require an unsaturated shear-strength model (such as
+  Fredlund's $\phi^b$), without which suction is neglected in the stability calculation regardless
+  of how the water table moves. Rapid drawdown, the other classic transient case, is already covered
+  by the staged Duncan & Wright procedure that is standard of practice. Problems 16–21 are blocked
+  on this.
+- **Specified-flux (Neumann) boundary conditions.** The solver's boundary conditions are fixed-head
+  and exit-face only. Problems 1 and 7 apply a uniform infiltration rate to the ground surface, which
+  has no fixed-head equivalent, so they are blocked on this. Their inputs and published answers are
+  recorded below for whenever it is added.
 
 ## Status
 
@@ -39,8 +54,8 @@ support — those rows stay blocked until a transient seepage capability exists.
 | [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](../files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
 | [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
 | 5 | Unsaturated flow behind an embankment | *no lock possible* | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. |
-| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh, the same free-surface question as GW11 (task #30). Case 4 needs the flux BC (task #28); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets and deferred. |
-| 7 | Seepage within layered slope | *blocked* | Rulon & Freeze layered slope: the manual applies a constant infiltration rate of 2.1×10⁻⁴ m/s to the top of the slope — a specified flux with no fixed-head equivalent (the stated water table position is an output, not an input), so this needs the flux boundary condition (task #28). k-charts and profile targets recorded for when it exists. |
+| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh, the same free-surface question as GW11. Case 4 needs the flux BC (out of scope, see above); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets and deferred. |
+| 7 | Seepage within layered slope | *blocked* | Rulon & Freeze layered slope: the manual applies a constant infiltration rate of 2.1×10⁻⁴ m/s to the top of the slope — a specified flux with no fixed-head equivalent (the stated water table position is an output, not an input), so this needs the flux boundary condition, which is out of scope (see above). k-charts and profile targets recorded for when it exists. |
 | 8 | Flow through ditch-drained soils | *blocked* | Inputs fully printed, but both soils use Gardner conductivity kr = 1/(1 + a·ψⁿ); the solver implements linear-front and van Genuchten only. A Gardner option would unlock GW8 and GW11. The problem exists to verify the Gardner function, so a van Genuchten stand-in was deliberately not attempted. |
 | [9](#gw9) | Seepage through dam | **built** (dam 1 of 2) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx). Bowles homogeneous dam via Chapuis et al. (2001): Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2 (drain) needs the source paper — its k-function and reservoir level are chart-only and the published Q implies a k two decades below the chart. |
 | [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](../files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |

@@ -370,7 +370,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 13
+SUPPORTED_TEMPLATE_VERSION = 14
 
 
 def load_slope_data(filepath):
@@ -525,6 +525,20 @@ def load_slope_data(filepath):
         v = pd.to_numeric(x, errors="coerce")
         return float(v) if pd.notna(v) else 0.0
 
+    def _pick(row, *names):
+        """First of ``names`` that is actually a COLUMN on this sheet.
+
+        v14 renamed the two unsaturated-curve parameters from the van-Genuchten-
+        specific 'vga'/'vgn' to the law-agnostic 'a'/'n' (they now serve van
+        Genuchten and Gardner alike), and renamed Poisson's ratio from 'n' to
+        'nu' — which had collided with the new 'n'. Order matters: a v14 sheet
+        has BOTH 'n' (the curve exponent) and 'nu', so nu must prefer 'nu' and
+        only fall back to 'n' on a pre-v14 sheet that has no 'nu' column."""
+        for nm in names:
+            if nm in row.index:
+                return row.get(nm, 0)
+        return 0
+
     def _choice(x, default):
         """Normalize a free-text option cell. An empty cell reaches here as the
         float NaN, which ``str()`` renders as 'nan' -- treat both as unset."""
@@ -558,14 +572,15 @@ def load_slope_data(filepath):
             )
 
         # Unsaturated relative-permeability model (template v11+): 'lf' (linear
-        # front, kr0/h0 apply) or 'vg' (van Genuchten, vg_a/vg_n apply). Older
-        # templates lack the column -> default 'lf' (current behavior). Read by
-        # header name, so column position is version-independent.
+        # front, kr0/h0 apply), 'vg' (van Genuchten) or 'gard' (Gardner, v14+).
+        # The last two share the a/n parameter pair. Older templates lack the
+        # column -> default 'lf' (current behavior). Read by header name, so
+        # column position is version-independent.
         unsat_raw = row.get('unsat', 'lf')
         unsat_val = str(unsat_raw).strip().lower() if (
             pd.notna(unsat_raw) and str(unsat_raw).strip().lower() not in ('', 'nan')
         ) else 'lf'
-        if unsat_val not in ('lf', 'vg'):
+        if unsat_val not in ('lf', 'vg', 'gard'):
             unsat_val = 'lf'
 
         # Excel row number: first data row sits just below the located header
@@ -584,11 +599,11 @@ def load_slope_data(filepath):
         # Strength model. Blank is allowed -- seep-only material rows carry no
         # strength -- but slice.py raises if a blank one reaches a failure surface.
         option_val = _choice(row.get('option'), '')
-        if option_val not in ('', 'mc', 'cp', 'pow'):
+        if option_val not in ('', 'mc', 'cp', 'pow', 'hb'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized strength option option='{option_val}'. "
-                "Expected one of: mc, cp, pow."
+                "Expected one of: mc, cp, pow, hb."
             )
 
         # v12 columns, read by header name. Older templates lack them entirely:
@@ -619,6 +634,31 @@ def load_slope_data(filepath):
                 f"option='pow' but pow_a ({pow_a_val}) and pow_b ({pow_b_val}) must both "
                 "be positive for the envelope tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c.")
 
+        # Generalized Hoek-Brown (v14). mb/s/a are DERIVED from GSI/mi/D at use
+        # time (xslope.hoekbrown), so only the four field-observable inputs are
+        # entered. GSI is defined on (0, 100] and D on [0, 1]; sigma_ci and mi
+        # must be positive or the envelope collapses.
+        hb_sci_val = _num(row.get('hbsci', 0))
+        hb_gsi_val = _num(row.get('hbgsi', 0))
+        hb_mi_val = _num(row.get('hbmi', 0))
+        hb_d_val = _num(row.get('hbd', 0))
+        if option_val == 'hb':
+            if hb_sci_val <= 0 or hb_mi_val <= 0:
+                raise ValueError(
+                    f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
+                    f"option='hb' but hb_sci ({hb_sci_val}) and hb_mi ({hb_mi_val}) must "
+                    "both be positive (intact strength and the intact Hoek-Brown constant).")
+            if not (0 < hb_gsi_val <= 100):
+                raise ValueError(
+                    f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
+                    f"option='hb' but has hb_gsi = {hb_gsi_val}. The Geological Strength "
+                    "Index must lie in (0, 100].")
+            if not (0 <= hb_d_val <= 1):
+                raise ValueError(
+                    f"Material '{material_name}' (mat sheet, Excel row {excel_row}) selects "
+                    f"option='hb' but has hb_d = {hb_d_val}. The disturbance factor must "
+                    "lie in [0, 1] (0 = undisturbed, 1 = heavily blast-damaged).")
+
         materials.append({
             "name": str(material_name).strip(),
             "gamma": gamma_val,
@@ -648,10 +688,22 @@ def load_slope_data(filepath):
             "unsat": unsat_val,
             "kr0" : _num(row.get('kr0', 0)),
             "h0" : _num(row.get('h0', 0)),
-            "vg_a": _num(row.get('vga', 0)),
-            "vg_n": _num(row.get('vgn', 0)),
+            # v14: 'a'/'n' (law-agnostic); pre-v14: 'vga'/'vgn'. Same two slots
+            # feed van Genuchten and Gardner, exactly as SEEP2D's uspar(1..2) do.
+            # The OLD names are checked first because they are unambiguous: on a
+            # pre-v14 sheet the bare 'n' column is POISSON'S RATIO, not the curve
+            # exponent, so preferring 'n' there would silently read nu into vg_n.
+            "vg_a": _num(_pick(row, 'vga', 'a')),
+            "vg_n": _num(_pick(row, 'vgn', 'n')),
             "E": _num(row.get('E', 0)),
-            "nu": _num(row.get('n', 0))
+            # v14 renamed this to 'nu'; pre-v14 sheets call it 'n'
+            "nu": _num(_pick(row, 'nu', 'n')),
+            # Generalized Hoek-Brown (v14). mb/s/a are DERIVED from GSI/mi/D by
+            # the Hoek-Brown 2002 relations, not entered — nobody has them to hand.
+            "hb_sci": hb_sci_val,
+            "hb_gsi": hb_gsi_val,
+            "hb_mi": hb_mi_val,
+            "hb_d": hb_d_val,
         })
 
     # === UNIFIED POLYGON REPRESENTATION ===
@@ -1465,9 +1517,14 @@ MAT_NUM_HEADERS = [
     ('ru', 'ru'),
     ('sigma_gamma', 's(g)'), ('sigma_c', 's(c)'), ('sigma_phi', 's(f)'),
     ('sigma_cp', 's(c/p)'), ('sigma_d', 's(d)'), ('sigma_psi', 's(psi)'),
+    ('hb_sci', 'hb_sci'), ('hb_gsi', 'hb_gsi'),
+    ('hb_mi', 'hb_mi'), ('hb_d', 'hb_d'),
     ('k1', 'k1'), ('k2', 'k2'), ('alpha', 'alpha'),
-    ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'vga'), ('vg_n', 'vgn'),
-    ('E', 'E'), ('nu', 'n'),
+    # v14: the curve-parameter pair is law-agnostic ('a'/'n'), serving both van
+    # Genuchten and Gardner; Poisson's ratio moved off 'n' to 'nu' to break the
+    # header collision that created.
+    ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'a'), ('vg_n', 'n'),
+    ('E', 'E'), ('nu', 'nu'),
 ]
 # Optional numerics: written only when set (None must stay a blank cell -- e.g.
 # a blank gsat means "fall back to gamma", which 0.0 would not).
@@ -1666,6 +1723,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # older template is skipped.
     mat_header_row, mat_cols = _read_mat_header_cols(filepath)
     mat = {}
+    # mat_cols is keyed underscore-insensitively (see _read_mat_header_cols), so every
+    # lookup must normalize the declared header the same way -- otherwise a header
+    # written with an underscore ('hb_sci') misses its column and the writer SILENTLY
+    # skips it, zeroing the property on the next load.
+    def _col(header):
+        return mat_cols.get(header.replace('_', ''))
+
     for idx, material in enumerate(slope_data.get('materials', [])):
         row = mat_header_row + 1 + idx
         if 'mat' in mat_cols:
@@ -1675,19 +1739,19 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         # option / u / unsat are strings; leave the cell blank when unset (the loader
         # reads an empty cell back as a default, so writing literal text is noise).
         for key, header in MAT_STR_HEADERS:
-            col = mat_cols.get(header)
+            col = _col(header)
             if col is None:
                 continue
             val = material.get(key)
             if val is not None and str(val).strip().lower() not in ('', 'nan'):
                 mat[cell_ref(row, col)] = str(val)
         for key, header in MAT_NUM_HEADERS:
-            col = mat_cols.get(header)
+            col = _col(header)
             if col is None:
                 continue
             mat[cell_ref(row, col)] = _f(material.get(key, 0) or 0)
         for key, header in MAT_OPT_NUM_HEADERS:
-            col = mat_cols.get(header)
+            col = _col(header)
             if col is None:
                 continue
             val = material.get(key)

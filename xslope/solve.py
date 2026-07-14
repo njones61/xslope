@@ -21,6 +21,7 @@ from shapely.geometry import LineString, Point
 from tabulate import tabulate
 
 from .advanced import rapid_drawdown
+from .hoekbrown import hb_tangent
 
 def solve_selected(method_name, slice_df, rapid=False):
     """
@@ -2194,8 +2195,35 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
 
 
 # =====================================================================
-# Power-curve (nonlinear) strength coupling — template v12 option 'pow'
+# Nonlinear strength coupling — options 'pow' (v12) and 'hb' (v14)
+#
+# Both envelopes are curved, so the shear strength depends on the base normal
+# stress, which itself depends on FS. Each is handled the same way: linearize
+# the envelope at the current sigma'_n into an instantaneous Mohr-Coulomb
+# tangent (c_i, phi_i), solve, recompute sigma'_n, repeat until FS is
+# stationary (_with_nonlinear_strength).
 # =====================================================================
+
+def _hb_update_strength(slice_df, sigma_n):
+    """Re-linearize the generalized Hoek-Brown envelope at the current base
+    normal stress into an instantaneous tangent (c_i, phi_i) for every
+    hb-flagged slice (Balmer transformation; see xslope.hoekbrown)."""
+    m = slice_df['hb_flag'].values.astype(bool)
+    if not m.any():
+        return
+    s = np.maximum(np.asarray(sigma_n, dtype=float)[m], 0.0)
+    c_i, phi_i = hb_tangent(s,
+                            slice_df['hb_sci'].values[m],
+                            slice_df['hb_gsi'].values[m],
+                            slice_df['hb_mi'].values[m],
+                            slice_df['hb_d'].values[m])
+    c_vals = slice_df['c'].values.copy()
+    phi_vals = slice_df['phi'].values.copy()
+    c_vals[m] = c_i
+    phi_vals[m] = phi_i
+    slice_df['c'] = c_vals
+    slice_df['phi'] = phi_vals
+
 
 def _pow_update_strength(slice_df, sigma_n):
     """Re-linearize the power-curve envelope tau = a*(sigma'_n + d)^b + c_p at
@@ -2224,18 +2252,26 @@ def _pow_update_strength(slice_df, sigma_n):
     slice_df['phi'] = phi_vals
 
 
+def _has_nonlinear(slice_df):
+    """True if any slice sits on a curved envelope ('pow' or 'hb')."""
+    for flag in ('pow_flag', 'hb_flag'):
+        if flag in slice_df.columns and slice_df[flag].any():
+            return True
+    return False
+
+
 def _with_nonlinear_strength(method):
-    """Outer fixed-point wrapper giving every solution method power-curve
-    support: solve with the current tangent strengths, update sigma'_n from the
-    method's n_eff, re-tangent, repeat until FS is stationary. slice_df arrives
-    seeded with tangent strengths at a no-FS normal-stress estimate (slice.py),
-    so the first inner solve is already close. Damped (50%) sigma updates
-    prevent oscillation on strongly curved envelopes."""
+    """Outer fixed-point wrapper giving every solution method curved-envelope
+    support ('pow' and 'hb'): solve with the current tangent strengths, update
+    sigma'_n from the method's n_eff, re-tangent, repeat until FS is stationary.
+    slice_df arrives seeded with tangent strengths at a no-FS normal-stress
+    estimate (slice.py), so the first inner solve is already close. Damped (50%)
+    sigma updates prevent oscillation on strongly curved envelopes."""
     import functools
 
     @functools.wraps(method)
     def wrapped(slice_df, *args, **kwargs):
-        if 'pow_flag' not in slice_df.columns or not slice_df['pow_flag'].any():
+        if not _has_nonlinear(slice_df):
             return method(slice_df, *args, **kwargs)
         dl = slice_df['dl'].values.astype(float)
         sigma = None
@@ -2247,12 +2283,15 @@ def _with_nonlinear_strength(method):
             n_eff = slice_df['n_eff'].values.astype(float)
             sigma_new = np.where(dl > 0, n_eff / np.where(dl > 0, dl, 1.0), 0.0)
             sigma = sigma_new if sigma is None else 0.5 * sigma + 0.5 * sigma_new
-            _pow_update_strength(slice_df, sigma)
+            if 'pow_flag' in slice_df.columns:
+                _pow_update_strength(slice_df, sigma)
+            if 'hb_flag' in slice_df.columns:
+                _hb_update_strength(slice_df, sigma)
             if fs_prev is not None and abs(res['FS'] - fs_prev) < 1e-4:
                 return ok, res
             fs_prev = res['FS']
-        return False, ("Power-curve strength iteration did not converge in 40 "
-                       "outer iterations (envelope tangent vs normal stress).")
+        return False, ("Nonlinear strength iteration did not converge in 40 outer "
+                       "iterations (envelope tangent vs normal stress).")
     return wrapped
 
 

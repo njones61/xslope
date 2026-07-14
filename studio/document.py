@@ -341,7 +341,7 @@ class ProjectDocument(QObject):
         SLOPE/W models and xslope cannot is returned as caveats rather than dropped
         in silence. REPLACES the current project (callers confirm discard); result is
         unsaved. Returns caveat strings."""
-        from xslope.geostudio import gsz_to_slope_data
+        from xslope.geostudio import gsz_to_slope_data, gsz_style
         from studio.editors import _resync_geometry
 
         sd, caveats = gsz_to_slope_data(gsz, analysis_id)
@@ -350,11 +350,11 @@ class ProjectDocument(QObject):
         self.slope_data = sd
         self.path = None
         self.results.clear()
-        self.style = {}
+        self.style = gsz_style(gsz, analysis_id)   # keep the user's own material colours
         self._undo.clear()
         self._redo.clear()
         self._clean_index = None      # freshly imported, never saved -> dirty
-        self._style_dirty = False
+        self._style_dirty = bool(self.style)   # so the colours reach the sidecar on save
         self._dirty = True
         self.loaded.emit()
         self.dirty_changed.emit(True)

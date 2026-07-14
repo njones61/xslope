@@ -232,18 +232,6 @@ def read_gsz(path):
             "option": _text(entry.find("ResultInputInfo"), "Option", "None"),
         }
 
-    # Piezometric surfaces live on the StabilityItem, not the geometry, and are
-    # polylines through the shared Points table — they store point IDs, not
-    # coordinates. <MaterialUsesPiezs> says which materials actually draw pore
-    # pressure from which surface.
-    piezo = {}
-    for ps in root.iter("PiezometricSurface"):
-        pid = _text(ps, "ID")
-        if pid is None:
-            continue
-        piezo[int(pid)] = [int(dp.text) for dp in ps.findall("./DataPoints/DataPoint")
-                           if dp.text]
-
     # Reinforcement product library (top level, shared across analyses).
     reinforcements = {}
     for rf in root.findall("./Reinforcements/Reinforcement"):
@@ -281,6 +269,19 @@ def read_gsz(path):
             if d.get("Number") and d.get("X") is not None:
                 local[int(d.get("Number"))] = (float(d.get("X")), float(d.get("Y")))
 
+        # Piezometric surfaces. They index this analysis's LOCAL DataPoints -- the same
+        # list the tension crack, surcharges and reinforcement index -- NOT the shared
+        # geometry <Points> table. Reading them against the geometry is silent nonsense:
+        # in one verification model it produced a water table that doubled back on
+        # itself, and pore pressures low enough to lift the factor of safety by 10%.
+        piezo = {}
+        for ps in entry.findall("./PiezometricSurfaces/PiezometricSurface"):
+            pid = _text(ps, "ID")
+            if pid is None:
+                continue
+            ids = [int(dp.text) for dp in ps.findall("./DataPoints/DataPoint") if dp.text]
+            piezo[int(pid)] = [local[i] for i in ids if i in local]
+
         tc = entry.find("TensionCrack")
         tcrack = None
         if tc is not None:
@@ -301,6 +302,26 @@ def read_gsz(path):
                 surcharges.append({"pressure": _num(sc, "Pressure", 0.0),
                                    "coords": coords})
 
+        # Line loads. The point is the local DataPoint with the same ID; the direction is
+        # a trend/plunge pair — plunge is the angle BELOW horizontal, trend picks which
+        # way along x. xslope wants an angle measured counter-clockwise from +x, so a
+        # plunge of 90 (straight down) becomes -90, which is xslope's own default.
+        line_loads = []
+        for lp_ in entry.findall("./LineLoadPoints/LineLoadPoint"):
+            pid = _text(lp_, "ID")
+            ll = lp_.find("LineLoad")
+            if pid is None or ll is None or int(pid) not in local:
+                continue
+            value = _num(ll, "Value", 0.0)
+            d = ll.find("Direction")
+            plunge = float(d.get("Plunge")) if (d is not None and d.get("Plunge")) else 90.0
+            trend = float(d.get("Trend")) if (d is not None and d.get("Trend")) else 0.0
+            angle = -plunge if abs(trend) < 90 else -(180.0 - plunge)
+            x, y = local[int(pid)]
+            if value > 0:
+                line_loads.append({"x": x, "y": y, "P": value, "angle": angle,
+                                   "label": f"Line load {pid}"})
+
         reinf_lines = []
         for rl in entry.findall("./ReinforcementLines/ReinforcementLine"):
             p1, p2 = rl.get("Point1Id"), rl.get("Point2Id")
@@ -316,10 +337,12 @@ def read_gsz(path):
             "k_seismic": float(kh) if kh else 0.0,
             "k_seismic_v": float(kv) if kv else 0.0,
             "material_piezo": uses,          # material ID -> piezometric surface ID
+            "piezo": piezo,                  # piezometric surface ID -> [(x, y), ...]
             "points": local,
             "tcrack": tcrack,
             "surcharges": surcharges,
             "reinf_lines": reinf_lines,
+            "line_loads": line_loads,
             # Everything GeoStudio put on this analysis, so gsz_to_slope_data can
             # report anything it does not import instead of dropping it in silence.
             "elements": [c.tag for c in entry],
@@ -332,7 +355,7 @@ def read_gsz(path):
     return {
         "path": str(path), "zip": zf, "analyses": analyses, "points": points,
         "regions": regions, "lines": glines, "materials": materials,
-        "contexts": contexts, "water": water, "piezo": piezo,
+        "contexts": contexts, "water": water,
         "stability": stability, "kfns": kfns, "bcs": bcs, "hyd_bcs": hyd_bcs,
         "reinforcements": reinforcements, "unit_system": unit_system,
     }
@@ -360,15 +383,24 @@ _ENTRY_ELEMENTS = {
     "InitialInputInfo": None,
     "ResultInputInfo": None,
     "SlipSurface": None,           # the search — reported separately, deliberately skipped
+    "ReinforcementLines": None,
+    "LineLoadPoints": None,
     # --- present, load-bearing, and NOT imported ---
-    # Each of these changes the factor of safety. Reinforcement is deliberately not
-    # guessed at: GeoStudio's nails/geosynthetics carry a pullout law, an out-of-plane
-    # spacing and a force distribution that do not line up with xslope's model 1:1, and
-    # a wrong reinforcement force is worse than an obviously absent one.
-    "ReinforcementLines": "reinforcement (nails / geosynthetics / anchors)",
-    "ReinforcementSets": "reinforcement sets",
-    "LineLoadPoints": "line loads",
+    "ReinforcementSets": "reinforcement sets (out-of-plane staging groups)",
 }
+
+# How GeoStudio says the tension crack is defined. 'Surface' means "by the line whose
+# points follow", which is the only form xslope can convert. A crack that is switched
+# OFF has NO <TensionOption> at all -- but GeoStudio keeps its geometry, so the presence
+# of a crack line means nothing on its own. Anything else here is reported, not guessed.
+_TCRACK_OPTIONS = {"Surface"}
+
+# SLOPE/W's SlipOrigSearchMethod, in the solved results: which searches produce a real
+# circle. 5 is entry-and-exit; 6 inherits the surface from a parent analysis, which is a
+# circle only if the parent's was. 2 (fully specified) and 4 (block) are not circles at
+# all -- though SLOPE/W still writes a centre and radius for them, which is the trap.
+# Callers must confirm a 6 really is a circle; read_gsz_results cannot know.
+_CIRCULAR_SEARCHES = {"5", "6"}
 
 
 def list_analyses(gsz):
@@ -445,6 +477,71 @@ def _circle_usable(slope_data, circle):
         return False
 
 
+# GeoStudio reinforcement Type -> xslope (type, dir, appl). These mirror fileio's
+# _TYPE_PRESETS, which is local to load_slope_data and so cannot be imported: 'axial'
+# acts along the bar, 'tangent' reorients to the slip surface; 'passive' means the force
+# is divided by the factor of safety (an ultimate capacity), 'active' means it is not.
+#
+# The file does NOT record a direction or an F-of-S dependence: GeoStudio implies both
+# from the Type. So does this table, and each row is measured against SLOPE/W's own
+# factor of safety rather than reasoned about -- see run_gsz_corpus().
+_REINF_TYPE = {
+    "Nail":         ("nail",         "axial",   "active"),
+    "Geosynthetic": ("geosynthetic", "axial",   "active"),
+    "Anchor":       ("anchor",       "axial",   "active"),
+    "Tieback":      ("tieback",      "axial",   "active"),
+}
+
+
+def _reinforcement(product, line, ground_surface):
+    """One GeoStudio reinforcement line -> one xslope ``reinforcement_lines`` entry.
+
+    The two models line up more closely than they first appear. xslope's capacity at a
+    point is ``cap_i = min(t_max, tend_i + t_max * d_i / lp_i)`` from each end i, taking
+    the smaller — i.e. the force available at the end itself, plus bond resistance earned
+    over the length d_i back to that end. ``t_max / lp_i`` IS a pullout rate, so:
+
+        lp = t_max / (pullout resistance per unit length)
+
+    reproduces GeoStudio's "pullout resistance x embedded length" exactly, and the plate
+    (facing) capacity is the end capacity ``tend`` at whichever end is at the face.
+
+    Everything is stored PER UNIT WIDTH: GeoStudio quotes per-element values with an
+    out-of-plane Spacing, and xslope's ``reinforcement_lines`` are already divided by it.
+    """
+    spacing = product.get("spacing") or 1.0
+    t_max = (product.get("tensile") or 0.0) / spacing
+    plate = (product.get("plate") or 0.0) / spacing
+    rate = (product.get("pullout") or 0.0) / spacing      # force per unit length
+    lp = (t_max / rate) if rate > 0 else 0.0              # 0 => that end is fully anchored
+
+    p1, p2 = line["p1"], line["p2"]
+    # The plate/facing sits at the end that is AT the face — the endpoint on (or nearest)
+    # the ground surface. The other end is buried and develops force only by bond.
+    if ground_surface is not None and not ground_surface.is_empty:
+        from shapely.geometry import Point
+        d1 = ground_surface.distance(Point(*p1))
+        d2 = ground_surface.distance(Point(*p2))
+        face_is_1 = d1 <= d2
+    else:
+        face_is_1 = True
+
+    xtype, xdir, xappl = _REINF_TYPE.get(product.get("type") or "",
+                                         ("", "tangent", "active"))
+    return {
+        "x1": p1[0], "y1": p1[1], "x2": p2[0], "y2": p2[1],
+        "t_max": t_max,
+        "t_res": float("nan"),          # GeoStudio has no post-peak drop: hold capacity
+        "lp1": lp, "lp2": lp,
+        "tend1": plate if face_is_1 else 0.0,
+        "tend2": 0.0 if face_is_1 else plate,
+        "E": float("nan"), "area": float("nan"),
+        "spacing": 1.0,                 # already per unit width — never divide twice
+        "label": product.get("name") or "reinforcement",
+        "type": xtype, "dir": xdir, "appl": xappl,
+    }
+
+
 def _y_on(line, x):
     """Elevation of a left-to-right polyline at x, or None if x is off its ends."""
     coords = list(line.coords)
@@ -458,23 +555,30 @@ def _y_on(line, x):
     return None
 
 
-def ponded_water_dload(ground_surface, piezo_line, gamma_water):
-    """Water standing above the ground surface, as a distributed load.
+def material_above_ground_dload(ground_surface, upper_line, unit_weight):
+    """The weight of whatever fills the gap between a line and the ground, as dloads.
 
-    GeoStudio has no ponded-water object: where the piezometric line rises above the
-    ground, SLOPE/W simply takes the water's weight as a surcharge. xslope needs that
-    surcharge to exist explicitly, so importing the piezo line alone would quietly lose
-    the weight of the reservoir.
+    Two GeoStudio things are this same object, and both would otherwise be lost:
 
-    Returns a list of dload blocks — one per submerged stretch — each a list of
-    ``{'X','Y','Normal'}`` along the ground surface, with ``Normal`` the water pressure
-    gamma_w * depth (zero at the waterline, so the load tapers out correctly).
+    * **Ponded water.** GeoStudio has no ponded-water object -- where the piezometric
+      line rises above the ground, SLOPE/W simply carries the water's weight. Pass the
+      piezo line and gamma_w.
+    * **A surcharge.** GeoStudio's ``<Surcharge>`` is a body of fill between a drawn
+      line and the ground, and its ``<Pressure>`` is the fill's UNIT WEIGHT, not a
+      pressure -- so the load varies with how deep the fill is. (Verified against
+      SLOPE/W's own per-slice surcharge forces: a 20 kN/m3 fill under a line running
+      1 m to 2 m above flat ground gives 300 kN/m, not 20 x 10 = 200.)
+
+    Returns a list of dload blocks -- one per stretch where the line is above ground --
+    each a list of ``{'X','Y','Normal'}``, with ``Normal`` the pressure
+    ``unit_weight * depth``, zero at the crossing so the load tapers out correctly.
     """
     from shapely.geometry import LineString
 
-    if not piezo_line or ground_surface is None or ground_surface.is_empty:
+    if not upper_line or ground_surface is None or ground_surface.is_empty:
         return []
-    piezo = LineString(piezo_line)
+    piezo = LineString(upper_line)
+    gamma_water = unit_weight
 
     # Sample where either line has a vertex, so no break in either is missed.
     xs = sorted({x for x, _ in ground_surface.coords} | {x for x, _ in piezo.coords})
@@ -506,6 +610,15 @@ def ponded_water_dload(ground_surface, piezo_line, gamma_water):
     if len(run) >= 2:
         blocks.append(run)
     return blocks
+
+
+def ponded_water_dload(ground_surface, piezo_line, gamma_water):
+    """Water standing above the ground surface, as a distributed load.
+
+    A thin name for :func:`material_above_ground_dload` -- ponded water is just the
+    material above the ground being water.
+    """
+    return material_above_ground_dload(ground_surface, piezo_line, gamma_water)
 
 
 def _blank_material(name):
@@ -571,6 +684,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
             "one of the others in the file.)")
 
     water = gsz["water"].get(analysis_id, {})
+    stab = gsz["stability"].get(analysis_id, {})
     gamma_water = water.get("gamma_water", _GAMMA_W_METRIC)
     units = _detect_units(gamma_water, gsz.get("unit_system"))
 
@@ -636,11 +750,11 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
     # draw from it — a material not listed there is dry even when a surface exists.
     piezo_line = []
     option = water.get("option") or "None"
-    uses = gsz["stability"].get(analysis_id, {}).get("material_piezo", {})
+    uses = stab.get("material_piezo", {})
+    surfaces = stab.get("piezo", {})
     if option == "PiezoSurface":
-        if gsz["piezo"]:
-            ids = next(iter(gsz["piezo"].values()))
-            piezo_line = [pts[i] for i in ids if i in pts]
+        if surfaces:
+            piezo_line = list(next(iter(surfaces.values())))
             for mid, mat in zip(used, materials):
                 # No MaterialUsesPiezs at all -> the surface applies to everything.
                 if not uses or mid in uses:
@@ -651,18 +765,29 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
                     f"material(s) {', '.join(repr(d) for d in dry)} are not connected "
                     f"to the piezometric surface in GeoStudio — imported with no pore "
                     f"pressure")
-            if len(gsz["piezo"]) > 1:
+            if len(surfaces) > 1:
                 caveats.append(
-                    f"the file defines {len(gsz['piezo'])} piezometric surfaces; "
+                    f"the file defines {len(surfaces)} piezometric surfaces; "
                     f"xslope takes one, so the first was imported")
         else:
             caveats.append("the analysis asks for a piezometric surface but the file "
                            "defines none — pore pressure imported as zero")
+    elif option == "Parent":
+        # The water condition is a whole head field computed by a parent SEEP/W run.
+        # It is not just pore pressure: SLOPE/W also raises the water standing against
+        # the slope from that same field, and that load is often the bigger half. In
+        # GeoStudio's own rapid-drawdown example, dropping both costs 13% of the FS.
+        caveats.append(
+            "THE FACTOR OF SAFETY WILL BE WRONG: this analysis takes its water from a "
+            "parent SEEP/W analysis, and xslope imports neither the pore pressure nor "
+            "the weight of the water standing against the slope. The soil and geometry "
+            "are right; the water is simply absent. Set a piezo line or a seepage "
+            "solution before you trust any number this model produces")
     elif option not in ("None", "", None):
         caveats.append(
-            f"pore pressure comes from SLOPE/W's '{option}' option, which xslope "
-            f"cannot read — imported as zero; set a piezo line, ru, or a seepage "
-            f"solution before solving")
+            f"THE FACTOR OF SAFETY WILL BE WRONG: pore pressure comes from SLOPE/W's "
+            f"'{option}' option, which xslope cannot read — imported as zero. Set a "
+            f"piezo line, ru, or a seepage solution before solving")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 
@@ -703,53 +828,84 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
     # so the model arrives complete and directly comparable.
     analysis = next(a for a in gsz["analyses"] if a["id"] == analysis_id)
     trials = read_gsz_results(gsz, analysis["name"]) if critical_surface else []
-    best = min(trials, key=lambda t: t["fs"]) if trials else None
+    # Only circular trials. SLOPE/W writes a centre and radius even for block and
+    # fully-specified surfaces, but they describe a circle FITTED to the surface, not
+    # the surface it solved -- importing one would silently swap the mechanism.
+    circular = [t for t in trials if t["circular"]]
+    best = min(circular, key=lambda t: t["fs"]) if circular else None
+    if trials and not circular:
+        caveats.append(
+            "SLOPE/W's critical surface here is non-circular (a block or fully "
+            "specified surface), which is not a trial circle xslope can take — no "
+            "failure surface was imported; define one, or run a search")
 
     # Does SLOPE/W's critical circle actually fit this model? It may not: with an
     # impenetrable bedrock, SLOPE/W truncates the circle ALONG the bedrock and reports
     # the FS of that composite surface. The circle itself then cuts below our domain
     # floor, and importing it would hand the user a model that cannot be solved.
-    if best is not None:
-        trial = {"Xo": best["xo"], "Yo": best["yo"], "R": best["r"],
-                 "Depth": best["yo"] - best["r"]}
-        if not _circle_usable(slope_data, trial):
-            caveats.append(
-                f"xslope could not build a slip surface from SLOPE/W's critical circle "
-                f"(SLOPE/W's FS = {best['fs']:.3f}, centre ({best['xo']:.1f}, "
-                f"{best['yo']:.1f}), R = {best['r']:.1f}), so NO failure surface was "
-                f"imported — define one, or run a search. Common causes: SLOPE/W scored a "
-                f"COMPOSITE surface (the circle truncated along an impenetrable "
-                f"boundary), or the mechanism is one xslope's slice generator rejects")
-            best = None
+    # SLOPE/W's own critical circle may not be one xslope can build -- with an
+    # impenetrable bedrock SLOPE/W truncates the circle ALONG the bedrock and scores
+    # that COMPOSITE surface, and the circle itself then cuts below our domain floor. So
+    # walk its trials from the most critical up and take the first that does build: the
+    # model still arrives complete and comparable, just on a slightly less severe circle.
+    chosen = rejected = None
+    for t in sorted(circular, key=lambda t: t["fs"]):
+        trial = {"Xo": t["xo"], "Yo": t["yo"], "R": t["r"], "Depth": t["yo"] - t["r"]}
+        if _circle_usable(slope_data, trial):
+            chosen = t
+            break
+        if rejected is None:
+            rejected = t
 
-    if best is not None:
-        slope_data["circles"] = [{"Xo": best["xo"], "Yo": best["yo"], "R": best["r"],
-                                  "Depth": best["yo"] - best["r"]}]
+    if chosen is not None:
+        slope_data["circles"] = [{"Xo": chosen["xo"], "Yo": chosen["yo"], "R": chosen["r"],
+                                  "Depth": chosen["yo"] - chosen["r"]}]
         slope_data["circular"] = True
         caveats.append(
-            f"the failure surface is SLOPE/W's own critical circle (its FS = "
-            f"{best['fs']:.3f} by {analysis['method'] or 'its method'}), not a search "
+            f"the failure surface is a trial circle of SLOPE/W's own (its FS = "
+            f"{chosen['fs']:.3f} by {analysis['method'] or 'its method'}), not a search "
             f"— it is imported so the model is complete and the two programs can be "
             f"compared on the same circle; run a search to find xslope's own critical "
             f"surface")
+        if rejected is not None:
+            caveats.append(
+                f"note that SLOPE/W's MOST critical surface (its FS = "
+                f"{rejected['fs']:.3f}) is not a circle xslope can build — most likely "
+                f"a COMPOSITE surface, truncated along the impenetrable bedrock. The "
+                f"circle imported above is the most critical one that does build, so "
+                f"its FS is higher than SLOPE/W's")
+    elif circular:
+        caveats.append(
+            f"none of SLOPE/W's {len(circular)} trial circles can be built on this "
+            f"model (its critical FS = {rejected['fs']:.3f}), so NO failure surface was "
+            f"imported — define one, or run a search. Usually this means SLOPE/W scored "
+            f"COMPOSITE surfaces, truncated along an impenetrable boundary")
     else:
         caveats.append(
             "no failure surface was imported — SLOPE/W's search definition has no "
-            "xslope equivalent, and this file carries no solved results to take a "
-            "critical circle from; define circles or a non-circular surface before "
-            "solving (an input file with no surface will not re-load)")
-
-    stab = gsz["stability"].get(analysis_id, {})
+            "xslope equivalent, and this file carries no solved circles to take one "
+            "from; define circles or a non-circular surface before solving (an input "
+            "file with no surface will not re-load)")
 
     # --- distributed loads -------------------------------------------------------
-    # GeoStudio surcharges map straight onto xslope dloads: a pressure over a run of
-    # ground, normal to the surface.
+    # A GeoStudio surcharge is NOT a uniform pressure, despite its <Pressure> tag: it is
+    # a body of fill between the line you draw and the ground, and <Pressure> is that
+    # fill's UNIT WEIGHT. So the load grows with the depth of the fill, and importing it
+    # as a constant pressure is wrong everywhere the wedge is not exactly 1 deep.
     dloads = []
+    n_sc = 0
     for sc in stab.get("surcharges", []):
-        dloads.append([{"X": x, "Y": y, "Normal": sc["pressure"]}
-                       for x, y in sc["coords"]])
-    if dloads:
-        caveats.append(f"{len(dloads)} surcharge load(s) imported as distributed loads")
+        blocks = material_above_ground_dload(ground_surface, sc["coords"], sc["pressure"])
+        dloads.extend(blocks)
+        n_sc += bool(blocks)
+        if not blocks:
+            caveats.append(
+                f"a surcharge of unit weight {sc['pressure']:g} does not sit above the "
+                f"ground surface anywhere, so it carries no load — NOT imported")
+    if n_sc:
+        caveats.append(f"{n_sc} surcharge load(s) imported as distributed loads — "
+                       f"GeoStudio's surcharge is a wedge of fill above the ground, so "
+                       f"the load varies with its depth")
 
     # Ponded water. GeoStudio stores no such object — where the piezometric line rises
     # above the ground, SLOPE/W just takes the water's weight as a surcharge. xslope
@@ -770,6 +926,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
     # GeoStudio's crack is an arbitrary polyline; xslope's is a uniform depth below the
     # ground surface. Convert by depth, and say so when the two cannot agree.
     tc = stab.get("tcrack")
+    opt = (tc.get("option") or "") if tc else ""
+    if tc and not opt:
+        # A crack that is switched OFF still keeps its geometry: GeoStudio drops the
+        # <TensionOption> element and leaves the DataPoints behind. Applying that
+        # leftover line as a real crack is silently wrong -- in a c'=0 soil a
+        # water-filled crack is pure driving force.
+        tc = None
+    elif tc and opt not in _TCRACK_OPTIONS:
+        caveats.append(f"GeoStudio defines the tension crack by '{opt}', which xslope "
+                       f"does not recognise — the crack was NOT imported, so the factor "
+                       f"of safety will be too high")
+        tc = None
+
     if tc and tc.get("coords"):
         depths = []
         for x, y in tc["coords"]:
@@ -790,14 +959,39 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
                 caveats.append(f"tension crack imported at depth {depth:.2f}"
                                + (f", {100*(tc.get('pct_water') or 0):.0f}% full of water"
                                   if tc.get("pct_water") else ""))
-            if tc.get("angle") is not None:
-                caveats.append(
-                    f"the tension crack is inclined ({tc['angle']:g} degrees) in "
-                    f"GeoStudio — xslope's crack is vertical, so the inclination was "
-                    f"dropped")
         else:
             caveats.append("GeoStudio defines a tension crack, but it does not sit "
                            "below the ground surface — it was NOT imported")
+
+    # --- reinforcement -----------------------------------------------------------
+    from .fileio import build_reinforce_lines
+
+    rlines = []
+    for rl in stab.get("reinf_lines", []):
+        product = gsz["reinforcements"].get(rl["reinforcement"])
+        if product is None:
+            caveats.append("a reinforcement line references a product the file does not "
+                           "define — skipped")
+            continue
+        rlines.append(_reinforcement(product, rl, ground_surface))
+    if rlines:
+        slope_data["reinforcement_lines"] = rlines
+        slope_data["reinforce_lines"] = build_reinforce_lines(rlines)
+        kinds = sorted({r["type"] or "generic" for r in rlines})
+        caveats.append(
+            f"{len(rlines)} reinforcement line(s) imported ({', '.join(kinds)}). "
+            f"GeoStudio's pullout resistance became xslope's bond length "
+            f"(Lp = Tmax / pullout rate) and its plate capacity the end capacity at the "
+            f"face — CHECK THE FORCES against GeoStudio before relying on the result")
+
+    # --- line loads --------------------------------------------------------------
+    lloads = []
+    for ll in stab.get("line_loads", []):
+        lloads.append({"x": ll["x"], "y": ll["y"], "P": ll["P"],
+                       "angle": ll["angle"], "label": ll["label"]})
+    if lloads:
+        slope_data["line_loads"] = lloads
+        caveats.append(f"{len(lloads)} line load(s) imported")
 
     # Anything GeoStudio attached to this analysis that we did NOT take. Driven off the
     # exhaustive _ENTRY_ELEMENTS table, so an element we have never seen is reported as
@@ -820,21 +1014,71 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True):
             f"a vertical seismic coefficient ({stab['k_seismic_v']:g}) is set in "
             f"GeoStudio — xslope models only the horizontal one, so it was dropped")
 
-    caveats.append(f"model read as {units} units "
-                   f"({'kN/m3, m, kPa' if units == 'metric' else 'lb/ft3, ft, psf'}) "
-                   f"— confirm the units match your template; xslope does not convert "
-                   f"between unit systems")
+    # A statement of fact, not a warning. There is nothing to convert and nothing to
+    # confirm: xslope has no unit setting anywhere, and an import builds a whole new
+    # model whose geometry, strengths and unit weight of water all come out of this one
+    # file. They are consistent with each other by construction. All the user needs to
+    # know is which system the numbers they are about to look at are in.
+    caveats.append(
+        f"this model is in {units} units "
+        f"({'kN/m3, m, kPa' if units == 'metric' else 'lb/ft3, ft, psf'}) — xslope is "
+        f"unit-agnostic and imports them as they are, so results come back in the same "
+        f"system")
     return slope_data, caveats
+
+
+def gsz_style(gsz, analysis_id=None):
+    """The material colours from a .gsz, as an xslope style sidecar.
+
+    GeoStudio gives every material a colour, and it is how people recognise their own
+    model at a glance -- so a model that comes back in xslope's default palette looks
+    like someone else's. Returns ``{'materials': {'<mat_id>': {'color': '#rrggbb'}}}``,
+    keyed the way :mod:`xslope.style` expects, or ``{}`` if the file names no colours.
+
+    Kept out of ``gsz_to_slope_data`` on purpose: colour is presentation, and
+    ``slope_data`` is the model that gets written to the input file.
+    """
+    if analysis_id is None:
+        analysis_id = gsz["analyses"][0]["id"] if gsz["analyses"] else None
+    assign = gsz["contexts"].get(analysis_id, {})
+    bedrock = {mid for mid, m in gsz["materials"].items() if m["model"] == "Bedrock"}
+
+    # Same ordering rule gsz_to_slope_data uses, so mat_id lines up with the polygons.
+    used = sorted({m for m in assign.values() if m not in bedrock})
+    colors = {}
+    for i, mid in enumerate(used):
+        rgb = _parse_rgb(gsz["materials"][mid].get("color"))
+        if rgb:
+            colors[str(i)] = {"color": "#%02x%02x%02x" % rgb}
+    return {"materials": colors} if colors else {}
+
+
+def _parse_rgb(text):
+    """GeoStudio writes colour as the string ``RGB=(211,201,137)``."""
+    m = re.search(r"RGB=\((\d+),\s*(\d+),\s*(\d+)\)", text or "")
+    if not m:
+        return None
+    r, g, b = (min(255, max(0, int(v))) for v in m.groups())
+    return r, g, b
 
 
 def read_gsz_results(gsz, analysis_name):
     """SLOPE/W's own solved trial slip surfaces for an analysis, if the file has them.
 
-    Returns ``[{'fs','xo','yo','r','weight'}, ...]`` — one entry per trial surface
-    SLOPE/W evaluated, with the factor of safety it computed. Empty if the file was
-    saved unsolved.
+    Returns ``[{'fs','xo','yo','r','weight','circular'}, ...]`` — one entry per trial
+    surface SLOPE/W evaluated, with the factor of safety it computed. Empty if the file
+    was saved unsolved.
 
-    This is not part of the model. It exists so the same circles can be re-solved
+    ``weight`` is SLOPE/W's own weight of the sliding mass, which is worth as much as the
+    factor of safety: it checks the imported geometry and unit weights on their own,
+    without the solver in the way.
+
+    ``circular`` is False for a surface SLOPE/W did not generate as a circle (a block or
+    fully-specified one). Those rows still carry a centre and a radius, but they describe
+    a *fitted* circle, not the surface that was solved -- rebuilding them as circles
+    silently scores the wrong geometry.
+
+    This is not part of the model. It exists so the same surfaces can be re-solved
     in xslope and the two programs' answers compared directly, with no difference
     in search to explain away.
     """
@@ -860,7 +1104,8 @@ def read_gsz_results(gsz, analysis_name):
             weight = float(row.get("SlipWeight") or 0.0)
         except ValueError:
             weight = 0.0
-        out.append({"fs": fs, "xo": xo, "yo": yo, "r": radius, "weight": weight})
+        out.append({"fs": fs, "xo": xo, "yo": yo, "r": radius, "weight": weight,
+                    "circular": row.get("SlipOrigSearchMethod") in _CIRCULAR_SEARCHES})
     return out
 
 
@@ -943,21 +1188,17 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         regions.append({"ids": [_point(xy) for xy in ring],
                         "mat": int(poly["mat_id"]) + 1})       # GeoStudio is 1-based
 
-    # The piezometric surface gets its OWN points, allocated in the order the line
-    # runs, rather than reusing coincident region vertices. GeoStudio expects a
-    # surface's point IDs to ascend along the polyline; reusing a region corner hands
-    # it a low ID out of sequence, and it reports the surface as corrupt.
-    piezo_ids = []
+    # The piezometric surface does NOT live in the geometry. Its points go in the
+    # analysis's own <DataPoints> list -- the local, self-contained one that carries X
+    # and Y and is numbered from 1 -- and the surface indexes THAT. Writing geometry
+    # point IDs here instead makes GeoStudio resolve them against an empty local list,
+    # and the water table silently disappears.
     piezo_line = slope_data.get("piezo_line") or []
+    piezo_ids = list(range(1, len(piezo_line) + 1))
     uses_piezo = any((m.get("u") or "none") == "piezo" for m in materials)
     if piezo_line and not uses_piezo:
         caveats.append("a piezo line is defined but no material uses it — written as "
                        "a piezometric surface anyway")
-    for xy in piezo_line:
-        pid = len(point_id) + 1
-        point_id[("piezo", len(piezo_ids))] = pid     # keyed so it never dedups
-        points[pid] = (round(xy[0], 9), round(xy[1], 9))
-        piezo_ids.append(pid)
 
     other_u = sorted({(m.get("u") or "none") for m in materials} - {"none", "piezo"})
     if other_u:
@@ -1092,6 +1333,11 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     k = float(slope_data.get("k_seismic") or 0.0)
     L.append('  <StabilityItems Len="1">')
     L.append('    <StabilityItem><AnalysisID>1</AnalysisID><Entry>')
+    if piezo_line:
+        L.append(f'      <DataPoints Len="{len(piezo_line)}">')
+        for i, (x, y) in zip(piezo_ids, piezo_line):
+            L.append(f'        <DataPoint Number="{i}" X="{x:.10g}" Y="{y:.10g}" />')
+        L.append('      </DataPoints>')
     L.append(f'      <Seismic Horizontal="{k:.10g}" Vertical="" />' if k else
              '      <Seismic Horizontal="" Vertical="" />')
     if piezo_ids:

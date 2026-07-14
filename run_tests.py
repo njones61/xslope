@@ -1180,6 +1180,14 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/StabilityItems/StabilityItem",
     "/GSIData/StabilityItems/StabilityItem/AnalysisID",
     "/GSIData/StabilityItems/StabilityItem/Entry",
+    # The analysis's LOCAL point list. The piezometric surface, tension crack, surcharges
+    # and reinforcement all index INTO this, by Number — not into the geometry <Points>.
+    "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints",
+    "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints/DataPoint",
+    "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints/DataPoint@Number",
+    "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints/DataPoint@X",
+    "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints/DataPoint@Y",
+    "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints@Len",
     "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs",
     "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs/MaterialUsesPiez",
     "/GSIData/StabilityItems/StabilityItem/Entry/MaterialUsesPiezs/MaterialUsesPiez@ID",
@@ -1216,66 +1224,81 @@ def _write_synthetic_gsz(path):
     region — to exercise the importer.
 
     The fixture is written here rather than shipped because GeoStudio's own sample and
-    verification files are Seequent's copyrighted Materials and must not be committed
-    to this repository. Authoring the XML also pins the exact schema the importer
-    relies on: material assignment lives in <Contexts> per analysis (NOT on the
-    region), and the piezometric surface indexes the shared <Points> table by ID.
+    verification files are Seequent's copyrighted Materials and must not be committed to
+    this repository. Authoring the XML also pins the exact schema the importer relies on
+    -- and every fact below was learned by scoring the importer against SLOPE/W's own
+    answers over a corpus of real files (tools/gsz_corpus.py). Each was silent when
+    wrong, and each cost real accuracy:
+
+      * material assignment lives in <Contexts>, PER ANALYSIS, not on the region;
+      * an undrained material keeps its strength in <Cohesion>, not <CohesionPrime>;
+      * <PiezometricSurfaces> hangs off StabilityItem/Entry, and indexes that analysis's
+        LOCAL <DataPoints> -- not the shared geometry <Points> table (10% of FS);
+      * a tension crack is switched off by DROPPING <TensionOption>; GeoStudio keeps the
+        crack's geometry, so the points alone mean nothing (2% of FS);
+      * a <Surcharge>'s <Pressure> is a UNIT WEIGHT, and the load is the weight of the
+        fill between the drawn line and the ground -- not a uniform pressure (4% of FS);
+      * reinforcement carries no direction: it is implied by <Type>.
     """
     import zipfile
     xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <GSIData Version="11.11" AppVersion="25.2.1.4">
   <FileInfo Title="synthetic" />
-  <Analyses Len="3">
+  <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
+  <Analyses Len="5">
     <Analysis><ID>1</ID><Name>dry</Name><Kind>SLOPE/W</Kind>
       <Method>Morgenstern-Price</Method></Analysis>
     <Analysis><ID>2</ID><Name>wet</Name><Kind>SLOPE/W</Kind>
       <Method>Spencer</Method></Analysis>
     <Analysis><ID>3</ID><Name>loaded</Name><Kind>SLOPE/W</Kind>
       <Method>Spencer</Method></Analysis>
+    <Analysis><ID>4</ID><Name>crack off</Name><Kind>SLOPE/W</Kind>
+      <Method>Spencer</Method></Analysis>
+    <Analysis><ID>5</ID><Name>nailed</Name><Kind>SLOPE/W</Kind>
+      <Method>Spencer</Method></Analysis>
   </Analyses>
   <Geometries Len="1">
     <Geometry><Name>2D</Name>
-      <Points Len="8">
+      <Points Len="6">
         <Point ID="1" X="0"  Y="0" /><Point ID="2" X="60" Y="0" />
         <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
         <Point ID="5" X="20" Y="10" /><Point ID="6" X="0"  Y="10" />
-        <Point ID="7" X="0"  Y="8" /><Point ID="8" X="60" Y="24" />
       </Points>
       <Regions Len="1">
         <Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region>
       </Regions>
-      <PiezometricSurfaces Len="1">
-        <PiezometricSurface><ID>1</ID>
-          <DataPoints Len="2"><DataPoint>7</DataPoint><DataPoint>8</DataPoint></DataPoints>
-        </PiezometricSurface>
-      </PiezometricSurfaces>
     </Geometry>
   </Geometries>
   <Materials Len="3">
-    <Material><ID>1</ID><Name>strong</Name><SlopeModel>MohrCoulomb</SlopeModel>
+    <Material><ID>1</ID><Name>strong</Name><Color>RGB=(211,201,137)</Color>
+      <SlopeModel>MohrCoulomb</SlopeModel>
       <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>25</CohesionPrime>
         <PhiPrime>30</PhiPrime></StressStrain></Material>
-    <Material><ID>2</ID><Name>weak</Name><SlopeModel>MohrCoulomb</SlopeModel>
+    <Material><ID>2</ID><Name>weak</Name><Color>RGB=(0,128,255)</Color>
+      <SlopeModel>MohrCoulomb</SlopeModel>
       <StressStrain><UnitWeight>18</UnitWeight><CohesionPrime>5</CohesionPrime>
         <PhiPrime>20</PhiPrime></StressStrain></Material>
     <Material><ID>3</ID><Name>undrained</Name><SlopeModel>UndrainedPhiZero</SlopeModel>
       <StressStrain><UnitWeight>19</UnitWeight><Cohesion>40</Cohesion></StressStrain></Material>
   </Materials>
-  <Contexts Len="3">
-    <Context><AnalysisID>1</AnalysisID>
-      <GeometryUsesMaterials Len="1">
-        <GeometryUsesMaterial ID="Regions-1" Entry="1" />
-      </GeometryUsesMaterials></Context>
-    <Context><AnalysisID>2</AnalysisID>
-      <GeometryUsesMaterials Len="1">
-        <GeometryUsesMaterial ID="Regions-1" Entry="2" />
-      </GeometryUsesMaterials></Context>
-    <Context><AnalysisID>3</AnalysisID>
-      <GeometryUsesMaterials Len="1">
-        <GeometryUsesMaterial ID="Regions-1" Entry="3" />
-      </GeometryUsesMaterials></Context>
+  <Reinforcements Len="1">
+    <Reinforcement><ID>1</ID><Name>Soil Nails</Name><Type>Nail</Type>
+      <Spacing>2</Spacing><Tensile>100</Tensile><PlateCapacity>60</PlateCapacity>
+      <PulloutResistance>10</PulloutResistance></Reinforcement>
+  </Reinforcements>
+  <Contexts Len="5">
+    <Context><AnalysisID>1</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>2</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="2" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>3</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="3" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>4</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>5</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
   </Contexts>
-  <WaterItems Len="3">
+  <WaterItems Len="5">
     <WaterItem><AnalysisID>1</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>2</AnalysisID>
@@ -1283,32 +1306,77 @@ def _write_synthetic_gsz(path):
         <UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>3</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>4</AnalysisID>
+      <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>5</AnalysisID>
+      <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
   </WaterItems>
-  <StabilityItems Len="3">
+  <StabilityItems Len="5">
     <StabilityItem><AnalysisID>1</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
+
     <StabilityItem><AnalysisID>2</AnalysisID>
-      <Entry><Seismic Horizontal="0.15" Vertical="" /></Entry></StabilityItem>
+      <Entry>
+        <DataPoints Len="2">
+          <DataPoint Number="1" X="0"  Y="8" />
+          <DataPoint Number="2" X="60" Y="24" />
+        </DataPoints>
+        <Seismic Horizontal="0.15" Vertical="" />
+        <PiezometricSurfaces Len="1">
+          <PiezometricSurface><ID>1</ID>
+            <DataPoints Len="2"><DataPoint>1</DataPoint><DataPoint>2</DataPoint></DataPoints>
+            <CapSuction>false</CapSuction><MaxSuction>0</MaxSuction>
+          </PiezometricSurface>
+        </PiezometricSurfaces>
+        <MaterialUsesPiezs Len="1"><MaterialUsesPiez ID="2" UsesID="1" /></MaterialUsesPiezs>
+      </Entry></StabilityItem>
+
     <StabilityItem><AnalysisID>3</AnalysisID>
       <Entry>
-        <Seismic Horizontal="" Vertical="" />
         <DataPoints Len="4">
           <DataPoint Number="1" X="40" Y="26" />
           <DataPoint Number="2" X="60" Y="26" />
-          <DataPoint Number="3" X="42" Y="30" />
-          <DataPoint Number="4" X="58" Y="30" />
+          <DataPoint Number="3" X="42" Y="31" />
+          <DataPoint Number="4" X="58" Y="33" />
         </DataPoints>
+        <Seismic Horizontal="" Vertical="" />
         <TensionCrack>
+          <TensionOption>Surface</TensionOption>
           <PctFilledWithWater>0.5</PctFilledWithWater>
           <DataPoints Len="2"><DataPoint>1</DataPoint><DataPoint>2</DataPoint></DataPoints>
         </TensionCrack>
         <Surcharges Len="1">
           <Surcharge><ID>1</ID>
             <DataPoints Len="2"><DataPoint>3</DataPoint><DataPoint>4</DataPoint></DataPoints>
-            <Pressure>35</Pressure>
+            <Pressure>20</Pressure>
           </Surcharge>
         </Surcharges>
         <SomeFutureGeoStudioFeature>whatever</SomeFutureGeoStudioFeature>
+      </Entry></StabilityItem>
+
+    <StabilityItem><AnalysisID>4</AnalysisID>
+      <Entry>
+        <DataPoints Len="2">
+          <DataPoint Number="1" X="40" Y="26" />
+          <DataPoint Number="2" X="60" Y="26" />
+        </DataPoints>
+        <Seismic Horizontal="" Vertical="" />
+        <TensionCrack>
+          <PctFilledWithWater>1</PctFilledWithWater>
+          <DataPoints Len="2"><DataPoint>1</DataPoint><DataPoint>2</DataPoint></DataPoints>
+        </TensionCrack>
+      </Entry></StabilityItem>
+
+    <StabilityItem><AnalysisID>5</AnalysisID>
+      <Entry>
+        <DataPoints Len="2">
+          <DataPoint Number="1" X="40" Y="30" />
+          <DataPoint Number="2" X="50" Y="20" />
+        </DataPoints>
+        <Seismic Horizontal="" Vertical="" />
+        <ReinforcementLines Len="1">
+          <ReinforcementLine ID="1" Reinforcement="1" Point1Id="1" Point2Id="2" />
+        </ReinforcementLines>
       </Entry></StabilityItem>
   </StabilityItems>
 </GSIData>
@@ -1330,7 +1398,7 @@ def run_gsz_import_test(test):
     rather than importing a wrong one. Returns (0.0, None) or (None, message).
     """
     import tempfile
-    from xslope.geostudio import read_gsz, list_analyses, gsz_to_slope_data
+    from xslope.geostudio import read_gsz, list_analyses, gsz_to_slope_data, gsz_style
 
     problems = []
     with tempfile.TemporaryDirectory() as td:
@@ -1339,12 +1407,14 @@ def run_gsz_import_test(test):
         gsz = read_gsz(path)
 
         analyses = list_analyses(gsz)
-        if len(analyses) != 3:
-            return None, f"GeoStudio import: {len(analyses)} analyses, expected 3"
+        if len(analyses) != 5:
+            return None, f"GeoStudio import: {len(analyses)} analyses, expected 5"
 
         sd1, cav1 = gsz_to_slope_data(gsz, 1)
         sd2, cav2 = gsz_to_slope_data(gsz, 2)
         sd3, cav3 = gsz_to_slope_data(gsz, 3)
+        sd4, cav4 = gsz_to_slope_data(gsz, 4)
+        sd5, cav5 = gsz_to_slope_data(gsz, 5)
 
         # An UNDRAINED material keeps its strength in <Cohesion>, not <CohesionPrime>.
         # Reading only the drained field gave c = 0, phi = 0 — a soil with no strength
@@ -1363,9 +1433,57 @@ def run_gsz_import_test(test):
             problems.append(f"tcrack_water {sd3['tcrack_water']}, expected 2 "
                             f"(a DEPTH, = 50% of the crack depth, not a fraction)")
 
-        # Surcharge -> distributed load, pressure preserved.
-        if len(sd3['dloads']) != 1 or sd3['dloads'][0][0]['Normal'] != 35.0:
-            problems.append(f"surcharge -> dloads {sd3['dloads']}")
+        # A crack with NO <TensionOption> is switched OFF — GeoStudio keeps its geometry
+        # anyway. Analysis 4 has the very same crack line as analysis 3 and no option,
+        # so it must import NO crack. Reading the points as a live crack put a 2 m
+        # water-filled crack into models that had none, and cost 2% of FS in c'=0 soil.
+        if sd4['tcrack_depth'] != 0.0 or sd4['tcrack_water'] != 0.0:
+            problems.append(f"a tension crack with no <TensionOption> is switched OFF, "
+                            f"but it imported at depth {sd4['tcrack_depth']}")
+
+        # A <Surcharge> is a WEDGE OF FILL between the drawn line and the ground, and
+        # <Pressure> is its unit weight — so the load varies with depth. Here a 20 kN/m3
+        # fill runs from 1 deep at x=42 to 3 deep at x=58 over flat ground at y=30, so
+        # the pressure must run 20 -> 60, NOT a constant 20.
+        dl = sd3['dloads']
+        if len(dl) != 1:
+            problems.append(f"surcharge -> {len(dl)} dload blocks, expected 1")
+        else:
+            got = [(round(p['X'], 3), round(p['Normal'], 3)) for p in dl[0]]
+            if got != [(42.0, 20.0), (58.0, 60.0)]:
+                problems.append(
+                    f"surcharge -> {got}, expected [(42.0, 20.0), (58.0, 60.0)]: "
+                    f"<Pressure> is a UNIT WEIGHT and the load is the weight of the "
+                    f"fill above the ground, not a uniform pressure")
+
+        # The piezometric surface indexes the analysis's LOCAL <DataPoints>, not the
+        # shared geometry <Points>. Read against the geometry it silently produced a
+        # water table that doubled back on itself, and 10% of FS.
+        if sd2['piezo_line'] != [(0.0, 8.0), (60.0, 24.0)]:
+            problems.append(f"piezo line {sd2['piezo_line']}, expected "
+                            f"[(0.0, 8.0), (60.0, 24.0)] — a piezometric surface indexes "
+                            f"the analysis's LOCAL DataPoints, not the geometry points")
+
+        # Reinforcement. GeoStudio quotes per-element values with an out-of-plane
+        # spacing; xslope's lines are per unit width. Tensile 100 / spacing 2 = 50;
+        # plate 60 / 2 = 30 at the end that is at the face; pullout 10 / 2 = 5 per unit
+        # length, so the bond length that develops full capacity is 50 / 5 = 10.
+        r5 = (sd5.get('reinforcement_lines') or [None])[0]
+        if r5 is None:
+            problems.append("reinforcement line was not imported")
+        else:
+            want = {'t_max': 50.0, 'lp1': 10.0, 'lp2': 10.0, 'tend1': 30.0, 'tend2': 0.0,
+                    'spacing': 1.0, 'type': 'nail', 'dir': 'axial', 'appl': 'active'}
+            bad = {k: r5.get(k) for k, v in want.items()
+                   if not (abs(r5.get(k) - v) < 1e-9 if isinstance(v, float)
+                           else r5.get(k) == v)}
+            if bad:
+                problems.append(f"reinforcement mapped to {bad}, expected "
+                                f"{ {k: want[k] for k in bad} }")
+
+        # Material colours come across, so an imported model still looks like the user's.
+        if gsz_style(gsz, 1) != {'materials': {'0': {'color': '#d3c989'}}}:
+            problems.append(f"material colour not imported: {gsz_style(gsz, 1)}")
 
         # FAIL LOUD: an element we do not recognise must be reported, never ignored.
         if not any('SomeFutureGeoStudioFeature' in c for c in cav3):

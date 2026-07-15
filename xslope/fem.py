@@ -406,6 +406,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     else:
         _gx = _gy = None
 
+    # Depth of every node below the ground surface, for the optional min_slip_depth
+    # surficial-failure filter (see solve_fem). Positive = below ground. The ground
+    # profile is single-valued in x, so a vertical interpolation is exact. With no
+    # ground surface the depth is zero everywhere; solve_fem then raises if the filter
+    # is switched on (rather than silently masking the whole mesh), so a ground surface
+    # is required to use min_slip_depth.
+    if _gx is not None:
+        node_depth = np.interp(nodes[:, 0], _gx, _gy) - nodes[:, 1]
+    else:
+        node_depth = np.zeros(len(nodes))
+
     for elem_idx in range(n_elements):
         mat_id = element_materials[elem_idx] - 1  # Convert to 0-based
         material = materials[mat_id]
@@ -1238,6 +1249,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # Construct fem_data dictionary
     fem_data = {
         "nodes": nodes,
+        "node_depth": node_depth,  # depth below ground per node (min_slip_depth filter)
         "elements": elements,
         "element_types": element_types,
         "element_materials": element_materials,
@@ -1327,7 +1339,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
-              early_exit=True, progress_callback=None):
+              early_exit=True, progress_callback=None, min_slip_depth=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1390,6 +1402,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             can never converge. Averaging cancels that mode exactly and leaves genuine
             plastic drift untouched. The verdict is insensitive to the width (10, 50 and 200
             agree), so this is not a tuning parameter.
+        min_slip_depth (float or None): Optional surficial-failure filter (default None
+            = off). When set, nodes shallower than this depth below the ground surface are
+            excluded from the out-of-balance maximum, so a shallow cohesionless "skin"
+            (FS = tan phi / tan beta, depth-independent for c=0) cannot on its own declare
+            the slope failing. A genuine deep-seated mechanism still trips the criterion
+            through its deep nodes. This is the SSRM analogue of an LEM minimum-slip-depth
+            search filter (Slide2's "minimum depth"); the search-side twin lives in
+            search.py. Off by default, so the reported FS is the true global minimum
+            (surficial skin included) unless the caller opts in.
         pp_formulation (str): How pore pressures enter the analysis.
             'effective' (default): u is moved into the load vector
             (K du = F_ext + int B^T m u dV) and the elastic stresses are
@@ -1909,6 +1930,32 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                                       + F_gravity[node_dof_y] ** 2))) if n_nodes else 0.0
     _floor = max(1e-3 * _g_typ, 1e-3 * _f_ext_max, 1e-30)
     g_node_den = np.maximum(g_node, _floor)
+
+    # Optional surficial-failure filter (min_slip_depth): a boolean mask, aligned with
+    # oob_node, that keeps only free nodes at least min_slip_depth below the ground
+    # surface. Excluding shallower nodes from the out-of-balance maximum means a purely
+    # surficial cohesionless "skin" (FS = tan phi / tan beta) can no longer, on its own,
+    # declare the slope failing — the SSRM analogue of an LEM minimum-slip-depth search
+    # filter. A genuine deep-seated mechanism still trips the test through its deep nodes.
+    # Default None -> mask is None -> the criterion is byte-identical to the unfiltered one.
+    _deep_free_mask = None
+    if min_slip_depth is not None and float(min_slip_depth) > 0:
+        _nd = fem_data.get("node_depth")
+        if _nd is not None:
+            _nd_free = np.asarray(_nd, dtype=float)[node_has_free]
+            _deep_free_mask = _nd_free >= float(min_slip_depth)
+            if not _deep_free_mask.any():
+                # Every free node is shallower than the requested depth: the filter would
+                # mask the WHOLE mesh, and an empty maximum reads 0.0 — which would falsely
+                # declare the slope stable at every F and make SSRM report a silently HIGH
+                # factor of safety. That is a misconfiguration (min_slip_depth deeper than
+                # the model, or no ground surface defined so every depth is 0), so fail
+                # loudly rather than return a wrong answer. (The LEM side already does.)
+                raise ValueError(
+                    f"min_slip_depth={float(min_slip_depth):g} excludes every node — the "
+                    f"deepest lies {float(_nd_free.max()) if _nd_free.size else 0.0:.3g} "
+                    f"below the ground surface. Reduce min_slip_depth, or check that a "
+                    f"ground surface is defined.")
     if debug_level >= 1 and vp_disp_limit is not None:
         print(f"  VP displacement limit: {vp_disp_limit:.2f} ({max_disp_factor:.0%} of mesh height {mesh_height:.1f})")
 
@@ -2346,7 +2393,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             loads_prev = loads.copy()
             r_node = np.sqrt(d_load[node_dof_x] ** 2 + d_load[node_dof_y] ** 2)
             oob_node = (r_node / g_node_den)[node_has_free]
-            unbalanced_force_ratio = float(np.max(oob_node)) if oob_node.size else 0.0
+            # min_slip_depth filter: take the maximum only over nodes deep enough to
+            # count. With no filter (_deep_free_mask is None) this is the full set.
+            _oob_for_max = oob_node if _deep_free_mask is None else oob_node[_deep_free_mask]
+            unbalanced_force_ratio = float(np.max(_oob_for_max)) if _oob_for_max.size else 0.0
             if debug_level >= 3:
                 n_hot = int(np.count_nonzero(oob_node > force_tol))
                 print(f"    OOB dist: max={unbalanced_force_ratio:.2e} "
@@ -3334,7 +3384,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-               grid=None):
+               grid=None, min_slip_depth=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3367,6 +3417,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             every decimal, not just +/- tolerance/2). ``grid`` becomes the precision
             (cell width). Default None = continuous bisection (bracket-dependent to
             +/- tolerance/2). Used by ``reliability_fem`` for reproducible results.
+        min_slip_depth (float or None): Optional surficial-failure filter, threaded to
+            solve_fem (default None = off). Excludes failures shallower than this depth
+            below the ground surface, so a shallow cohesionless skin does not govern the
+            SSRM factor of safety. Off by default; see solve_fem for the full description.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Max viscoplastic iterations passed to solve_fem
         convergence_tol (float): Convergence tolerance passed to solve_fem
@@ -3432,7 +3486,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand, grid=grid)
+            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3442,7 +3496,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand, grid=grid)
+            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3450,7 +3504,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check, progress_callback=progress_callback)
+            cancel_check=cancel_check, progress_callback=progress_callback,
+            min_slip_depth=min_slip_depth)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -3476,7 +3531,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-                 grid=None):
+                 grid=None, min_slip_depth=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -3523,7 +3578,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          dt_scale=dt_scale, pp_formulation=pp_formulation,
                          max_iterations=max_iterations, tolerance=convergence_tol,
                          max_disp_factor=max_disp_factor, staged=staged,
-                         tension_cutoff=tension_cutoff,
+                         tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
                          progress_callback=_fem_progress(step, prefix))
 
@@ -3697,7 +3752,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
                  pp_formulation='effective',
-                 dt_scale=1.0, cancel_check=None, progress_callback=None):
+                 dt_scale=1.0, cancel_check=None, progress_callback=None,
+                 min_slip_depth=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -3760,7 +3816,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
         """Run solve_fem; return the displacement measure (characteristic-point
         VP displacement, or global max before the point is selected)."""
         sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation, force_tol=force_tol,
-                        oob_window=oob_window,
+                        oob_window=oob_window, min_slip_depth=min_slip_depth,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)

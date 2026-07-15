@@ -195,6 +195,7 @@ class FemRunner(QThread):
                     fem_data, F_min=opts.get("F_min", 1.0), F_max=opts.get("F_max", 2.0),
                     tolerance=opts.get("tolerance", 0.01), debug_level=1,
                     failure_criterion=opts.get("failure_criterion", "non_convergence"),
+                    min_slip_depth=opts.get("min_slip_depth"),
                     cancel_check=self._cancel.is_set, progress_callback=cb)
                 if not result.get("converged", False):
                     self.failed.emit(f"SSRM did not converge: "
@@ -241,6 +242,7 @@ class LemRunner(QThread):
         self._fs_tol = options.get("fs_tol")
         self._tol = options.get("tol")
         self._max_iter = options.get("max_iter")
+        self._min_slip_depth = options.get("min_slip_depth")
         self._cancel = threading.Event()
 
     def cancel(self):
@@ -256,6 +258,8 @@ class LemRunner(QThread):
             kw["fs_tol"] = self._fs_tol
         if self._max_iter is not None:
             kw["max_iter"] = self._max_iter
+        if self._min_slip_depth is not None:
+            kw["min_slip_depth"] = self._min_slip_depth
         if circular and self._tol is not None:
             kw["tol"] = self._tol
         return kw

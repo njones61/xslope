@@ -444,6 +444,28 @@ Three dependencies are worth knowing, because the tolerance is absolute:
 
 **Submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) converge like any other problem under the effective-stress pore-pressure formulation combined with consistent boundary-load integration: the submerged soil carries its buoyant weight, the flooded surface skin is in compression, and trials below the critical strength-reduction factor reach true equilibrium (the G&L Example 6 dam at $F = 1$ settles in a handful of iterations). A useful sanity check for any submerged model is to run a single solve at $F = 1$ and confirm it converges quickly with an essentially elastic strain field — flooded ground at working strength must sit quietly; if it does not, suspect the inputs (loads inconsistent with boundary pore pressures) rather than tightening solver knobs. Two numerical requirements matter for this problem class: quadratic **triangles** (tri6) are preferred over quad8 (the 2×2 reduced-integration quad has a zero-energy hourglass mode that persistent near-surface forcing can excite), and the boundary tractions must be integrated **consistently** over the element edges (XSLOPE does this automatically; see *Boundary Conditions* above).
 
+### Surficial (Skin) Failures and the Minimum-Slip-Depth Filter
+
+On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide running parallel to the slope, with $FS = \tan\phi / \tan\beta$ — a result that is *independent of depth*, so the shallowest surface governs. The per-node force-equilibrium criterion detects this "skin" faithfully, and because it is the true global minimum the reported factor of safety can sit well below a deeper, more conventional mechanism — and below published values that report the deeper one. This is physically correct but often not the engineering question, and the steep, purely frictional faces of embankment dams are where it shows up most.
+
+The optional **`min_slip_depth`** parameter — on both `solve_fem`/`solve_ssrm` and the LEM searches, **off by default** — excludes any failure shallower than the given depth below the ground surface, so the analysis reports the deeper mechanism instead. It is the finite-element analogue of the minimum-slip-depth filter that limit-equilibrium codes (e.g. Slide2) apply to the same effect. With the filter off, the reported factor of safety is the true global minimum, skin included.
+
+**Choosing `min_slip_depth`.** As you increase the depth, the factor of safety follows a characteristic curve: it holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the cutoff clears the band, then **flattens onto a plateau** — the deep-seated factor of safety. Because of that plateau, the choice is robust: any depth on the flat part returns the same FS.
+
+So don't pick one value blind — **sweep it and find the plateau.** Run the analysis at a handful of depths (say 5, 10, 15, 20, 25 % of the slope height) and watch the FS:
+
+>- Still rising → the cutoff is inside the surficial band; go deeper.<br>
+>- Flat → you are on the plateau; that value is the deep-seated FS. Report it.<br>
+>- Practical starting point: **~10–20 % of the slope height** (both dam benchmarks reach their plateau within that band).
+
+Read the result as a diagnostic, too:
+
+>- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: 1.68 skin → 1.81 deep-seated).<br>
+>- A small gap means no significant skin — the deep mechanism already governs; leave the filter off.<br>
+>- If the FS never flattens and keeps climbing toward a large fraction of the slope height, you have gone past the real mechanism and are excluding genuine failure — back off to where it plateaued. (Set the depth deeper than the mesh itself and the solver refuses outright rather than returning a false answer.)
+
+Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism, keeping an LEM/SSRM comparison on like-for-like surfaces.
+
 ### The `solve_fem()` Function
 
 The viscoplastic algorithm described above is implemented in the `solve_fem()` function in the `fem.py` module. This function takes a FEM data dictionary (built by `build_fem_data()`) and an optional strength reduction factor $F$, assembles and factors the elastic stiffness matrix once, then runs the viscoplastic iteration loop until convergence or the maximum iteration count is reached.

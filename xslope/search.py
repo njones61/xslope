@@ -72,6 +72,24 @@ def _too_thin(df_slices, h_ground, frac):
     return thick < frac * h_ground
 
 
+def _too_shallow(df_slices, min_slip_depth):
+    """True if the deepest point of the slip surface lies less than
+    ``min_slip_depth`` below the ground surface — an ABSOLUTE minimum-slip-depth
+    filter (Slide2's 'minimum depth'), and the search-side twin of solve_fem's
+    ``min_slip_depth`` in SSRM. ``None`` or a non-positive value disables it.
+
+    Unlike ``_too_thin`` (a fraction of slope height, grid-mode only), this
+    applies to EVERY trial when set, so a caller can suppress surficial
+    cohesionless skins (FS = tan phi / tan beta) on demand while leaving the
+    default seeded search untouched."""
+    if min_slip_depth is None or min_slip_depth <= 0:
+        return False
+    if df_slices is None or len(df_slices) == 0 or 'y_ct' not in df_slices.columns:
+        return True
+    max_depth = float((df_slices['y_ct'] - df_slices['y_cb']).max())
+    return max_depth < min_slip_depth
+
+
 def _base_tension_too_extensive(df_slices):
     """True if a large fraction of slices carry a negative effective base normal
     (base in tension) — a non-physical surface, e.g. a circle through a
@@ -99,7 +117,8 @@ def _check_cancel(cancel_check):
 
 def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                        rapid=False, composite=False, nx=10, ny=5, n_tangents=6,
-                       keep=4, diagnostic=False, cancel_check=None, circle_cache=None):
+                       keep=4, diagnostic=False, cancel_check=None, circle_cache=None,
+                       min_slip_depth=None):
     """Coarse grid-and-tangent sweep that SEEDS the adaptive circular search.
 
     The adaptive 9-point search is a local optimizer: it refines whatever
@@ -174,7 +193,8 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 if not success:
                     continue
                 df_slices, failure_surface = result
-                if _net_driving_too_small(df_slices) or _too_thin(df_slices, H, MIN_THICKNESS_FRAC):
+                if (_net_driving_too_small(df_slices) or _too_thin(df_slices, H, MIN_THICKNESS_FRAC)
+                        or _too_shallow(df_slices, min_slip_depth)):
                     continue
                 if rapid:
                     ok, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
@@ -212,7 +232,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None, composite=False,
-                    seed='circles'):
+                    seed='circles', min_slip_depth=None):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -246,6 +266,14 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     mechanism there rides the base, and a search clamped to the floor can only ever
     reach a circle tangent to it. Leave it off when the floor is just ``max_depth``,
     a search bound rather than bedrock.
+
+    ``min_slip_depth`` (default None = off) is an absolute minimum-slip-depth filter:
+    trial surfaces whose deepest point is less than this far below the ground surface
+    are rejected, so a shallow surficial skin (FS = tan phi / tan beta on a
+    cohesionless face) cannot win. This is Slide2's "minimum depth" filter and the
+    search-side twin of solve_fem's ``min_slip_depth`` in SSRM — set the same value in
+    both to keep an LEM/SSRM comparison on the same mechanism. Off by default, so the
+    reported surface is the true minimum unless the caller opts in.
 
     Returns:
         list of dict: sorted fs_cache by FS
@@ -308,7 +336,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         circles = _grid_seed_circles(
             slope_data, method_name, num_slices=num_slices, fs_fail=fs_fail,
             rapid=rapid, composite=composite, diagnostic=diagnostic,
-            cancel_check=cancel_check, circle_cache=circle_cache)
+            cancel_check=cancel_check, circle_cache=circle_cache,
+            min_slip_depth=min_slip_depth)
         circles = circles + list(slope_data.get('circles') or [])
         if not circles:
             return [], False, [], circle_cache
@@ -347,7 +376,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                     solver_result = None
                 else:
                     df_slices, failure_surface = result
-                    if _net_driving_too_small(df_slices) or _too_thin(df_slices, h_ground, thin_frac):
+                    if (_net_driving_too_small(df_slices) or _too_thin(df_slices, h_ground, thin_frac)
+                            or _too_shallow(df_slices, min_slip_depth)):
                         FS = fs_fail  # degenerate (near-zero driving; grid mode also drops skins)
                         solver_result = None
                     else:
@@ -538,7 +568,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path, circle_cache
 
-def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, cancel_check=None):
+def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, cancel_check=None, min_slip_depth=None):
     """
     Non-circular search using the specified solver.
 
@@ -666,6 +696,10 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
 
         # Reject surfaces with negligible net driving force (flat / non-failure).
         if _net_driving_too_small(df_slices):
+            return float('inf'), None, None, None, fs_cache
+
+        # Optional minimum-slip-depth filter: drop surficial skins on demand.
+        if _too_shallow(df_slices, min_slip_depth):
             return float('inf'), None, None, None, fs_cache
 
         if rapid:

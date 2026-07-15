@@ -115,6 +115,32 @@ class RunFemDialog(QDialog):
             self.failure_criterion.setCurrentIndex(cidx)
         form.addRow("Failure criterion", self.failure_criterion)
 
+        # Optional surficial-failure filter. Off by default. A cohesionless slope's
+        # true global minimum is an infinitely shallow surface-parallel "skin" slide
+        # (FS = tan phi / tan beta, depth-independent), which masks the deep-seated
+        # factor of safety; enabling this ignores any mechanism shallower than the
+        # given depth so the search reports the deep answer instead.
+        self.min_slip_on = QCheckBox("Ignore surficial (skin) failures")
+        self.min_slip_on.setChecked(bool(defaults.get("min_slip_depth")))
+        self.min_slip_on.setToolTip(
+            "Exclude near-surface, surface-parallel failures from the SSRM search.\n\n"
+            "A cohesionless slope's true critical mechanism is an infinitely shallow "
+            "skin slide with FS = tan phi / tan beta — correct, but not the deep-seated "
+            "answer a design usually wants. Turn this on and set a minimum depth below "
+            "the ground surface; sweep the depth until FS stops rising (the plateau) to "
+            "read the deep-seated factor of safety.\n\n"
+            "Depth is in model length units. SSRM only.")
+        form.addRow("", self.min_slip_on)
+
+        self.min_slip_depth = QDoubleSpinBox()
+        self.min_slip_depth.setDecimals(2)
+        self.min_slip_depth.setRange(0.0, 1.0e6)
+        self.min_slip_depth.setSingleStep(1.0)
+        self.min_slip_depth.setValue(float(defaults.get("min_slip_depth") or 0.0))
+        self.min_slip_depth.setToolTip("Minimum failure depth below the ground surface, "
+                                       "in model length units.")
+        form.addRow("Min slip depth", self.min_slip_depth)
+
         layout.addLayout(form)
         self._rel_note = QLabel(
             "Reliability uses the bracket above only to find the most-likely-value "
@@ -134,6 +160,7 @@ class RunFemDialog(QDialog):
         layout.addWidget(bb)
 
         self.analysis.currentIndexChanged.connect(self._sync_enabled)
+        self.min_slip_on.toggled.connect(self._sync_enabled)
         self._sync_enabled()
 
     def _sync_enabled(self):
@@ -149,6 +176,9 @@ class RunFemDialog(QDialog):
         self.tolerance.setEnabled(a == "ssrm")
         self.reliability_tol.setEnabled(a == "reliability")
         self._rel_note.setVisible(a == "reliability")   # note only applies to reliability
+        # Surficial-failure filter applies to the SSRM criterion only.
+        self.min_slip_on.setEnabled(a == "ssrm")
+        self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())
 
     def options(self):
         return {
@@ -159,6 +189,9 @@ class RunFemDialog(QDialog):
             "tolerance": self.tolerance.value(),
             "reliability_tol": self.reliability_tol.value(),
             "failure_criterion": self.failure_criterion.currentData(),
+            "min_slip_depth": (self.min_slip_depth.value()
+                               if self.min_slip_on.isChecked()
+                               and self.min_slip_depth.value() > 0 else None),
         }
 
 
@@ -358,6 +391,30 @@ class RunLemDialog(QDialog):
         self.diagnostic.setChecked(bool(defaults.get("diagnostic", False)))
         form.addRow("", self.diagnostic)
 
+        # Optional surficial-failure filter (auto-search only): reject any trial
+        # surface whose maximum depth is shallower than the given depth. Off by
+        # default. Mirrors the SSRM filter so a cohesionless slope's shallow skin
+        # mechanisms don't win the search over the deep-seated surface.
+        self.min_slip_on = QCheckBox("Ignore surficial (skin) failures")
+        self.min_slip_on.setChecked(bool(defaults.get("min_slip_depth")))
+        self.min_slip_on.setToolTip(
+            "Reject trial surfaces shallower than a minimum depth during the search.\n\n"
+            "On a cohesionless slope the critical surface is an infinitely shallow "
+            "skin slide; without this the search chases it instead of the deep-seated "
+            "mechanism a design wants. Set a minimum depth below the ground surface and "
+            "sweep it until the factor of safety stops rising (the plateau).\n\n"
+            "Depth is in model length units. Auto-search only.")
+        form.addRow("", self.min_slip_on)
+
+        self.min_slip_depth = QDoubleSpinBox()
+        self.min_slip_depth.setDecimals(2)
+        self.min_slip_depth.setRange(0.0, 1.0e6)
+        self.min_slip_depth.setSingleStep(1.0)
+        self.min_slip_depth.setValue(float(defaults.get("min_slip_depth") or 0.0))
+        self.min_slip_depth.setToolTip("Minimum failure depth below the ground surface, "
+                                       "in model length units.")
+        form.addRow("Min slip depth", self.min_slip_depth)
+
         layout.addLayout(form)
 
         # Search-convergence tolerances — only meaningful for auto-search and
@@ -400,6 +457,7 @@ class RunLemDialog(QDialog):
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
             self.surface.currentIndexChanged.connect(self._sync_tols)
+        self.min_slip_on.toggled.connect(self._sync_tols)
         self._sync_tols()
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -437,6 +495,12 @@ class RunLemDialog(QDialog):
         self.composite.setEnabled(circular)
         if not circular:
             self.composite.setChecked(False)
+        # The surficial-failure filter rejects too-shallow trials, so it only has
+        # meaning for the auto-search (single-surface just evaluates the given
+        # surface; the reliability path does not thread it through).
+        auto_search = self.analysis.currentData() == "auto_search"
+        self.min_slip_on.setEnabled(auto_search)
+        self.min_slip_depth.setEnabled(auto_search and self.min_slip_on.isChecked())
 
     def options(self):
         return {
@@ -451,6 +515,9 @@ class RunLemDialog(QDialog):
             "fs_tol": self.fs_tol.value(),
             "tol": self.tol.value(),
             "max_iter": self.max_iter.value(),
+            "min_slip_depth": (self.min_slip_depth.value()
+                               if self.min_slip_on.isChecked()
+                               and self.min_slip_depth.value() > 0 else None),
         }
 
 

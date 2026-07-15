@@ -460,7 +460,7 @@ So don't pick one value blind — **sweep it and find the plateau.** Run the ana
 
 Read the result as a diagnostic, too:
 
->- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: 1.68 skin → 1.81 deep-seated).<br>
+>- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: the 1.68 downstream-face skin vs a ~1.8 deeper mechanism the filter recovers; the deeper value is mesh-sensitive and is not the dam's benchmark FS — the skin is, see [RS2-4](../verification/rs2.md#rs2-4)).<br>
 >- A small gap means no significant skin — the deep mechanism already governs; leave the filter off.<br>
 >- If the FS never flattens and keeps climbing toward a large fraction of the slope height, you have gone past the real mechanism and are excluding genuine failure — back off to where it plateaued. (Set the depth deeper than the mesh itself and the solver refuses outright rather than returning a false answer.)
 

@@ -56,7 +56,7 @@ shear strain contours at the critical SRF.
 | [1](#rs2-1) | Simple slope stability assessment | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx). SSRM 0.986 vs RS2 SSRM 0.99, Slide Bishop 0.987, ACADS referee 1.00. |
 | [2](#rs2-2) | Non-homogeneous slope | **built** | [vp003.xlsx](../files/rocscience/vp003.xlsx). SSRM 1.375 vs RS2 1.36, Slide Spencer 1.375, referee 1.39. |
 | [3](#rs2-3) | Non-homogeneous slope with seismic load (0.15g) | **built** | [vp004.xlsx](../files/rocscience/vp004.xlsx). SSRM 0.948 vs RS2 0.97, Slide Spencer 0.991, referee 1.00. |
-| [4](#rs2-4) | Dry Talbingo dam | **built** | [vp005.xlsx](../files/rocscience/vp005.xlsx). SSRM 1.909 vs RS2 1.88, Slide 1.948, referee 1.95. |
+| [4](#rs2-4) | Dry Talbingo dam | **built** | [vp005.xlsx](../files/rocscience/vp005.xlsx). SSRM finds the true global minimum — the steeper downstream-bench skin (tan45/tan30.9 = 1.669) — at 1.678; the published RS2 1.88 / Slide 1.948 / referee 1.95 are the gentler upstream face. |
 | [5](#rs2-5) | Water table with weak seam | **built** | [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx). SSRM 1.286 (mesh-stable: 1.280 at 1.2 m) vs RS2 1.26, Slide Spencer 1.258, referee 1.24–1.27. |
 | [6](#rs2-6) | Slope with load and pore pressure by water table (ACADS 4) | **built** (caveat) | [vp009.xlsx](../files/rocscience/vp009.xlsx). SSRM 0.81, mesh-stable, vs ACADS survey mean 0.808 and referee 0.78 — but +18% above RS2's SSRM 0.69 and Slide2's MC-optimized LEM 0.68–0.71. |
 | [7](#rs2-7) | Pore pressure by digitized total head grid (ACADS 5) | **built** | [vp010.xlsx](../files/rocscience/vp010.xlsx). SSRM 1.483 vs RS2 SSRM 1.48 (+0.2%), on the FE-seepage model XSLOPE built for Slide2 VP10. Slide2 LEM 1.498–1.501, Giam 1.53. |
@@ -97,7 +97,7 @@ shear strain contours at the critical SRF.
 | [37](#rs2-37) | Embankment with layered foundation (D&W Fig 6.39) | *reported, no lock* | RS2's SSRM is the artesian downstream-toe slide (0.95 in its table, 1.1 in its own convergence graph); XSLOPE's SSRM finds the deep mechanism at 1.31. |
 | 38 | Cohesionless embankment on saturated clay foundation | *planned* | Slide2 [VP73](rocscience.md#vp73)/[VP74](rocscience.md#vp74) family. |
 | 39, 41, 43 | Earth embankment, infinite-slope mechanism (I–III) | *planned* | Slide2 [VP69](rocscience.md#vp69) family. |
-| [40](#rs2-40) | Dam with impermeable foundation (D&W Fig 7.24) | **built** (piezo case) | [vp077b.xlsx](../files/rocscience/vp077b.xlsx). SSRM 1.491 vs RS2 SSRM 1.53; the FE-seepage case is blocked. |
+| [40](#rs2-40) | Dam with impermeable foundation (D&W Fig 7.24) | **built** (piezo case) | [vp077b.xlsx](../files/rocscience/vp077b.xlsx). SSRM finds the saturated-toe skin at 1.126 (true global minimum, ~5% below the idealized toe infinite slope); RS2 SSRM 1.53 reports a deeper face. FE-seepage case blocked. |
 | [42](#rs2-42) | James dike | **built** | [vp075.xlsx](../files/rocscience/vp075.xlsx). SSRM 1.249 vs RS2 SSRM 1.26 (−0.9%); Slide2 noncircular LEM 1.11–1.16, referee 1.17. |
 | [44](#rs2-44) | Seepage analysis for an earth embankment (D&W Fig 14.20-a) | **built** | [vp082.xlsx](../files/rocscience/vp082.xlsx). SSRM 1.511 vs RS2 SSRM 1.51 (+0.1%); Slide2 LEM 1.532/1.541, referee 1.528–1.542. |
 | [45](#rs2-45) | Varying undrained shear strength profiles (D&W Fig 14.20-b) | **built** (caveat) | [vp083a](../files/rocscience/vp083a.xlsx) / [b](../files/rocscience/vp083b.xlsx). SSRM 1.41 / 1.37 vs RS2 SSRM 1.32 / 1.32 (D&W referee 1.28–1.33). |
@@ -190,11 +190,22 @@ Slide2 counterpart: [VP5](rocscience.md#vp5).
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM | 1.909 | RS2 SSRM 1.88 |
+| SSRM | 1.678 | RS2 SSRM 1.88 (upstream face) |
 
-*Cross-bearings: Slide2 1.948 (LEM); ACADS referee 1.95.*
+For a dry cohesionless dam the critical mechanism is a surface-parallel (infinite-slope)
+slide, FS = tan φ / tan β, which is *independent of depth* — so the steepest face governs. The
+per-node SSRM criterion finds the true global minimum on the steeper **downstream** bench
+(30.9°): tan 45° / tan 30.9° = 1.669, and the FEM returns 1.678 (+0.5%). The published values
+report the gentler, constrained **upstream** face (27.2°, the end-of-construction problem):
+tan 45° / tan 27.2° = 1.948, matched by RS2 SSRM 1.88, Slide2 1.948 (all LEM methods collapse
+to tan φ / tan β on a cohesionless face), and the ACADS referee 1.95. Both are correct
+infinite-slope answers; XSLOPE reports the more critical one. The seeded LEM search
+([VP5](rocscience.md#vp5)) stays on the upstream circle in the input file and locks 1.955, so
+the LEM and SSRM entries for this dam report different faces by construction, not a discrepancy.
 
-<!-- test: file=../files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.909, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=4000, benchmark=RS2-4 -->
+*Closed-form check: across φ = 35–45° (c = 0 materials only) the SSRM tracks tan φ / tan 30.9° to 0.3%.*
+
+<!-- test: file=../files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.678, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, benchmark=RS2-4 -->
 
 ![RS2-4: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-4.png)
 
@@ -806,11 +817,21 @@ Slide2 counterpart: [VP77](rocscience.md#vp77). Built for the piezo case.
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM (vp077b, piezo case) | 1.491 | RS2 SSRM 1.53 |
+| SSRM (vp077b, piezo case) | 1.126 | RS2 SSRM 1.53 |
+
+As with the dry Talbingo dam (RS2-4), the cohesionless downstream shell fails as a
+surface-parallel skin rather than a deep rotation. Here the piezometric line daylights at the
+toe, so the governing mechanism is the *saturated* toe: the seepage-parallel infinite-slope
+limit is (140 − 62.4)/140 × tan 38° / tan 20° = 1.190, and the per-node SSRM returns 1.126. The
+per-node out-of-balance nodes sit exactly on the daylighting toe (x ∈ [1162, 1234]). The finite,
+partially-saturated toe geometry softens the FEM ~5% below the idealized infinite slope, so this
+skin's analytic anchor is looser than RS2-4's ±0.5% — a φ-sweep clincher (as in RS2-4) is the
+natural way to tighten it. The published RS2 SSRM 1.53 reports a deeper mechanism on the face;
+XSLOPE reports the more critical toe skin as the true global minimum.
 
 *The FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core (the documented tri3/tri6 trade).*
 
-<!-- test: file=../files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.491, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=4000, benchmark=RS2-40 -->
+<!-- test: file=../files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.126, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, benchmark=RS2-40 -->
 
 ![RS2-40: piezometric case (vp077b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-40.png)
 

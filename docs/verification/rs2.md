@@ -197,8 +197,10 @@ slide, FS = tan φ / tan β, which is *independent of depth* — so the steepest
 per-node SSRM criterion finds the true global minimum on the steeper **downstream** bench
 (30.9°): tan 45° / tan 30.9° = 1.669, and the FEM returns 1.678 (+0.5%). The published values
 report the gentler, constrained **upstream** face (27.2°, the end-of-construction problem):
-tan 45° / tan 27.2° = 1.948, matched by RS2 SSRM 1.88, Slide2 1.948 (all LEM methods collapse
-to tan φ / tan β on a cohesionless face), and the ACADS referee 1.95. Both are correct
+tan 45° / tan 27.2° = 1.948 — Slide2 reports 1.948 (all LEM methods collapse to
+tan φ / tan β on a cohesionless face) and the ACADS referee 1.95; RS2's SSRM 1.88 is
+consistent with the same upstream-face problem, though its manual does not state which
+mechanism its mesh resolved. Both faces are correct
 infinite-slope answers; XSLOPE reports the more critical one. The seeded LEM search
 ([VP5](rocscience.md#vp5)) stays on the upstream circle in the input file and locks 1.955, so
 the LEM and SSRM entries for this dam report different faces by construction, not a discrepancy.
@@ -825,8 +827,10 @@ toe, so the governing mechanism is the *saturated* toe: the seepage-parallel inf
 limit is (140 − 62.4)/140 × tan 38° / tan 20° = 1.190, and the per-node SSRM returns 1.126. The
 per-node out-of-balance nodes sit exactly on the daylighting toe (x ∈ [1162, 1234]). The finite,
 partially-saturated toe geometry softens the FEM ~5% below the idealized infinite slope, so this
-skin's analytic anchor is looser than RS2-4's ±0.5% — a φ-sweep clincher (as in RS2-4) is the
-natural way to tighten it. The published RS2 SSRM 1.53 reports a deeper mechanism on the face;
+skin's analytic anchor is looser than RS2-4's ±0.5% — but a shell-φ sweep tracks the
+anchor law at a *constant* ratio (0.943–0.953 across φ = 30–42°), confirming the toe-skin
+mechanism with the same rigor as RS2-4's sweep. The published RS2 SSRM 1.53 evidently
+reports a deeper mechanism (which one its mesh resolved is not stated in its manual);
 XSLOPE reports the more critical toe skin as the true global minimum.
 
 *The FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core (the documented tri3/tri6 trade).*

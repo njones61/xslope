@@ -37,6 +37,8 @@ dependencies = [
   "scipy",
   "shapely",
   "openpyxl",
+  "lxml",        # fileio imports it at module scope for the XML-level xlsx writer
+  "tabulate",    # solve + advanced import it at module scope
 ]
 
 [project.optional-dependencies]

@@ -126,6 +126,14 @@ All 47 sections of the manual. **built** = an XSLOPE input file with verified re
 problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged there; *partial*, *blocked*,
 *planned* as in that corpus. Rows that share a problem with Rocscience link to it, and it links back.
 
+**Manual edition.** The manual tracked here is the **2025.2 edition**. Its 47
+two-dimensional problems (chapter 2, "Verifications – 2D", §2.1–2.47) are carried
+unchanged from the October 2022 edition, so the section numbering below is valid against
+either. The 2025.2 edition also adds an 11-problem "Verifications – 3D" chapter
+(§3.1–3.11) verifying SLOPE3D — ellipsoidal and wedge surfaces, 3D seismic and
+piezometric cases, and the Kettleman Hills case history. XSLOPE is a 2D formulation, so
+the 3D chapter is out of scope and not tracked here.
+
 | § | Problem | Status | XSLOPE file / results vs SLOPE/W |
 |---:|---|---|---|
 | 2.1 | ACADS Simple Slope | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx): Bishop 0.985 vs SLOPE/W 0.963, Slide 0.987; ACADS reference 1.00. — [details](#gs-2-1) |

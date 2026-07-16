@@ -11,6 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+from shapely.geometry import Polygon  # noqa: E402
+
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -220,7 +222,81 @@ def rs2_60c():
     return 'rs2_60c.xlsx'
 
 
+def _poly_slope_data(polygons, materials, circle, max_depth):
+    """Assemble a polygon-input slope_data for RS2 Part-III problems whose
+    geometry is a set of material zones (not stacked profile lines).
+
+    ``polygons`` is a list of (mat_id, [(x, y), ...]) exterior rings; ``materials``
+    a list of dicts merged onto the ACADS-1a template material (so every physics
+    field the loader expects is present); ``circle`` a single starting circle for
+    the LEM search; ``max_depth`` the search floor. Geometry coordinates are
+    transcribed from the vendor RS2 .fez models (dev-side cross-check only) and
+    hard-coded here so the corpus rebuilds without them."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    mats = []
+    for spec in materials:
+        m = dict(base)
+        m.update(option='mc', u='none', psi=0.0)
+        m.update(spec)
+        mats.append(m)
+    sd['materials'] = mats
+    sd['profile_lines'] = []
+    sd['polygons'] = [{'mat_id': mid, 'polygon': Polygon(coords)}
+                      for mid, coords in polygons]
+    sd['max_depth'] = float(max_depth)
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['dloads2'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [circle]
+    return sd
+
+
+def rs2_63():
+    """RS2 #63 -- Slope Stability Assessment of a Homogeneous Slope, after Cheng,
+    Lansivaara & Wei (2007). An 11 m homogeneous slope (c = 10 kPa, phi = 30 deg,
+    gamma = 20 kN/m3). Published: Slide2 1.380, RS2 SSRM 1.38, Cheng LEM 1.3830.
+    Geometry from RS2 vendor model 'slope stability #063.fez'."""
+    poly = [(46.0, 0.0), (0.0, 0.0), (0.0, 10.0), (10.0, 10.0), (16.0, 16.0),
+            (26.0, 21.0), (46.0, 21.0), (46.0, 0.0)]
+    sd = _poly_slope_data(
+        polygons=[(0, poly)],
+        materials=[dict(name='soil', c=10.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
+                        E=14000.0, nu=0.3)],
+        circle={'Xo': 8.0, 'Yo': 24.0, 'Depth': 10.0, 'R': 14.0},
+        max_depth=0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_63.xlsx'))
+    return 'rs2_63.xlsx'
+
+
+def rs2_61a():
+    """RS2 #61 case 1 -- Local and Global Minima for a Homogeneous Slope, after
+    Cheng, Lansivaara & Wei (2007). Case 1 is the UNCONSTRAINED global minimum
+    (the other three cases fence a Polygon Search Area onto successive local
+    minima, which xslope has no direct analog for -- see the rs2.md row).
+    Homogeneous benched slope, c = 5 kPa, phi = 30 deg, gamma = 20 kN/m3.
+    Published for case 1: Slide2 1.336, Cheng LEM 1.327, RS2 SSRM 1.35.
+
+    A grid seed traps on a steeper local circle (FS 1.44) -- exactly the trap the
+    paper is about -- so the search is seeded with a toe-to-crest circle that
+    refines onto the global minimum. Geometry from 'slope stability #061_01.fez'."""
+    poly = [(54.324, 0.073), (-0.057, 0.073), (-0.057, 9.965), (10.118, 9.965),
+            (20.011, 14.883), (26.003, 19.858), (31.939, 19.858), (34.878, 22.797),
+            (42.905, 26.811), (54.324, 26.811), (54.324, 0.073)]
+    sd = _poly_slope_data(
+        polygons=[(0, poly)],
+        materials=[dict(name='soil', c=5.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
+                        E=14000.0, nu=0.3)],
+        circle={'Xo': 25.0, 'Yo': 40.0, 'Depth': 0.5, 'R': 39.5},
+        max_depth=0.073)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_61a.xlsx'))
+    return 'rs2_61a.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
-               rs2_60a, rs2_60b, rs2_60c):
+               rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_63):
         print(fn())

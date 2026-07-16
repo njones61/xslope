@@ -128,16 +128,90 @@ independently verifiable.
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
-| 59 | Three-layered soil slope | *planned* | Görög & Török (2007), vs Slide2 + PLAXIS. |
+| 59 | Three-layered soil slope | *planned* | Görög & Török (2007) Budapest landslide, vs Slide2 1.567 / RS2 SSRM 1.57 / PLAXIS 1.6. Tranche-2: the critical mechanism rides a thin weak "waste" lens (c = 1, φ = 5) and is **non-circular** — a circular search only finds the deeper competing surface (FS ≈ 1.9); needs an authored non-circular surface along the lens, or an SSRM run on the ~415 m-wide domain. |
 | [60](#rs2-60) | Generalized Hoek–Brown, homogeneous slope | **built** (LEM) | [rs2_60a.xlsx](../files/rocscience/rs2_60a.xlsx) / [b](../files/rocscience/rs2_60b.xlsx) / [c](../files/rocscience/rs2_60c.xlsx). Three slope angles from Li, Merifield & Lyamin (2008) at GSI = 70, the strong-rock end of the criterion. Bishop/Spencer 1.009 / 1.017 / 1.008 against Li's F = 1.0. SSRM is not locked on this problem. |
-| 61 | Local and global minima, homogeneous slope | *planned* | |
-| 62 | Three-layered slope with a soft band | *planned* | |
-| 63 | Homogeneous slope assessment | *planned* | |
-| 64 | Three homogeneous landslides | *planned* | |
-| 65 | Tailings dam | *planned* | |
-| 66 | Embankment basal stability | *planned* | |
+| [61](#rs2-61) | Local and global minima, homogeneous slope | **built** (case 1) | [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx). Cheng, Lansivaara & Wei (2007). Case 1 (global minimum) Spencer 1.338 vs Slide2 1.336, Cheng 1.327, RS2 SSRM 1.35. Cases 2–4 fence a Polygon Search Area onto local minima — deferred, gated on a search-area constraint. |
+| 62 | Three-layered slope with a soft band | *planned* | Cheng et al. (2007), 3 domains × 2 dilation cases. Tranche-2, and **partly not LEM-lockable**: the published split is the point — RS2/PLAXIS SSRM 0.81–0.98 vs Flac3D 1.03–1.64, a dilation-angle (associated vs non-associated) effect that a limit-equilibrium lock cannot reproduce. SSRM only. |
+| [63](#rs2-63) | Homogeneous slope assessment | **built** | [rs2_63.xlsx](../files/rocscience/rs2_63.xlsx). Cheng et al. (2007), 11 m homogeneous slope. Spencer 1.398 and SSRM 1.409 vs Slide2 1.380 / RS2 SSRM 1.38 / Cheng 1.383 (a consistent +1.5%). |
+| 64 | Three homogeneous landslides | *planned* | Teoman, Topal & Isik (2004), Ankara clay E90 highway. Tranche-2: **12 cases** (3 slopes × original/failed × short/long-term), each a Bishop FS on a *proposed* (digitized) non-circular slip surface — RS2 SSR 0.99–6.97 vs Slide2 Bishop. Bulk single_noncirc locks; large geometry-transcription effort. |
+| 65 | Tailings dam | *planned* | Tzenkov (2008) Padina dam, **8 materials**. Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41. Tranche-2: multi-material cross-section transcription. |
+| 66 | Embankment basal stability | *planned* | Nakamura, Cai & Ugai (2008). Embankment / soft ground / bearing stratum, 5 soft-layer thicknesses (h₁ = 2–10 m). Slide2 Spencer 1.05–1.16, RS2 SSRM 1.05–1.19, LEM/FEM ref 1.08–1.24. Tranche-2: tractable 5-case family (a candidate for tranche 2's first build). |
 | 67 | Earth dam under steady & transient unsaturated seepage | *blocked* | Transient — blocked on a transient solver. |
-| 68 | Seismically loaded slopes | *planned* | |
+| 68 | Seismically loaded slopes | *planned* | Loukidis, Bandini & Salgado (2003). Publishes a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — Slide2 Bishop/Spencer k꜀ 0.118–0.431 vs limit-analysis bounds. Tranche-2: needs a k꜀-search harness (invert seismic k for FS = 1), which the current tags do not provide. |
+
+### Part IV — RS2 *Slope Stability Verification Manual, Pt 4* (catalog)
+
+Parts I–III of the RS2 manual seeded the corpus rows above. **Part 4** is a separate, later
+manual (© 2021) and the newest of the four. It is not a fresh set of problems so much as an
+RS2 shear-strength-reduction **re-verification of 52 Slide2 verification problems** (numbered
+by their Slide2 VP id, #1–#102), run against the reference literature and Slide2's own LEM.
+It is the authoritative source of most of the "RS2 SSRM x.xx" numbers already cited in the
+Part I–III rows. Cataloged here so the corpus tracks it; the **new** rows (no existing corpus
+counterpart) are tranche-2+ build candidates. Values are the manual's published RS2 SSR and
+its reference/Slide2 figures (representative case where a problem has several).
+
+| Pt4 VP | Problem | RS2 SSR | Reference / Slide2 | Corpus |
+|---:|---|---|---|---|
+| 1 | Slope, homogeneous (ACADS 1a) | 0.98 | ref 1.00 [Giam] | [RS2-1](#rs2-1) |
+| 2 | Slope, homogeneous, tension crack (ACADS 1b) | 1.63 | ref 1.65 [Giam] | *new* |
+| 3 | Slope, 3 materials (ACADS 1c) | 1.34 | ref 1.39 | [RS2-2](#rs2-2) |
+| 4 | Slope, 3 materials, seismic (ACADS 1d) | 0.95 | ref 1.00 | [RS2-3](#rs2-3) |
+| 5 | Dam, 4 materials (ACADS 2a) | — | ref 1.95 | [RS2-4](#rs2-4) |
+| 6 | Dam, 4 materials, predefined surface (ACADS 2b) | 2.15 | ref 2.29 | *new* |
+| 7 | Slope, 2 materials, weak layer (ACADS 3a) | 1.24 | ref 1.24–1.27 | [RS2-5](#rs2-5) |
+| 9 | Weak layer, water table, load (ACADS 4) | 0.76 | ref 0.78 | [RS2-6](#rs2-6) |
+| 10 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | 1.46 | ref 1.53 | [RS2-7](#rs2-7) |
+| 14 | Slope, homogeneous (Arai & Tagyo 1) | 1.37–1.39 | — | [RS2-10](#rs2-10) |
+| 15 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | 0.41 | Kim/Greco 0.39–0.44 | [RS2-11](#rs2-11) |
+| 16 | Slope, homogeneous, water table (Arai & Tagyo 3) | 1.09 | — | [RS2-12](#rs2-12) |
+| 17 | Slope, homogeneous (Yamagami & Ueta) | 1.32 | — | [RS2-13](#rs2-13) |
+| 19 | Slope, 4 materials (Greco ex. 4) | 1.38 | Greco/Spencer 1.40–1.42 | [RS2-15](#rs2-15) |
+| 21 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | 1.98 / 1.68 / 1.77 | — | [RS2-17](#rs2-17) |
+| 22 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | 1.26 / 0.99 / 1.15 | — | [RS2-18](#rs2-18) |
+| 24 | Slope, 3 materials (Low 1989) | 1.42 | Low 1.44 | [RS2-19](#rs2-19) |
+| 25 | Bearing-capacity slope (Prandtl / Chen & Shao) | 1.01 | Chen & Shao 1.05 | [RS2-20](#rs2-20) |
+| 26 | Bearing-capacity prism (Prandtl II) | 1.00 | theory 1.0 | [RS2-21](#rs2-21) |
+| 32 | Reinforced embankment, 7 materials (Borges 2002) | 1.24 / 1.21 / 0.98 | Borges 1.25 / 1.19 / 0.99 | [RS2-24](#rs2-24) |
+| 38 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | 1.56 / 1.46 / 1.32 | — | RS2-28 *(planned)* |
+| 39 | Reinforced embankment, geosynthetic (Tandjiria 2002) | 0.97 / 1.42 / 1.22 / 1.39 | — | [RS2-29](#rs2-29) |
+| 40 | Homogeneous, power curve, sensitivity (Perry 1993) | 0.97 | Perry 0.98 | [RS2-30](#rs2-30) |
+| 41 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | 1.64 | Bishop 1.66 / Janbu 1.60–1.67 | *new* |
+| 42 | Dam, safety-map example (Baker & Leshchinsky 2001) | 1.84 | Spencer non-circular 1.91 | *new* |
+| 44 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | 0.96 / 1.5 / 0.93 | — | [RS2-31](#rs2-31) |
+| 45 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | 2.65 / 2.78 / 2.63 | — | [RS2-32](#rs2-32) |
+| 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | 1.22 | — | *new* |
+| 56 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | 1.26 | 8-program 1.02–1.32 | [RS2-33](#rs2-33) |
+| 57 | Layered, TC (Pockoski & Duncan slope 3) | 1.32 | 8-program ~1.40 | *new* |
+| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | 0.98 | GOLD-NAIL 0.91, UTEXAS4 1.02 | *new* |
+| 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | 1.34 / 1.45 | Baker 1.35 / 1.48 | [RS2-34](#rs2-34) |
+| 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | 0.96 | — | RS2-68 *(planned)* |
+| 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | 0.99 | — | RS2-68 *(planned)* |
+| 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | *new* |
+| 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | 2.60 | ref 2.71 | *new* |
+| 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | 2.22 | ref 2.30 | *new* |
+| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | *new* |
+| 68 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | 1.17 | ref 1.33 | *new* |
+| 69 | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | 1.94 | ref 2.01 | *new* |
+| 70 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | 1.58 | Spencer 1.60, ref 1.60 | *new* |
+| 71 | Homogeneous, FE seepage (Duncan & Wright Fig 6.37) | 1.11 / 1.12 | Spencer 1.13 / 1.14 | [RS2-36](#rs2-36) |
+| 72 | Embankment dam, 4 materials, FE seepage (D&W Fig 6.39) | 1.00–1.49 | Spencer 1.16–1.63 | [RS2-37](#rs2-37) |
+| 74 | Cohesionless embankment on clay (D&W Fig 7.12) | 1.17 | Spencer 1.20 | RS2-38 *(planned)* |
+| 75 | James Bay dyke, 4 materials (D&W Fig 7.16) | 1.19 | circ 1.45 / non-circ 1.17 | [RS2-42](#rs2-42) |
+| 76 | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | 0.97 / 0.98 | ref 1.08–1.19 | [RS2-40](#rs2-40) |
+| 78 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | 1.04–1.07 | Spencer 1.12–1.20 | [RS2-47](#rs2-47) |
+| 79 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | 1.41 / 1.45 | ref 1.40 / 1.44 | RS2-39/41/43 *(planned)* |
+| 81 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | 1.23 / 1.15 | ref 1.21 / 1.15 | RS2-39/41/43 *(planned)* |
+| 82 | Earth embankment, water table (D&W Fig 14.20-a) | 1.50 | Spencer 1.54 | [RS2-44](#rs2-44) |
+| 83 | Embankment wall (D&W Fig 14.20-b) | 1.29 / 1.30 | Spencer 1.28 / 1.33 | [RS2-45](#rs2-45) |
+| 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | 2.43 | Spencer 2.46, ref 2.43 | *new* (cf. RS2-67) |
+
+**Part 4 in one line:** 52 problems cataloged — 35 already in the corpus as RS2-1…47 rows, 2
+mapping to planned rows (RS2-68 Loukidis, RS2-28/38/39-41-43), and **≈15 genuinely new**
+candidates: the ACADS 1b/2b variants (VP2, VP6), the USACE 2003 embankment set (VP64–69, six
+problems), the Pockoski & Duncan slope 3 and soil-nail wall (VP57, VP60), Zhu's 12-method
+slope (VP51), the Baker/Jiang power-curve and Baker–Leshchinsky safety-map problems (VP41,
+VP42), the Duncan & Wright submerged slope (VP70), and the Huang & Jia rapid-drawdown dam
+(VP102). None are built in tranche 1.
 
 ---
 
@@ -1171,6 +1245,56 @@ it as 15° as well: its Slide2 value for case a (1.011) reproduces Li's own F fo
 <!-- test: file=../files/rocscience/rs2_60a.xlsx, type=circular_search, method=spencer, expected_fs=1.009, num_slices=40, benchmark=RS2-60a -->
 <!-- test: file=../files/rocscience/rs2_60b.xlsx, type=circular_search, method=spencer, expected_fs=1.017, num_slices=40, benchmark=RS2-60b -->
 <!-- test: file=../files/rocscience/rs2_60c.xlsx, type=circular_search, method=spencer, expected_fs=1.008, num_slices=40, benchmark=RS2-60c -->
+
+### RS2-61: Local and global minima, homogeneous slope (Cheng et al. 2007) {#rs2-61}
+
+**Input files:** [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx) (case 1, global minimum)
+
+A homogeneous benched slope, after
+
+> Cheng, Y.M., Lansivaara, T., & Wei, W.B. (2007). "Two-dimensional slope stability analysis
+> by limit equilibrium and strength reduction methods." *Computers and Geotechnics* 34, 137–150.
+
+c = 5 kPa, φ = 30°, γ = 20 kN/m³. The problem exists to show how a search settles onto
+*different* minima: case 1 is the unconstrained global minimum, while cases 2–4 fence an RS2
+Polygon Search Area onto successive shallower **local** minima (published RS2 SSR 1.36 / 1.42 /
+1.42; Cheng 1.375 / 1.415 / 1.40). Only case 1 is locked here — xslope has no search-area
+constraint, and a grid seed on this geometry traps on a steeper local circle at FS ≈ 1.44,
+which is exactly the trap the paper illustrates. Seeding the circular search with a
+toe-to-crest circle refines onto the global minimum:
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer (global min) | 1.338 | Slide2 1.336, RS2 SSRM 1.35 |
+
+*Cross-bearings: Bishop 1.342 (XSLOPE); Cheng et al. limit-equilibrium 1.327.*
+
+The three local-minima cases are a tranche-2 item, gated on a polygon search-area constraint.
+
+<!-- test: file=../files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.338, num_slices=40, benchmark=RS2-61a -->
+
+### RS2-63: Slope stability assessment of a homogeneous slope (Cheng et al. 2007) {#rs2-63}
+
+**Input files:** [rs2_63.xlsx](../files/rocscience/rs2_63.xlsx)
+
+An 11 m homogeneous slope, from the same Cheng, Lansivaara & Wei (2007) paper as
+[RS2-61](#rs2-61). c = 10 kPa, φ = 30°, γ = 20 kN/m³ — a single, well-defined mechanism, so
+LEM and SSRM agree:
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | 1.398 | Slide2 1.380 |
+| SSRM | 1.409 | RS2 SSRM 1.38 |
+
+*Cross-bearings: Bishop 1.401 (XSLOPE); Cheng et al. limit-equilibrium 1.383.*
+
+Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.409 against a
+1.38–1.383 reference band) — a consistent, small offset rather than a method disagreement.
+
+<!-- test: file=../files/rocscience/rs2_63.xlsx, type=circular_search, method=spencer, expected_fs=1.398, num_slices=40, benchmark=RS2-63-lem -->
+<!-- test: file=../files/rocscience/rs2_63.xlsx, type=fem_ssrm, expected_fs=1.409, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, benchmark=RS2-63 -->
+
+![RS2-63: homogeneous slope (Cheng et al. 2007), SSRM 1.409 — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-63.png)
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

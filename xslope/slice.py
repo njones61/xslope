@@ -150,21 +150,12 @@ def get_piezometric_y_coordinates(x_coords, piezo_line):
     return y_coords
 
 
-def circle_polyline_intersections(Xo, Yo, R, polyline):
+def _circle_polyline_all(Xo, Yo, R, polyline):
     """
-    Find intersection points between the bottom half of a circle and a polyline (LineString).
-    Returns a list of shapely Point objects.
+    Every crossing of a full circle with a polyline, unfiltered.
 
-    The `yi < Yo` test is load-bearing, not an optimization. A crossing above the
-    equator means the center sits below the ground surface, so the daylight points
-    bound an arc longer than a semicircle — reverse curvature. The arc built by
-    generate_failure_surface is hardcoded to the bottom semicircle, so such a
-    circle cannot be represented: clipping to the daylight x-range would splice a
-    vertical face from the daylight point down to the bottom arc, inventing an
-    arbitrary-depth tension crack tied to no input and artificially lowering FS.
-    Dropping these points makes the circle read as "never reaches the ground" and
-    it is rejected instead, which is the correct outcome for a search. Removing
-    this test drops vp023 bishop 1.130 -> 0.820 and five other locked searches.
+    Callers almost always want circle_polyline_intersections instead — see its
+    docstring for why crossings above the equator must not reach the slicer.
     """
     intersections = []
     coords = list(polyline.coords)
@@ -176,6 +167,8 @@ def circle_polyline_intersections(Xo, Yo, R, polyline):
 
         # Quadratic coefficients for t
         a = dx**2 + dy**2
+        if a == 0:
+            continue  # zero-length segment
         b = 2 * (dx * (x1 - Xo) + dy * (y1 - Yo))
         c = (x1 - Xo)**2 + (y1 - Yo)**2 - R**2
 
@@ -187,11 +180,62 @@ def circle_polyline_intersections(Xo, Yo, R, polyline):
         for sign in [-1, 1]:
             t = (-b + sign * sqrt_disc) / (2 * a)
             if 0 <= t <= 1:
-                xi = x1 + t * dx
-                yi = y1 + t * dy
-                if yi < Yo:  # Only keep points below the center (bottom half)
-                    intersections.append(Point(xi, yi))
+                intersections.append(Point(x1 + t * dx, y1 + t * dy))
     return intersections
+
+
+def circle_polyline_intersections(Xo, Yo, R, polyline):
+    """
+    Find intersection points between the bottom half of a circle and a polyline (LineString).
+    Returns a list of shapely Point objects.
+
+    The `yi < Yo` test is load-bearing, not an optimization. A crossing above the
+    equator means the center sits below the ground surface, so the daylight points
+    bound an arc longer than a semicircle — reverse curvature. The arc built by
+    generate_failure_surface is the bottom semicircle, so such a circle cannot be
+    represented: clipping to the daylight x-range would splice a vertical face from
+    the daylight point down to the bottom arc, inventing an arbitrary-depth tension
+    crack tied to no input and artificially lowering FS. Dropping these points makes
+    the circle read as "never reaches the ground" and it is rejected instead, which
+    is the correct outcome for a search. Removing this test drops vp023 bishop
+    1.130 -> 0.820 and five other locked searches.
+
+    A circle rejected here can still be scored if the input specifies a tension
+    crack — see _recover_ends_via_tcrack.
+    """
+    return [p for p in _circle_polyline_all(Xo, Yo, R, polyline) if p.y < Yo]
+
+
+def _recover_ends_via_tcrack(ground_surface, circle, tcrack_depth):
+    """
+    Recover the two daylight points for a reverse-curvature circle whose uphill end
+    is resolved by an explicit tension crack. Returns [left, right] or None.
+
+    A tension crack lowers the effective ground surface, but only upstream: the arc
+    exits at the crack on the uphill side, while the toe still daylights on the true
+    ground (soil cracks in tension behind the crest, not at the toe in compression).
+    So each end is taken from its own surface. Lowering the whole surface instead
+    drags the toe down with it and invents a crack there — worth ~8% of FS on VP30,
+    and drifting with crack depth.
+
+    The principled depth is y_uphill - Yo, which puts the uphill exit exactly on the
+    equator; the tolerance below admits that case, which a strict `<` would reject
+    while a hair deeper succeeded.
+
+    Only reachable when tcrack_depth > 0, i.e. when the user asked for a crack.
+    Searches set no crack, so they still reject these circles outright.
+    """
+    Xo, Yo, R = circle['Xo'], circle['Yo'], circle['R']
+    crack_surface = LineString([(x, y - tcrack_depth) for x, y in ground_surface.coords])
+    cpts = sorted((p for p in _circle_polyline_all(Xo, Yo, R, crack_surface)
+                   if p.y <= Yo + 1e-9), key=lambda p: p.x)
+    gpts = sorted(circle_polyline_intersections(Xo, Yo, R, ground_surface), key=lambda p: p.x)
+    if len(cpts) < 2 or not gpts:
+        return None
+    right_facing = cpts[0].y > cpts[-1].y
+    if right_facing:
+        return [cpts[0], gpts[-1]]   # uphill exit at the crack, toe on the true ground
+    return [gpts[0], cpts[-1]]
 
 
 def get_sorted_intersections(failure_surface, ground_surface, circle_params=None):
@@ -285,6 +329,18 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
         success, msg, points = get_sorted_intersections(failure_surface, ground_surface, circle_params=circle)
     else:
         success, msg, points = get_sorted_intersections(failure_surface, ground_surface)
+
+    # A reverse-curvature circle daylights above its equator, which Step 2 cannot see,
+    # so it reads as never reaching the ground. An explicit tension crack lowers the
+    # effective ground on the uphill side and can give that end a valid exit; recover
+    # the ends from their own surfaces and skip Step 3, which has then already been
+    # applied. Gated on tcrack_depth, so searches still reject these circles.
+    tcrack_recovered = False
+    if not success and circular and circle and tcrack_depth > 0:
+        recovered = _recover_ends_via_tcrack(ground_surface, circle, tcrack_depth)
+        if recovered is not None:
+            points, success, tcrack_recovered = recovered, True, True
+
     if not success:
         return False, msg
 
@@ -293,7 +349,7 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     right_facing = y_left > y_right
 
     # --- Step 3: If tension crack exists, find intersection with tension crack surface ---
-    if tcrack_depth > 0:
+    if tcrack_depth > 0 and not tcrack_recovered:
         # Create tension crack surface as parallel offset of entire ground surface
         tcrack_surface = LineString([(x, y - tcrack_depth) for x, y in ground_surface.coords])
 

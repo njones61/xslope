@@ -1981,6 +1981,172 @@ def run_gsz_import_test(test):
     return 0.0, None
 
 
+# A minimal Slide2 model in the sectioned ASCII grammar Slide2 writes. Authored here
+# rather than shipped because Rocscience's own tutorial files are their copyrighted
+# material and are not in this repository (the same reason the .gsz fixture above is
+# synthesised). Two materials over a two-layer slope, a water table the upper layer
+# draws from, and one specified circle — enough to exercise the cell-union geometry,
+# the shared-strength/per-scenario-flag material merge, the 'hu' water mapping, and a
+# round-trip through the .xlsx writer and load_slope_data.
+_SYNTH_SLI = """
+model description:
+  version: 9.027
+  methods: 6
+  units: metric
+  seismic: 0
+  seismicv: 0
+  water: hu
+  direction: right to left
+  gammaw: 9.81
+  nummaterials: 2
+  transient: no
+  design_selection: 0
+
+material types:
+  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 withru: 0
+  soil2 = type: 0 water: 1 wtable: 1 c: 25 phi: 32 uw: 20 hutype: 0 withru: 0
+
+vertices:
+  1 x: 0  y: 0
+  2 x: 40  y: 0
+  3 x: 40  y: 6
+  4 x: 0  y: 6
+  5 x: 40  y: 18
+  6 x: 20  y: 18
+  7 x: 0  y: 9
+  8 x: 40  y: 9
+
+cells:
+  1  vertices: [1,2,3] material: soil2
+  2  vertices: [1,3,4] material: soil2
+  3  vertices: [4,3,5] material: soil1
+  4  vertices: [4,5,6] material: soil1
+
+water table:
+  from_boreholes: 0  vertices: [7,8]
+
+exterior:
+  1  vertices: [1,2,5,6,4]
+
+centers:
+  1 x: 12 y: 30 r: 26 unique_id: {AAAAAAAA-0000-0000-0000-000000000001}
+
+grids:
+
+surfaces:
+
+anchors:
+"""
+
+
+def _write_synthetic_slim(path):
+    """Author a minimal Slide2 .slim — a ZIP of one .sli plus empty sidecars."""
+    import zipfile
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("synthetic.sli", _SYNTH_SLI)
+        zf.writestr("synthetic.slv", "")     # view options — ignored by the reader
+        zf.writestr("synthetic.sltm", "")    # theme — ignored
+
+
+def run_slide2_import_test(test):
+    """Import a synthetic Slide2 .slim and check the model that comes out.
+
+    Guards the schema facts the importer depends on, each silent when wrong:
+      - triangular cells are unioned per material into one zone each, so two
+        materials yield two polygons over the shared vertex table;
+      - c/phi/uw come across, and only Mohr-Coulomb (type 0) maps cleanly;
+      - a 'hu' water table becomes a piezo line, and only materials with wtable = 1
+        draw pore pressure from it;
+      - a specified circle is imported (a search would not be);
+      - the whole model round-trips through the .xlsx writer and load_slope_data.
+    """
+    import tempfile
+    from xslope.slide2 import (read_slim, read_slide2, list_scenarios,
+                               slide2_to_slope_data, import_slmd)
+    from xslope.fileio import (save_slope_data_to_xlsx, load_slope_data,
+                               default_template_path)
+
+    problems = []
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "synthetic.slim")
+        _write_synthetic_slim(path)
+
+        d = read_slim(path)
+        scens = list_scenarios(d)
+        if len(scens) != 1:
+            return None, f"Slide2 import: {len(scens)} scenarios, expected 1"
+
+        sd, caveats = slide2_to_slope_data(d)
+
+        # Two materials, two zones, strengths intact.
+        mats = sd["materials"]
+        if len(mats) != 2:
+            problems.append(f"{len(mats)} materials, expected 2")
+        else:
+            if (round(mats[0]["c"], 3), round(mats[0]["phi"], 3),
+                    round(mats[0]["gamma"], 3)) != (5.0, 30.0, 19.0):
+                problems.append(f"soil1 came across as c={mats[0]['c']} phi="
+                                f"{mats[0]['phi']} gamma={mats[0]['gamma']}, "
+                                f"expected 5/30/19")
+            if (round(mats[1]["c"], 3), round(mats[1]["phi"], 3),
+                    round(mats[1]["gamma"], 3)) != (25.0, 32.0, 20.0):
+                problems.append(f"soil2 came across as c={mats[1]['c']} phi="
+                                f"{mats[1]['phi']} gamma={mats[1]['gamma']}, "
+                                f"expected 25/32/20")
+        if len(sd["polygons"]) != 2:
+            problems.append(f"{len(sd['polygons'])} polygons, expected 2 (the "
+                            f"triangular cells did not union per material)")
+
+        # 'hu' water table -> piezo line; both materials have wtable = 1.
+        if len(sd["piezo_line"]) != 2:
+            problems.append(f"piezo_line has {len(sd['piezo_line'])} points, "
+                            f"expected 2 (the water table did not import)")
+        if [m["u"] for m in mats] != ["piezo", "piezo"]:
+            problems.append(f"materials take u={[m['u'] for m in mats]}, expected "
+                            f"['piezo', 'piezo'] — a 'hu' water table is a piezo line")
+
+        # A specified circle is imported; a search would not be.
+        if len(sd["circles"]) != 1:
+            problems.append(f"{len(sd['circles'])} circles, expected 1")
+        elif round(sd["circles"][0]["R"], 3) != 26.0:
+            problems.append(f"circle R={sd['circles'][0]['R']}, expected 26")
+
+        # A search-only model must report its missing surface, never invent one.
+        d2 = read_slim(path)
+        d2["scenarios"][0]["sections"]["centers"] = []
+        sd_ns, cav_ns = slide2_to_slope_data(d2)
+        if sd_ns["circles"] or sd_ns["non_circ"]:
+            problems.append("a search-only scenario imported a surface it should not")
+        if not any("no failure surface" in c for c in cav_ns):
+            problems.append("a search-only scenario did not report its missing surface")
+
+        # read_slide2 dispatches on extension and agrees with read_slim.
+        if len(list_scenarios(read_slide2(path))) != 1:
+            problems.append("read_slide2 did not dispatch a .slim correctly")
+
+        # Round-trip: the model must survive the .xlsx writer AND reload — solving the
+        # raw dict is not enough (load_slope_data is the real consumer).
+        xlsx = os.path.join(td, "synthetic.xlsx")
+        rcav = import_slmd(path, default_template_path(), xlsx)
+        if not os.path.exists(xlsx):
+            problems.append("import_slmd did not write the .xlsx")
+        else:
+            reloaded = load_slope_data(xlsx)
+            if len(reloaded["materials"]) != 2:
+                problems.append(f"reloaded model has {len(reloaded['materials'])} "
+                                f"materials, expected 2")
+            if not reloaded.get("circular") or len(reloaded["circles"]) != 1:
+                problems.append("the circle did not survive the .xlsx round-trip")
+            if len(reloaded.get("piezo_line") or []) != 2:
+                problems.append("the piezo line did not survive the .xlsx round-trip")
+        if not isinstance(rcav, list):
+            problems.append("import_slmd did not return a caveat list")
+
+    if problems:
+        return None, "Slide2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_vg_kr_test(test):
     """Unit check for the van Genuchten relative-permeability function and the
     kr-model dispatch (xslope.seep). Verifies kr_vg_vec against an independent
@@ -2101,6 +2267,8 @@ def run_test(test):
         return run_dxf_roundtrip_test(test)
     if test_type == 'gsz':
         return run_gsz_import_test(test)
+    if test_type == 'slide2':
+        return run_slide2_import_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'gsat_pair':
@@ -2149,7 +2317,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'gsz', 'vg_kr',
+    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'gsz', 'slide2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -2197,6 +2365,8 @@ def main():
                              'tests (needs ezdxf + PySide6)')
     parser.add_argument('--gsz', action='store_true',
                         help='Run only the GeoStudio (.gsz) import test')
+    parser.add_argument('--slide2', action='store_true',
+                        help='Run only the Slide2 (.slim/.slmd) import test')
     parser.add_argument('--tolerance', type=float, default=0.01,
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
@@ -2225,13 +2395,14 @@ def main():
 
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.roundtrip or args.dxf
-                   or args.gsz)
+                   or args.gsz or args.slide2)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
     run_roundtrip = args.roundtrip or run_all
     run_dxf = args.dxf or run_all
     run_gsz = args.gsz or run_all
+    run_slide2 = args.slide2 or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -2411,6 +2582,15 @@ def main():
                       'method': '-', 'source': 'gsz'})
         if not run_all:
             print("Including 1 GeoStudio import test")
+
+    # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
+    # files are their copyrighted material and are not in this repository), so it needs
+    # no input file and no GUI — engine-only, always runnable.
+    if run_slide2:
+        tests.append({'type': 'slide2', 'file': '(synthetic .slim)',
+                      'method': '-', 'source': 'slide2'})
+        if not run_all:
+            print("Including 1 Slide2 import test")
 
     if args.skip_benchmarks:
         n_before = len(tests)

@@ -738,6 +738,81 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
+def run_deps_declared_test(test):
+    """Every third-party module imported at module scope in xslope/ must be a declared
+    runtime dependency in pyproject.toml.
+
+    A module-scope import that isn't declared makes `pip install xslope` install a
+    package that cannot be imported — while every test here still passes, because the
+    suite runs against the source tree in a dev environment that happens to have the
+    module. `twine check` doesn't catch it either; it only validates metadata. That is
+    exactly how lxml (fileio, since 2026-06-08) and tabulate (solve, advanced) shipped
+    undeclared through releases 0.1.50-0.1.54: six weeks of broken clean installs.
+
+    Import-time is the criterion, not usage. A module imported lazily inside a function
+    may legitimately be an optional extra (ezdxf in cad.py is, and __init__ imports only
+    _version, so a plain `import xslope` never pulls it). One imported at module scope
+    cannot be optional for any module a user imports.
+
+    Returns (0.0, None) if clean, else (None, message).
+    """
+    import ast as _ast
+    root = Path(__file__).parent
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():
+        return None, "pyproject.toml missing"
+
+    # Declared runtime deps: the [project] dependencies array. Parsed by hand so the
+    # check runs on 3.9/3.10 without tomllib.
+    txt = pyproject.read_text()
+    m = re.search(r"^dependencies\s*=\s*\[(.*?)\]", txt, re.S | re.M)
+    if not m:
+        return None, "could not find [project] dependencies in pyproject.toml"
+    declared = {re.split(r"[<>=!\[; ]", s)[0].strip().lower()
+                for s in re.findall(r'"([^"]+)"', m.group(1))}
+
+    # Optional extras are allowed at module scope only in modules the package never
+    # imports on its own; those are opt-in imports by the user.
+    extras = set()
+    for em in re.finditer(r'^\w[\w-]*\s*=\s*\[(.*?)\]', txt, re.S | re.M):
+        for s in re.findall(r'"([^"]+)"', em.group(1)):
+            extras.add(re.split(r"[<>=!\[; ]", s)[0].strip().lower())
+    OPTIONAL_OK = {"ezdxf", "gmsh", "pyside6", "litellm", "keyring", "pyobjc-framework-cocoa"}
+
+    stdlib = getattr(sys, "stdlib_module_names", frozenset())
+    offenders = {}
+    for py in sorted((root / "xslope").glob("*.py")):
+        try:
+            tree = _ast.parse(py.read_text())
+        except SyntaxError as e:
+            return None, f"could not parse {py.name}: {e}"
+        for node in tree.body:                       # module scope only
+            mods = []
+            if isinstance(node, _ast.Import):
+                mods = [a.name.split('.')[0] for a in node.names]
+            elif isinstance(node, _ast.ImportFrom):
+                if node.level:                        # relative -> in-package
+                    continue
+                if node.module:
+                    mods = [node.module.split('.')[0]]
+            for mod in mods:
+                low = mod.lower()
+                if mod in stdlib or mod == "xslope" or low in declared:
+                    continue
+                if low in OPTIONAL_OK:
+                    continue
+                offenders.setdefault(mod, []).append(py.name)
+
+    if offenders:
+        parts = [f"{mod} ({', '.join(sorted(set(files)))})"
+                 for mod, files in sorted(offenders.items())]
+        return None, ("imported at module scope but not a declared runtime dependency: "
+                      + "; ".join(parts)
+                      + " — add to [project] dependencies in pyproject.toml, or make the "
+                        "import lazy if it is genuinely optional")
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -2498,6 +2573,8 @@ def run_test(test):
         return run_rs2_import_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
+    if test_type == 'deps_declared':
+        return run_deps_declared_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -2544,7 +2621,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'template_sync', 'deps_declared', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -2767,6 +2844,10 @@ def main():
         # from their editable docs masters.
         tests.append({'type': 'template_sync', 'file': BUNDLED_TEMPLATE,
                       'method': '-', 'source': 'template'})
+        # Guard that every module-scope third-party import is a declared runtime dep,
+        # so `pip install xslope` yields a package that actually imports.
+        tests.append({'type': 'deps_declared', 'file': 'pyproject.toml',
+                      'method': '-', 'source': 'packaging'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})

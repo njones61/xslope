@@ -2237,7 +2237,10 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
             rows.append({'x1': faces[t] + 0.05, 'y1': y, 'x2': faces[t] + L, 'y2': y,
                          't_max': ta, 't_res': float('nan'),
                          'lp1': ta / (po * d1), 'lp2': ta / (po * d2),
-                         'E': float('nan'), 'area': float('nan'),
+                         # EA = 2e3 kN/m (the RS2 SSRM geotextile-truss convention,
+                         # same as the vp032/RS2-24 files) so the same file runs the
+                         # FEM SSRM as well as the LEM; the LEM ignores E/area.
+                         'E': 2e4, 'area': 0.1,
                          'label': f'T{t + 1}L{k + 1}', 'type': 'geosynthetic',
                          'dir': 'axial', 'appl': 'passive',
                          'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
@@ -2842,28 +2845,36 @@ def vp042():
 
 def vp043():
     """Slide #43 / Baker (2001): planar (Culmann) failure through the toe of
-    a steep homogeneous slope ((0,0)-(3,10) face, crest to (20,10); c'=30,
-    phi'=30, gamma=20, dry). Slide Janbu simplified on the critical plane:
-    1.352 at 49.5 deg (RocPlane 1.351, Baker's Culmann 1.35; Slide circular
-    1.329). A 3-m apron is added left of the toe so the surface has ground
-    to cross. Stored surface = the 49.5-deg critical plane."""
-    import math
+    a steep homogeneous slope (c'=30, phi'=30, gamma=20, dry), evaluated on the
+    critical plane that daylights at X = x/H = 0.85 on the backslope.
+
+    Geometry is pinned to the SLOPE/W model for the same problem (GeoStudio
+    manual sec. 2.26, benchmarks/geostudio/build_gs2_26.py): H = 10 m, crest
+    offset 2.5 m -> face angle atan(10/2.5) = 75.96 deg, backslope flat to
+    x = 20. The critical slip plane runs from the toe (0,0) to the daylight
+    point (8.5, 10) -- inclination atan(10/8.5) = 49.6 deg, matching Slide's
+    reported critical-plane angle (~49.5 deg). Both endpoints lie exactly on
+    the ground surface, so no construction apron is needed.
+
+    The earlier build inferred a 3.0 m crest offset (face 73.3 deg) from the
+    manual's unlabeled figure and read Spencer ~1.43 against the ~1.35
+    references; reading the exact 2.5 m offset out of the SLOPE/W model resolves
+    the discrepancy. Slide/RocPlane/Baker report ~1.35 (Slide circular 1.329)."""
     sd = load_slope_data(ACADS_1A)
     m = sd['materials'][0]
     m.update(name='Material 1', c=30.0, phi=30.0, gamma=20.0, option='mc', u='none')
     sd['materials'] = [m]
     sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(-3.0, 0.0), (0.0, 0.0), (3.0, 10.0), (20.0, 10.0)]},
+        {'mat_id': 0, 'coords': [(0.0, 0.0), (2.5, 10.0), (20.0, 10.0)]},
     ]
-    sd['max_depth'] = -3.0
+    sd['max_depth'] = 0.0
     sd['circular'] = False
     sd['circles'] = []
-    run = 10.0 / math.tan(math.radians(49.5))
+    # Critical planar surface: toe (0,0) to the daylight point at x/H=0.85
+    # (8.5, 10) on the flat backslope -- the SLOPE/W critical plane.
     sd['non_circ'] = [
-        {'X': -0.3, 'Y': 0.21, 'Movement': 'Free'},
         {'X': 0.0, 'Y': 0.0, 'Movement': 'Free'},
-        {'X': run, 'Y': 10.0, 'Movement': 'Free'},
-        {'X': run + 0.3, 'Y': 10.21, 'Movement': 'Free'},
+        {'X': 8.5, 'Y': 10.0, 'Movement': 'Free'},
     ]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp043.xlsx'))
     return 'vp043.xlsx'

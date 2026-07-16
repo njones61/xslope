@@ -54,6 +54,17 @@ earlier global-norm test.
 
 ## Status
 
+**Completeness.** Where a problem cannot be reproduced, the row says why rather than leaving a blank.
+The *no lock possible* rows are final, and split into two kinds: the measured pore-pressure-grid
+embankments (RS2-8/9), whose printed grids are construction-induced pressures with no flow field
+behind them; and cases whose *published* SSRM value depends on a "can't fail" elastic region rather
+than the mechanics (RS2-9/23), which is a vendor modelling artifice with no reproducible physics
+target — those slopes are anchored by their LEM lock instead. The *blocked* rows are tracked against
+a named feature gap — the FEM has no r<sub>u</sub> option yet (RS2-27) and no transient-seepage
+solver (RS2-67), and some FE-seepage cases do not converge on the high-contrast tri6 mesh. Everything
+else is built and regression-locked at its tagged mesh; the corpus is complete relative to what is
+independently verifiable.
+
 ### Part I (1–34)
 
 | # | Problem | Status | XSLOPE file / results |
@@ -108,8 +119,7 @@ earlier global-norm test.
 | [45](#rs2-45) | Varying undrained shear strength profiles (D&W Fig 14.20-b) | **built** (caveat) | [vp083a](../files/rocscience/vp083a.xlsx) / [b](../files/rocscience/vp083b.xlsx). SSRM 1.31 / 1.31 vs RS2 SSRM 1.32 / 1.32 (D&W referee 1.28–1.33). |
 | [46](#rs2-46) | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | **built** | [vp084a–d](../files/rocscience/vp084a.xlsx). SSRM 0.79 / 0.93 / 1.06 / 1.15 vs RS2 SSRM 0.78 / 0.93 / 1.05 / 1.15 (±1%); D&W 0.75 / 0.90 / 1.03 / 1.13. |
 | [47](#rs2-47) | Purely cohesive slope, varying thickness (D&W Fig 14.3) | **built** (30-ft case) | [vp078.xlsx](../files/rocscience/vp078.xlsx). SSRM 1.08 vs RS2 SSRM 1.03; D&W referee 1.124–1.135. The 46.5- and 60-ft variants are deferred. |
-| [48–54](#rs2-48) | Multi-tiered geotextile walls (Leshchinsky & Han 2004) | *blocked* | Slide2 [VP87](rocscience.md#vp87)–VP93. The FEM reinforcement tensile-capacity cap is not enforced in SSRM. Extraction and published tables are complete for all seven; the series unlocks together when the cap is fixed. |
-| 55 | Five 1.8-m tiers | *blocked* | Slide2 VP94; belongs to the #48–54 family — blocked with the series. |
+| [48–55](#rs2-48) | Multi-tiered geotextile walls (Leshchinsky & Han 2004) | **built** (baseline) / partial | Slide2 [VP87](rocscience.md#vp87)–VP94. The SSRM now enforces the geotextile tensile-capacity cap; the baseline wall (vp087) verifies at SSRM 0.981 vs L&H ≈1.0 / Slide 1.04. Of the seven parametric variants, four converge (0.76–1.10, bracketing ≈1.0) and three (vp089 / vp090 / vp093) do not reach equilibrium on this mesh — the remaining tracked gap. |
 | [56](#rs2-56) | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | **built** | [rs2_56a](../files/rocscience/rs2_56a.xlsx) / [b](../files/rocscience/rs2_56b.xlsx). All five within ±3.3% of RS2's M-C and inside the four-program band; locks bracket the family (0.664 / 2.096). Full tables in [the Pruska section](#pruska). |
 | [57](#rs2-57) | Pruska H = 10.5 m, 6 cases | **built** | [rs2_57a](../files/rocscience/rs2_57a.xlsx) / [b](../files/rocscience/rs2_57b.xlsx). All six within ±3.6% of RS2's M-C; locks 0.440 / 1.389. Full tables in [the Pruska section](#pruska). |
 | [58](#rs2-58) | Pruska H = 14 m, 6 cases | **built** (5 of 6) | [rs2_58a](../files/rocscience/rs2_58a.xlsx) / [b](../files/rocscience/rs2_58b.xlsx). Four within ±3.6%; case 5 reads 0.667 vs a published 0.72–0.75 cluster and is unlocked pending explanation; locks 0.328 / 1.029. |
@@ -967,21 +977,34 @@ The 46.5- and 60-ft variants (RS2 1.02 / 1.02) need deepened-base builds and are
 
 ![RS2-47: 30-ft case (vp078) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-47.png)
 
-### RS2-48–54: Multi-tiered geotextile walls (Leshchinsky & Han 2004) {#rs2-48}
+### RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004) {#rs2-48}
 
-Slide2 counterparts: [VP87](rocscience.md#vp87)–VP93 (one-for-one, verified; only VP87 has a
-detail section on the LEM page). *Blocked*.
+Slide2 counterparts: [VP87](rocscience.md#vp87)–VP94 (one-for-one, verified; only VP87 has a
+detail section on the LEM page). Baseline SSRM built; parametric variants partial.
+
+The SSRM enforces the geotextile tensile-capacity cap, so a strength-reduced wall fails through
+the reinforced mass and the factor of safety responds to the reinforcement. On the baseline
+three-tier wall this reproduces the published stability:
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM (baseline wall, reinforced — any T<sub>a</sub>) | 1.72 | ≈1.0 |
-| SSRM (baseline wall, unreinforced) | 0.41 | — |
+| SSRM (baseline wall, vp087, T<sub>a</sub> = 10 kN/m) | 0.981 | L&H 0.99 (FLAC) / 1.00 (Bishop); Slide 1.04 |
 
-*The FEM reinforcement tensile-capacity cap is not enforced in SSRM, which is why the SSRM is provably T<sub>a</sub>-insensitive on the baseline wall.*
+**Input files:** [vp087.xlsx](../files/rocscience/vp087.xlsx) (baseline) through
+[vp094.xlsx](../files/rocscience/vp094.xlsx). Geotextile modelled as an FEM truss with
+EA = 2×10³ kN/m (the RS2 SSRM convention).
 
-Extraction and published tables are complete for all seven; the series unlocks together when
-the cap is fixed. Problem 55 (five 1.8-m tiers, Slide2 VP94) belongs to this family and is
-blocked with the series.
+Across the seven parametric variants (vp088–vp094 — fill quality, reinforcement length/type,
+foundation soil, water, surcharge, tier count), the SSRM converges on four, landing 0.76–1.10
+and bracketing the published ≈1.0 (as RS2's own four-program spread, 0.86–1.04, does — the
+lowest, vp091, is the c = 0/φ = 18° foundation case that fails in bearing, where L&H's FLAC
+likewise drops to 0.86). Three do not reach equilibrium on this mesh — vp089 (short 4.2 m
+reinforcement), vp090 (dual geotextile type) and vp093 (crest surcharge) drop to the
+auto-bracket floor — a mesh/reinforcement-geometry convergence gap that is now the remaining
+named issue for those three. Only the baseline is regression-locked; the variants are recorded
+as attempted.
+
+<!-- test: file=../files/rocscience/vp087.xlsx, type=fem_ssrm, expected_fs=0.981, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=1.3, max_iter=16000, benchmark=RS2-48 -->
 
 ### RS2-56: Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) {#rs2-56}
 

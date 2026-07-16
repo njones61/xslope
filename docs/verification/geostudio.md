@@ -126,6 +126,15 @@ All 47 sections of the manual. **built** = an XSLOPE input file with verified re
 problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged there; *partial*, *blocked*,
 *planned* as in that corpus. Rows that share a problem with Rocscience link to it, and it links back.
 
+**Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
+row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no
+seepage solution can regenerate it — a final gap it shares with the Slide2 corpus. The *blocked* / *partial*
+rows are each tracked against a named gap: a strength or geometry model XSLOPE does not yet have (§2.16's
+flat-ground bearing mechanism behind the flat-arc guard, §2.47's dip-relative anisotropic/compound strength),
+or a source document not yet in hand (§2.25's B&L paper, the §2.35–2.37/2.39 Pockoski & Duncan and Loukidis
+reports). Everything else is built and verified, or covered by the regression-locked Rocscience build; the
+corpus is complete relative to what is independently verifiable.
+
 **Manual edition.** The manual tracked here is the **2025.2 edition**. Its 47
 two-dimensional problems (chapter 2, "Verifications – 2D", §2.1–2.47) are carried
 unchanged from the October 2022 edition, so the section numbering below is valid against
@@ -472,8 +481,9 @@ reproduce the manual's printed layer-bottom strengths to the digit). The geosynt
 (Tmax = 200 kN/m, interface friction 33.7°, unanchored) is laid at y = 1.0 across the
 embankment base as an axial geosynthetic; on the critical surface it is fully embedded,
 so the full 200 kN/m develops and the factor of safety is insensitive to the bond
-length. This is a GeoStudio-only problem — the full geometry is in the builder
-(`benchmarks/geostudio/build_gs2_18.py`).
+length. This is also [Slide2 VP31](rocscience.md) (the same Borges & Cardoso Case 2,
+materials matching to rounding), which is *covered* by this build; the full geometry
+is in the builder (`benchmarks/geostudio/build_gs2_18.py`).
 
 **Input:** [gs2_18.xlsx](../files/geostudio/gs2_18.xlsx)
 

@@ -154,6 +154,17 @@ def circle_polyline_intersections(Xo, Yo, R, polyline):
     """
     Find intersection points between the bottom half of a circle and a polyline (LineString).
     Returns a list of shapely Point objects.
+
+    The `yi < Yo` test is load-bearing, not an optimization. A crossing above the
+    equator means the center sits below the ground surface, so the daylight points
+    bound an arc longer than a semicircle — reverse curvature. The arc built by
+    generate_failure_surface is hardcoded to the bottom semicircle, so such a
+    circle cannot be represented: clipping to the daylight x-range would splice a
+    vertical face from the daylight point down to the bottom arc, inventing an
+    arbitrary-depth tension crack tied to no input and artificially lowering FS.
+    Dropping these points makes the circle read as "never reaches the ground" and
+    it is rejected instead, which is the correct outcome for a search. Removing
+    this test drops vp023 bishop 1.130 -> 0.820 and five other locked searches.
     """
     intersections = []
     coords = list(polyline.coords)

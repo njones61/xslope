@@ -24,9 +24,9 @@ rather than leaving a blank. The *no lock possible* rows are final: the measured
 embankments (VP11–13) print construction-induced excess pressures with no flow field behind them, so
 no seepage solution can regenerate them, and XSLOPE deliberately takes water only as piezometric
 lines, r<sub>u</sub>, or FE seepage. The remaining *blocked* / *partial* rows are each tracked
-against a named gap — a vendor-specific construction the physics does not share (VP30's automatic
-reverse-curvature tension crack) or a source artifact not yet in hand (VP46's discrete drawdown
-strength functions) — not an open-ended backlog. Everything else is built and regression-locked; the
+against a named gap — a modelling capability XSLOPE does not have (VP30's reverse-curvature
+circles, which bound an arc longer than a semicircle) or a source artifact not yet in hand
+(VP46's discrete drawdown strength functions) — not an open-ended backlog. Everything else is built and regression-locked; the
 corpus is complete relative to what is independently verifiable.
 
 <!-- test: file=../files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
@@ -204,7 +204,7 @@ corpus is complete relative to what is independently verifiable.
 | [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 manual slope (undulating bedrock, zero-strength cap, γ/γsat split, WT). Uses the piezometric-line Type=`phreatic` flag (template v13) this problem requires: all six methods land 1.9% below Slide/XSTABL uniformly (Bishop 1.369 vs 1.396/1.397), within the ±2 ft pixel-traced water table. |
 | [28](#vp28) | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | **built** (3 of 10 cases) | [vp028a](../files/rocscience/vp028a.xlsx) / [b](../files/rocscience/vp028b.xlsx) / [c](../files/rocscience/vp028c.xlsx). Chowdhury & Xu (1995): Congress St. Cut + embankment on soft clay, fixed printed circles. Bishop 1.129 / 1.158 / 1.177 vs Slide 1.128 / 1.160 / 1.185; TSPM PF 22.1 / 21.6 / 21.2% vs Slide MC 24.6 / 21.2 / 19.9%. Deep Congress-St. mode and Examples 2–4 not locked — inputs underdetermined (see section). Also [SLOPE/W §2.17](geostudio.md) — same problem in the GeoStudio corpus. |
 | [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](../files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical TSPM problem, targeted against BOTH primary sources. Duncan's surface as a smooth least-squares arc (RMS 1.1 ft against the trace): Spencer 1.145 vs Duncan 1.17 / Slide 1.157. TSPM with Slide's published σ inputs: β_ln 0.936, **PF 17.5% vs Duncan's own 18%** (Slide's Monte Carlo: 14%); the γ term matches Duncan's table (ΔF 0.203 vs 0.20). Published PF spans 14–33% across sources — the σ-input choice dwarfs the estimator. |
-| 30 | Reinforced embankment, (4) materials, tension crack, geosynthetic | *blocked* | Borges & Cardoso (2002) Case 1. Both reference circles have reverse curvature, and Slide auto-inserts a tension crack in that portion (Slide 1.69 / 1.66 vs Borges 1.77 / 1.74 — the manual attributes the gap to exactly this) — an artifice XSLOPE deliberately does not reproduce (it never synthesizes a free vertical crack from reverse curvature). Matching Borges' own 1.77 / 1.74 instead would need the Case-1 embankment geometry, which — unlike Case 2's — is not pinned to a vendor model; the Case-1 clay profile also has a middle layer whose strength *decreases* with depth (8.49 → 4.725). Tracked as a named gap. |
+| [30](#vp30) | Reinforced embankment, (4) materials, tension crack, geosynthetic | *blocked* | Borges & Cardoso (2002) Case 1 — geosynthetic-reinforced embankment on soft clay. Cases 2 and 3 are VP31 and [VP32](#vp32). |
 | 31 | Reinforced embankment, (5) materials, geosynthetic | covered | Borges & Cardoso (2002) Case 2 — the same problem is built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) ([gs2_18.xlsx](../files/geostudio/gs2_18.xlsx)): identical embankment (c'=0, φ'=35, γ=20), the four depth-varying soft-clay layers (Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding) and the unanchored 200 kN/m geosynthetic (δ=33.7°). M-P 1.153 / Bishop 1.154 vs SLOPE/W 1.171 / 1.170 and B&C 1.15 — the same reference as Slide2's Circle A/B (Slide 1.18 / 1.16, Borges 1.19 / 1.15). The reverse-curvature blocker noted for VP30 does not arise on the critical circle. |
 | [32](#vp32) | Reinforced embankment, (7) materials, geosynthetic | **built** | [vp032a](../files/rocscience/vp032a.xlsx) / [b](../files/rocscience/vp032b.xlsx) / [c](../files/rocscience/vp032c.xlsx). Borges & Cardoso (2002) case 3, geometry from the RS2 manual's fully labeled figures for the same problem (Slide2's own are unlabeled): on the three printed circles, Bishop/Spencer 1.218 / 1.216 / 0.981 vs Slide2 1.23 / 1.22 / 0.98 and Borges 1.25 / 1.19 / 0.99. |
 | [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](../files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke: the critical surface is composite (circle truncated at the model base, running flat in the presheared clay-shale). Bishop 1.299 vs Slide 1.305 / El-Ramly 1.31 on Slide's circle; composite grid search digs to 1.253. PF not locked (see section). Also [SLOPE/W §2.20](geostudio.md) — same problem in the GeoStudio corpus. |
@@ -759,6 +759,69 @@ Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Fran
 *Surface provenance: the arc is anchored at the trench corner (138, −120) rather than Slide's printed left endpoint, which is pulled 0.25 ft below the trench floor; the drawn surface in Slide's figure is partially occluded by a coordinate label near its entry, so that span is read at the label's edges. On the probabilistic side, note that the same slope carries three published probabilities of failure — 14% (Slide MC), 18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, wider 2σ-rule envelope): two TSPM analyses by the same author differ by more than TSPM differs from Monte Carlo, so the σ-input choice, not the estimator, dominates probabilistic comparisons.*
 
 ![vp029: inputs and representative solution](images/vp029.png)
+
+### VP30: Reinforced embankment, (4) materials, tension crack, geosynthetic {#vp30}
+
+Borges & Cardoso (2002)'s first geosynthetic-reinforced embankment on soft clay: a 2 m
+symmetric embankment, 10.6 m crest, 2:3 (V/H) faces, on a 5 m saturated clay layer over a
+rigid stratum, with one unanchored geosynthetic level (T = 200 kN/m) at the fill base. The
+paper's other two embankments are both built: Case 2 as VP31, covered by
+[SLOPE/W §2.18](geostudio.md#gs-2-18), and Case 3 as [VP32](#vp32).
+
+Every input is pinned. The manual prints the materials (Table 30.2) and the reinforcement;
+the paper supplies the geometry (§4.1) and, in its Table 10, both published circles
+explicitly — center (1.0, 1.0), R = 5.74 (A) and R = 5.24 (B) — with the resisting moment
+broken out by foundation / embankment / reinforcement. The two sources agree to the digit
+(A: M<sub>O</sub> 631.38 / M<sub>R</sub> 1114.70 vs the manual's 631 / 1115), and
+M<sub>RR</sub> = 200.00 on every circle fixes the datum: 200 kN/m on a 1.0 m arm puts the
+geosynthetic at y = 0.
+
+| Circle | XSLOPE | Slide2 | Borges & Cardoso |
+|---|---|---|---|
+| A | *not built* | 1.69 | 1.77 |
+| B | *not built* | 1.66 | 1.74 |
+
+*Not blocked on data — blocked on a modelling capability, and the two published columns are
+not the same kind of unreachable. See below.*
+
+**Both circles have reverse curvature**, which here has a precise meaning: their center sits
+below the crest, so the arc's uphill end is buried at its equator and the daylight points lie
+*above* the equator (circle A enters the crest at y = 2.0 with Y<sub>o</sub> = 1.0). The
+failure arc they bound therefore exceeds a semicircle — 190° for A, 195° for B.
+`generate_failure_surface` builds the arc as exactly the bottom semicircle, so neither circle
+is representable, and `circle_polyline_intersections` drops the above-equator crossings so
+they read as "never reaches the ground" and are rejected. That rejection is deliberate: were
+the points kept, the clip to the daylight x-range would splice a vertical face from the
+daylight point down to the bottom arc — an arbitrary-depth crack tied to no input, which
+artificially lowers FS (removing the guard drops [VP23](#vp23)'s locked search from 1.130 to
+0.820).
+
+**Slide's 1.69 / 1.66 are reachable; the guard is what stands in the way.** Slide gets its
+values by auto-cracking the reverse-curvature portion, and the manual attributes its own gap
+to the source to exactly that. The equivalent in XSLOPE is `tcrack_depth`, which clips at a
+proper offset surface, and the principled depth is not a fudge: the reverse-curvature portion
+*is* the arc above the equator, and the equator lies at Y<sub>o</sub>, so the crack depth is
+y<sub>crest</sub> − Y<sub>o</sub> = 1.0 m. Scored that way — crack applied to the uphill end
+only, guard lifted — XSLOPE reads **1.679** and **1.650** against Slide's 1.69 / 1.66
+(−0.7% / −0.6%), and the answer is flat for any crack from 0.90 to 1.25 m because the arc is
+near-vertical where the crack cuts it. The row stays unbuilt only because the guard cannot
+simply be lifted; making this scoreable needs the crack path reachable *without* re-admitting
+invented cracks into searches. Tracked as a named gap.
+
+**Borges' 1.77 / 1.74 are a different matter, and are final.** They come from a moment-based
+limit equilibrium method integrating the whole arc, overhang included. A method of vertical
+slices cannot represent that arc at all: between the crest entry and the equator the surface
+doubles back 89 mm, so one x-position carries two depths. This is not a guard that could be
+relaxed — it is what slicing *is*. A crack removes the overhang, but a cracked surface is
+Slide's problem, not Borges'.
+
+One note for whoever builds it: the Case-1 clay profile has a middle layer whose undrained
+strength *decreases* with depth (8.49 → 4.725, manual Table 30.2 = paper Table 4), unlike the
+monotonically increasing profiles in Cases 2 and 3. The paper explains it — the top metre
+consolidated during construction (~14 kPa), so its strength was computed at the raised stress.
+
+**Sources:** Slide Slope Stability Verification Manual §30; Borges & Cardoso (2002),
+*Geotextiles and Geomembranes* 20(6), 395–421.
 
 ### VP32: Reinforced embankment, (7) materials, geosynthetic {#vp32}
 

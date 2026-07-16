@@ -417,15 +417,54 @@ The viscoplastic iteration loop requires a convergence criterion to determine wh
 
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
 
-2. **Plastic flow stopped** — the per-iteration change of the accumulated viscoplastic body-load vector (measured by the unbalanced force ratio, dUFR) must decay below 1% of its own peak for the solve. At true equilibrium no Gauss point is yielding, the body loads freeze, and dUFR → 0; a failing state pumps body loads at a constant rate indefinitely. Because the threshold is *relative to the solve's own peak*, the test is dimensionless and scale-free — independent of unit system, domain size, and the size of the yielding zone. The measured separation between settled and creeping states is roughly two to three orders of magnitude.
+2. **Force equilibrium** — the criterion of Dawson, Roth & Drescher (1999): every node's out-of-balance force, normalized by the gravitational body force acting on *that* node, must fall below a tolerance:
+
+>>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \text{force\_tol}$
+
+Because this is an initial-stress viscoplastic scheme, each solve enforces $\int B^T D(Bu - \varepsilon^{vp})\,dV = F_{ext}$ *exactly* using the previous iteration's plastic strains. The state is therefore always in equilibrium with the stresses it was built from, and what is still out of balance is the amount by which the viscoplastic body load is **still changing** — the increment of $\{loads\} - \{loads\}_{base}$ between iterations. When plastic flow genuinely ceases that increment decays to zero and the stress field is both admissible and in equilibrium. When the slope is failing, flow never ceases: the increment plateaus at a non-zero value and feeds displacement indefinitely.
+
+The **locality** of this test is what makes it trustworthy. The increment is non-zero only at nodes adjacent to Gauss points that are still flowing, so material added to the mesh that merely sits there in equilibrium — a deeper foundation, a longer runout — contributes exactly zero and cannot shift the maximum. A *global* norm ratio, $\|\mathbf{r}\| / \|\mathbf{F}_{grav}\|$, measures the failure mechanism against the weight of the entire mesh and offers no such protection: padding the domain changes the yardstick without changing the slope.
+
+The denominator is a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ over the elements touching the node — *not* the consistent nodal gravity load. For a 6-node triangle the consistent load at a corner node is exactly zero (the corner shape function integrates to zero over the element, so the whole element weight goes to the midsides), and quad8 corners carry a small *negative* load. Normalizing by those would divide the residual by nothing at roughly a quarter of the nodes in any tri6 mesh. The lumped weight is what "the body force acting on that node" actually means, and it is strictly positive everywhere.
+
+The state is in equilibrium when the maximum falls below `force_tol`; a failing state plateaus above it. The size of the gap between the two regimes is problem-dependent and is **not** guaranteed to be large. On a Hoek–Brown slope it spans several orders of magnitude; on the flagship Griffiths & Lane benchmark the marginal failing plateau sits about two orders above the default tolerance; but on a Mohr-Coulomb slope with a non-associated flow rule it can close entirely, for the reason below.
+
+Three dependencies are worth knowing, because the tolerance is absolute:
+
+>- **The yield-surface limit cycle (why `oob_window` exists).** A *one-iteration* increment does not decay on a settled slope. Gauss points resting exactly on the yield surface flip their flow direction on alternate iterations, producing a clean **period-2** oscillation in the viscoplastic body load — measured $\cos(\Delta L_n, \Delta L_{n-1}) = -1.0000$ with $|\Delta L|$ pinned at a constant, on a model whose displacements were frozen to four decimals and whose accumulated body load was frozen to seven significant figures. Its amplitude is proportional to $\Delta t$, so damping the timestep shrinks it but never removes it: no iteration budget and no `dt_scale` can clear it, and a stable slope is reported as failing forever. This is what made the predicate non-monotone in $F$ and the bisection ill-posed. Averaging the increment over `oob_window` iterations (default 10) cancels the mode exactly while leaving genuine plastic drift ($\cos = +1$) untouched, and restores monotonicity. The verdict is insensitive to the width — 10, 50 and 200 agree on the same $F$ at the same iteration — so this rejects a specific numerical mode rather than tuning a threshold. Note this is **not** the tension apex: enabling `tension_cutoff` does not remove the floor (measured: no change at all on RS2-40, and still ~45× above tolerance on RS2-4).<br>
+>- **Iteration count.** The test demands *actual* force equilibrium rather than a decayed rate, and displacements settle long before the per-node maximum does (a benchmark whose $\max|u|$ is frozen by iteration ~5,000 may only reach `force_tol` at ~11,000). Budget roughly **3× the iterations** the older rate-based criterion needed; a ceiling set too low silently truncates a converging solve and reports it as failure, biasing FS **low**.<br>
+>- **Element size.** The ratio scales roughly as $1/h$ — the numerator is an internal-force residual ($\sim\sigma h$) while the denominator is a body force ($\sim\gamma h^2$). A coarser mesh therefore narrows the margin.<br>
+>- **Timestep scale.** The residual is the *increment* of the viscoplastic body load, which is proportional to $\Delta t$. Shrinking `dt_scale` shrinks the residual without making the slope any more stable, so a failing state can be driven under an absolute `force_tol` and reported as converged. Leave `dt_scale` at 1.0 unless you have a specific reason not to, and never lower it to force a reluctant model to "converge".
 
 **Implementation in XSLOPE:**
 
->- Default tolerance: $\text{tol} = 10^{-3}$; plastic-settled threshold: 1% of the per-solve dUFR peak<br>
->- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point)<br>
->- Displacement limit: viscoplastic displacement > `max_disp_factor` (default 0.1) × mesh height ⇒ failed, regardless of the convergence tests
+>- Default tolerances: $\text{tol} = 10^{-3}$ (displacement); $\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value)<br>
+>- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point). A genuinely stable trial that exhausts the ceiling is called *failed*, which biases the factor of safety **low** — the conservative direction.<br>
+>- Displacement limit: viscoplastic displacement > `max_disp_factor` × mesh height ⇒ failed. **Disabled on the default criterion**, and deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a model is given a deeper foundation. The force-equilibrium test has no such dependence and supersedes it.
 
 **Submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) converge like any other problem under the effective-stress pore-pressure formulation combined with consistent boundary-load integration: the submerged soil carries its buoyant weight, the flooded surface skin is in compression, and trials below the critical strength-reduction factor reach true equilibrium (the G&L Example 6 dam at $F = 1$ settles in a handful of iterations). A useful sanity check for any submerged model is to run a single solve at $F = 1$ and confirm it converges quickly with an essentially elastic strain field — flooded ground at working strength must sit quietly; if it does not, suspect the inputs (loads inconsistent with boundary pore pressures) rather than tightening solver knobs. Two numerical requirements matter for this problem class: quadratic **triangles** (tri6) are preferred over quad8 (the 2×2 reduced-integration quad has a zero-energy hourglass mode that persistent near-surface forcing can excite), and the boundary tractions must be integrated **consistently** over the element edges (XSLOPE does this automatically; see *Boundary Conditions* above).
+
+### Surficial (Skin) Failures and the Minimum-Slip-Depth Filter
+
+On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide running parallel to the slope, with $FS = \tan\phi / \tan\beta$ — a result that is *independent of depth*, so the shallowest surface governs. The per-node force-equilibrium criterion detects this "skin" faithfully, and because it is the true global minimum the reported factor of safety can sit well below a deeper, more conventional mechanism — and below published values that report the deeper one. This is physically correct but often not the engineering question, and the steep, purely frictional faces of embankment dams are where it shows up most.
+
+The optional **`min_slip_depth`** parameter — on both `solve_fem`/`solve_ssrm` and the LEM searches, **off by default** — excludes any failure shallower than the given depth below the ground surface, so the analysis reports the deeper mechanism instead. It is the finite-element analogue of the minimum-slip-depth filter that limit-equilibrium codes (e.g. Slide2) apply to the same effect. With the filter off, the reported factor of safety is the true global minimum, skin included.
+
+**Choosing `min_slip_depth`.** As you increase the depth, the factor of safety follows a characteristic curve: it holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the cutoff clears the band, then **flattens onto a plateau** — the deep-seated factor of safety. Because of that plateau, the choice is robust: any depth on the flat part returns the same FS.
+
+So don't pick one value blind — **sweep it and find the plateau.** Run the analysis at a handful of depths (say 5, 10, 15, 20, 25 % of the slope height) and watch the FS:
+
+>- Still rising → the cutoff is inside the surficial band; go deeper.<br>
+>- Flat → you are on the plateau; that value is the deep-seated FS. Report it.<br>
+>- Practical starting point: **~10–20 % of the slope height** (both dam benchmarks reach their plateau within that band).
+
+Read the result as a diagnostic, too:
+
+>- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: the 1.68 downstream-face skin vs a ~1.8 deeper mechanism the filter recovers; the deeper value is mesh-sensitive and is not the dam's benchmark FS — the skin is, see [RS2-4](../verification/rs2.md#rs2-4)).<br>
+>- A small gap means no significant skin — the deep mechanism already governs; leave the filter off.<br>
+>- If the FS never flattens and keeps climbing toward a large fraction of the slope height, you have gone past the real mechanism and are excluding genuine failure — back off to where it plateaued. (Set the depth deeper than the mesh itself and the solver refuses outright rather than returning a false answer.)
+
+Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism, keeping an LEM/SSRM comparison on like-for-like surfaces.
 
 ### The `solve_fem()` Function
 
@@ -491,7 +530,9 @@ Determining the critical factor of safety in the SSRM requires a criterion to di
 
 #### 1. Non-Convergence (`"non_convergence"`, default)
 
-The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and the plastic-flow-stopped test are satisfied (see Convergence Criterion above) — so the bisection brackets the genuine boundary between states that reach static equilibrium and states that creep indefinitely. The result is insensitive to the pseudo-timestep, tolerance, and ceiling because the settled test is scale-free and the creeping states never satisfy it at any ceiling.
+The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and the force-equilibrium test are satisfied (see Convergence Criterion above) — so the bisection brackets the genuine boundary between states that reach static equilibrium and states that creep indefinitely.
+
+The force-equilibrium half is Dawson, Roth & Drescher's, not Griffiths & Lane's: G&L's own criterion is the displacement test plus an iteration ceiling. In practice the displacement test alone almost never discriminates here — a slope creeping steadily past its critical factor produces a bounded per-iteration displacement change measured against a growing total, so the ratio decays and the test passes on states that are plainly failing. It is the force test that separates them.
 
 Validated against: Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), their Example 6 dam without free surface (≈ 2.4-2.5 vs published ~2.4), and the geogrid-reinforced slope (≈ 1.65 vs the limit-equilibrium Spencer value 1.59 on the same model).
 
@@ -509,7 +550,7 @@ The automatic selection makes the criterion robust against any localized backgro
 
 | Problem class | Criterion | Why |
 |---|---|---|
-| All slope problems, including submerged boundaries / reservoir loading | `non_convergence` (default) | Bisection on true equilibrium; scale-free; fastest near-FS behavior. With the effective-stress pore-pressure formulation and consistent boundary loads, submerged problems converge cleanly below the critical factor (validated: G&L Ex. 6 wet 1.91 vs Spencer 1.915 and published ~1.9; Johnson Reservoir 1.30 vs Spencer 1.26) |
+| All slope problems, including submerged boundaries / reservoir loading | `non_convergence` (default) | Bisection on true equilibrium. The force test is per-node, so it cannot be diluted by inert padding; it is *not* independent of element size (roughly 1/h). With the effective-stress pore-pressure formulation and consistent boundary loads, submerged problems converge cleanly below the critical factor (validated: G&L Ex. 6 wet 1.91 vs Spencer 1.915 and published ~1.9; Johnson Reservoir 1.30 vs Spencer 1.26) |
 | Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve (the failure evidence Griffiths & Lane present); read the upturn at the automatically selected characteristic point |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.
@@ -547,7 +588,7 @@ The key parameters of `solve_ssrm()` are:
 >- **`grid`** (default `None`): If set, the search bisects over a **fixed global grid** of step `grid` (candidate factors $F = i \cdot \text{grid}$) rather than halving the supplied bracket. Because the failure threshold sits between two fixed global grid points — a property of the slope and mesh, not of the bracket — *every* starting `[F_min, F_max]` converges to the same cell, so the reported FS is **independent of the bracket** (identical to every decimal, not just ± tolerance/2), at the same ~$\log_2$ cost. `grid` becomes the precision. Used by the [reliability analysis](reliability.md) for reproducible results; leave `None` for a single solve.<br>
 >- **`failure_criterion`** (default `"non_convergence"`): Selects the failure criterion — `"non_convergence"` or `"displacement_increase"` as described above (see *Choosing a Failure Criterion*).<br>
 >- **`pp_formulation`** (default `"effective"`): How pore pressures enter the analysis — `"effective"` moves $u$ into the load vector so the computed stresses are effective stresses directly (recommended); `"total"` is the legacy subtract-at-Gauss-point recipe (see *Pore Pressure at Gauss Points*).<br>
->- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed).<br>
+>- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed). **Do not lower it to make a model converge.** The force-equilibrium residual is the *increment* of the viscoplastic body load and is proportional to $\Delta t$, so shrinking `dt_scale` shrinks the residual without making the slope any more stable — a failing state can be pushed under the absolute `force_tol` and reported as converged, inflating the factor of safety.<br>
 >- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>
 >- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>
 >- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 3000): Passed through to `solve_fem()` for each trial.

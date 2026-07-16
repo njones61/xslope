@@ -14,7 +14,7 @@ slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx
 
 # For circular search (method can be any of: 'oms', 'bishop', 'janbu',
 # 'corps', 'lowe', 'spencer', 'mprice'):
-fs_cache, converged, search_path = circular_search(slope_data, 'spencer', diagnostic=False)
+fs_cache, converged, search_path, circle_cache = circular_search(slope_data, 'spencer', diagnostic=False)
 plot_circular_search_results(slope_data, fs_cache, search_path)
 
 

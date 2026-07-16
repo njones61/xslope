@@ -406,6 +406,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     else:
         _gx = _gy = None
 
+    # Depth of every node below the ground surface, for the optional min_slip_depth
+    # surficial-failure filter (see solve_fem). Positive = below ground. The ground
+    # profile is single-valued in x, so a vertical interpolation is exact. With no
+    # ground surface the depth is zero everywhere; solve_fem then raises if the filter
+    # is switched on (rather than silently masking the whole mesh), so a ground surface
+    # is required to use min_slip_depth.
+    if _gx is not None:
+        node_depth = np.interp(nodes[:, 0], _gx, _gy) - nodes[:, 1]
+    else:
+        node_depth = np.zeros(len(nodes))
+
     for elem_idx in range(n_elements):
         mat_id = element_materials[elem_idx] - 1  # Convert to 0-based
         material = materials[mat_id]
@@ -1238,6 +1249,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     # Construct fem_data dictionary
     fem_data = {
         "nodes": nodes,
+        "node_depth": node_depth,  # depth below ground per node (min_slip_depth filter)
         "elements": elements,
         "element_types": element_types,
         "element_materials": element_materials,
@@ -1326,18 +1338,34 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
-              pp_formulation='effective',
-              early_exit=True, progress_callback=None):
+              pp_formulation='effective', force_tol=1e-3, oob_window=10,
+              early_exit=True, progress_callback=None, min_slip_depth=None):
     """
-    Solve FEM using Griffiths & Lane (1999) viscoplastic algorithm.
+    Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
-    Implements the exact algorithm from the 1999 Geotechnique paper:
+    Implements the algorithm from the 1999 Geotechnique paper:
     - 8-node quadrilateral elements with reduced integration (4 Gauss points)
     - Viscoplastic stress redistribution with accumulated plastic strains
-    - Non-convergence failure criterion with displacement limit safeguard
     - Pre-factored elastic stiffness matrix for efficiency
     - No damping (stability from dt parameter)
     - Direct solve each iteration (not residual-based)
+
+    A trial is CONVERGED (the slope is stable at this F) when both hold:
+
+      1. Displacements have stopped changing — Smith & Griffiths' CHECON test,
+         max|du| / max|u| < `tolerance`.
+      2. Force equilibrium has been reached — the maximum over all nodes of the
+         nodal out-of-balance force, each normalized by that node's own
+         gravitational body force, is below `force_tol`. This is the criterion of
+         Dawson, Roth & Drescher (Geotechnique 49(6), 1999). Its locality is what
+         makes it trustworthy: inert material added to the mesh sits in equilibrium
+         and contributes ~0 to the maximum, so padding a model with extra foundation
+         or runout cannot dilute the measure. A GLOBAL norm ratio can be diluted
+         exactly that way, which is what an earlier version of this code did, and it
+         inflated the factor of safety on deeply-founded models.
+
+    Failure to satisfy both within `max_iterations` is failure of the slope, which
+    is Griffiths & Lane's non-convergence criterion.
 
     Parameters:
         fem_data (dict): FEM data dictionary from build_fem_data
@@ -1352,7 +1380,37 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             If max VP displacement (total - elastic) exceeds this fraction of the mesh height,
             the slope is declared as failed regardless of convergence. This prevents false
             convergence when large displacements make the relative change appear small.
-            Set to None to disable.
+            Set to None to disable. NOTE this yardstick is the height of the MESH, not of
+            the SLOPE, so it grows when a model is given a deeper foundation; prefer
+            force_tol, which has no such dependence. The default SSRM path disables it.
+        force_tol (float): Force-equilibrium tolerance (default 1e-3, the value used by
+            Dawson, Roth & Drescher 1999). The state is in equilibrium when the maximum
+            over all nodes of |nodal out-of-balance force| / |nodal body force| falls below
+            this. The denominator is a LUMPED tributary weight (sum over the adjacent
+            elements of gamma_e * A_e / n_e), NOT the consistent nodal gravity load — the
+            consistent load is exactly zero at a tri6 corner, which makes the ratio there
+            meaningless. Being a force over a force at the same node, the ratio is
+            dimensionless and independent of the unit system and — the property this test
+            exists for — of the size of the domain and of the yielding zone. It is NOT
+            independent of element size: it goes roughly as 1/h, so a coarser mesh narrows
+            the margin to this tolerance.
+        oob_window (int): Number of iterations the plastic-flow increment is averaged over
+            before the per-node maximum is taken (default 10). Must be >= 2. A one-iteration
+            increment does NOT decay on a settled slope — Gauss points resting on the yield
+            surface flip flow direction every iteration, giving a period-2 limit cycle whose
+            amplitude scales with dt but never vanishes — so with oob_window=1 a stable slope
+            can never converge. Averaging cancels that mode exactly and leaves genuine
+            plastic drift untouched. The verdict is insensitive to the width (10, 50 and 200
+            agree), so this is not a tuning parameter.
+        min_slip_depth (float or None): Optional surficial-failure filter (default None
+            = off). When set, nodes shallower than this depth below the ground surface are
+            excluded from the out-of-balance maximum, so a shallow cohesionless "skin"
+            (FS = tan phi / tan beta, depth-independent for c=0) cannot on its own declare
+            the slope failing. A genuine deep-seated mechanism still trips the criterion
+            through its deep nodes. This is the SSRM analogue of an LEM minimum-slip-depth
+            search filter (Slide2's "minimum depth"); the search-side twin lives in
+            search.py. Off by default, so the reported FS is the true global minimum
+            (surficial skin included) unless the caller opts in.
         pp_formulation (str): How pore pressures enter the analysis.
             'effective' (default): u is moved into the load vector
             (K du = F_ext + int B^T m u dV) and the elastic stresses are
@@ -1787,6 +1845,117 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         vp_disp_limit = max_disp_factor * mesh_height
     else:
         vp_disp_limit = None
+
+    # A one-iteration increment never decays on a settled slope (period-2 yield-surface
+    # flicker), so a window of 1 would make convergence unreachable. Refuse it loudly rather
+    # than silently returning a factor of safety driven by a numerical artifact.
+    if int(oob_window) < 2:
+        raise ValueError(
+            f"oob_window must be >= 2 (got {oob_window}). A single-iteration increment does "
+            "not decay on a settled slope: Gauss points on the yield surface flip flow "
+            "direction every iteration, and that period-2 mode never vanishes at any dt or "
+            "iteration count, so a stable slope would be reported as failing.")
+    oob_window = int(oob_window)
+
+    # ---- Step 7b: per-node out-of-balance setup (Dawson, Roth & Drescher 1999) ----
+    # Dawson et al. (Geotechnique 49(6), 835-840) normalize EACH node's unbalanced
+    # force by the gravitational body force acting on THAT node, and call the state
+    # converged when the MAXIMUM over all nodes drops below a small tolerance.
+    #
+    # The locality is the entire point. A global norm ratio, ||r|| / ||F_gravity||,
+    # measures the failure mechanism against the weight of the WHOLE MESH, so padding
+    # a model with inert foundation or runout — material that just sits there in
+    # equilibrium — changes the yardstick without changing the slope. A per-node
+    # maximum cannot be diluted that way: the added nodes are in equilibrium, they
+    # contribute ~0, and the maximum still lives in the failing zone.
+    if dof_offset is not None:
+        node_dof_x = np.array([dof_offset[i] for i in range(n_nodes)], dtype=int)
+    else:
+        node_dof_x = 2 * np.arange(n_nodes, dtype=int)
+    node_dof_y = node_dof_x + 1
+
+    # A constrained DOF's out-of-balance is carried by the support reaction, not by
+    # the soil, so it is not a residual and must not enter the maximum.
+    free_dof_mask = np.zeros(n_dof, dtype=bool)
+    free_dof_mask[free_dofs] = True
+    node_has_free = free_dof_mask[node_dof_x] | free_dof_mask[node_dof_y]
+
+    # Per-node body force: a LUMPED tributary weight, sum over the elements touching
+    # the node of (element weight / its node count).
+    #
+    # NOT the consistent nodal gravity load. For a 6-node triangle the consistent load
+    # at a CORNER is exactly zero — the corner shape function N = L(2L-1) integrates to
+    # zero over the element, so the whole element weight goes to the midside nodes. A
+    # tri6 mesh therefore has ~27% of its nodes carrying literally no consistent weight
+    # (measured: min |f_grav| = 4e-16 against a median of 21), and dividing a residual
+    # by that is meaningless: it amplifies those nodes by ~1e6 and the maximum lands on
+    # one of them every single iteration, so the convergence verdict gets decided by a
+    # shape-function artifact rather than by the slope. quad8 has the same pathology in
+    # milder form (corner loads go NEGATIVE, -gamma*A/12). Dawson's "gravitational body
+    # force acting on that node" means the weight the node actually carries, which is
+    # what the lumped tributary weight gives — and it is strictly positive everywhere.
+    _elem_w = np.zeros(n_nodes)
+    _k_fac = float(np.sqrt(1.0 + k_seismic ** 2))   # driving body force incl. seismic
+    for _e in range(n_elements):
+        # Slice to the element's node count. Do NOT filter on `v >= 0`: the connectivity
+        # array is padded to width 9 with ZERO (mesh.py), and node indices are 0-based, so
+        # a `>= 0` filter keeps every pad entry. That made len(_en) == 9 for every element
+        # — the weight was divided by 9 instead of n_e (an element-type-dependent gate:
+        # 3x tight on tri3, 1.5x on tri6, 1.125x on quad8) and node 0 absorbed a pad share
+        # from every element in the mesh, which buried it ~1000x deep and made it
+        # permanently invisible to the maximum.
+        _et = int(element_types[_e])
+        _en = [int(v) for v in elements[_e][:_et]]
+        if not _en:
+            continue
+        _corners = _en[:3] if _et in (3, 6) else _en[:4]
+        _xy = nodes[_corners]
+        # shoelace on the corner nodes (curved-edge area differs negligibly, and this
+        # denominator only needs to be a faithful force SCALE, not an exact integral)
+        _area = 0.5 * abs(np.dot(_xy[:, 0], np.roll(_xy[:, 1], -1))
+                          - np.dot(_xy[:, 1], np.roll(_xy[:, 0], -1)))
+        _gam = float(gamma_by_mat[int(element_materials[_e]) - 1])
+        _w = _gam * _area * _k_fac / len(_en)
+        for _nd in _en:
+            _elem_w[_nd] += _w
+    g_node = _elem_w
+    # Guard the divide for a NEAR-weightless material (the corpus's surcharge-driven
+    # bearing-capacity prisms use gamma = 1e-6; gamma <= 0 is rejected outright in
+    # build_fem_data). Their nodal body force is negligible, so there is no gravity scale
+    # worth normalizing by, and the floor instead pins the denominator to a fraction of the
+    # largest nodal force in F_gravity — which by this point includes the applied boundary
+    # forces, i.e. the surcharge, which IS the driving force in those problems.
+    _g_typ = float(np.median(g_node[g_node > 0])) if np.any(g_node > 0) else 0.0
+    _f_ext_max = float(np.max(np.sqrt(F_gravity[node_dof_x] ** 2
+                                      + F_gravity[node_dof_y] ** 2))) if n_nodes else 0.0
+    _floor = max(1e-3 * _g_typ, 1e-3 * _f_ext_max, 1e-30)
+    g_node_den = np.maximum(g_node, _floor)
+
+    # Optional surficial-failure filter (min_slip_depth): a boolean mask, aligned with
+    # oob_node, that keeps only free nodes at least min_slip_depth below the ground
+    # surface. Excluding shallower nodes from the out-of-balance maximum means a purely
+    # surficial cohesionless "skin" (FS = tan phi / tan beta) can no longer, on its own,
+    # declare the slope failing — the SSRM analogue of an LEM minimum-slip-depth search
+    # filter. A genuine deep-seated mechanism still trips the test through its deep nodes.
+    # Default None -> mask is None -> the criterion is byte-identical to the unfiltered one.
+    _deep_free_mask = None
+    if min_slip_depth is not None and float(min_slip_depth) > 0:
+        _nd = fem_data.get("node_depth")
+        if _nd is not None:
+            _nd_free = np.asarray(_nd, dtype=float)[node_has_free]
+            _deep_free_mask = _nd_free >= float(min_slip_depth)
+            if not _deep_free_mask.any():
+                # Every free node is shallower than the requested depth: the filter would
+                # mask the WHOLE mesh, and an empty maximum reads 0.0 — which would falsely
+                # declare the slope stable at every F and make SSRM report a silently HIGH
+                # factor of safety. That is a misconfiguration (min_slip_depth deeper than
+                # the model, or no ground surface defined so every depth is 0), so fail
+                # loudly rather than return a wrong answer. (The LEM side already does.)
+                raise ValueError(
+                    f"min_slip_depth={float(min_slip_depth):g} excludes every node — the "
+                    f"deepest lies {float(_nd_free.max()) if _nd_free.size else 0.0:.3g} "
+                    f"below the ground surface. Reduce min_slip_depth, or check that a "
+                    f"ground surface is defined.")
     if debug_level >= 1 and vp_disp_limit is not None:
         print(f"  VP displacement limit: {vp_disp_limit:.2f} ({max_disp_factor:.0%} of mesh height {mesh_height:.1f})")
 
@@ -1852,13 +2021,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         if debug_level >= 1 and stage_idx == 0:
             print(f"  Initial elastic: max|u| = {np.max(np.abs(u)):.6f}")
 
-        norm_F_gravity = np.linalg.norm(base_loads)
         converged = False
         unbalanced_force_ratio = 0.0
-        ufr_prev = 0.0       # previous-iteration UFR
-        ufr_rate_peak = 0.0  # per-solve peak of dUFR (reference for settled test)
-        ufr_rate_best = float('inf')   # lowest dUFR since the peak
-        last_progress_iter = 0         # iteration of last meaningful dUFR improvement
+        # Previous iteration's load vector. Seeded with base_loads (zero viscoplastic
+        # body load), so iteration 0 measures the first plastic correction against
+        # nothing, which is exactly what it is.
+        loads_prev = base_loads.copy()
+        # Reset per STAGE: base_loads changes at a stage boundary, so a history carried
+        # across it would measure a load step, not a residual.
+        loads_hist = [base_loads.copy()]
+        ufr_best = float('inf')        # lowest out-of-balance seen this stage
+        last_progress_iter = 0         # iteration of last meaningful improvement
 
         for iteration in range(max_iterations):
             # Build body load correction from accumulated viscoplastic strains
@@ -2176,12 +2349,61 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     if n_pile_yielded_V > 0 or n_pile_yielded_M > 0:
                         print(f"    Pile elements: {n_pile_yielded_V} V-yielded, {n_pile_yielded_M} M-yielded")
 
-            # Compute unbalanced force ratio: ||VP corrections|| / ||F_gravity||
-            # This measures how far the system is from force equilibrium.
-            if norm_F_gravity > 1e-30:
-                unbalanced_force_ratio = np.linalg.norm(loads - base_loads) / norm_F_gravity
-            else:
-                unbalanced_force_ratio = np.linalg.norm(loads - base_loads)
+            # ---- Out-of-balance force, per node (Dawson, Roth & Drescher 1999) ----
+            #
+            # This is an initial-stress viscoplastic scheme, so the solve below
+            # enforces
+            #       int B^T D (B u - evp) dV  =  F_ext
+            # EXACTLY, using the evp that built this iteration's `loads`. The state
+            # is therefore always in equilibrium with the stresses it was built from,
+            # and what is still "out of balance" is the amount by which the
+            # viscoplastic body load is STILL CHANGING: the increment of
+            # (loads - base_loads) from one iteration to the next.
+            #
+            # When plastic flow genuinely ceases, that increment decays to zero and
+            # the stress field is both admissible and in equilibrium — a stable slope.
+            # When the slope is failing, plastic flow never ceases: the increment
+            # plateaus at a non-zero value and keeps feeding displacement forever.
+            #
+            # The increment is STRICTLY LOCAL — it is non-zero only at nodes adjacent
+            # to Gauss points whose plastic strain is still flowing. Elastic padding
+            # contributes exactly zero. Taking the MAXIMUM of the per-node value,
+            # each normalized by that node's own weight, therefore measures the
+            # failure mechanism against itself, and inert material added to the mesh
+            # cannot dilute it.
+            # The increment is AVERAGED OVER A WINDOW of `oob_window` iterations rather than
+            # taken between consecutive ones. A one-iteration increment does not decay on a
+            # settled slope: Gauss points sitting exactly on the yield surface flip their
+            # flow direction every iteration, and the resulting body-load flicker is a clean
+            # PERIOD-2 limit cycle — measured cos(dL_n, dL_n-1) = -1.0000 with |dL| pinned at
+            # a constant, on a model whose displacements were frozen to four decimals and
+            # whose accumulated body load was frozen to seven significant figures. Damping dt
+            # only scales its amplitude (it is proportional to dt); it never removes it, so no
+            # iteration budget can clear it. Averaging over the window cancels it exactly,
+            # while genuine plastic drift (cos = +1) passes through untouched. The result is
+            # insensitive to the width — 10, 50 and 200 converge on the same F at the same
+            # iteration — so this rejects a specific numerical mode, it is not a tuning knob.
+            # Locality, and hence padding immunity, is unaffected: elastic material contributes
+            # exactly zero over any window.
+            loads_hist.append(loads.copy())
+            if len(loads_hist) > oob_window + 1:
+                loads_hist.pop(0)
+            d_load = ((loads - loads_hist[0])
+                      / min(oob_window, len(loads_hist) - 1)) * free_dof_mask
+            loads_prev = loads.copy()
+            r_node = np.sqrt(d_load[node_dof_x] ** 2 + d_load[node_dof_y] ** 2)
+            oob_node = (r_node / g_node_den)[node_has_free]
+            # min_slip_depth filter: take the maximum only over nodes deep enough to
+            # count. With no filter (_deep_free_mask is None) this is the full set.
+            _oob_for_max = oob_node if _deep_free_mask is None else oob_node[_deep_free_mask]
+            unbalanced_force_ratio = float(np.max(_oob_for_max)) if _oob_for_max.size else 0.0
+            if debug_level >= 3:
+                n_hot = int(np.count_nonzero(oob_node > force_tol))
+                print(f"    OOB dist: max={unbalanced_force_ratio:.2e} "
+                      f"p999={np.quantile(oob_node, 0.999):.2e} "
+                      f"p99={np.quantile(oob_node, 0.99):.2e} "
+                      f"p90={np.quantile(oob_node, 0.90):.2e} "
+                      f"n>tol={n_hot}/{oob_node.size} ({100*n_hot/oob_node.size:.2f}%)")
 
             # Solve K * u_new = loads
             loads_free = loads[free_dofs]
@@ -2209,48 +2431,47 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             else:
                 relative_change = norm_diff
 
-            # Plastic-settled condition: the rate of change of the accumulated
-            # body-load vector (dUFR) decays to zero when viscoplastic flow has
-            # genuinely ceased, while a failing (permanently creeping) state
-            # plateaus at a constant rate. The threshold is PEAK-RELATIVE — each
-            # solve provides its own reference — so the test is dimensionless
-            # and scale-free (independent of units, domain size, and yielding-
-            # zone fraction). Measured separation between settled and creeping
-            # states is ~700x; the 1%-of-peak threshold has wide margin.
-            ufr_rate = abs(unbalanced_force_ratio - ufr_prev)
-            ufr_prev = unbalanced_force_ratio
-            if ufr_rate > ufr_rate_peak:
-                ufr_rate_peak = ufr_rate
-            plastic_settled = ufr_rate <= max(0.01 * ufr_rate_peak, 1e-14)
+            # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
+            # makes the test immune to the size of the domain and to the size of the
+            # yielding zone: the quantity is already dimensionless (a force over a
+            # force, both at the same node), so it needs no reference drawn from the
+            # run itself.
+            #
+            # This replaces an earlier PEAK-RELATIVE test — "has the rate of change
+            # fallen to 1% of the largest rate this solve has seen?" — whose reference,
+            # the first elastic-to-plastic burst, is an EXTENSIVE quantity: it grows
+            # with the number of Gauss points that yield at once, and so with the size
+            # of the mesh. The creep it was compared against is INTENSIVE, set by the
+            # slope. Padding the domain inflated the reference, loosened the threshold,
+            # and let a still-creeping slope be called settled, which read out as a
+            # non-conservatively HIGH factor of safety.
+            plastic_settled = unbalanced_force_ratio < force_tol
 
-            # No-progress early exit: a settling state's dUFR keeps decaying
-            # toward the threshold; a failing state's dUFR plateaus. If 500
-            # iterations pass with no meaningful improvement (>1%) of the best
-            # dUFR seen, the trial cannot settle - declare failure early
-            # rather than burning the ceiling. Disabled in displacement-limit
-            # mode, where failure is defined by the limit trip itself.
-            if ufr_rate < 0.99 * ufr_rate_best:
-                ufr_rate_best = ufr_rate
+            # No-progress early exit: a settling state's out-of-balance keeps decaying
+            # toward the threshold; a failing state's plateaus. If a long window passes
+            # with no meaningful improvement (>1%) on the best value seen, the trial
+            # cannot settle — declare failure rather than burning the iteration ceiling.
+            if unbalanced_force_ratio < 0.99 * ufr_best:
+                ufr_best = unbalanced_force_ratio
                 last_progress_iter = iteration
-            # Window calibration: genuinely settling states can stall for
-            # >500 iterations mid-decay (reinforced slope at F=1.6 settles at
-            # ~2900 iters with a ~1000-iter dUFR plateau on the way), so the
-            # window must be generous; post-vectorization the extra iterations
-            # cost seconds.
+            # Window calibration: genuinely settling states can stall for >500
+            # iterations mid-decay (the reinforced slope at F=1.6 settles at ~2900
+            # iterations with a ~1000-iteration plateau on the way), so the window must
+            # be generous; post-vectorization the extra iterations cost seconds.
             if (early_exit and not plastic_settled
                     and iteration - last_progress_iter > 1500):
                 converged = False
                 u = u_new
                 if debug_level >= 1:
-                    print(f"  Early exit at iteration {iteration+1}: no dUFR "
-                          f"progress for 1500 iterations (plateau "
-                          f"{ufr_rate:.2e} vs settled target "
-                          f"{0.01*ufr_rate_peak:.2e}) - declared FAILED")
+                    print(f"  Early exit at iteration {iteration+1}: no progress in "
+                          f"out-of-balance force for 1500 iterations (plateau "
+                          f"{unbalanced_force_ratio:.2e} vs tolerance {force_tol:.1e})"
+                          f" - declared FAILED")
                 break
 
             if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
                 print(f"  Iter {iteration+1:4d}: max|du|/max|u| = {relative_change:.3e}, "
-                      f"UFR = {unbalanced_force_ratio:.3e}, dUFR = {ufr_rate:.2e}, "
+                      f"max nodal OOB = {unbalanced_force_ratio:.3e}, "
                       f"yielding = {n_yielding}/{n_total_gp}, max|u| = {np.max(np.abs(u_new)):.6f}")
 
             # Report intra-solve progress (throttled) so a caller can advance a
@@ -2259,7 +2480,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 try:
                     progress_callback((iteration + 1) / max_iterations,
                                       f"vp iter {iteration + 1}/{max_iterations}, "
-                                      f"dUFR={ufr_rate:.1e}")
+                                      f"oob={unbalanced_force_ratio:.1e}")
                 except Exception:
                     pass
 
@@ -2311,11 +2532,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                                   f"{int(newly.sum())} bar element(s) dropped to "
                                   f"t_res ({int(softened_1d.sum())} total); "
                                   f"re-solving")
-                        # reopen the iteration: reset the settling trackers so the
+                        # reopen the iteration: reset the no-progress tracker so the
                         # new equilibrium is judged on its own decay history
-                        ufr_prev = unbalanced_force_ratio
-                        ufr_rate_peak = 0.0
-                        ufr_rate_best = np.inf
+                        ufr_best = np.inf
                         last_progress_iter = iteration
                         u = u_new
                         continue
@@ -2325,7 +2544,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 if debug_level >= 1:
                     print(f"  Converged after {iteration+1} iterations "
                           f"(max|du|/max|u| = {relative_change:.3e}, "
-                          f"dUFR = {ufr_rate:.2e} <= 1% of peak {ufr_rate_peak:.2e})")
+                          f"max nodal OOB = {unbalanced_force_ratio:.2e} < {force_tol:.1e})")
                 break
 
             u = u_new
@@ -3157,14 +3376,15 @@ def _ssrm_bisect_steps(width, tolerance):
     return max(1, int(np.ceil(np.log2(width / tolerance))))
 
 
-def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
+def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
+               oob_window=10,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="non_convergence", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-               grid=None):
+               grid=None, min_slip_depth=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3197,6 +3417,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
             every decimal, not just +/- tolerance/2). ``grid`` becomes the precision
             (cell width). Default None = continuous bisection (bracket-dependent to
             +/- tolerance/2). Used by ``reliability_fem`` for reproducible results.
+        min_slip_depth (float or None): Optional surficial-failure filter, threaded to
+            solve_fem (default None = off). Excludes failures shallower than this depth
+            below the ground surface, so a shallow cohesionless skin does not govern the
+            SSRM factor of safety. Off by default; see solve_fem for the full description.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Max viscoplastic iterations passed to solve_fem
         convergence_tol (float): Convergence tolerance passed to solve_fem
@@ -3205,9 +3429,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
         failure_criterion (str): How to determine failure.
             "non_convergence" (default) - Bisection on TRUE viscoplastic
                 equilibrium: a trial converges only if both the CHECON
-                displacement test and the plastic-flow-stopped test (dUFR
-                below 1% of its per-solve peak) are satisfied. Scale-free and
-                insensitive to dt/tolerance/ceiling. Use for problems without
+                displacement test and the force-equilibrium test are satisfied
+                — the latter being the maximum over nodes of |out-of-balance
+                force| / |nodal body force|, below `force_tol` (Dawson, Roth &
+                Drescher 1999). Being per-node, it cannot be diluted by padding
+                the mesh with inert foundation or runout. It is NOT independent
+                of element size (it goes as ~1/h), and it needs roughly 3x the
+                iterations the old rate-based test did, because it demands real
+                equilibrium rather than a decayed rate. Use for problems without
                 reservoir loading.
             "displacement_limit" - Bisection on whether the max VP displacement
                 exceeds max_disp_factor x mesh height within the iteration
@@ -3250,29 +3479,33 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
 
     if failure_criterion == "non_convergence":
         result = _ssrm_displacement_limit(
-            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand, grid=grid)
+            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
-            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand, grid=grid)
+            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
-            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance,
+            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
-            cancel_check=cancel_check, progress_callback=progress_callback)
+            cancel_check=cancel_check, progress_callback=progress_callback,
+            min_slip_depth=min_slip_depth)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -3290,14 +3523,15 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0,
     return result
 
 
-def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
+def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
+                              oob_window=10,
                               debug_level=0, max_iterations=500,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-                 grid=None):
+                 grid=None, min_slip_depth=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -3339,11 +3573,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         return _cb
 
     def _solve_at(F, step, prefix):
-        return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1),
+        return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1), force_tol=force_tol,
+                         oob_window=oob_window,
                          dt_scale=dt_scale, pp_formulation=pp_formulation,
                          max_iterations=max_iterations, tolerance=convergence_tol,
                          max_disp_factor=max_disp_factor, staged=staged,
-                         tension_cutoff=tension_cutoff,
+                         tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
                          progress_callback=_fem_progress(step, prefix))
 
@@ -3500,16 +3735,25 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
         "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
         "interval_width": F_right - F_left,
-        "method": "SSRM — Non-Convergence (Griffiths & Lane 1999)" if max_disp_factor is None else "SSRM — Displacement Limit"
+        # The bisection-on-non-convergence framing is Griffiths & Lane's; the
+        # equilibrium test that decides "converged" is Dawson, Roth & Drescher's
+        # per-node out-of-balance force. Credit both — G&L's own criterion is the
+        # displacement test plus an iteration ceiling, and the displacement test on
+        # its own does not discriminate here.
+        "method": ("SSRM — Non-Convergence (Griffiths & Lane 1999; equilibrium test "
+                   "after Dawson, Roth & Drescher 1999)"
+                   if max_disp_factor is None else "SSRM — Displacement Limit")
     }
 
 
-def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
+def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
+                                 oob_window=10,
                                  debug_level=0, max_iterations=500,
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
                  pp_formulation='effective',
-                 dt_scale=1.0, cancel_check=None, progress_callback=None):
+                 dt_scale=1.0, cancel_check=None, progress_callback=None,
+                 min_slip_depth=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -3571,7 +3815,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05,
     def _get_max_vp_disp(F_val, progress_cb=None):
         """Run solve_fem; return the displacement measure (characteristic-point
         VP displacement, or global max before the point is selected)."""
-        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation,
+        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation, force_tol=force_tol,
+                        oob_window=oob_window, min_slip_depth=min_slip_depth,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)

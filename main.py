@@ -45,6 +45,6 @@ plot_solution(slope_data, slice_df, failure_surface, results)
 solve_all(slice_df)
 
 
-fs_cache, converged, search_path = circular_search(slope_data, methods[5], diagnostic=False)
+fs_cache, converged, search_path, circle_cache = circular_search(slope_data, methods[5], diagnostic=False)
 plot_circular_search_results(slope_data, fs_cache, search_path)
 

@@ -407,6 +407,41 @@ class ProjectDocument(QObject):
         self.dirty_changed.emit(True)
         return caveats
 
+    def build_from_fez(self, fez_path):
+        """Build a fresh project from a Rocscience RS2 model (.fez).
+
+        Unlike a .gsz or a Slide2 file, a .fez holds exactly one model — RS2 has no
+        concept of bundling scenarios/analyses in one file — so there is no picker
+        step: read and convert happen in one call (the engine's ``read_fez`` +
+        ``fez_to_slope_data``). Material zones, strengths and water conditions arrive
+        already identified, so there is nothing to map; what RS2 defines and xslope
+        cannot (its SSR settings, joints, reinforcement, loads) is returned as
+        caveats rather than dropped in silence. RS2's slope-stability answer is a
+        finite-element SSR field, not a limit-equilibrium surface, so the import
+        NEVER carries a failure surface — the document still opens for editing (the
+        caveat says so) and the user defines circles afterward, same as an unsolved
+        .gsz or a search-only Slide2 scenario. REPLACES the current project (callers
+        confirm discard); result is unsaved. Returns caveat strings."""
+        from xslope.rs2 import read_fez, fez_to_slope_data
+        from studio.editors import _resync_geometry
+
+        d = read_fez(str(fez_path))
+        sd, caveats = fez_to_slope_data(d)
+        _resync_geometry(sd)               # ground surface / domain / t-crack
+
+        self.slope_data = sd
+        self.path = None
+        self.results.clear()
+        self.style = {}                    # RS2 carries no colour info to keep
+        self._undo.clear()
+        self._redo.clear()
+        self._clean_index = None      # freshly imported, never saved -> dirty
+        self._style_dirty = False
+        self._dirty = True
+        self.loaded.emit()
+        self.dirty_changed.emit(True)
+        return caveats
+
     # --- editing / snapshot undo ----------------------------------------
     # Cap on the undo/redo depth: each snapshot deep-copies slope_data (the mesh is
     # shared, not copied — see _snapshot), so an unbounded stack would still grow on

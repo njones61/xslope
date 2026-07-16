@@ -377,6 +377,8 @@ class MainWindow(QMainWindow):
                                       triggered=self.import_gsz_dialog)
         self.act_import_slide2 = QAction("Import &Slide2…", self,
                                          triggered=self.import_slide2_dialog)
+        self.act_import_rs2 = QAction("Import &RS2 (.fez)…", self,
+                                      triggered=self.import_rs2_dialog)
         self.act_export_dxf = QAction("&Export Geometry (DXF)…", self, enabled=False,
                                       triggered=self.export_dxf_dialog)
         self.act_export_gsz = QAction("Export to GeoStudio (SLOPE/&W)…", self,
@@ -406,6 +408,7 @@ class MainWindow(QMainWindow):
         m_file.addAction(self.act_import_dxf)
         m_file.addAction(self.act_import_gsz)
         m_file.addAction(self.act_import_slide2)
+        m_file.addAction(self.act_import_rs2)
         m_file.addAction(self.act_export_dxf)
         m_file.addAction(self.act_export_gsz)
         m_file.addSeparator()
@@ -722,6 +725,50 @@ class MainWindow(QMainWindow):
         if caveats:
             QMessageBox.information(
                 self, "Slide2 imported",
+                "Imported with notes:\n\n• " + "\n• ".join(caveats) +
+                "\n\nSee the Log pane for details.")
+
+    def import_rs2_dialog(self):
+        """Import a Rocscience RS2 finite-element model (.fez) into a fresh project
+        (confirm discard first, like Open).
+
+        A .fez holds exactly one model — RS2 has no notion of bundling several
+        scenarios/analyses in one file the way a .gsz or .slmd does — so there is no
+        scenario picker: the only prompt is which file to open. Geometry, materials
+        and water conditions import directly; what RS2 defines and xslope cannot
+        (its Shear-Strength-Reduction settings, joints, reinforcement, loads) comes
+        back as caveats and is shown, not dropped quietly. RS2's slope-stability
+        result is a finite-element SSR field, not a limit-equilibrium search, so the
+        import NEVER carries a failure surface — the document still opens for
+        editing (the caveat says so) and the user defines circles afterward, same as
+        a search-only Slide2 import. Left unsaved so the user reviews it and Saves
+        As."""
+        if not self._confirm_discard():
+            return
+        start = os.path.dirname(self._recent[0]) if self._recent else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import RS2", start, "RS2 models (*.fez);;All files (*)")
+        if not path:
+            return
+        try:
+            caveats = self.doc.build_from_fez(path)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import RS2 file",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+
+        d = self.doc.slope_data
+        for c in caveats:                          # surface to the Log pane
+            print(f"RS2 import note: {c}")
+        self.statusBar().showMessage(
+            f"Imported {os.path.basename(path)} — "
+            f"{len(d.get('materials') or [])} material(s), "
+            f"{len(d.get('polygons') or [])} zone(s), "
+            f"{len(d.get('circles') or [])} circle(s). Review, then Save As.")
+        if caveats:
+            QMessageBox.information(
+                self, "RS2 imported",
                 "Imported with notes:\n\n• " + "\n• ".join(caveats) +
                 "\n\nSee the Log pane for details.")
 

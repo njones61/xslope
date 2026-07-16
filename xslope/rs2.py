@@ -639,6 +639,27 @@ def fez_to_slope_data(d):
             f"{counts.get('line_loads', 0)} line load(s) are defined in RS2 but were NOT "
             f"imported — add them by hand; the factor of safety will differ")
 
+    # Pseudo-static seismic: ``seismic: kh kv f1 f2 f3`` — horizontal and vertical
+    # coefficients first, then load factors (surveyed across the 298 public
+    # verification models; every one is static, kh = kv = ±0). The horizontal
+    # coefficient maps onto xslope's k; the vertical has no xslope analog.
+    k_seismic = 0.0
+    _seis = str(d.get("model_description", {}).get("seismic", "")).split()
+    if _seis:
+        kh = _fnum(_seis[0])
+        kv = _fnum(_seis[1]) if len(_seis) > 1 else 0.0
+        if kh:
+            k_seismic = kh
+            caveats.append(
+                f"a horizontal seismic coefficient ({kh:g}) was imported as k — RS2's "
+                f"sign/direction convention has not been verified against a solved "
+                f"seismic RS2 model (none exist in the public verification set), so "
+                f"check the pseudo-static force direction before trusting the result")
+        if kv:
+            caveats.append(
+                f"a vertical seismic coefficient ({kv:g}) is set in RS2 — xslope "
+                f"models only the horizontal one, so it was dropped")
+
     caveats.append(
         "no failure surface was imported — an RS2 slope-stability model defines an SSR "
         "finite-element analysis, which has no xslope slip surface to take. Define "
@@ -654,7 +675,7 @@ def fez_to_slope_data(d):
         "gamma_water": gamma_water,
         "tcrack_depth": 0.0,
         "tcrack_water": 0.0,
-        "k_seismic": 0.0,
+        "k_seismic": k_seismic,
         "max_depth": None,
         "profile_lines": [],
         "polygons": polygons,

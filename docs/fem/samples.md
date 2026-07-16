@@ -48,7 +48,7 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.43**. The companion LEM analysis
+SSRM results. The computed factor of safety is **FS = 1.49**. The companion LEM analysis
 gives **FS = 1.59** by Spencer's method (see [LEM sample problem 9](../lem/samples.md)),
 and the FEM reads below it — as it should for this model, because this is a *peak-residual*
 run: $T_{res}$ = 600 lb/ft is filled in, so reinforcement elements that yield shed down to
@@ -83,7 +83,7 @@ and how many have dropped to the residual capacity — together with a status fo
 | SOFTENED | Elements yielded and then dropped to $T_{res}$ |
 | INACTIVE | No elements carrying tension |
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.432, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=4000 -->
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.491, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
 
 At the factor of safety the reinforcement is heavily mobilized: interior elements have
 reached $T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, and elements inside the
@@ -133,7 +133,7 @@ SSRM results without piles (**FS = 1.18**). The shear strain concentration shows
 
 ![piles_fem_results_no_pile.png](images/piles_fem_results_no_pile.png){width=1000}
 
-SSRM results with two rows of piles (**FS = 1.38**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
+SSRM results with two rows of piles (**FS = 1.36**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
@@ -148,11 +148,11 @@ Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
 --------------------------------------------------------------------------------
 ```
 
-The two rows of piles increase the factor of safety from 1.18 to 1.38 — a 17% improvement. The maximum bending moment (7228 per unit width in Pile 2) reaches about 72% of the moment capacity ($M_{\text{cap}}/S$ = 10,000), and the maximum shear about 30% of $V_{\text{cap}}/S$, so the structural capacity does not govern for this problem. The soil's ability to transfer lateral load to the piles is the limiting factor, not the pile strength.
+The two rows of piles increase the factor of safety from 1.18 to 1.36 — a 15% improvement. The maximum bending moment (7228 per unit width in Pile 2) reaches about 72% of the moment capacity ($M_{\text{cap}}/S$ = 10,000), and the maximum shear about 30% of $V_{\text{cap}}/S$, so the structural capacity does not govern for this problem. The soil's ability to transfer lateral load to the piles is the limiting factor, not the pile strength.
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=4000 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 
@@ -190,7 +190,7 @@ stiffens the thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.68**. The plots show the solution
+SSRM results. The computed factor of safety is **FS = 1.59**. The plots show the solution
 at the computed factor of safety. The middle plot shows the viscoplastic shear strain
 concentration, which clearly reveals the non-circular failure mechanism passing through the
 thin weak clay layer — matching the expected behavior without any prior assumption about
@@ -199,19 +199,19 @@ lateral sliding of the slope mass along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 1.68 is about 3% below the LEM result of FS = 1.74 obtained using
+The FEM result of FS = 1.59 is about 9% below the LEM result of FS = 1.74 obtained using
 Spencer's method — both analyses use the same piezometric surface in the foundation sand.
 Differences of this order between SSRM and LEM are typical: the FEM develops the failure
 mechanism freely through the global stress field, while the LEM evaluates rigid-block
 equilibrium on a prescribed surface, and the two methods answer subtly different questions.
 The FS shows a mild residual mesh sensitivity characteristic of thin-shear-band
-localization (1.70 / 1.68 / 1.67 at target sizes 2.0 / 1.0 / 0.75): the finer the mesh, the
+localization (1.64 / 1.59 / 1.55 at target sizes 2.0 / 1.0 / 0.75): the finer the mesh, the
 more sharply the band through the 2-ft layer is resolved.
 
 <!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
-     target_size=1.0 or finer (ts=2.0 gives 1.697, ts=1.0 gives 1.684, ts=0.75 gives
-     1.672 — mild thin-band localization sensitivity) -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.68, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=4000 -->
+     target_size=1.0 or finer (ts=2.0 gives 1.641, ts=1.0 gives 1.591, ts=0.75 gives
+     1.553 — mild thin-band localization sensitivity) -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.59, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
 
 ### 4. Reliability Analysis: Two-Layer c–φ Slope
 

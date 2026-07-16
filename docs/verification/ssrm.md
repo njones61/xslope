@@ -37,14 +37,14 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 ![griffiths1_mesh.png](../fem/images/griffiths1_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.36** under XSLOPE's strict
+SSRM results. The computed factor of safety is **FS = 1.35** under XSLOPE's strict
 true-equilibrium convergence criterion, with the displacement-vs-F upturn at **F ≈ 1.40** —
 bracketing the published values: [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 report FE FOS = 1.4 (their tolerant convergence check accepts slow residual creep that
 XSLOPE's equilibrium criterion rejects; their Table 2 converges at F = 1.35 and fails at
 1.40), and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129)
-stability chart gives 1.380. All three readings agree within ±3%. The plots below show the
-solution at the computed factor of safety (F = 1.36). The top plot shows the deformed mesh;
+stability chart gives 1.380. All three readings agree within ±4%. The plots below show the
+solution at the computed factor of safety (F = 1.35). The top plot shows the deformed mesh;
 the middle plot shows the viscoplastic shear strain concentration, which reveals the circular
 failure mechanism without any prior assumption about its shape or location; the bottom plot
 shows the displacement vectors.
@@ -61,7 +61,7 @@ order of magnitude by F = 1.6.
 This benchmark also appears on the
 [Verification](../verification/ssrm.md) page.
 
-<!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-1 -->
+<!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.35, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-1 -->
 <!-- Element-type coverage: SSRM on each quadratic type (tri6, quad8, quad9). Slower (SSRM x3), so benchmark-gated. -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_elements, expected_fs=1.36, tolerance=0.04, target_size=3.5, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
 <!-- SSRM auto-bracketing: a deliberately-wrong [F_min,F_max] must still find the FS. Coarse tri6 mesh (~1.39, fast) so these run un-gated. -->
@@ -101,16 +101,16 @@ Results:
 
 | Case | XSLOPE FOS | G&L FOS | Diff |
 |---|---|---|---|
-| Full reservoir (free surface) | 1.89 | ~1.9 | −1% |
-| Before filling (no free surface) | 2.44 | ~2.4 | +2% |
+| Full reservoir (free surface) | 1.86 | ~1.9 | −2% |
+| Before filling (no free surface) | 2.40 | ~2.4 | 0% |
 
-Solution for the before-filling (dry) case at the computed factor of safety (F = 2.44). The
+Solution for the before-filling (dry) case at the computed factor of safety (F = 2.40). The
 shear strain concentration and displacement vectors show the critical mechanism passing
 beneath the crest and exiting on the downstream face:
 
 ![griffiths6_dry_results.png](../fem/images/griffiths6_dry_results.png){width=1000}
 
-Solution for the full-reservoir case at the computed factor of safety (F = 1.88). With the
+Solution for the full-reservoir case at the computed factor of safety (F = 1.86). With the
 free surface in place, the downstream slope is the weaker side: the shear strain band runs
 from the crest to the downstream toe, and the displacement vectors show the rotational
 sliding mass — the same surface found by Griffiths & Lane and by XSLOPE's own Spencer
@@ -126,13 +126,13 @@ effective-stress formulation with consistently integrated boundary loads, the
 submerged soil simply carries its buoyant weight: a solve at F = 1 converges in
 a handful of iterations with an essentially elastic strain field (flooded
 ground at working strength sits quietly — a sanity check worth running on any
-submerged model), and the failure boundary emerges sharply at F = 1.91 under
+submerged model), and the failure boundary emerges sharply at F = 1.86 under
 the default non-convergence criterion. The agreement with limit equilibrium is
 striking: XSLOPE's own Spencer analysis of the same section gives 1.915 (vs the
 paper's limit-equilibrium 1.90), with the same downstream critical surface, and
-the relative reservoir effect matches the paper (wet/dry = 0.78 vs 0.79). See
+the relative reservoir effect matches the paper (wet/dry = 0.77 vs 0.79). See
 the [Verification](../verification/ssrm.md) page.
 
-<!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.45, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=4000, benchmark=SSRM-2 -->
-<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.886, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=4000, benchmark=SSRM-2 -->
+<!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.40, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
+<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.858, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->
 

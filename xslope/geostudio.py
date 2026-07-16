@@ -166,6 +166,13 @@ def read_gsz(path):
     points, regions, glines = {}, {}, {}
     for g in root.findall("./Geometries/Geometry"):
         for p in g.findall("./Points/Point"):
+            # A deleted point keeps its ID slot but loses its coordinates
+            # (<Point ID="4" /> — seen in the staged rapid-drawdown examples).
+            # Skip it: nothing may reference it, and if something does, the
+            # plain dict lookup downstream raises KeyError on the real culprit
+            # instead of this parse dying on every orphaned slot.
+            if p.get("X") is None or p.get("Y") is None:
+                continue
             points[int(p.get("ID"))] = (float(p.get("X")), float(p.get("Y")))
         for r in g.findall("./Regions/Region"):
             ids = _text(r, "PointIDs")

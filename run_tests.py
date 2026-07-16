@@ -2147,6 +2147,231 @@ def run_slide2_import_test(test):
     return 0.0, None
 
 
+# --------------------------------------------------------------------------------------
+# RS2 (.fez) import test
+# --------------------------------------------------------------------------------------
+
+# A hand-authored RS2 model, synthesised so the test carries NO Rocscience file. The
+# real .fea (megabytes of finite-element mesh) is reduced to just the sections the
+# importer reads: the model description with its SSR settings and the version-on-the-
+# next-line dialect, two Mohr-Coulomb materials, a two-zone geometry (an external
+# boundary cut by one material boundary), the coarse material-mesh seed triangles that
+# label the zones, and a piezometric line the two materials draw from. Enough to
+# exercise the boundary polygonisation, the seed-triangle material assignment, the
+# next-line value dialect, the water mapping, and a round-trip through the .xlsx writer
+# and load_slope_data.
+_SYNTH_FEA = """model description:
+version:
+11.028
+title:
+analysis:  solid
+strength_reduction_analysis: ON
+auto_SRF: ON
+change_in_SRF: 0.2
+initial_SRF: 1
+final_SRF: 2
+maxiter_SRF: 500
+tolerance_SRF: 0.001
+delta_FS: 0.01
+tensilestrength_SRF: 1
+RFCunits: Metric kPa
+stages: 1
+
+material types:
+material 1: soilA
+ solid properties:
+  rhoS: 2 rhoF: 1 porosity: 0.5
+ Elastic Properties: LinearElastic
+  nu: 0.3 E: 50000
+ Plasticity Specifications: MohrCoulomb
+  C: 5 phi: 30 dil: 0 T: 5 Cr: 5 phir: 30 Tr: 5 Apply_SSR: 1
+material 2: soilB
+ solid properties:
+  rhoS: 2 rhoF: 1 porosity: 0.5
+ Elastic Properties: LinearElastic
+  nu: 0.3 E: 50000
+ Plasticity Specifications: MohrCoulomb
+  C: 25 phi: 32 dil: 0 T: 25 Cr: 25 phir: 32 Tr: 25 Apply_SSR: 1
+
+material properties:
+soilA
+1 19 0 50000 8333 0.3 0 20000 20000 20000 0.2 0.2 0.2 1 0 5 0 30 30 5 5 100000
+soilB
+1 20 0 50000 8333 0.3 0 20000 20000 20000 0.2 0.2 0.2 1 0 25 0 32 32 25 25 100000
+
+material piezos:
+ 1
+ 1
+
+groundwater setup:
+  gw_type: "Static Analysis"
+
+piezos:
+1
+1
+2
+0 6
+40 6
+
+materials mesh start:
+  num elements: 2
+  num valid stages: 1
+  element 0 start:
+    P1: 20, 10
+    P2: 21, 10
+    P3: 20, 11
+    materials start:
+      stage 1: 1
+    materials end:
+  element 0 end:
+  element 1 start:
+    P1: 20, 2
+    P2: 21, 2
+    P3: 20, 3
+    materials start:
+      stage 1: 2
+    materials end:
+  element 1 end:
+materials mesh end:
+
+v6 geometry start:
+  num boundaries: 2
+  boundary 1 start:
+    type: "external"
+    guid: "{00000000-0000-0000-0000-000000000001}"
+    vertices start:
+      dpoint array start:
+        num points: 5
+        0: 0, 0
+        1: 40, 0
+        2: 40, 18
+        3: 20, 18
+        4: 0, 9
+      dpoint array end:
+    vertices end:
+  boundary 1 end:
+  boundary 2 start:
+    type: "material"
+    guid: "{00000000-0000-0000-0000-000000000002}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 0, 4.5
+        1: 40, 4.5
+      dpoint array end:
+    vertices end:
+  boundary 2 end:
+v6 geometry end:
+"""
+
+
+def _write_synthetic_fez(path):
+    """Author a minimal RS2 .fez — a ZIP of one .fea plus empty sidecars."""
+    import zipfile
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("synthetic.fea", _SYNTH_FEA)
+        zf.writestr("synthetic.p2m", "")       # binary mesh sidecar — ignored
+        zf.writestr("synthetic.config", "")    # view config — ignored
+
+
+def run_rs2_import_test(test):
+    """Import a synthetic RS2 .fez and check the model that comes out.
+
+    Guards the schema facts the importer depends on, each silent when wrong:
+      - the 'version:' then '11.028' next-line dialect parses;
+      - two Mohr-Coulomb materials come across with c/phi (from 'material types:')
+        and unit weight (from the 'material properties:' numeric row);
+      - an external boundary cut by one material boundary polygonises into two zones,
+        each labelled by its material-mesh seed triangle;
+      - a piezometric line becomes the piezo line and the materials draw from it;
+      - the SSR settings are surfaced as metadata, never turned into an LEM search;
+      - NO failure surface is imported (an SSR analysis has none), and that is said;
+      - the model round-trips through the .xlsx writer and load_slope_data.
+    """
+    import tempfile
+    from xslope.rs2 import read_fez, fez_to_slope_data, import_fez
+    from xslope.fileio import (save_slope_data_to_xlsx, load_slope_data,
+                               default_template_path)
+
+    problems = []
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "synthetic.fez")
+        _write_synthetic_fez(path)
+
+        d = read_fez(path)
+        if d["version"] != "11.028":
+            problems.append(f"version parsed as {d['version']!r}, expected '11.028' "
+                            f"(the next-line value dialect did not parse)")
+        if d["srf"].get("strength_reduction_analysis") != "ON":
+            problems.append("SSR settings did not parse from the model description")
+
+        sd, caveats = fez_to_slope_data(d)
+
+        # Two materials, two zones, strengths intact.
+        mats = sd["materials"]
+        if len(mats) != 2:
+            problems.append(f"{len(mats)} materials, expected 2")
+        else:
+            if (round(mats[0]["c"], 3), round(mats[0]["phi"], 3),
+                    round(mats[0]["gamma"], 3)) != (5.0, 30.0, 19.0):
+                problems.append(f"soilA came across as c={mats[0]['c']} phi="
+                                f"{mats[0]['phi']} gamma={mats[0]['gamma']}, "
+                                f"expected 5/30/19")
+            if (round(mats[1]["c"], 3), round(mats[1]["phi"], 3),
+                    round(mats[1]["gamma"], 3)) != (25.0, 32.0, 20.0):
+                problems.append(f"soilB came across as c={mats[1]['c']} phi="
+                                f"{mats[1]['phi']} gamma={mats[1]['gamma']}, "
+                                f"expected 25/32/20")
+        if len(sd["polygons"]) != 2:
+            problems.append(f"{len(sd['polygons'])} polygons, expected 2 (the external "
+                            f"boundary did not polygonise into two zones)")
+
+        # A piezometric line -> piezo line; both materials draw from it.
+        if len(sd["piezo_line"]) != 2:
+            problems.append(f"piezo_line has {len(sd['piezo_line'])} points, "
+                            f"expected 2 (the water table did not import)")
+        if [m["u"] for m in mats] != ["piezo", "piezo"]:
+            problems.append(f"materials take u={[m['u'] for m in mats]}, expected "
+                            f"['piezo', 'piezo']")
+
+        # An RS2 model imports NO failure surface, and must say so.
+        if sd["circles"] or sd["non_circ"]:
+            problems.append("an RS2 model imported a failure surface it should not have")
+        if not any("no failure surface" in c for c in caveats):
+            problems.append("the missing failure surface was not reported")
+        if not any("Shear-Strength-Reduction" in c for c in caveats):
+            problems.append("the SSR analysis metadata was not reported as a caveat")
+
+        # Round-trip: the geometry must survive the .xlsx writer AND reload. An RS2
+        # import carries no surface, so give it one (as a user must) before saving —
+        # load_slope_data rejects a surface-less file, which is the real consumer.
+        sd["circular"] = True
+        sd["circles"] = [{"Xo": 20.0, "Yo": 30.0, "R": 26.0, "Depth": 4.0}]
+        xlsx = os.path.join(td, "synthetic.xlsx")
+        save_slope_data_to_xlsx(sd, xlsx, template=default_template_path())
+        reloaded = load_slope_data(xlsx)
+        if len(reloaded["materials"]) != 2:
+            problems.append(f"reloaded model has {len(reloaded['materials'])} "
+                            f"materials, expected 2")
+        if len(reloaded["polygons"]) != 2:
+            problems.append("the two zones did not survive the .xlsx round-trip")
+        if len(reloaded.get("piezo_line") or []) != 2:
+            problems.append("the piezo line did not survive the .xlsx round-trip")
+
+        # import_fez writes an .xlsx and returns the caveat list (the surface-less file
+        # it writes is intentionally incomplete — an SSR model has no LEM surface).
+        out2 = os.path.join(td, "direct.xlsx")
+        rcav = import_fez(path, default_template_path(), out2)
+        if not os.path.exists(out2):
+            problems.append("import_fez did not write the .xlsx")
+        if not isinstance(rcav, list):
+            problems.append("import_fez did not return a caveat list")
+
+    if problems:
+        return None, "RS2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_vg_kr_test(test):
     """Unit check for the van Genuchten relative-permeability function and the
     kr-model dispatch (xslope.seep). Verifies kr_vg_vec against an independent
@@ -2269,6 +2494,8 @@ def run_test(test):
         return run_gsz_import_test(test)
     if test_type == 'slide2':
         return run_slide2_import_test(test)
+    if test_type == 'rs2':
+        return run_rs2_import_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'gsat_pair':
@@ -2317,7 +2544,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'gsz', 'slide2', 'vg_kr',
+    elif test_type in ('roundtrip', 'template_sync', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -2367,6 +2594,8 @@ def main():
                         help='Run only the GeoStudio (.gsz) import test')
     parser.add_argument('--slide2', action='store_true',
                         help='Run only the Slide2 (.slim/.slmd) import test')
+    parser.add_argument('--rs2', action='store_true',
+                        help='Run only the RS2 (.fez) import test')
     parser.add_argument('--tolerance', type=float, default=0.01,
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
@@ -2395,7 +2624,7 @@ def main():
 
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.roundtrip or args.dxf
-                   or args.gsz or args.slide2)
+                   or args.gsz or args.slide2 or args.rs2)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -2403,6 +2632,7 @@ def main():
     run_dxf = args.dxf or run_all
     run_gsz = args.gsz or run_all
     run_slide2 = args.slide2 or run_all
+    run_rs2 = args.rs2 or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -2591,6 +2821,15 @@ def main():
                       'method': '-', 'source': 'slide2'})
         if not run_all:
             print("Including 1 Slide2 import test")
+
+    # The RS2 import test authors its own .fez fixture (Rocscience's own verification
+    # files are their copyrighted material and are not in this repository), so it needs
+    # no input file and no GUI — engine-only, always runnable.
+    if run_rs2:
+        tests.append({'type': 'rs2', 'file': '(synthetic .fez)',
+                      'method': '-', 'source': 'rs2'})
+        if not run_all:
+            print("Including 1 RS2 import test")
 
     if args.skip_benchmarks:
         n_before = len(tests)

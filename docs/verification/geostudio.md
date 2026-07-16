@@ -145,22 +145,22 @@ problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged
 | 2.15 | Chen & Shao Frictionless Slope | covered | Same problem as [Rocscience #25](rocscience.md#vp25) — [vp025.xlsx](../files/rocscience/vp025.xlsx), Prandtl mechanism on a 60° weightless slope: Spencer 1.052 vs SLOPE/W 1.036, Slide 1.051, theory 1.0. — [details](#gs-2-15) |
 | 2.16 | Prandtl Bearing Capacity | blocked | Same as [Rocscience #26](rocscience.md) — the flat-ground bearing mechanism is rejected by the flat-arc guard (a feature gap, not a data gap). The SLOPE/W model is a public download (see above), and its critical surface is fully specified, so it will import once the guard is relaxed. |
 | 2.17 | Chowdhury & Xu (1995), 5 examples | covered | Same problem as [Rocscience #28](rocscience.md#vp28) — Congress St. Cut + embankment on soft clay, 3 of 10 cases built and reliability-tagged. |
-| 2.18 | Borges & Cardoso Geosynthetic Emb. #2 | planned | GS-only reinforced embankment. |
-| 2.19 | Borges & Cardoso Geosynthetic Emb. #3 | planned | GS-only reinforced embankment. |
+| 2.18 | Borges & Cardoso Geosynthetic Emb. #2 | **built** | [gs2_18.xlsx](../files/geostudio/gs2_18.xlsx) — geosynthetic-reinforced embankment on depth-varying soft clay (SFnDepth → XSLOPE `cp`). M-P 1.153 vs SLOPE/W 1.171 (−1.5%) and Borges & Cardoso 1.15 (+0.3%). — [details](#gs-2-18) |
+| 2.19 | Borges & Cardoso Geosynthetic Emb. #3 | covered | Same problem as [Rocscience #32](rocscience.md#vp32) / [RS2 #24](rs2.md#rs2-24) — [vp032a](../files/rocscience/vp032a.xlsx) (7 m) / [vp032c](../files/rocscience/vp032c.xlsx) (8.75 m): identical materials, foundation and embankment geometry (verified to <1 cm); the reinforcement-friction difference between vendor sources (39.6° vs 31.0°) is immaterial because the fully-embedded bar develops its full 200 kN/m either way. SLOPE/W's own solves (1.229 / 0.972) bracket the vp032 locks (1.218 / 0.981). |
 | 2.20 | Probabilistic – Syncrude Dyke | covered | Same problem as [Rocscience #33](rocscience.md#vp33) — El-Ramly et al. (2003), built deterministically (composite surface through the presheared clay-shale). |
 | 2.21 | Cannon Dam | covered | Same problem as [Rocscience #34](rocscience.md#vp34) — Clarence Cannon Dam (Wolff & Harr 1987) on the noncircular surface. The SLOPE/W model is a public download (see above). |
 | 2.22 | Cannon Dam #2 | covered | Same problem as [Rocscience #35](rocscience.md#vp35) — Hassan & Wolff (1999), the min-β ≠ min-FS benchmark. |
 | 2.23 | Li & Lumb – Reliability Index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx): deterministic Bishop 1.333, β_ln 2.263 vs H&W 1.334 / 2.336; GS reports minimum β 2.04 at FS 1.190 across surfaces. — [details](#gs-2-23) |
 | 2.24 | Tandjiria – Geosynthetic Reinforced Emb. | **built** | Same problem as [Rocscience #39](rocscience.md#vp39) — [vp039a-d](../files/rocscience/vp039a.xlsx). Also the reinforcement benchmark for the **importer**: on SLOPE/W's own circles the imported geosynthetic reproduces its FS to −0.27% (clay) and −0.64% (sand) — see [Importer verification](#importer-verification). — [details](#gs-2-24) |
 | 2.25 | Baker & Leshchinsky – Earth Dam | partial | Same as Rocscience #42: phreatic line through the core is unlabeled in both manuals — needs the B&L (2001) paper. |
-| 2.26 | Baker – Planar Homogeneous | planned | Planar-surface comparison (Rocscience #43 analog). |
+| 2.26 | Baker – Planar Homogeneous | **built** | [gs2_26.xlsx](../files/geostudio/gs2_26.xlsx) — Spencer/Janbu 1.352 vs SLOPE/W 1.352 and Baker ≈1.35, essentially exact; the model pins the crest offset at 2.5 m, resolving the Rocscience #43 build's geometry ambiguity. — [details](#gs-2-26) |
 | 2.27 | Sheahan – Amherst Soil Nails | covered | Same problem as [Rocscience #47](rocscience.md#vp47) — [vp047.xlsx](../files/rocscience/vp047.xlsx), Sheahan & Ho (2003) Amherst test wall: Janbu 0.899 vs Slide 0.890 / Sheahan 0.887. The SLOPE/W model is a public download (see above). — [details](#gs-2-27) |
 | 2.28 | Sheahan – Clouterre Test Wall | covered | Same problem as [Rocscience #48](rocscience.md#vp48) — [vp048.xlsx](../files/rocscience/vp048.xlsx), Clouterre full-scale test wall, 7 nail rows. |
 | 2.29 | Snailz – Reinforced Slope | covered | Same problem as [Rocscience #49](rocscience.md#vp49) — [vp049.xlsx](../files/rocscience/vp049.xlsx), SNAILZ soldier-pile tieback wall. |
 | 2.30 | Snailz – Geotextile Layers | **built** | [vp050.xlsx](../files/rocscience/vp050.xlsx) (Rocscience #50, same SNAILZ model): Janbu(corr) 1.448 vs SLOPE/W force 1.354 (×fo ≈ 1.44) and SNAILZ 1.46; M-P/Spencer 1.576 vs SLOPE/W M-P 1.606. — [details](#gs-2-30) |
 | 2.31 | Zhu – Four Layer Slope | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx) (Rocscience #51): Bishop 1.278 vs SLOPE/W 1.284; Spencer 1.294 vs 1.299; M-P 1.304 vs 1.310; Lowe 1.296 vs 1.283; Corps 1.404 vs 1.368. Zhu paper source in `ref_docs_lim_eq/`. — [details](#gs-2-31) |
 | 2.32 | Zhu & Lee – Heterogeneous Slope | **built** | [vp052a/b.xlsx](../files/rocscience/vp052a.xlsx) (Rocscience #52): wet deep-family Spencer 1.189 matches Slide exactly; see that row. — [details](#gs-2-32) |
-| 2.33 | Priest – Rigid Blocks | planned | Block-mechanism comparison. |
+| 2.33 | Priest – Rigid Blocks | **built** | [gs2_33.xlsx](../files/geostudio/gs2_33.xlsx) — Janbu 1.049 / M-P 1.049 vs Priest (hand) 1.049 and SLOPE/W 1.049, exact. — [details](#gs-2-33) |
 | 2.34 | Yamagami – Stabilizing Piles | **built** | [vp054a/b.xlsx](../files/rocscience/vp054a.xlsx) (Rocscience #54): no-pile Bishop 1.100 vs SLOPE/W 1.102 — exact; with-pile 1.185 vs SLOPE/W 1.223, Slide 1.193, Yamagami 1.20 (pile-force conventions differ program-to-program). — [details](#gs-2-34) |
 | 2.35 | Pockoski & Duncan – Tie-Back Wall | partial | P&D series — blocked on the CGPR report (see Rocscience #55-63 note). |
 | 2.36 | Pockoski & Duncan – Reinforcement | partial | Same. |
@@ -172,9 +172,9 @@ problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged
 | 2.42 | Rapid Drawdown – Pumped Storage Dam | **built** | Same problem as Slide [VP99](rocscience.md#vp99): xslope 1.390 vs SLOPE/W 1.550, DWW 1.56 (~7% low; geometry to be re-pinned from the .gsz). — [details](#gs-2-42) |
 | 2.43 | Rapid Drawdown – Pilarcitos Dam | **built** | [vp097.xlsx](../files/rocscience/vp097.xlsx) (Rocscience #97): Spencer 1.044 / Bishop 1.042. — [details](#gs-2-43) |
 | 2.44 | Probability – James Bay Case History | covered | Same problem as [Rocscience #75](rocscience.md#vp75) — the James Bay dyke (El-Ramly et al.). |
-| 2.45 | Eurocode 7 – Cutting in Clay | planned | Partial-factor design check. |
-| 2.46 | Eurocode 7 – Earth Dam | planned | Partial-factor design check. |
-| 2.47 | Compound Strength vs Anisotropic Function | planned | Anisotropic-strength comparison (feature assessment needed). |
+| 2.45 | Eurocode 7 – Cutting in Clay | **built** | [gs2_45.xlsx](../files/geostudio/gs2_45.xlsx) — DA3 partial factors baked into the material (c′* = 8.0, φ′* = 23.04°); Spencer 1.173 vs SLOPE/W ODF 1.174 (−0.07%). — [details](#gs-2-45) |
+| 2.46 | Eurocode 7 – Earth Dam | **built** | [gs2_46.xlsx](../files/geostudio/gs2_46.xlsx) — DA1-C2 factors + XSLOPE FE seepage; on SLOPE/W's own circle M-P 1.099 vs 1.101 (−0.19%), free-search minimum 1.073 ≈ the Smith textbook 1.07. — [details](#gs-2-46) |
+| 2.47 | Compound Strength vs Anisotropic Function | blocked | Needs an orientation-dependent (dip-relative) strength model XSLOPE does not have: AnisotropicFn/CompoundStrength interpolate strength by slice-base angle against a discontinuity dip over angle ranges A/B (the .gsz importer already flags exactly this on import). SLOPE/W: Anisotropic 1.113, Compound 1.118 — solved on the *same* surface these differ by 0.4%, so the gap is the strength model, not the search. The 21-material faulted section has no printed coordinate table (a secondary blocker). |
 
 ## Problem details
 
@@ -453,6 +453,41 @@ XSLOPE's Spencer FS of 1.052 matches Slide (1.051) and sits just above SLOPE/W (
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.15; Chen & Shao (1988).
 
+### 2.18 — Borges & Cardoso – Geosynthetic Embankment #2 {#gs-2-18}
+
+Borges & Cardoso (2002)'s Case 2: a 5 m geosynthetic-reinforced embankment (c′ = 0,
+φ′ = 35°, γ = 20) over four soft-clay layers whose undrained strength increases with
+depth. The two deeper clays are GeoStudio "Su-varies-with-depth" (SFnDepth) materials,
+which map exactly onto XSLOPE's `cp` option (Su = c + cp·max(0, r_elev − y)): Clay 3 is
+16 + 0.96·z and Clay 4 is 18.4 + 1.314·z below their layer tops (the mapped rates
+reproduce the manual's printed layer-bottom strengths to the digit). The geosynthetic
+(Tmax = 200 kN/m, interface friction 33.7°, unanchored) is laid at y = 1.0 across the
+embankment base as an axial geosynthetic; on the critical surface it is fully embedded,
+so the full 200 kN/m develops and the factor of safety is insensitive to the bond
+length. This is a GeoStudio-only problem — the full geometry is in the builder
+(`benchmarks/geostudio/build_gs2_18.py`).
+
+**Input:** [gs2_18.xlsx](../files/geostudio/gs2_18.xlsx)
+
+![gs2_18: inputs and representative solution](images/gs2_18.png)
+
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Morgenstern-Price | 1.153 | 1.171 | Borges & Cardoso 1.15 |
+| Bishop | 1.154 | 1.170 | — |
+| Janbu | 1.327 | 1.233 | — |
+
+Run on SLOPE/W's own critical circle (which a grid search confirms is also XSLOPE's
+critical), XSLOPE's Morgenstern-Price 1.153 sits 1.5% below SLOPE/W's 1.171 and 0.3%
+above the Borges & Cardoso (2002) published 1.15; Bishop tracks at −1.4%. Janbu is
+higher because XSLOPE reports the f₀-corrected value where the manual's Janbu column is
+uncorrected. Without the geosynthetic the M-P factor falls to 1.011, so the
+reinforcement carries a large share of the resistance.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.18; Borges & Cardoso (2002).
+
+<!-- test: file=../files/geostudio/gs2_18.xlsx, type=single_circle, num_slices=60, fs_bishop=1.155, fs_spencer=1.148, fs_mprice=1.153, fs_janbu=1.330, benchmark=GS-2.18 -->
+
 ### 2.23 — Li & Lumb – Reliability Index {#gs-2-23}
 
 The Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: a homogeneous slope with an r_u pore-pressure ratio for which both the deterministic Bishop factor of safety and the lognormal reliability index β are computed from the variability in c′, φ′, and γ. It shares the vp036.xlsx input with the Rocscience corpus, so the full geometry and material statistics are deferred to the linked Rocscience detail.
@@ -486,6 +521,37 @@ Tandjiria (2002)'s required-reinforcement half-embankment on soft clay, evaluate
 Run on SLOPE/W's own critical circles, the imported geosynthetic reproduces SLOPE/W's reinforced factor of safety to within −0.27% (clay fill) and −0.64% (sand fill), isolating the reinforcement handling with no search difference to explain away.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.24; Tandjiria (2002).
+
+### 2.26 — Baker – Planar Homogeneous {#gs-2-26}
+
+Baker (2001)'s planar-slip-surface benchmark: a homogeneous, dry c′-φ′ slope (H = 10 m,
+face angle 76.0°, c′ = 30, φ′ = 30°, γ = 20) evaluated on planes through the toe, with
+FS plotted against the daylight point's normalized position X = x/H on the backslope.
+The critical plane sits at X = 0.85. The SLOPE/W model pins the exact geometry (crest
+offset 2.5 m) — which also resolves the Rocscience corpus's VP43 analog, whose build
+inferred 3 m and read FS ≈ 1.43 against the ≈ 1.35 references.
+
+**Input:** [gs2_26.xlsx](../files/geostudio/gs2_26.xlsx)
+
+![gs2_26: inputs and representative solution](images/gs2_26.png)
+
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Spencer / Janbu | 1.352 | 1.352 | Baker & Leshchinsky (2001) ≈ 1.35 |
+
+XSLOPE's Spencer and Janbu match SLOPE/W's own solved value (1.352, on the identical
+toe-to-(8.5, 10) plane; sliding-mass weight 600 kN/m agrees exactly) to within 0.01%,
+and the Baker & Leshchinsky reference to 0.15%. XSLOPE's Morgenstern-Price declines
+this surface: on a single straight plane α is constant for every slice, and the
+unconstrained λ-search reaches equilibrium only by driving ~70% of the interslice
+forces into tension — the solver's admissibility guard rejects that as unphysical
+(Corps and Lowe-Karafiath hit the same guard), leaving Spencer as the rigorous method
+that converges.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.26; Baker (2001); Baker &
+Leshchinsky (2001).
+
+<!-- test: file=../files/geostudio/gs2_26.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, benchmark=GS-2.26 -->
 
 ### 2.27 — Sheahan – Amherst Soil Nails {#gs-2-27}
 
@@ -555,6 +621,35 @@ The Zhu & Lee heterogeneous benched slope (four materials, water table, tension 
 XSLOPE's wet deep-family Spencer FS of 1.189 matches Slide exactly.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.32; Zhu & Lee (2002).
+
+### 2.33 — Priest – Rigid Blocks {#gs-2-33}
+
+Priest (1993), *Discontinuity Analysis for Rock Engineering*: a classical rock-slope
+planar failure — a single rigid block translating on one straight failure plane
+(despite the section title, not a multi-block assembly) — with a 15 m tension crack at
+the crest, 25% water-filled. One Mohr-Coulomb material: c′ = 20, φ′ = 30°, γ = 25. The
+face rises at 60° from the toe (0, 0) to the crest (17.32, 30) with a flat crest
+beyond. The failure plane dips at 30° from the toe; XSLOPE specifies it untruncated (to
+its natural daylight point) and lets `tcrack_depth = 15` truncate it, which reproduces
+SLOPE/W's own solved endpoint (25.98, 15.0) exactly.
+
+**Input:** [gs2_33.xlsx](../files/geostudio/gs2_33.xlsx)
+
+![gs2_33: inputs and representative solution](images/gs2_33.png)
+
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Janbu | 1.049 | 1.049 | Priest (hand) 1.049 |
+| Morgenstern-Price | 1.049 | 1.049 | — |
+
+All XSLOPE methods agree to four decimals on this surface and Janbu's f₀ correction is
+exactly 1.00 — expected for a single straight plane, and the same behaviour the
+manual's FS-vs-λ figure shows for SLOPE/W (moment and force factors coincide regardless
+of the interslice assumption). Total sliding weight matches SLOPE/W's to 0.004%.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.33; Priest (1993).
+
+<!-- test: file=../files/geostudio/gs2_33.xlsx, type=single_noncirc, num_slices=50, fs_janbu=1.049, fs_mprice=1.049, fs_spencer=1.049, benchmark=GS-2.33 -->
 
 ### 2.34 — Yamagami – Stabilizing Piles {#gs-2-34}
 
@@ -655,3 +750,63 @@ A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthf
 XSLOPE's Spencer (1.044) and Bishop (1.042) staged factors of safety are essentially identical; the geostudio entry reports the shared VP97 XSLOPE run, with the published Slide and Duncan–Wright–Wong reference values documented in the linked Rocscience detail.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.43; Duncan, Wright & Wong (1990).
+
+### 2.45 — Eurocode 7: Cutting in Clay {#gs-2-45}
+
+A 1:2 cutting in a homogeneous clay (characteristic c′ = 10, φ′ = 28°, γ = 20) with a
+water table and a 35 kPa permanent crest surcharge, checked to Eurocode 7 Design
+Approach 3 (after the *Designers' Guide to Eurocode 7*). XSLOPE has no native
+partial-factor feature, so the DA3 material factors (set M2) are baked into the
+authored material — c′* = 10/1.25 = 8.0 kPa, φ′* = atan(tan 28°/1.25) = 23.04° — with
+soil weight and the permanent surcharge at their factor of 1.0. An ordinary analysis of
+the factored model then reproduces GeoStudio's Overdesign Factor (ODF).
+
+**Input:** [gs2_45.xlsx](../files/geostudio/gs2_45.xlsx)
+
+![gs2_45: inputs and representative solution](images/gs2_45.png)
+
+| Method | XSLOPE | SLOPE/W (ODF) | Reference |
+|---|---|---|---|
+| Spencer | 1.173 | 1.174 | book (Bishop) 1.193 |
+| Bishop | 1.172 | 1.173 | — |
+
+XSLOPE's Spencer ODF matches SLOPE/W's to −0.07%, and on SLOPE/W's own critical circle
+the two agree to −0.09% — the factored-parameter emulation reproduces the EC7 design
+check at method level. Janbu is not compared (XSLOPE reports the f₀-corrected value;
+the manual's column is uncorrected).
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.45; *Designers' Guide to
+Eurocode 7*.
+
+<!-- test: file=../files/geostudio/gs2_45.xlsx, type=circular_search, num_slices=40, fs_spencer=1.173, fs_bishop=1.172, benchmark=GS-2.45 -->
+
+### 2.46 — Eurocode 7: Earth Dam {#gs-2-46}
+
+A homogeneous clay dam (characteristic c′ = 12, φ′ = 20°, γ = 19.2) with an upstream
+reservoir at 5.1 m total head, analysed as coupled steady-state seepage + slope
+stability under Eurocode 7 Design Approach 1, Combination 2 (after *Smith's Elements of
+Soil Mechanics*, ex. 5.12). Pore pressures come from an XSLOPE finite-element seepage
+solve (u = 'seep' with mesh/solution sidecars) whose phreatic surface reproduces
+SEEP/W's to ~0.1–0.2 m; the DA1-C2 material factors (set M2) are baked in — c′* = 9.6
+kPa, φ′* = 16.23° — so an ordinary analysis yields the Overdesign Factor.
+
+**Input:** [gs2_46.xlsx](../files/geostudio/gs2_46.xlsx) (+ `gs2_46_mesh.json`,
+`gs2_46_seep.csv`)
+
+![gs2_46: inputs and representative solution](images/gs2_46.png)
+
+| Method | XSLOPE | SLOPE/W (ODF) | Reference |
+|---|---|---|---|
+| Morgenstern-Price | 1.073 | 1.091 | book (Bishop) 1.07 |
+| Bishop | 1.074 | 1.092 | — |
+
+On SLOPE/W's own critical circle XSLOPE's Morgenstern-Price (1.099) matches SLOPE/W
+(1.101) to −0.2%; XSLOPE's free search finds a slightly more critical downstream
+surface at 1.073, landing on the Smith textbook value (1.07), where SLOPE/W reports its
+base-truncated composite minimum at 1.091 — a search-coverage difference, not a model
+one. Janbu is not compared (corrected vs uncorrected convention).
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.46; *Smith's Elements of Soil
+Mechanics* (8th ed.), ex. 5.12.
+
+<!-- test: file=../files/geostudio/gs2_46.xlsx, type=circular_search, num_slices=40, fs_mprice=1.073, fs_bishop=1.074, fs_spencer=1.074, benchmark=GS-2.46 -->

@@ -28,7 +28,8 @@ from xslope.fileio import default_template_path
 
 from .canvas import MplCanvas
 from .dialogs import (
-    BuildMeshDialog, DxfImportDialog, GszImportDialog, RunFemDialog, RunLemDialog, RunSeepDialog,
+    BuildMeshDialog, DxfImportDialog, GszImportDialog, RunFemDialog, RunLemDialog,
+    RunSeepDialog, Slide2ImportDialog,
 )
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
@@ -374,6 +375,8 @@ class MainWindow(QMainWindow):
                                       triggered=self.import_dxf_dialog)
         self.act_import_gsz = QAction("Import &GeoStudio (SLOPE/W)…", self,
                                       triggered=self.import_gsz_dialog)
+        self.act_import_slide2 = QAction("Import &Slide2…", self,
+                                         triggered=self.import_slide2_dialog)
         self.act_export_dxf = QAction("&Export Geometry (DXF)…", self, enabled=False,
                                       triggered=self.export_dxf_dialog)
         self.act_export_gsz = QAction("Export to GeoStudio (SLOPE/&W)…", self,
@@ -402,6 +405,7 @@ class MainWindow(QMainWindow):
         m_file.addSeparator()
         m_file.addAction(self.act_import_dxf)
         m_file.addAction(self.act_import_gsz)
+        m_file.addAction(self.act_import_slide2)
         m_file.addAction(self.act_export_dxf)
         m_file.addAction(self.act_export_gsz)
         m_file.addSeparator()
@@ -658,6 +662,66 @@ class MainWindow(QMainWindow):
         if caveats:
             QMessageBox.information(
                 self, "GeoStudio imported",
+                "Imported with notes:\n\n• " + "\n• ".join(caveats) +
+                "\n\nSee the Log pane for details.")
+
+    def import_slide2_dialog(self):
+        """Import a Rocscience Slide2 model (.sli/.slim/.slmd) into a fresh project
+        (confirm discard first, like Open).
+
+        Like a .gsz, a Slide2 file needs no mapping wizard — its geometry, materials
+        and water conditions are already identified — so the only prompt is which
+        scenario to import, since a .slmd usually holds several (a base case plus
+        variants) and they can differ in geometry and water as well as materials.
+        Whatever xslope cannot represent (supports/anchors, loads, Slide2's search
+        definition) comes back as caveats and is shown, not dropped quietly. Most
+        Slide2 tutorial models are search-only, so the import routinely arrives with
+        no failure circle — the document still opens for editing (the caveat says
+        so) and the user defines circles afterward. Left unsaved so the user reviews
+        it and Saves As."""
+        if not self._confirm_discard():
+            return
+        start = os.path.dirname(self._recent[0]) if self._recent else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Slide2", start,
+            "Slide2 models (*.slmd *.slim *.sli);;All files (*)")
+        if not path:
+            return
+        try:
+            d, scenarios = self.doc.read_slide2_scenarios(path)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import Slide2 file",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+
+        if len(scenarios) == 1:
+            scenario = scenarios[0]["index"]        # nothing to choose
+        else:
+            picker = Slide2ImportDialog(scenarios, self)
+            if not picker.exec():
+                return
+            scenario = picker.result()
+
+        try:
+            caveats = self.doc.build_from_slide2(d, scenario)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not import Slide2 file",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+
+        d2 = self.doc.slope_data
+        for c in caveats:                          # surface to the Log pane
+            print(f"Slide2 import note: {c}")
+        self.statusBar().showMessage(
+            f"Imported {os.path.basename(path)} — "
+            f"{len(d2.get('materials') or [])} material(s), "
+            f"{len(d2.get('polygons') or [])} zone(s), "
+            f"{len(d2.get('circles') or [])} circle(s). Review, then Save As.")
+        if caveats:
+            QMessageBox.information(
+                self, "Slide2 imported",
                 "Imported with notes:\n\n• " + "\n• ".join(caveats) +
                 "\n\nSee the Log pane for details.")
 

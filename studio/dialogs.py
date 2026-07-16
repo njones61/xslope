@@ -692,3 +692,59 @@ class GszImportDialog(QDialog):
         """The chosen analysis ID."""
         row = self.table.currentRow()
         return self._ids[row if row >= 0 else 0]
+
+
+class Slide2ImportDialog(QDialog):
+    """Rocscience Slide2 (.sli/.slim/.slmd) import: choose which scenario to
+    import.
+
+    Like a .gsz, a Slide2 model needs no layer-mapping wizard — it already knows
+    what its geometry means. The one thing it cannot decide for us is *which*
+    scenario: a ``.slmd`` routinely bundles several over the same geometry (a base
+    case plus variants), and they can differ in more than the slip surface. So
+    this dialog just lists them.
+
+    ``result()`` returns the chosen scenario index.
+    """
+
+    def __init__(self, scenarios, parent=None):
+        # scenarios: [{'index','name'}, ...] from slide2.list_scenarios
+        super().__init__(parent)
+        self.setWindowTitle("Import Slide2 — choose a scenario")
+        self.resize(520, 360)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "This Slide2 file contains the scenarios below. Choose one to import.\n"
+            "• Material zones, strengths and water conditions import automatically.\n"
+            "• Scenarios can use different geometry and water conditions, so the "
+            "choice matters.\n"
+            "• Supports/anchors, loads and Slide2's search are not imported — you "
+            "will get a list of what was left out."))
+
+        self.table = QTableWidget(len(scenarios), 1, self)
+        self.table.setHorizontalHeaderLabels(["Scenario"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+
+        self._indices = []
+        for row, s in enumerate(scenarios):
+            self._indices.append(s["index"])
+            self.table.setItem(row, 0, QTableWidgetItem(s.get("name") or ""))
+        self.table.selectRow(0)
+
+        layout.addWidget(self.table, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        # Double-clicking a row is the natural "pick this one".
+        self.table.doubleClicked.connect(self.accept)
+
+    def result(self):
+        """The chosen scenario index."""
+        row = self.table.currentRow()
+        return self._indices[row if row >= 0 else 0]

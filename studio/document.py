@@ -360,6 +360,53 @@ class ProjectDocument(QObject):
         self.dirty_changed.emit(True)
         return caveats
 
+    def read_slide2_scenarios(self, slide2_path):
+        """Open a Rocscience Slide2 model (.sli/.slim/.slmd) and list the scenarios
+        it holds, without mutating the project (the engine's ``read_slide2``). A
+        ``.slmd`` routinely bundles several scenarios over one geometry (a base case
+        plus variants), the way a GeoStudio ``.gsz`` bundles several analyses — so
+        the import dialog shows them and the user picks one, then calls
+        ``build_from_slide2``. A ``.sli``/``.slim`` has exactly one.
+
+        Returns ``(d, scenarios)``; the opaque ``d`` is passed straight back."""
+        from xslope.slide2 import read_slide2, list_scenarios
+        d = read_slide2(str(slide2_path))
+        scenarios = list_scenarios(d)
+        if not scenarios:
+            raise ValueError("This Slide2 file defines no scenarios.")
+        return d, scenarios
+
+    def build_from_slide2(self, d, scenario):
+        """Build a fresh project from one scenario of a parsed Slide2 model.
+
+        Like a .gsz, a Slide2 file is semantically complete — material zones,
+        strengths and water conditions arrive already identified, so there is
+        nothing to map. What Slide2 models and xslope cannot is returned as
+        caveats rather than dropped in silence. Most Slide2 tutorial models define
+        a SEARCH rather than a specified surface, so the import routinely arrives
+        with no failure circle — the document still opens for editing (the caveat
+        says so) and the user defines circles afterward, same as an unsolved .gsz.
+        REPLACES the current project (callers confirm discard); result is unsaved.
+        Returns caveat strings."""
+        from xslope.slide2 import slide2_to_slope_data
+        from studio.editors import _resync_geometry
+
+        sd, caveats = slide2_to_slope_data(d, scenario)
+        _resync_geometry(sd)               # ground surface / domain / t-crack
+
+        self.slope_data = sd
+        self.path = None
+        self.results.clear()
+        self.style = {}                    # Slide2 carries no colour info to keep
+        self._undo.clear()
+        self._redo.clear()
+        self._clean_index = None      # freshly imported, never saved -> dirty
+        self._style_dirty = False
+        self._dirty = True
+        self.loaded.emit()
+        self.dirty_changed.emit(True)
+        return caveats
+
     # --- editing / snapshot undo ----------------------------------------
     # Cap on the undo/redo depth: each snapshot deep-copies slope_data (the mesh is
     # shared, not copied — see _snapshot), so an unbounded stack would still grow on

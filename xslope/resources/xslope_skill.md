@@ -745,10 +745,12 @@ Method notes:
 ### Sensitivity & design studies
 
 Four engine entry points in `xslope.sensitivity`, all sharing one parameter grammar:
-`sensitivity()` sweeps one input and reports FS per point; `design()` sweeps one input to
-find the value where FS meets a target; `tornado()` / `tornado_from_sweeps()` rank several
-parameters by FS swing; and `list_params()` enumerates every sweepable parameter so you
-never guess a ref.
+`sensitivity()` sweeps one input and reports the OUTPUT per point; `design()` sweeps one
+input to find the value where the output meets a target; `tornado()` /
+`tornado_from_sweeps()` rank several parameters by output swing; and `list_params()`
+enumerates every sweepable parameter so you never guess a ref. All four take a `mode`
+(`'lem'` default → output = FS; `'fem'` → output = FS from a full SSRM solve; `'seep'` →
+output = total discharge q) — see **Engine modes: FEM and seepage** below.
 
 ```python
 from xslope.sensitivity import (sensitivity, design, tornado,
@@ -762,14 +764,17 @@ ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
 - Param refs are `"kind:name:field"`: `mat` (strength fields valid for the material's
   `option`, plus `gamma`/`gamma_sat`/`ru`/`d`/`psi`), `reinforce` (by line label:
   `t_max`, `lp1`, ...), `piles` (by label: `H`, `S`, ...), `global` (`k_seismic`,
-  `tcrack_depth`, `tcrack_water`), `seep` (`k1`, ...), and `geom:piezo:dy` (vertical
+  `tcrack_depth`, `tcrack_water`), `seep` (`k1`, `k2`, `alpha`, `kr0`, `h0`),
+  `seep_bc:<set>:<head_index>` (a specified-head boundary value — set is 1 or 2, index
+  is 0-based into that BC set's `specified_heads`), and `geom:piezo:dy` (vertical
   water-table shift; the value is a DELTA). `design()` also accepts the dict form
-  `{"material": name_or_index, "property": field}` / `{"global": field}` and a
-  `(kind, name, field)` tuple. Bad refs raise naming what exists — do not guess field
-  names, read the error.
+  `{"material": name_or_index, "property": field}` / `{"global": field}` /
+  `{"seep_bc": {"set": 1, "head_index": 0}}` and a `(kind, name, field)` tuple. Bad refs
+  raise naming what exists — do not guess field names, read the error.
 - Discover refs with `list_params(slope_data)` — a list of dicts, each with `ref`,
   `label`, `value`, and `sigma` (the reliability std-dev if the model carries one). This
-  is the menu a picker or a design/tornado study draws from.
+  is the menu a picker or a design/tornado study draws from. Pass `mode="seep"` to switch
+  the menu to the seepage set (hydraulic `k`/unsaturated fields + `seep_bc` head refs).
 - `search=True` (default) re-searches the critical surface per point — the honest setting,
   since the critical surface moves; `search=False` re-solves `circles[0]` / `non_circ`
   (~50x faster, for prescribed-surface questions).
@@ -812,6 +817,45 @@ if not res["bracketed"]:
     lo, hi = res["fs_range"]
     print(f"FS = {res['target_fs']} not reached; FS spans [{lo:.3f}, {hi:.3f}].")
     print("extend the range", res["extend"])   # e.g. "above 1200" — which way to widen
+```
+
+#### Engine modes: FEM and seepage
+
+`sensitivity()`, `design()`, and `tornado()` take `mode=` to choose the engine that
+evaluates each swept point — and hence the OUTPUT quantity. `mode='lem'` (the default) is
+limit equilibrium: output = FS, `method=` picks the LEM method, `search=` re-searches the
+critical surface per point (everything above). The other two modes need a finite-element
+mesh in `slope_data['mesh']` (build one first — see the FEM / Seepage sections); without
+it the call returns `False` with a "build a mesh first" message.
+
+- **`mode='fem'`** — a full **SSRM** solve per point (`xslope.fem`); output is still FS,
+  but each point is MINUTES of compute, so keep the point count tiny (2-3 for a design
+  sweep, not the default 11). `fem_opts={'F_min':.., 'F_max':.., 'tolerance':..,
+  'failure_criterion':.., 'min_slip_depth':..}` forwards the SSRM knobs (defaults mirror
+  `solve_ssrm`). In Studio the sweep runs on a background thread with a live progress bar
+  and a Cancel button; a headless script blocks until it finishes.
+- **`mode='seep'`** — a seepage solve per point (`xslope.seep`); output is **total
+  discharge q**, NOT a factor of safety, so `target_fs` names a target q and the plot's
+  y-axis auto-labels "Total discharge, q" (no FS = 1 guide). `seep_opts={'bc': 1}` selects
+  the BC set (1 or 2).
+
+Seepage design — "what conductivity (or reservoir level) gives a target discharge?":
+
+```python
+ok, res = design(slope_data, "seep:Soil:k1", low=6e-6, high=1.6e-5, steps=11,
+                 target_fs=6e-6, mode="seep", seep_opts={"bc": 1})   # target_fs is a target q
+print(res["message"])          # "q = 6e-06 at seep:Soil:k1 = 1.11e-05 (interpolated ...)"
+print(res["crossing"])         # the k1 (or head) that produces the target q
+plot_sensitivity(res["df"], target_fs=res["target_fs"])   # y-axis auto-labels "Total discharge, q"
+```
+
+`crossing` / `bracketed` / `fs_range` / `extend` carry the same honest-miss semantics as
+the FS case — never extrapolate a crossing past the swept range. The classic reservoir
+study sweeps a specified-head boundary instead, charting discharge against reservoir level:
+
+```python
+ok, res = design(slope_data, {"seep_bc": {"set": 1, "head_index": 0}},
+                 low=3.0, high=8.0, steps=11, target_fs=6e-6, mode="seep")
 ```
 
 #### Tornado: rank several parameters

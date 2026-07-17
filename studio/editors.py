@@ -636,8 +636,12 @@ XY_FIELDS = [Field("x", "x"), Field("y", "y")]
 
 class _SeepBcSetWidget(QWidget):
     """One seepage BC set as a single master/detail: the left list holds each
-    specified-head boundary AND the exit face; the right side shows one
-    full-height point table (plus a head-value field, hidden for the exit face)."""
+    specified-head boundary, each specified-flux boundary, AND the exit face; the
+    right side shows one full-height point table plus a value field — "Head value:"
+    for heads, "Flux value:" for fluxes, both hidden for the exit face.
+
+    List order is heads … fluxes … exit face; picking.py mirrors this so a canvas
+    double-click jumps to the right row."""
 
     def __init__(self, bc, parent=None):
         super().__init__(parent)
@@ -645,12 +649,10 @@ class _SeepBcSetWidget(QWidget):
         self._heads = [{"head": h.get("head", 0.0),
                         "coords": [tuple(c) for c in h.get("coords", [])]}
                        for h in (bc.get("specified_heads") or [])]
-        self._exit = [tuple(c) for c in (bc.get("exit_face") or [])]
-        # Flux BCs are not editable here yet, but they must survive a round trip
-        # through this dialog: without this they would be silently dropped on save.
         self._fluxes = [{"flux": f.get("flux", 0.0),
                          "coords": [tuple(c) for c in f.get("coords", [])]}
                         for f in (bc.get("specified_fluxes") or [])]
+        self._exit = [tuple(c) for c in (bc.get("exit_face") or [])]
         self._cur = -1
         self.table = None
 
@@ -669,6 +671,14 @@ class _SeepBcSetWidget(QWidget):
         lb.addWidget(b_add)
         lb.addWidget(b_rem)
         left.addLayout(lb)
+        lb2 = QHBoxLayout()
+        b_addf = QPushButton("Add flux")
+        b_addf.clicked.connect(self._add_flux)
+        b_remf = QPushButton("Remove flux")
+        b_remf.clicked.connect(self._remove_flux)
+        lb2.addWidget(b_addf)
+        lb2.addWidget(b_remf)
+        left.addLayout(lb2)
 
         right = QVBoxLayout()
         body.addLayout(right, 1)
@@ -678,20 +688,39 @@ class _SeepBcSetWidget(QWidget):
         self.head_edit = QLineEdit()
         hrow.addWidget(self.head_edit, 1)
         right.addLayout(hrow)
+        frow = QHBoxLayout()
+        self.flux_label = QLabel("Flux value:")
+        frow.addWidget(self.flux_label)
+        self.flux_edit = QLineEdit()
+        frow.addWidget(self.flux_edit, 1)
+        right.addLayout(frow)
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
 
         self._refresh()
         self.list.setCurrentRow(0)
 
+    # Index scheme: heads occupy [0, n_heads); fluxes [n_heads, n_heads+n_flux);
+    # the exit face is the single trailing row.
+    def _is_head(self, idx):
+        return 0 <= idx < len(self._heads)
+
+    def _is_flux(self, idx):
+        return len(self._heads) <= idx < len(self._heads) + len(self._fluxes)
+
+    def _flux_idx(self, idx):
+        return idx - len(self._heads)
+
     def _is_exit(self, idx):
-        return idx == len(self._heads)
+        return idx == len(self._heads) + len(self._fluxes)
 
     def _refresh(self):
         self.list.blockSignals(True)
         self.list.clear()
         for i, h in enumerate(self._heads):
             self.list.addItem(f"Head {i + 1}  (h = {h['head']})")
+        for i, f in enumerate(self._fluxes):
+            self.list.addItem(f"Flux {i + 1}  (q = {f['flux']})")
         self.list.addItem("Exit face")
         self.list.blockSignals(False)
 
@@ -701,7 +730,14 @@ class _SeepBcSetWidget(QWidget):
         coords = [(r["x"], r["y"]) for r in self.table.result_rows()] if self.table else []
         if self._is_exit(self._cur):
             self._exit = coords
-        elif self._cur < len(self._heads):
+        elif self._is_flux(self._cur):
+            f = self._fluxes[self._flux_idx(self._cur)]
+            try:
+                f["flux"] = float(self.flux_edit.text() or 0)
+            except ValueError:
+                f["flux"] = 0.0
+            f["coords"] = coords
+        elif self._is_head(self._cur):
             try:
                 self._heads[self._cur]["head"] = float(self.head_edit.text() or 0)
             except ValueError:
@@ -714,14 +750,21 @@ class _SeepBcSetWidget(QWidget):
             self.table = None
         if idx < 0:
             return
-        is_exit = self._is_exit(idx)
-        self.head_label.setVisible(not is_exit)
-        self.head_edit.setVisible(not is_exit)
-        if is_exit:
-            rows = [{"x": x, "y": y} for (x, y) in self._exit]
-        else:
+        is_head = self._is_head(idx)
+        is_flux = self._is_flux(idx)
+        self.head_label.setVisible(is_head)
+        self.head_edit.setVisible(is_head)
+        self.flux_label.setVisible(is_flux)
+        self.flux_edit.setVisible(is_flux)
+        if is_head:
             self.head_edit.setText(str(self._heads[idx]["head"]))
             rows = [{"x": x, "y": y} for (x, y) in self._heads[idx]["coords"]]
+        elif is_flux:
+            f = self._fluxes[self._flux_idx(idx)]
+            self.flux_edit.setText(str(f["flux"]))
+            rows = [{"x": x, "y": y} for (x, y) in f["coords"]]
+        else:  # exit face
+            rows = [{"x": x, "y": y} for (x, y) in self._exit]
         self.table = _EditableTable(XY_FIELDS, rows, _new_pt)
         self._holder.addWidget(self.table)
 
@@ -733,17 +776,34 @@ class _SeepBcSetWidget(QWidget):
     def _add_head(self):
         self._commit()
         self._heads.append({"head": 0.0, "coords": []})
+        self._cur = -1                     # rows below shifted; avoid a stale commit
         self._refresh()
         self.list.setCurrentRow(len(self._heads) - 1)
 
     def _remove_head(self):
         idx = self.list.currentRow()
-        if idx < 0 or self._is_exit(idx):  # the exit face is permanent
+        if not self._is_head(idx):         # only a head row is removable here
             return
         self._heads.pop(idx)
         self._cur = -1
         self._refresh()
-        self.list.setCurrentRow(min(idx, len(self._heads)))
+        self.list.setCurrentRow(min(idx, self.list.count() - 1))
+
+    def _add_flux(self):
+        self._commit()
+        self._fluxes.append({"flux": 0.0, "coords": []})
+        self._cur = -1
+        self._refresh()
+        self.list.setCurrentRow(len(self._heads) + len(self._fluxes) - 1)
+
+    def _remove_flux(self):
+        idx = self.list.currentRow()
+        if not self._is_flux(idx):
+            return
+        self._fluxes.pop(self._flux_idx(idx))
+        self._cur = -1
+        self._refresh()
+        self.list.setCurrentRow(min(idx, self.list.count() - 1))
 
     def result(self):
         self._commit()
@@ -763,9 +823,10 @@ class SeepBcEditor(CategoryEditor):
         dlg.resize(640, 520)
         layout = QVBoxLayout(dlg)
         layout.addWidget(_help_label(
-            "Seepage boundary conditions: a list of specified-head boundaries (each a head "
-            "value + its points) and an exit face (where water leaves the slope). Set 2 is "
-            "used for rapid-drawdown (the second seepage solution)."))
+            "Seepage boundary conditions: specified-head boundaries (each a head value + "
+            "its points), specified-flux boundaries (each a flux value + its points), and "
+            "an exit face (where water leaves the slope). Set 2 is used for rapid-drawdown "
+            "(the second seepage solution)."))
         tabs = QTabWidget()
         w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"))
         w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"))

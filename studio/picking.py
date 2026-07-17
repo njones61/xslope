@@ -66,14 +66,19 @@ def pick_category(slope_data, x, y, tol, mode=None):
             for i, line in enumerate(d.get(key) or []):
                 cands.append((_line_dist(pt, line), "dloads", (s, i)))
     if mode is None or mode == "seep":
-        # index is (set, row) where row is the head index, or len(heads) for the
-        # exit face — matching the editor's list (heads… then "Exit face").
+        # index is (set, row), matching the editor's list order: heads (0…), then
+        # fluxes, then the exit face as the trailing row.
         for s, key in enumerate(("seepage_bc", "seepage_bc2")):
             bc = d.get(key) or {}
             heads = bc.get("specified_heads") or []
+            fluxes = bc.get("specified_fluxes") or []
             for j, sh in enumerate(heads):
                 cands.append((_line_dist(pt, sh.get("coords") or []), "seep_bc", (s, j)))
-            cands.append((_line_dist(pt, bc.get("exit_face") or []), "seep_bc", (s, len(heads))))
+            for j, sf in enumerate(fluxes):
+                cands.append((_line_dist(pt, sf.get("coords") or []),
+                              "seep_bc", (s, len(heads) + j)))
+            cands.append((_line_dist(pt, bc.get("exit_face") or []),
+                          "seep_bc", (s, len(heads) + len(fluxes))))
     for key in ("piezo_line", "piezo_line2"):
         cands.append((_line_dist(pt, d.get(key) or []), "piezo", None))
     for i, c in enumerate(d.get("circles") or []):

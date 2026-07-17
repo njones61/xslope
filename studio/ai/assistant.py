@@ -182,6 +182,16 @@ writes a summary CSV + ONE plot to the output folder, and restores the project.
 `apply(v)` is your callback that edits slope_data to an absolute value (e.g. moves
 the crest). Don't hand-roll the loop with a solution plot per step. For a single
 analysis, use `run_lem(method=...)` (pass plot=False to suppress its plot).
+
+For a DESIGN question ("what c gives FS = 1.5?", "vary Su between X and Y and
+show where FS hits the target") use the preloaded `design_sweep(param, low,
+high, steps=..., target_fs=..., method=...)`: param takes
+`{'material': name_or_index, 'property': field}` or `{'global': 'k_seismic'}`;
+it sweeps, plots FS-vs-value with the target line, and returns the result dict —
+read `crossing` (the interpolated required value) only when `bracketed` is True;
+on a miss report `fs_range` and extend the way `extend` says, never extrapolate.
+Discover sweepable parameters with `list_params()`. For material properties
+prefer these over the callback-style `sensitivity()`.
 """
 
 # Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.

@@ -11,6 +11,9 @@ reservoir loads are applied as consistent boundary tractions, so submerged
 problems converge without any special criterion (see
 [FEM Overview](../fem/overview.md)).
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 ### Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
 
 This is the benchmark problem from Griffiths & Lane (1999), "Slope stability analysis by finite elements,"

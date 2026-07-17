@@ -7,6 +7,9 @@
     little beyond cross-bearing, and the survey below is retained only as a
     reference should that judgment ever change.
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 The SVSLOPE 5 verification manual (207 pages, ~105 problems) is one of the largest published
 limit-equilibrium verification sets, organized as:
 

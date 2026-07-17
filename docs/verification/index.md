@@ -34,24 +34,10 @@ suite (`run_tests.py`).
 
 ## References
 
-- Arai, K. & Tagyo, K. (1985). Determination of noncircular slip surface giving
-  the minimum factor of safety in slope stability analysis. *Soils and
-  Foundations* 25(1).
-- Bishop, A.W. & Morgenstern, N. (1960). Stability coefficients for earth
-  slopes. *Géotechnique* 10(4).
-- Donald, I.B. & Giam, P. (1989). *Soil slope stability programs review*. ACADS.
-- GEO-SLOPE / Seequent (2022). *Stability Modeling with GeoStudio — SLOPE/W
-  Verification Manual*.
-- Griffiths, D.V. & Lane, P.A. (1999). Slope stability analysis by finite
-  elements. *Géotechnique* 49(3).
-- Harr, M.E. (1962). *Groundwater and Seepage*. McGraw-Hill.
-- Polubarinova-Kochina, P.Ya. (1962). *Theory of Ground Water Movement*.
-  Princeton University Press.
-- Smith, I.M. & Griffiths, D.V. (1998). *Programming the Finite Element
-  Method*, 3rd ed. Wiley.
-- Sun, et al. (2021). Displacement-catastrophe criterion for strength-reduction
-  finite-element slope stability.
-- Tracy, F.T. *SEEP2D* (USACE Waterways Experiment Station).
+Full bibliographic details for every author-year citation across the corpus
+pages — the published benchmark papers, the vendor verification manuals, and the
+analytical-anchor sources — are collected on the shared
+[**References**](references.md) page, alphabetical by author.
 
 
 ---

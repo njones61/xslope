@@ -6,6 +6,9 @@ This page tracks the [RS2 Slope Stability Verification Manual](https://www.rocsc
 limit equilibrium. The long-standing SSRM anchors (Griffiths & Lane 1999 and the feature
 samples) live on the [SSRM benchmarks page](ssrm.md).
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 Where a problem shares its geometry with a built Slide2 problem, the SSRM analysis runs on
 the **same corpus input file** — the extraction is already validated there. SSRM results
 use the Griffiths elastic convention (E = 10⁵ kPa, or its psf equivalent on the imperial

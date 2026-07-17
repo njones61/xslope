@@ -7,6 +7,9 @@ tracks its manual: every problem gets a row, built problems get an XSLOPE input 
 corpus, the seepage tags mesh and solve live on every run — the committed artifact is the
 input file alone.
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 <!-- test: file=../files/rocscience_gw/gw001.xlsx, type=seep, target_size=0.2, expected_flowrate=2.500e-05, tolerance=0.02, benchmark=GW1-q -->
 <!-- test: file=../files/rocscience_gw/gw001.xlsx, type=seep_head, target_size=0.2, points=2:2:4.052;4:2:4.150;6:2:4.030, tolerance=0.02, benchmark=GW1-h -->
 <!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep, target_size=0.10, expected_flowrate=4.534e-06, tolerance=0.02, benchmark=GW2-q -->

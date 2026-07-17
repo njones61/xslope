@@ -10,6 +10,9 @@ regression-tagged in the table above, so no tags are duplicated here. XSLOPE's J
 SLOPE/W's "Janbu" column is the uncorrected force solution, so those columns are compared via the correction
 factor where noted.
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 ## Building these problems
 
 Most of the entries below were built by transcribing the manual's geometry figures by hand — which is why several

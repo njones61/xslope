@@ -4,6 +4,9 @@ The two analytical-anchor benchmarks below were developed as seepage sample
 problems and now live here; the remaining worked examples are in the
 [seepage sample problems](../seep/samples.md).
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 ### Confined Radial Flow {#verification-confined-radial}
 
 A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer arc

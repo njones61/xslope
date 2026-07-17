@@ -9,6 +9,9 @@ test tag. Status values: **built** (input file + verified results below), *cover
 existing XSLOPE sample), *partial* (some data extracted, some still needed), *blocked* (source data not
 yet available), *planned*.
 
+Full bibliographic details for the author-year citations on this page are on the
+shared [References](references.md) page.
+
 Problems are built from the manual's tabulated data and coordinate-labeled figures; where a problem's
 geometry exists only as an unlabeled figure, the original source publication is consulted before the
 problem is marked *built* — no digitized guesses are used for benchmark inputs.

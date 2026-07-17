@@ -14,7 +14,7 @@ The window is organized around a central **canvas** with docks on each side:
 
 | Region | Purpose |
 | --- | --- |
-| **Toolbar** (top) | New / Open, Undo / Redo, the analysis-mode selector, Build Mesh, and Run. |
+| **Toolbar** (top) | New / Open, Undo / Redo, the analysis-mode selector, Build Mesh, Run, and Sensitivity / Design. |
 | **Inputs tree** (left, top) | A list of every input category; click one to edit it. |
 | **Display dock** (left, bottom) | Per-view plot options for the active result tab, plus the **Styles…** button. |
 | **Canvas + view tabs** (center) | The plots. The **Inputs** tab is always present; result tabs are added as you run analyses. |
@@ -36,7 +36,6 @@ in a zoomable, pannable canvas. Each canvas has a small toolbar:
 | Control | Action |
 | --- | --- |
 | **Fit** | Frame the drawing to the window. |
-| **100%** | Reset to actual size. |
 | **+** / **−** | Zoom in / out. |
 | **Zoom to box** | A checkable mode — drag a rectangle to zoom into it (otherwise drag pans). |
 | **Save…** | Export the current view as a PNG / PDF / SVG image, or as a DXF (see [Export](analysis.md#exporting-views-images-and-dxf)). |

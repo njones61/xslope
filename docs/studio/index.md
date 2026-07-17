@@ -25,8 +25,9 @@ point-and-click.
   run seepage and FEM analyses, each with a run-options dialog.
 - **View** results across dedicated tabs (search, solution, reliability, seepage,
   FEM), with a context-sensitive **Display** panel for per-view plot options.
-- **Export** any view as a PNG/PDF/SVG image or as a DXF, and import/export model
-  geometry as DXF.
+- **Export** any view as a PNG/PDF/SVG image or as a DXF.
+- **Import** models from other tools — DXF, GeoStudio (SLOPE/W), Slide2, and
+  RS2 (`.fez`) — and export back to DXF or GeoStudio.
 - **Ask** the built-in AI assistant to build inputs, run analyses, and script
   parameter studies in natural language.
 - **Save** back to the same Excel format (and the `{stem}_mesh.json` /

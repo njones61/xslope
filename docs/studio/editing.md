@@ -89,19 +89,37 @@ surface on save:
 
 ![Line loads editor](images/editing_line_loads_editor.png)
 
-**Reinforcement** rows carry the line's endpoints plus **Type**, **Dir**, and
-**Appl** dropdowns — picking a Type (geosynthetic, nail, tieback, anchor)
-defaults the other two, and a blank Type means a generic tensile line. The
-LEM/FEM column toggles hide the inputs the other analysis uses, and the preview
-pane draws the lines on the section with the selected one emphasized:
+Like the materials editor, the **reinforcement** and **pile** editors each offer
+two interchangeable views. The default **List view** edits one line at a time as a
+grouped form beside the live section preview; **Table view** is available for bulk
+entry of many lines. Both views edit the same rows, so switching is lossless, and
+the **Show columns for** (LEM / FEM) toggles hide the columns an analysis doesn't
+use in the table.
 
-![Reinforcement editor](images/editing_reinforcement_editor.png)
+**Reinforcement** lines are grouped as **Geometry** (endpoints), **Capacity**
+(Tmax, Tres, E, Area), **Anchorage** (Lp1/Lp2 pullout lengths, Tend1/Tend2 end
+capacities, Spacing), and **Type** — picking a Type (geosynthetic, nail, tieback,
+anchor) defaults **Dir** and **Appl**, and a blank Type means a generic tensile
+line. The preview draws the lines on the section with the selected one emphasized
+and its pullout breakpoints marked:
 
-**Piles** are a table too, with an **Appl** dropdown choosing how the pile
-resistance enters the analysis (active = allowable force; passive = ultimate
-capacity ÷ FS); leaving **H** blank auto-computes the Ito & Matsui force:
+![Reinforcement editor (list view)](images/editing_reinforcement_editor.png)
 
-![Piles editor](images/editing_piles_editor.png)
+Table view lays every column out at once — the bulk-entry path for the fifteen-plus
+lines of a tiered wall:
+
+![Reinforcement editor (table view)](images/editing_reinforcement_table.png)
+
+**Piles** group their fields as **Geometry**, **Capacity / design** (H, D, S, Vcap,
+Mcap, and the FEM E/I/Area), and **Behavior** — the **Appl** dropdown chooses how
+the pile resistance enters the analysis (active = allowable force; passive =
+ultimate capacity ÷ FS), and leaving **H** blank auto-computes the Ito & Matsui
+force. A model rarely has more than a few piles, so the list view is usually all
+you need; the table is there for the exceptions:
+
+![Piles editor (list view)](images/editing_piles_editor.png)
+
+![Piles editor (table view)](images/editing_piles_table.png)
 
 **Seep BC** is a master/detail editor over the two BC sets (Set 2 drives rapid
 drawdown): specified-**head** lines (a head value plus its points),

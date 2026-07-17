@@ -59,7 +59,21 @@ class PythonKernel:
 
     def _helpers(self):
         """Convenience functions seeded into the namespace so the model doesn't
-        have to reconstruct the engine pipeline (a common failure mode)."""
+        have to reconstruct the engine pipeline (a common failure mode). Seeded:
+
+        - ``run_lem(method='bishop', ...)`` — one single-surface LEM solve on the
+          loaded surface; returns the result dict, shows the solution plot.
+        - ``resync_geometry(slope_data=None)`` — rebuild derived geometry after an
+          in-snippet geometry edit (call inside sweep loops).
+        - ``sensitivity(values, apply, param=..., ...)`` — callback-driven FS-vs-
+          parameter sweep (you write ``apply(v)``); writes a CSV + one plot.
+        - ``list_params(slope_data=None)`` — discover every sweepable parameter as
+          a menu of canonical refs (feeds design_sweep / the engine sweepers).
+        - ``design_sweep(param, low, high, target_fs=1.5, ...)`` — vary ONE named
+          parameter and find where FS meets a target; renders one FS-vs-parameter
+          plot with the target highlighted. The engine-driven counterpart to
+          ``sensitivity`` — no callback needed, just a parameter ref or dict spec.
+        """
         doc = self._doc
 
         def resync_geometry(slope_data=None):
@@ -198,8 +212,87 @@ class PythonKernel:
             print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
             return df
 
+        def list_params(slope_data=None):
+            """List every sweepable parameter in the current project — the menu
+            `design_sweep` and the engine sweepers draw their parameter refs from.
+
+            Thin wrapper over `xslope.sensitivity.list_params`. Returns a list of
+            dicts, one per parameter, each carrying a canonical `ref`
+            ("kind:name:field", e.g. "mat:Clay:c", "global:k_seismic"), a `label`,
+            the current `value`, and `sigma` (the reliability std-dev if the model
+            carries one). Covers every material's option-aware strength + general
+            fields plus the global k_seismic; blank/zero fields are still listed so a
+            design sweep with explicit bounds can target them. Prints a compact table
+            and returns the list so a snippet can pick a ref programmatically.
+
+            Hand any `ref` straight to `design_sweep(param=...)`, or use the
+            LLM-friendly dict form {'material': name_or_index, 'property': field} /
+            {'global': field}.
+            """
+            from xslope.sensitivity import list_params as _list_params
+            sd = doc.slope_data if slope_data is None else slope_data
+            params = _list_params(sd)
+            for p in params:
+                val = "—" if p["value"] is None else f"{p['value']:g}"
+                sig = f"   sigma={p['sigma']:g}" if p.get("sigma") else ""
+                print(f"  {p['ref']:<30} = {val}{sig}")
+            return params
+
+        def design_sweep(param, low, high, steps=11, target_fs=1.5,
+                         method="spencer", search=True, num_slices=40, plot=True,
+                         slope_data=None):
+            """Design sweep: vary ONE parameter from `low` to `high` and find the
+            value at which the factor of safety meets `target_fs` — the
+            deterministic-design staple ("vary the undrained strength between X and
+            Y, plot FS vs Su, highlight where FS = 1.5").
+
+            Thin wrapper over `xslope.sensitivity.design`. `param` is a parameter
+            reference in any form the engine accepts: a "kind:name:field" string
+            (e.g. "mat:Clay:c", "global:k_seismic"), a (kind, name, field) tuple
+            (name may be a 1-based material index), or the LLM-friendly dict
+            {'material': name_or_index, 'property': field} / {'global': field}. Run
+            `list_params()` first to discover the refs.
+
+            Runs `steps` evenly spaced solves across [low, high], re-searching the
+            critical surface at each step by default (search=True — the critical
+            surface MOVES as the parameter changes; a fixed-surface sweep understates
+            the effect). Renders ONE FS-vs-parameter plot (via `plot_sensitivity`,
+            with FS = 1 and FS = target_fs guide lines) the same way `run_lem` shows
+            its plot — pass plot=False in a loop. Does NOT modify the project (a sweep
+            is analysis, not an edit).
+
+            Returns the engine's result dict:
+              'crossing'  — interpolated parameter value at FS = target_fs, or None.
+              'bracketed' — True iff FS = target_fs is crossed inside [low, high].
+              'crossings' — every crossing found (list; usually one).
+              'fs_range'  — (min FS, max FS) over the successful sweep points.
+              'direction' — 'increasing' / 'decreasing' / 'non-monotonic'.
+              'extend'    — when NOT bracketed, which way to widen the range
+                            ('above {high}' / 'below {low}'). Report fs_range + this;
+                            NEVER extrapolate a crossing past the swept range.
+              'message'   — one-line human summary. Also: 'df', 'param', 'base_value'.
+            """
+            from xslope.sensitivity import design as _design
+            from xslope.plot import plot_sensitivity
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            ok, res = _design(sd, param, low, high, steps=steps, target_fs=target_fs,
+                              method=method, search=search, num_slices=num_slices)
+            if not ok:
+                raise RuntimeError(res)
+            print(res["message"])
+            if not res["bracketed"]:
+                lo, hi = res["fs_range"]
+                print(f"  (not bracketed — FS spans [{lo:.3f}, {hi:.3f}]; extend "
+                      f"the range {res['extend']} to reach FS = {target_fs:g})")
+            if plot:
+                plot_sensitivity(res["df"], target_fs=res["target_fs"],
+                                 fig=plt.figure(figsize=(8, 5)))
+            return res
+
         return {"run_lem": run_lem, "resync_geometry": resync_geometry,
-                "sensitivity": sensitivity}
+                "sensitivity": sensitivity, "list_params": list_params,
+                "design_sweep": design_sweep}
 
     @staticmethod
     def _normalize(code):

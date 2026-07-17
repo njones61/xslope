@@ -778,6 +778,10 @@ def _editor_fixture():
         _editor_full_material("m-cp-piezo-vg",   "cp",  "piezo", "vg"),
         _editor_full_material("m-pow-seep-gard", "pow", "seep",  "gard"),
         _editor_full_material("m-hb-ru-lf",      "hb",  "ru",    "lf"),
+        # A seep-only material with a BLANK strength option ('' — valid per the
+        # loader). Locks the MaterialsEditor combo's empty entry: without it the
+        # combo would normalize blank -> 'mc' and drop the seep-only classification.
+        _editor_full_material("m-blank-seep-vg", "",    "seep",  "vg"),
     ]
 
     def pile(x1, y1, x2, y2):

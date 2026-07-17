@@ -457,7 +457,11 @@ class MaterialsEditor(CategoryEditor):
         Field("name", "name", "str"),
         Field("gamma", "g", applies=LF),
         Field("gamma_sat", "gsat", "optfloat", applies=LF),
-        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb"], applies=LF),
+        # A BLANK option is valid for seep-only material rows (the loader keeps ''
+        # via _choice; document._blank_material produces it for DXF imports). Offer
+        # it as an empty combo entry so the editor round-trips it instead of
+        # normalizing blank -> 'mc'. Kept last so the default (first choice) stays 'mc'.
+        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", ""], applies=LF),
         Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),

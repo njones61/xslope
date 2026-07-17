@@ -3484,7 +3484,9 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
         base = g.loc[g['is_base'] & g['success']]
         if not base.empty and np.isfinite(base['value'].iloc[0]):
             ax.plot(base['value'].iloc[0], base['fs'].iloc[0], 's', color='k',
-                    ms=8, zorder=6)
+                    ms=8, zorder=6,
+                    label=f"base case ({base['value'].iloc[0]:g}, "
+                          f"FS = {base['fs'].iloc[0]:.3f})")
     ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
     if target_fs is not None:
         ax.axhline(target_fs, color='gray', linestyle='--', linewidth=0.8,
@@ -3502,13 +3504,15 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
 
 
 def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
-                 style=None):
+                 style=None, widest_on_top=True):
     """Duncan-style tornado diagram from tornado(): horizontal bars of the FS
     swing between each parameter's low and high bound, sorted by span, with
     the base-case FS as the vertical reference.
 
     Parameters:
         result: the dict from tornado() (carries 'df', 'base_fs', 'method').
+        widest_on_top: the classic tornado stacking (default). False inverts,
+            widest at the bottom.
     """
     import numpy as np
     df, base_fs = result['df'], result['base_fs']
@@ -3524,7 +3528,7 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
             continue
         lo_fs, hi_fs = ok['fs'].iloc[0], ok['fs'].iloc[-1]
         bars.append((param, lo_fs, hi_fs, abs(hi_fs - lo_fs)))
-    bars.sort(key=lambda b: b[3])          # widest on top
+    bars.sort(key=lambda b: b[3], reverse=not widest_on_top)  # barh draws k=0 at the bottom
 
     for k, (param, lo_fs, hi_fs, _span) in enumerate(bars):
         left, width = min(lo_fs, hi_fs), abs(hi_fs - lo_fs)

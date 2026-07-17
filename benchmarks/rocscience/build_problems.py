@@ -1243,6 +1243,76 @@ def vp029():
     return 'vp029.xlsx'
 
 
+def _vp030_slope_data():
+    """Slide #30 / Borges & Cardoso (2002) case 1 shared geometry. The manual
+    prints the materials (Table 30.2) and the reinforcement but leaves the
+    geometry to an unlabeled figure; the paper supplies it (§4.1): a 2 m
+    embankment, 10.6 m crest, 2:3 (V/H) faces, on 5 m of soft clay over a
+    rigid stratum — and Table 10 lists both published circles outright,
+    center (1.0, 1.0), R 5.74 / 5.24, with MRR = 200.00 on a 1.0 m arm
+    pinning the geosynthetic at y = 0. Clay su: 8.49 to el -1.0, then
+    DECREASING to 4.725 at -1.8 (the paper's construction-consolidated top
+    metre), then increasing at 2.625/m below. Geosynthetic axial/passive per
+    B&C ("acting horizontally ... the most conservative assumption"),
+    unanchored (lp 0 — no pullout ramp, full capacity available at any
+    crossing). Both circles daylight above their equator, so the files
+    carry the principled tension crack tcrack_depth = y_crest - Yo = 1.0 m
+    (see the VP30 corpus section for why, and for the Spencer caveat)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    def mat(name, c, phi, g, option='mc', cp=0.0, r_elev=0.0):
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=g, gamma_sat=g, option=option,
+                 cp=cp, r_elev=r_elev, u='none', E=1e5, nu=0.3, psi=0.0)
+        return m
+    sd['materials'] = [
+        mat('Embankment', 0.0, 35.0, 20.0),
+        mat('Upper Clay', 8.49, 0.0, 17.0),
+        mat('Middle Clay', 8.49, 0.0, 17.0, option='cp', cp=-4.70625, r_elev=-1.0),
+        mat('Lower Clay', 4.725, 0.0, 17.0, option='cp', cp=2.625, r_elev=-1.8),
+    ]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-25.0, 0.0), (-13.6, 0.0), (-10.6, 2.0),
+                                 (0.0, 2.0), (3.0, 0.0), (15.0, 0.0)]},
+        {'mat_id': 1, 'coords': [(-25.0, 0.0), (15.0, 0.0)]},
+        {'mat_id': 2, 'coords': [(-25.0, -1.0), (15.0, -1.0)]},
+        {'mat_id': 3, 'coords': [(-25.0, -1.8), (15.0, -1.8)]},
+    ]
+    sd['max_depth'] = -5.0
+    sd['gamma_water'] = 9.81
+    sd['tcrack_depth'] = 1.0
+    sd['tcrack_water'] = 0.0
+    sd['dloads'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    lines = [{'x1': -13.6, 'y1': 0.0, 'x2': 3.0, 'y2': 0.0,
+              't_max': 200.0, 't_res': float('nan'), 'lp1': 0.0, 'lp2': 0.0,
+              'E': 2e4, 'area': 0.1, 'label': 'geosynthetic',
+              'type': 'geosynthetic', 'dir': 'axial', 'appl': 'passive',
+              'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
+    sd['reinforcement_lines'] = lines
+    sd['reinforce_lines'] = lines
+    return sd
+
+
+def vp030a():
+    """Slide #30 circle A ((1,1) R 5.74): Bishop 1.679 vs Slide2 1.69 and
+    Borges & Cardoso 1.77 (their uncracked overhang; see the corpus section)."""
+    sd = _vp030_slope_data()
+    sd['circles'] = [{'Xo': 1.0, 'Yo': 1.0, 'Depth': 1.0 - 5.74, 'R': 5.74}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp030a.xlsx'))
+    return 'vp030a.xlsx'
+
+
+def vp030b():
+    """Slide #30 circle B ((1,1) R 5.24): Bishop 1.650 vs Slide2 1.66 and
+    Borges & Cardoso 1.74."""
+    sd = _vp030_slope_data()
+    sd['circles'] = [{'Xo': 1.0, 'Yo': 1.0, 'Depth': 1.0 - 5.24, 'R': 5.24}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp030b.xlsx'))
+    return 'vp030b.xlsx'
+
+
 def _vp032_slope_data(case):
     """Slide #32 / Borges & Cardoso (2002) case 3 shared geometry. Slide2's
     own figures are unlabeled; the geometry comes from the RS2 manual's fully
@@ -4108,7 +4178,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

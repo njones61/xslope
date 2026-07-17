@@ -718,6 +718,159 @@ def run_roundtrip_test(test):
     return 0.0, None
 
 
+# === Editor round-trip guard (studio.editors) ===
+# Opening each CategoryEditor on a fully-populated record and applying with NO
+# changes must leave its inputs deep-equal — the editor module's contract that "a
+# round-trip through an editor never drops data". This is the guard that would
+# have caught the materials-combo corruption: a Field whose `choices` lagged the
+# loader's accepted set left the combo unselectable for a valid value, so OK
+# silently rewrote option/u/unsat to the combo's first item. The Excel --roundtrip
+# test never routes through the editors, so it can't see this. Needs PySide6 (the
+# studio layer), so it's registered only when that imports — engine-only installs
+# skip it cleanly, like the DXF tests.
+
+# slope_data keys each editor round-trips (its "managed" inputs). Keys the editors
+# recompute from these (ground_surface, domain_polygon, tcrack_surface,
+# reinforce_lines, circular, has_seepage_bc2, ...) are derived, not source, so are
+# excluded — only the source inputs must survive a no-op round-trip.
+_EDITOR_MANAGED_KEYS = {
+    "global": ["gamma_water", "tcrack_depth", "tcrack_water", "k_seismic"],
+    "materials": ["materials"],
+    "circles": ["circles"],
+    "non_circ": ["non_circ"],
+    "piezo": ["piezo_line", "piezo_line2"],
+    "dloads": ["dloads", "dloads2"],
+    "seep_bc": ["seepage_bc", "seepage_bc2"],
+    "piles": ["pile_lines"],
+    "reinforce": ["reinforcement_lines"],
+    "profile": ["profile_lines"],
+    "polygons": ["polygons"],
+}
+
+
+def _editor_full_material(name, option, u, unsat):
+    """A material with EVERY loader-produced key set to a distinct non-default
+    value, so a dropped key is caught; option/u/unsat carry the enum value under
+    test. Together the fixture's rows exercise every accepted option (mc/cp/pow/hb),
+    u (none/piezo/seep/ru) and unsat (lf/vg/gard) value."""
+    return {
+        "name": name, "gamma": 120.0, "gamma_sat": 125.0, "option": option,
+        "c": 100.0, "phi": 30.0, "cp": 0.5, "r_elev": 12.0, "d": 3.0, "psi": 5.0,
+        "pow_a": 1.1, "pow_b": 0.9, "pow_c": 2.0, "pow_d": 4.0,
+        "u": u, "ru": 0.35,
+        "sigma_gamma": 1.0, "sigma_c": 2.0, "sigma_phi": 3.0, "sigma_cp": 0.1,
+        "sigma_d": 0.2, "sigma_psi": 0.3,
+        "k1": 1.0, "k2": 2.0, "alpha": 0.4, "unsat": unsat,
+        "kr0": 0.6, "h0": 7.0, "vg_a": 0.05, "vg_n": 1.4, "E": 5000.0, "nu": 0.3,
+        "hb_sci": 50.0, "hb_gsi": 60.0, "hb_mi": 10.0, "hb_d": 0.0,
+    }
+
+
+def _editor_fixture():
+    """A fully-populated slope_data spanning every editable category, canonical so
+    each editor's apply-time transform (circle R/Depth, pile theta, geometry
+    resync, ...) is idempotent on its managed keys."""
+    import math
+    from shapely.geometry import Polygon
+
+    materials = [
+        _editor_full_material("m-mc-none-lf",    "mc",  "none",  "lf"),
+        _editor_full_material("m-cp-piezo-vg",   "cp",  "piezo", "vg"),
+        _editor_full_material("m-pow-seep-gard", "pow", "seep",  "gard"),
+        _editor_full_material("m-hb-ru-lf",      "hb",  "ru",    "lf"),
+    ]
+
+    def pile(x1, y1, x2, y2):
+        p = {"label": "P", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "H": 10.0,
+             "theta_p": math.degrees(math.atan2(x2 - x1, -(y2 - y1))),
+             "D_pile": 2.0, "S": 6.0, "E": 3000.0, "I": 1.5, "area": 4.0,
+             "V_cap": 50.0, "M_cap": 200.0, "fixity": "fixed"}
+        return p
+
+    return {
+        "gamma_water": 62.4, "tcrack_depth": 0.0, "tcrack_water": 0.0,
+        "k_seismic": 0.15, "max_depth": 0.0,
+        "profile_lines": [{"coords": [(0.0, 0.0), (20.0, 20.0), (100.0, 20.0)],
+                           "mat_id": 0}],
+        "polygons": [{"polygon": Polygon([(0.0, 0.0), (20.0, 20.0), (100.0, 20.0),
+                                          (100.0, 0.0)]), "mat_id": 0}],
+        "ground_surface": None, "domain_polygon": None, "tcrack_surface": None,
+        "materials": materials,
+        "piezo_line": [(0.0, 5.0), (100.0, 5.0)],
+        "piezo_line2": [(0.0, 3.0), (100.0, 3.0)],
+        "circular": True,
+        "circles": [{"Xo": 10.0, "Yo": 40.0, "Option": "Depth", "Depth": 5.0,
+                     "Xi": 0.0, "Yi": 0.0, "R": 35.0}],
+        "non_circ": [{"X": 0.0, "Y": 10.0, "Movement": "Free"},
+                     {"X": 50.0, "Y": 2.0, "Movement": "Horiz"},
+                     {"X": 100.0, "Y": 10.0, "Movement": "Fixed"}],
+        "dloads": [[{"X": 0.0, "Y": 20.0, "Normal": 100.0},
+                    {"X": 30.0, "Y": 20.0, "Normal": 100.0}]],
+        "dloads2": [[{"X": 0.0, "Y": 20.0, "Normal": 50.0},
+                     {"X": 30.0, "Y": 20.0, "Normal": 50.0}]],
+        "reinforcement_lines": [{"x1": 0.0, "y1": 5.0, "x2": 40.0, "y2": 5.0,
+                                 "t_max": 1000.0, "t_res": 800.0, "lp1": 2.0,
+                                 "lp2": 3.0, "E": 2000.0, "area": 1.2}],
+        "pile_lines": [pile(20.0, 20.0, 20.0, 0.0)],
+        "seepage_bc": {
+            "specified_heads": [
+                {"head": 18.0, "coords": [(0.0, 0.0), (0.0, 18.0)]},
+                {"head": 5.0, "coords": [(100.0, 0.0), (100.0, 5.0)]}],
+            "specified_fluxes": [{"flux": 1.5, "coords": [(40.0, 20.0), (60.0, 20.0)]}],
+            "exit_face": [(60.0, 20.0), (100.0, 5.0)],
+        },
+        "seepage_bc2": {
+            "specified_heads": [{"head": 10.0, "coords": [(0.0, 0.0), (0.0, 10.0)]}],
+            "specified_fluxes": [],
+            "exit_face": [(60.0, 20.0), (100.0, 5.0)],
+        },
+        "has_seepage_bc2": True,
+        "mesh": None,
+    }
+
+
+def _editor_norm(key, val):
+    """Normalize a managed value for deep comparison: material-zone polygons hold
+    shapely objects rebuilt fresh on apply, so compare their exterior coordinate
+    rings + mat_id rather than object identity."""
+    if key == "polygons":
+        out = []
+        for p in (val or []):
+            poly = p.get("polygon")
+            coords = list(poly.exterior.coords) if poly is not None else []
+            out.append({"coords": coords, "mat_id": p.get("mat_id")})
+        return out
+    return val
+
+
+def run_editor_roundtrip_test(test):
+    """Open each studio CategoryEditor on a fully-populated record, apply with NO
+    changes, and assert its managed keys are deep-equal in -> out.
+
+    Returns (0.0, None) on success, or (None, message) naming the dropped/corrupted
+    fields. Fast (one offscreen QApplication, no file or solver work).
+    """
+    import copy
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    from PySide6.QtWidgets import QApplication
+    from studio.editors import CATEGORY_EDITORS
+
+    QApplication.instance() or QApplication([])
+    problems = []
+    for key, editor in CATEGORY_EDITORS.items():
+        keys = _EDITOR_MANAGED_KEYS.get(key, [])
+        sd = _editor_fixture()
+        before = {k: _editor_norm(k, copy.deepcopy(sd.get(k))) for k in keys}
+        dlg = editor.build(sd, None)
+        editor.apply(sd, dlg)
+        for k in keys:
+            problems += _roundtrip_diff(before[k], _editor_norm(k, sd.get(k)),
+                                        f"{key}:{k}")
+    if problems:
+        return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])
+    return 0.0, None
+
+
 def run_template_sync_test(test):
     """Verify a copy shipped in the wheel (xslope/resources) is byte-identical to
     its editable docs master, so the two can't silently drift when the master is
@@ -2608,6 +2761,8 @@ def run_test(test):
         return run_vg_kr_test(test)
     if test_type == 'roundtrip':
         return run_roundtrip_test(test)
+    if test_type == 'editor_roundtrip':
+        return run_editor_roundtrip_test(test)
     if test_type == 'dxf':
         return run_dxf_roundtrip_test(test)
     if test_type == 'gsz':
@@ -2666,7 +2821,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'template_sync', 'deps_declared', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -2896,6 +3051,17 @@ def main():
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})
+        # Editor no-drop guard (studio.editors). Touches the studio/Qt layer, so
+        # it's skipped cleanly when PySide6 is absent (engine-only installs), like
+        # the DXF round-trip tests.
+        try:
+            import PySide6          # noqa: F401
+            tests.append({'type': 'editor_roundtrip', 'file': '(studio editors)',
+                          'method': '-', 'source': 'editor_roundtrip'})
+            if not run_all:
+                print("Including 1 editor round-trip guard")
+        except ImportError:
+            print("Skipping editor round-trip guard (PySide6 not installed)")
         if Path(ROUNDTRIP_TEMPLATE).exists():
             n_rt = 0
             for fp in ROUNDTRIP_FILES:

@@ -447,18 +447,19 @@ class MaterialsEditor(CategoryEditor):
     FIELDS = [
         Field("name", "name", "str"),
         Field("gamma", "g", applies=LF),
-        Field("option", "option", "choice", choices=["mc", "cp"], applies=LF),
+        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb"], applies=LF),
         Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
-        Field("u", "u", "choice", choices=["none", "piezo", "seep"], applies=LF),
+        Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
         Field("k1", "k1", usage="seep"), Field("k2", "k2", usage="seep"),
         Field("alpha", "alpha", usage="seep"),
-        # Unsaturated model: lf (linear front -> kr0/h0) or vg (van Genuchten -> vg_a/vg_n).
-        Field("unsat", "unsat", "choice", choices=["lf", "vg"], usage="seep"),
+        # Unsaturated model: lf (linear front -> kr0/h0), vg (van Genuchten) or gard
+        # (Gardner); vg/gard share the vg_a/vg_n curve pair.
+        Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
         Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),

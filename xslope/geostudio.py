@@ -154,17 +154,29 @@ def read_gsz(path):
         for ts in a.findall("./TimeIncrements/TimeSteps/TimeStep"):
             if ts.get("Save") == "true" and ts.get("ElapsedTime"):
                 times.append(float(ts.get("ElapsedTime")))
+        # An analysis names its geometry by <GeometryId>. GeoStudio puts no <ID> on the
+        # <Geometry> element itself — the reference is POSITIONAL, 1-based, in document
+        # order. A single-geometry file (the vast majority) always says GeometryId 1.
+        gid = _text(a, "GeometryId")
         analyses.append({
             "id": int(aid),
             "name": _text(a, "Name", f"Analysis {aid}"),
             "kind": _text(a, "Kind", ""),
             "method": _text(a, "Method", ""),
             "parent": int(parent) if parent else None,
+            "geometry_id": int(gid) if gid else None,
             "times": times,
         })
 
-    points, regions, glines = {}, {}, {}
-    for g in root.findall("./Geometries/Geometry"):
+    # <Geometries> holds one <Geometry> PER geometry, in document order, keyed 1-based to
+    # match the analyses' <GeometryId>. They must be kept SEPARATE, not merged: a file with
+    # two geometries (e.g. the same embankment at two heights) reuses point and region IDs
+    # across them — both number from 1 — so a single merged table lets the last geometry
+    # parsed silently overwrite the first, and every analysis then resolves to whichever
+    # geometry came last. gsz_to_slope_data picks the analysis's own geometry.
+    geometries = {}
+    for gidx, g in enumerate(root.findall("./Geometries/Geometry"), start=1):
+        gpoints, gregions, gglines = {}, {}, {}
         for p in g.findall("./Points/Point"):
             # A deleted point keeps its ID slot but loses its coordinates
             # (<Point ID="4" /> — seen in the staged rapid-drawdown examples).
@@ -173,15 +185,26 @@ def read_gsz(path):
             # instead of this parse dying on every orphaned slot.
             if p.get("X") is None or p.get("Y") is None:
                 continue
-            points[int(p.get("ID"))] = (float(p.get("X")), float(p.get("Y")))
+            gpoints[int(p.get("ID"))] = (float(p.get("X")), float(p.get("Y")))
         for r in g.findall("./Regions/Region"):
             ids = _text(r, "PointIDs")
             if ids:
-                regions[int(_text(r, "ID"))] = [int(i) for i in ids.split(",")]
+                gregions[int(_text(r, "ID"))] = [int(i) for i in ids.split(",")]
         for ln in g.findall("./Lines/Line"):
             p1, p2 = _text(ln, "PointID1"), _text(ln, "PointID2")
             if p1 and p2:
-                glines[int(_text(ln, "ID"))] = (int(p1), int(p2))
+                gglines[int(_text(ln, "ID"))] = (int(p1), int(p2))
+        geometries[gidx] = {"points": gpoints, "regions": gregions, "lines": gglines}
+
+    # Flat, merged views for any caller that reads gsz["points"]/["regions"]/["lines"]
+    # directly. For a single-geometry file these are the whole model; for a multi-geometry
+    # one they are last-geometry-wins, which is exactly why gsz_to_slope_data does NOT use
+    # them — it goes through gsz["geometries"] keyed by the analysis's GeometryId instead.
+    points, regions, glines = {}, {}, {}
+    for geom in geometries.values():
+        points.update(geom["points"])
+        regions.update(geom["regions"])
+        glines.update(geom["lines"])
 
     materials = {}
     for m in root.findall("./Materials/Material"):
@@ -383,7 +406,8 @@ def read_gsz(path):
 
     return {
         "path": str(path), "zip": zf, "analyses": analyses, "points": points,
-        "regions": regions, "lines": glines, "materials": materials,
+        "regions": regions, "lines": glines, "geometries": geometries,
+        "materials": materials,
         "contexts": contexts, "water": water,
         "stability": stability, "kfns": kfns, "bcs": bcs, "hyd_bcs": hyd_bcs,
         "reinforcements": reinforcements, "unit_system": unit_system,
@@ -835,7 +859,6 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     will solve — or reload, since an input file with no surface does not validate.
     """
     caveats = []
-    pts = gsz["points"]
 
     if not gsz["analyses"]:
         raise ValueError("This .gsz defines no analyses.")
@@ -844,6 +867,19 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     analysis = next((a for a in gsz["analyses"] if a["id"] == analysis_id), None)
     if analysis is None:
         raise ValueError(f"This .gsz has no analysis with ID {analysis_id}.")
+
+    # Resolve THIS analysis's geometry. A multi-geometry .gsz (e.g. the same embankment
+    # imported at two heights) stores one <Geometry> per analysis and the analysis names
+    # its own by GeometryId; because the geometries reuse point and region IDs, only the
+    # analysis's own geometry carries the right coordinates. Fall back to the sole/last
+    # geometry for an older file that names none.
+    geom = gsz["geometries"].get(analysis.get("geometry_id"))
+    if geom is None:
+        # No GeometryId named (older single-geometry files): fall back to the flat
+        # merged tables, which are exactly what the importer used before it became
+        # geometry-aware — so a single-geometry import is byte-for-byte unchanged.
+        geom = {"points": gsz["points"], "regions": gsz["regions"]}
+    pts = geom["points"]
 
     assign = gsz["contexts"].get(analysis_id, {})
     if not assign:
@@ -906,7 +942,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 
     polygons = []
     for region_id, mid in sorted(assign.items()):
-        ring = gsz["regions"].get(region_id)
+        ring = geom["regions"].get(region_id)
         if not ring:
             continue
         polygons.append({"polygon": Polygon([pts[i] for i in ring]),

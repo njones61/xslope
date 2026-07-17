@@ -1476,28 +1476,46 @@ def _write_synthetic_gsz(path):
 <GSIData Version="11.11" AppVersion="25.2.1.4">
   <FileInfo Title="synthetic" />
   <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
-  <Analyses Len="7">
+  <Analyses Len="8">
     <Analysis><ID>1</ID><Name>dry</Name><Kind>SLOPE/W</Kind>
-      <Method>Morgenstern-Price</Method></Analysis>
+      <Method>Morgenstern-Price</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>2</ID><Name>wet</Name><Kind>SLOPE/W</Kind>
-      <Method>Spencer</Method></Analysis>
+      <Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>3</ID><Name>loaded</Name><Kind>SLOPE/W</Kind>
-      <Method>Spencer</Method></Analysis>
+      <Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>4</ID><Name>crack off</Name><Kind>SLOPE/W</Kind>
-      <Method>Spencer</Method></Analysis>
+      <Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>5</ID><Name>nailed</Name><Kind>SLOPE/W</Kind>
-      <Method>Spencer</Method></Analysis>
+      <Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>6</ID><Name>seepage</Name><Kind>SEEP/W</Kind>
-      <Method>SteadyState</Method></Analysis>
+      <Method>SteadyState</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>7</ID><Name>seep stability</Name><Kind>SLOPE/W</Kind>
-      <ParentID>6</ParentID><Method>Spencer</Method></Analysis>
+      <ParentID>6</ParentID><Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>
+    <Analysis><ID>8</ID><Name>tall</Name><Kind>SLOPE/W</Kind>
+      <Method>Morgenstern-Price</Method><GeometryId>2</GeometryId></Analysis>
   </Analyses>
-  <Geometries Len="1">
+  <Geometries Len="2">
     <Geometry><Name>2D</Name>
       <Points Len="6">
         <Point ID="1" X="0"  Y="0" /><Point ID="2" X="60" Y="0" />
         <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
         <Point ID="5" X="20" Y="10" /><Point ID="6" X="0"  Y="10" />
+      </Points>
+      <Regions Len="1">
+        <Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region>
+      </Regions>
+    </Geometry>
+    <!-- A SECOND geometry in the same file — the "same embankment at another height"
+         shape (Borges & Cardoso Case 3). It REUSES point IDs 1-6 and region ID 1, but a
+         taller slope: crest at y=45, not y=30. GeoStudio gives the geometry element no
+         <ID>; the analysis names it by POSITION via <GeometryId>. Because the IDs collide,
+         a single merged point table resolves every analysis to whichever geometry was
+         parsed last — here geometry 2 — so analysis 1 would silently import THIS slope. -->
+    <Geometry><Name>2D tall</Name>
+      <Points Len="6">
+        <Point ID="1" X="0"  Y="0" /><Point ID="2" X="60" Y="0" />
+        <Point ID="3" X="60" Y="45" /><Point ID="4" X="40" Y="45" />
+        <Point ID="5" X="20" Y="15" /><Point ID="6" X="0"  Y="15" />
       </Points>
       <Regions Len="1">
         <Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region>
@@ -1521,7 +1539,7 @@ def _write_synthetic_gsz(path):
       <Spacing>2</Spacing><Tensile>100</Tensile><PlateCapacity>60</PlateCapacity>
       <PulloutResistance>10</PulloutResistance></Reinforcement>
   </Reinforcements>
-  <Contexts Len="6">
+  <Contexts Len="7">
     <Context><AnalysisID>1</AnalysisID><GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
     <Context><AnalysisID>2</AnalysisID><GeometryUsesMaterials Len="1">
@@ -1534,8 +1552,10 @@ def _write_synthetic_gsz(path):
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
     <Context><AnalysisID>7</AnalysisID><GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>8</AnalysisID><GeometryUsesMaterials Len="1">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
   </Contexts>
-  <WaterItems Len="6">
+  <WaterItems Len="7">
     <WaterItem><AnalysisID>1</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>2</AnalysisID>
@@ -1550,8 +1570,10 @@ def _write_synthetic_gsz(path):
     <WaterItem><AnalysisID>7</AnalysisID>
       <Entry><ResultInputInfo><Option>Parent</Option></ResultInputInfo>
         <UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>8</AnalysisID>
+      <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
   </WaterItems>
-  <StabilityItems Len="6">
+  <StabilityItems Len="7">
     <StabilityItem><AnalysisID>1</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
 
@@ -1620,6 +1642,9 @@ def _write_synthetic_gsz(path):
       </Entry></StabilityItem>
 
     <StabilityItem><AnalysisID>7</AnalysisID>
+      <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
+
+    <StabilityItem><AnalysisID>8</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
   </StabilityItems>
 </GSIData>
@@ -1746,8 +1771,8 @@ def run_gsz_import_test(test):
         gsz = read_gsz(path)
 
         analyses = list_analyses(gsz)
-        if len(analyses) != 7:
-            return None, f"GeoStudio import: {len(analyses)} analyses, expected 7"
+        if len(analyses) != 8:
+            return None, f"GeoStudio import: {len(analyses)} analyses, expected 8"
 
         sd1, cav1 = gsz_to_slope_data(gsz, 1)
         sd2, cav2 = gsz_to_slope_data(gsz, 2)
@@ -1755,6 +1780,7 @@ def run_gsz_import_test(test):
         sd4, cav4 = gsz_to_slope_data(gsz, 4)
         sd5, cav5 = gsz_to_slope_data(gsz, 5)
         sd7, cav7 = gsz_to_slope_data(gsz, 7)
+        sd8, cav8 = gsz_to_slope_data(gsz, 8)
 
         # --- a stability analysis fed by a parent SEEP/W run -------------------------
         # Its water <Option> is "Parent": pore pressure is a whole finite element FIELD,
@@ -1906,6 +1932,25 @@ def run_gsz_import_test(test):
             problems.append("zone ring did not round-trip")
         if not sd1['ground_surface'] or sd1['ground_surface'].is_empty:
             problems.append("no ground surface derived")
+
+        # PER-ANALYSIS GEOMETRY. This file carries TWO geometries that reuse the same
+        # point IDs (1-6) and region ID (1); each analysis names its own by <GeometryId>.
+        # Analyses 1-7 bind geometry 1 (crest at y=30); analysis 8 binds geometry 2 (crest
+        # at y=45). If GeometryId is ignored and the point tables are merged, both resolve
+        # to whichever geometry was parsed LAST (geometry 2), so analysis 1 silently
+        # imports the taller slope — distinct heights, distinct factors of safety, no word
+        # said. This was the Borges & Cardoso Case 3 defect (7 m vs 8.75 m embankment).
+        def _crest_y(sd):
+            return max(xy[1] for pg in sd['polygons']
+                       for xy in pg['polygon'].exterior.coords)
+        if abs(_crest_y(sd1) - 30.0) > 1e-6:
+            problems.append(f"analysis 1 resolved to crest y={_crest_y(sd1)}, expected 30 "
+                            f"— its <GeometryId> was ignored, so it took the last geometry "
+                            f"parsed instead of its own")
+        if abs(_crest_y(sd8) - 45.0) > 1e-6:
+            problems.append(f"analysis 8 (GeometryId 2) resolved to crest y={_crest_y(sd8)}, "
+                            f"expected 45 — its own geometry, which reuses geometry 1's "
+                            f"point IDs, was not selected")
 
         # Pore pressure: analysis 1 dry, analysis 2 on the piezo surface (points 7-8).
         if sd1['piezo_line'] or sd1['materials'][0]['u'] != 'none':

@@ -1,9 +1,11 @@
 # PLAXIS LE (SVSLOPE) Corpus
 
-!!! note "Status: stub — corpus not yet started"
-    This page will track the SVSLOPE verification manual (SoilVision Systems, 2019 —
-    the product Bentley now sells as **PLAXIS LE**) the way the
-    [Slide2 corpus](rocscience.md) tracks its manual. Nothing is built yet.
+!!! note "Status: not planned"
+    This corpus will not be built. With the Slide2 (111 problems), RS2 SSR,
+    SLOPE/W, and Slide2 groundwater corpora in place, the verification program
+    carries sufficient independent published coverage; a fourth LEM manual adds
+    little beyond cross-bearing, and the survey below is retained only as a
+    reference should that judgment ever change.
 
 The SVSLOPE 5 verification manual (207 pages, ~105 problems) is one of the largest published
 limit-equilibrium verification sets, organized as:

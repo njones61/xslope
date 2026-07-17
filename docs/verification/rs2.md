@@ -97,7 +97,7 @@ independently verifiable.
 | [26](#rs2-26) | Clarence Cannon dam (Wolff & Harr 1987) | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). SSRM 2.24 vs RS2 SSRM 2.29 (−2.1%); Slide2 GLE 2.333 / Spencer 2.383, W&H 2.36, XSLOPE LEM M-P 2.384. |
 | [27](#rs2-27) | Homogeneous slope, pore pressure by r<sub>u</sub> | *blocked* | The FEM has no r<sub>u</sub> option (task, with RS2 #14); RS2's own text cites Slide2 [VP36](rocscience.md#vp36) (Li & Lumb), not VP21. |
 | 28 | FE analysis with groundwater and stress | *planned* | Slide2 VP38 family. |
-| [29](#rs2-29) | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | **built** (sand case) | [vp039c.xlsx](../files/rocscience/vp039c.xlsx). SSRM 1.181 vs RS2 SSRM 1.25, Spencer 1.209, Tandjiria 1.219 (a shallow compound mechanism through the c=0 fill face and soft-clay toe). The clay case is not locked. |
+| [29](#rs2-29) | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | **built** (sand case) | [vp039c.xlsx](../files/rocscience/vp039c.xlsx). SSRM 1.181 vs RS2 SSRM 1.25, Spencer 1.209, Tandjiria 1.219 (a shallow compound mechanism through the c=0 fill face and soft-clay toe). The clay case is final — *no lock possible*, its FS is governed by a water-filled tension crack, an LEM construct with no continuum counterpart (see the section). |
 | [30](#rs2-30) | Homogeneous slope, power-curve strength (Perry 1993) | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). SSRM 0.898 vs RS2 SRF 0.91 (−1.3%); Slide2 Janbu 0.944, Perry 0.98. |
 | [31](#rs2-31) | M-C vs power curve (Baker 2003 ex. 1) | **built** (all three halves) | [vp044a](../files/rocscience/vp044a.xlsx) / [b](../files/rocscience/vp044b.xlsx) / [c](../files/rocscience/vp044c.xlsx). M-C SSRM 1.529 / 0.931 vs RS2 1.53 / 0.98; power-curve SSRM 0.921. |
 | [32](#rs2-32) | Heading mismatch — body is Baker's example 2 | **built** (both halves) | [vp045a](../files/rocscience/vp045a.xlsx) / [vp045b](../files/rocscience/vp045b.xlsx). M-C SSRM 2.790 vs RS2 2.83 (−1.4%); power-curve SSRM 2.623 vs RS2 2.74 (−4.3%), Slide2 Spencer 2.662. |
@@ -767,8 +767,18 @@ the soft-clay toe (the above-tolerance band sits at ~0.4 m median depth on the 6
 embankment). The pure fill-skin closed form, tan 37°/tan 31° = 1.254, coincides with
 RS2's published 1.25 but is not the minimum here.
 
-The clay case (RS2 SSRM 0.99) is not locked: its water-filled tension crack has no FEM
-representation (XSLOPE reads 1.05 without it).
+**The clay case (RS2 SSRM 0.99) is final: no lock is possible, by design.** Its LEM value
+(VP39a, locked at 0.968) is governed by a water-filled tension crack — a limit-equilibrium
+construct, surface truncation plus a hydrostatic thrust on the crack wall, with no
+continuum counterpart. RS2's own #29 SSR models draw the same line: their geometry contains
+no crack construct at all (a two-material Mohr-Coulomb continuum, unreinforced, no water),
+and tension is handled constitutively — a tensile strength the SSR does not reduce,
+dropping to zero on brittle tensile failure — so a "crack" in the FEM is an emergent
+tensile-failure zone, never an input. XSLOPE's crack-free SSRM reads 1.05, on top of a
+no-crack LEM run (Bishop 1.042): the correct continuum answer. The remaining distance to
+0.968 is the crack truncation and the water thrust, and the water is the hard stop — a
+continuum has no cavity to pressurize. (The sand case's nominal crack is procedural:
+c = 0 gives zero theoretical crack depth, and removing it moves the LEM under 1%.)
 
 <!-- test: file=../files/rocscience/vp039c.xlsx, type=fem_ssrm, expected_fs=1.181, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, benchmark=RS2-29 -->
 

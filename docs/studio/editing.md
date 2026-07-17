@@ -24,13 +24,37 @@ open its editor:
 | **Failure surfaces** | Circles (center, radius/depth/intercept) or the non-circular surface (vertex table). |
 | **Distributed loads** | The two distributed-load sets. |
 | **Reinforcement** | Reinforcement lines (rebuilt into the engine's display format). |
+| **Line loads** | Concentrated line loads (force per unit width) on the ground surface. |
 | **Piles** | Pile lines. |
-| **Seepage BC** | Specified-head lines and exit faces (two BC sets). Specified-flux lines are preserved on save but are not yet editable here — set them in the Excel **seep bc** sheet. |
+| **Seepage BC** | Specified-head lines, specified-flux lines, and exit faces (two BC sets). |
 
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows.
 
+The materials editor has two interchangeable views. **Table view** mirrors the
+`mat` worksheet row-for-row, with **Show columns for** toggles (LEM / Seepage /
+FEM / Reliability) that hide the columns an analysis doesn't use:
+
 ![Materials table editor](images/editing_materials_table.png)
+
+**List view** edits one material at a time as a grouped form — Identity, Unit
+weights, Strength, Pore pressure, Conductivity — showing only the fields the
+selected strength and conductivity options use. Turning on the **Reliability**
+toggle here reveals the **± σ** field next to each value instead of hiding
+columns. Two confirmation plots on the right — the strength envelope and the
+unsaturated-conductivity curve — redraw as you type, so a wrong option choice is
+obvious at a glance:
+
+![Materials list view](images/editing_materials_list.png)
+
+The **Display color** swatch under Identity sets the material's color on the
+plots (**Reset** returns it to the default palette); the same swatch is the first
+column of the table view. Both views edit the same rows, so switching is
+lossless.
+
+![Display color swatch in list view](images/editing_materials_list_color.png)
+
+![Color swatch column in table view](images/editing_materials_table_color.png)
 
 ![Global parameters form](images/editing_global_form.png)
 
@@ -39,9 +63,16 @@ in the title bar), and re-render the affected layers. Records preserve fields th
 aren't shown in a given editor, so editing one column never drops the others.
 
 The geometry editors (profile lines and polygons) use a master/detail layout — pick
-a line on the left, edit its vertices on the right:
+a line on the left, edit its vertices on the right. A **live preview** pane redraws
+the section as you type, with the selected line highlighted, so a mistyped vertex
+is visible before you commit:
 
-![Geometry master-detail editor](images/editing_geometry_dialog.png)
+![Profile lines editor](images/editing_geometry_dialog.png)
+
+The polygons editor is the same dialog for polygon-based models — the preview
+fills the selected zone and dims the rest:
+
+![Polygons editor](images/editing_polygon_dialog.png)
 
 !!! note "Profile-based vs. polygon-based models"
     A model defines its geometry either through **profile lines** (stacked
@@ -49,6 +80,37 @@ a line on the left, edit its vertices on the right:
     Inputs tree marks **Polygons** editable only when there are no profile lines;
     otherwise edit the **Profile lines**. Both use the same master/detail geometry
     dialog.
+
+The remaining feature editors follow the same pattern — a table (or master/detail
+list) plus a live preview of the feature on the section.
+
+**Line loads** are concentrated forces per unit width acting at a point on the
+ground surface (a facing plate, a crane pad). Each row is a point, a magnitude
+**P**, and an **Angle** (−90° = straight down); loads are snapped onto the ground
+surface on save:
+
+![Line loads editor](images/editing_line_loads_editor.png)
+
+**Reinforcement** rows carry the line's endpoints plus **Type**, **Dir**, and
+**Appl** dropdowns — picking a Type (geosynthetic, nail, tieback, anchor)
+defaults the other two, and a blank Type means a generic tensile line. The
+LEM/FEM column toggles hide the inputs the other analysis uses, and the preview
+pane draws the lines on the section with the selected one emphasized:
+
+![Reinforcement editor](images/editing_reinforcement_editor.png)
+
+**Piles** are a table too, with an **Appl** dropdown choosing how the pile
+resistance enters the analysis (active = allowable force; passive = ultimate
+capacity ÷ FS); leaving **H** blank auto-computes the Ito & Matsui force:
+
+![Piles editor](images/editing_piles_editor.png)
+
+**Seep BC** is a master/detail editor over the two BC sets (Set 2 drives rapid
+drawdown): specified-**head** lines (a head value plus its points),
+specified-**flux** lines (**Add flux**, a **Flux value** plus its points), and
+the **exit face**:
+
+![Seep BC editor](images/editing_seep_bc_editor.png)
 
 ---
 
@@ -63,9 +125,10 @@ Studio maps the click to the drawing's coordinates and hit-tests the geometry, s
 this works on:
 
 - profile and polygon lines (opens the geometry editor at that line),
-- the max-depth line, piezometric lines, distributed loads, reinforcement, piles,
+- the max-depth line, piezometric lines, distributed loads, line loads,
+  reinforcement, piles,
 - failure circles and non-circular points,
-- seepage boundary conditions (specified-head lines and exit faces; specified-flux lines round-trip untouched),
+- seepage boundary conditions (specified-head lines, specified-flux lines, and exit faces),
 - a material-zone interior (falls back to the materials editor).
 
 The hit-test is **mode-aware** — seepage BCs are only pickable in Seepage mode,

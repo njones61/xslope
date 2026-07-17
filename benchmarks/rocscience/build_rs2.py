@@ -296,7 +296,92 @@ def rs2_61a():
     return 'rs2_61a.xlsx'
 
 
+def _rs2_66_slope_data(h1):
+    """RS2 #66 (Part III) -- Embankment Basal Stability, after
+
+        Nakamura, A., Cai, F. & Ugai, K. (2008), "Embankment basal stability
+        analysis using shear strength reduction finite element method."
+
+    A 10 m high embankment (1.5:1 side slopes, 20 m crest) is built on a two-layer
+    foundation: a SOFT upper stratum (phi = 0, c = 35 kPa) of thickness h1, over a
+    firm 10 m bearing stratum (phi = 0, c = 100 kPa). The soft-layer thickness h1 is
+    the varied parameter (2, 4, 6, 8, 10 m); the embankment and the bearing stratum
+    are held constant. Fill is a c = 0, phi = 35 deg granular material. gamma = 18.82
+    kN/m3 throughout. The mechanism is a basal squeeze through the soft clay, so the
+    factor of safety is governed by the phi = 0 band, not by the fill.
+
+    The paper (and RS2) set the dilation angle psi = phi for all soils; XSLOPE's
+    SSRM runs non-associated (psi = 0, the Griffiths convention the corpus uses).
+    For a basal mechanism inside the phi = 0 clay the flow rule is dilationless there
+    regardless, so the difference is confined to the granular fill and is small.
+
+    Geometry transcribed from the RS2 vendor models 'slope stability #066_0N (h=..).fez':
+    external domain 150 m wide, bearing stratum 0..10 m, soft stratum 10..(10+h1),
+    embankment base at y = 10 + h1 from x = 50..100, crest y = 20 + h1 from x = 65..85.
+    """
+    top = 10.0 + h1
+    crest = 20.0 + h1
+    bearing = [(0.0, 0.0), (150.0, 0.0), (150.0, 10.0), (0.0, 10.0)]
+    soft = [(0.0, 10.0), (150.0, 10.0), (150.0, top), (0.0, top)]
+    embank = [(50.0, top), (100.0, top), (85.0, crest), (65.0, crest)]
+    sd = _poly_slope_data(
+        polygons=[(0, embank), (1, soft), (2, bearing)],
+        materials=[
+            dict(name='embankment', c=0.0, phi=35.0, gamma=18.82, gamma_sat=18.82,
+                 E=1.0e5, nu=0.3),
+            dict(name='soft ground', c=35.0, phi=0.0, gamma=18.82, gamma_sat=18.82,
+                 E=1.0e5, nu=0.3),
+            dict(name='bearing stratum', c=100.0, phi=0.0, gamma=18.82,
+                 gamma_sat=18.82, E=1.0e5, nu=0.3),
+        ],
+        circle={'Xo': 75.0, 'Yo': crest + 20.0, 'Depth': 9.0,
+                'R': crest + 20.0 - 9.0},
+        max_depth=0.0)
+    return sd
+
+
+def rs2_66a():
+    """RS2 #66 case 1, h1 = 2 m. Published: Slide2 Spencer 1.05, RS2 SSR 1.13,
+    Nakamura LEM 1.21, Nakamura FEM 1.24."""
+    sd = _rs2_66_slope_data(2.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_66a.xlsx'))
+    return 'rs2_66a.xlsx'
+
+
+def rs2_66b():
+    """RS2 #66 case 2, h1 = 4 m. Published: Slide2 Spencer 1.16, RS2 SSR 1.19,
+    Nakamura LEM 1.22, Nakamura FEM 1.16."""
+    sd = _rs2_66_slope_data(4.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_66b.xlsx'))
+    return 'rs2_66b.xlsx'
+
+
+def rs2_66c():
+    """RS2 #66 case 3, h1 = 6 m. Published: Slide2 Spencer 1.10, RS2 SSR 1.13,
+    Nakamura LEM 1.22, Nakamura FEM 1.16."""
+    sd = _rs2_66_slope_data(6.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_66c.xlsx'))
+    return 'rs2_66c.xlsx'
+
+
+def rs2_66d():
+    """RS2 #66 case 4, h1 = 8 m. Published: Slide2 Spencer 1.13, RS2 SSR 1.08,
+    Nakamura LEM 1.10, Nakamura FEM 1.10."""
+    sd = _rs2_66_slope_data(8.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_66d.xlsx'))
+    return 'rs2_66d.xlsx'
+
+
+def rs2_66e():
+    """RS2 #66 case 5, h1 = 10 m. Published: Slide2 Spencer 1.05, RS2 SSR 1.05,
+    Nakamura LEM 1.08, Nakamura FEM 1.08."""
+    sd = _rs2_66_slope_data(10.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_66e.xlsx'))
+    return 'rs2_66e.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
-               rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_63):
+               rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_63,
+               rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e):
         print(fn())

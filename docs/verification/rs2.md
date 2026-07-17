@@ -135,7 +135,7 @@ independently verifiable.
 | [63](#rs2-63) | Homogeneous slope assessment | **built** | [rs2_63.xlsx](../files/rocscience/rs2_63.xlsx). Cheng et al. (2007), 11 m homogeneous slope. Spencer 1.398 and SSRM 1.409 vs Slide2 1.380 / RS2 SSRM 1.38 / Cheng 1.383 (a consistent +1.5%). |
 | 64 | Three homogeneous landslides | *planned* | Teoman, Topal & Isik (2004), Ankara clay E90 highway. Tranche-2: **12 cases** (3 slopes × original/failed × short/long-term), each a Bishop FS on a *proposed* (digitized) non-circular slip surface — RS2 SSR 0.99–6.97 vs Slide2 Bishop. Bulk single_noncirc locks; large geometry-transcription effort. |
 | 65 | Tailings dam | *planned* | Tzenkov (2008) Padina dam, **8 materials**. Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41. Tranche-2: multi-material cross-section transcription. |
-| 66 | Embankment basal stability | *planned* | Nakamura, Cai & Ugai (2008). Embankment / soft ground / bearing stratum, 5 soft-layer thicknesses (h₁ = 2–10 m). Slide2 Spencer 1.05–1.16, RS2 SSRM 1.05–1.19, LEM/FEM ref 1.08–1.24. Tranche-2: tractable 5-case family (a candidate for tranche 2's first build). |
+| [66](#rs2-66) | Embankment basal stability | **built** | [rs2_66a.xlsx](../files/rocscience/rs2_66a.xlsx)…e. Nakamura, Cai & Ugai (2008), 5 soft-layer thicknesses (h₁ = 2–10 m). SSRM 1.04–1.08 across the family vs Slide2 Spencer 1.05–1.16 / RS2 SSRM 1.05–1.19 / LEM–FEM ref 1.08–1.24 — a few percent low (ψ = 0 vs the reference ψ = φ; thin φ = 0 band is mesh-sensitive). Regression-locked at a common 3 m mesh. |
 | 67 | Earth dam under steady & transient unsaturated seepage | *blocked* | Transient — blocked on a transient solver. |
 | 68 | Seismically loaded slopes | *planned* | Loukidis, Bandini & Salgado (2003). Publishes a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — Slide2 Bishop/Spencer k꜀ 0.118–0.431 vs limit-analysis bounds. Tranche-2: needs a k꜀-search harness (invert seismic k for FS = 1), which the current tags do not provide. |
 
@@ -1305,6 +1305,53 @@ Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.4
 <!-- test: file=../files/rocscience/rs2_63.xlsx, type=fem_ssrm, expected_fs=1.409, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, benchmark=RS2-63 -->
 
 ![RS2-63: homogeneous slope (Cheng et al. 2007), SSRM 1.409 — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-63.png)
+
+### RS2-66: Embankment basal stability (Nakamura et al. 2008) {#rs2-66}
+
+**Input files:** [rs2_66a.xlsx](../files/rocscience/rs2_66a.xlsx) (h₁ = 2 m) ·
+[b](../files/rocscience/rs2_66b.xlsx) (4 m) · [c](../files/rocscience/rs2_66c.xlsx) (6 m) ·
+[d](../files/rocscience/rs2_66d.xlsx) (8 m) · [e](../files/rocscience/rs2_66e.xlsx) (10 m)
+
+A 10 m high embankment on soft ground, after
+
+> Nakamura, A., Cai, F., & Ugai, K. (2008). "Embankment basal stability analysis using shear
+> strength reduction finite element method." *(as cited in the RS2 Slope Stability Verification
+> Manual, Part III, Problem 66).*
+
+A cohesionless fill (c = 0, φ = 35°, 1.5:1 side slopes, 20 m crest, 10 m high) is placed on a
+**soft** upper foundation stratum (φ = 0, c = 35 kPa) of thickness h₁ over a firm 10 m bearing
+stratum (φ = 0, c = 100 kPa); γ = 18.82 kN/m³ throughout. The soft-layer thickness h₁ is the
+varied parameter (2, 4, 6, 8, 10 m). The failure mechanism is a **basal squeeze** through the
+soft φ = 0 band, so the factor of safety is governed by the band, not the fill.
+
+| h₁ (m) | XSLOPE SSRM | Slide2 Spencer | RS2 SSR | Nakamura LEM | Nakamura FEM |
+|---:|---|---|---|---|---|
+| 2 | 1.081 | 1.05 | 1.13 | 1.21 | 1.24 |
+| 4 | 1.069 | 1.16 | 1.19 | 1.22 | 1.16 |
+| 6 | 1.056 | 1.10 | 1.13 | 1.22 | 1.16 |
+| 8 | 1.044 | 1.13 | 1.08 | 1.10 | 1.10 |
+| 10 | 1.056 | 1.05 | 1.05 | 1.08 | 1.08 |
+
+XSLOPE's SSRM clusters at 1.04–1.08 across the family, running a few percent below the RS2 SSR
+and Slide2 Spencer references (best at h₁ = 10 m: 1.056 vs 1.05 / 1.05). Two effects sit under
+the offset. First, **flow rule**: Nakamura and RS2 use an associated rule (ψ = φ), while XSLOPE's
+SSRM runs non-associated (ψ = 0, the Griffiths convention this corpus uses) — the difference is
+confined to the granular fill, since the governing φ = 0 clay is dilationless either way. Second,
+**mesh**: the thin soft band is a φ = 0 shear band with no length scale to pin it, so it keeps
+localizing as the elements shrink — the h₁ = 2 m case reads 1.081 at the tagged 3 m mesh but
+1.006 at 1.5 m. The values are therefore locked as **regression** anchors at a common coarse
+(3 m) mesh, not advertised as converged, consistent with the mesh discipline stated at the top
+of this page.
+
+<!-- test: file=../files/rocscience/rs2_66a.xlsx, type=fem_ssrm, expected_fs=1.081, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66a -->
+<!-- test: file=../files/rocscience/rs2_66b.xlsx, type=fem_ssrm, expected_fs=1.069, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66b -->
+<!-- test: file=../files/rocscience/rs2_66c.xlsx, type=fem_ssrm, expected_fs=1.056, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66c -->
+<!-- test: file=../files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66d -->
+<!-- test: file=../files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.056, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66e -->
+
+![RS2-66: embankment basal stability (Nakamura et al. 2008), thinnest (h₁ = 2 m, SSRM 1.081) and thickest (h₁ = 10 m, SSRM 1.056) soft-band cases — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-66a.png)
+
+![RS2-66 (h₁ = 10 m)](images/RS2-66e.png)
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

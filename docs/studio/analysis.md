@@ -53,6 +53,19 @@ The result depends on the analysis type:
 
 ![LEM Solution view](images/analysis_lem_solution.png)
 
+When the accepted solution carries admissibility defects — base tension on a
+cohesionless slice, interslice tension, or a line of thrust that leaves the
+slices — an amber strip across the top of the **LEM · Solution** view lists
+them, so an inadmissible FS is never mistaken for a clean success:
+
+![LEM Solution with admissibility warnings](images/analysis_solution_warnings.png)
+
+The warnings never change the factor of safety — they say the internal force
+distribution behind it is strained, and not all of them are equally alarming —
+see [Interpreting the Admissibility
+Warnings](../lem/spencer.md#interpreting-the-admissibility-warnings). A clean
+solution shows no strip.
+
 Both circular and non-circular surfaces are supported for single solves and
 searches. Search iteration progress streams to the Log pane, and a search (or a
 reliability run) can be **cancelled** from the status bar.
@@ -63,16 +76,17 @@ reliability run) can be **cancelled** from the status bar.
 
 ## Sensitivity / Design study
 
-In **LEM** mode a second entry point sits beside Run — **Sensitivity / Design…** — on both
-the **Run menu** and the main **toolbar**. It is available whenever a model is open in LEM
-mode (hidden in Seepage and FEM mode, and disabled while another analysis is running). Both
-modes drive the same sweep engine as the library — see
+A second entry point sits beside Run — **Sensitivity / Design…** — on both the **Run menu**
+and the main **toolbar**, in all three modes (LEM, Seepage, FEM). It is available whenever
+a model is open — in Seepage and FEM mode it additionally needs a built mesh, exactly like
+Run — and is disabled while another analysis is running. Every version of it drives the
+same sweep engine as the library — see
 [Sensitivity Analysis](../lem/sensitivity.md) for the engine, and the
 [`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
 
-One dialog covers two modes, chosen by the **Mode** selector. Three controls are shared by
-both: **Method** (any of the seven LEM methods), **Number of slices**, and a **Parameter**
-picker — a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a
+One dialog covers two study modes, chosen by its **Mode** selector. In **LEM** three
+controls are shared by both: **Method** (any of the seven LEM methods), **Number of
+slices**, and a **Parameter** picker — a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a
 **Property** dropdown listing that material's option-aware sweepable fields (both drawn from
 the engine's `list_params`). A **Re-search the critical surface at each step** checkbox
 applies to both modes: on by default — the honest setting, since the critical surface moves
@@ -142,6 +156,14 @@ of the engine's
     background and is cancellable. In **Seepage** the output is the **total discharge q**
     through the section. FEM and seepage sweeps run on the mesh, so build one first.
 
+The dialog's solver rows follow the app mode: in **FEM** they become the SSRM knobs
+(`F_min` / `F_max`, tolerance, failure criterion), and in **Seepage** they become the BC
+set and convergence tolerance, with the design target a discharge **q** rather than an FS:
+
+![Sensitivity / Design dialog in FEM mode](images/analysis_sensitivity_dialog_fem.png)
+
+![Sensitivity / Design dialog in Seepage mode](images/analysis_sensitivity_dialog_seep.png)
+
 ---
 
 ## Building a mesh
@@ -170,10 +192,13 @@ geometry edit that invalidates the mesh clears it and re-gates Run.
 
 ## Seepage
 
-In **Seepage** mode, **Run Seep…** opens a dialog with the convergence tolerance,
-the **BC set** (1 or 2), the **variable to plot** (head, pressure, velocity
-magnitude, gradient magnitude), contour levels, and toggles for flow lines,
-vectors, fill, and the phreatic surface.
+In **Seepage** mode, **Run Seep…** opens a dialog with just the solve parameters:
+the **BC set** (set 1, set 2, or both — the extra choices appear when the file
+defines a second set) and the **convergence tolerance**. Display choices — the
+plotted variable, contour levels, flow lines, vectors, fill, the phreatic
+surface — are not run options; they live on the
+[Display panel](#display-options-per-view) of the solution view and re-render
+the cached solution without re-solving.
 
 ![Run Seep dialog](images/analysis_run_seep_dialog.png)
 
@@ -277,14 +302,31 @@ it and Save As.
 
 ## GeoStudio (SLOPE/W) import and export
 
-Studio also exchanges whole models — not just geometry — with GeoStudio SLOPE/W.
+Studio also exchanges whole models — not just geometry — with other slope-stability
+packages: GeoStudio SLOPE/W in both directions, and Rocscience Slide2 and RS2 as imports.
 
 **Import** — **File → Import GeoStudio (SLOPE/W)…** reads a `.gsz`. Unlike DXF, there
 is no mapping wizard to work through: a `.gsz` already knows what its geometry means, so
 material zones, strengths, water conditions and the seismic coefficient all arrive
 identified. The one prompt is **which analysis** to import, because a GeoStudio file
 usually holds several over the same geometry — and they can differ in *materials*, not
-just in slip surface, so the choice changes the model you get.
+just in slip surface, so the choice changes the model you get:
+
+![GeoStudio import — choosing an analysis](images/analysis_gsz_import_dialog.png)
+
+The other two vendor importers follow the same shape. **File → Import Slide2…** reads a
+Rocscience Slide2 model (`.sli` / `.slim` / `.slmd`) and asks the same one question with a
+scenario chooser, since a `.slmd` routinely bundles several scenarios over the same
+geometry:
+
+![Slide2 import — choosing a scenario](images/analysis_slide2_import_dialog.png)
+
+**File → Import RS2 (.fez)…** reads a Rocscience RS2 finite-element model. A `.fez` holds
+exactly one model, so the only prompt is the file picker; geometry, materials and water
+conditions import directly, and whatever RS2 defines that cannot cross (its SSR settings,
+joints, reinforcement, loads) comes back in the post-import notes dialog. RS2's stability
+result is an SSR field rather than a slip surface, so the import never carries a failure
+surface — you define circles afterward.
 
 **Export** — **File → Export to GeoStudio (SLOPE/W)…** writes the current model out as a
 `.gsz`. It needs a polygon-based model (material zones), since a profile-line model has

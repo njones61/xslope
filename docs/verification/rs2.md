@@ -131,7 +131,7 @@ independently verifiable.
 | 59 | Three-layered soil slope | *planned* | Görög & Török (2007) Budapest landslide, vs Slide2 1.567 / RS2 SSRM 1.57 / PLAXIS 1.6. Tranche-2: the critical mechanism rides a thin weak "waste" lens (c = 1, φ = 5) and is **non-circular** — a circular search only finds the deeper competing surface (FS ≈ 1.9); needs an authored non-circular surface along the lens, or an SSRM run on the ~415 m-wide domain. |
 | [60](#rs2-60) | Generalized Hoek–Brown, homogeneous slope | **built** (LEM) | [rs2_60a.xlsx](../files/rocscience/rs2_60a.xlsx) / [b](../files/rocscience/rs2_60b.xlsx) / [c](../files/rocscience/rs2_60c.xlsx). Three slope angles from Li, Merifield & Lyamin (2008) at GSI = 70, the strong-rock end of the criterion. Bishop/Spencer 1.009 / 1.017 / 1.008 against Li's F = 1.0. SSRM is not locked on this problem. |
 | [61](#rs2-61) | Local and global minima, homogeneous slope | **built** (case 1) | [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx). Cheng, Lansivaara & Wei (2007). Case 1 (global minimum) Spencer 1.338 vs Slide2 1.336, Cheng 1.327, RS2 SSRM 1.35. Cases 2–4 fence a Polygon Search Area onto local minima — deferred, gated on a search-area constraint. |
-| 62 | Three-layered slope with a soft band | *planned* | Cheng et al. (2007), 3 domains × 2 dilation cases. Tranche-2, and **partly not LEM-lockable**: the published split is the point — RS2/PLAXIS SSRM 0.81–0.98 vs Flac3D 1.03–1.64, a dilation-angle (associated vs non-associated) effect that a limit-equilibrium lock cannot reproduce. SSRM only. |
+| [62](#rs2-62) | Three-layered slope with a soft band | **built** (Analysis III) | [rs2_62c.xlsx](../files/rocscience/rs2_62c.xlsx) (+ a/b built, unlocked). Cheng et al. (2007), 3 band widths × 2 dilation cases. SSRM (ψ = 0) 0.843 on the 12 m geometry vs RS2 0.81 / Plaxis 0.82 (Flac3D's ψ = 0 = 1.03 is the code-split the problem is about). The ≈ 0.4 m band must be mesh-resolved (0.998 → 0.843 from 0.5 → 0.3 m); the wider I/II domains are too costly to band-resolve for the suite, and the ψ = φ column is non-associated-only out of scope. |
 | [63](#rs2-63) | Homogeneous slope assessment | **built** | [rs2_63.xlsx](../files/rocscience/rs2_63.xlsx). Cheng et al. (2007), 11 m homogeneous slope. Spencer 1.398 and SSRM 1.409 vs Slide2 1.380 / RS2 SSRM 1.38 / Cheng 1.383 (a consistent +1.5%). |
 | 64 | Three homogeneous landslides | *planned* | Teoman, Topal & Isik (2004), Ankara clay E90 highway. Tranche-2: **12 cases** (3 slopes × original/failed × short/long-term), each a Bishop FS on a *proposed* (digitized) non-circular slip surface — RS2 SSR 0.99–6.97 vs Slide2 Bishop. Bulk single_noncirc locks; large geometry-transcription effort. |
 | 65 | Tailings dam | *planned* | Tzenkov (2008) Padina dam, **8 materials**. Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41. Tranche-2: multi-material cross-section transcription. |
@@ -1282,6 +1282,41 @@ toe-to-crest circle refines onto the global minimum:
 The three local-minima cases are a tranche-2 item, gated on a polygon search-area constraint.
 
 <!-- test: file=../files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.338, num_slices=40, benchmark=RS2-61a -->
+
+### RS2-62: Three-layered slope with a soft band (Cheng et al. 2007) {#rs2-62}
+
+**Input files:** [rs2_62a.xlsx](../files/rocscience/rs2_62a.xlsx) (Analysis I, 28 m) ·
+[b](../files/rocscience/rs2_62b.xlsx) (II, 20 m) · [c](../files/rocscience/rs2_62c.xlsx) (III, 12 m)
+
+A three-layer slope carrying a thin **soft band** (Soil 2: c = 0, φ = 25°) that dips through it
+between a stronger cap (Soil 1: c = 20, φ = 35°) and base (Soil 3: c = 10, φ = 35°); γ = 19,
+E = 14 MPa, ν = 0.3 throughout. From the same Cheng, Lansivaara & Wei (2007) paper as
+[RS2-61](#rs2-61)/[63](#rs2-63). Three geometries narrow the band's daylight width (Analysis
+I / II / III = 28 / 20 / 12 m domains), and each was run at two dilation angles — Case 1 (ψ = 0)
+and Case 2 (ψ = φ, associated). **This is a hard, code-divergent benchmark by design**: for the
+same ψ = 0 input, Plaxis and RS2 return ≈ 0.8–0.9 while Flac3D returns 1.03–1.64.
+
+| Analysis | XSLOPE SSRM (ψ = 0) | RS2 SSR | Plaxis | Flac3D |
+|---|---|---|---|---|
+| I (28 m) | ≈ 1.0 (coarse mesh) | 0.88 | 0.86 | 1.64 |
+| II (20 m) | ≈ 1.0 (coarse mesh) | 0.89 | 0.85 | 1.30 |
+| III (12 m) | **0.843** | 0.81 | 0.82 | 1.03 |
+
+*Case 2 (ψ = φ) reference values — RS2 0.98 / 0.98 / 0.93, Plaxis 0.97 / 0.97 / 0.94, Flac3D
+1.61 / 1.28 / 1.03 — are not reproducible here: XSLOPE's SSRM is non-associated only (ψ = 0,
+the Griffiths convention), so the associated-flow column is out of scope by construction.*
+
+The controlling detail is the **band thickness** (≈ 0.4 m): the SSRM only reproduces the
+Plaxis/RS2 ψ = 0 cluster when the mesh resolves the band. Analysis III drifts from 0.998 at a
+0.5 m mesh to **0.843** at 0.3 m (≈ 2 elements across the band) — landing on RS2 0.81 / Plaxis
+0.82. Analyses I and II show the same behaviour (≈ 1.0 at a coarse 0.6 m mesh) but their wider
+domains make a band-resolving 0.3 m mesh too costly for the regression suite, so only the small
+Analysis III geometry is locked; it is the representative case for the family. The lock is a
+regression anchor at the tagged 0.3 m mesh, not a converged value.
+
+<!-- test: file=../files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.843, element_type=tri6, target_size=0.3, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=16000, benchmark=RS2-62c -->
+
+![RS2-62: three-layered slope with a soft band (Cheng et al. 2007), Analysis III (12 m domain, ψ = 0, SSRM 0.843) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism riding the soft band](images/RS2-62c.png)
 
 ### RS2-63: Slope stability assessment of a homogeneous slope (Cheng et al. 2007) {#rs2-63}
 

@@ -380,8 +380,80 @@ def rs2_66e():
     return 'rs2_66e.xlsx'
 
 
+_RS2_62_SOILS = [
+    dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
+    dict(name='Soil 2 (soft band)', c=0.0, phi=25.0, gamma=19.0, gamma_sat=19.0,
+         E=14000.0, nu=0.3),
+    dict(name='Soil 3', c=10.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
+]
+
+
+def _rs2_62_slope_data(polys):
+    """RS2 #62 (Part III) -- Stability of a Three-Layered Slope With a Soft Band, after
+
+        Cheng, Y.M., Lansivaara, T. & Wei, W.B. (2007), "Two-dimensional slope stability
+        analysis by limit equilibrium and strength reduction methods." Comput. Geotech. 34.
+
+    A 10 m slope carries a thin SOFT band (Soil 2: c = 0, phi = 25 deg) dipping through it,
+    between a stronger cap (Soil 1: c = 20, phi = 35) and base (Soil 3: c = 10, phi = 35);
+    gamma = 19, E = 14 MPa, nu = 0.3 throughout. Three geometries vary the band's DAYLIGHT
+    width (Analysis I / II / III = 28 / 20 / 12 m domains), and each was run at two dilation
+    angles (Case 1 psi = 0, Case 2 psi = phi). XSLOPE's SSRM is non-associated only (psi = 0),
+    so ONLY the Case-1 (psi = 0) column is reproducible here; the Case-2 associated-flow column
+    and Flac3D's much higher associated-flow values are recorded in rs2.md for context.
+
+    ``polys`` are the three zone polygons (mat_id 0 = Soil 1, 1 = soft band, 2 = Soil 3),
+    transcribed from the RS2 vendor models 'slope stability #062_0N.fez' via the .fez zone
+    polygonizer and hard-coded so the corpus rebuilds without them. SSRM only; the circle is
+    an inert placeholder the loader requires."""
+    sd = _poly_slope_data(
+        polygons=polys, materials=[dict(m) for m in _RS2_62_SOILS],
+        circle={'Xo': 10.0, 'Yo': 20.0, 'Depth': 3.0, 'R': 17.0}, max_depth=0.0)
+    return sd
+
+
+def rs2_62a():
+    """RS2 #62 Analysis I (28 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.88,
+    Plaxis 0.86 | Flac3D 1.64 (associated). Case 2 psi = phi: RS2 0.98 (not reproducible)."""
+    polys = [
+        (0, [(5.0, 5.0), (8.0, 8.0), (20.0, 15.0), (28.0, 15.0), (28.0, 10.0), (8.0, 7.5)]),
+        (1, [(28.0, 10.0), (28.0, 9.5), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
+             (8.0, 7.5)]),
+        (2, [(28.0, 9.5), (28.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
+    ]
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62a.xlsx'))
+    return 'rs2_62a.xlsx'
+
+
+def rs2_62b():
+    """RS2 #62 Analysis II (20 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.89,
+    Plaxis 0.85 | Flac3D 1.30 (associated). Case 2 psi = phi: RS2 0.98 (not reproducible)."""
+    polys = [
+        (0, [(5.0, 5.0), (8.0, 8.0), (20.0, 15.0), (20.0, 8.911), (8.0, 7.5)]),
+        (1, [(20.0, 8.911), (20.0, 8.287), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
+             (8.0, 7.5)]),
+        (2, [(20.0, 8.287), (20.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
+    ]
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62b.xlsx'))
+    return 'rs2_62b.xlsx'
+
+
+def rs2_62c():
+    """RS2 #62 Analysis III (12 m domain), psi = 0. Published (psi = 0): RS2 SSR 0.81,
+    Plaxis 0.82 | Flac3D 1.03 (associated). Case 2 psi = phi: RS2 0.93 (not reproducible)."""
+    polys = [
+        (0, [(5.0, 5.0), (8.0, 8.0), (12.0, 10.333), (12.0, 7.97), (8.0, 7.5)]),
+        (1, [(12.0, 7.97), (12.0, 7.496), (8.0, 7.1), (5.0, 4.5), (0.0, 5.0), (5.0, 5.0),
+             (8.0, 7.5)]),
+        (2, [(12.0, 7.496), (12.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
+    ]
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62c.xlsx'))
+    return 'rs2_62c.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_63,
-               rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e):
+               rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
+               rs2_62a, rs2_62b, rs2_62c):
         print(fn())

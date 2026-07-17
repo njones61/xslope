@@ -133,6 +133,12 @@ class ColorButton(QToolButton):
         self._apply()
         self.colorChanged.emit(h)
 
+    def set_default(self, h):
+        """Update the factory/palette color the popup's "Default" swatch resets to.
+        Used when one button is reused across items (e.g. the Materials editor list
+        view shows one color button, re-pointed at the selected material's default)."""
+        self._default = h
+
     def _apply(self):
         c = QColor(self._hex)
         fg = "#000" if c.lightnessF() > 0.5 else "#fff"

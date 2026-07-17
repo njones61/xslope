@@ -935,6 +935,24 @@ def run_editor_roundtrip_test(test):
     dlg.deleteLater()
     app.processEvents()
 
+    # (3) Display colors live in the STYLE delta, not the material dicts. Opening the
+    #     editor on a project that carries per-material color overrides and applying
+    #     with NO color change must leave the sparse style delta byte-for-byte equal —
+    #     in both views — so colors stay out of the material data path.
+    from studio.editors import MaterialsDialog, _new_material
+    sd = _editor_fixture()
+    style = {"materials": {"0": {"color": "#123456"},
+                           "1": {"color": "#abcdef", "hatch": "....", "alpha": 0.5}}}
+    before_style = copy.deepcopy(style)
+    dlg = MaterialsDialog("Materials", mat_editor.FIELDS, sd["materials"],
+                          _new_material, None, style=style)
+    dlg.set_view_mode("table")
+    problems += _roundtrip_diff(before_style, dlg.result_style(), "materials(style)")
+    dlg.set_view_mode("list")
+    problems += _roundtrip_diff(before_style, dlg.result_style(), "materials(style-list)")
+    dlg.deleteLater()
+    app.processEvents()
+
     if problems:
         return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])
     return 0.0, None

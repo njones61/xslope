@@ -10,6 +10,7 @@ sigmas), so a round-trip through an editor never drops data.
 
 from __future__ import annotations
 
+import copy
 import math
 
 from PySide6.QtCore import Qt, QTimer
@@ -115,15 +116,23 @@ class _EditableTable(QWidget):
     """A table over a list of dict records with Add/Remove rows. Unshown keys are
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
-    def __init__(self, fields, rows, new_row, parent=None):
+    def __init__(self, fields, rows, new_row, parent=None, swatch_state=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
         self._bases = [dict(r) for r in rows]  # keep originals to preserve extra keys
+        # Optional leading display-color swatch column (Materials editor). It is a
+        # *display* column, not a data field: kept as the appended LOGICAL column
+        # (len(fields)) so every field/column index elsewhere — result_rows,
+        # apply_usage_filter, callers indexing by field position — is unchanged, then
+        # moved to VISUAL position 0 so it reads as a leading swatch. Slot-keyed via
+        # the shared _MaterialColorState; committed to the style delta on OK.
+        self._swatch = swatch_state
+        ncols = len(fields) + (1 if swatch_state is not None else 0)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.table = QTableWidget(len(rows), len(fields))
+        self.table = QTableWidget(len(rows), ncols)
         self.table.setHorizontalHeaderLabels([f.header for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         for j, f in enumerate(fields):  # color usage-tagged headers (red=LEM, blue=FEM, …)
@@ -134,9 +143,19 @@ class _EditableTable(QWidget):
                     fnt = hi.font()
                     fnt.setBold(True)
                     hi.setFont(fnt)
+        if swatch_state is not None:
+            col = len(fields)
+            hdr = QTableWidgetItem("\U0001F3A8")   # palette glyph — no data header text
+            hdr.setToolTip("Display color on the Inputs plot — not a 'mat' worksheet "
+                           "column. Click a swatch to change it; pick “Default” "
+                           "to reset to the palette color.")
+            self.table.setHorizontalHeaderItem(col, hdr)
+            self.table.horizontalHeader().moveSection(col, 0)   # -> leading (visual)
         layout.addWidget(self.table)
         for i, row in enumerate(rows):
             self._set_row(i, row)
+        if swatch_state is not None:
+            self._rebuild_swatches()
 
         bar = QHBoxLayout()
         add = QPushButton("Add row")
@@ -168,18 +187,36 @@ class _EditableTable(QWidget):
             else:
                 self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
 
+    def _rebuild_swatches(self):
+        """(Re)build the leading display-color swatch button for every row, bound to
+        the row's CURRENT index. Rebuilt after any add/remove so each button targets
+        its live slot — colors are slot-keyed (they follow the row position, matching
+        the canvas), so after a removal the remaining rows show their slot's color."""
+        if self._swatch is None:
+            return
+        from .styles_dialog import ColorButton, MATERIAL_PALETTE
+        col = len(self._fields)
+        for i in range(self.table.rowCount()):
+            btn = ColorButton(self._swatch.resolved_hex(i),
+                              default_hex=self._swatch.default_hex(i),
+                              palette=MATERIAL_PALETTE)
+            btn.colorChanged.connect(lambda h, idx=i: self._swatch.set(idx, h))
+            self.table.setCellWidget(i, col, btn)
+
     def _add_row(self):
         i = self.table.rowCount()
         self.table.insertRow(i)
         base = self._new_row()
         self._bases.append(base)
         self._set_row(i, base)
+        self._rebuild_swatches()
 
     def _remove_rows(self):
         for r in sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True):
             self.table.removeRow(r)
             if r < len(self._bases):
                 self._bases.pop(r)
+        self._rebuild_swatches()
 
     def result_rows(self):
         out = []
@@ -466,13 +503,63 @@ _MAT_UNSAT_FIELDS = {"lf": ["kr0", "h0"], "vg": ["vg_a", "vg_n"],
 _MAT_ALL_UNSAT_FIELDS = ["kr0", "h0", "vg_a", "vg_n"]
 
 
-def _material_swatch(idx):
-    """A color swatch QIcon for material ``idx``, using the SAME palette the canvas
-    zones use (``xslope.style.material_style`` -> tab10 fallback), so a list entry
-    reads as the same color as its zone on the Inputs plot."""
+class _MaterialColorState:
+    """Working per-material display-color overrides for the Materials editor, shared
+    by both views and committed to the document's style delta on OK.
+
+    Seeded from the incoming sparse style delta's material *color* entries; stays
+    sparse — an index only appears when its color differs from the tab10 palette
+    default (so "reset to default" simply drops the key). Keyed by material INDEX
+    (slot), exactly as ``xslope.style`` / the canvas resolve material color
+    (``str(mat_id)`` == index), so an override stays with the *slot*, not the
+    material, when materials are added/removed/reordered — matching the Styles
+    dialog and the Inputs plot. Hatch/alpha (owned by the Styles dialog) are not
+    touched here; the OK merge carries them through untouched."""
+
+    def __init__(self, style):
+        from matplotlib.colors import to_hex
+        self._over = {}          # idx -> hex string
+        for k, ov in ((style or {}).get("materials") or {}).items():
+            if isinstance(ov, dict) and ov.get("color"):
+                try:
+                    self._over[int(k)] = to_hex(ov["color"])
+                except (ValueError, TypeError):
+                    pass
+
+    def default_hex(self, idx):
+        from matplotlib.colors import to_hex
+        from xslope.plot import get_material_color
+        return to_hex(get_material_color(idx))
+
+    def resolved_hex(self, idx):
+        return self._over.get(idx) or self.default_hex(idx)
+
+    def has_override(self, idx):
+        return idx in self._over
+
+    def set(self, idx, hex_color):
+        """Record a color for ``idx``, staying sparse: a value equal to the palette
+        default drops the override (that's how "Default" in the picker resets)."""
+        if not hex_color or hex_color.lower() == self.default_hex(idx).lower():
+            self._over.pop(idx, None)
+        else:
+            self._over[idx] = hex_color
+
+    def reset(self, idx):
+        self._over.pop(idx, None)
+
+
+def _material_swatch(idx, color=None):
+    """A color swatch QIcon for material ``idx``. When ``color`` (a hex / mpl color)
+    is given it is drawn directly — the editor passes the pending override or the
+    resolved default so a list entry tracks in-dialog color edits. Otherwise it falls
+    back to the SAME palette the canvas zones use (``xslope.style.material_style`` ->
+    tab10 fallback), so a list entry reads as the same color as its zone on the
+    Inputs plot."""
     from matplotlib.colors import to_rgba
-    from xslope.style import material_style, resolve_style
-    color = material_style(resolve_style(None), idx)["color"]
+    if color is None:
+        from xslope.style import material_style, resolve_style
+        color = material_style(resolve_style(None), idx)["color"]
     r, g, b, a = to_rgba(color)
     pm = QPixmap(16, 16)
     pm.fill(Qt.transparent)
@@ -496,12 +583,15 @@ class _MaterialListView(QWidget):
 
     _STRENGTH_KEYS = _MAT_ALL_OPTION_FIELDS + ["d", "psi", "E", "nu"]
 
-    def __init__(self, fields, rows, new_row, reliability_on, parent=None):
+    def __init__(self, fields, rows, new_row, reliability_on, parent=None,
+                 color_state=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
         self._new_row = new_row
         self._rows = [dict(r) for r in rows]
         self._reliability_on = bool(reliability_on)
+        self._color = color_state if color_state is not None else _MaterialColorState({})
+        self._loading = False     # suppress color write-through while populating a row
         self._cur = -1
         self._edits = {}          # key -> QLineEdit / QComboBox
         self._cell_widgets = {}   # key -> the labeled cell QWidget (for show/hide)
@@ -597,16 +687,59 @@ class _MaterialListView(QWidget):
         h.addWidget(cell_b, 1)
         return w
 
+    def _build_color_row(self):
+        """The Identity display-color control: a swatch button (same picker as the
+        Styles dialog, seeded with the resolved override-or-default) beside a small
+        Reset button that drops the override so the palette default shows through."""
+        from .styles_dialog import ColorButton, MATERIAL_PALETTE
+        cell = QWidget()
+        h = QHBoxLayout(cell)
+        h.setContentsMargins(0, 2, 0, 2)
+        h.setSpacing(4)
+        lab = QLabel("Display color")
+        lab.setMinimumWidth(80)
+        lab.setToolTip("Color of this material's zone on the Inputs plot. Stored as a "
+                       "style override, not a 'mat' property.")
+        h.addWidget(lab)
+        self._color_btn = ColorButton("#000000", palette=MATERIAL_PALETTE)
+        self._color_btn.colorChanged.connect(self._on_color_changed)
+        h.addWidget(self._color_btn)
+        reset = QPushButton("Reset")
+        reset.setToolTip("Remove the override — show the default palette color.")
+        reset.clicked.connect(self._on_color_reset)
+        h.addWidget(reset)
+        h.addStretch(1)
+        return cell
+
+    def _on_color_changed(self, hexc):
+        if self._loading or not (0 <= self._cur < len(self._rows)):
+            return
+        self._color.set(self._cur, hexc)
+        self._refresh_list_item(self._cur)   # track the change in the list swatch
+
+    def _on_color_reset(self):
+        if not (0 <= self._cur < len(self._rows)):
+            return
+        self._color.reset(self._cur)
+        self._loading = True
+        self._color_btn.blockSignals(True)
+        self._color_btn.set_hex(self._color.default_hex(self._cur))
+        self._color_btn.blockSignals(False)
+        self._loading = False
+        self._refresh_list_item(self._cur)
+
     def _build_form_pane(self):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         body = QWidget()
         v = QVBoxLayout(body)
 
-        # Identity
+        # Identity — name plus the display color (swatch button + reset), the same
+        # override the Styles dialog edits and the Inputs plot resolves.
         g = QGroupBox("Identity")
         gv = QVBoxLayout(g)
         gv.addWidget(self._cell("Name", "name"))
+        gv.addWidget(self._build_color_row())
         v.addWidget(g)
 
         # Unit weights (γ | γsat side by side; γ carries its σ)
@@ -711,13 +844,16 @@ class _MaterialListView(QWidget):
         self.list.blockSignals(True)
         self.list.clear()
         for i in range(len(self._rows)):
-            item = QListWidgetItem(_material_swatch(i), self._item_text(i))
+            item = QListWidgetItem(_material_swatch(i, self._color.resolved_hex(i)),
+                                   self._item_text(i))
             self.list.addItem(item)
         self.list.blockSignals(False)
 
     def _refresh_list_item(self, i):
         if 0 <= i < self.list.count():
-            self.list.item(i).setText(self._item_text(i))
+            it = self.list.item(i)
+            it.setText(self._item_text(i))
+            it.setIcon(_material_swatch(i, self._color.resolved_hex(i)))
 
     # --- load / commit ---------------------------------------------------
     def _load(self, idx):
@@ -736,6 +872,14 @@ class _MaterialListView(QWidget):
                 w.blockSignals(False)
         ok = 0 <= idx < len(self._rows)
         self.setEnabled(True)
+        self._loading = True
+        self._color_btn.blockSignals(True)
+        if ok:
+            self._color_btn.set_default(self._color.default_hex(idx))
+            self._color_btn.set_hex(self._color.resolved_hex(idx))
+        self._color_btn.setEnabled(ok)
+        self._color_btn.blockSignals(False)
+        self._loading = False
         if ok:
             self._cur = idx
             self._update_option_visibility()
@@ -864,7 +1008,7 @@ class MaterialsDialog(QDialog):
     and σ fields (list) in both views."""
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
-                 usage_toggles=None):
+                 usage_toggles=None, style=None, doc=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -874,6 +1018,13 @@ class MaterialsDialog(QDialog):
         self._mode = None
         self._table = None
         self._list_view = None
+        # Display-color overrides live in the project style delta (NOT the material
+        # dicts). Seed a working state from the incoming delta, shared by both views;
+        # result_style() folds it back into the delta on OK. doc is the document to
+        # commit to (None in headless/round-trip use — colors just aren't committed).
+        self._doc = doc
+        self._orig_style = copy.deepcopy(style or {})
+        self._color = _MaterialColorState(self._orig_style)
         self.resize(1180, 640)
 
         layout = QVBoxLayout(self)
@@ -953,14 +1104,16 @@ class MaterialsDialog(QDialog):
         if self._table is not None:
             self._table.setParent(None)
             self._table.deleteLater()
-        self._table = _EditableTable(self._fields, self._rows, self._new_row)
+        self._table = _EditableTable(self._fields, self._rows, self._new_row,
+                                     swatch_state=self._color)
         self._table_lay.addWidget(self._table)
         self._table.apply_usage_filter(self._enabled_usage())
 
     def _ensure_list(self):
         if self._list_view is None:
             self._list_view = _MaterialListView(self._fields, self._rows,
-                                                self._new_row, self._reliability_on())
+                                                self._new_row, self._reliability_on(),
+                                                color_state=self._color)
             self._list_lay.addWidget(self._list_view)
         else:
             self._list_view.set_rows(self._rows, self._reliability_on())
@@ -990,6 +1143,38 @@ class MaterialsDialog(QDialog):
     def result_rows(self):
         self._harvest()
         return self._rows
+
+    def result_style(self):
+        """The project style delta with material *display colors* reconciled from the
+        editor's working overrides. Sparse: an override is written only where the
+        color differs from the palette default; hatch/alpha (owned by the Styles
+        dialog) are carried through untouched. Slot-keyed by material index, so
+        entries for slots past the current material count are dropped. Applying with
+        no color change returns a delta equal to the one passed in."""
+        from matplotlib.colors import to_hex
+        n = len(self.result_rows())
+        out = copy.deepcopy(self._orig_style)
+        mats = dict(out.get("materials") or {})
+        new_mats = {}
+        for idx in range(n):
+            key = str(idx)
+            entry = dict(mats.get(key) or {})
+            if self._color.has_override(idx):
+                new_hex = self._color.resolved_hex(idx)
+                old = entry.get("color")
+                # Keep the original color string when it's the same color (avoids
+                # churning e.g. "red" -> "#ff0000" on an untouched override).
+                if old is None or to_hex(old).lower() != new_hex.lower():
+                    entry["color"] = new_hex
+            else:
+                entry.pop("color", None)
+            if entry:
+                new_mats[key] = entry
+        if new_mats:
+            out["materials"] = new_mats
+        else:
+            out.pop("materials", None)
+        return out
 
 
 class MaterialsEditor(CategoryEditor):
@@ -1038,6 +1223,11 @@ class MaterialsEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
+        # The display-color swatch edits the project's style delta, which lives on the
+        # document (reached via the parent window); headless/round-trip callers pass a
+        # bare parent, so both are optional and colors simply aren't committed then.
+        doc = getattr(parent, "doc", None)
+        style = getattr(doc, "style", None) if doc is not None else None
         return MaterialsDialog(
             "Materials", self.FIELDS, slope_data.get("materials", []), _new_material, parent,
             help_text="Table view mirrors the 'mat' worksheet (row order = Mat ID "
@@ -1045,11 +1235,20 @@ class MaterialsEditor(CategoryEditor):
                       "strength- and conductivity-model plots that confirm the "
                       "selected options. Both views edit the same rows, so switching "
                       "is lossless. In list view only 'Reliability' applies — it shows "
-                      "each value's σ; the other toggles hide table columns.",
-            usage_toggles=["lem", "seep", "fem", "rel"])
+                      "each value's σ; the other toggles hide table columns. The color "
+                      "swatch sets the material's display color on the Inputs plot.",
+            usage_toggles=["lem", "seep", "fem", "rel"], style=style, doc=doc)
 
     def apply(self, slope_data, dlg):
         slope_data["materials"] = dlg.result_rows()
+        # Display colors are style deltas, not material data — commit them via the
+        # document's style store (same path as the Styles dialog), only when changed,
+        # so the sparse delta stays sparse and an unchanged apply is a no-op.
+        doc = getattr(dlg, "_doc", None)
+        if doc is not None:
+            new_style = dlg.result_style()
+            if new_style != doc.style:
+                doc.set_style(new_style)
 
 
 def _new_circle():

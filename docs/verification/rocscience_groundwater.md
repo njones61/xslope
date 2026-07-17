@@ -1,6 +1,6 @@
 # Rocscience Slide2 Groundwater Corpus
 
-This page tracks the [Slide2 Groundwater Verification Manual](https://www.rocscience.com/support/slide2/verification)
+This page tracks the [Slide2 Groundwater Verification Manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
 (Rocscience, 2022; 21 problems) the same way the [Slide2 slope-stability corpus](rocscience.md)
 tracks its manual: every problem gets a row, built problems get an XSLOPE input file
 (`docs/files/rocscience_gw/`), a results section, and regression test tags. Unlike the LEM

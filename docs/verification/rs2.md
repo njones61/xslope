@@ -1,6 +1,6 @@
 # Rocscience RS2 (SSRM) Corpus
 
-This page tracks the RS2 Slope Stability Verification Manual (Rocscience, Parts I–III,
+This page tracks the [RS2 Slope Stability Verification Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals) (Rocscience, Parts I–III,
 68 problems) the way the [Slide2 corpus](rocscience.md) tracks its manual — but for the
 **shear strength reduction (SSRM)** method against XSLOPE's FEM/SSRM solver rather than
 limit equilibrium. The long-standing SSRM anchors (Griffiths & Lane 1999 and the feature

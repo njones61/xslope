@@ -77,11 +77,17 @@ def solve_selected(method_name, slice_df, rapid=False):
         print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
     elif func == corps:
         print(f'Corps Engineers: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
+        for w in result.get('warnings', []):
+            print(f'  Corps admissibility warning: {w}')
     elif func == lowe:
         print(f'Lowe & Karafiath: FS={result["FS"]:.3f}')
+        for w in result.get('warnings', []):
+            print(f'  Lowe & Karafiath admissibility warning: {w}')
     elif func == mprice:
         print(f'Morgenstern-Price ({result["f_type"]}): FS={result["FS"]:.3f}, '
               f'lambda={result["lambda"]:.3f}')
+        for w in result.get('warnings', []):
+            print(f'  Morgenstern-Price admissibility warning: {w}')
 
     return result
 
@@ -1053,6 +1059,62 @@ def _mp_march(slice_df, lam, f_vals, FS, right_facing=False):
     return _mp_residuals(_mp_extract(slice_df, right_facing), f_vals, lam, FS)
 
 
+def _admissibility_warnings(c, N_eff, Z, y_lt=None, y_lb=None, yt_l=None):
+    """Report-only admissibility screen shared by spencer/mprice/corps/lowe.
+
+    Returns a list of Duncan & Wright admissibility notes for an ALREADY-ACCEPTED
+    solution — it never affects FS, convergence, or acceptance. The tension guard
+    in each solver normalizes base tension by cohesive capacity, so a c=0 slice
+    can carry unbounded base tension without tripping it (VP30: -71 kN/m on the
+    cohesionless crack-face sliver scores 0.0 and passes). These report the
+    signatures that guard cannot see. Deliberately narrow — every accepted
+    solution already satisfies the guard on cohesive slices, so re-flagging their
+    tension would be noise:
+      - base tension only on COHESIONLESS slices (the guard's blind spot);
+      - interslice tension only against a clearly compressive field (when every
+        Z is negative the sign convention itself is ambiguous, e.g. right-facing
+        nailed walls, and no verdict is offered);
+      - thrust line outside the slice on >10% of interior boundaries, with
+        NaN/inf ratios counting as outside — skipped when no thrust line is
+        supplied (corps/lowe expose no line of thrust).
+
+    Z must arrive in the physical convention (tension < 0); callers whose march
+    stores the opposite sign negate it before passing it in.
+    """
+    warns = []
+    c = np.asarray(c, dtype=float)
+    N_eff = np.asarray(N_eff, dtype=float)
+    Z = np.asarray(Z, dtype=float)
+    n_scale = float(np.max(np.abs(N_eff))) if len(N_eff) else 0.0
+    cohesionless = np.abs(c) <= 1e-9
+    bad_n = np.flatnonzero(cohesionless & (N_eff < -0.01 * n_scale))
+    if bad_n.size:
+        worst = int(bad_n[np.argmin(N_eff[bad_n])])
+        warns.append(f"base tension on {bad_n.size} cohesionless slice(s), "
+                     f"worst N' = {float(N_eff[worst]):.1f} at slice {worst + 1}")
+    Z_int = Z[1:-1]
+    if Z_int.size:
+        z_min = float(np.min(Z_int))
+        z_max = float(np.max(Z_int))
+        if z_min < 0 and z_max > 0 and -z_min > 0.10 * z_max:
+            warns.append(f"interslice tension (min Z = {z_min:.1f} vs max "
+                         f"compression {z_max:.1f})")
+    if yt_l is not None and y_lt is not None and y_lb is not None:
+        y_lt_arr = np.asarray(y_lt, dtype=float)
+        y_lb_arr = np.asarray(y_lb, dtype=float)
+        yt_l_arr = np.asarray(yt_l, dtype=float)
+        h_bnd = y_lt_arr[1:] - y_lb_arr[1:]          # interior boundaries 1..n-1
+        tall = h_bnd > 1e-9
+        if np.any(tall):
+            t_ratio = (yt_l_arr[1:][tall] - y_lb_arr[1:][tall]) / h_bnd[tall]
+            inside = np.isfinite(t_ratio) & (t_ratio >= -0.05) & (t_ratio <= 1.05)
+            frac_out = 1.0 - float(np.mean(inside))
+            if frac_out > 0.10:
+                warns.append(f"line of thrust outside the slice on {frac_out:.0%} "
+                             f"of boundaries")
+    return warns
+
+
 def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False, right_facing=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
@@ -1188,11 +1250,19 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     slice_df['n_eff'] = N  # store effective normal forces in slice_df
     slice_df['z'] = Z[:-1]  # store interslice forces in slice_df, adjust length to n slices
 
+    # Report-only admissibility screen (corps/lowe inherit it). The parallel-force
+    # march exposes no line of thrust, so only the base-tension and interslice-
+    # tension signatures apply; the third is skipped. On right-facing slopes the
+    # caller negates theta_list, flipping Z's sign, so tension there is Z>0 — pass
+    # the physical-convention Z (tension < 0) the helper expects.
+    Z_phys = -Z if right_facing else Z
+    warns = _admissibility_warnings(c, N, Z_phys)
+
     if debug:
         r_opt = residual(FS_opt)
         print(f" Converged FS = {FS_opt:.6f}, residual = {r_opt:.4g}")
 
-    return True, {'FS': FS_opt}
+    return True, {'FS': FS_opt, 'warnings': warns}
 
 def corps(slice_df, variant=2, debug=False):
     """
@@ -1884,41 +1954,15 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
     # --- Admissibility screen (report-only; acceptance above is unchanged) ---
     # max_tension_ratio normalizes base tension by cohesive capacity, so a c=0
     # slice can carry unlimited base tension without tripping it (VP30: -71 kN/m
-    # on the cohesionless crack-face sliver scores 0.0 and passes). These report
-    # the Duncan & Wright admissibility signatures that guard cannot see.
-    # Deliberately narrow — every accepted solution already satisfies the guard
-    # on cohesive slices, so re-flagging their tension would be noise:
-    #   - base tension only on COHESIONLESS slices (the guard's blind spot);
-    #   - interslice tension only against a clearly compressive field (when
-    #     every Z is negative the sign convention itself is ambiguous, e.g.
-    #     right-facing nailed walls, and no verdict is offered);
-    #   - thrust ratios that are NaN/inf count as outside.
-    warns = []
-    n_scale = float(np.max(np.abs(N_eff))) if len(N_eff) else 0.0
-    cohesionless = np.abs(c) <= 1e-9
-    bad_n = np.flatnonzero(cohesionless & (N_eff < -0.01 * n_scale))
-    if bad_n.size:
-        worst = int(bad_n[np.argmin(N_eff[bad_n])])
-        warns.append(f"base tension on {bad_n.size} cohesionless slice(s), "
-                     f"worst N' = {float(N_eff[worst]):.1f} at slice {worst + 1}")
-    Z_int = Z[1:-1]
-    if Z_int.size:
-        z_min = float(np.min(Z_int))
-        z_max = float(np.max(Z_int))
-        if z_min < 0 and z_max > 0 and -z_min > 0.10 * z_max:
-            warns.append(f"interslice tension (min Z = {z_min:.1f} vs max "
-                         f"compression {z_max:.1f})")
-    y_lt_arr = slice_df['y_lt'].values
-    y_lb_arr = slice_df['y_lb'].values
-    h_bnd = y_lt_arr[1:] - y_lb_arr[1:]          # interior boundaries 1..n-1
-    tall = h_bnd > 1e-9
-    if np.any(tall):
-        t_ratio = (yt_l[1:][tall] - y_lb_arr[1:][tall]) / h_bnd[tall]
-        inside = np.isfinite(t_ratio) & (t_ratio >= -0.05) & (t_ratio <= 1.05)
-        frac_out = 1.0 - float(np.mean(inside))
-        if frac_out > 0.10:
-            warns.append(f"line of thrust outside the slice on {frac_out:.0%} "
-                         f"of boundaries")
+    # on the cohesionless crack-face sliver scores 0.0 and passes). The shared
+    # helper reports the Duncan & Wright signatures that guard cannot see; here
+    # spencer keeps its own thrust line (yt_l), so all three fire. Z is already
+    # in the physical convention (tension < 0) for both facings.
+    warns = _admissibility_warnings(
+        c, N_eff, Z,
+        y_lt=slice_df['y_lt'].values,
+        y_lb=slice_df['y_lb'].values,
+        yt_l=yt_l)
     if warns and debug_level >= 1:
         print("Spencer admissibility warnings: " + "; ".join(warns))
 
@@ -2230,9 +2274,22 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     slice_df['theta'] = theta_deg[1:]   # right-boundary interslice angle per slice
     _mp_line_of_thrust(slice_df, Z, np.arctan(lam_star * f_vals), right_facing, FS=FS)
 
+    # Report-only admissibility screen (never affects FS/λ or acceptance). M-P
+    # keeps the un-negated θ convention for both facings, so its Z is already
+    # physical (tension < 0); the thrust line just stored gives the third
+    # signature. On VP30 this fires interslice tension and thrust-outside — the
+    # inadmissibility the λ-optimisation exploits, silent until now.
+    warns = _admissibility_warnings(
+        slice_df['c'].values, N, Z,
+        y_lt=slice_df['y_lt'].values,
+        y_lb=slice_df['y_lb'].values,
+        yt_l=slice_df['yt_l'].values)
+
     if debug_level >= 1:
         print(f"Morgenstern-Price ({f_type}): FS = {FS:.5f}, λ = {lam_star:.5f}, "
               f"force_res = {force_res:.2e}, moment_res = {moment_res:.2e}")
+        for w in warns:
+            print(f"  M-P admissibility warning: {w}")
 
     return True, {
         'method': 'mprice',
@@ -2240,6 +2297,7 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         'lambda': lam_star,
         'f_type': f_type,
         'theta': theta_deg,
+        'warnings': warns,
     }
 
 

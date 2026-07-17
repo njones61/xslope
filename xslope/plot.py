@@ -3535,7 +3535,16 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
                     xytext=(6, 0), ha='left', va='center', fontsize=8)
     ax.set_yticks(range(len(bars)))
     ax.set_yticklabels([b[0] for b in bars])
-    ax.margins(x=0.12)   # room for the low/high value labels beside the bars
+    # Explicit limits, not margins(): the Studio canvas re-fits axes after render,
+    # which drops margin padding and lets the widest bar's low/high value labels
+    # collide with the tick labels at the spine. Fixed limits survive the re-fit.
+    if bars:
+        ends = [b[1] for b in bars] + [b[2] for b in bars]
+        if base_fs is not None and np.isfinite(base_fs):
+            ends.append(base_fs)
+        lo_min, hi_max = min(ends), max(ends)
+        span = (hi_max - lo_min) or max(abs(hi_max), 1.0)
+        ax.set_xlim(lo_min - 0.15 * span, hi_max + 0.15 * span)
     if base_fs is not None and np.isfinite(base_fs):
         ax.axvline(base_fs, color='k', linewidth=1.0,
                    label=f'base FS = {base_fs:.3f}')

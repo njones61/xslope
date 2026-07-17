@@ -453,19 +453,25 @@ class SensitivityRunner(QThread):
     def _run_design(self):
         from xslope.sensitivity import design
         o = self._opts
+        emode = o.get("engine_mode", "lem")
         total = int(o["steps"]) + 1        # points + base
 
         def cb(done, _t, label):
             self.progress.emit(int(done), total, str(label))
 
-        print(f"Design sweep: {o['param']} from {o['low']:g} to {o['high']:g} in "
-              f"{o['steps']} steps, target FS = {o['target_fs']:g} "
-              f"({o['method']}{'' if o['search'] else ', no re-search'})…")
+        out = "q" if emode == "seep" else "FS"
+        engine_tag = {"lem": o.get("method", "spencer"), "fem": "SSRM",
+                      "seep": f"BC {o.get('seep_opts', {}).get('bc', 1)}"}.get(emode, emode)
+        print(f"Design sweep ({emode}): {o['param']} from {o['low']:g} to "
+              f"{o['high']:g} in {o['steps']} steps, target {out} = "
+              f"{o['target_fs']:g} ({engine_tag})…")
         ok, res = design(self._sd, param=o["param"], low=o["low"], high=o["high"],
-                         steps=o["steps"], target_fs=o["target_fs"],
-                         method=o["method"], search=o["search"],
-                         num_slices=o["num_slices"], progress_callback=cb,
-                         cancel_check=self._cancel.is_set)
+                         steps=o["steps"], target_fs=o["target_fs"], mode=emode,
+                         method=o.get("method", "spencer"),
+                         search=o.get("search", True),
+                         num_slices=o.get("num_slices", 40),
+                         fem_opts=o.get("fem_opts"), seep_opts=o.get("seep_opts"),
+                         progress_callback=cb, cancel_check=self._cancel.is_set)
         if not ok:
             self.failed.emit(str(res))
             return
@@ -476,12 +482,16 @@ class SensitivityRunner(QThread):
         import numpy as np
         from xslope.sensitivity import sensitivity, tornado_from_sweeps
         o = self._opts
+        emode = o.get("engine_mode", "lem")
         specs = o["params"]
         if not specs:
             self.failed.emit("Add at least one parameter to sweep.")
             return
         n = int(o["n"])
-        method = o["method"]
+        method = o.get("method", "spencer")
+        # display method label for the tornado axis/title (an LEM method only
+        # makes sense in LEM mode; FEM/Seep carry their own quantity label)
+        disp_method = {"lem": method, "fem": "SSRM", "seep": ""}.get(emode, method)
 
         def n_points(spec):
             if spec.get("values") is not None:
@@ -495,7 +505,7 @@ class SensitivityRunner(QThread):
             count[0] += 1
             self.progress.emit(count[0], total, str(label))
 
-        sweeps, base_fs = {}, None
+        sweeps, base_fs, out = {}, None, "FS"
         for i, spec in enumerate(specs):
             ref = spec["ref"]
             if spec.get("low") is not None and spec.get("high") is not None:
@@ -506,21 +516,26 @@ class SensitivityRunner(QThread):
                 values = None
                 rel = spec.get("rel_range", 0.2)
                 tag = f"±{rel * 100:g}%"
-            print(f"[{i + 1}/{len(specs)}] Sweeping {ref} {tag} ({method})…")
+            print(f"[{i + 1}/{len(specs)}] Sweeping {ref} {tag} ({emode})…")
             ok, res = sensitivity(self._sd, param=ref, values=values, rel_range=rel,
-                                  n=n, methods=(method,), search=o["search"],
-                                  num_slices=o["num_slices"], progress_callback=cb,
+                                  n=n, mode=emode, methods=(method,),
+                                  search=o.get("search", True),
+                                  num_slices=o.get("num_slices", 40),
+                                  fem_opts=o.get("fem_opts"),
+                                  seep_opts=o.get("seep_opts"),
+                                  progress_callback=cb,
                                   cancel_check=self._cancel.is_set)
             if not ok:
                 self.failed.emit(f"{ref}: {res}")
                 return
             df = res["df"]
+            out = res.get("output", "FS")
             sweeps[res["param"]] = df
             if base_fs is None:
                 b = df.loc[df["is_base"] & df["success"], "fs"]
                 base_fs = float(b.iloc[0]) if len(b) else None
-        tornado = tornado_from_sweeps(sweeps, base_fs=base_fs, method=method)
-        print(f"Sensitivity done — {len(sweeps)} parameter(s), base FS = "
-              f"{base_fs:.3f}." if base_fs is not None else "Sensitivity done.")
+        tornado = tornado_from_sweeps(sweeps, base_fs=base_fs, method=disp_method)
+        print(f"Sensitivity done — {len(sweeps)} parameter(s), base {out} = "
+              f"{base_fs:.3g}." if base_fs is not None else "Sensitivity done.")
         self.succeeded.emit({"kind": "sensitivity", "sweeps": sweeps,
-                             "tornado": tornado, "method": method})
+                             "tornado": tornado, "method": disp_method})

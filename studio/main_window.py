@@ -206,17 +206,18 @@ class SweepCanvas(MplCanvas):
         self._draw(draw, dxf=False)
 
     def _annotate_crossing(self, fig, target_fs, summary):
-        """Mark the interpolated FS=target crossing (or an honest miss note)."""
+        """Mark the interpolated output=target crossing (or an honest miss note)."""
         ax = self._main_axes()
         if ax is None:
             return
         param = summary.get("param", "")
         short = param.split(":")[-1] or param
+        out = summary.get("output", "FS")            # 'FS' or 'q'
         if summary.get("bracketed") and summary.get("crossing") is not None:
             xc = summary["crossing"]
             ax.axvline(xc, color="#0a7d2c", linestyle="--", linewidth=1.0)
             ax.plot([xc], [target_fs], marker="D", color="#0a7d2c", ms=9, zorder=8)
-            ax.annotate(f"{short} = {xc:.4g}\nfor FS = {target_fs:g}",
+            ax.annotate(f"{short} = {xc:.4g}\nfor {out} = {target_fs:g}",
                         xy=(xc, target_fs), xytext=(8, 14),
                         textcoords="offset points", color="#0a7d2c", fontsize=9,
                         fontweight="bold", zorder=9,
@@ -289,7 +290,7 @@ class MainWindow(QMainWindow):
         self._mesh_busy = False
         self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
-        self._last_sens_opts = {}
+        self._last_sens_opts = {}          # keyed by engine mode (lem/fem/seep)
         self._last_mesh_opts = {}
         self._last_seep_opts = {}
         self._last_fem_opts = {}
@@ -1190,14 +1191,22 @@ class MainWindow(QMainWindow):
         busy = (self._runner is not None or self._seep_runner is not None
                 or self._fem_runner is not None or self._sens_runner is not None
                 or self._mesh_busy)
-        # Sensitivity / design is an LEM study — offered in LEM mode only.
-        self.act_sensitivity.setVisible(mode == "lem")
-        self.act_sensitivity.setEnabled(open_ and mode == "lem" and not busy)
+        has_mesh = open_ and self.doc.slope_data.get("mesh") is not None
+        # Sensitivity / design has a version for every mode (LEM: FS; FEM: FS via
+        # SSRM; Seep: discharge q). Always visible; the FEM/Seep sweeps run on the
+        # mesh, so gate those on a built mesh exactly like Run.
+        self.act_sensitivity.setVisible(True)
+        if mode == "lem":
+            self.act_sensitivity.setEnabled(open_ and not busy)
+            self.act_sensitivity.setToolTip("")
+        else:
+            self.act_sensitivity.setEnabled(open_ and has_mesh and not busy)
+            self.act_sensitivity.setToolTip(
+                "" if has_mesh else "Build a mesh first (Build Mesh…).")
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
             self.act_run.setToolTip("")
         else:
-            has_mesh = open_ and self.doc.slope_data.get("mesh") is not None
             implemented = mode in self._run_implemented
             self.act_run.setEnabled(open_ and has_mesh and implemented and not busy)
             self.act_run.setToolTip(
@@ -1908,12 +1917,18 @@ class MainWindow(QMainWindow):
     def run_sensitivity(self):
         if not self.doc.is_open or self._sens_runner is not None:
             return
-        dlg = SensitivityDialog(self, defaults=self._last_sens_opts,
-                                slope_data=self.doc.slope_data)
+        # FEM/Seep sweeps run on the mesh — require one, like Run.
+        if self._mode != "lem" and self.doc.slope_data.get("mesh") is None:
+            QMessageBox.warning(self, "No mesh",
+                                "Build a finite-element mesh first (Build Mesh…) — "
+                                "FEM and seepage sweeps run on the mesh.")
+            return
+        dlg = SensitivityDialog(self, defaults=self._last_sens_opts.get(self._mode, {}),
+                                slope_data=self.doc.slope_data, app_mode=self._mode)
         if not dlg.exec():
             return
         opts = dlg.options()
-        self._last_sens_opts = opts
+        self._last_sens_opts[self._mode] = opts
         if opts["mode"] == "design" and not opts.get("param"):
             QMessageBox.warning(self, "Nothing to sweep",
                                 "Pick a material and property to sweep.")
@@ -1946,7 +1961,8 @@ class MainWindow(QMainWindow):
                 self.view_tabs.setCurrentWidget(self.design_canvas)
             if bundle.get("bracketed"):
                 self.statusBar().showMessage(
-                    f"Design — FS = {bundle['target_fs']:g} at "
+                    f"Design — {bundle.get('output', 'FS')} = "
+                    f"{bundle['target_fs']:g} at "
                     f"{bundle['param'].split(':')[-1]} = {bundle['crossing']:.4g}")
             else:
                 self.statusBar().showMessage(bundle.get("message", "Design done."))

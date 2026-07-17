@@ -537,47 +537,76 @@ class SensitivityDialog(QDialog):
     """
 
     _GLOBAL_LABEL = "k_seismic (global)"
+    # per-engine-mode output quantity: (short name, long label, design-target label)
+    _OUTPUT = {
+        "lem": ("FS", "Factor of Safety", "Target FS"),
+        "fem": ("FS", "Factor of Safety", "Target FS"),
+        "seep": ("q", "total discharge q", "Target q"),
+    }
 
-    def __init__(self, parent=None, defaults=None, slope_data=None):
+    def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem"):
         super().__init__(parent)
-        self.setWindowTitle("Sensitivity / Design study")
+        self.app_mode = app_mode if app_mode in self._OUTPUT else "lem"
+        out_short, out_long, target_label = self._OUTPUT[self.app_mode]
+        self._out_short = out_short
+        titles = {"lem": "Sensitivity / Design study (LEM)",
+                  "fem": "Sensitivity / Design study (FEM · SSRM)",
+                  "seep": "Sensitivity / Design study (Seepage)"}
+        self.setWindowTitle(titles[self.app_mode])
         defaults = defaults or {}
         slope_data = slope_data or {}
 
         from xslope.sensitivity import list_params
-        self._params = list_params(slope_data)
+        self._params = list_params(slope_data, mode=self.app_mode)
         self._by_ref = {e["ref"]: e for e in self._params}
-        # Materials in first-appearance order (globals handled as a special item).
-        self._mat_names = []
+        # Group parameters for the picker's first combo: materials by name, plus
+        # the pseudo-groups globals ('__global__') and seep boundary heads
+        # ('__seep_bc__'). First-appearance order preserved.
+        self._groups = []                 # (display, key)
+        self._group_entries = {}          # key -> [entries]
         for e in self._params:
-            if e["kind"] == "mat" and e["name"] not in self._mat_names:
-                self._mat_names.append(e["name"])
+            if e["kind"] == "global":
+                key, disp = "__global__", self._GLOBAL_LABEL
+            elif e["kind"] == "seep_bc":
+                key, disp = "__seep_bc__", "Boundary heads"
+            else:
+                key, disp = e["name"], e["name"]
+            if key not in self._group_entries:
+                self._group_entries[key] = []
+                self._groups.append((disp, key))
+            self._group_entries[key].append(e)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
         self.mode = self._combo([("sensitivity", "Sensitivity (tornado)"),
-                                 ("design", "Design (FS vs one parameter)")],
+                                 (f"design", f"Design ({out_short} vs one parameter)")],
                                 defaults.get("mode", "sensitivity"))
         form.addRow("Mode", self.mode)
 
+        # Engine-specific solver row(s). LEM keeps method + slices; FEM swaps in the
+        # SSRM knobs (each step is a full SSRM solve); Seep takes a BC set + tol.
         self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
-        form.addRow("Method", self.method)
-
         self.num_slices = QSpinBox()
         self.num_slices.setRange(5, 500)
         self.num_slices.setValue(int(defaults.get("num_slices", 40)))
-        form.addRow("Number of slices", self.num_slices)
+        if self.app_mode == "lem":
+            form.addRow("Method", self.method)
+            form.addRow("Number of slices", self.num_slices)
+        elif self.app_mode == "fem":
+            self._build_fem_solver_rows(form, defaults)
+        elif self.app_mode == "seep":
+            self._build_seep_solver_rows(form, defaults, slope_data)
         layout.addLayout(form)
 
         # --- parameter picker (shared by both modes) ------------------------
         picker = QGroupBox("Parameter")
         pform = QFormLayout(picker)
         self.material = QComboBox()
-        for name in self._mat_names:
-            self.material.addItem(name, name)
-        self.material.addItem(self._GLOBAL_LABEL, "__global__")
-        pform.addRow("Material", self.material)
+        for disp, key in self._groups:
+            self.material.addItem(disp, key)
+        pform.addRow("Material" if self.app_mode != "seep" else "Material / BC",
+                     self.material)
         self.prop = QComboBox()
         pform.addRow("Property", self.prop)
         self.material.currentIndexChanged.connect(self._on_material_changed)
@@ -587,10 +616,11 @@ class SensitivityDialog(QDialog):
         # --- mode pages -----------------------------------------------------
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_sens_page(defaults))
-        self.stack.addWidget(self._build_design_page(defaults))
+        self.stack.addWidget(self._build_design_page(defaults, target_label))
         layout.addWidget(self.stack)
 
-        # Re-search toggle applies to both modes (correctness vs speed).
+        # Re-search toggle is an LEM concept (FEM finds its own mechanism, seepage
+        # has no failure surface) — only shown in LEM mode.
         self.search = QCheckBox("Re-search the critical surface at each step")
         self.search.setChecked(bool(defaults.get("search", True)))
         self.search.setToolTip(
@@ -599,6 +629,7 @@ class SensitivityDialog(QDialog):
             "silently understates the sensitivity.\n\n"
             "Off: re-solve the entered surface only (much faster, but the answer is "
             "only right for that prescribed surface).")
+        self.search.setVisible(self.app_mode == "lem")
         layout.addWidget(self.search)
 
         self.note = QLabel()
@@ -621,7 +652,52 @@ class SensitivityDialog(QDialog):
                 self._add_row(e, pct=spec.get("pct", self.pct.value()),
                               use_sigma=spec.get("use_sigma", False))
         self._on_mode_changed()
-        self.resize(560, 560)
+        self.resize(560, 600)
+
+    # --- engine-specific solver rows ----------------------------------------
+    def _build_fem_solver_rows(self, form, defaults):
+        fo = defaults.get("fem_opts", {}) or {}
+        self.f_min = self._dspin(0.1, 10.0, float(fo.get("F_min", 1.0)))
+        self.f_min.setSingleStep(0.05)
+        self.f_max = self._dspin(0.1, 20.0, float(fo.get("F_max", 2.0)))
+        self.f_max.setSingleStep(0.05)
+        self.ssrm_tol = QDoubleSpinBox()
+        self.ssrm_tol.setDecimals(4)
+        self.ssrm_tol.setRange(0.0001, 1.0)
+        self.ssrm_tol.setValue(float(fo.get("tolerance", 0.01)))
+        self.failure_criterion = self._combo(FEM_FAILURE_CRITERIA,
+                                              fo.get("failure_criterion",
+                                                     "non_convergence"))
+        form.addRow("F min (SSRM)", self.f_min)
+        form.addRow("F max (SSRM)", self.f_max)
+        form.addRow("Tolerance (SSRM)", self.ssrm_tol)
+        form.addRow("Failure criterion", self.failure_criterion)
+        note = QLabel("Each swept point is a full SSRM solve (output = FS) — minutes "
+                      "per step. Runs in the background and is cancellable; keep the "
+                      "step count small.")
+        note.setWordWrap(True)
+        form.addRow("", note)
+
+    def _build_seep_solver_rows(self, form, defaults, slope_data):
+        so = defaults.get("seep_opts", {}) or {}
+        self.seep_bc = QComboBox()
+        self.seep_bc.addItem("Set 1", 1)
+        if (slope_data.get("seepage_bc2") or {}).get("specified_heads"):
+            self.seep_bc.addItem("Set 2 (rapid drawdown)", 2)
+        bidx = self.seep_bc.findData(so.get("bc", 1))
+        if bidx >= 0:
+            self.seep_bc.setCurrentIndex(bidx)
+        self.seep_tol = QDoubleSpinBox()
+        self.seep_tol.setDecimals(8)
+        self.seep_tol.setRange(1e-10, 1.0)
+        self.seep_tol.setValue(float(so.get("tol", 1e-4)))
+        form.addRow("BC set", self.seep_bc)
+        form.addRow("Convergence tol", self.seep_tol)
+        note = QLabel("Output quantity = total discharge q through the section. Sweep "
+                      "hydraulic conductivity / boundary heads; each step is one "
+                      "seepage solve.")
+        note.setWordWrap(True)
+        form.addRow("", note)
 
     # --- page builders ------------------------------------------------------
     def _build_sens_page(self, defaults):
@@ -666,7 +742,7 @@ class SensitivityDialog(QDialog):
         self._rows = []            # [{ref, value, sigma, pct_spin, sigma_btn}]
         return page
 
-    def _build_design_page(self, defaults):
+    def _build_design_page(self, defaults, target_label="Target FS"):
         page = QWidget()
         form = QFormLayout(page)
         form.setContentsMargins(0, 0, 0, 0)
@@ -675,41 +751,50 @@ class SensitivityDialog(QDialog):
         f.setBold(True)
         self._design_echo.setFont(f)
         form.addRow("Sweeping", self._design_echo)
-        self.d_from = self._dspin(-1e9, 1e9, float(defaults.get("low", 0.0)))
-        self.d_to = self._dspin(-1e9, 1e9, float(defaults.get("high", 1.0)))
+        # Seepage sweeps hydraulic conductivity (k ~ 1e-5) and boundary heads, so
+        # the bound/target spins need many decimals and a fine step or a tiny k
+        # rounds to 0.000 in the display. LEM/FEM keep the compact 3-decimal spins.
+        dec, step = (8, 1e-6) if self.app_mode == "seep" else (3, 1.0)
+        self.d_from = self._dspin(-1e9, 1e9, float(defaults.get("low", 0.0)),
+                                  decimals=dec, step=step)
+        self.d_to = self._dspin(-1e9, 1e9, float(defaults.get("high", 1.0)),
+                                decimals=dec, step=step)
         self.d_steps = QSpinBox()
         self.d_steps.setRange(2, 200)
         self.d_steps.setValue(int(defaults.get("steps", 11)))
-        self.d_target = self._dspin(0.0, 100.0, float(defaults.get("target_fs", 1.5)))
+        if self.app_mode == "seep":
+            self.d_target = self._dspin(0.0, 1e9, float(defaults.get("target_fs", 1e-5)),
+                                        decimals=8, step=1e-6)
+        else:
+            self.d_target = self._dspin(0.0, 100.0, float(defaults.get("target_fs", 1.5)))
         form.addRow("From", self.d_from)
         form.addRow("To", self.d_to)
         form.addRow("Steps", self.d_steps)
-        form.addRow("Target FS", self.d_target)
+        form.addRow(target_label, self.d_target)
         self._design_seeded = "low" in defaults      # don't re-seed a remembered range
         return page
 
     # --- picker / mode logic ------------------------------------------------
     @staticmethod
-    def _dspin(lo, hi, val):
+    def _dspin(lo, hi, val, decimals=3, step=None):
         s = QDoubleSpinBox()
         s.setRange(lo, hi)
-        s.setDecimals(3)
+        s.setDecimals(decimals)                # decimals BEFORE value: a tiny value
+        if step is not None:                   # must not round away on setValue
+            s.setSingleStep(step)
         s.setValue(val)
         return s
 
     def _on_material_changed(self):
         self.prop.blockSignals(True)
         self.prop.clear()
-        is_global = self.material.currentData() == "__global__"
-        if is_global:
-            self.prop.addItem("k_seismic", "global:k_seismic")
-        else:
-            name = self.material.currentData()
-            for e in self._params:
-                if e["kind"] == "mat" and e["name"] == name:
-                    tag = "" if e["value"] not in (None,) else "  (unset)"
-                    self.prop.addItem(f"{e['field']}{tag}", e["ref"])
-        self.prop.setEnabled(not is_global)
+        key = self.material.currentData()
+        entries = self._group_entries.get(key, [])
+        for e in entries:
+            tag = "" if e["value"] is not None else "  (unset)"
+            self.prop.addItem(f"{e['field']}{tag}", e["ref"])
+        # a single-entry group (globals) has nothing to pick between
+        self.prop.setEnabled(len(entries) > 1)
         self.prop.blockSignals(False)
         self._on_prop_changed()
 
@@ -733,16 +818,17 @@ class SensitivityDialog(QDialog):
     def _on_mode_changed(self):
         design = self.mode.currentData() == "design"
         self.stack.setCurrentIndex(1 if design else 0)
+        q = self._out_short
         if design:
             self.note.setText(
-                "Design: sweeps the one parameter above across [From, To] and "
-                "annotates where FS meets the target (interpolated). If it never "
-                "crosses, the plot says which way to widen the range.")
+                f"Design: sweeps the one parameter above across [From, To] and "
+                f"annotates where {q} meets the target (interpolated). If it never "
+                f"crosses, the plot says which way to widen the range.")
         else:
             self.note.setText(
-                "Sensitivity: add parameters, each swept ±% about its value (or "
-                "click σ for a ±σ range). The result is a tornado; click a bar to "
-                "see that parameter's FS-vs-value curve.")
+                f"Sensitivity: add parameters, each swept ±% about its value (or "
+                f"click σ for a ±σ range). The result is a tornado; click a bar to "
+                f"see that parameter's {q}-vs-value curve.")
 
     # --- sensitivity table --------------------------------------------------
     def _on_add_clicked(self):
@@ -801,12 +887,24 @@ class SensitivityDialog(QDialog):
 
     # --- result -------------------------------------------------------------
     def options(self):
+        # 'engine_mode' selects the sweep engine (lem/fem/seep); 'mode' stays the
+        # sensitivity-vs-design study type the runner already keys on.
         common = {
             "mode": self.mode.currentData(),
+            "engine_mode": self.app_mode,
             "method": self.method.currentData(),
             "num_slices": self.num_slices.value(),
-            "search": self.search.isChecked(),
+            "search": self.search.isChecked() if self.app_mode == "lem" else False,
         }
+        if self.app_mode == "fem":
+            common["fem_opts"] = {
+                "F_min": self.f_min.value(), "F_max": self.f_max.value(),
+                "tolerance": self.ssrm_tol.value(),
+                "failure_criterion": self.failure_criterion.currentData(),
+            }
+        elif self.app_mode == "seep":
+            common["seep_opts"] = {"bc": self.seep_bc.currentData(),
+                                   "tol": self.seep_tol.value()}
         if common["mode"] == "design":
             common.update({
                 "param": self.prop.currentData(),

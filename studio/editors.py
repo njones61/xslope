@@ -366,17 +366,18 @@ def _draw_input_features(ax, slope_data, style, skip=()):
 
 
 def _draw_profile_preview(ax, lines, selected, max_depth, slope_data, style):
-    """Preview for the profile-line editor: the PENDING profile lines drawn over the
-    otherwise-current model. The selected line is bold (emphasis color) with vertex
-    markers; the others keep their material color, thin and dimmed. The max-depth
-    base and the light surface overlays (piezo / loads / reinforcement / piles) give
-    context; trial surfaces are skipped as orthogonal clutter. Zone fills are NOT
-    re-derived here — rebuilding them from a half-edited line is fragile — so this is
-    a line preview (see the caption)."""
+    """Preview for the profile-line editor: ONLY the PENDING profile lines plus the
+    max-depth base line — nothing else. The selected line is bold (emphasis color)
+    with vertex markers; the others keep their material color, thin and dimmed. The
+    max-depth base stays because this same dialog edits max_depth. The other input
+    overlays (piezo / loads / reinforcement / piles) are deliberately NOT drawn here:
+    Norm asked this preview stay a clean profile-lines-only view — they cluttered the
+    picture and aren't what's being edited. Zone fills are NOT re-derived either
+    (rebuilding them from a half-edited line is fragile), so this is a line preview
+    (see the caption)."""
     from xslope.plot import plot_max_depth
     from xslope.style import resolve_style
     rstyle = resolve_style(style)
-    _draw_input_features(ax, slope_data, rstyle, skip={"circles", "non_circ"})
     if max_depth is not None:
         drawable = [{"coords": ln["coords"]} for ln in lines if ln.get("coords")]
         if drawable:
@@ -519,6 +520,263 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
+# --------------------------------------------------------------------------- #
+# Overlay-feature previews (reinforcement / piles / line loads / non-circular /
+# distributed loads / piezometric lines). These edit features that layer OVER the
+# base geometry, so each preview draws the FULL cross-section as backdrop — the base
+# geometry plus every other overlay — and then draws the feature being edited itself,
+# the selected object emphasized and the rest dimmed. Same emphasis/dim vocabulary as
+# the geometry previews above.
+# --------------------------------------------------------------------------- #
+def _draw_section_context(ax, slope_data, style, skip=()):
+    """Draw the full cross-section as backdrop for an overlay-feature preview: the
+    base geometry (profile/polygon layers + max-depth/domain base) plus every input
+    overlay EXCEPT those named in ``skip`` — the feature being edited, which the
+    caller draws itself with emphasis. Each layer is guarded so a half-edited model
+    can never blank the backdrop."""
+    from xslope.plot import plot_base_geometry
+    try:
+        plot_base_geometry(ax, slope_data, labels=False, style=style)
+    except Exception:
+        pass
+    _draw_input_features(ax, slope_data, style, skip=skip)
+
+
+def _xy(row, kx, ky):
+    """(x, y) floats from a pending row, or None if either is blank/half-typed."""
+    try:
+        return float(row.get(kx, 0) or 0), float(row.get(ky, 0) or 0)
+    except (TypeError, ValueError):
+        return None
+
+
+def _draw_reinforcement_preview(ax, rows, selected, slope_data, style):
+    """Preview for the reinforcement editor: each pending line from (x1,y1)→(x2,y2)
+    over the full section (the trial failure surface, if present, is drawn as context
+    so a line's crossing position reads at a glance). The selected line is bold
+    (emphasis color) with endpoint markers; the others keep the reinforcement color,
+    thin and dimmed."""
+    from xslope.style import resolve_style, feature_style
+    rstyle = resolve_style(style)
+    _draw_section_context(ax, slope_data, rstyle, skip={"reinforcement"})
+    base = feature_style(rstyle, "reinforcement").get("color", "darkgray")
+    for i, r in enumerate(rows):
+        p1, p2 = _xy(r, "x1", "y1"), _xy(r, "x2", "y2")
+        if p1 is None or p2 is None:
+            continue
+        xs, ys = [p1[0], p2[0]], [p1[1], p2[1]]
+        if i == selected:
+            ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
+                    marker="o", markersize=6, markerfacecolor=_PREVIEW_EMPH,
+                    markeredgecolor="white", zorder=20)
+        else:
+            ax.plot(xs, ys, color=base, linewidth=2.0, alpha=_PREVIEW_DIM_ALPHA,
+                    zorder=6)
+    _finish_preview_axes(ax)
+
+
+def _draw_piles_preview(ax, rows, selected, slope_data, style):
+    """Preview for the piles editor: each pending pile from (x1,y1)→(x2,y2) over the
+    full section. The selected pile is bold (emphasis color) with a square cap marker
+    at its upper end and a downward-triangle tip marker at its lower end; the others
+    keep the pile color, thinner and dimmed."""
+    from xslope.style import resolve_style, feature_style
+    rstyle = resolve_style(style)
+    _draw_section_context(ax, slope_data, rstyle, skip={"piles"})
+    base = feature_style(rstyle, "piles").get("color", "green")
+    for i, p in enumerate(rows):
+        p1, p2 = _xy(p, "x1", "y1"), _xy(p, "x2", "y2")
+        if p1 is None or p2 is None:
+            continue
+        xs, ys = [p1[0], p2[0]], [p1[1], p2[1]]
+        if i == selected:
+            ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW + 1.0,
+                    solid_capstyle="butt", zorder=20)
+            cap, tip = (p1, p2) if p1[1] >= p2[1] else (p2, p1)  # cap = upper end
+            ax.plot([cap[0]], [cap[1]], marker="s", markersize=9, color=_PREVIEW_EMPH,
+                    markeredgecolor="white", markeredgewidth=1.2, zorder=21)
+            ax.plot([tip[0]], [tip[1]], marker="v", markersize=10, color=_PREVIEW_EMPH,
+                    markeredgecolor="white", markeredgewidth=1.2, zorder=21)
+        else:
+            ax.plot(xs, ys, color=base, linewidth=3.0, alpha=_PREVIEW_DIM_ALPHA,
+                    solid_capstyle="butt", zorder=6)
+    _finish_preview_axes(ax)
+
+
+def _draw_line_loads_preview(ax, rows, selected, slope_data, style):
+    """Preview for the line-loads editor: each pending load as an arrow pointing IN
+    the force direction, its head on the point of application (mirrors plot_line_loads
+    exactly, but with the selected load emphasized and the others dimmed). Arrow-tail
+    length is 6% of the model span, so the glyph and its label stay in view."""
+    import numpy as np
+    from xslope.style import resolve_style
+    rstyle = resolve_style(style)
+    # Trial surfaces don't inform load placement (and a far circle center can inflate
+    # the frame), so the section + other overlays are context enough here.
+    _draw_section_context(ax, slope_data, rstyle, skip={"line_loads", "circles", "non_circ"})
+    gs = slope_data.get("ground_surface")
+    if gs is not None and not getattr(gs, "is_empty", False):
+        xs = [p[0] for p in gs.coords]
+        span = max(xs) - min(xs)
+    else:
+        span = 100.0
+    alen = 0.06 * span
+    for i, ll in enumerate(rows):
+        pt = _xy(ll, "x", "y")
+        if pt is None:
+            continue
+        try:
+            ang = np.radians(float(ll.get("angle", -90.0) or 0))
+            P = float(ll.get("P", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        x, y = pt
+        tx, ty = x - np.cos(ang) * alen, y - np.sin(ang) * alen
+        emph = (i == selected)
+        color = _PREVIEW_EMPH if emph else "purple"
+        lw = _PREVIEW_EMPH_LW if emph else 2.0
+        alpha = 1.0 if emph else _PREVIEW_DIM_ALPHA
+        ax.annotate("", xy=(x, y), xytext=(tx, ty), annotation_clip=False,
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=lw, alpha=alpha))
+        ax.plot([tx], [ty], linestyle="None")   # keep the arrow (+ label) framed
+        label = str(ll.get("label") or "L")
+        ax.annotate(f"{label}={P:.0f}", (tx, ty), textcoords="offset points",
+                    xytext=(4, 4), fontsize=8, color=color, alpha=alpha,
+                    fontweight="bold" if emph else "normal")
+    _finish_preview_axes(ax)
+
+
+_NCPT_MARKER = {"Fixed": "s", "Horiz": "D", "Free": "o"}   # per movement type
+
+
+def _draw_noncirc_preview(ax, rows, selected, slope_data, style):
+    """Preview for the non-circular editor: the pending polyline (all rows) drawn bold
+    over the section, each vertex marked with a per-movement glyph — □ Fixed, ◇
+    Horiz-only, ○ Free — and the selected vertex enlarged and filled. Horiz vertices
+    also carry a small ↔ direction glyph. Points are ordered left→right as entered."""
+    import numpy as np
+    from xslope.style import resolve_style
+    rstyle = resolve_style(style)
+    _draw_section_context(ax, slope_data, rstyle, skip={"non_circ", "circles"})
+    pts = []
+    for r in rows:
+        pt = _xy(r, "X", "Y")
+        if pt is not None:
+            pts.append((pt[0], pt[1], str(r.get("Movement", "Free"))))
+    if len(pts) >= 2:
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=_PREVIEW_EMPH,
+                linewidth=_PREVIEW_EMPH_LW, zorder=18)
+    xs = [p[0] for p in pts]
+    glyph = ((max(xs) - min(xs)) * 0.035) if len(xs) >= 2 and max(xs) > min(xs) else 1.0
+    for i, (x, y, mv) in enumerate(pts):
+        emph = (i == selected)
+        # Horiz vertices carry a ↔ direction glyph UNDER the marker, so an open
+        # (non-selected) marker shows it through and the caption legend explains it.
+        if mv == "Horiz":
+            ax.annotate("", xy=(x + glyph, y), xytext=(x - glyph, y), zorder=19,
+                        annotation_clip=False,
+                        arrowprops=dict(arrowstyle="<->", color=_PREVIEW_EMPH, lw=1.5))
+        ax.plot([x], [y], marker=_NCPT_MARKER.get(mv, "o"),
+                markersize=11 if emph else 7, color=_PREVIEW_EMPH,
+                markerfacecolor=_PREVIEW_EMPH if emph else "white",
+                markeredgecolor=_PREVIEW_EMPH, markeredgewidth=1.6, zorder=20)
+    _finish_preview_axes(ax)
+
+
+def _draw_dload_block(ax, block, color, gamma_w, emph):
+    """Draw one distributed-load block: its surface polyline, the load-profile line
+    (surface offset perpendicular by Normal/γ_w, i.e. the equivalent water depth) and
+    downward pressure arrows sampled along it. Emphasized blocks use the emphasis
+    color, full opacity and a heavier weight; the rest dim to context. Raises nothing
+    the caller doesn't guard — a half-typed point skips the whole block."""
+    import numpy as np
+    pts = []
+    for p in block:
+        try:
+            pts.append((float(p["X"]), float(p["Y"]), float(p["Normal"])))
+        except (TypeError, ValueError, KeyError):
+            return
+    if len(pts) < 2 or gamma_w <= 0:
+        return
+    ec = _PREVIEW_EMPH if emph else color
+    lw = _PREVIEW_EMPH_LW if emph else 1.6
+    alpha = 0.95 if emph else _PREVIEW_DIM_ALPHA
+    z = 20 if emph else 6
+    xs = [p[0] for p in pts]
+    ax.plot(xs, [p[1] for p in pts], color=ec, linewidth=lw, alpha=alpha, zorder=z)
+    total_dx = max(xs) - min(xs)
+    step = (total_dx / 14) if total_dx > 0 else 1.0   # ~14 arrows across the block
+    top_xs, top_ys = [], []
+    for i in range(len(pts) - 1):
+        x1, y1, n1 = pts[i]
+        x2, y2, n2 = pts[i + 1]
+        dx, dy = x2 - x1, y2 - y1
+        seg = np.hypot(dx, dy)
+        if seg == 0:
+            continue
+        perp_x, perp_y = -dy / seg, dx / seg   # rotate segment dir +90° (away from soil)
+        n = max(1, int(round(abs(dx) / step))) if step else 1
+        for t in np.linspace(0, 1, n + 1):
+            x, y = x1 + t * dx, y1 + t * dy
+            h = (n1 + t * (n2 - n1)) / gamma_w
+            ax_, ay_ = x + perp_x * h, y + perp_y * h
+            top_xs.append(ax_)
+            top_ys.append(ay_)
+            if h > 1e-6:
+                ax.annotate("", xy=(x, y), xytext=(ax_, ay_), annotation_clip=False,
+                            arrowprops=dict(arrowstyle="-|>", color=ec, alpha=alpha,
+                                            lw=lw * 0.6, shrinkA=0, shrinkB=0))
+    if top_xs:
+        ax.plot(top_xs, top_ys, color=ec, linewidth=lw, alpha=alpha, zorder=z)
+
+
+def _draw_dloads_preview(ax, set1_blocks, set2_blocks, active_set, selected_block,
+                         slope_data, style):
+    """Preview for the distributed-loads editor: both sets on the section (set 1 and
+    set 2 in their distinct feature colors, so a rapid-drawdown pair reads apart), the
+    selected block of the ACTIVE tab emphasized and everything else dimmed. Follows the
+    active set tab and the selected load within it."""
+    from xslope.style import resolve_style, feature_style
+    rstyle = resolve_style(style)
+    _draw_section_context(ax, slope_data, rstyle, skip={"dloads", "circles", "non_circ"})
+    gamma_w = slope_data.get("gamma_water") or 62.4
+    c1 = feature_style(rstyle, "dloads").get("color", "purple")
+    c2 = feature_style(rstyle, "dloads2").get("color", "orange")
+    for si, (blocks, color) in enumerate(((set1_blocks, c1), (set2_blocks, c2))):
+        for bi, block in enumerate(blocks or []):
+            emph = (si == active_set and bi == selected_block)
+            try:
+                _draw_dload_block(ax, block, color, gamma_w, emph)
+            except Exception:
+                pass
+    _finish_preview_axes(ax)
+
+
+def _draw_piezo_preview(ax, rows_per_tab, active_tab, slope_data, style):
+    """Preview for the piezometric-lines editor: BOTH piezo lines on the section, the
+    one whose tab is active bold (emphasis color) with vertex markers, the other in
+    its own color, thin and dimmed. Line 2 is the rapid-drawdown / second table."""
+    from xslope.style import resolve_style, feature_style
+    rstyle = resolve_style(style)
+    _draw_section_context(ax, slope_data, rstyle, skip={"piezo", "circles", "non_circ"})
+    colors = [feature_style(rstyle, "piezo_line").get("color", "b"),
+              feature_style(rstyle, "piezo_line2").get("color", "skyblue")]
+    for ti, rows in enumerate(rows_per_tab):
+        pts = [p for p in (_xy(r, "x", "y") for r in rows) if p is not None]
+        if not pts:
+            continue
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        if ti == active_tab:
+            ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
+                    marker="o", markersize=5, markerfacecolor=_PREVIEW_EMPH,
+                    markeredgecolor="white", zorder=20)
+        else:
+            ax.plot(xs, ys, color=colors[ti] if ti < len(colors) else "gray",
+                    linewidth=1.6, marker="o", markersize=3,
+                    alpha=_PREVIEW_DIM_ALPHA, zorder=6)
+    _finish_preview_axes(ax)
+
+
 class TableEditorDialog(QDialog):
     """Editable table over a list of dict records.
 
@@ -611,12 +869,20 @@ class TableEditorDialog(QDialog):
 
 
 class TabbedTableEditorDialog(QDialog):
-    """A tabbed dialog, one editable table per tab (e.g. the two piezo lines)."""
+    """A tabbed dialog, one editable table per tab (e.g. the two piezo lines).
 
-    def __init__(self, title, tabs, parent=None, help_text=None):
+    ``preview_draw`` (a hook ``draw(ax, rows_per_tab, active_tab)`` where
+    ``rows_per_tab`` is each tab's live rows) attaches a live preview pane on the
+    right behind a splitter; the highlight follows the ACTIVE tab. Each tab's table
+    drives the preview via its ``on_change`` hook, and a tab switch reschedules it."""
+
+    def __init__(self, title, tabs, parent=None, help_text=None,
+                 preview_draw=None, preview_caption=None):
         # tabs: list of (tab_title, fields, rows, new_row)
         super().__init__(parent)
         self.setWindowTitle(title)
+        self._preview_draw = preview_draw
+        self._preview = None
         max_cols = max(len(fields) for _, fields, _, _ in tabs)
         self.resize(min(1200, 200 + 110 * max_cols), 480)
         layout = QVBoxLayout(self)
@@ -624,12 +890,36 @@ class TabbedTableEditorDialog(QDialog):
             layout.addWidget(_help_label(help_text))
         self._tabs = QTabWidget()
         self._editables = []
+        on_change = self._schedule_preview if preview_draw is not None else None
         for tab_title, fields, rows, new_row in tabs:
-            et = _EditableTable(fields, rows, new_row)
+            et = _EditableTable(fields, rows, new_row, on_change=on_change)
             self._tabs.addTab(et, tab_title)
             self._editables.append(et)
-        layout.addWidget(self._tabs)
+        if preview_draw is not None:
+            from .canvas import PreviewPane
+            self._tabs.currentChanged.connect(self._schedule_preview)
+            self._preview = PreviewPane(
+                lambda ax: self._preview_draw(
+                    ax, [et.result_rows() for et in self._editables],
+                    self._tabs.currentIndex()),
+                caption=preview_caption)
+            split = QSplitter(Qt.Horizontal)
+            split.addWidget(self._tabs)
+            split.addWidget(self._preview)
+            split.setStretchFactor(0, 1)
+            split.setStretchFactor(1, 1)
+            split.setSizes([560, 500])
+            layout.addWidget(split, 1)
+            self.resize(min(1280, 620 + 110 * max_cols), 520)
+        else:
+            layout.addWidget(self._tabs)
         _ok_cancel(self, layout)
+        if self._preview is not None:
+            self._preview.refresh_now()
+
+    def _schedule_preview(self, *_):
+        if self._preview is not None:
+            self._preview.schedule()
 
     def result_rows(self, index):
         return self._editables[index].result_rows()
@@ -640,11 +930,15 @@ class _BlockListWidget(QWidget):
     rows: a list of blocks (left) + the selected block's row table (right).
     Used for distributed loads (and reusable for other block-structured inputs)."""
 
-    def __init__(self, blocks, fields, new_row, block_label="Load", parent=None):
+    def __init__(self, blocks, fields, new_row, block_label="Load", parent=None,
+                 on_change=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
         self._block_label = block_label
+        # Optional live-edit hook (used by the dloads preview): fires on any point
+        # edit (via the inner table), block add/remove, or block selection change.
+        self._on_change = on_change
         self._blocks = [[dict(r) for r in blk] for blk in (blocks or [])]
         self._cur = -1
         self.table = None
@@ -688,19 +982,26 @@ class _BlockListWidget(QWidget):
             self.table = None
         if not (0 <= idx < len(self._blocks)):
             return
-        self.table = _EditableTable(self._fields, self._blocks[idx], self._new_row)
+        self.table = _EditableTable(self._fields, self._blocks[idx], self._new_row,
+                                    on_change=self._notify)
         self._holder.addWidget(self.table)
+
+    def _notify(self):
+        if self._on_change is not None:
+            self._on_change()
 
     def _on_select(self, idx):
         self._commit_current()
         self._cur = idx
         self._load(idx)
+        self._notify()
 
     def _add_block(self):
         self._commit_current()
         self._blocks.append([])
         self._refresh_list()
         self.list.setCurrentRow(len(self._blocks) - 1)
+        self._notify()
 
     def _remove_block(self):
         idx = self.list.currentRow()
@@ -713,6 +1014,19 @@ class _BlockListWidget(QWidget):
             self.list.setCurrentRow(min(idx, len(self._blocks) - 1))
         else:
             self._load(-1)
+        self._notify()
+
+    def selected_block(self):
+        """Index of the currently selected block, or -1 if none."""
+        return self.list.currentRow()
+
+    def pending_blocks(self):
+        """A snapshot of all blocks with the in-progress table's LIVE rows folded in,
+        without mutating internal state — the preview's view of the current edit."""
+        out = [list(b) for b in self._blocks]
+        if 0 <= self._cur < len(out) and self.table is not None:
+            out[self._cur] = self.table.result_rows()
+        return out
 
     def result_blocks(self):
         self._commit_current()
@@ -1599,9 +1913,17 @@ class NonCircEditor(CategoryEditor):
               Field("Movement", "Movement", "choice", choices=["Free", "Horiz", "Fixed"])]
 
     def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows, selected):
+            _draw_noncirc_preview(ax, rows, selected, slope_data, style)
+
         return TableEditorDialog(
             "Non-circular surface", self.FIELDS, slope_data.get("non_circ", []), _new_ncpt, parent,
-            help_text="Points ordered left→right. Entry/exit points use Movement='Free'.")
+            help_text="Points ordered left→right. Entry/exit points use Movement='Free'.",
+            preview_draw=preview,
+            preview_caption="Preview shows the non-circular surface on the section "
+                            "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed).")
 
     def apply(self, slope_data, dlg):
         slope_data["non_circ"] = dlg.result_rows()
@@ -1619,13 +1941,21 @@ class PiezoEditor(CategoryEditor):
         return [{"x": x, "y": y} for (x, y) in (slope_data.get(key) or [])]
 
     def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows_per_tab, active_tab):
+            _draw_piezo_preview(ax, rows_per_tab, active_tab, slope_data, style)
+
         return TabbedTableEditorDialog(
             "Piezometric lines",
             [("Line 1", self.FIELDS, self._rows(slope_data, "piezo_line"), _new_pt),
              ("Line 2 (rapid drawdown)", self.FIELDS, self._rows(slope_data, "piezo_line2"), _new_pt)],
             parent,
             help_text="Points ordered left→right. Line 2 is only used for rapid-drawdown "
-                      "analysis (the drawdown / second water table).")
+                      "analysis (the drawdown / second water table).",
+            preview_draw=preview,
+            preview_caption="Preview shows both piezometric lines on the section (the "
+                            "active tab's line bold with its points; the other dimmed).")
 
     def apply(self, slope_data, dlg):
         slope_data["piezo_line"] = [(r["x"], r["y"]) for r in dlg.result_rows(0)]
@@ -1663,19 +1993,50 @@ class DloadsEditor(CategoryEditor):
         dlg = QDialog(parent)
         dlg.setWindowTitle("Distributed loads")
         dlg.resize(640, 520)
+        dlg._preview = None            # so the on_change closure is safe pre-build
+        style = _doc_style(parent)
         layout = QVBoxLayout(dlg)
         layout.addWidget(_help_label(
             "Each load is a left→right series of points (≥2). Select a load to edit its "
             "points. Set 2 is the second rapid-drawdown stage."))
+
+        def schedule():
+            if dlg._preview is not None:
+                dlg._preview.schedule()
+
         tabs = QTabWidget()
-        w1 = _BlockListWidget(slope_data.get("dloads"), DLOAD_FIELDS, _new_dload_pt, "Load")
-        w2 = _BlockListWidget(slope_data.get("dloads2"), DLOAD_FIELDS, _new_dload_pt, "Load")
+        w1 = _BlockListWidget(slope_data.get("dloads"), DLOAD_FIELDS, _new_dload_pt,
+                              "Load", on_change=schedule)
+        w2 = _BlockListWidget(slope_data.get("dloads2"), DLOAD_FIELDS, _new_dload_pt,
+                              "Load", on_change=schedule)
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
-        layout.addWidget(tabs)
+        tabs.currentChanged.connect(lambda *_: schedule())
+
+        def preview(ax):
+            active = tabs.currentIndex()
+            w = (w1, w2)[active] if active in (0, 1) else w1
+            _draw_dloads_preview(ax, w1.pending_blocks(), w2.pending_blocks(),
+                                 active, w.selected_block(), slope_data, style)
+
+        from .canvas import PreviewPane
+        dlg._preview = PreviewPane(
+            preview,
+            caption="Preview shows both load sets on the section (set 1 / set 2 in "
+                    "their own colors; the active tab's selected load emphasized, the "
+                    "rest dimmed).")
+        split = QSplitter(Qt.Horizontal)
+        split.addWidget(tabs)
+        split.addWidget(dlg._preview)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 1)
+        split.setSizes([560, 500])
+        layout.addWidget(split, 1)
         _ok_cancel(dlg, layout)
         dlg._sets = (w1, w2)
         _apply_set_selection((w1, w2), tabs, select)
+        dlg.resize(1160, 560)
+        dlg._preview.refresh_now()
         return dlg
 
     def apply(self, slope_data, dlg):
@@ -1925,13 +2286,21 @@ class PilesEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows, selected):
+            _draw_piles_preview(ax, rows, selected, slope_data, style)
+
         return TableEditorDialog(
             "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile, parent,
             help_text="Leave H blank for auto Ito & Matsui force. I / Area auto-compute "
                       "from D when blank. θ is auto-derived from the pile axis. Vcap/Mcap "
                       "require S (spacing). Appl: active = allowable force; passive = "
                       "ultimate capacity ÷ FS.",
-            usage_toggles=["lem", "fem"])
+            usage_toggles=["lem", "fem"],
+            preview_draw=preview,
+            preview_caption="Preview shows the piles on the section (selected pile bold "
+                            "with □ cap and ▽ tip markers; others dimmed).")
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -2309,6 +2678,11 @@ class ReinforcementEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows, selected):
+            _draw_reinforcement_preview(ax, rows, selected, slope_data, style)
+
         return TableEditorDialog(
             "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
             _new_reinf, parent,
@@ -2317,7 +2691,11 @@ class ReinforcementEditor(CategoryEditor):
                       "Type defaults Dir/Appl when blank; leave Type blank for a generic "
                       "tensile line. Tend1/Tend2 are the end-anchorage capacities; capacities "
                       "and E/Area are per-unit-width (Spacing divides discrete supports).",
-            usage_toggles=["lem", "fem"])
+            usage_toggles=["lem", "fem"],
+            preview_draw=preview,
+            preview_caption="Preview shows the reinforcement lines on the section "
+                            "(selected line bold with its endpoints; others dimmed; the "
+                            "trial surface, if any, is drawn for crossing context).")
 
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines
@@ -2347,6 +2725,11 @@ class LineLoadsEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows, selected):
+            _draw_line_loads_preview(ax, rows, selected, slope_data, style)
+
         return TableEditorDialog(
             "Line loads", self.FIELDS, slope_data.get("line_loads", []),
             _new_lload, parent,
@@ -2355,7 +2738,11 @@ class LineLoadsEditor(CategoryEditor):
                       "plate. P is the magnitude (positive); Angle is the direction "
                       "in degrees (−90 = straight down). Each load is snapped onto "
                       "the ground surface on save, since the loader requires line "
-                      "loads to act on the surface.")
+                      "loads to act on the surface.",
+            preview_draw=preview,
+            preview_caption="Preview shows the line loads on the section (selected "
+                            "load's arrow emphasized; others dimmed). The arrow points "
+                            "in the force direction, head on the point of application.")
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()

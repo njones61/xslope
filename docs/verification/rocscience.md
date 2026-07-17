@@ -172,6 +172,7 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
 <!-- test: file=../files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
 <!-- test: file=../files/rocscience/vp021b.xlsx, type=single_circle, num_slices=60, fs_oms=1.606, fs_bishop=1.759, fs_spencer=1.757, fs_mprice=1.756, benchmark=VP21-ru -->
+<!-- test: file=../files/rocscience/vp021c.xlsx, type=single_circle, num_slices=60, fs_oms=1.693, fs_bishop=1.829, fs_spencer=1.827, fs_mprice=1.826, benchmark=VP21-wt -->
 <!-- test: file=../files/rocscience/vp022a.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.297, fs_bishop=1.380, fs_spencer=1.379, fs_mprice=1.370, benchmark=VP22-dry -->
 <!-- test: file=../files/rocscience/vp022b.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.037, fs_bishop=1.121, fs_spencer=1.122, fs_mprice=1.112, benchmark=VP22-ru -->
 
@@ -197,7 +198,7 @@ corpus is complete relative to what is independently verifiable.
 | [18](#vp18) | Slope, homogenous slope, ru pore pressure | **built** | [vp018.xlsx](../files/rocscience/vp018.xlsx). Spencer (1969)/Baker (1980) slope, ru=0.5, non-circular search (right-facing). Spencer 1.033 / M-P 1.024 vs Slide 1.010 (random search + Monte-Carlo optimization), Baker 1.02, Spencer (1969) 1.08. |
 | [19](#vp19) | Slope, (4) materials | **built** | [vp019.xlsx](../files/rocscience/vp019.xlsx). Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope; circular search, with a documented non-circular search-power gap. Also [SLOPE/W §2.13](geostudio.md) — same problem in the GeoStudio corpus. |
 | [20](#vp20) | Slope, (4) materials, weak layer, water table | **built** | [vp020.xlsx](../files/rocscience/vp020.xlsx). Greco (1996) ex. 5 / Chen & Shao (1988): a 0.5 m weak seam along the inclined base (polygon zones) with a water table; same search-power gap as #19. Also [SLOPE/W §2.14](geostudio.md) — same problem in the GeoStudio corpus. |
-| [21](#vp21) | Slope, homogenous, ru pore pressure | partial | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry) / [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub>=0.25). Fredlund & Krahn (1977) classic homogeneous slope, fixed circle (120, 90, R=80), imperial units. Case 3 (water table) pending the phreatic-line coordinates. |
+| [21](#vp21) | Slope, homogenous, ru pore pressure | **built** | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry) / [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub>=0.25) / [vp021c.xlsx](../files/rocscience/vp021c.xlsx) (water table). Fredlund & Krahn (1977) classic homogeneous slope, fixed circle (120, 90, R=80), imperial units. All three F&K pore-pressure cases; the case-3 phreatic line (0,40)-(140,20)-(180,20) is read from the vendor Slide2 model. |
 | [22](#vp22) | Slope, (2) materials, weak layer, ru pore pressure | **built** | [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry) / [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub>=0.25). The Fredlund & Krahn (1977) slope of [#21](#vp21) with a weak seam — the corpus's first composite-surface problem (F&K's circle truncates on the base and runs along the seam). |
 | [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
 | [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
@@ -631,11 +632,13 @@ Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a 0.5 m wea
 
 Slide #21: Fredlund & Krahn (1977)'s classic homogeneous slope — the reference
 problem that [VP22](#vp22) extends with a weak seam. A single fixed circle,
-center (120, 90), R = 80, in imperial units, solved dry and at r<sub>u</sub> = 0.25.
-F&K published all four method values for both cases.
+center (120, 90), R = 80, in imperial units, solved for all three of F&K's
+pore-pressure cases: dry, r<sub>u</sub> = 0.25, and a piezometric water table.
+F&K published all four method values for every case.
 
 **Input files:** [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry),
-[vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub> = 0.25)
+[vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub> = 0.25),
+[vp021c.xlsx](../files/rocscience/vp021c.xlsx) (water table)
 
 | Method | XSLOPE (dry) | Published (dry) | XSLOPE (r<sub>u</sub>) | Published (r<sub>u</sub>) |
 |---|---|---|---|---|
@@ -644,12 +647,27 @@ F&K published all four method values for both cases.
 | Spencer | 2.071 | F&K 2.073 | 1.757 | F&K 1.761 |
 | Morgenstern–Price | 2.071 | F&K 2.076 | 1.756 | F&K 1.764 |
 
-*XSLOPE reproduces Fredlund & Krahn's own Ordinary-method r<sub>u</sub> value
-(1.606 vs 1.607) exactly, where Slide reads 1.687. Case 3 (water table) is pending
-the phreatic-line coordinates.*
+Case 3 adds F&K's piezometric line, read from the Slide2 model itself — the
+vendor RS2 "Slide2 Import" of Slide #21 carries it verbatim in its `piezos`
+block. The line enters the crest face at el. 40, descends to meet the ground at
+the slope toe (140, 20) and runs along the toe bench: coordinates
+(0, 40) — (140, 20) — (180, 20).
+
+| Method | XSLOPE (water table) | F&K | Slide |
+|---|---|---|---|
+| Ordinary | 1.693 | 1.693 | 1.716 |
+| Bishop | 1.829 | 1.834 | 1.833 |
+| Spencer | 1.827 | 1.830 | 1.831 |
+| Morgenstern–Price | 1.826 | 1.832 | 1.831 |
+
+*XSLOPE reproduces Fredlund & Krahn's own Ordinary-method value exactly in both
+the r<sub>u</sub> case (1.606 vs 1.607) and the water-table case (1.693 vs 1.693),
+where Slide reads 1.687 and 1.716; the rigorous methods agree with both F&K and
+Slide to within 0.006.*
 
 ![vp021a: inputs and representative solution](images/vp021a.png)
 ![vp021b: inputs and representative solution](images/vp021b.png)
+![vp021c: inputs and representative solution](images/vp021c.png)
 
 ### VP22: Slope, (2) materials, weak layer, composite surface {#vp22}
 

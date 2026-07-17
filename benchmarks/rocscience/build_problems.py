@@ -296,6 +296,22 @@ def vp021b():
     return 'vp021b.xlsx'
 
 
+def vp021c():
+    """Slide #21 case 3 (water table). F&K: OMS 1.693, Bishop 1.834, Spencer
+    1.830, M-P 1.832; Slide: 1.716 / 1.833 / 1.831 / 1.831 (Slide2 manual
+    Table 21.2). The phreatic line is read from the vendor Slide2 model
+    (RS2 "Slide2 Import" of Slide #21, file "slope stability #021-3.fez",
+    piezos block): (0, 40) - (140, 20) - (180, 20), i.e. it enters the crest
+    face at el. 40, descends to meet the ground at the slope toe (140, 20) and
+    runs along the toe bench. Exercises the template piezometric-surface
+    option on the F&K homogeneous slope."""
+    sd = _fk_slope_data()
+    sd['materials'][0].update(u='piezo')
+    sd['piezo_line'] = [(0.0, 40.0), (140.0, 20.0), (180.0, 20.0)]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp021c.xlsx'))
+    return 'vp021c.xlsx'
+
+
 def _fk_weak_slope_data():
     """Fredlund & Krahn (1977) slope with the weak layer (Slide #22): the same
     ground as #21, (0,60)-(60,60)-(140,20)-(180,20), but with a 1-ft weak seam
@@ -4178,7 +4194,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

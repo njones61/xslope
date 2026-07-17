@@ -508,6 +508,25 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             need = max(need, _runs_width(runs, fs_px) + 2 * pad)
         col_px[c] = int(need)
 
+    # A merged header whose (centered) text is wider than its span is clipped at the
+    # merge boundary; grow the span's columns so it fits — the multi-column analogue
+    # of the single-column autofit above (e.g. "Piezometric Line #1" over A:B).
+    for (ar, ac), (mnr, mnc, mxr, mxc) in merged_anchor.items():
+        if mxc <= mnc or ar < r0 or ar > r1:
+            continue
+        cols_in = [c for c in range(mnc, mxc + 1) if c in col_px]
+        if len(cols_in) < 2:
+            continue
+        val = value_at(ar, ac)
+        if val in (None, ""):
+            continue
+        need = _runs_width(_cell_runs(ws.cell(row=ar, column=ac), val, theme), fs_px) + 2 * pad
+        have = sum(col_px[c] for c in cols_in)
+        if need > have:
+            per = (need - have) // len(cols_in) + 1
+            for c in cols_in:
+                col_px[c] += per
+
     row_px = {r: row_height_px(ws, r, default_rh) * SS for r in row_list}
 
     # ----- canvas layout --------------------------------------------------- #
@@ -766,20 +785,29 @@ def render_via_libreoffice(xlsx_path, sheet, out_path):
 
 
 def _patch_active_tab(src, dst, idx):
-    """Copy the xlsx and set the workbook activeTab / per-sheet tabSelected at the
-    XML level so LibreOffice renders sheet `idx` — without an openpyxl re-save,
-    which would drop the chart drawing."""
+    """Copy the xlsx and make sheet `idx` the FIRST sheet, at the zip/XML level —
+    without an openpyxl re-save, which would drop the chart drawing. LibreOffice's
+    image export always rasterises the first sheet regardless of activeTab /
+    tabSelected, so reordering the ``<sheet>`` list in workbook.xml (which only
+    changes tab order, not the chart's worksheet relationships) is what actually
+    selects it."""
     with zipfile.ZipFile(src) as zin:
         names = zin.namelist()
         data = {n: zin.read(n) for n in names}
+
     wbxml = data["xl/workbook.xml"].decode("utf-8")
+    m = re.search(r"(<sheets>)(.*?)(</sheets>)", wbxml, re.S)
+    if m:
+        sheet_elems = re.findall(r"<sheet\b[^>]*/>", m.group(2))
+        if 0 <= idx < len(sheet_elems):
+            reordered = [sheet_elems[idx]] + sheet_elems[:idx] + sheet_elems[idx + 1:]
+            wbxml = wbxml[:m.start(2)] + "".join(reordered) + wbxml[m.end(2):]
+    # point activeTab at the (now first) target sheet
     if "<workbookView" in wbxml:
-        wbxml = re.sub(r'activeTab="\d+"', "", wbxml)
-        wbxml = wbxml.replace("<workbookView", '<workbookView activeTab="%d"' % idx, 1)
-    else:
-        wbxml = re.sub(r"(<bookViews>)",
-                       r'\1<workbookView activeTab="%d"/>' % idx, wbxml, count=1)
+        wbxml = re.sub(r'\s*activeTab="\d+"', "", wbxml)
+        wbxml = wbxml.replace("<workbookView", '<workbookView activeTab="0"', 1)
     data["xl/workbook.xml"] = wbxml.encode("utf-8")
+
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for n in names:
             zout.writestr(n, data[n])

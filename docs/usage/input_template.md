@@ -59,11 +59,9 @@ The following sections describe each worksheet in detail, including the data str
 
 ![sheet_main.png](images/sheet_main.png)
 
-**⚠ FIGURE NEEDS UPDATE: screenshot shows template version 11; current version is 14.**
-
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **14**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates.
+- **Template version**: Tracks template format for compatibility. The current version is **15**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates.
 - **Unit weight of water** (γw): Used in pore pressure calculations
 - **Tension crack parameters**: Depth and water level within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh): Horizontal seismic acceleration coefficient for pseudo-static earthquake analysis
@@ -105,9 +103,9 @@ the horizontal scale.
 
 ![sheet_mat1.png](images/sheet_mat1.png)
 
-**⚠ FIGURE NEEDS UPDATE: new γ_sat, pow_a–pow_d, r_u and hb_sci–hb_d columns; new blank spacer row above the table (headers moved down one row); new `pow`, `hb` and `ru` legend entries.**
-
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
+
+The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left: the **strength** columns (above), the **variability** columns for reliability analysis, and the **seepage** and **stiffness** columns (both further below). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -198,7 +196,9 @@ This happens automatically and iteratively — see [Hoek-Brown strength](../lem/
 
 ![sheet_mat2.png](images/sheet_mat2.png)
 
-**⚠ FIGURE NEEDS UPDATE: seepage/stiffness columns shifted right by the new strength columns; headers moved down one row; the van Genuchten `vg_a`/`vg_n` columns are now the law-agnostic `a`/`n` pair shared with the new `gard` option.**
+The remaining columns hold the seepage and stiffness properties, shown in the third view below.
+
+![sheet_mat3.png](images/sheet_mat3.png)
 
 **Permeability** (for seepage analysis):
 
@@ -288,6 +288,8 @@ each polygon you provide:
   the profile sheet, the material name in row 6 is filled in automatically by looking up the material
   ID in the materials table.
 - The polygon **vertices** as XY coordinates starting in row 8, one vertex per row.
+
+![sheet_polygon.png](images/sheet_polygon.png)
 
 A few rules govern how the vertices are interpreted:
 
@@ -443,7 +445,9 @@ described in more detail in the [Automated Search Algorithms](../lem/search.md) 
 
 The **dloads** and **dloads (2)** worksheets define distributed surface loads applied to the slope. These represent surcharge loads 
 such as traffic, buildings, stockpiled materials, or other surface loading. They are also used with submerged slopes 
-to represent the force of the water on the slope. During limit equilibrium analysis, distributed loads are applied to the top of each slice, which affects either or both of the driving and resisting forces depending on the slope angle and load orientation. The **dloads** sheet defines loads used in a normal slope stability analysis or the first stage of a rapid drawdown analysis. The **dloads (2)** sheet defines loads used in the second stage of a rapid drawdown analysis.
+to represent the force of the water on the slope. During limit equilibrium analysis, distributed loads are applied to the top of each slice, which affects either or both of the driving and resisting forces depending on the slope angle and load orientation. The **dloads** sheet defines loads used in a normal slope stability analysis or the first stage of a rapid drawdown analysis. The **dloads (2)** sheet defines loads used in the second stage of a rapid drawdown analysis, and has the same layout:
+
+![sheet_dloads2.png](images/sheet_dloads2.png)
 
 Each worksheet is formatted for 6 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, but additional rows can be added below the end of table if necessary.
 
@@ -468,8 +472,6 @@ defined by two points with a normal force for each.
 ## Worksheet: reinforce
 
 ![sheet_reinforce.png](images/sheet_reinforce.png)
-
-**⚠ FIGURE NEEDS UPDATE (v12): new Label column; new Type/Dir/Appl (green), Tend1/Tend2/Spacing (red) columns; columns regrouped by analysis type; legend text box and color key added.**
 
 The **reinforce** worksheet defines soil reinforcement elements such as soil nails, rock anchors, geosynthetic 
 reinforcement, or tiebacks. These elements provide additional resistance to sliding by mobilizing tensile forces 
@@ -540,8 +542,6 @@ How the force is then *used* differs by analysis:
 
 ![sheet_piles.png](images/sheet_piles.png)
 
-**⚠ FIGURE NEEDS UPDATE (v12): new Appl column (green); columns regrouped by analysis type (H, θp, Appl | D, S, Vcap, Mcap | E, I, Area, Fixity); legend text box updated.**
-
 The **piles** worksheet defines pile and concrete pier support elements that provide lateral resistance to slope movement. Unlike flexible reinforcement (soil nails, geogrids) which resists movement through tension along the reinforcement axis, piles are rigid structural elements that resist soil movement through lateral shear and bending at the failure surface intersection.
 
 ![Pile Example](images/pile_example.png){width=800px}
@@ -586,7 +586,7 @@ See the [LEM Piles](../lem/piles.md) section for detailed equation derivations a
 
 ## Worksheet: lloads
 
-**⚠ FIGURE NEEDED (v12): add a screenshot of the new lloads worksheet.**
+![sheet_lloads.png](images/sheet_lloads.png)
 
 The **lloads** worksheet defines line loads — concentrated forces applied at a point on the ground surface, per
 unit width of slope. A typical use is the self-weight of a facing element, such as the shotcrete plate of a soil
@@ -609,11 +609,6 @@ at the top of the slice rather than at the failure surface).
 ---
 
 ## Worksheet: seep bc
-
-<!-- TODO(Norm): re-shoot images/sheet_seepbc.png for template v15. The current screenshot
-     still shows the v14 sheet ("Specified Head #1..#5", a "Head:" label in E3) and does not
-     show the new Head/Flux BC blocks: the head/flux type dropdown in E3/H3/K3/N3/Q3, or the
-     "BC Option:" legend in T3:U5. Same for the seep bc (2) sheet if it is shown anywhere. -->
 
 ![sheet_seepbc.png](images/sheet_seepbc.png)
 
@@ -665,7 +660,9 @@ but additional rows can be added below the end of table if necessary.
 
 For most analyses, only the main **seep bc** sheet is used. However, the **seep bc (2)** sheet is used for rapid drawdown 
 analysis where a second seepage solution is used to calculate the pore pressures corresponding to the drawdown 
-condition.
+condition. It has the same layout as the main **seep bc** sheet:
+
+![sheet_seepbc2.png](images/sheet_seepbc2.png)
 
 During seepage analysis, xslope:
 

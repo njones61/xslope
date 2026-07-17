@@ -406,3 +406,121 @@ class LemRunner(QThread):
 
     def _rapid_tag(self):
         return " (rapid drawdown)" if self._rapid else ""
+
+
+class SensitivityRunner(QThread):
+    """Runs a sensitivity / design study off the GUI thread.
+
+    A sweep is N sequential LEM solves (no multiprocessing). Progress is reported
+    per solve and the run cancels cooperatively (each engine sweep is passed a
+    ``cancel_check``; an in-flight solve finishes, then the sweep stops at the next
+    point). A thin caller of ``xslope.sensitivity``:
+
+      * design mode  -> ``design()``  -> bundle {'kind':'design', df, crossing, …}
+      * sensitivity  -> ``sensitivity()`` per parameter (full FS-vs-value curves,
+        for click-through) + ``tornado_from_sweeps()`` -> bundle
+        {'kind':'sensitivity', sweeps, tornado, method}.
+    """
+
+    succeeded = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+    progress = Signal(int, int, str)   # done, total, label
+
+    def __init__(self, slope_data, options, parent=None):
+        super().__init__(parent)
+        self._sd = slope_data
+        self._opts = options
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
+
+    def run(self):
+        from xslope.search import AnalysisCancelled
+        try:
+            if self._opts.get("mode") == "design":
+                self._run_design()
+            else:
+                self._run_sensitivity()
+        except AnalysisCancelled:
+            print("Sweep cancelled.")
+            self.cancelled.emit()
+        except Exception:
+            traceback.print_exc()   # streams to the Log pane via the stdout tee
+            self.failed.emit("Sweep failed — see the Log pane for details.")
+
+    def _run_design(self):
+        from xslope.sensitivity import design
+        o = self._opts
+        total = int(o["steps"]) + 1        # points + base
+
+        def cb(done, _t, label):
+            self.progress.emit(int(done), total, str(label))
+
+        print(f"Design sweep: {o['param']} from {o['low']:g} to {o['high']:g} in "
+              f"{o['steps']} steps, target FS = {o['target_fs']:g} "
+              f"({o['method']}{'' if o['search'] else ', no re-search'})…")
+        ok, res = design(self._sd, param=o["param"], low=o["low"], high=o["high"],
+                         steps=o["steps"], target_fs=o["target_fs"],
+                         method=o["method"], search=o["search"],
+                         num_slices=o["num_slices"], progress_callback=cb,
+                         cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(res))
+            return
+        print(res["message"])
+        self.succeeded.emit({"kind": "design", **res})
+
+    def _run_sensitivity(self):
+        import numpy as np
+        from xslope.sensitivity import sensitivity, tornado_from_sweeps
+        o = self._opts
+        specs = o["params"]
+        if not specs:
+            self.failed.emit("Add at least one parameter to sweep.")
+            return
+        n = int(o["n"])
+        method = o["method"]
+
+        def n_points(spec):
+            if spec.get("values") is not None:
+                return len(spec["values"])
+            return n
+
+        total = sum(n_points(s) + 1 for s in specs)   # +1 base per parameter
+        count = [0]
+
+        def cb(_done, _t, label):
+            count[0] += 1
+            self.progress.emit(count[0], total, str(label))
+
+        sweeps, base_fs = {}, None
+        for i, spec in enumerate(specs):
+            ref = spec["ref"]
+            if spec.get("low") is not None and spec.get("high") is not None:
+                values = list(np.linspace(spec["low"], spec["high"], n))
+                rel = 0.5
+                tag = f"±σ [{spec['low']:g}, {spec['high']:g}]"
+            else:
+                values = None
+                rel = spec.get("rel_range", 0.2)
+                tag = f"±{rel * 100:g}%"
+            print(f"[{i + 1}/{len(specs)}] Sweeping {ref} {tag} ({method})…")
+            ok, res = sensitivity(self._sd, param=ref, values=values, rel_range=rel,
+                                  n=n, methods=(method,), search=o["search"],
+                                  num_slices=o["num_slices"], progress_callback=cb,
+                                  cancel_check=self._cancel.is_set)
+            if not ok:
+                self.failed.emit(f"{ref}: {res}")
+                return
+            df = res["df"]
+            sweeps[res["param"]] = df
+            if base_fs is None:
+                b = df.loc[df["is_base"] & df["success"], "fs"]
+                base_fs = float(b.iloc[0]) if len(b) else None
+        tornado = tornado_from_sweeps(sweeps, base_fs=base_fs, method=method)
+        print(f"Sensitivity done — {len(sweeps)} parameter(s), base FS = "
+              f"{base_fs:.3f}." if base_fs is not None else "Sensitivity done.")
+        self.succeeded.emit({"kind": "sensitivity", "sweeps": sweeps,
+                             "tornado": tornado, "method": method})

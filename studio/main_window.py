@@ -30,7 +30,7 @@ from xslope.fileio import default_template_path
 from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, RunFemDialog, RunLemDialog,
-    RunSeepDialog, Slide2ImportDialog,
+    RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
 )
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
@@ -39,7 +39,7 @@ from .display_panels import (
 )
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
-from .runners import FemRunner, LemRunner, MeshWorker, SeepRunner
+from .runners import FemRunner, LemRunner, MeshWorker, SeepRunner, SensitivityRunner
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -177,6 +177,64 @@ class SolutionView(QWidget):
         self._warning.setVisible(True)
 
 
+class SweepCanvas(MplCanvas):
+    """Result canvas for sensitivity / design sweeps.
+
+    A thin MplCanvas subclass that renders the three sweep plots through the base
+    canvas's ``_draw`` — so the Save… button, zoom/pan, and the pick machinery all
+    come for free. It reuses the engine's ``plot_tornado`` / ``plot_sensitivity``
+    as-is; the design view adds the target-FS crossing annotation on top (the
+    engine plot draws the target line but not the interpolated crossing).
+    """
+
+    def render_tornado(self, result):
+        from xslope.plot import plot_tornado
+        self._draw(lambda fig: plot_tornado(result, fig=fig), dxf=False)
+
+    def render_curve(self, df, target_fs=None):
+        from xslope.plot import plot_sensitivity
+        self._draw(lambda fig: plot_sensitivity(df, target_fs=target_fs, fig=fig),
+                   dxf=False)
+
+    def render_design(self, df, target_fs, summary):
+        from xslope.plot import plot_sensitivity
+
+        def draw(fig):
+            plot_sensitivity(df, target_fs=target_fs, fig=fig)
+            self._annotate_crossing(fig, target_fs, summary)
+
+        self._draw(draw, dxf=False)
+
+    def _annotate_crossing(self, fig, target_fs, summary):
+        """Mark the interpolated FS=target crossing (or an honest miss note)."""
+        ax = self._main_axes()
+        if ax is None:
+            return
+        param = summary.get("param", "")
+        short = param.split(":")[-1] or param
+        if summary.get("bracketed") and summary.get("crossing") is not None:
+            xc = summary["crossing"]
+            ax.axvline(xc, color="#0a7d2c", linestyle="--", linewidth=1.0)
+            ax.plot([xc], [target_fs], marker="D", color="#0a7d2c", ms=9, zorder=8)
+            ax.annotate(f"{short} = {xc:.4g}\nfor FS = {target_fs:g}",
+                        xy=(xc, target_fs), xytext=(8, 14),
+                        textcoords="offset points", color="#0a7d2c", fontsize=9,
+                        fontweight="bold", zorder=9,
+                        bbox=dict(boxstyle="round,pad=0.3", fc="white",
+                                  ec="#0a7d2c", alpha=0.9))
+        else:
+            # Put the note in the empty band: just under the target line when the
+            # curve sits below the target (need a higher FS), else near the bottom.
+            fs_min = (summary.get("fs_range") or (None, None))[0]
+            below_range = fs_min is not None and target_fs < fs_min
+            y, va = (0.05, "bottom") if below_range else (0.95, "top")
+            ax.text(0.5, y, summary.get("message", "Target FS not reached."),
+                    transform=ax.transAxes, ha="center", va=va, fontsize=9,
+                    color="#7a5200", wrap=True, zorder=9,
+                    bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
+                              ec="#e0b400", alpha=0.95))
+
+
 class MainWindow(QMainWindow):
     # Emitted to hand a mesh build to the persistent mesh thread (queued).
     _mesh_requested = Signal(object, object)
@@ -210,6 +268,10 @@ class MainWindow(QMainWindow):
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
+        # Sensitivity / design study result tabs.
+        self.sens_canvas = None            # tornado
+        self.sens_curve_canvas = None      # click-through FS-vs-value curve
+        self.design_canvas = None          # design curve + target crossing
         self.seep_data_canvas = {}        # bc set -> MplCanvas
         self.seep_solution_canvas = {}    # bc set -> MplCanvas
         self.fem_data_canvas = None
@@ -223,9 +285,11 @@ class MainWindow(QMainWindow):
         self._runner = None
         self._seep_runner = None
         self._fem_runner = None
+        self._sens_runner = None
         self._mesh_busy = False
         self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
+        self._last_sens_opts = {}
         self._last_mesh_opts = {}
         self._last_seep_opts = {}
         self._last_fem_opts = {}
@@ -465,6 +529,8 @@ class MainWindow(QMainWindow):
                                 enabled=False, triggered=self.save)
         self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
         self.act_run = QAction("Run &LEM…", self, enabled=False, triggered=self.run_current)
+        self.act_sensitivity = QAction("Sensitivity / &Design…", self, enabled=False,
+                                       triggered=self.run_sensitivity)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
 
@@ -496,6 +562,7 @@ class MainWindow(QMainWindow):
         m_run.addAction(self.act_build_mesh)
         m_run.addSeparator()
         m_run.addAction(self.act_run)
+        m_run.addAction(self.act_sensitivity)
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
@@ -1118,7 +1185,11 @@ class MainWindow(QMainWindow):
                               "fem": "Run &FEM…"}.get(mode, "Run…"))
         open_ = self.doc.is_open
         busy = (self._runner is not None or self._seep_runner is not None
-                or self._fem_runner is not None or self._mesh_busy)
+                or self._fem_runner is not None or self._sens_runner is not None
+                or self._mesh_busy)
+        # Sensitivity / design is an LEM study — offered in LEM mode only.
+        self.act_sensitivity.setVisible(mode == "lem")
+        self.act_sensitivity.setEnabled(open_ and mode == "lem" and not busy)
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
             self.act_run.setToolTip("")
@@ -1314,6 +1385,7 @@ class MainWindow(QMainWindow):
         if not self.doc.is_open:
             return
         single = ["search_canvas", "solution_canvas", "reliability_canvas",
+                  "sens_canvas", "sens_curve_canvas", "design_canvas",
                   "fem_data_canvas", "fem_results_canvas"]
         if clear_mesh:
             single.append("mesh_canvas")
@@ -1336,7 +1408,8 @@ class MainWindow(QMainWindow):
             setattr(self, a, None)
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
-        for key in ("lem_solution", "seep_solutions", "fem_solution"):
+        for key in ("lem_solution", "seep_solutions", "fem_solution",
+                    "design", "sensitivity"):
             self.doc.results.pop(key, None)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
@@ -1701,7 +1774,7 @@ class MainWindow(QMainWindow):
         self._runner.start()
 
     def _cancel_run(self):
-        runner = next((r for r in (self._runner, self._fem_runner)
+        runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner)
                        if r is not None and r.isRunning()), None)
         if runner is not None:
             runner.cancel()
@@ -1828,11 +1901,150 @@ class MainWindow(QMainWindow):
             except Exception:
                 traceback.print_exc()
 
+    # --- sensitivity / design study --------------------------------------
+    def run_sensitivity(self):
+        if not self.doc.is_open or self._sens_runner is not None:
+            return
+        dlg = SensitivityDialog(self, defaults=self._last_sens_opts,
+                                slope_data=self.doc.slope_data)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self._last_sens_opts = opts
+        if opts["mode"] == "design" and not opts.get("param"):
+            QMessageBox.warning(self, "Nothing to sweep",
+                                "Pick a material and property to sweep.")
+            return
+        if opts["mode"] == "sensitivity" and not opts.get("params"):
+            QMessageBox.warning(self, "Nothing to sweep",
+                                "Add at least one parameter to the table.")
+            return
+        self.act_sensitivity.setEnabled(False)
+        self.act_run.setEnabled(False)
+        verb = "Design sweep" if opts["mode"] == "design" else "Sensitivity sweep"
+        self.statusBar().showMessage(f"{verb} — {opts['method']} …")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
+        self._sens_runner = SensitivityRunner(self.doc.slope_data, opts, parent=self)
+        self._sens_runner.succeeded.connect(self._on_sens_succeeded)
+        self._sens_runner.failed.connect(self._on_sens_failed)
+        self._sens_runner.cancelled.connect(self._on_sens_cancelled)
+        self._sens_runner.progress.connect(self._on_run_progress)
+        self._sens_runner.finished.connect(self._on_sens_finished)
+        self._sens_runner.start()
+
+    def _on_sens_succeeded(self, bundle):
+        if bundle.get("kind") == "design":
+            self.doc.results["design"] = bundle
+            self._show_design()
+            if self.design_canvas is not None:
+                self.view_tabs.setCurrentWidget(self.design_canvas)
+            if bundle.get("bracketed"):
+                self.statusBar().showMessage(
+                    f"Design — FS = {bundle['target_fs']:g} at "
+                    f"{bundle['param'].split(':')[-1]} = {bundle['crossing']:.4g}")
+            else:
+                self.statusBar().showMessage(bundle.get("message", "Design done."))
+        else:
+            self.doc.results["sensitivity"] = bundle
+            self._show_sensitivity()
+            if self.sens_canvas is not None:
+                self.view_tabs.setCurrentWidget(self.sens_canvas)
+            n = len(bundle.get("sweeps", {}))
+            self.statusBar().showMessage(
+                f"Sensitivity — {n} parameter(s); click a tornado bar for its curve.")
+
+    def _on_sens_failed(self, message):
+        QMessageBox.warning(self, "Sweep failed", message)
+        self.statusBar().showMessage("Sweep failed.")
+
+    def _on_sens_cancelled(self):
+        self.statusBar().showMessage("Sweep cancelled.")
+
+    def _on_sens_finished(self):
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.cancel_btn.setVisible(False)
+        if self._sens_runner is not None:
+            self._sens_runner.deleteLater()
+            self._sens_runner = None
+        self._update_run_actions()
+
+    def _show_design(self):
+        if self.design_canvas is None:
+            self.design_canvas = SweepCanvas(self)
+            self.view_tabs.addTab(self.design_canvas, "Design")
+            # No display-option panel: the curve/target are set at run time. The
+            # Display dock tracks the tab (shows the placeholder), like other views.
+        self._rerender_design()
+
+    def _rerender_design(self):
+        bundle = self.doc.results.get("design")
+        if bundle and self.design_canvas is not None:
+            try:
+                self.design_canvas.render_design(bundle["df"], bundle["target_fs"],
+                                                 bundle)
+            except Exception:
+                traceback.print_exc()
+
+    def _show_sensitivity(self):
+        # A fresh sweep invalidates any prior click-through curve (different data),
+        # so drop the curve tab; the user re-clicks a bar on the new tornado.
+        if self.sens_curve_canvas is not None:
+            idx = self.view_tabs.indexOf(self.sens_curve_canvas)
+            if idx >= 0:
+                self.view_tabs.removeTab(idx)
+            self.sens_curve_canvas.deleteLater()
+            self.sens_curve_canvas = None
+        if self.sens_canvas is None:
+            self.sens_canvas = SweepCanvas(self)
+            self.view_tabs.addTab(self.sens_canvas, "Sensitivity")
+            # Double-click a bar to open that parameter's FS-vs-value curve.
+            self.sens_canvas.set_pick_enabled(True)
+            self.sens_canvas._hint_label.setText(
+                "(double-click a bar to see its FS curve)")
+            self.sens_canvas.picked.connect(self._on_tornado_pick)
+        self._rerender_sensitivity()
+
+    def _rerender_sensitivity(self):
+        bundle = self.doc.results.get("sensitivity")
+        if bundle and self.sens_canvas is not None:
+            try:
+                self.sens_canvas.render_tornado(bundle["tornado"])
+            except Exception:
+                traceback.print_exc()
+
+    def _on_tornado_pick(self, x, y, _tol):
+        """Map a double-clicked tornado bar (its y row) to a parameter and show
+        that parameter's FS-vs-value curve in a companion tab."""
+        bundle = self.doc.results.get("sensitivity")
+        if not bundle or self.sens_canvas is None:
+            return
+        ax = self.sens_canvas._main_axes()
+        if ax is None:
+            return
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        k = int(round(y))
+        if not (0 <= k < len(labels)):
+            return
+        param = labels[k]
+        df = bundle["sweeps"].get(param)
+        if df is None:
+            return
+        if self.sens_curve_canvas is None:
+            self.sens_curve_canvas = SweepCanvas(self)
+            self.view_tabs.addTab(self.sens_curve_canvas, "Sensitivity · Curve")
+        self.sens_curve_canvas.render_curve(df, target_fs=bundle.get("target_fs"))
+        self.view_tabs.setCurrentWidget(self.sens_curve_canvas)
+
     def _clear_result_tabs(self):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
         single = ("mesh_canvas", "search_canvas", "solution_canvas",
-                  "reliability_canvas", "fem_data_canvas", "fem_results_canvas")
+                  "reliability_canvas", "sens_canvas", "sens_curve_canvas",
+                  "design_canvas", "fem_data_canvas", "fem_results_canvas")
         # The seep canvases are per-BC dicts; flatten them in with the rest.
         canvases = [getattr(self, a) for a in single]
         canvases += list(self.seep_data_canvas.values())
@@ -2011,6 +2223,9 @@ class MainWindow(QMainWindow):
         if self._fem_runner is not None and self._fem_runner.isRunning():
             self._fem_runner.cancel()       # SSRM stops cooperatively
             self._fem_runner.wait(15000)
+        if self._sens_runner is not None and self._sens_runner.isRunning():
+            self._sens_runner.cancel()      # sweep stops at the next point
+            self._sens_runner.wait(15000)
         # Stop the persistent mesh thread (lets an in-flight build finish first).
         self._mesh_thread.quit()
         self._mesh_thread.wait(10000)

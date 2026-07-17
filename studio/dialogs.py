@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout,
-    QGroupBox, QHeaderView, QLabel, QSpinBox, QTableWidget, QTableWidgetItem,
-    QVBoxLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
+    QPushButton, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 LEM_METHODS = [
@@ -519,6 +520,328 @@ class RunLemDialog(QDialog):
                                if self.min_slip_on.isChecked()
                                and self.min_slip_depth.value() > 0 else None),
         }
+
+
+class SensitivityDialog(QDialog):
+    """Options for a sensitivity / design study (one dialog, two modes).
+
+    Sensitivity mode sweeps several parameters, each +/- a percent about its
+    current value (per-row overridable, with a one-click sigma-range preset that
+    reuses the reliability sigma_* columns) — the result is a tornado diagram.
+    Design mode sweeps ONE parameter across explicit From/To bounds in N steps and
+    finds where FS meets a target. The sweepable set is any numeric material
+    property plus the global k_seismic; geometry design stays in main_design.py.
+
+    A thin caller of ``xslope.sensitivity``: ``options()`` returns plain
+    dicts/lists the runner forwards straight to ``design()`` / ``sensitivity()``.
+    """
+
+    _GLOBAL_LABEL = "k_seismic (global)"
+
+    def __init__(self, parent=None, defaults=None, slope_data=None):
+        super().__init__(parent)
+        self.setWindowTitle("Sensitivity / Design study")
+        defaults = defaults or {}
+        slope_data = slope_data or {}
+
+        from xslope.sensitivity import list_params
+        self._params = list_params(slope_data)
+        self._by_ref = {e["ref"]: e for e in self._params}
+        # Materials in first-appearance order (globals handled as a special item).
+        self._mat_names = []
+        for e in self._params:
+            if e["kind"] == "mat" and e["name"] not in self._mat_names:
+                self._mat_names.append(e["name"])
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.mode = self._combo([("sensitivity", "Sensitivity (tornado)"),
+                                 ("design", "Design (FS vs one parameter)")],
+                                defaults.get("mode", "sensitivity"))
+        form.addRow("Mode", self.mode)
+
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        form.addRow("Method", self.method)
+
+        self.num_slices = QSpinBox()
+        self.num_slices.setRange(5, 500)
+        self.num_slices.setValue(int(defaults.get("num_slices", 40)))
+        form.addRow("Number of slices", self.num_slices)
+        layout.addLayout(form)
+
+        # --- parameter picker (shared by both modes) ------------------------
+        picker = QGroupBox("Parameter")
+        pform = QFormLayout(picker)
+        self.material = QComboBox()
+        for name in self._mat_names:
+            self.material.addItem(name, name)
+        self.material.addItem(self._GLOBAL_LABEL, "__global__")
+        pform.addRow("Material", self.material)
+        self.prop = QComboBox()
+        pform.addRow("Property", self.prop)
+        self.material.currentIndexChanged.connect(self._on_material_changed)
+        self.prop.currentIndexChanged.connect(self._on_prop_changed)
+        layout.addWidget(picker)
+
+        # --- mode pages -----------------------------------------------------
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self._build_sens_page(defaults))
+        self.stack.addWidget(self._build_design_page(defaults))
+        layout.addWidget(self.stack)
+
+        # Re-search toggle applies to both modes (correctness vs speed).
+        self.search = QCheckBox("Re-search the critical surface at each step")
+        self.search.setChecked(bool(defaults.get("search", True)))
+        self.search.setToolTip(
+            "On (recommended): re-run the search at every swept value, because the "
+            "critical surface moves as the parameter changes — a fixed surface "
+            "silently understates the sensitivity.\n\n"
+            "Off: re-solve the entered surface only (much faster, but the answer is "
+            "only right for that prescribed surface).")
+        layout.addWidget(self.search)
+
+        self.note = QLabel()
+        self.note.setWordWrap(True)
+        layout.addWidget(self.note)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self._ok = bb.button(QDialogButtonBox.Ok)
+        self._ok.setText("Run")
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+        self.mode.currentIndexChanged.connect(self._on_mode_changed)
+        self._on_material_changed()                 # populate property combo
+        # Restore a remembered sensitivity table (from the previous run this session).
+        for spec in defaults.get("_remember_params", []):
+            e = self._by_ref.get(spec.get("ref"))
+            if e is not None:
+                self._add_row(e, pct=spec.get("pct", self.pct.value()),
+                              use_sigma=spec.get("use_sigma", False))
+        self._on_mode_changed()
+        self.resize(560, 560)
+
+    # --- page builders ------------------------------------------------------
+    def _build_sens_page(self, defaults):
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 0, 0, 0)
+
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel("Default ±%"))
+        self.pct = QDoubleSpinBox()
+        self.pct.setRange(1.0, 99.0)
+        self.pct.setDecimals(0)
+        self.pct.setSuffix(" %")
+        self.pct.setValue(float(defaults.get("default_pct", 20.0)))
+        controls.addWidget(self.pct)
+        controls.addSpacing(12)
+        controls.addWidget(QLabel("Points"))
+        self.n_points = QSpinBox()
+        self.n_points.setRange(3, 31)
+        self.n_points.setValue(int(defaults.get("n", 7)))
+        self.n_points.setToolTip("Points per parameter's FS-vs-value curve "
+                                 "(shown on click-through). The tornado uses the "
+                                 "curve's two endpoints.")
+        controls.addWidget(self.n_points)
+        controls.addStretch(1)
+        self.add_btn = QPushButton("Add parameter")
+        self.add_btn.clicked.connect(self._on_add_clicked)
+        controls.addWidget(self.add_btn)
+        v.addLayout(controls)
+
+        self.table = QTableWidget(0, 4, page)
+        self.table.setHorizontalHeaderLabels(["Parameter", "±%", "σ range", ""])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        v.addWidget(self.table, 1)
+        self._rows = []            # [{ref, value, sigma, pct_spin, sigma_btn}]
+        return page
+
+    def _build_design_page(self, defaults):
+        page = QWidget()
+        form = QFormLayout(page)
+        form.setContentsMargins(0, 0, 0, 0)
+        self._design_echo = QLabel("—")
+        f = self._design_echo.font()
+        f.setBold(True)
+        self._design_echo.setFont(f)
+        form.addRow("Sweeping", self._design_echo)
+        self.d_from = self._dspin(-1e9, 1e9, float(defaults.get("low", 0.0)))
+        self.d_to = self._dspin(-1e9, 1e9, float(defaults.get("high", 1.0)))
+        self.d_steps = QSpinBox()
+        self.d_steps.setRange(2, 200)
+        self.d_steps.setValue(int(defaults.get("steps", 11)))
+        self.d_target = self._dspin(0.0, 100.0, float(defaults.get("target_fs", 1.5)))
+        form.addRow("From", self.d_from)
+        form.addRow("To", self.d_to)
+        form.addRow("Steps", self.d_steps)
+        form.addRow("Target FS", self.d_target)
+        self._design_seeded = "low" in defaults      # don't re-seed a remembered range
+        return page
+
+    # --- picker / mode logic ------------------------------------------------
+    @staticmethod
+    def _dspin(lo, hi, val):
+        s = QDoubleSpinBox()
+        s.setRange(lo, hi)
+        s.setDecimals(3)
+        s.setValue(val)
+        return s
+
+    def _on_material_changed(self):
+        self.prop.blockSignals(True)
+        self.prop.clear()
+        is_global = self.material.currentData() == "__global__"
+        if is_global:
+            self.prop.addItem("k_seismic", "global:k_seismic")
+        else:
+            name = self.material.currentData()
+            for e in self._params:
+                if e["kind"] == "mat" and e["name"] == name:
+                    tag = "" if e["value"] not in (None,) else "  (unset)"
+                    self.prop.addItem(f"{e['field']}{tag}", e["ref"])
+        self.prop.setEnabled(not is_global)
+        self.prop.blockSignals(False)
+        self._on_prop_changed()
+
+    def _on_prop_changed(self):
+        ref = self.prop.currentData()
+        e = self._by_ref.get(ref)
+        self._design_echo.setText(ref or "—")
+        # Seed sensible From/To bounds around the current value the first time.
+        if e is not None and not self._design_seeded:
+            self._seed_design_bounds(e)
+
+    def _seed_design_bounds(self, entry):
+        val = entry.get("value")
+        if val is None or val == 0:
+            lo, hi = (0.0, 1.0) if entry["field"] != "k_seismic" else (0.0, 0.3)
+        else:
+            lo, hi = val * 0.5, val * 1.5
+        self.d_from.setValue(lo)
+        self.d_to.setValue(hi)
+
+    def _on_mode_changed(self):
+        design = self.mode.currentData() == "design"
+        self.stack.setCurrentIndex(1 if design else 0)
+        if design:
+            self.note.setText(
+                "Design: sweeps the one parameter above across [From, To] and "
+                "annotates where FS meets the target (interpolated). If it never "
+                "crosses, the plot says which way to widen the range.")
+        else:
+            self.note.setText(
+                "Sensitivity: add parameters, each swept ±% about its value (or "
+                "click σ for a ±σ range). The result is a tornado; click a bar to "
+                "see that parameter's FS-vs-value curve.")
+
+    # --- sensitivity table --------------------------------------------------
+    def _on_add_clicked(self):
+        ref = self.prop.currentData()
+        e = self._by_ref.get(ref)
+        if e is None:
+            return
+        if any(r["ref"] == ref for r in self._rows):
+            return                                   # already added
+        self._add_row(e, pct=self.pct.value(), use_sigma=False)
+
+    def _add_row(self, entry, pct, use_sigma):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        item = QTableWidgetItem(entry["ref"])
+        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        self.table.setItem(row, 0, item)
+
+        pct_spin = QDoubleSpinBox()
+        pct_spin.setRange(1.0, 99.0)
+        pct_spin.setDecimals(0)
+        pct_spin.setSuffix(" %")
+        pct_spin.setValue(float(pct))
+        pct_spin.setMinimumWidth(72)         # keep the value visible past the arrows
+        self.table.setCellWidget(row, 1, pct_spin)
+
+        sigma = entry.get("sigma")
+        sigma_btn = QPushButton("σ")
+        sigma_btn.setCheckable(True)
+        if sigma:
+            sigma_btn.setToolTip(f"Use ±σ range: {entry['value'] - sigma:g} … "
+                                 f"{entry['value'] + sigma:g}  (σ = {sigma:g})")
+            sigma_btn.setChecked(bool(use_sigma))
+        else:
+            sigma_btn.setEnabled(False)
+            sigma_btn.setToolTip("No standard deviation (sigma_*) for this property.")
+        sigma_btn.toggled.connect(lambda on, s=pct_spin: s.setEnabled(not on))
+        pct_spin.setEnabled(not sigma_btn.isChecked())
+        self.table.setCellWidget(row, 2, sigma_btn)
+
+        rm = QPushButton("✕")
+        rm.setToolTip("Remove this parameter")
+        rm.clicked.connect(lambda _=False, b=rm: self._remove_row(b))
+        self.table.setCellWidget(row, 3, rm)
+
+        self._rows.append({"ref": entry["ref"], "value": entry.get("value"),
+                           "sigma": sigma, "pct_spin": pct_spin,
+                           "sigma_btn": sigma_btn, "rm": rm})
+
+    def _remove_row(self, btn):
+        idx = next((i for i, r in enumerate(self._rows) if r["rm"] is btn), None)
+        if idx is None:
+            return
+        self.table.removeRow(idx)
+        self._rows.pop(idx)
+
+    # --- result -------------------------------------------------------------
+    def options(self):
+        common = {
+            "mode": self.mode.currentData(),
+            "method": self.method.currentData(),
+            "num_slices": self.num_slices.value(),
+            "search": self.search.isChecked(),
+        }
+        if common["mode"] == "design":
+            common.update({
+                "param": self.prop.currentData(),
+                "low": self.d_from.value(),
+                "high": self.d_to.value(),
+                "steps": self.d_steps.value(),
+                "target_fs": self.d_target.value(),
+            })
+        else:
+            specs, remembered = [], []
+            for r in self._rows:
+                use_sigma = r["sigma_btn"].isChecked() and r["sigma"]
+                if use_sigma:
+                    specs.append({"ref": r["ref"], "low": r["value"] - r["sigma"],
+                                  "high": r["value"] + r["sigma"]})
+                else:
+                    specs.append({"ref": r["ref"],
+                                  "rel_range": r["pct_spin"].value() / 100.0})
+                remembered.append({"ref": r["ref"], "pct": r["pct_spin"].value(),
+                                   "use_sigma": bool(use_sigma)})
+            common.update({"params": specs, "n": self.n_points.value(),
+                           "default_pct": self.pct.value(),
+                           # remembered table for the next session
+                           "_remember_params": remembered})
+        return common
+
+    @staticmethod
+    def _combo(items, selected):
+        combo = QComboBox()
+        for key, label in items:
+            combo.addItem(label, key)
+        idx = combo.findData(selected)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        return combo
 
 
 # Import targets shown in the wizard (label, cad.DXF_TARGETS key). "Ignore" first

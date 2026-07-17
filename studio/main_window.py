@@ -1178,6 +1178,7 @@ class MainWindow(QMainWindow):
         add("Distributed loads", len(d.get("dloads") or []), category="dloads")
         add("Reinforcement lines", len(d.get("reinforcement_lines") or []),
             category="reinforce")
+        add("Line loads", len(d.get("line_loads") or []), category="line_loads")
         add("Piles", len(d.get("pile_lines") or []), category="piles")
         add("Seep BC", len(sbc.get("specified_heads", [])), category="seep_bc")
         self.inputs_tree.expandAll()
@@ -1270,7 +1271,8 @@ class MainWindow(QMainWindow):
         "global": "Global Parameters", "materials": "Materials", "circles": "Circles",
         "non_circ": "Non-Circular Surface", "piezo": "Piezometric Lines",
         "dloads": "Distributed Loads", "seep_bc": "Seepage BC", "piles": "Piles",
-        "reinforce": "Reinforcement", "profile": "Profile Lines", "polygons": "Polygons",
+        "reinforce": "Reinforcement", "line_loads": "Line Loads",
+        "profile": "Profile Lines", "polygons": "Polygons",
     }
 
     # Source inputs whose change makes the mesh stale (the domain geometry plus

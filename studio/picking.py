@@ -52,6 +52,13 @@ def pick_category(slope_data, x, y, tol, mode=None):
         cands.append((_line_dist(pt, [(p["x1"], p["y1"]), (p["x2"], p["y2"])]), "piles", i))
     for i, r in enumerate(d.get("reinforcement_lines") or []):
         cands.append((_line_dist(pt, [(r["x1"], r["y1"]), (r["x2"], r["y2"])]), "reinforce", i))
+    # Line loads are single points on the ground surface (drawn as an arrow); a
+    # point hit-test picks the one nearest the click.
+    for i, ll in enumerate(d.get("line_loads") or []):
+        try:
+            cands.append((pt.distance(Point(ll["x"], ll["y"])), "line_loads", i))
+        except Exception:
+            pass
     if mode != "seep":
         # Both sets are drawn (purple / orange); index is (set, block) so the
         # editor can jump to the right tab + load.

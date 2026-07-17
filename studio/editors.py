@@ -1117,6 +1117,55 @@ class ReinforcementEditor(CategoryEditor):
         slope_data["reinforce_lines"] = build_reinforce_lines(rows)
 
 
+# --- line loads ------------------------------------------------------------- #
+def _new_lload():
+    # Same key set load_slope_data produces (fileio.py:1325-1330). Angle defaults
+    # to -90° (straight down), mirroring the loader's blank-angle fallback.
+    return {"x": 0.0, "y": 0.0, "P": 0.0, "angle": -90.0, "label": "Load"}
+
+
+class LineLoadsEditor(CategoryEditor):
+    label = "Line loads"
+    # Loader keys (fileio.py:1325-1330): x, y, P (magnitude), angle, label. A line
+    # load is a concentrated force per unit width acting at a point on the ground
+    # surface; used by both LEM (slice.py) and FEM (fem.py), so no usage tags.
+    FIELDS = [
+        Field("label", "Label", "str"),
+        Field("x", "x"), Field("y", "y"),
+        Field("P", "P"),
+        Field("angle", "Angle", default=-90.0),
+    ]
+
+    def build(self, slope_data, parent):
+        return TableEditorDialog(
+            "Line loads", self.FIELDS, slope_data.get("line_loads", []),
+            _new_lload, parent,
+            help_text="A concentrated line load (force per unit width) acting at a "
+                      "point on the ground surface — e.g. the weight of a facing "
+                      "plate. P is the magnitude (positive); Angle is the direction "
+                      "in degrees (−90 = straight down). Each load is snapped onto "
+                      "the ground surface on save, since the loader requires line "
+                      "loads to act on the surface.")
+
+    def apply(self, slope_data, dlg):
+        rows = dlg.result_rows()
+        # Mirror the loader (fileio.py:1315-1324), which requires a line load to act
+        # ON the ground surface: snap each point onto the nearest surface location so
+        # Studio can never author a load the loader would refuse. (The loader also
+        # rejects points beyond a tolerance; snapping is the forgiving inverse — the
+        # saved point always lands exactly on the surface.)
+        gs = slope_data.get("ground_surface")
+        if gs is not None and not gs.is_empty:
+            from shapely.geometry import Point
+            for ll in rows:
+                try:
+                    snapped = gs.interpolate(gs.project(Point(ll["x"], ll["y"])))
+                    ll["x"], ll["y"] = float(snapped.x), float(snapped.y)
+                except Exception:
+                    pass
+        slope_data["line_loads"] = rows
+
+
 CATEGORY_EDITORS = {
     "global": GlobalEditor(),
     "materials": MaterialsEditor(),
@@ -1127,6 +1176,7 @@ CATEGORY_EDITORS = {
     "seep_bc": SeepBcEditor(),
     "piles": PilesEditor(),
     "reinforce": ReinforcementEditor(),
+    "line_loads": LineLoadsEditor(),
     "profile": ProfileEditor(),
     "polygons": PolygonEditor(),
 }

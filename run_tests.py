@@ -743,6 +743,7 @@ _EDITOR_MANAGED_KEYS = {
     "seep_bc": ["seepage_bc", "seepage_bc2"],
     "piles": ["pile_lines"],
     "reinforce": ["reinforcement_lines"],
+    "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
     "polygons": ["polygons"],
 }
@@ -816,6 +817,10 @@ def _editor_fixture():
                                  "t_max": 1000.0, "t_res": 800.0, "lp1": 2.0,
                                  "lp2": 3.0, "E": 2000.0, "area": 1.2}],
         "pile_lines": [pile(20.0, 20.0, 20.0, 0.0)],
+        # ground_surface is None in this fixture, so LineLoadsEditor.apply performs
+        # no snapping and the record must round-trip byte-for-byte.
+        "line_loads": [{"x": 30.0, "y": 20.0, "P": 500.0, "angle": -90.0,
+                        "label": "Facing plate"}],
         "seepage_bc": {
             "specified_heads": [
                 {"head": 18.0, "coords": [(0.0, 0.0), (0.0, 18.0)]},

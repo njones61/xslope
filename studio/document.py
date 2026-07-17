@@ -33,6 +33,7 @@ def new_slope_data():
         "circular": False, "circles": [], "non_circ": [],
         "dloads": [], "dloads2": [],
         "reinforce_lines": [], "reinforcement_lines": [], "pile_lines": [],
+        "line_loads": [],
         "seepage_bc": {"specified_heads": [], "exit_face": []},
         "seepage_bc2": {"specified_heads": [], "exit_face": []},
         "has_seepage_bc2": False, "mesh": None,

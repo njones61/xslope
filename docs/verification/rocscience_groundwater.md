@@ -46,7 +46,15 @@ design rather than pending work:
 Problems 1, 7, 8 and 14 apply a uniform infiltration rate to the ground surface, which has no
 fixed-head equivalent. These require a
 [specified-flux (Neumann) boundary condition](../seep/overview.md#specified-flux-boundary-conditions-neumann),
-which the solver now supports; the four are buildable and are queued rather than blocked.
+which the solver now supports. Three of them — **1** (Dupuit recharge mound), **7** (Rulon &
+Freeze layered slope) and **8** (ditch-drained aquifer) — are built on that boundary. The fourth,
+**14**, turned out to be blocked for a different reason: its published quantity is the Gardner
+(1958) capillary profile, which is derived for the *exponential* conductivity law
+$k = k_s\,e^{\alpha\psi}$ — a law XSLOPE does not implement (its `gard` option is the power form
+$k_r = 1/(1 + a\,\psi^n)$ that SEEP/W and Slide carry, a different function). With no exponential
+law and no tabulated Slide value to compare against (the manual prints only Fig. 14.3/14.4 charts),
+there is nothing to lock beyond a one-dimensional through-flux the flux cross-check already verifies
+to machine precision, so GW14 is blocked rather than tuned to a substitute curve.
 
 ## Status
 
@@ -65,7 +73,7 @@ which the solver now supports; the four are buildable and are queued rather than
 | [11](#gw11) | Earth/rock-fill dam, Gardner permeability function | **built** (case 1 of 2, discrepancy) | [gw011.xlsx](../files/rocscience_gw/gw011.xlsx). Zhang et al. (2001) homogeneous dam with the Gardner law (`unsat=gard`, *a* = 0.15, *n* = 6 as published). The free-surface **release point comes out at el. 17.8 ± 0.15 against Slide 19.40 / ABAQUS 19.64 — about 1.6 m low**, and the cause is not the conductivity model: the real Gardner law reproduces what van Genuchten and linear-front stand-ins gave (17.4). Mesh refinement (1.3k → 14.6k nodes) and the kr floor (1e-4 → 1e-8) both leave it unmoved. This is the one exit-face problem in the panel where XSLOPE releases low — the [SEEP2D cross-check](#seep2d-crosscheck) puts it on the same release point as SEEP2D everywhere else. Only the flowrate is locked; the release point is reported, not locked. Case 2 (zoned dam with foundation and toe drain) is not built. |
 | [12](#gw12) | Seepage from a trapezoidal ditch into a deep drainage layer | **built** | [gw012.xlsx](../files/rocscience_gw/gw012.xlsx). Vedernikov: Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) / theory 4.0×10⁻⁴; flow-bulb half-width ≈42 vs Slide 41 / theory 40. |
 | [13](#gw12) | Seepage from a triangular ditch into a deep drainage layer | **built** | [gw013.xlsx](../files/rocscience_gw/gw013.xlsx). Vedernikov: Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) / theory 2.0×10⁻². |
-| 14 | Unsaturated soil column | *queued* | Steady (Gardner 1958 capillary profile under constant infiltration). Needs a specified-flux surface boundary (now supported) and a Gardner-exponential conductivity k = ks·e^(−αψ) — note this is the *exponential* Gardner form, not the kr = 1/(1 + a·ψⁿ) form the `gard` option implements, so the conductivity law still has to be confirmed before this can be locked. Belongs with GW1, not the transient tier. |
+| 14 | Unsaturated soil column | blocked | Steady Gardner (1958) capillary profile (L = 1 m, ks = 10⁻⁷ m/s, ν = ±8.64×10⁻⁴ m/d = ±10⁻⁸ m/s, α = 1 m⁻¹). Confirmed blocked: the analytical profile is derived for the **exponential** Gardner law k = ks·e^(αψ) (the vendor RS2 model sets `conductivity: Gardner, α = 1`), which XSLOPE does not implement — its `gard` option is the power form kr = 1/(1 + a·ψⁿ). The manual publishes only Fig 14.3/14.4 charts (no tabulated Slide value), so with no matching law and nothing numeric to compare, the only lockable quantity is a 1-D through-flux the [flux cross-check](#flux-crosscheck) already verifies to machine precision. Blocked rather than tuned to a substitute curve. |
 | 15 | 1-D consolidation, uniform initial excess pore pressure | blocked | Transient/consolidation — no transient solver |
 | 16 | Pore pressure dissipation of stratified soil | blocked | Transient/consolidation |
 | 17 | Transient seepage, earth fill dam with toe drain | blocked | Transient |

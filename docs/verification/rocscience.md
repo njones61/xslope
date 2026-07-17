@@ -981,6 +981,11 @@ Hassan & Wolff's published surfaces are search products (their figures do not re
 the individual circles), so the comparison reproduces the *procedure*: a Bishop critical
 search at mean strengths (their surface A), and a direct minimum-β scan over downstream
 circles evaluating the Taylor-series β on each fixed candidate (their surface B). The
+benchmark — and the lock — is **downstream-slope-specific**: a global (grid-seeded)
+search finds a substantial upstream mechanism at Bishop ≈ 1.88, well below the
+downstream 2.53, on this dry end-of-construction model. Hassan & Wolff and Slide
+analyze the downstream slope, so the seeded search reproduces the published problem;
+the upstream face is simply outside the benchmark's scope. The
 c–φ correlations enter as the standard Taylor-series cross-terms
 (2ρ·(ΔF_c/2)·(ΔF_φ/2)); the regression tag locks the uncorrelated β.
 

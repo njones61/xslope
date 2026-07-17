@@ -9,6 +9,7 @@ and saving arrive in later phases.
 
 from __future__ import annotations
 
+import html
 import json
 import os
 import re
@@ -104,6 +105,76 @@ class _LogStream(QObject):
                 self._original.flush()
             except Exception:
                 pass
+
+
+class SolutionView(QWidget):
+    """The LEM Solution tab: an admissibility-warning strip stacked above the
+    result canvas.
+
+    The solvers return ``results['warnings']`` — Duncan & Wright admissibility
+    notes on an already-accepted solution (base tension on cohesionless slices,
+    interslice tension, thrust line outside the slices; see
+    ``solve._admissibility_warnings``). They reach the Log pane via the stdout tee,
+    but a Studio user reading only the plot would take an inadmissible FS as a
+    clean success. This strip surfaces them beside the solution: hidden when the
+    list is empty, otherwise one amber line per note. It refreshes from the fresh
+    results on every render, so it clears on the next (clean) solve.
+
+    The view quacks like the ``MplCanvas`` it wraps for the two calls the main
+    window makes on a result view — ``render_solution`` and ``ensure_fitted`` — so
+    it slots into the existing tab / display / clear machinery with no
+    special-casing beyond the one-line class swap that builds it.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.canvas = MplCanvas(self)
+        self._warning = QLabel()
+        self._warning.setWordWrap(True)
+        self._warning.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # Amber wash + deep-amber text, matching the app's existing warning hue
+        # (#9a6700, used in the chat dock). Padding/radius follow the chat blocks;
+        # the strip sizes to its wrapped text (no fixed height) and the canvas
+        # takes the rest, so it self-adjusts to width and to the number of notes.
+        self._warning.setStyleSheet(
+            "QLabel {"
+            " background-color: #fff4d6;"
+            " color: #7a5200;"
+            " border: 1px solid #e0b400;"
+            " border-radius: 4px;"
+            " padding: 6px 10px;"
+            " }")
+        self._warning.setVisible(False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.addWidget(self._warning)        # strip above the plot
+        layout.addWidget(self.canvas, 1)       # canvas takes the remaining height
+
+    def render_solution(self, *args, **kwargs):
+        # The main window passes ``results`` as the 4th positional arg; refresh the
+        # strip from it (empty -> hidden) before drawing, so it tracks each solve.
+        results = args[3] if len(args) > 3 else kwargs.get("results")
+        self._set_warnings(results)
+        self.canvas.render_solution(*args, **kwargs)
+
+    def ensure_fitted(self):
+        self.canvas.ensure_fitted()
+
+    def _set_warnings(self, results):
+        warns = list(results.get("warnings") or []) if isinstance(results, dict) else []
+        if not warns:
+            self._warning.setVisible(False)
+            self._warning.clear()
+            return
+        method = (results.get("method") or "").strip()
+        plural = "s" if len(warns) > 1 else ""
+        head = (f"{method.title()} — admissibility warning{plural}" if method
+                else f"Admissibility warning{plural}")
+        body = "<br>".join("&#8226;&nbsp;" + html.escape(w) for w in warns)
+        self._warning.setText(f"<b>{html.escape(head)}</b><br>{body}")
+        self._warning.setVisible(True)
 
 
 class MainWindow(QMainWindow):
@@ -1731,7 +1802,10 @@ class MainWindow(QMainWindow):
 
     def _show_solution(self, bundle):
         if self.solution_canvas is None:
-            self.solution_canvas = MplCanvas(self)
+            # A SolutionView (warning strip + canvas) rather than a bare MplCanvas,
+            # so non-empty admissibility warnings surface above the plot. It forwards
+            # render_solution/ensure_fitted, so the tab machinery is unchanged.
+            self.solution_canvas = SolutionView(self)
             self.view_tabs.addTab(self.solution_canvas, "LEM · Solution")
             panel = SolutionDisplayPanel()
             panel.changed.connect(self._rerender_solution)

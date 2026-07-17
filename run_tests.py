@@ -891,7 +891,7 @@ def run_editor_roundtrip_test(test):
     from PySide6.QtWidgets import QApplication
     from studio.editors import CATEGORY_EDITORS
 
-    QApplication.instance() or QApplication([])
+    app = QApplication.instance() or QApplication([])
     problems = []
     for key, editor in CATEGORY_EDITORS.items():
         keys = _EDITOR_MANAGED_KEYS.get(key, [])
@@ -902,6 +902,39 @@ def run_editor_roundtrip_test(test):
         for k in keys:
             problems += _roundtrip_diff(before[k], _editor_norm(k, sd.get(k)),
                                         f"{key}:{k}")
+
+    # The materials editor has a second view (List) that binds to the SAME rows.
+    # Both the list-view round-trip and a table->list->table switch mid-edit must
+    # preserve every key — the lossless-switch invariant. The generic loop above
+    # only exercises the default (Table) view, so cover the list path explicitly.
+    mat_editor = CATEGORY_EDITORS["materials"]
+
+    # (1) Open, switch to LIST view, apply unchanged — deep-equal.
+    sd = _editor_fixture()
+    before_mats = copy.deepcopy(sd["materials"])
+    dlg = mat_editor.build(sd, None)
+    dlg.set_view_mode("list")
+    mat_editor.apply(sd, dlg)
+    problems += _roundtrip_diff(before_mats, sd["materials"], "materials(list)")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # (2) Edit a value in the TABLE view, switch table->list->table, apply — the
+    #     edit must survive both switches and nothing else may change.
+    sd = _editor_fixture()
+    expected_mats = copy.deepcopy(sd["materials"])
+    dlg = mat_editor.build(sd, None)
+    dlg.set_view_mode("table")                       # explicit (session may remember List)
+    c_col = next(j for j, f in enumerate(mat_editor.FIELDS) if f.key == "c")
+    dlg._table.table.item(0, c_col).setText("137.5")
+    expected_mats[0]["c"] = 137.5
+    dlg.set_view_mode("list")
+    dlg.set_view_mode("table")
+    mat_editor.apply(sd, dlg)
+    problems += _roundtrip_diff(expected_mats, sd["materials"], "materials(switch)")
+    dlg.deleteLater()
+    app.processEvents()
+
     if problems:
         return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])
     return 0.0, None

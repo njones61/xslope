@@ -297,6 +297,22 @@ class MplCanvas(QWidget):
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
             legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig))
 
+    def render_axes(self, plot_fn, dxf=False):
+        """Render a single-axes figure by calling ``plot_fn(ax)`` — a lightweight
+        entry point for property plots (e.g. the Materials list view's strength /
+        kr panels) that want one Axes rather than a full engine figure. Rides the
+        same deferred, viewport-sized, 1:1 render path as the engine plots, so the
+        panel stays crisp and needs no hand-tuned sizing. ``dxf`` is False by
+        default (these plots aren't geometry, so the Save dialog omits DXF)."""
+        def _draw(fig):
+            ax = fig.add_subplot(111)
+            plot_fn(ax)
+            try:
+                fig.tight_layout()
+            except Exception:
+                pass
+        self._draw(_draw, dxf=dxf)
+
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):
         """Export the current figure to a file. PNG prompts for a DPI; PDF/SVG/DXF

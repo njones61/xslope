@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QPushButton, QTableWidget,
-    QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
+    QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
+    QDialogButtonBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter,
+    QStackedWidget, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
+    QWidget,
 )
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
@@ -439,6 +441,549 @@ def _new_material():
             "E": 0.0, "nu": 0.0}
 
 
+# --------------------------------------------------------------------------- #
+# Materials editor — Table view (the Excel-mirroring table) + List view (a
+# per-material form with strength/kr confirmation plots). Both bind to the SAME
+# underlying rows, so switching mid-edit is lossless.
+# --------------------------------------------------------------------------- #
+
+# Remembered within the session (module-global); first open defaults to Table.
+_LAST_MATERIALS_VIEW = "table"
+
+# Base fields that carry a paired sigma_* (shown beside the value under Reliability).
+_MAT_SIGMA = {"gamma": "sigma_gamma", "c": "sigma_c", "phi": "sigma_phi",
+              "cp": "sigma_cp", "d": "sigma_d", "psi": "sigma_psi"}
+# Strength option -> the option-specific fields shown in the list-view form (only
+# the selected option's are visible; blank shows none, per bc0999d).
+_MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"],
+                      "pow": ["pow_a", "pow_b", "pow_c", "pow_d"],
+                      "hb": ["hb_sci", "hb_gsi", "hb_mi", "hb_d"], "": []}
+_MAT_ALL_OPTION_FIELDS = ["c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c",
+                          "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d"]
+# Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py).
+_MAT_UNSAT_FIELDS = {"lf": ["kr0", "h0"], "vg": ["vg_a", "vg_n"],
+                     "gard": ["vg_a", "vg_n"]}
+_MAT_ALL_UNSAT_FIELDS = ["kr0", "h0", "vg_a", "vg_n"]
+
+
+def _material_swatch(idx):
+    """A color swatch QIcon for material ``idx``, using the SAME palette the canvas
+    zones use (``xslope.style.material_style`` -> tab10 fallback), so a list entry
+    reads as the same color as its zone on the Inputs plot."""
+    from matplotlib.colors import to_rgba
+    from xslope.style import material_style, resolve_style
+    color = material_style(resolve_style(None), idx)["color"]
+    r, g, b, a = to_rgba(color)
+    pm = QPixmap(16, 16)
+    pm.fill(Qt.transparent)
+    from PySide6.QtGui import QPainter, QPen
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    p.setBrush(QColor.fromRgbF(r, g, b, a))
+    p.setPen(QPen(QColor("#666666")))
+    p.drawRoundedRect(1, 1, 13, 13, 3, 3)
+    p.end()
+    return QIcon(pm)
+
+
+class _MaterialListView(QWidget):
+    """List view for the materials editor: three splitter panes —
+    [materials list | property form | confirmation plots]. Binds to a list of
+    material dicts; edits write through to those dicts immediately, so
+    ``result_rows`` (and a view switch) never lose an in-progress edit. All 36
+    loader keys have a widget (hidden ones keep their value), so a round-trip
+    preserves every field exactly as the table view does."""
+
+    _STRENGTH_KEYS = _MAT_ALL_OPTION_FIELDS + ["d", "psi", "E", "nu"]
+
+    def __init__(self, fields, rows, new_row, reliability_on, parent=None):
+        super().__init__(parent)
+        self._field_by_key = {f.key: f for f in fields}
+        self._new_row = new_row
+        self._rows = [dict(r) for r in rows]
+        self._reliability_on = bool(reliability_on)
+        self._cur = -1
+        self._edits = {}          # key -> QLineEdit / QComboBox
+        self._cell_widgets = {}   # key -> the labeled cell QWidget (for show/hide)
+        self._sigma_widgets = {}  # base key -> (sigma label, sigma edit)
+
+        self._plot_timer = QTimer(self)
+        self._plot_timer.setSingleShot(True)
+        self._plot_timer.setInterval(160)     # debounce so plots don't lag typing
+        self._plot_timer.timeout.connect(self._refresh_plots)
+
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(self._build_list_pane())
+        splitter.addWidget(self._build_form_pane())
+        splitter.addWidget(self._build_plots_pane())
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 1)
+        splitter.setSizes([200, 470, 530])
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(splitter)
+
+        self._refresh_list()
+        self._update_sigma_visibility()
+        if self._rows:
+            self.list.setCurrentRow(0)
+        else:
+            self._load(-1)
+
+    # --- panes -----------------------------------------------------------
+    def _build_list_pane(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        self.list = QListWidget()
+        self.list.currentRowChanged.connect(self._on_select)
+        v.addWidget(self.list, 1)
+        bar = QHBoxLayout()
+        add = QPushButton("Add")
+        add.clicked.connect(self._add)
+        rem = QPushButton("Remove")
+        rem.clicked.connect(self._remove)
+        bar.addWidget(add)
+        bar.addWidget(rem)
+        v.addLayout(bar)
+        return w
+
+    def _make_edit(self, key):
+        f = self._field_by_key[key]
+        if f.kind == "choice":
+            w = QComboBox()
+            w.addItems(f.choices)
+        else:
+            w = QLineEdit()
+            w.editingFinished.connect(self._on_edit)
+        self._edits[key] = w
+        return w
+
+    def _cell(self, label, key, sigma=False, label_w=80):
+        """A [label | value | (± σ | sigma value)] cell as a QWidget, registered by
+        key for show/hide + load/commit. Widths are kept tight so even the widest
+        row (a d|ψ pair, both carrying σ) fits the form pane without a horizontal
+        scrollbar."""
+        cell = QWidget()
+        h = QHBoxLayout(cell)
+        h.setContentsMargins(0, 2, 0, 2)
+        h.setSpacing(4)
+        lab = QLabel(label)
+        lab.setMinimumWidth(label_w)
+        h.addWidget(lab)
+        edit = self._make_edit(key)
+        edit.setMinimumWidth(44)
+        h.addWidget(edit, 1)
+        if sigma and key in _MAT_SIGMA:
+            skey = _MAT_SIGMA[key]
+            slab = QLabel("± σ")
+            slab.setStyleSheet(f"color:{USAGE_COLOR['rel']};")
+            sedit = self._make_edit(skey)
+            sedit.setFixedWidth(48)
+            h.addWidget(slab)
+            h.addWidget(sedit)
+            self._sigma_widgets[key] = (slab, sedit)
+        self._cell_widgets[key] = cell
+        return cell
+
+    @staticmethod
+    def _pair(cell_a, cell_b):
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.addWidget(cell_a, 1)
+        h.addWidget(cell_b, 1)
+        return w
+
+    def _build_form_pane(self):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        body = QWidget()
+        v = QVBoxLayout(body)
+
+        # Identity
+        g = QGroupBox("Identity")
+        gv = QVBoxLayout(g)
+        gv.addWidget(self._cell("Name", "name"))
+        v.addWidget(g)
+
+        # Unit weights (γ | γsat side by side; γ carries its σ)
+        g = QGroupBox("Unit weights")
+        gv = QVBoxLayout(g)
+        gv.addWidget(self._pair(self._cell("γ", "gamma", sigma=True, label_w=28),
+                                self._cell("γ_sat", "gamma_sat", label_w=44)))
+        v.addWidget(g)
+
+        # Strength: option combo, then only the selected option's fields, then
+        # dilation d/ψ and elastic E/ν.
+        g = QGroupBox("Strength")
+        gv = QVBoxLayout(g)
+        opt_cell = QWidget()
+        oh = QHBoxLayout(opt_cell)
+        oh.setContentsMargins(0, 2, 0, 2)
+        olab = QLabel("Model (option)")
+        olab.setMinimumWidth(96)
+        oh.addWidget(olab)
+        self._opt_combo = self._make_edit("option")
+        self._opt_combo.currentIndexChanged.connect(self._on_option_changed)
+        oh.addWidget(self._opt_combo, 1)
+        gv.addWidget(opt_cell)
+        for key in _MAT_ALL_OPTION_FIELDS:
+            gv.addWidget(self._cell(self._label_for(key), key,
+                                    sigma=key in _MAT_SIGMA))
+        gv.addSpacing(4)
+        gv.addWidget(self._pair(self._cell("d (dil.)", "d", sigma=True, label_w=52),
+                                self._cell("ψ", "psi", sigma=True, label_w=18)))
+        gv.addWidget(self._pair(self._cell("E", "E", label_w=18),
+                                self._cell("ν", "nu", label_w=18)))
+        v.addWidget(g)
+
+        # Pore pressure (ru only when u = 'ru')
+        g = QGroupBox("Pore pressure")
+        gv = QVBoxLayout(g)
+        u_cell = QWidget()
+        uh = QHBoxLayout(u_cell)
+        uh.setContentsMargins(0, 2, 0, 2)
+        ulab = QLabel("Model (u)")
+        ulab.setMinimumWidth(96)
+        uh.addWidget(ulab)
+        self._u_combo = self._make_edit("u")
+        self._u_combo.currentIndexChanged.connect(self._on_u_changed)
+        uh.addWidget(self._u_combo, 1)
+        gv.addWidget(u_cell)
+        gv.addWidget(self._cell("ru", "ru"))
+        v.addWidget(g)
+
+        # Conductivity: k1/k2/alpha, then unsat model + its curve params.
+        g = QGroupBox("Conductivity")
+        gv = QVBoxLayout(g)
+        gv.addWidget(self._pair(self._cell("k1", "k1", label_w=22),
+                                self._cell("k2", "k2", label_w=22)))
+        gv.addWidget(self._cell("alpha", "alpha"))
+        us_cell = QWidget()
+        ush = QHBoxLayout(us_cell)
+        ush.setContentsMargins(0, 2, 0, 2)
+        uslab = QLabel("Unsat model")
+        uslab.setMinimumWidth(96)
+        ush.addWidget(uslab)
+        self._unsat_combo = self._make_edit("unsat")
+        self._unsat_combo.currentIndexChanged.connect(self._on_unsat_changed)
+        ush.addWidget(self._unsat_combo, 1)
+        gv.addWidget(us_cell)
+        for key in _MAT_ALL_UNSAT_FIELDS:
+            gv.addWidget(self._cell(self._label_for(key), key))
+        v.addWidget(g)
+
+        v.addStretch(1)
+        scroll.setWidget(body)
+        return scroll
+
+    def _build_plots_pane(self):
+        from .canvas import MplCanvas
+        pane = QSplitter(Qt.Vertical)
+        self._strength_canvas = MplCanvas()
+        self._kr_canvas = MplCanvas()
+        pane.addWidget(self._strength_canvas)
+        pane.addWidget(self._kr_canvas)
+        pane.setSizes([320, 320])
+        return pane
+
+    def _label_for(self, key):
+        f = self._field_by_key.get(key)
+        return f.header if f is not None else key
+
+    # --- list ------------------------------------------------------------
+    def _item_text(self, i):
+        name = self._rows[i].get("name") or ""
+        return f"{i + 1}.  {name}" if name else f"{i + 1}."
+
+    def _refresh_list(self):
+        self.list.blockSignals(True)
+        self.list.clear()
+        for i in range(len(self._rows)):
+            item = QListWidgetItem(_material_swatch(i), self._item_text(i))
+            self.list.addItem(item)
+        self.list.blockSignals(False)
+
+    def _refresh_list_item(self, i):
+        if 0 <= i < self.list.count():
+            self.list.item(i).setText(self._item_text(i))
+
+    # --- load / commit ---------------------------------------------------
+    def _load(self, idx):
+        self._cur = -1                       # suppress write-through while populating
+        for key, w in self._edits.items():
+            val = self._rows[idx].get(key) if (0 <= idx < len(self._rows)) else None
+            if isinstance(w, QComboBox):
+                w.blockSignals(True)
+                txt = "" if val is None else str(val)
+                j = w.findText(txt)
+                w.setCurrentIndex(j if j >= 0 else 0)
+                w.blockSignals(False)
+            else:
+                w.blockSignals(True)
+                w.setText("" if val is None else str(val))
+                w.blockSignals(False)
+        ok = 0 <= idx < len(self._rows)
+        self.setEnabled(True)
+        if ok:
+            self._cur = idx
+            self._update_option_visibility()
+            self._update_u_visibility()
+            self._update_unsat_visibility()
+            self._update_sigma_visibility()
+            self._refresh_plots()
+        else:
+            self._clear_plots()
+
+    def _commit(self):
+        if not (0 <= self._cur < len(self._rows)):
+            return
+        row = self._rows[self._cur]
+        for key, w in self._edits.items():
+            f = self._field_by_key[key]
+            if isinstance(w, QComboBox):
+                row[key] = w.currentText()
+            else:
+                row[key] = f.from_text(w.text())
+
+    # --- visibility ------------------------------------------------------
+    def _update_option_visibility(self):
+        opt = self._opt_combo.currentText().strip().lower()
+        shown = set(_MAT_OPTION_FIELDS.get(opt, []))
+        for key in _MAT_ALL_OPTION_FIELDS:
+            self._cell_widgets[key].setVisible(key in shown)
+
+    def _update_u_visibility(self):
+        self._cell_widgets["ru"].setVisible(
+            self._u_combo.currentText().strip().lower() == "ru")
+
+    def _update_unsat_visibility(self):
+        um = self._unsat_combo.currentText().strip().lower()
+        shown = set(_MAT_UNSAT_FIELDS.get(um, []))
+        for key in _MAT_ALL_UNSAT_FIELDS:
+            self._cell_widgets[key].setVisible(key in shown)
+
+    def _update_sigma_visibility(self):
+        for _key, (slab, sedit) in self._sigma_widgets.items():
+            slab.setVisible(self._reliability_on)
+            sedit.setVisible(self._reliability_on)
+
+    def set_reliability(self, on):
+        self._reliability_on = bool(on)
+        self._update_sigma_visibility()
+
+    # --- events ----------------------------------------------------------
+    def _on_select(self, idx):
+        self._commit()
+        self._load(idx)
+
+    def _on_edit(self):
+        self._commit()
+        self._refresh_list_item(self._cur)   # name edits update the list label
+        self._plot_timer.start()
+
+    def _on_option_changed(self):
+        self._commit()
+        self._update_option_visibility()
+        self._plot_timer.start()
+
+    def _on_u_changed(self):
+        self._commit()
+        self._update_u_visibility()          # u affects neither plot; no refresh
+
+    def _on_unsat_changed(self):
+        self._commit()
+        self._update_unsat_visibility()
+        self._plot_timer.start()             # kr plot depends on the unsat model
+
+    def _add(self):
+        self._commit()
+        self._rows.append(self._new_row())
+        self._cur = -1
+        self._refresh_list()
+        self.list.setCurrentRow(len(self._rows) - 1)
+
+    def _remove(self):
+        idx = self.list.currentRow()
+        if not (0 <= idx < len(self._rows)):
+            return
+        self._rows.pop(idx)
+        self._cur = -1
+        self._refresh_list()
+        if self._rows:
+            self.list.setCurrentRow(min(idx, len(self._rows) - 1))
+        else:
+            self._load(-1)
+
+    # --- plots -----------------------------------------------------------
+    def _refresh_plots(self):
+        from xslope.plot import plot_material_strength, plot_material_kr
+        if not (0 <= self._cur < len(self._rows)):
+            self._clear_plots()
+            return
+        mat = dict(self._rows[self._cur])    # snapshot for the deferred draw
+        self._strength_canvas.render_axes(lambda ax: plot_material_strength(ax, mat))
+        self._kr_canvas.render_axes(lambda ax: plot_material_kr(ax, mat))
+
+    def _clear_plots(self):
+        self._strength_canvas.clear()
+        self._kr_canvas.clear()
+
+    # --- external API (used by MaterialsDialog on view switch) -----------
+    def set_rows(self, rows, reliability_on):
+        self._reliability_on = bool(reliability_on)
+        self._rows = [dict(r) for r in rows]
+        self._cur = -1
+        self._refresh_list()
+        if self._rows:
+            self.list.setCurrentRow(0)
+        else:
+            self._load(-1)
+
+    def result_rows(self):
+        self._commit()
+        return [dict(r) for r in self._rows]
+
+
+class MaterialsDialog(QDialog):
+    """The materials editor dialog: a segmented Table/List view toggle over a
+    QStackedWidget. Both views bind to ``self._rows`` (the single source of truth):
+    switching harvests the active view's edits into it and rebuilds the target, so
+    a switch mid-edit is lossless. The Reliability toggle drives σ columns (table)
+    and σ fields (list) in both views."""
+
+    def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
+                 usage_toggles=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self._title = title
+        self._fields = fields
+        self._new_row = new_row
+        self._rows = [dict(r) for r in rows]
+        self._mode = None
+        self._table = None
+        self._list_view = None
+        self.resize(1180, 640)
+
+        layout = QVBoxLayout(self)
+        if help_text:
+            layout.addWidget(_help_label(help_text))
+
+        top = QHBoxLayout()
+        seg_group = QButtonGroup(self)
+        seg_group.setExclusive(True)
+        self._seg = {}
+        for mode, lbl in (("table", "Table view"), ("list", "List view")):
+            b = QPushButton(lbl)
+            b.setCheckable(True)
+            b.clicked.connect(lambda _checked=False, m=mode: self._set_mode(m))
+            seg_group.addButton(b)
+            self._seg[mode] = b
+            top.addWidget(b)
+        top.addSpacing(24)
+        top.addWidget(QLabel("Show columns for:"))
+        from PySide6.QtCore import QSettings
+        s = QSettings("XSlope", "XSlope Studio")
+        self._toggles = {}
+        for t in (usage_toggles or []):
+            cb = QCheckBox(USAGE_TOGGLE_LABEL[t])
+            default = (t != "rel")
+            cb.setChecked(bool(s.value(f"editor_toggles/{self._title}/{t}",
+                                       default, type=bool)))
+            cb.setStyleSheet(f"color:{USAGE_COLOR[t]}; font-weight:bold;")
+            cb.toggled.connect(self._on_toggle)
+            self._toggles[t] = cb
+            top.addWidget(cb)
+        top.addStretch(1)
+        layout.addLayout(top)
+
+        self._stack = QStackedWidget()
+        self._table_holder = QWidget()
+        self._table_lay = QVBoxLayout(self._table_holder)
+        self._table_lay.setContentsMargins(0, 0, 0, 0)
+        self._list_holder = QWidget()
+        self._list_lay = QVBoxLayout(self._list_holder)
+        self._list_lay.setContentsMargins(0, 0, 0, 0)
+        self._stack.addWidget(self._table_holder)     # index 0
+        self._stack.addWidget(self._list_holder)      # index 1
+        layout.addWidget(self._stack, 1)
+
+        _ok_cancel(self, layout)
+
+        initial = _LAST_MATERIALS_VIEW if _LAST_MATERIALS_VIEW in ("table", "list") else "table"
+        self._set_mode(initial)
+
+    # --- toggles ---------------------------------------------------------
+    def _reliability_on(self):
+        cb = self._toggles.get("rel")
+        return bool(cb.isChecked()) if cb is not None else False
+
+    def _enabled_usage(self):
+        return {t for t, cb in self._toggles.items() if cb.isChecked()}
+
+    def _on_toggle(self):
+        from PySide6.QtCore import QSettings
+        s = QSettings("XSlope", "XSlope Studio")
+        for t, cb in self._toggles.items():
+            s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
+        if self._mode == "table" and self._table is not None:
+            self._table.apply_usage_filter(self._enabled_usage())
+        if self._mode == "list" and self._list_view is not None:
+            self._list_view.set_reliability(self._reliability_on())
+
+    # --- view switching --------------------------------------------------
+    def _harvest(self):
+        if self._mode == "table" and self._table is not None:
+            self._rows = self._table.result_rows()
+        elif self._mode == "list" and self._list_view is not None:
+            self._rows = self._list_view.result_rows()
+
+    def _build_table(self):
+        if self._table is not None:
+            self._table.setParent(None)
+            self._table.deleteLater()
+        self._table = _EditableTable(self._fields, self._rows, self._new_row)
+        self._table_lay.addWidget(self._table)
+        self._table.apply_usage_filter(self._enabled_usage())
+
+    def _ensure_list(self):
+        if self._list_view is None:
+            self._list_view = _MaterialListView(self._fields, self._rows,
+                                                self._new_row, self._reliability_on())
+            self._list_lay.addWidget(self._list_view)
+        else:
+            self._list_view.set_rows(self._rows, self._reliability_on())
+
+    def _set_mode(self, mode):
+        if mode not in ("table", "list"):
+            return
+        if mode == self._mode:
+            self._seg[mode].setChecked(True)
+            return
+        self._harvest()                      # pull current edits into self._rows
+        if mode == "table":
+            self._build_table()
+            self._stack.setCurrentIndex(0)
+        else:
+            self._ensure_list()
+            self._stack.setCurrentIndex(1)
+        self._mode = mode
+        self._seg[mode].setChecked(True)
+        global _LAST_MATERIALS_VIEW
+        _LAST_MATERIALS_VIEW = mode
+
+    def set_view_mode(self, mode):
+        """Programmatic view switch (used by the round-trip guard)."""
+        self._set_mode(mode)
+
+    def result_rows(self):
+        self._harvest()
+        return self._rows
+
+
 class MaterialsEditor(CategoryEditor):
     label = "Materials"
     # Columns mirror the 'mat' worksheet in order: name, g, gsat, option, c, f,
@@ -485,12 +1030,14 @@ class MaterialsEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
-        return TableEditorDialog(
+        return MaterialsDialog(
             "Materials", self.FIELDS, slope_data.get("materials", []), _new_material, parent,
-            help_text="Columns mirror the 'mat' worksheet. Row order = Mat ID order "
-                      "(row 1 → Mat ID 1). Use the toggles to show only the columns "
-                      "for your analysis; reliability σ columns are hidden unless "
-                      "'Reliability' is on.",
+            help_text="Table view mirrors the 'mat' worksheet (row order = Mat ID "
+                      "order). List view edits one material at a time as a form with "
+                      "strength- and conductivity-model plots that confirm the "
+                      "selected options. Both views edit the same rows, so switching "
+                      "is lossless. In list view only 'Reliability' applies — it shows "
+                      "each value's σ; the other toggles hide table columns.",
             usage_toggles=["lem", "seep", "fem", "rel"])
 
     def apply(self, slope_data, dlg):

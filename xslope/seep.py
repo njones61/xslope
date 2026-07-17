@@ -595,6 +595,31 @@ def solve_confined(nodes, elements, bc_type, dirichlet_bcs, k1_vals, k2_vals, an
     return head, A, q, total_flow
 
 
+def _require_runtime_dirichlet(dir_mask):
+    """Guard the unconfined solve against a RUNTIME-singular system.
+
+    The static input guards (build_seep_data / run_seepage_analysis) only see
+    the DECLARED boundary conditions: they accept a model as long as it carries
+    a specified head OR an exit face. But the exit face is a free boundary whose
+    active (Dirichlet) set is recomputed every iteration, and it can empty
+    mid-solve — every exit-face node goes unsaturated and drops out. When it does
+    and there is no specified head anywhere, the effective Dirichlet set is empty:
+    the stiffness matrix is pure Neumann (singular), head is defined only up to
+    an additive constant, and spsolve returns garbage (~1e15) instead of failing.
+
+    Testing the effective set each iteration turns that silent divergence into a
+    clear, user-actionable SeepInputError — routed exactly like the static input
+    guards (studio's SeepRunner prints SeepInputError cleanly, no traceback)."""
+    if not np.any(dir_mask):
+        raise SeepInputError(
+            "Unconfined seepage solve became singular: the exit face fully "
+            "deactivated and no specified-head boundary remains, so the head is "
+            "defined only up to an additive constant. Add a specified head, or "
+            "check the exit-face definition (an exit face entirely above the "
+            "water table drains nothing and cannot anchor the head)."
+        )
+
+
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
                       max_iter=400, tol=1e-6, element_types=None,
@@ -632,6 +657,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
     # Initialize heads
     fixed_heads = bc_values[bc_type == 1]
+    has_fixed_head = bool(np.any(bc_type == 1))  # loop-invariant: anchors the solve
     h_free = np.mean(fixed_heads) if len(fixed_heads) > 0 else np.mean(y)
     h = np.where(bc_type == 1, bc_values, np.where(bc_type == 2, y, h_free))
 
@@ -718,6 +744,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
         # Apply boundary conditions: fixed heads plus the active exit-face set
         dir_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
+        _require_runtime_dirichlet(dir_mask)
         dir_values = np.where(bc_type == 1, bc_values, y)
         A, b = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=f_ext)
 
@@ -800,6 +827,37 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 new_exit_face_active[mid] = True
                 new_exit_face_active[c2] = True
 
+        # Rescue against a SINGULAR full collapse of a quadratic exit face. The
+        # edge-based rule above keeps a tri6/quad8 seepage side all-or-nothing,
+        # which is what makes the seepage transition land cleanly on a corner on a
+        # well-resolved face. But on a COARSE exit face the phreatic exit point
+        # lands on a corner shared by the last wet edge and the first dry edge:
+        # that corner sits at pressure ~ 0 and reads a borderline (near-zero,
+        # often slightly positive) reaction, so it fails its own h/q test AND
+        # vetoes the wet edge below it — dropping EVERY exit-face node to inactive.
+        # Once empty the face cannot recover, because the strict turn-on test needs
+        # h >= y + hyst but the transition corner's equilibrium head is exactly its
+        # elevation. With no specified head anywhere the solve is then left with no
+        # Dirichlet row at all and spsolve diverges to ~1e15 (issue #51, the tri6
+        # thin-domain divergence).
+        #
+        # Rescue ONLY in that singular configuration — no fixed head AND every exit
+        # node inactive — by falling back to per-corner activation (the rule linear
+        # tri3 elements always use) for any corner that PASSES its own SEEP2D h/q
+        # test. The transition still occurs at a corner (the midside above stays
+        # governed by the edge rule and inactive). Gating on `has_fixed_head`
+        # is what makes this INERT on every healthy model: any model carrying a
+        # specified head (every earth-dam / reservoir case, where the exit face is
+        # free to empty transiently and re-fill as the phreatic front settles)
+        # keeps a Dirichlet row regardless, so the clause is unreachable there and
+        # the edge rule's tuned all-or-nothing toe behaviour is untouched. When
+        # the set empties with nothing to rescue, `_require_runtime_dirichlet`
+        # (issue #53) reports the true singularity on the next solve.
+        face_active = np.any((bc_type == 2) & new_exit_face_active)
+        stranded = is_corner & corner_candidate & ~new_exit_face_active
+        if not has_fixed_head and not face_active and np.any(stranded):
+            new_exit_face_active[stranded] = True
+
         newly_active = new_exit_face_active & ~exit_face_active
         h_new[newly_active] = y[newly_active]
         exit_face_active = new_exit_face_active
@@ -871,6 +929,7 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     # exit face status and the final (kr-consistent) matrix to get clean q
     # (inactive nodes become free → q ≈ 0), and report the flowrate from it.
     dir_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
+    _require_runtime_dirichlet(dir_mask)
     dir_values = np.where(bc_type == 1, bc_values, y)
     A_final, b_final = _dirichlet_system(asm, data, dir_mask, dir_values, neumann=f_ext)
     h_new = spsolve(A_final, b_final)

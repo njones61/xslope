@@ -2876,9 +2876,112 @@ def run_mesh_conform_test(test):
     return 0.0, None
 
 
+def run_seep_exit_collapse_test(test):
+    """Guard the tri6 exit-face active-set logic on a thin flat domain — the
+    geometry class that exposed two coupled seepage defects (found during the
+    GW8 build).
+
+    Both checks run on a 1.0 x 0.5 m domain (target 0.25, so the full-height
+    left-wall exit face is only two quadratic edges) meshed as tri3 and tri6:
+
+    #51  Rain flux on the top (q = 4.4e-6 over L = 1, so Q = q*L is exact by
+         construction) + the left-wall exit face + NO specified head. The tri3
+         oracle drains through the bottom of the face and converges. Pre-fix,
+         tri6 collapsed the WHOLE exit face to inactive — the edge-based
+         active-set rule let the borderline transition corner veto the wet edge
+         below it — leaving no Dirichlet node, so spsolve diverged to ~1e15 and
+         converged=False. The fix must make tri6 CONVERGE to a finite field with
+         at least one active exit node and the same construction-exact flowrate.
+
+    #53  A deliberately SINGULAR flux-only + exit-face model: an extraction
+         (outflow) flux with the same exit face and no specified head. The exit
+         face legitimately empties (nothing to rescue) so the effective Dirichlet
+         set is empty. Pre-fix that silently diverged to ~1e15; the runtime guard
+         must now raise a clear SeepInputError naming the cause.
+
+    Returns (0.0, None) on success, else (None, message). Builds its own mesh —
+    no input file needed; gmsh is already a seep-suite dependency."""
+    import io
+    import contextlib
+    import numpy as np
+    from xslope.mesh import build_mesh_from_polygons
+    from xslope.seep import solve_unsaturated, assemble_flux_nodal, SeepInputError
+
+    poly = [(0.0, 0.0), (1.0, 0.0), (1.0, 0.5), (0.0, 0.5)]
+
+    def _solve(element_type, flux):
+        with contextlib.redirect_stdout(io.StringIO()):
+            mesh = build_mesh_from_polygons([{'coords': poly, 'mat_id': 0}], 0.25, element_type)
+            nodes = np.asarray(mesh['nodes'], dtype=float)
+            x, y = nodes[:, 0], nodes[:, 1]
+            bc_type = np.zeros(len(nodes), dtype=int)
+            bc_values = np.zeros(len(nodes), dtype=float)
+            left = np.abs(x) <= 1e-6            # full-height left-wall exit face
+            bc_type[left] = 2
+            bc_values[left] = y[left]
+            fluxes = [{'coords': [(0.0, 0.5), (1.0, 0.5)], 'flux': flux}]   # top
+            flux_nodal = assemble_flux_nodal(nodes, mesh['elements'],
+                                             mesh['element_types'], fluxes, 1e-6)
+            res = solve_unsaturated(
+                nodes=nodes, elements=mesh['elements'], bc_type=bc_type,
+                bc_values=bc_values, kr0=0.001, h0=-1.0, k1_vals=1.0, k2_vals=1.0,
+                angles=0.0, element_types=mesh['element_types'], tol=1e-6,
+                max_iter=400, closure_tol=1e-3, flux_nodal=flux_nodal)
+        head, _A, _q, total_flow, exit_active, converged, _closure = res
+        n_active = int(np.sum(exit_active & (bc_type == 2)))
+        return head, total_flow, n_active, converged
+
+    problems = []
+
+    # ---- #51: thin-domain exit face must CONVERGE (tri3 is the oracle) --------
+    q_rain = 4.4e-6
+    try:
+        h3, flow3, act3, conv3 = _solve('tri3', q_rain)
+    except Exception as e:
+        return None, f"#51 tri3 oracle unexpectedly failed: {type(e).__name__}: {e}"
+    if not conv3:
+        problems.append("#51 tri3 oracle did not converge")
+    try:
+        h6, flow6, act6, conv6 = _solve('tri6', q_rain)
+    except Exception as e:
+        problems.append(f"#51 tri6 raised instead of converging: {type(e).__name__}: {e}")
+        conv6 = False; h6 = np.array([np.nan]); flow6 = 0.0; act6 = 0
+    if not conv6:
+        problems.append("#51 tri6 did not converge (exit face collapsed -> singular)")
+    if not np.all(np.isfinite(h6)):
+        problems.append("#51 tri6 head is not finite (diverged)")
+    elif np.max(np.abs(h6)) > 1.0:
+        problems.append(f"#51 tri6 head unphysical (max|h|={np.max(np.abs(h6)):.3e}, expected <1)")
+    if act6 < 1:
+        problems.append("#51 tri6 finished with no active exit-face node")
+    # Flowrate is Q = q*L = 4.4e-6, exact by construction for every element type.
+    if abs(flow6 - q_rain) > 1e-9 or abs(flow3 - q_rain) > 1e-9:
+        problems.append(f"#51 flowrate off q*L: tri3={flow3:.3e}, tri6={flow6:.3e}, expected {q_rain:.3e}")
+
+    # ---- #53: deliberately singular flux-only + exit face must RAISE ----------
+    raised = False
+    try:
+        _solve('tri6', -q_rain)     # extraction: face empties, no head anchor
+    except SeepInputError as e:
+        raised = True
+        msg = str(e).lower()
+        if 'singular' not in msg or 'exit face' not in msg:
+            problems.append(f"#53 raised SeepInputError but message unclear: {str(e)[:60]}")
+    except Exception as e:
+        problems.append(f"#53 raised {type(e).__name__}, expected SeepInputError")
+    if not raised:
+        problems.append("#53 singular flux-only+exit-face model did NOT raise (diverged silently)")
+
+    if problems:
+        return None, "; ".join(problems[:6])
+    return 0.0, None
+
+
 def run_test(test):
     """Run a single test and return (computed_value, error_msg)."""
     test_type = test.get('type', '')
+    if test_type == 'seep_exit_collapse':
+        return run_seep_exit_collapse_test(test)
     if test_type == 'mesh_conform':
         return run_mesh_conform_test(test)
     if test_type == 'vg_kr':
@@ -2946,7 +3049,7 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
-                       'mesh_conform', 'seep_elements', 'fem_elements',
+                       'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
@@ -3075,6 +3178,11 @@ def main():
         # Mesh conforming-edge (T-junction) regression.
         tests.append({'type': 'mesh_conform', 'file': 'conforming edges (mesh)',
                       'method': '-', 'source': 'mesh_conform'})
+        # Thin-domain tri6 exit-face regression: must converge (#51) and the
+        # singular flux-only+exit-face model must raise a clear error (#53).
+        tests.append({'type': 'seep_exit_collapse',
+                      'file': 'tri6 thin-domain exit face (#51 #53)',
+                      'method': '-', 'source': 'seep_exit_collapse'})
         seep_samples = Path('docs/seep/samples.md')
         if seep_samples.exists():
             tests.extend(parse_test_tags(seep_samples))

@@ -3448,17 +3448,24 @@ def get_plot_elements_bounds(ax, slope_data):
 
 def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
                      dpi=300, fig=None, style=None):
-    """Plot a sensitivity() sweep: FS vs parameter value, one line per method.
+    """Plot a sensitivity() sweep: the output quantity vs parameter value, one
+    line per method.
 
-    The base case is marked, FS = 1 gets a horizontal guide (plus an optional
-    target), and if the sweep re-searched the critical surface, points where
-    the surface JUMPED between neighbours (a different failure mode taking
-    over) are drawn open — the Xo/Yo/R columns make the jump detectable in the
-    data, not just suspected.
+    The base case is marked, and — when the output is a factor of safety — FS = 1
+    gets a horizontal guide (plus an optional target). If the sweep re-searched
+    the critical surface, points where the surface JUMPED between neighbours (a
+    different failure mode taking over) are drawn open — the Xo/Yo/R columns make
+    the jump detectable in the data, not just suspected.
+
+    The y-axis / title follow the swept quantity: 'Factor of Safety' for an LEM or
+    FEM sweep, 'Total discharge, q' for a seepage sweep (the df's 'output' /
+    'output_label' columns carry it; absent columns default to FS for backward
+    compatibility, so old sweeps plot exactly as before).
 
     Parameters:
         df: the DataFrame from sensitivity() (result['df']).
-        target_fs: optional design FS to draw as a second guide line.
+        target_fs: optional design target to draw as a second guide line (an FS in
+            LEM/FEM, a discharge q in a seepage sweep).
     """
     import numpy as np
     if fig is None:
@@ -3467,6 +3474,12 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
         ax = fig.add_subplot(111)
 
     param = df['param'].iloc[0]
+    # output-quantity awareness (backward-compatible defaults)
+    output = df['output'].iloc[0] if 'output' in df.columns and len(df) else 'FS'
+    output_label = (df['output_label'].iloc[0]
+                    if 'output_label' in df.columns and len(df)
+                    else 'Factor of Safety')
+    is_fs = output == 'FS'
     for method, g in df.groupby('method'):
         pts = g.loc[~g['is_base'] & g['success']].sort_values('value')
         ax.plot(pts['value'], pts['fs'], marker='o', label=method)
@@ -3486,14 +3499,15 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
             ax.plot(base['value'].iloc[0], base['fs'].iloc[0], 's', color='k',
                     ms=8, zorder=6,
                     label=f"base case ({base['value'].iloc[0]:g}, "
-                          f"FS = {base['fs'].iloc[0]:.3f})")
-    ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
+                          f"{output} = {base['fs'].iloc[0]:.3g})")
+    if is_fs:                                    # FS = 1 guide only for a safety factor
+        ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
     if target_fs is not None:
         ax.axhline(target_fs, color='gray', linestyle='--', linewidth=0.8,
-                   label=f'FS = {target_fs}')
+                   label=f'{output} = {target_fs:g}')
     ax.set_xlabel(param)
-    ax.set_ylabel('Factor of Safety')
-    ax.set_title(f'Sensitivity: FS vs {param}')
+    ax.set_ylabel(output_label)
+    ax.set_title(f'Sensitivity: {output} vs {param}')
     ax.legend()
     ax.grid(True, alpha=0.4)
     fig.tight_layout()
@@ -3505,17 +3519,26 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
 
 def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
                  style=None, widest_on_top=True):
-    """Duncan-style tornado diagram from tornado(): horizontal bars of the FS
-    swing between each parameter's low and high bound, sorted by span, with
-    the base-case FS as the vertical reference.
+    """Duncan-style tornado diagram from tornado(): horizontal bars of the output
+    swing between each parameter's low and high bound, sorted by span, with the
+    base-case value as the vertical reference.
+
+    The swept quantity follows result['output'] / result['output_label'] — a
+    factor of safety for an LEM/FEM tornado, total discharge q for a seepage one
+    (absent keys default to FS, so an old result plots as before).
 
     Parameters:
-        result: the dict from tornado() (carries 'df', 'base_fs', 'method').
+        result: the dict from tornado() (carries 'df', 'base_fs', 'method', and
+            optionally 'output' / 'output_label').
         widest_on_top: the classic tornado stacking (default). False inverts,
             widest at the bottom.
     """
     import numpy as np
     df, base_fs = result['df'], result['base_fs']
+    output = result.get('output', 'FS')
+    output_label = result.get('output_label', 'Factor of Safety')
+    # FS reads best fixed-point; a tiny discharge q needs significant figures.
+    vfmt = (lambda x: f'{x:.2f}') if output == 'FS' else (lambda x: f'{x:.3g}')
     if fig is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
@@ -3533,9 +3556,9 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
     for k, (param, lo_fs, hi_fs, _span) in enumerate(bars):
         left, width = min(lo_fs, hi_fs), abs(hi_fs - lo_fs)
         ax.barh(k, width, left=left, height=0.55, color='C0', alpha=0.75)
-        ax.annotate(f'{lo_fs:.2f}', (lo_fs, k), textcoords='offset points',
+        ax.annotate(vfmt(lo_fs), (lo_fs, k), textcoords='offset points',
                     xytext=(-6, 0), ha='right', va='center', fontsize=8)
-        ax.annotate(f'{hi_fs:.2f}', (hi_fs, k), textcoords='offset points',
+        ax.annotate(vfmt(hi_fs), (hi_fs, k), textcoords='offset points',
                     xytext=(6, 0), ha='left', va='center', fontsize=8)
     ax.set_yticks(range(len(bars)))
     ax.set_yticklabels([b[0] for b in bars])
@@ -3551,10 +3574,13 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
         ax.set_xlim(lo_min - 0.15 * span, hi_max + 0.15 * span)
     if base_fs is not None and np.isfinite(base_fs):
         ax.axvline(base_fs, color='k', linewidth=1.0,
-                   label=f'base FS = {base_fs:.3f}')
+                   label=f'base {output} = {vfmt(base_fs)}')
         ax.legend()
-    ax.set_xlabel(f"Factor of Safety ({result.get('method', '')})")
-    ax.set_title('Tornado: FS swing per parameter')
+    # LEM method label only makes sense for a factor of safety.
+    method = result.get('method', '')
+    xlabel = output_label + (f" ({method})" if method and output == 'FS' else "")
+    ax.set_xlabel(xlabel)
+    ax.set_title(f'Tornado: {output} swing per parameter')
     ax.grid(True, axis='x', alpha=0.4)
     fig.tight_layout()
     if save_png:

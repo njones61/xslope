@@ -27,7 +27,8 @@ import time
 import numpy as np
 import pandas as pd
 
-__all__ = ['sensitivity', 'tornado', 'set_param', 'resolve_param']
+__all__ = ['sensitivity', 'tornado', 'design', 'set_param', 'resolve_param',
+           'list_params', 'tornado_from_sweeps']
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +65,14 @@ def _mat_strength_fields(material, mat_name):
 
 
 def _find_by_name(items, name, kind, name_key='name'):
-    """Case-insensitive unique lookup; raises naming what was given and what exists."""
+    """Case-insensitive unique lookup by name, or by 1-based index when ``name`` is
+    an integer. Raises naming what was given and what exists."""
+    # An integer (not the bool subclass) addresses the item by 1-based position —
+    # the "material index or name" the AI/GUI specs allow.
+    if isinstance(name, int) and not isinstance(name, bool):
+        if 1 <= name <= len(items):
+            return name - 1, items[name - 1]
+        raise ValueError(f"{kind} index {name} out of range (1..{len(items)}).")
     want = str(name).strip().lower()
     hits = [(i, it) for i, it in enumerate(items)
             if str(it.get(name_key, '')).strip().lower() == want]
@@ -106,6 +114,30 @@ def _copy_for_edit(slope_data):
     return sd
 
 
+def _dict_to_ref(d):
+    """Normalize a plain-dict parameter spec to a (kind, name, field) tuple the
+    rest of resolve_param understands. Accepts the shapes an LLM or GUI naturally
+    writes:
+        {'ref': 'mat:Clay:c'}                      -> passed straight through
+        {'material': 'Clay', 'property': 'c'}      -> ('mat', 'Clay', 'c')
+        {'material': 2, 'property': 'phi'}         -> ('mat', 2, 'phi')  (1-based index)
+        {'global': 'k_seismic'}                    -> ('global', 'k_seismic')
+        {'kind': 'seep', 'name': 'Clay', 'field': 'k1'}
+    """
+    d = {str(k).lower(): v for k, v in d.items()}
+    if d.get('ref'):
+        return d['ref']
+    field = d.get('field') or d.get('property') or d.get('prop')
+    if 'global' in d:
+        g = d['global']
+        return ('global', field if g is True else g)
+    kind = str(d.get('kind') or 'mat').lower()
+    if kind == 'global':
+        return ('global', field)
+    name = d.get('name') or d.get('material') or d.get('mat') or d.get(kind)
+    return (kind, name, field)
+
+
 def resolve_param(slope_data, ref):
     """Validate a parameter reference against THIS model and resolve it.
 
@@ -113,8 +145,11 @@ def resolve_param(slope_data, ref):
     ``(slope_data, value) -> slope_data`` operating on a fresh copy.
     Raises ValueError naming what was given and what exists on any miss.
     """
+    if isinstance(ref, dict):
+        ref = _dict_to_ref(ref)
     if isinstance(ref, (tuple, list)):
-        parts = [str(p) for p in ref]
+        # keep native types (a material index stays an int for _find_by_name)
+        parts = list(ref)
     else:
         parts = str(ref).split(':')
     if len(parts) == 2:
@@ -124,7 +159,7 @@ def resolve_param(slope_data, ref):
     else:
         raise ValueError(f"Parameter ref '{ref}' is not 'kind:name:field' "
                          f"(or 'global:field' / 'geom:piezo:dy').")
-    kind = kind.strip().lower()
+    kind = str(kind).strip().lower()
 
     if kind == 'mat':
         idx, mat = _find_by_name(slope_data['materials'], name, 'material')
@@ -324,7 +359,8 @@ def _run_lem_point(sd, methods, search, num_slices):
 
 def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
                 rel_range=0.5, n=9, analysis='lem', methods=('spencer',),
-                search=True, num_slices=40, debug_level=0):
+                search=True, num_slices=40, debug_level=0,
+                progress_callback=None, cancel_check=None):
     """Sweep one input; report FS (and the critical surface) per point.
 
     Parameters:
@@ -344,6 +380,12 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
             sweep silently understates sensitivity) vs re-solve the stored
             surface (~50x faster; right for prescribed-surface questions).
         num_slices: slices per evaluation.
+        progress_callback: optional callable(done, total, label) invoked once per
+            swept point (the base case is point 1), for a GUI progress bar.
+        cancel_check: optional callable() -> bool; checked before every point and
+            if it returns True an xslope.search.AnalysisCancelled is raised so a
+            background runner can abort the sweep cleanly. Never set for a plain
+            data-in/data-out call.
 
     Returns:
         (success, result): result['df'] is a tidy long-format DataFrame (one
@@ -386,10 +428,29 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
                                  and np.isfinite(base_value) else np.nan),
                          'is_base': is_base, 'analysis': analysis, **pr})
 
+    total = 1 + len(values)
+    done = [0]
+
+    def _tick(label):
+        done[0] += 1
+        if progress_callback is not None:
+            try:
+                progress_callback(done[0], total, label)
+            except Exception:                             # noqa: BLE001
+                pass
+
+    def _check_cancel():
+        if cancel_check is not None and cancel_check():
+            from .search import AnalysisCancelled
+            raise AnalysisCancelled()
+
     # base case first: the unmodified model
+    _check_cancel()
     add_rows(base_value, True, _run_lem_point(slope_data, methods, search, num_slices))
+    _tick(f"{canonical} (base)")
 
     for v in values:
+        _check_cancel()
         try:
             sd = setter(_copy_for_edit(slope_data), v) if modify is not None \
                 else setter(slope_data, v)
@@ -397,16 +458,19 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
             add_rows(v, False, [{'method': m, 'fs': np.nan, 'success': False,
                                  'msg': f'setter failed: {e}', 'Xo': np.nan,
                                  'Yo': np.nan, 'R': np.nan} for m in methods])
+            _tick(f"{canonical} = {v:g}")
             continue
         err = _validate_model(sd)
         if err:
             add_rows(v, False, [{'method': m, 'fs': np.nan, 'success': False,
                                  'msg': err, 'Xo': np.nan, 'Yo': np.nan,
                                  'R': np.nan} for m in methods])
+            _tick(f"{canonical} = {v:g}")
             continue
         if debug_level > 0:
             print(f"sensitivity: {canonical} = {v:g}")
         add_rows(v, False, _run_lem_point(sd, methods, search, num_slices))
+        _tick(f"{canonical} = {v:g}")
 
     df = pd.DataFrame(rows, columns=['param', 'value', 'rel', 'is_base', 'analysis',
                                      'method', 'fs', 'success', 'msg',
@@ -455,3 +519,217 @@ def tornado(slope_data, params, rel_range=0.25, bounds=None, analysis='lem',
             frames.append(df.loc[~df['is_base']])
     out = pd.concat(frames, ignore_index=True)
     return True, {'df': out, 'base_fs': base_fs, 'method': method}
+
+
+def tornado_from_sweeps(sweeps, base_fs=None, method=None):
+    """Assemble a tornado result (the dict plot_tornado consumes) from full
+    per-parameter sensitivity() sweeps.
+
+    Where tornado() re-solves each parameter's two endpoints, this reuses sweeps a
+    caller already ran — e.g. a GUI that runs a full FS-vs-value curve per
+    parameter for click-through and wants the tornado for free. plot_tornado reads
+    each parameter's lowest- and highest-value FS, so a full sweep yields the same
+    bar as a 2-point one.
+
+    Parameters:
+        sweeps: dict {canonical_ref: df} or a sequence of sensitivity DataFrames,
+            each carrying the base row plus one parameter's swept points.
+        base_fs: base-case FS for the reference line; taken from the sweeps'
+            is_base row if omitted.
+        method: the LEM method label (for the plot's axis title).
+
+    Returns {'df', 'base_fs', 'method'} — the shape tornado() returns.
+    """
+    dfs = list(sweeps.values()) if isinstance(sweeps, dict) else list(sweeps)
+    if not dfs:
+        return {'df': pd.DataFrame(), 'base_fs': base_fs, 'method': method}
+    combined = pd.concat(dfs, ignore_index=True)
+    if base_fs is None:
+        b = combined.loc[combined['is_base'] & combined['success'], 'fs']
+        base_fs = float(b.iloc[0]) if len(b) else None
+    return {'df': combined, 'base_fs': base_fs, 'method': method}
+
+
+def _target_crossings(values, fs, target):
+    """Parameter values where the FS curve crosses ``target``, linearly
+    interpolated between adjacent solves. Handles a non-monotonic curve (returns
+    every crossing) and endpoints exactly on target."""
+    xs = []
+    n = len(values)
+    for i in range(n - 1):
+        f0, f1 = fs[i], fs[i + 1]
+        if not (np.isfinite(f0) and np.isfinite(f1)):
+            continue
+        g0, g1 = f0 - target, f1 - target
+        if g0 == 0.0:
+            xs.append(values[i])
+        elif (g0 < 0) != (g1 < 0) and g1 != 0.0:
+            t = g0 / (g0 - g1)
+            xs.append(values[i] + t * (values[i + 1] - values[i]))
+    if n and np.isfinite(fs[-1]) and (fs[-1] - target) == 0.0:
+        xs.append(values[-1])
+    uniq = []
+    for x in xs:
+        if not any(abs(x - u) < 1e-9 for u in uniq):
+            uniq.append(float(x))
+    return uniq
+
+
+def design(slope_data, param, low, high, steps=11, target_fs=1.5,
+           analysis='lem', method='spencer', search=True, num_slices=40,
+           progress_callback=None, cancel_check=None, debug_level=0):
+    """Design sweep: vary ONE parameter from ``low`` to ``high`` and find the value
+    at which the factor of safety meets ``target_fs``.
+
+    The deterministic-design staple — "vary the undrained strength between X and Y
+    and find where FS = 1.5". Runs ``steps`` evenly spaced solves across
+    [low, high] (re-searching the critical surface at each step by default), then
+    linearly interpolates the parameter value where the FS curve crosses
+    ``target_fs``. Honest about misses: if the target is never reached inside the
+    swept range, ``bracketed`` is False and ``extend``/``message`` say which way to
+    widen the range.
+
+    Parameters:
+        param: parameter reference — a "kind:name:field" string (e.g. "mat:Clay:c",
+            "global:k_seismic"), a (kind, name, field) tuple (name may be a 1-based
+            material index), or a dict {'material': name|index, 'property': field}
+            / {'global': field}. See resolve_param for the full grammar.
+        low, high: inclusive bounds of the swept parameter value.
+        steps: number of solves across [low, high] (>= 2).
+        target_fs: the design factor of safety to locate (default 1.5).
+        analysis: 'lem' (the only implemented engine so far).
+        method: one LEM method name (any of the seven).
+        search: re-search the critical surface at each step (default; correct — the
+            critical surface moves as the parameter changes) or re-solve the stored
+            surface (faster, but understates the movement).
+        num_slices: slices per evaluation.
+        progress_callback: optional callable(done, total, label) for a GUI.
+        cancel_check: optional callable() -> bool; True mid-sweep raises
+            xslope.search.AnalysisCancelled. Never set for a plain data call.
+
+    Returns:
+        (success, result). On success ``result`` carries:
+          'df'         — the sensitivity DataFrame (FS vs value, one method).
+          'param'      — canonical parameter ref.
+          'target_fs'  — the target.
+          'crossing'   — interpolated parameter value at FS = target_fs, or None.
+          'crossings'  — every crossing found (list; usually one).
+          'bracketed'  — True iff the target is crossed inside [low, high].
+          'fs_range'   — (min FS, max FS) over the successful sweep points.
+          'direction'  — 'increasing' / 'decreasing' / 'non-monotonic' trend of FS
+                         vs the parameter (None if undetermined).
+          'extend'     — when not bracketed, 'above {high}' or 'below {low}': which
+                         way to widen the range to bracket the target; else None.
+          'message'    — one-line human-readable summary.
+          'base_value' — the parameter's current (unmodified) value.
+          'runtime'    — wall-clock seconds.
+    """
+    if int(steps) < 2:
+        return False, "steps must be >= 2."
+    values = np.linspace(float(low), float(high), int(steps))
+    ok, res = sensitivity(slope_data, param=param, values=values, analysis=analysis,
+                          methods=(method,), search=search, num_slices=num_slices,
+                          progress_callback=progress_callback,
+                          cancel_check=cancel_check, debug_level=debug_level)
+    if not ok:
+        return False, res
+
+    df = res['df']
+    canonical = res['param']
+    target = float(target_fs)
+    swept = df.loc[~df['is_base'] & df['success']].sort_values('value')
+    vals = swept['value'].to_numpy(dtype=float)
+    fs = swept['fs'].to_numpy(dtype=float)
+    crossings = _target_crossings(vals, fs, target)
+    bracketed = len(crossings) > 0
+    fs_min = float(np.min(fs)) if len(fs) else float('nan')
+    fs_max = float(np.max(fs)) if len(fs) else float('nan')
+
+    direction = None
+    if len(fs) >= 2:
+        diffs = np.diff(fs)
+        if np.all(diffs >= -1e-9):
+            direction = 'increasing'
+        elif np.all(diffs <= 1e-9):
+            direction = 'decreasing'
+        else:
+            direction = 'non-monotonic'
+
+    extend = None
+    if not bracketed and len(fs):
+        rises = (direction == 'increasing') or (direction != 'decreasing'
+                                                and fs[-1] >= fs[0])
+        need_higher = target > fs_max
+        if need_higher:
+            extend = f"above {high:g}" if rises else f"below {low:g}"
+        else:                                  # target below the whole swept range
+            extend = f"below {low:g}" if rises else f"above {high:g}"
+
+    if bracketed:
+        crossing = float(crossings[0])
+        message = (f"FS = {target:g} at {canonical} = {crossing:.4g} "
+                   f"(interpolated between solves).")
+        if len(crossings) > 1:
+            message += f"  [{len(crossings)} crossings; first reported]"
+    else:
+        crossing = None
+        message = (f"FS = {target:g} is not reached for {canonical} in "
+                   f"[{low:g}, {high:g}] — FS spans [{fs_min:.3f}, {fs_max:.3f}]."
+                   + (f" Extend the range {extend} to bracket it." if extend else ""))
+
+    return True, {'df': df, 'param': canonical, 'target_fs': target,
+                  'crossing': crossing, 'crossings': [float(c) for c in crossings],
+                  'bracketed': bracketed, 'fs_range': (fs_min, fs_max),
+                  'direction': direction, 'extend': extend, 'message': message,
+                  'base_value': res['base_value'], 'runtime': res['runtime']}
+
+
+def list_params(slope_data):
+    """Enumerate every sweepable parameter in this model as plain dicts — the menu
+    a GUI parameter-picker or an LLM uses to drive sensitivity()/design()/tornado().
+
+    Covers every material's numeric strength and general fields (option-aware, the
+    same set resolve_param accepts) plus the global k_seismic. Blank/zero-valued
+    fields are still listed (value None/0) so a design sweep with explicit bounds
+    can target them.
+
+    Each entry:
+        'ref'    — canonical "kind:name:field" string accepted by every entry point
+        'kind'   — 'mat' or 'global'
+        'name'   — material name (None for globals)
+        'index'  — 1-based material index (None for globals)
+        'field'  — property key
+        'value'  — current value (float, or None if unset)
+        'sigma'  — reliability std-dev for the field (sigma_c, sigma_phi, …) if the
+                   model carries a non-zero one, else None — lets a GUI offer a
+                   one-click +/-sigma range
+        'label'  — short human label, e.g. 'Clay · c'
+    """
+    out = []
+    for i, mat in enumerate(slope_data.get('materials') or []):
+        name = mat.get('name') or f'Material_{i + 1}'
+        try:
+            strength = _mat_strength_fields(mat, name)
+        except Exception:                                 # noqa: BLE001
+            strength = ()
+        seen = set()
+        for field in tuple(strength) + _MAT_GENERAL_FIELDS:
+            if field in seen or field not in mat:
+                continue
+            seen.add(field)
+            val = mat.get(field)
+            sig = mat.get('sigma_' + field)
+            out.append({
+                'ref': f'mat:{name}:{field}', 'kind': 'mat', 'name': name,
+                'index': i + 1, 'field': field,
+                'value': (float(val) if isinstance(val, (int, float))
+                          and not isinstance(val, bool) else None),
+                'sigma': (float(sig) if isinstance(sig, (int, float))
+                          and not isinstance(sig, bool) and sig else None),
+                'label': f'{name} · {field}',
+            })
+    out.append({'ref': 'global:k_seismic', 'kind': 'global', 'name': None,
+                'index': None, 'field': 'k_seismic',
+                'value': float(slope_data.get('k_seismic') or 0.0),
+                'sigma': None, 'label': 'k_seismic (global)'})
+    return out

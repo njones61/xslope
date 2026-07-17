@@ -135,9 +135,12 @@ of the engine's
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
 
-!!! note "Sweeps are LEM-only"
-    The Sensitivity / Design dialog sweeps the **limit-equilibrium** analyses; FEM and
-    seepage sweeps are not yet offered in the dialog.
+!!! note "A sweep for each mode"
+    The Sensitivity / Design dialog has a version for every mode. In **LEM** it sweeps the
+    limit-equilibrium analyses (output: factor of safety). In **FEM** each swept point is a
+    full SSRM solve (output: factor of safety) — expect minutes per step, so it runs in the
+    background and is cancellable. In **Seepage** the output is the **total discharge q**
+    through the section. FEM and seepage sweeps run on the mesh, so build one first.
 
 ---
 

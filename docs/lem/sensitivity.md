@@ -129,9 +129,16 @@ guide lines, marks the unmodified model as a labelled **base case** entry in the
 the black square in the plot reads as `base case (value, FS = …)` rather than an unexplained
 point — and draws any point where the critical surface jumped as an open circle.
 
-Only `analysis='lem'` is implemented: sweeps run the limit-equilibrium methods. FEM and
-seepage sweeps are planned but not yet available, and a request for either returns a
-`success=False` message rather than a silent no-op.
+`mode=` selects the engine that evaluates each swept point. `mode='lem'` (the default)
+runs the limit-equilibrium methods and reports a factor of safety. `mode='fem'` runs a
+full SSRM solve at every point — the output is still a factor of safety, but each step is
+a complete finite-element analysis (expect minutes per step; run it in the background) and
+the model must carry a mesh in `slope_data['mesh']`. `mode='seep'` rebuilds and solves the
+seepage problem at every point and reports the **total discharge q** through the section
+(the same flow rate the seepage solver returns), and likewise needs a mesh. The result's
+value column stays `fs` for a consistent schema; `result['output']` (`'FS'` or `'q'`) and
+`result['output_label']` say what it really is, so a discharge sweep is never mislabelled a
+factor of safety.
 
 ## Sweeping anything else: `modify=`
 

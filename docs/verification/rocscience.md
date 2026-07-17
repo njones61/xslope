@@ -787,7 +787,14 @@ circle fixes the datum — 200 kN/m on a 1.0 m arm puts the geosynthetic at y = 
 
 Bishop is the method the manual specifies for this problem — it "best simulates the moment
 based limit-equilibrium method the authors use" — and it lands within 0.7% of Slide on both
-circles.
+circles. The locked values include the geosynthetic at full capacity: removing it drops
+Bishop to 1.359 / 1.262, a ΔF of +0.320 / +0.388 — the paper's own decomposition to the
+third decimal (M<sub>RR</sub>/M<sub>O</sub> = 200/631.38 = 0.317 and 200/521.66 = 0.383).
+The soil-side moments agree with Table 10 to under 1% (driving 635.9 vs 631.38, clay arc
+845.0 vs 849.25), so the three published anchors reconcile completely: Borges' 1.77 is the
+uncracked arc plus the geosynthetic, Slide's 1.69 and XSLOPE's 1.679 are the cracked arc
+plus the same geosynthetic, and the crack costs −0.090 of FS — which is the published
+1.77 − 1.69 spread, computed rather than asserted.
 
 **The tension crack is the whole problem.** Both circles have their center below the crest,
 so the arc's uphill end is buried at its equator and the daylight point sits *above* it
@@ -808,10 +815,29 @@ of vertical slices cannot represent it at all. This is not a guard that could be
 is what slicing is. The published spread is itself instructive: Slide 1.69 / 1.66 against
 Borges 1.77 / 1.74 is the cost of the crack, and XSLOPE reproduces the cracked branch.
 
-**Spencer is not locked here, and disagrees sharply** (1.192 / 1.080 against Bishop's 1.679 /
-1.650). On [VP32](#vp32) — same paper, same reinforcement model, no crack — Bishop and Spencer
-agree to three decimals, so the split is specific to this configuration and is recorded rather
-than explained. Only the Bishop comparison the manual calls for is regression-locked.
+**Spencer is not locked here, and the disagreement is measured, not mysterious** (1.192 /
+1.080 against Bishop's 1.679 / 1.650, with Janbu refusing outright and Corps / Lowe & Karafiath
+inflating to 2.8–4.6). The crack-shortened arc exceeds a semicircle — base angles run from
++83° at the crack face to −74° at the exit — so the horizontal projections of the base normals
+nearly cancel: the whole mass carries only ≈68 kN/m of net horizontal driving force at F = 1,
+a third of the 200 kN/m the geosynthetic mobilizes. Horizontal force equilibrium is close to
+the null space of the problem, and any FS built on it is a ratio of two cancelling sums; Janbu
+says so plainly ("net horizontal driving force is non-positive"). Spencer's constant
+interslice inclination can transmit the concentrated horizontal force entering at the
+near-vertical end only by hanging ≈240 kN/m of interslice *tension* at the crack face with a
+negative normal on the cohesionless sliver — a root that satisfies both equations while the
+thrust line leaves the soil, and that never converges: 1.19 → 1.38 as the slices refine from
+60 to 960, then no solution at all. The two controls isolate the cause. Soil-only, the
+geometry is benign (Bishop 1.359, Spencer 1.358 on circle A); and the same 200 kN/m spread
+along the arc instead of concentrated at the entry returns Spencer to 1.683, beside Bishop.
+Complete equilibrium *is* satisfiable at the moment answer: Morgenstern–Price with a half-sine
+interslice function — side forces flattening exactly where the horizontal force enters —
+converges with all base normals positive at **1.670 / 1.632**, within 0.6% of Bishop. For
+φ = 0 circles the moment-equilibrium FS is the complete-equilibrium value (Duncan, Wright &
+Brandon 2014, pp. 89, 96–97), which is why the manual prescribes Bishop and only the Bishop
+comparison is regression-locked. On [VP32](#vp32) — same paper, same reinforcement model, no
+crack — none of this arises: the arc is an ordinary sub-semicircle and Bishop and Spencer
+agree to three decimals.
 
 One note on the materials: the Case-1 clay profile has a middle layer whose undrained strength
 *decreases* with depth (8.49 → 4.725 kPa), unlike the monotonically increasing profiles in

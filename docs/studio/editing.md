@@ -52,8 +52,6 @@ plots (**Reset** returns it to the default palette); the same swatch is the firs
 column of the table view. Both views edit the same rows, so switching is
 lossless.
 
-![Display color swatch in list view](images/editing_materials_list_color.png)
-
 ![Color swatch column in table view](images/editing_materials_table_color.png)
 
 ![Global parameters form](images/editing_global_form.png)

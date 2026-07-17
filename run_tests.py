@@ -953,6 +953,43 @@ def run_editor_roundtrip_test(test):
     dlg.deleteLater()
     app.processEvents()
 
+    # The reinforcement and pile editors likewise have a List view bound to the SAME
+    # rows (default view; the table is the bulk-entry path). Cover both invariants for
+    # each — a list-view no-op round-trip and a table->list->table mid-edit survival —
+    # mirroring the materials cases. The switch case edits a NON-geometry field so the
+    # pile's axis-derived θ stays idempotent (editing x/y would legitimately recompute
+    # it, which isn't what this guard is measuring).
+    for cat, mkey, edit_key, edit_val in (
+            ("reinforce", "reinforcement_lines", "t_max", 1234.5),
+            ("piles",     "pile_lines",          "V_cap", 77.5)):
+        editor = CATEGORY_EDITORS[cat]
+
+        # (1) Open, switch to LIST view, apply unchanged — deep-equal.
+        sd = _editor_fixture()
+        before = copy.deepcopy(sd[mkey])
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode("list")
+        editor.apply(sd, dlg)
+        problems += _roundtrip_diff(before, sd[mkey], f"{cat}(list)")
+        dlg.deleteLater()
+        app.processEvents()
+
+        # (2) Edit a value in the TABLE view, switch table->list->table, apply — the
+        #     edit must survive both switches and nothing else may change.
+        sd = _editor_fixture()
+        expected = copy.deepcopy(sd[mkey])
+        dlg = editor.build(sd, None)
+        dlg.set_view_mode("table")                   # explicit (default/session is List)
+        col = next(j for j, f in enumerate(editor.FIELDS) if f.key == edit_key)
+        dlg._table.table.item(0, col).setText(str(edit_val))
+        expected[0][edit_key] = edit_val
+        dlg.set_view_mode("list")
+        dlg.set_view_mode("table")
+        editor.apply(sd, dlg)
+        problems += _roundtrip_diff(expected, sd[mkey], f"{cat}(switch)")
+        dlg.deleteLater()
+        app.processEvents()
+
     if problems:
         return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])
     return 0.0, None

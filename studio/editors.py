@@ -2109,6 +2109,418 @@ class MaterialsEditor(CategoryEditor):
                 doc.set_style(new_style)
 
 
+# --------------------------------------------------------------------------- #
+# Line editors — Table view (the bulk-entry table) + List view (a per-line
+# grouped form beside the live section preview). Shared by the reinforcement and
+# pile editors: both edit a list of 2-endpoint line records. Both views bind to
+# the SAME rows, so switching mid-edit is lossless (mirrors MaterialsDialog).
+# --------------------------------------------------------------------------- #
+
+# Last-used view per line editor, remembered within the session. Unlike materials
+# (which mirrors the wide 'mat' sheet and opens on the table), these open on the
+# LIST view: piles are almost always 1-3 rows, and a tiered wall's reinforcement is
+# edited one line at a time — the table stays the bulk-entry path for the 15-20
+# lines of a big wall, but the list is the primary editing surface.
+_LAST_LINE_VIEW = {"reinforce": "list", "piles": "list"}
+
+
+def _last_line_view(key):
+    return _LAST_LINE_VIEW.get(key, "list")
+
+
+def _set_last_line_view(key, mode):
+    _LAST_LINE_VIEW[key] = mode
+
+
+class _LineListView(QWidget):
+    """List view for the 2-endpoint line editors (reinforcement / piles): three
+    splitter panes — [items list | grouped property form | section preview]. Binds
+    to a list of row dicts; edits write through immediately, so ``result_rows`` (and
+    a view switch) never lose an in-progress edit. Every table field has a widget
+    (grouped, all shown), and unshown keys (e.g. a pile's derived θ) ride along
+    untouched, so a round-trip preserves every field exactly as the table view does.
+    The preview is the SAME debounced ``PreviewPane`` the table view uses; a click in
+    it selects the corresponding list item (the emphasis follows)."""
+
+    def __init__(self, fields, rows, new_row, groups, item_label,
+                 preview_draw, pick_resolve, preview_caption=None, parent=None):
+        super().__init__(parent)
+        self._field_by_key = {f.key: f for f in fields}
+        self._new_row = new_row
+        self._rows = [dict(r) for r in rows]
+        self._groups = groups
+        self._item_label = item_label
+        self._preview_draw = preview_draw
+        self._pick_resolve = pick_resolve
+        self._cur = -1
+        self._edits = {}          # key -> QLineEdit / QComboBox
+
+        from .canvas import PreviewPane
+        list_pane = self._build_list_pane()
+        form_pane = self._build_form_pane()
+        self._preview = PreviewPane(
+            lambda ax: self._preview_draw(ax, self._rows, self._cur),
+            caption=preview_caption)
+        self._preview.clicked.connect(self._on_preview_click)
+
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(list_pane)
+        splitter.addWidget(form_pane)
+        splitter.addWidget(self._preview)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 1)
+        splitter.setSizes([200, 380, 470])
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(splitter)
+
+        self._refresh_list()
+        if self._rows:
+            self.list.setCurrentRow(0)
+        else:
+            self._load(-1)
+        self._preview.refresh_now()
+
+    # --- panes -----------------------------------------------------------
+    def _build_list_pane(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        self.list = QListWidget()
+        self.list.currentRowChanged.connect(self._on_select)
+        v.addWidget(self.list, 1)
+        bar = QHBoxLayout()
+        add = QPushButton("Add")
+        add.clicked.connect(self._add)
+        rem = QPushButton("Remove")
+        rem.clicked.connect(self._remove)
+        bar.addWidget(add)
+        bar.addWidget(rem)
+        v.addLayout(bar)
+        return w
+
+    def _make_edit(self, key):
+        f = self._field_by_key[key]
+        if f.kind == "choice":
+            w = QComboBox()
+            w.addItems(f.choices)               # blank-tolerant: a "" choice is a real
+            w.currentIndexChanged.connect(self._on_edit)   # (empty) entry, as in the table
+        else:
+            w = QLineEdit()
+            w.editingFinished.connect(self._on_edit)
+        self._edits[key] = w
+        return w
+
+    def _cell(self, key, label_w=58):
+        f = self._field_by_key[key]
+        cell = QWidget()
+        h = QHBoxLayout(cell)
+        h.setContentsMargins(0, 2, 0, 2)
+        h.setSpacing(4)
+        lab = QLabel(f.header)
+        lab.setMinimumWidth(label_w)
+        if f.usage:                             # mirror the table's header coloring
+            lab.setStyleSheet(f"color:{USAGE_COLOR[f.usage]};")
+        h.addWidget(lab)
+        edit = self._make_edit(key)
+        edit.setMinimumWidth(56)
+        h.addWidget(edit, 1)
+        return cell
+
+    @staticmethod
+    def _pair(cell_a, cell_b):
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.addWidget(cell_a, 1)
+        h.addWidget(cell_b, 1)
+        return w
+
+    def _build_form_pane(self):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        body = QWidget()
+        v = QVBoxLayout(body)
+        for title, group_rows in self._groups:
+            g = QGroupBox(title)
+            gv = QVBoxLayout(g)
+            for keys in group_rows:
+                if len(keys) == 2:
+                    gv.addWidget(self._pair(self._cell(keys[0]), self._cell(keys[1])))
+                else:
+                    gv.addWidget(self._cell(keys[0]))
+            v.addWidget(g)
+        v.addStretch(1)
+        scroll.setWidget(body)
+        self._form_scroll = scroll
+        return scroll
+
+    # --- list ------------------------------------------------------------
+    def _refresh_list(self):
+        self.list.blockSignals(True)
+        self.list.clear()
+        for i in range(len(self._rows)):
+            self.list.addItem(QListWidgetItem(self._item_label(i, self._rows[i])))
+        self.list.blockSignals(False)
+
+    def _refresh_list_item(self, i):
+        if 0 <= i < self.list.count():
+            self.list.item(i).setText(self._item_label(i, self._rows[i]))
+
+    # --- load / commit ---------------------------------------------------
+    def _load(self, idx):
+        self._cur = -1                       # suppress write-through while populating
+        ok = 0 <= idx < len(self._rows)
+        for key, w in self._edits.items():
+            val = self._rows[idx].get(key) if ok else None
+            w.blockSignals(True)
+            if isinstance(w, QComboBox):
+                txt = "" if val is None else str(val)
+                j = w.findText(txt)
+                w.setCurrentIndex(j if j >= 0 else 0)
+            else:
+                w.setText("" if val is None else str(val))
+            w.blockSignals(False)
+        self._form_scroll.setEnabled(ok)
+        if ok:
+            self._cur = idx
+        self._preview.schedule()
+
+    def _commit(self):
+        if not (0 <= self._cur < len(self._rows)):
+            return
+        row = self._rows[self._cur]
+        for key, w in self._edits.items():
+            f = self._field_by_key[key]
+            if isinstance(w, QComboBox):
+                row[key] = w.currentText()
+            else:
+                row[key] = f.from_text(w.text())
+
+    # --- events ----------------------------------------------------------
+    def _on_select(self, idx):
+        self._commit()
+        self._load(idx)
+
+    def _on_edit(self, *_):
+        self._commit()
+        self._refresh_list_item(self._cur)   # label/type edits update the list line
+        self._preview.schedule()
+
+    def _add(self):
+        self._commit()
+        self._rows.append(self._new_row())
+        self._cur = -1
+        self._refresh_list()
+        self.list.setCurrentRow(len(self._rows) - 1)
+
+    def _remove(self):
+        idx = self.list.currentRow()
+        if not (0 <= idx < len(self._rows)):
+            return
+        self._rows.pop(idx)
+        self._cur = -1
+        self._refresh_list()
+        if self._rows:
+            self.list.setCurrentRow(min(idx, len(self._rows) - 1))
+        else:
+            self._load(-1)
+
+    def _on_preview_click(self, x, y, tol):
+        """A click in the preview: resolve it to a row and select that list item (the
+        selection path then re-renders the preview with the new emphasis)."""
+        row = self._pick_resolve(x, y, tol, self._rows)
+        if row is not None and 0 <= row < self.list.count():
+            self.list.setCurrentRow(row)
+
+    # --- external API (used by _LineEditorDialog on view switch) ---------
+    def set_rows(self, rows):
+        self._rows = [dict(r) for r in rows]
+        self._cur = -1
+        self._refresh_list()
+        if self._rows:
+            self.list.setCurrentRow(0)
+        else:
+            self._load(-1)
+        self._preview.refresh_now()
+
+    def result_rows(self):
+        self._commit()
+        return [dict(r) for r in self._rows]
+
+
+class _LineEditorDialog(QDialog):
+    """Table/List view toggle for the 2-endpoint line editors (reinforcement, piles),
+    mirroring ``MaterialsDialog``. Both views bind to ``self._rows`` (the single source
+    of truth): switching harvests the active view's edits into it and rebuilds the
+    target, so a switch mid-edit is lossless. Each view carries the SAME kind of
+    cross-section ``PreviewPane`` (right of the table; third pane of the list view)
+    with click-to-select. The usage toggles show/hide table columns; the list view
+    always shows every field, so they don't affect it (as in materials).
+
+    These default to the LIST view (materials keeps its table default), remembering the
+    last-used view for the session — see ``_LAST_LINE_VIEW``."""
+
+    def __init__(self, title, fields, rows, new_row, groups, item_label,
+                 preview_draw, pick_resolve, view_state, parent=None,
+                 help_text=None, usage_toggles=None, preview_caption=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self._title = title
+        self._fields = fields
+        self._new_row = new_row
+        self._groups = groups
+        self._item_label = item_label
+        self._preview_draw = preview_draw
+        self._pick_resolve = pick_resolve
+        self._preview_caption = preview_caption
+        self._view_state = view_state
+        self._rows = [dict(r) for r in rows]
+        self._mode = None
+        self._table = None
+        self._table_split = None
+        self._table_preview = None
+        self._list_view = None
+        self.resize(1200, 620)
+
+        layout = QVBoxLayout(self)
+        if help_text:
+            layout.addWidget(_help_label(help_text))
+
+        top = QHBoxLayout()
+        seg_group = QButtonGroup(self)
+        seg_group.setExclusive(True)
+        self._seg = {}
+        for mode, lbl in (("table", "Table view"), ("list", "List view")):
+            b = QPushButton(lbl)
+            b.setCheckable(True)
+            b.clicked.connect(lambda _checked=False, m=mode: self._set_mode(m))
+            seg_group.addButton(b)
+            self._seg[mode] = b
+            top.addWidget(b)
+        top.addSpacing(24)
+        from PySide6.QtCore import QSettings
+        s = QSettings("XSlope", "XSlope Studio")
+        self._toggles = {}
+        if usage_toggles:
+            top.addWidget(QLabel("Show columns for:"))
+        for t in (usage_toggles or []):
+            cb = QCheckBox(USAGE_TOGGLE_LABEL[t])
+            cb.setChecked(bool(s.value(f"editor_toggles/{self._title}/{t}",
+                                       True, type=bool)))
+            cb.setStyleSheet(f"color:{USAGE_COLOR[t]}; font-weight:bold;")
+            cb.toggled.connect(self._on_toggle)
+            self._toggles[t] = cb
+            top.addWidget(cb)
+        top.addStretch(1)
+        layout.addLayout(top)
+
+        self._stack = QStackedWidget()
+        self._table_holder = QWidget()
+        self._table_lay = QVBoxLayout(self._table_holder)
+        self._table_lay.setContentsMargins(0, 0, 0, 0)
+        self._list_holder = QWidget()
+        self._list_lay = QVBoxLayout(self._list_holder)
+        self._list_lay.setContentsMargins(0, 0, 0, 0)
+        self._stack.addWidget(self._table_holder)     # index 0
+        self._stack.addWidget(self._list_holder)      # index 1
+        layout.addWidget(self._stack, 1)
+
+        _ok_cancel(self, layout)
+
+        last = _last_line_view(self._view_state)
+        self._set_mode(last if last in ("table", "list") else "list")
+
+    # --- toggles ---------------------------------------------------------
+    def _enabled_usage(self):
+        return {t for t, cb in self._toggles.items() if cb.isChecked()}
+
+    def _on_toggle(self):
+        from PySide6.QtCore import QSettings
+        s = QSettings("XSlope", "XSlope Studio")
+        for t, cb in self._toggles.items():
+            s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
+        if self._mode == "table" and self._table is not None:
+            self._table.apply_usage_filter(self._enabled_usage())
+
+    # --- view switching --------------------------------------------------
+    def _harvest(self):
+        if self._mode == "table" and self._table is not None:
+            self._rows = self._table.result_rows()
+        elif self._mode == "list" and self._list_view is not None:
+            self._rows = self._list_view.result_rows()
+
+    def _schedule_table_preview(self, *_):
+        if self._table_preview is not None:
+            self._table_preview.schedule()
+
+    def _on_table_preview_click(self, x, y, tol):
+        row = self._pick_resolve(x, y, tol, self._table.result_rows())
+        if row is not None:
+            self._table.select_row(row)
+
+    def _build_table(self):
+        from .canvas import PreviewPane
+        if self._table_split is not None:      # rebuild from the shared rows
+            self._table_split.setParent(None)
+            self._table_split.deleteLater()
+        self._table = _EditableTable(self._fields, self._rows, self._new_row,
+                                     on_change=self._schedule_table_preview,
+                                     on_select=self._schedule_table_preview)
+        self._table_preview = PreviewPane(
+            lambda ax: self._preview_draw(ax, self._table.result_rows(),
+                                          self._table.selected_row()),
+            caption=self._preview_caption)
+        self._table_preview.clicked.connect(self._on_table_preview_click)
+        split = QSplitter(Qt.Horizontal)
+        split.addWidget(self._table)
+        split.addWidget(self._table_preview)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 1)
+        split.setSizes([640, 460])
+        self._table_split = split
+        self._table_lay.addWidget(split)
+        self._table.apply_usage_filter(self._enabled_usage())
+        self._table_preview.refresh_now()
+
+    def _ensure_list(self):
+        if self._list_view is None:
+            self._list_view = _LineListView(
+                self._fields, self._rows, self._new_row, self._groups,
+                self._item_label, self._preview_draw, self._pick_resolve,
+                preview_caption=self._preview_caption)
+            self._list_lay.addWidget(self._list_view)
+        else:
+            self._list_view.set_rows(self._rows)
+
+    def _set_mode(self, mode):
+        if mode not in ("table", "list"):
+            return
+        if mode == self._mode:
+            self._seg[mode].setChecked(True)
+            return
+        self._harvest()                      # pull current edits into self._rows
+        if mode == "table":
+            self._build_table()
+            self._stack.setCurrentIndex(0)
+        else:
+            self._ensure_list()
+            self._stack.setCurrentIndex(1)
+        self._mode = mode
+        self._seg[mode].setChecked(True)
+        _set_last_line_view(self._view_state, mode)
+
+    def set_view_mode(self, mode):
+        """Programmatic view switch (used by the round-trip guard)."""
+        self._set_mode(mode)
+
+    def result_rows(self):
+        self._harvest()
+        return self._rows
+
+
 def _new_circle():
     return {"Xo": 0.0, "Yo": 0.0, "Option": "Depth", "Depth": 0.0,
             "Xi": 0.0, "Yi": 0.0, "R": 0.0}
@@ -2540,6 +2952,26 @@ def _new_pile():
             "appl": "active"}
 
 
+# List-view form layout for a pile: every PilesEditor.FIELDS key grouped (Identity /
+# Geometry / Capacity / Behavior). theta_p is NOT a field — it's derived from the axis
+# on apply — so it has no widget and rides along as an unshown key.
+_PILE_FORM_GROUPS = [
+    ("Identity", [["label"]]),
+    ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
+    ("Capacity / design", [["H"], ["D_pile", "S"], ["V_cap", "M_cap"],
+                           ["E", "I"], ["area"]]),
+    ("Behavior", [["appl", "fixity"]]),
+]
+
+
+def _pile_item_label(i, row):
+    name = str(row.get("label") or "Pile")
+    try:
+        return f"{i + 1}. {name} @ x={float(row.get('x1', 0) or 0):g}"
+    except (TypeError, ValueError):
+        return f"{i + 1}. {name}"
+
+
 class PilesEditor(CategoryEditor):
     label = "Piles"
     FIELDS = [
@@ -2562,18 +2994,22 @@ class PilesEditor(CategoryEditor):
         def preview(ax, rows, selected):
             _draw_piles_preview(ax, rows, selected, slope_data, style)
 
-        return TableEditorDialog(
-            "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile, parent,
-            help_text="Leave H blank for auto Ito & Matsui force. I / Area auto-compute "
-                      "from D when blank. θ is auto-derived from the pile axis. Vcap/Mcap "
-                      "require S (spacing). Appl: active = allowable force; passive = "
-                      "ultimate capacity ÷ FS.",
+        return _LineEditorDialog(
+            "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile,
+            _PILE_FORM_GROUPS, _pile_item_label, preview,
+            lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
+            view_state="piles", parent=parent,
+            help_text="List view edits one pile at a time as a grouped form beside a "
+                      "live section preview; the table view is available for bulk entry "
+                      "of many piles. Both views edit the same rows, so switching is "
+                      "lossless. Leave H blank for auto Ito & Matsui force. I / Area "
+                      "auto-compute from D when blank. θ is auto-derived from the pile "
+                      "axis. Vcap/Mcap require S (spacing). Appl: active = allowable "
+                      "force; passive = ultimate capacity ÷ FS.",
             usage_toggles=["lem", "fem"],
-            preview_draw=preview,
             preview_caption="Preview shows the piles on the section (selected pile bold "
                             "with □ cap and ▽ tip markers; others dimmed). "
-                            "Click a pile to select it.",
-            pick_resolve=lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol))
+                            "Click a pile to select it.")
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -2953,6 +3389,26 @@ def _new_reinf():
             "tend1": 0.0, "tend2": 0.0, "spacing": 1.0}
 
 
+# List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
+# key grouped (Geometry / Capacity / Anchorage / Type). The Type combos are blank-
+# tolerant exactly as the table enums are (a "" type is a real, selectable entry).
+_REINF_FORM_GROUPS = [
+    ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
+    ("Capacity", [["t_max", "t_res"], ["E", "area"]]),
+    ("Anchorage", [["lp1", "lp2"], ["tend1", "tend2"], ["spacing"]]),
+    ("Type", [["type"], ["dir", "appl"]]),
+]
+
+
+def _reinf_item_label(i, row):
+    typ = str(row.get("type") or "line")
+    try:
+        return (f"{i + 1}. {typ} (x={float(row.get('x1', 0) or 0):g}"
+                f"→{float(row.get('x2', 0) or 0):g})")
+    except (TypeError, ValueError):
+        return f"{i + 1}. {typ}"
+
+
 class ReinforcementEditor(CategoryEditor):
     label = "Reinforcement"
     LF = {"lem", "fem"}
@@ -2980,21 +3436,25 @@ class ReinforcementEditor(CategoryEditor):
         def preview(ax, rows, selected):
             _draw_reinforcement_preview(ax, rows, selected, slope_data, style)
 
-        return TableEditorDialog(
+        return _LineEditorDialog(
             "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
-            _new_reinf, parent,
-            help_text="Lp1/Lp2 are the pullout lengths at each end (0 = fully anchored). "
-                      "The LEM tension distribution shown on the plot is derived from these. "
-                      "Type defaults Dir/Appl when blank; leave Type blank for a generic "
-                      "tensile line. Tend1/Tend2 are the end-anchorage capacities; capacities "
-                      "and E/Area are per-unit-width (Spacing divides discrete supports).",
+            _new_reinf, _REINF_FORM_GROUPS, _reinf_item_label, preview,
+            lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
+            view_state="reinforce", parent=parent,
+            help_text="List view edits one line at a time as a grouped form beside a "
+                      "live section preview; the table view is available for bulk entry "
+                      "of the many lines of a tiered wall. Both views edit the same rows, "
+                      "so switching is lossless. Lp1/Lp2 are the pullout lengths at each "
+                      "end (0 = fully anchored); the LEM tension distribution on the "
+                      "preview is derived from these. Type defaults Dir/Appl when blank; "
+                      "leave Type blank for a generic tensile line. Tend1/Tend2 are the "
+                      "end-anchorage capacities; capacities and E/Area are per-unit-width "
+                      "(Spacing divides discrete supports).",
             usage_toggles=["lem", "fem"],
-            preview_draw=preview,
             preview_caption="Preview shows the reinforcement lines on the section "
                             "(selected line bold with its endpoints; others dimmed; the "
                             "trial surface, if any, is drawn for crossing context). "
-                            "Click a line to select it.",
-            pick_resolve=lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol))
+                            "Click a line to select it.")
 
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines

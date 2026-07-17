@@ -886,6 +886,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "appl": r.get("appl", "active"),
                 "psi": psi_line,
                 "avail": reinforce_available_tension,
+                "claimed": set(),
             })
     elif slope_data.get("reinforce_lines"):
         for line in slope_data["reinforce_lines"]:
@@ -893,7 +894,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             ts = [pt["T"] for pt in line]
             geom = LineString([(pt["X"], pt["Y"]) for pt in line])
             reinf_lines_data.append({"xs": xs, "ts": ts, "geom": geom,
-                                     "dir": "tangent", "appl": "active"})
+                                     "dir": "tangent", "appl": "active",
+                                     "claimed": set()})
 
     # Prepare pile lines data
     pile_lines_data = []
@@ -910,6 +912,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "M_cap": pile.get("M_cap"),
                 "appl": pile.get("appl", "active"),
                 "label": pile.get("label", ""),
+                "claimed": set(),
             })
 
     # Line loads (v12 'lloads' sheet): concentrated forces per unit width on the
@@ -1455,6 +1458,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 #  skip it. Our assumption is only one Point per slice-base.)
                 continue
 
+            # A crossing that lands exactly on a shared slice corner is returned
+            # by shapely to BOTH adjacent bases; without a claim check the line's
+            # tension is counted twice (measured: Bishop 1.679 -> 1.998 on vp030a
+            # with the geosynthetic moved onto the corner). First base to see the
+            # point keeps it.
+            pt_key = (round(intersec.x, 9), round(intersec.y, 9))
+            if pt_key in rl["claimed"]:
+                continue
+            rl["claimed"].add(pt_key)
+
             if "envelope" in rl:
                 s_along = rl["geom"].project(intersec)
                 t_mx, lp1, lp2, te1, te2 = rl["envelope"]
@@ -1503,6 +1516,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if intersec.is_empty:
                 continue
             if isinstance(intersec, Point):
+                # Same shared-corner claim check as the reinforcement lines
+                # above: a crossing exactly on a slice corner is returned to
+                # both adjacent bases and would count the pile force twice.
+                pt_key = (round(intersec.x, 9), round(intersec.y, 9))
+                if pt_key in pl["claimed"]:
+                    continue
+                pl["claimed"].add(pt_key)
                 pile_H = pl["H"]
                 pile_H_was_auto = False
                 F_pile_single = None

@@ -417,10 +417,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.480 | 1.593 | 1.551 | 1.377 | 1.597 | 1.587 | 1.587 |
+| 1.480 | 1.593 | 1.524 | 1.377 | 1.597 | 1.587 | 1.587 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.551, fs_corps=1.377, fs_lowe=1.597, fs_spencer=1.587, fs_mprice=1.587 -->
+<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.524, fs_corps=1.377, fs_lowe=1.597, fs_spencer=1.587, fs_mprice=1.587 -->
 
 !!! note
     This problem is UTEXASED's Example 5 (Wright), whose reported solution is FS = 1.646 (Spencer) on a critical
@@ -533,10 +533,10 @@ produces. The FEM result is generally considered more realistic for pile-stabili
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.622 | 1.854 | 1.649 | 1.369 | 1.857 | 1.842 | 1.842 |
+| 1.622 | 1.854 | 1.649 | 1.369 | 1.978 | 1.842 | 1.842 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.854, fs_janbu=1.649, fs_corps=1.369, fs_lowe=1.857, fs_spencer=1.842, fs_mprice=1.842 -->
+<!-- test: file=files/xslope_piles.xlsx, type=circular_search, num_slices=40, fs_oms=1.622, fs_bishop=1.854, fs_janbu=1.649, fs_corps=1.369, fs_lowe=1.978, fs_spencer=1.842, fs_mprice=1.842 -->
 
 ### 11. Polygon Input with a Sloping Bottom
 

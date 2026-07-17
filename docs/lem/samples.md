@@ -528,6 +528,13 @@ the LEM applies the Ito & Matsui force (even after capping) as a concentrated lo
 while the FEM beam elements only develop as much resistance as the global deformation pattern naturally
 produces. The FEM result is generally considered more realistic for pile-stabilized slopes.
 
+One more caution this problem teaches: the tabulated values are the deep-surface results the Ito & Matsui
+walkthrough analyzes, found by the search seeded from the circles sheet. A grid-seeded global search
+(`seed='grid'`) finds a *shallower* surface at FS ≈ 1.70 for the complete-equilibrium methods — the
+pile forces make the deep basin locally attractive while a shallower mechanism governs. See the
+[Multiple Local Minima](#13-multiple-local-minima) discussion; checking the shallow bypass is part of
+pile design.
+
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
 
@@ -656,6 +663,26 @@ embankment circle, so a search that stops at the sliver is both non-physical and
 unconservative for the foundation. The lesson: on a cohesionless-over-soft-foundation
 profile, never trust a single free search — seed circles tangent to each candidate
 failure depth and compare.
+
+**Single-seed searches can also trap on problems with concentrated forces.** The
+pile-stabilized sample ([Problem 10](#10-pile-reinforced-slope)) is a measured
+example: seeded from its circles sheet, the search converges to the deep surface
+tabulated there (Spencer 1.842, Lowe 1.978), but the grid-seeded global search
+(`seed='grid'`, which sweeps a coarse grid of centers and tangent depths before
+refining) finds a *shallower* surface at $FS \approx 1.70$ for every
+complete-equilibrium method — the pile forces make the deep basin locally
+attractive while a shallower mechanism governs. Checking that a stabilized slope
+cannot fail *around* its piles on a shallower surface is part of pile design.
+
+Grid seeding is not a universal upgrade, however: swept across the whole sample
+library, it drives the simplified and force-only methods onto exactly the
+degenerate slivers this section warns about (Janbu collapsing to near-zero on a
+few-foot sliver, Corps dropping below OMS), because the global sweep finds the
+mathematical minimum of each method's equation with no regard for physical sense.
+The tabulated sample values therefore remain single-seed by deliberate choice, and
+the working practice is the same as above: run the free search, then cross-check
+with `seed='grid'` and with tangent-seeded circles at each candidate depth, and
+judge the surfaces — not just the numbers — before accepting any of them.
 
 Excel input file: [xslope_mult_min_KEY.xlsx](files/xslope_mult_min_KEY.xlsx)
 

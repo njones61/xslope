@@ -197,7 +197,7 @@ corpus is complete relative to what is independently verifiable.
 | [18](#vp18) | Slope, homogenous slope, ru pore pressure | **built** | [vp018.xlsx](../files/rocscience/vp018.xlsx). Spencer (1969)/Baker (1980) slope, ru=0.5, non-circular search (right-facing). Spencer 1.033 / M-P 1.024 vs Slide 1.010 (random search + Monte-Carlo optimization), Baker 1.02, Spencer (1969) 1.08. |
 | [19](#vp19) | Slope, (4) materials | **built** | [vp019.xlsx](../files/rocscience/vp019.xlsx). Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope. Circular search: Spencer 1.429 / Bishop 1.448 vs published Spencer 1.40-1.42. Non-circular: XSLOPE's local search plateaus at ~1.45 from the stored seed while Slide's Monte-Carlo optimization reaches 1.398 — a search-power gap (noted for future search work), not a model difference. Also [SLOPE/W §2.13](geostudio.md) — same problem in the GeoStudio corpus. |
 | [20](#vp20) | Slope, (4) materials, weak layer, water table | **built** | [vp020.xlsx](../files/rocscience/vp020.xlsx). Greco (1996) ex. 5 / Chen & Shao (1988): 0.5 m weak seam along the inclined base (polygon zones), water table. Circular: Bishop 1.086 / Spencer 1.091 vs Slide 1.087 / 1.093 (exact). Non-circular seam block: local search 1.082 vs Slide Monte-Carlo 1.010, Chen & Shao 1.01-1.03, Greco 0.973-1.1 — same search-power gap as #19. Also [SLOPE/W §2.14](geostudio.md) — same problem in the GeoStudio corpus. |
-| 21 | Slope, homogenous, ru pore pressure | partial | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry), [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (ru=0.25) — Fredlund & Krahn (1977) classic, fixed circle (120,90,R=80), imperial units. Dry: OMS 1.927 / Bishop 2.075 / Spencer 2.071 / M-P 2.071 vs F&K 1.928 / 2.080 / 2.073 / 2.076. ru: OMS 1.606 / Bishop 1.759 / Spencer 1.757 / M-P 1.756 vs F&K 1.607 / 1.766 / 1.761 / 1.764 (XSLOPE matches the F&K OMS-ru value exactly; Slide reports 1.687 there). Case 3 (water table) pending the phreatic-line coordinates. |
+| [21](#vp21) | Slope, homogenous, ru pore pressure | partial | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry) / [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub>=0.25). Fredlund & Krahn (1977) classic homogeneous slope, fixed circle (120, 90, R=80), imperial units. Case 3 (water table) pending the phreatic-line coordinates. |
 | [22](#vp22) | Slope, (2) materials, weak layer, ru pore pressure | **built** | [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry), [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub>=0.25). Fredlund & Krahn (1977) with a weak seam. The **first composite-surface problem** in the corpus: F&K's circle (120, 90, R=80) bottoms out five feet below the impenetrable base, so the surface is truncated and runs along the seam. Dry: OMS 1.297 / Bishop 1.380 / Spencer 1.379 / M-P 1.370 vs Slide 1.300 / 1.382 / 1.382 / 1.372. r<sub>u</sub>: Bishop 1.121 / Spencer 1.122 / M-P 1.112 vs Slide 1.124 / 1.124 / 1.114. |
 | [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
 | [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
@@ -626,6 +626,30 @@ Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a 0.5 m wea
 *Non-circular seam block: local search 1.082 vs Slide MC 1.010, Chen & Shao 1.01–1.03.*
 
 ![vp020: inputs and representative solution](images/vp020.png)
+
+### VP21: Slope, homogeneous, r<sub>u</sub> pore pressure (Fredlund & Krahn 1977) {#vp21}
+
+Slide #21: Fredlund & Krahn (1977)'s classic homogeneous slope — the reference
+problem that [VP22](#vp22) extends with a weak seam. A single fixed circle,
+center (120, 90), R = 80, in imperial units, solved dry and at r<sub>u</sub> = 0.25.
+F&K published all four method values for both cases.
+
+**Input files:** [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry),
+[vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub> = 0.25)
+
+| Method | XSLOPE (dry) | Published (dry) | XSLOPE (r<sub>u</sub>) | Published (r<sub>u</sub>) |
+|---|---|---|---|---|
+| Ordinary | 1.927 | F&K 1.928 | 1.606 | F&K 1.607 *(Slide 1.687)* |
+| Bishop | 2.075 | F&K 2.080 | 1.759 | F&K 1.766 |
+| Spencer | 2.071 | F&K 2.073 | 1.757 | F&K 1.761 |
+| Morgenstern–Price | 2.071 | F&K 2.076 | 1.756 | F&K 1.764 |
+
+*XSLOPE reproduces Fredlund & Krahn's own Ordinary-method r<sub>u</sub> value
+(1.606 vs 1.607) exactly, where Slide reads 1.687. Case 3 (water table) is pending
+the phreatic-line coordinates.*
+
+![vp021a: inputs and representative solution](images/vp021a.png)
+![vp021b: inputs and representative solution](images/vp021b.png)
 
 ### VP22: Slope, (2) materials, weak layer, composite surface {#vp22}
 

@@ -17,7 +17,11 @@ them, because $m_b$, $s$ and $a$ are all *derived* from GSI, $m_i$ and $D$ — p
 them independently would be meaningless.
 
 Sweeps are configured entirely through the API — sensitivity describes an analysis you
-run, not a property of the model, so nothing is added to the Excel input template.
+run, not a property of the model, so nothing is added to the Excel input template. The same
+engine drives the point-and-click
+[Sensitivity / Design study dialog in Studio](../studio/analysis.md#sensitivity-design-study)
+and the recipes in the [`/xslope` Claude Code skill](../usage/claude/index.md), so a study
+set up one way reads the same the others.
 
 ## Addressing a parameter
 
@@ -43,6 +47,44 @@ read the value, and the sweep would silently report zero sensitivity.
 Note that `gamma` and `gamma_sat` are the same soil weighed two ways, so sweeping
 `gamma` moves `gamma_sat` by the same absolute delta (the same coupling the reliability
 module applies); `gamma_sat` remains separately addressable when that is what you mean.
+
+## Discovering and specifying parameters
+
+Rather than hand-write every reference, `list_params(slope_data)` enumerates every sweepable
+parameter in the loaded model — each material's option-aware strength and general fields,
+plus the global `k_seismic` — as plain dicts. It is the menu a GUI parameter-picker (or an
+assistant driving the API) chooses from, so a reference is never guessed:
+
+```python
+from xslope.sensitivity import list_params
+
+for p in list_params(slope_data):
+    print(p['ref'], p['value'], p['sigma'])
+    # mat:Soil:c        3.0   1.8
+    # mat:Soil:phi      19.6  2.744
+    # mat:Soil:gamma    20.0  1.2
+    # global:k_seismic  0.0   None
+```
+
+Each entry carries `ref` (the canonical string), `kind`, `name`, `index` (the 1-based
+material index), `field`, `value` (the current value, or `None` if unset), `sigma` (the
+reliability standard deviation — `sigma_c`, `sigma_phi`, … — if the model carries a non-zero
+one, so a picker can offer a one-click ±σ range), and a short `label`. Blank or zero-valued
+fields are still listed, so a design study can target them with explicit bounds.
+
+Anywhere a `"kind:name:field"` string is accepted, the entry points also accept the
+equivalent **dict** or **tuple** — often what a GUI or an assistant naturally produces. All
+forms resolve to the same setter and validate identically:
+
+```python
+design(slope_data, {"material": "Soil", "property": "c"}, low=6, high=18)  # dict, by name
+design(slope_data, {"material": 1, "property": "phi"}, low=15, high=25)     # 1-based index
+design(slope_data, {"global": "k_seismic"}, low=0.0, high=0.3)             # a global
+design(slope_data, ("mat", "Soil", "c"), low=6, high=18)                    # tuple form
+```
+
+The dict accepts `ref` (passed straight through), `material`/`name` and `property`/`field`,
+or a `global` key; a material may be named or given by 1-based index.
 
 ## Running a sweep
 
@@ -81,6 +123,15 @@ unmodified model included as a flagged `is_base` row:
 | `method`, `fs` | solver name and factor of safety |
 | `success`, `msg` | per-point outcome — a failed point is a row, not an exception, so a sweep that breaks at value 7 of 9 still reports 1–6 (finding where things break is often the point) |
 | `Xo`, `Yo`, `R` | the critical circle per point (searched sweeps), so a jump of the critical surface is visible in the data — `plot_sensitivity` draws jumped points open |
+
+`plot_sensitivity` draws one line per method with FS = 1 (and an optional `target_fs`) as
+guide lines, marks the unmodified model as a labelled **base case** entry in the legend — so
+the black square in the plot reads as `base case (value, FS = …)` rather than an unexplained
+point — and draws any point where the critical surface jumped as an open circle.
+
+Only `analysis='lem'` is implemented: sweeps run the limit-equilibrium methods. FEM and
+seepage sweeps are planned but not yet available, and a request for either returns a
+`success=False` message rather than a silent no-op.
 
 ## Sweeping anything else: `modify=`
 
@@ -123,6 +174,78 @@ validates the modified model at every point (polygon validity, ground surface pr
 precisely because setters may be user-written: a broken edit becomes a `success=False`
 row naming what broke, never a silently inconsistent answer.
 
+## Design studies: finding the value that hits a target FS
+
+Where a sweep asks *how much does FS move*, a **design study** asks the inverse — *what value
+of this parameter gives FS = 1.5?* `design()` runs a fixed number of evenly spaced solves
+across an explicit `[low, high]` range and linearly interpolates the parameter value where the
+FS curve crosses the target. It is the deterministic-design staple: "vary the undrained
+strength between X and Y and find where FS reaches the design factor."
+
+```python
+from xslope.sensitivity import design
+from xslope.plot import plot_sensitivity
+
+success, result = design(
+    slope_data,
+    param="mat:Soil:c",          # or {"material": "Soil", "property": "c"}, or a tuple
+    low=6, high=18, steps=7,     # 7 evenly spaced solves across [6, 18]
+    target_fs=1.5,
+    method="bishop",             # one method — a design study locates a single curve
+    num_slices=30,
+)
+print(result['message'])
+plot_sensitivity(result['df'], target_fs=result['target_fs'])
+```
+
+`design()` returns `(success, result)`; on success `result` carries the sweep DataFrame
+(`result['df']`, exactly the sensitivity shape above) plus a summary:
+
+| field | meaning |
+|---|---|
+| `crossing` | interpolated parameter value at FS = `target_fs`, or `None` if the target is not reached |
+| `crossings` | every crossing found — a non-monotonic curve can cross twice; `crossing` is the first |
+| `bracketed` | `True` only when the target is crossed *inside* `[low, high]` |
+| `fs_range` | `(min FS, max FS)` over the successful sweep points |
+| `direction` | `'increasing'` / `'decreasing'` / `'non-monotonic'` trend of FS vs the parameter |
+| `extend` | on a miss, `'above {high}'` or `'below {low}'` — which way to widen the range; else `None` |
+| `message` | one-line human-readable summary |
+| `param`, `target_fs`, `base_value`, `runtime` | canonical ref, the target, the parameter's current value, wall-clock seconds |
+
+`design()` also takes `progress_callback` and `cancel_check` hooks (a per-point progress
+callback and a cooperative cancel), which is how Studio streams a progress bar and a Cancel
+button over a background sweep; a plain data-in/data-out call leaves both `None`.
+
+**Honest about misses — the engine never extrapolates.** A crossing is reported *only* when
+the target is bracketed by two actual solves. If the swept range never reaches the target,
+`bracketed` is `False`, `crossing` is `None`, and `extend` names the direction to widen the
+range — the study reports that it fell short rather than projecting a value past the last
+solve.
+
+Worked example, on the [ACADS simple slope](files/xslope_acads_simple.xlsx) used throughout
+these pages (base cohesion c = 3 kPa, base Bishop FS = 0.985). Sweeping the cohesion from 6 to
+18 kPa in seven steps and asking where FS reaches 1.5:
+
+```
+FS = 1.5 at mat:Soil:c = 13.4 (interpolated between solves).
+```
+
+`result['crossing']` is 13.40, `result['bracketed']` is `True`, and `result['direction']` is
+`'increasing'`; the sweep spans FS = 1.154 (c = 6) to FS = 1.693 (c = 18). Re-solving at the
+interpolated c = 13.40 returns FS = 1.500 — the linear interpolation between the c = 12 and
+c = 14 solves lands the target to within 0.01%.
+
+Ask the same question over a range that never reaches the target — say c from 3 to 9 — and the
+study declines to guess:
+
+```
+FS = 1.5 is not reached for mat:Soil:c in [3, 9] — FS spans [0.985, 1.302].
+Extend the range above 9 to bracket it.
+```
+
+Here `result['bracketed']` is `False`, `result['crossing']` is `None`, and `result['extend']`
+is `'above 9'`.
+
 ## Tornado diagrams
 
 To compare several parameters at once, `tornado()` evaluates each at its low and high
@@ -146,6 +269,26 @@ plot_tornado(result)
 
 For the shipped ACADS sample (a weak c–φ soil), the tornado ranks φ far ahead of c and
 γ — the ±25% φ band alone swings FS from 0.77 to 1.21 across FS = 1.
+
+`plot_tornado` draws the base-case FS as a labelled vertical reference line and stacks the
+bars widest-on-top by default — the classic Duncan ordering that gives the diagram its name.
+Pass `widest_on_top=False` to invert the stack (widest at the bottom); the parameter is kept
+for programmatic callers, and Studio deliberately exposes no toggle for it.
+
+When you have already run *full* per-parameter sweeps — a GUI that draws an FS-vs-value curve
+per parameter for click-through, for instance — `tornado_from_sweeps()` assembles the same
+diagram from those DataFrames with no extra solves, since `plot_tornado` reads each
+parameter's lowest- and highest-value FS:
+
+```python
+from xslope.sensitivity import sensitivity, tornado_from_sweeps
+
+sweeps = {ref: sensitivity(slope_data, param=ref, rel_range=0.25, n=5,
+                           methods=("bishop",))[1]['df']
+          for ref in ("mat:Soil:c", "mat:Soil:phi", "mat:Soil:gamma")}
+result = tornado_from_sweeps(sweeps, method="bishop")   # {'df', 'base_fs', 'method'}
+plot_tornado(result)
+```
 
 ## Worked sample
 

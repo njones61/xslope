@@ -551,27 +551,56 @@ def _xy(row, kx, ky):
 
 
 def _draw_reinforcement_preview(ax, rows, selected, slope_data, style):
-    """Preview for the reinforcement editor: each pending line from (x1,y1)→(x2,y2)
-    over the full section (the trial failure surface, if present, is drawn as context
-    so a line's crossing position reads at a glance). The selected line is bold
-    (emphasis color) with endpoint markers; the others keep the reinforcement color,
-    thin and dimmed."""
+    """Preview for the reinforcement editor: the base geometry ONLY (profile/polygon
+    layers + domain base — no loads, surfaces, or other overlays; Norm: they get in
+    the way here) with each pending line from (x1,y1)→(x2,y2). The selected line is
+    bold (emphasis color) with endpoint markers; the others keep the reinforcement
+    color, thin and dimmed. Pullout-length positions — lp1 measured from end 1 and
+    lp2 from end 2, where the available tension reaches t_max — are dotted on every
+    line, mirroring the standard reinforcement plot's tension breakpoints: they are
+    part of the geometry being edited."""
+    import math as _math
+    from xslope.plot import plot_base_geometry
     from xslope.style import resolve_style, feature_style
     rstyle = resolve_style(style)
-    _draw_section_context(ax, slope_data, rstyle, skip={"reinforcement"})
+    try:
+        plot_base_geometry(ax, slope_data, labels=False, style=rstyle)
+    except Exception:
+        pass
     base = feature_style(rstyle, "reinforcement").get("color", "darkgray")
     for i, r in enumerate(rows):
         p1, p2 = _xy(r, "x1", "y1"), _xy(r, "x2", "y2")
         if p1 is None or p2 is None:
             continue
         xs, ys = [p1[0], p2[0]], [p1[1], p2[1]]
-        if i == selected:
+        emph = i == selected
+        if emph:
             ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
                     marker="o", markersize=6, markerfacecolor=_PREVIEW_EMPH,
                     markeredgecolor="white", zorder=20)
         else:
             ax.plot(xs, ys, color=base, linewidth=2.0, alpha=_PREVIEW_DIM_ALPHA,
                     zorder=6)
+        # Pullout-length breakpoints along the line (only when 0 < lp < length).
+        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+        length = _math.hypot(dx, dy)
+        if length <= 0:
+            continue
+        ux, uy = dx / length, dy / length
+        for lp_key, (ox, oy), sgn in (("lp1", p1, +1), ("lp2", p2, -1)):
+            try:
+                lp = float(r.get(lp_key, 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if 0 < lp < length:
+                px, py = ox + sgn * ux * lp, oy + sgn * uy * lp
+                if emph:
+                    ax.plot([px], [py], marker="o", markersize=7,
+                            markerfacecolor="white", markeredgecolor=_PREVIEW_EMPH,
+                            markeredgewidth=1.8, zorder=21)
+                else:
+                    ax.plot([px], [py], marker="o", markersize=4, color=base,
+                            alpha=_PREVIEW_DIM_ALPHA, zorder=7)
     _finish_preview_axes(ax)
 
 
@@ -650,14 +679,20 @@ _NCPT_MARKER = {"Fixed": "s", "Horiz": "D", "Free": "o"}   # per movement type
 
 
 def _draw_noncirc_preview(ax, rows, selected, slope_data, style):
-    """Preview for the non-circular editor: the pending polyline (all rows) drawn bold
-    over the section, each vertex marked with a per-movement glyph — □ Fixed, ◇
-    Horiz-only, ○ Free — and the selected vertex enlarged and filled. Horiz vertices
-    also carry a small ↔ direction glyph. Points are ordered left→right as entered."""
+    """Preview for the non-circular editor: the base geometry ONLY (profile/polygon
+    layers + max-depth base — no piezo or other overlays; Norm's declutter) with the
+    pending polyline (all rows) drawn bold, each vertex marked with a per-movement
+    glyph — □ Fixed, ◇ Horiz-only, ○ Free — and the selected vertex enlarged and
+    filled. Horiz vertices also carry a small ↔ direction glyph. Points are ordered
+    left→right as entered."""
     import numpy as np
+    from xslope.plot import plot_base_geometry
     from xslope.style import resolve_style
     rstyle = resolve_style(style)
-    _draw_section_context(ax, slope_data, rstyle, skip={"non_circ", "circles"})
+    try:
+        plot_base_geometry(ax, slope_data, labels=False, style=rstyle)
+    except Exception:
+        pass
     pts = []
     for r in rows:
         pt = _xy(r, "X", "Y")

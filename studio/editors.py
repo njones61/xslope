@@ -690,9 +690,17 @@ class _MaterialListView(QWidget):
         pane.setSizes([320, 320])
         return pane
 
+    # List view shows friendly symbols where the table mirrors the terse 'mat'
+    # sheet headers (Norm: "use φ in the list view"). Only display labels — the
+    # underlying keys/headers are untouched.
+    _FRIENDLY = {"f": "φ", "psi": "ψ", "s(f)": "σ(φ)", "s(g)": "σ(γ)",
+                 "s(c)": "σ(c)", "s(c/p)": "σ(c/p)", "s(d)": "σ(d)",
+                 "s(psi)": "σ(ψ)"}
+
     def _label_for(self, key):
         f = self._field_by_key.get(key)
-        return f.header if f is not None else key
+        header = f.header if f is not None else key
+        return self._FRIENDLY.get(header, header)
 
     # --- list ------------------------------------------------------------
     def _item_text(self, i):

@@ -789,7 +789,8 @@ class SeepBcEditor(CategoryEditor):
 def _new_pile():
     return {"label": "Pile", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "H": None,
             "theta_p": 0.0, "D_pile": None, "S": None, "E": None, "I": None,
-            "area": None, "V_cap": None, "M_cap": None, "fixity": "free"}
+            "area": None, "V_cap": None, "M_cap": None, "fixity": "free",
+            "appl": "active"}
 
 
 class PilesEditor(CategoryEditor):
@@ -802,6 +803,9 @@ class PilesEditor(CategoryEditor):
         Field("E", "E", "optfloat", usage="fem"), Field("I", "I", "optfloat", usage="fem"),
         Field("area", "Area", "optfloat", usage="fem"),
         Field("V_cap", "Vcap", "optfloat", usage="lem"), Field("M_cap", "Mcap", "optfloat", usage="lem"),
+        # Force application (v12, LEM only): active = allowable force applied as-is;
+        # passive = ultimate capacity divided by FS (loader default 'active').
+        Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem"),
         Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem"),
     ]
 
@@ -810,7 +814,8 @@ class PilesEditor(CategoryEditor):
             "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile, parent,
             help_text="Leave H blank for auto Ito & Matsui force. I / Area auto-compute "
                       "from D when blank. θ is auto-derived from the pile axis. Vcap/Mcap "
-                      "require S (spacing).",
+                      "require S (spacing). Appl: active = allowable force; passive = "
+                      "ultimate capacity ÷ FS.",
             usage_toggles=["lem", "fem"])
 
     def apply(self, slope_data, dlg):
@@ -1088,16 +1093,32 @@ class PolygonEditor(CategoryEditor):
 
 # --- reinforcement ---------------------------------------------------------- #
 def _new_reinf():
+    # A generic tensile line (blank type -> tangent/active via the loader presets,
+    # spacing 1 -> no per-width division); mirrors the pre-v12 default row.
     return {"x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "t_max": 0.0, "t_res": 0.0,
-            "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0}
+            "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
+            "type": "", "dir": "tangent", "appl": "active",
+            "tend1": 0.0, "tend2": 0.0, "spacing": 1.0}
 
 
 class ReinforcementEditor(CategoryEditor):
     label = "Reinforcement"
+    LF = {"lem", "fem"}
+    # Support-type columns (v12). `type` choices are the loader's _TYPE_PRESETS keys
+    # (fileio.py) plus a blank entry — a blank type is a generic line whose Dir/Appl
+    # default via the presets; offering '' as an empty combo entry lets a blank type
+    # round-trip unchanged (same treatment as the materials blank option). Dir/Appl
+    # mirror the loader's accepted values.
     FIELDS = [
         Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
+        Field("type", "Type", "choice",
+              choices=["", "geosynthetic", "nail", "tieback", "anchor"], applies=LF),
+        Field("dir", "Dir", "choice", choices=["tangent", "axial"], applies=LF),
+        Field("appl", "Appl", "choice", choices=["active", "passive"], applies=LF),
         Field("t_max", "Tmax", usage="lem"), Field("t_res", "Tres", usage="fem"),
+        Field("tend1", "Tend1", usage="lem"), Field("tend2", "Tend2", usage="lem"),
         Field("lp1", "Lp1", usage="lem"), Field("lp2", "Lp2", usage="lem"),
+        Field("spacing", "Spacing", applies=LF),
         Field("E", "E", usage="fem"), Field("area", "Area", usage="fem"),
     ]
 
@@ -1106,7 +1127,10 @@ class ReinforcementEditor(CategoryEditor):
             "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
             _new_reinf, parent,
             help_text="Lp1/Lp2 are the pullout lengths at each end (0 = fully anchored). "
-                      "The LEM tension distribution shown on the plot is derived from these.",
+                      "The LEM tension distribution shown on the plot is derived from these. "
+                      "Type defaults Dir/Appl when blank; leave Type blank for a generic "
+                      "tensile line. Tend1/Tend2 are the end-anchorage capacities; capacities "
+                      "and E/Area are per-unit-width (Spacing divides discrete supports).",
             usage_toggles=["lem", "fem"])
 
     def apply(self, slope_data, dlg):

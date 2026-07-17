@@ -785,11 +785,11 @@ def _editor_fixture():
         _editor_full_material("m-blank-seep-vg", "",    "seep",  "vg"),
     ]
 
-    def pile(x1, y1, x2, y2):
+    def pile(x1, y1, x2, y2, appl="active"):
         p = {"label": "P", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "H": 10.0,
              "theta_p": math.degrees(math.atan2(x2 - x1, -(y2 - y1))),
              "D_pile": 2.0, "S": 6.0, "E": 3000.0, "I": 1.5, "area": 4.0,
-             "V_cap": 50.0, "M_cap": 200.0, "fixity": "fixed"}
+             "V_cap": 50.0, "M_cap": 200.0, "fixity": "fixed", "appl": appl}
         return p
 
     return {
@@ -813,10 +813,33 @@ def _editor_fixture():
                     {"X": 30.0, "Y": 20.0, "Normal": 100.0}]],
         "dloads2": [[{"X": 0.0, "Y": 20.0, "Normal": 50.0},
                      {"X": 30.0, "Y": 20.0, "Normal": 50.0}]],
-        "reinforcement_lines": [{"x1": 0.0, "y1": 5.0, "x2": 40.0, "y2": 5.0,
-                                 "t_max": 1000.0, "t_res": 800.0, "lp1": 2.0,
-                                 "lp2": 3.0, "E": 2000.0, "area": 1.2}],
-        "pile_lines": [pile(20.0, 20.0, 20.0, 0.0)],
+        # One row per support type (blank/geosynthetic/nail/tieback/anchor) so the
+        # editor exercises every Type value plus both Dir (tangent/axial) and Appl
+        # (active/passive) enums and the tend1/tend2/spacing numerics.
+        "reinforcement_lines": [
+            {"x1": 0.0, "y1": 5.0, "x2": 40.0, "y2": 5.0, "t_max": 1000.0,
+             "t_res": 800.0, "lp1": 2.0, "lp2": 3.0, "E": 2000.0, "area": 1.2,
+             "type": "", "dir": "tangent", "appl": "active",
+             "tend1": 0.0, "tend2": 0.0, "spacing": 1.0},
+            {"x1": 0.0, "y1": 6.0, "x2": 38.0, "y2": 6.0, "t_max": 900.0,
+             "t_res": 700.0, "lp1": 1.5, "lp2": 2.5, "E": 1800.0, "area": 1.1,
+             "type": "geosynthetic", "dir": "tangent", "appl": "active",
+             "tend1": 5.0, "tend2": 6.0, "spacing": 1.0},
+            {"x1": 0.0, "y1": 7.0, "x2": 36.0, "y2": 7.0, "t_max": 800.0,
+             "t_res": 600.0, "lp1": 1.0, "lp2": 2.0, "E": 1600.0, "area": 1.0,
+             "type": "nail", "dir": "axial", "appl": "passive",
+             "tend1": 10.0, "tend2": 12.0, "spacing": 1.5},
+            {"x1": 0.0, "y1": 8.0, "x2": 34.0, "y2": 8.0, "t_max": 700.0,
+             "t_res": 500.0, "lp1": 0.5, "lp2": 1.5, "E": 1400.0, "area": 0.9,
+             "type": "tieback", "dir": "axial", "appl": "active",
+             "tend1": 15.0, "tend2": 18.0, "spacing": 2.0},
+            {"x1": 0.0, "y1": 9.0, "x2": 32.0, "y2": 9.0, "t_max": 600.0,
+             "t_res": 400.0, "lp1": 0.5, "lp2": 1.0, "E": 1200.0, "area": 0.8,
+             "type": "anchor", "dir": "axial", "appl": "passive",
+             "tend1": 20.0, "tend2": 22.0, "spacing": 2.5},
+        ],
+        "pile_lines": [pile(20.0, 20.0, 20.0, 0.0, "passive"),
+                       pile(35.0, 20.0, 35.0, 2.0, "active")],
         # ground_surface is None in this fixture, so LineLoadsEditor.apply performs
         # no snapping and the record must round-trip byte-for-byte.
         "line_loads": [{"x": 30.0, "y": 20.0, "P": 500.0, "angle": -90.0,

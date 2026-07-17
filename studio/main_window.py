@@ -597,6 +597,9 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_build_mesh)
         tb.addAction(self.act_run)
+        # Sensitivity / Design lives on the toolbar too (Norm's ask); the action's
+        # existing mode-visibility (LEM-only) hides the button in other modes.
+        tb.addAction(self.act_sensitivity)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.

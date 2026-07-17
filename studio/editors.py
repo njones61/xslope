@@ -329,42 +329,6 @@ def _material_color(style, mat_id, fallback_idx):
     return material_style(style, idx)["color"]
 
 
-def _draw_input_features(ax, slope_data, style, skip=()):
-    """Draw the input *overlay* features on ``ax`` — the piezo line, distributed
-    loads, tension crack, reinforcement, piles, line loads and the trial failure
-    surface(s): everything ``plot_inputs`` layers OVER the base geometry. Uses the
-    engine's per-feature ``plot_*`` helpers (which already take an Axes) so a preview
-    shows the FULL model as context around the object being edited. Each feature is
-    drawn in its own try/except so one malformed record (a half-edited preview) can't
-    blank the rest of the model. ``skip`` omits named features — e.g. the circles
-    editor skips ``{"circles"}`` and draws its own live-edited circles on top.
-
-    Editor-side (not in xslope.plot) so it composes the display helpers without
-    touching the engine's plotting module."""
-    from xslope import plot as _p
-
-    def _try(name, fn):
-        if name in skip:
-            return
-        try:
-            fn()
-        except Exception:
-            pass
-
-    materials = slope_data.get("materials") or []
-    if any(m.get("u") == "piezo" for m in materials):
-        _try("piezo", lambda: _p.plot_piezo_line(ax, slope_data, style=style))
-    _try("dloads", lambda: _p.plot_dloads(ax, slope_data, style=style))
-    _try("tcrack", lambda: _p.plot_tcrack_surface(ax, slope_data, style=style))
-    _try("reinforcement", lambda: _p.plot_reinforcement_lines(ax, slope_data, style=style))
-    _try("piles", lambda: _p.plot_piles(ax, slope_data, style=style))
-    _try("line_loads", lambda: _p.plot_line_loads(ax, slope_data, style=style))
-    if slope_data.get("circular"):
-        _try("circles", lambda: _p.plot_circles(ax, slope_data, style=style))
-    elif slope_data.get("non_circ"):
-        _try("non_circ", lambda: _p.plot_non_circ(ax, slope_data["non_circ"], style=style))
-
-
 def _draw_profile_preview(ax, lines, selected, max_depth, slope_data, style):
     """Preview for the profile-line editor: ONLY the PENDING profile lines plus the
     max-depth base line — nothing else. The selected line is bold (emphasis color)
@@ -405,12 +369,11 @@ def _draw_profile_preview(ax, lines, selected, max_depth, slope_data, style):
 def _draw_polygon_preview(ax, polys, selected, slope_data, style):
     """Preview for the polygon editor: the PENDING material zones. The selected zone
     is filled (its material color, higher opacity + hatch) with a bold emphasis edge
-    and vertex markers; the others are dimmed fills. The domain base and light surface
-    overlays give context; trial surfaces are skipped. Rings are closed for display."""
+    and vertex markers; the others are dimmed fills. The domain base gives context
+    (uncluttered, per the preview rule). Rings are closed for display."""
     from xslope.plot import plot_domain_base
     from xslope.style import resolve_style
     rstyle = resolve_style(style)
-    _draw_input_features(ax, slope_data, rstyle, skip={"circles", "non_circ"})
     try:
         plot_domain_base(ax, slope_data.get("domain_polygon"), style=rstyle)
     except Exception:
@@ -470,7 +433,6 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
     from xslope.style import resolve_style
     rstyle = resolve_style(style)
     plot_base_geometry(ax, slope_data, labels=False, style=rstyle)
-    _draw_input_features(ax, slope_data, rstyle, skip={"circles", "non_circ"})
     ground_surface = slope_data.get("ground_surface")
     tcrack_depth = slope_data.get("tcrack_depth", 0)
 
@@ -528,18 +490,29 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
 # the selected object emphasized and the rest dimmed. Same emphasis/dim vocabulary as
 # the geometry previews above.
 # --------------------------------------------------------------------------- #
-def _draw_section_context(ax, slope_data, style, skip=()):
-    """Draw the full cross-section as backdrop for an overlay-feature preview: the
-    base geometry (profile/polygon layers + max-depth/domain base) plus every input
-    overlay EXCEPT those named in ``skip`` — the feature being edited, which the
-    caller draws itself with emphasis. Each layer is guarded so a half-edited model
-    can never blank the backdrop."""
-    from xslope.plot import plot_base_geometry
+def _draw_section_context(ax, slope_data, style, include=()):
+    """Backdrop for a feature preview — Norm's rule: keep it uncluttered, just
+    enough to confirm placement. Draws the base geometry (profile/polygon layers
+    + max-depth/domain base) and ONLY the overlay features named in ``include``.
+    The one standing inclusion: the dloads editor passes ('piezo',), since a
+    distributed load often represents a water load and reads against the water
+    line. Guarded so a half-edited model can never blank the backdrop."""
+    from xslope import plot as _p
     try:
-        plot_base_geometry(ax, slope_data, labels=False, style=style)
+        _p.plot_base_geometry(ax, slope_data, labels=False, style=style)
     except Exception:
         pass
-    _draw_input_features(ax, slope_data, style, skip=skip)
+    extras = {
+        "piezo": lambda: _p.plot_piezo_line(ax, slope_data, style=style),
+        "dloads": lambda: _p.plot_dloads(ax, slope_data, style=style),
+    }
+    for name in include:
+        fn = extras.get(name)
+        if fn is not None:
+            try:
+                fn()
+            except Exception:
+                pass
 
 
 def _xy(row, kx, ky):
@@ -611,7 +584,7 @@ def _draw_piles_preview(ax, rows, selected, slope_data, style):
     keep the pile color, thinner and dimmed."""
     from xslope.style import resolve_style, feature_style
     rstyle = resolve_style(style)
-    _draw_section_context(ax, slope_data, rstyle, skip={"piles"})
+    _draw_section_context(ax, slope_data, rstyle)
     base = feature_style(rstyle, "piles").get("color", "green")
     for i, p in enumerate(rows):
         p1, p2 = _xy(p, "x1", "y1"), _xy(p, "x2", "y2")
@@ -642,7 +615,7 @@ def _draw_line_loads_preview(ax, rows, selected, slope_data, style):
     rstyle = resolve_style(style)
     # Trial surfaces don't inform load placement (and a far circle center can inflate
     # the frame), so the section + other overlays are context enough here.
-    _draw_section_context(ax, slope_data, rstyle, skip={"line_loads", "circles", "non_circ"})
+    _draw_section_context(ax, slope_data, rstyle)
     gs = slope_data.get("ground_surface")
     if gs is not None and not getattr(gs, "is_empty", False):
         xs = [p[0] for p in gs.coords]
@@ -773,7 +746,7 @@ def _draw_dloads_preview(ax, set1_blocks, set2_blocks, active_set, selected_bloc
     active set tab and the selected load within it."""
     from xslope.style import resolve_style, feature_style
     rstyle = resolve_style(style)
-    _draw_section_context(ax, slope_data, rstyle, skip={"dloads", "circles", "non_circ"})
+    _draw_section_context(ax, slope_data, rstyle, include=("piezo",))
     gamma_w = slope_data.get("gamma_water") or 62.4
     c1 = feature_style(rstyle, "dloads").get("color", "purple")
     c2 = feature_style(rstyle, "dloads2").get("color", "orange")
@@ -793,7 +766,7 @@ def _draw_piezo_preview(ax, rows_per_tab, active_tab, slope_data, style):
     its own color, thin and dimmed. Line 2 is the rapid-drawdown / second table."""
     from xslope.style import resolve_style, feature_style
     rstyle = resolve_style(style)
-    _draw_section_context(ax, slope_data, rstyle, skip={"piezo", "circles", "non_circ"})
+    _draw_section_context(ax, slope_data, rstyle)
     colors = [feature_style(rstyle, "piezo_line").get("color", "b"),
               feature_style(rstyle, "piezo_line2").get("color", "skyblue")]
     for ti, rows in enumerate(rows_per_tab):

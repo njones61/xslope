@@ -1,6 +1,12 @@
 # xslope
 Python package for limit equilibrium slope stability analysis
 
+> **⚠️ Beta — under active development.** xslope is still in development mode:
+> changes land daily, interfaces and input templates may shift between releases,
+> and results should be independently verified before use in practice. We hope
+> to formally issue version 1.0 soon. Feedback and issue reports are welcome in
+> the meantime.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.

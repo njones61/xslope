@@ -742,33 +742,96 @@ Method notes:
 `FS`, `Xo`, `Yo`, `Depth` (tangent elevation), plus `slices`, `failure_surface`,
 `solver_result`. There is no `R` key — compute `R = Yo - Depth`.
 
-### Sensitivity sweeps
+### Sensitivity & design studies
+
+Four engine entry points in `xslope.sensitivity`, all sharing one parameter grammar:
+`sensitivity()` sweeps one input and reports FS per point; `design()` sweeps one input to
+find the value where FS meets a target; `tornado()` / `tornado_from_sweeps()` rank several
+parameters by FS swing; and `list_params()` enumerates every sweepable parameter so you
+never guess a ref.
 
 ```python
-from xslope.sensitivity import sensitivity, tornado
+from xslope.sensitivity import (sensitivity, design, tornado,
+                                tornado_from_sweeps, list_params)
 from xslope.plot import plot_sensitivity, plot_tornado
 
 ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
                       methods=("bishop",), search=True)   # res['df'] is tidy long-format
-ok, res = tornado(slope_data, ["mat:Clay:c", "mat:Clay:phi", "mat:Clay:gamma"],
-                  rel_range=0.25, method="bishop")
 ```
 
 - Param refs are `"kind:name:field"`: `mat` (strength fields valid for the material's
   `option`, plus `gamma`/`gamma_sat`/`ru`/`d`/`psi`), `reinforce` (by line label:
   `t_max`, `lp1`, ...), `piles` (by label: `H`, `S`, ...), `global` (`k_seismic`,
   `tcrack_depth`, `tcrack_water`), `seep` (`k1`, ...), and `geom:piezo:dy` (vertical
-  water-table shift; the value is a DELTA). Bad refs raise naming what exists — do not
-  guess field names, read the error.
-- For geometry or anything else, pass `modify=fn, label="..."` where
+  water-table shift; the value is a DELTA). `design()` also accepts the dict form
+  `{"material": name_or_index, "property": field}` / `{"global": field}` and a
+  `(kind, name, field)` tuple. Bad refs raise naming what exists — do not guess field
+  names, read the error.
+- Discover refs with `list_params(slope_data)` — a list of dicts, each with `ref`,
+  `label`, `value`, and `sigma` (the reliability std-dev if the model carries one). This
+  is the menu a picker or a design/tornado study draws from.
+- `search=True` (default) re-searches the critical surface per point — the honest setting,
+  since the critical surface moves; `search=False` re-solves `circles[0]` / `non_circ`
+  (~50x faster, for prescribed-surface questions).
+- For geometry or anything without a ref, pass `modify=fn, label="..."` where
   `fn(slope_data, value) -> slope_data` and MUST rebuild derived geometry itself
   (polygons + `build_ground_surface_from_polygons`) if it moves profile points.
-- `search=True` (default) re-searches the critical surface per point — the honest
-  setting, since the critical surface moves; `search=False` re-solves `circles[0]` /
-  `non_circ` (~50x faster, for prescribed-surface questions).
 - A failed point is a `success=False` ROW in the DataFrame, not an exception.
 - Sweeping `gamma` co-moves `gamma_sat` by the same absolute delta (same coupling as
   reliability); sweep `gamma_sat` directly when that is what you mean.
+
+#### Design: find the value that hits a target FS
+
+The deterministic-design staple — "vary the undrained strength between X and Y and find
+where FS = 1.5". `design()` runs `steps` evenly spaced solves across `[low, high]` and
+linearly interpolates the parameter value where the FS curve crosses `target_fs`:
+
+```python
+ok, res = design(slope_data, {"material": "Clay", "property": "c"},
+                 low=200, high=1200, steps=11, target_fs=1.5, method="spencer")
+if res["bracketed"]:
+    print(res["message"])                     # "FS = 1.5 at mat:Clay:c = 735 (interpolated ...)"
+    print("design value:", res["crossing"])   # interpolated c at FS = 1.5
+plot_sensitivity(res["df"], target_fs=res["target_fs"], save_png=True)
+```
+
+- `res['crossing']` — interpolated parameter value at `target_fs` (`None` if not reached).
+  `res['crossings']` lists every crossing (a non-monotonic curve can cross twice).
+- `res['bracketed']` — True only if the target is crossed inside `[low, high]`.
+- `res['direction']` — `'increasing'` / `'decreasing'` / `'non-monotonic'`;
+  `res['fs_range']` — `(min FS, max FS)` over the successful sweep points.
+- `plot_sensitivity(df, target_fs=...)` draws FS vs the parameter with FS = 1 and the
+  target as guide lines and marks the base case.
+
+**Honest misses — never extrapolate.** When `bracketed` is False the target is not reached
+in the swept range. Report `fs_range` and widen the range the way `extend` says; do NOT
+project a crossing past the last solve:
+
+```python
+if not res["bracketed"]:
+    lo, hi = res["fs_range"]
+    print(f"FS = {res['target_fs']} not reached; FS spans [{lo:.3f}, {hi:.3f}].")
+    print("extend the range", res["extend"])   # e.g. "above 1200" — which way to widen
+```
+
+#### Tornado: rank several parameters
+
+`tornado()` re-solves each parameter's low/high bound. If you already ran full sweeps (e.g.
+for FS-vs-value curves), feed them to `tornado_from_sweeps()` for the same bars with no
+extra solves — `plot_tornado` reads each parameter's lowest- and highest-value FS:
+
+```python
+picks = [p["ref"] for p in list_params(slope_data)
+         if p["field"] in ("c", "phi", "gamma")]         # pick from the menu
+sweeps = {ref: sensitivity(slope_data, param=ref, rel_range=0.25, n=5,
+                           methods=("bishop",))[1]["df"] for ref in picks}
+result = tornado_from_sweeps(sweeps, method="bishop")     # {'df', 'base_fs', 'method'}
+plot_tornado(result, save_png=True)
+```
+
+For a straight low/high tornado without full curves, call
+`tornado(slope_data, picks, rel_range=0.25, method="bishop")` instead (it returns the same
+`result` dict `plot_tornado` consumes).
 
 ---
 

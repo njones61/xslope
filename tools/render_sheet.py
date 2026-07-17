@@ -670,12 +670,34 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     grid_w = gutter_w + sum(col_px[c] for c in col_list)
     grid_h = header_h + sum(row_px[r] for r in row_list)
 
+    # ----- fill a narrow grid with empty gridlined columns ----------------- #
+    # The sheet-tab strip is drawn at one fixed scale on every sheet. When the grid
+    # is narrower than that strip, a real Excel window shows no white void to the
+    # right of the last content column: it just continues empty, gridlined columns
+    # (each with its column letter) out to the window edge. Reproduce that — append
+    # default-width columns (continuing the column letters) until the grid is at
+    # least as wide as the tab strip, so the grid, not a blank void, meets it. These
+    # filler columns render as pure chrome — gridlines + column letter only, never
+    # any value/fill/border/merge, even where the underlying sheet holds data there
+    # (e.g. a mat view's next-view columns): `filler_cols` marks them so the content
+    # passes below skip them. Wide grids append nothing and stay byte-identical.
+    tab_strip_w = _tab_strip_width(wb_f.sheetnames, sheet)
+    filler_cols = set()
+    if grid_w < tab_strip_w:
+        nc = max(col_list) + 1
+        while grid_w < tab_strip_w:
+            col_px[nc] = col_width_px(ws, nc, default_cw) * SS
+            col_list.append(nc)
+            filler_cols.add(nc)
+            grid_w += col_px[nc]
+            nc += 1
+
     tab_h = int(round(20 * PT_TO_PX * SS))
     tab_gap = 6 * SS
     total_h = grid_h + tab_gap + tab_h
-    # The tab strip is drawn at one fixed scale on every sheet; a narrow grid simply
-    # gets a wider canvas rather than a shrunken (unreadable) strip.
-    canvas_w = max(grid_w, _tab_strip_width(wb_f.sheetnames, sheet))
+    # After the fill above, grid_w >= tab_strip_w for narrow sheets too, so the grid
+    # spans the whole canvas and the tab strip meets gridlined columns, not a void.
+    canvas_w = max(grid_w, tab_strip_w)
 
     img = Image.new("RGB", (canvas_w, total_h), "#FFFFFF")
     d = ImageDraw.Draw(img)
@@ -706,7 +728,7 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     # ----- 2. fills (static, then conditional) ----------------------------- #
     for r in row_list:
         for c in col_list:
-            if (r, c) in merged_covered:
+            if c in filler_cols or (r, c) in merged_covered:
                 continue
             cell = ws.cell(row=r, column=c)
             color = _fill_color(cell, theme)
@@ -741,7 +763,7 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
 
     for r in row_list:
         for c in col_list:
-            if (r, c) in merged_covered:
+            if c in filler_cols or (r, c) in merged_covered:
                 continue
             anc = merged_anchor.get((r, c))
             if anc:
@@ -761,7 +783,7 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
 
     for r in row_list:
         for c in col_list:
-            if (r, c) in merged_covered:
+            if c in filler_cols or (r, c) in merged_covered:
                 continue
             runs, cell = text_for(r, c)
             if not runs:

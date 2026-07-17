@@ -1,21 +1,32 @@
-"""Render the side-by-side (FEM inputs | SSRM shear strain) figures for the RS2
-SSR corpus page (docs/verification/rs2.md).
+"""Render the 4-panel FEM/SSRM figures for the RS2 SSR corpus page
+(docs/verification/rs2.md).
 
-Two panels per problem, matching what the SSR corpus is actually about:
+Four panels per problem, arranged 2x2, giving the reader the inputs, the mesh,
+and the two SSRM field solutions at a glance:
 
-  left  — plot_fem_data: the mesh, coloured by material zone, with the
-          displacement/boundary conditions drawn.
-  right — plot_fem_results('shear_strain'): the viscoplastic max shear strain at
-          the critical F. Colour fill only (no mesh lines) so the failure
-          mechanism reads at panel size.
+  upper-left  — plot_inputs(mode="fem"): the slope geometry with the FEM-relevant
+                overlays (material zones, water table / piezo line, reinforcement,
+                loads). This is the "what went in" panel.
+  lower-left  — plot_fem_data: the mesh, coloured by material zone, with the
+                displacement/boundary conditions drawn.
+  upper-right — plot_fem_results('shear_strain'): the viscoplastic max shear
+                strain at the critical F. Colour fill only (no mesh lines) so the
+                failure mechanism reads at panel size.
+  lower-right — plot_fem_results('displace_vector'): the viscoplastic displacement
+                vectors at the critical F, over the mesh boundary outline — the
+                kinematics of the same failure mechanism.
+
+The two right panels share the same field solution (the last converged SSRM
+solve, at the F just below critical), so the strain contours and the displacement
+arrows are two views of one mechanism.
 
 The cases are parsed straight out of the ``fem_ssrm`` test tags in rs2.md rather
 than kept in a second list here. That is deliberate: the figure is then rendered
 on the SAME mesh and F-bracket the regression lock uses, so a retagged mesh size
 cannot silently leave a stale figure behind.
 
-Each SSRM solve costs about a minute, so a full run is slow. Pass benchmark ids
-to render a subset.
+Each SSRM solve costs about a minute (more on a fine mesh), so a full run is slow.
+Pass benchmark ids to render a subset.
 
 Run from the repo root:
     python benchmarks/rocscience/make_rs2_figures.py            # all
@@ -33,6 +44,7 @@ import contextlib
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -42,6 +54,7 @@ from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints)
+from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
@@ -99,8 +112,14 @@ def _build(tag):
     return sd, build_fem_data(sd, mesh)
 
 
-def make_figure(tag, panel_size=(8.0, 5.0), dpi=150):
-    bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+def build_and_solve(tag):
+    """Build the mesh, run the SSRM bracket, and return the pieces the figure
+    needs: (sd, fem_data, field, FS).
+
+    ``field`` is the FIELD solution (displacements, viscoplastic strains) from the
+    last converged solve — the F just below critical, i.e. the developed
+    mechanism worth plotting — not the bracket midpoint.
+    """
     sd, fem_data = _build(tag)
 
     with contextlib.redirect_stdout(io.StringIO()):
@@ -113,45 +132,112 @@ def make_figure(tag, panel_size=(8.0, 5.0), dpi=150):
     if not sol.get('converged'):
         raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
 
-    # solve_ssrm returns the bracket result; the FIELD solution (displacements,
-    # viscoplastic strains) is the last converged solve, at the F just below
-    # critical -- that is the developed mechanism worth plotting.
     field = sol.get('last_solution')
     if field is None:
         raise RuntimeError('SSRM returned no last_solution to plot')
+    return sd, fem_data, field, sol['FS']
 
-    paths = []
-    # left: mesh + materials + boundary conditions
-    fig = plt.figure(figsize=panel_size)
-    plot_fem_data(fem_data, fig=fig, show_title=True)
-    p = os.path.join(OUT, f'_{bench}_data.png')
-    fig.savefig(p, dpi=dpi, bbox_inches='tight')
-    plt.close(fig)
-    paths.append(p)
 
-    # right: viscoplastic shear strain at the critical F, colour fill only
-    fig = plt.figure(figsize=panel_size)
-    plot_fem_results(fem_data, field, plot_type=['shear_strain'],
-                     show_mesh=False, show_reinforcement=True,
-                     fig=fig, show_title=True, show_legend=False)
-    p = os.path.join(OUT, f'_{bench}_strain.png')
-    fig.savefig(p, dpi=dpi, bbox_inches='tight')
-    plt.close(fig)
-    paths.append(p)
+def _compose_2x2(paths, gutter_frac=0.02):
+    """Stitch the four panel PNGs (keyed 'UL','UR','LL','LR') into a 2x2 grid.
 
-    imgs = [Image.open(p) for p in paths]
-    h = min(im.height for im in imgs)
-    imgs = [im.resize((int(im.width * h / im.height), h)) for im in imgs]
-    combo = Image.new('RGB', (sum(im.width for im in imgs) + 20, h), 'white')
-    x = 0
-    for im in imgs:
-        combo.paste(im, (x, 0))
-        x += im.width + 20
-    out = os.path.join(OUT, f'{bench}.png')
+    Each panel is rendered independently with its own tight_layout, so the sizing
+    here is deliberately self-adjusting rather than hand-tuned:
+
+      * every panel is scaled to a common column width (the narrowest panel's
+        width, so nothing is upscaled and blurred) — this aligns the two columns;
+      * each row's height is the taller of its two panels, and the shorter panel
+        is vertically centred in the row — this aligns the two rows and keeps the
+        left column (which carries a legend below the axes) flush with the right;
+      * the gutter between panels is a fraction of the column width, so it tracks
+        the render resolution instead of being a fixed pixel constant.
+    """
+    ims = {k: Image.open(p) for k, p in paths.items()}
+    W = min(im.width for im in ims.values())
+
+    def fit(im):
+        if im.width == W:
+            return im
+        return im.resize((W, round(im.height * W / im.width)), Image.LANCZOS)
+
+    ims = {k: fit(v) for k, v in ims.items()}
+    row0 = max(ims['UL'].height, ims['UR'].height)
+    row1 = max(ims['LL'].height, ims['LR'].height)
+    gut = max(1, round(gutter_frac * W))
+
+    combo = Image.new('RGB', (2 * W + gut, row0 + row1 + gut), 'white')
+
+    def place(key, col, row_top, row_h):
+        im = ims[key]
+        x = col * (W + gut)
+        y = row_top + (row_h - im.height) // 2
+        combo.paste(im, (x, y))
+
+    place('UL', 0, 0, row0)
+    place('UR', 1, 0, row0)
+    place('LL', 0, row0 + gut, row1)
+    place('LR', 1, row0 + gut, row1)
+    return combo
+
+
+def render_figure(bench, sd, fem_data, field, out_dir=OUT, panel_size=(8.0, 5.0), dpi=150):
+    """Render the four panels and compose them into <out_dir>/<bench>.png.
+
+    Pure plotting: no solve happens here, so a cached (sd, fem_data, field) can be
+    re-rendered cheaply while iterating on the layout.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    tmp = {}
+
+    def _panel(key, draw, figsize=panel_size):
+        fig = plt.figure(figsize=figsize)
+        draw(fig)
+        p = os.path.join(out_dir, f'_{bench}_{key}.png')
+        fig.savefig(p, dpi=dpi, bbox_inches='tight')
+        plt.close(fig)
+        tmp[key] = p
+
+    # The three FEM panels box-adjust to a tight wide strip (cropped by the tight
+    # bbox), but plot_inputs uses adjustable='datalim' and so pads the data range
+    # out to whatever figure aspect it is given. Size its figure to the actual
+    # slope aspect so it crops to the same strip as the others instead of leaving
+    # a tall band of dead space above and below the geometry.
+    nodes = fem_data['nodes']
+    dw = float(nodes[:, 0].max() - nodes[:, 0].min())
+    dh = float(nodes[:, 1].max() - nodes[:, 1].min())
+    aspect = (dh / dw) if dw > 0 else 0.5
+    ul_h = float(np.clip(panel_size[0] * aspect, 2.0, panel_size[1]))
+
+    # upper-left: FEM inputs (geometry, material zones, water table, reinforcement)
+    _panel('UL', lambda fig: plot_inputs(
+        sd, mode='fem', title='FEM Inputs', fig=fig,
+        show_title=True, show_legend=True), figsize=(panel_size[0], ul_h))
+    # lower-left: mesh + material zones + boundary conditions
+    _panel('LL', lambda fig: plot_fem_data(fem_data, fig=fig, show_title=True))
+    # upper-right: viscoplastic shear strain at the critical F, colour fill only
+    _panel('UR', lambda fig: plot_fem_results(
+        fem_data, field, plot_type=['shear_strain'],
+        show_mesh=False, show_reinforcement=True,
+        fig=fig, show_title=True, show_legend=False))
+    # lower-right: viscoplastic displacement vectors at the critical F
+    _panel('LR', lambda fig: plot_fem_results(
+        fem_data, field, plot_type=['displace_vector'],
+        show_reinforcement=True,
+        fig=fig, show_title=True, show_legend=False))
+
+    combo = _compose_2x2(tmp)
+    out = os.path.join(out_dir, f'{bench}.png')
     combo.save(out)
-    for p in paths:
+    for p in tmp.values():
         os.remove(p)
-    return out, sol['FS']
+    return out
+
+
+def make_figure(tag, panel_size=(8.0, 5.0), dpi=150):
+    bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+    sd, fem_data, field, fs = build_and_solve(tag)
+    out = render_figure(bench, sd, fem_data, field, panel_size=panel_size, dpi=dpi)
+    return out, fs
 
 
 if __name__ == '__main__':

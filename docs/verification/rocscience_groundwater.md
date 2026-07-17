@@ -7,6 +7,8 @@ tracks its manual: every problem gets a row, built problems get an XSLOPE input 
 corpus, the seepage tags mesh and solve live on every run — the committed artifact is the
 input file alone.
 
+<!-- test: file=../files/rocscience_gw/gw001.xlsx, type=seep, target_size=0.2, expected_flowrate=2.500e-05, tolerance=0.02, benchmark=GW1-q -->
+<!-- test: file=../files/rocscience_gw/gw001.xlsx, type=seep_head, target_size=0.2, points=2:2:4.052;4:2:4.150;6:2:4.030, tolerance=0.02, benchmark=GW1-h -->
 <!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep, target_size=0.10, expected_flowrate=4.534e-06, tolerance=0.02, benchmark=GW2-q -->
 <!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep_head, target_size=0.10, points=4:1:0.500;4.5:0.866:0.381;5:0:0.263;6:0:0.202, tolerance=0.01, benchmark=GW2-h -->
 <!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.10, expected_flowrate=2.351e-05, tolerance=0.02, benchmark=GW3-q -->
@@ -50,7 +52,7 @@ which the solver now supports; the four are buildable and are queued rather than
 
 | # | Problem | Status | Notes |
 |---|---|---|---|
-| 1 | Shallow unconfined flow with rainfall | *queued* | Uniform infiltration (P = 2.5×10⁻⁶ m/s) across the top boundary, applied as a specified flux. Published targets: x_a = 4.06 / 3.98, h_max = 4.49 / 4.25. |
+| [1](#gw1) | Shallow unconfined flow with rainfall | **built** | [gw001.xlsx](../files/rocscience_gw/gw001.xlsx). Dupuit recharge mound between two rivers, P = 2.5×10⁻⁶ m/s applied as a specified flux. The free-surface crest reads x_a ≈ 4.1, h_max ≈ 4.61 vs Slide 4.06 / 4.49 and Haar's closed form 3.98 / 4.25 — a touch above Slide, the same free-surface-family bias the SEEP2D cross-check documents. Q = P·L = 2.5×10⁻⁵ locked. |
 | [2](#gw2) | Flow around cylinder | **built** | [gw002.xlsx](../files/rocscience_gw/gw002.xlsx). Confined potential flow: solved heads match Slide within 0.0013 m at every printed point and the closed form within its own idealization error. |
 | [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](../files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
 | [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
@@ -73,6 +75,36 @@ which the solver now supports; the four are buildable and are queued rather than
 | 21 | Transient seepage through a fully confined aquifer | blocked | Transient |
 
 ## Results
+
+### GW1: Shallow unconfined flow with rainfall {#gw1}
+
+**Input files:** [gw001.xlsx](../files/rocscience_gw/gw001.xlsx)
+
+Flow between two long parallel rivers 10 m apart (Haar 1990; the Dupuit–Forchheimer
+recharge problem), the manual's first specified-flux case. A 10 × 5 m block (base
+impermeable, ground surface at el 5) with river heads h₁ = 3.75 m on the left edge and
+h₂ = 3.0 m on the right, a uniform rainfall P = 2.5×10⁻⁶ m/s infiltrating the top, and
+k = 1×10⁻⁵ m/s. The recharge builds an **internal** free surface that mounds above both
+river levels; there is no daylighting seepage face, so the top edge is declared both the
+flux boundary and an (inactive) exit face — the device that puts the solver on the
+unsaturated free-surface path the internal mound needs. The free-surface position is set
+by mass balance, independent of k and of the unsaturated model.
+
+| Quantity | XSLOPE | Slide | Haar eqs 1.2–1.3 |
+|---|---|---|---|
+| x_a (crest position) | ≈ 4.1 | 4.06 | 3.98 |
+| h_max (crest elevation) | 4.61 | 4.49 | 4.25 |
+| Q (m³/s per m) | 2.500×10⁻⁵ | — | P·L = 2.5×10⁻⁵ |
+
+The mound crest lands within ~0.05 m of Slide in position and ~0.12 m in height — XSLOPE
+sits a touch above Slide, the same slightly-high free-surface bias the
+[SEEP2D cross-check](#seep2d-crosscheck) documents across this panel; both finite-element
+solutions sit above Haar's Dupuit closed form, which neglects the vertical flow the FE
+models resolve near the crest. The flowrate lock is Q = P·L = 2.5×10⁻⁵ (exact by
+construction, since all the rain enters and drains to the rivers); a head regression at
+three interior stations guards the mound shape, which the flux total alone does not.
+
+![gw001: mesh and solved heads](images/gw001.png)
 
 ### GW2: Flow around cylinder {#gw2}
 

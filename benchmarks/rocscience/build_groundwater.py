@@ -40,6 +40,47 @@ def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4):
     return sd
 
 
+def gw001():
+    """GW#1: shallow unconfined flow with rainfall (Haar 1990; Dupuit). Flow
+    between two parallel rivers 10 m apart with a rainfall recharge on the land
+    surface, the manual's first specified-flux problem after the flux BC landed.
+    Domain 10 x 5 m (vendor RS2 groundwater #001_01: base y=0 impermeable, ground
+    surface y=5); river heads h1=3.75 on the left edge (0,0)-(0,3.75) and h2=3.0
+    on the right (10,0)-(10,3.0), exactly as the RS2 nodal 'total head' cards;
+    uniform rainfall P=2.5e-6 m/s on the top ('vert infilt' 2.5e-6), k=1e-5 m/s.
+    The whole recharge mounds an INTERNAL free surface between the rivers - there
+    is no daylighting seepage face, so the top edge is declared BOTH the flux and
+    an exit face: it stays inactive (dry, the mound crest el ~4.6 sits below the
+    y=5 surface) but switches the solver onto the unsaturated free-surface path,
+    which the internal mound needs. Targets (Table 1.1): the free-surface crest
+    (x_a, h_max) - Slide 4.06 / 4.49, Haar eqs 1.2-1.3 3.98 / 4.25. xslope reads
+    x_a~=4.1, h_max~=4.61 (a touch above Slide, the same free-surface-family bias
+    the SEEP2D cross-check documents); Q=P*L=2.5e-5 m3/s per m is exact by
+    construction. The free surface is k- and unsat-model independent (mass balance
+    sets it); the flowrate lock plus a mound-guarding head regression are taken."""
+    sd = _base_sd(k1=1e-5)
+    from shapely.geometry import Polygon
+    sd['profile_lines'] = []
+    sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
+        [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0)])}]
+    sd['max_depth'] = None
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 3.75, 'coords': [(0.0, 0.0), (0.0, 3.75)]},
+            {'head': 3.0, 'coords': [(10.0, 0.0), (10.0, 3.0)]},
+        ],
+        'specified_fluxes': [
+            {'flux': 2.5e-6, 'coords': [(0.0, 5.0), (10.0, 5.0)]},
+        ],
+        # Same polyline as the flux: an internal recharge mound has no daylight
+        # face, so the top doubles as an (inactive) exit face to select the
+        # unsaturated solver. It never activates - the mound crest is below y=5.
+        'exit_face': [(0.0, 5.0), (10.0, 5.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw001.xlsx'))
+    return 'gw001.xlsx'
+
+
 def gw002():
     """GW#2: confined potential flow around a cylinder (Streeter analytical;
     Desai & Kundu FE). Half-domain 8 x 4 m with a 24-segment semicircular
@@ -323,6 +364,6 @@ def gw008():
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for fn in (gw002, gw003, gw004, gw006a, gw008, gw009a, gw010, gw011,
-               gw012, gw013):
+    for fn in (gw001, gw002, gw003, gw004, gw006a, gw008, gw009a, gw010,
+               gw011, gw012, gw013):
         print(fn())

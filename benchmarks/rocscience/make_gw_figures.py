@@ -39,6 +39,7 @@ OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification'
 
 # (stem, target_size or None for span/120, max_iter) — mesh sizes match the test tags
 CASES = [
+    ('gw001', 0.20, 400),
     ('gw002', 0.10, 400),
     ('gw003', 0.40, 400),
     ('gw004', 0.147, 400),

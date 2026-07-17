@@ -104,3 +104,20 @@ where the two codes' unsaturated relative-permeability treatments differ in
 detail; the bulk flow field agrees to about 0.1 ft.
 
 ![Johnson Reservoir: inputs and SEEP2D cross-check solution](images/johnson_res.png)
+
+**Van Genuchten discharge vs SEEP2D — a known reporting offset, not a solver
+difference.** On problems with van Genuchten conductivity, XSLOPE's total
+discharge reads 3.5–4.7% below SEEP2D's self-reported flow (gw009a
+2.299×10⁻⁵ vs 2.412×10⁻⁵; gw010 6.07×10⁻⁵ vs 6.29×10⁻⁵) even though the head
+fields agree to a relative RMS of ~10⁻⁴ and the linear-front problems above
+agree to better than 0.15%. The difference was traced to SEEP2D's flow
+*reporting*, not to either code's physics: both codes integrate the relative
+conductivity properly (SEEP2D at 16 Gauss points from nodal pressures — the
+two element formulations are mathematically equivalent for linear triangles),
+and on SEEP2D's own converged heads the assembled nodal reaction matches
+XSLOPE's value. SEEP2D's printed flow is accumulated during its seepage-face
+iteration and lags the heads it reports beside it; the offset does not shrink
+with mesh refinement. XSLOPE reports the conservative Galerkin flux — inflow
+equals outflow to machine precision — and is deliberately left unchanged.
+Heads, pore pressures, and stability results are unaffected (they read the
+head field, which the two codes agree on).

@@ -222,8 +222,9 @@ slope_data['materials'] = [
         'phi':   28.0,           # friction angle (degrees)
         'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
         # --- option='cp' only ---
-        'cp':    0.0,            # c/p ratio
-        'r_elev':0.0,            # reference elevation for c/p
+        'cp':    0.0,            # c/p ratio: rate of Su increase per unit depth below r_elev
+        'r_elev':0.0,            # reference elevation for c/p (normally cp>0; negative only
+                                 #   for a consolidated crust over softer clay — see VP30)
         # --- option='pow' only: tau = pow_a*(sigma_n + pow_d)^pow_b + pow_c ---
         'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0,
         # --- option='hb' only: generalized Hoek-Brown (mb/s/a are derived, not entered) ---

@@ -145,7 +145,11 @@ For the **cp** strength option, the undrained shear strength at elevation $y$ is
 where **c** is the strength at the reference elevation **r-elev** and **cp** is the *rate* of strength increase per
 unit elevation below it (e.g. psf/ft). At or above **r-elev** the strength equals **c**. This behaves like a
 $S_u/\sigma'_v$ (c/p) ratio but is referenced to elevation rather than depth, giving more precise control for
-slope-stability problems.
+slope-stability problems. The rate is normally **positive** — undrained strength increasing with depth, the
+familiar c/p behavior. A negative rate is accepted for one special case: a stronger consolidated crust over
+softer clay, as in the Borges & Cardoso embankment ([VP30](../verification/rocscience.md#vp30)), where the top
+metre of the foundation gained strength under construction loading and the profile decreases into the layer
+beneath.
 
 For the **pow** strength option, the shear strength is a curved envelope in terms of the effective normal stress
 $\sigma'_n$ on the failure surface:

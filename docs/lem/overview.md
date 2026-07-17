@@ -43,7 +43,8 @@ per unit elevation below it (e.g. psf/ft). At or above the reference elevation t
 plays the role of the familiar $S_u/\sigma'_v$ (c/p) ratio, but keyed to elevation rather than depth below ground —
 which is more precise for slope problems, where "depth" is ambiguous once the ground surface is no longer flat. It
 is a $\phi = 0$ model: the strength assigned to a slice base depends only on where that base sits, not on the
-normal stress acting on it.
+normal stress acting on it. The rate is normally positive (strength increasing with depth); a negative rate is
+accepted for the consolidated-crust case — see [VP30](../verification/rocscience.md#vp30).
 
 **Nonlinear (power-curve) strength.** In addition to the linear Mohr-Coulomb envelope, a material may use the
 curved power-curve envelope (option `pow` in the input template):

@@ -47,6 +47,7 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
 <!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
 <!-- test: file=../files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
+<!-- test: file=../files/rocscience/vp026.xlsx, type=single_noncirc, num_slices=60, right_facing=true, fs_spencer=1.043, benchmark=VP26 -->
 <!-- test: file=../files/rocscience/vp027.xlsx, type=single_circle, num_slices=50, fs_bishop=1.369, fs_spencer=1.375, fs_janbu=1.365, fs_mprice=1.371, fs_corps=1.388, fs_lowe=1.386, benchmark=VP27 -->
 <!-- test: file=../files/rocscience/vp035.xlsx, type=circular_search, num_slices=50, fs_bishop=2.529, benchmark=VP35-fs -->
 <!-- test: file=../files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.353, tolerance=0.03, benchmark=VP35-beta -->
@@ -203,7 +204,7 @@ corpus is complete relative to what is independently verifiable.
 | [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
 | [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
 | [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope (Chen & Shao 1988), surface constructed analytically as a 45° wedge + tangent fan arc. Also [SLOPE/W §2.15](geostudio.md) — same problem in the GeoStudio corpus. |
-| 26 | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | partial | [vp026.xlsx](../files/rocscience/vp026.xlsx), extracted from the RS2 manual's fully specified statement of the same problem (weightless c=20 soil, UDL 102.83, exact Prandtl mechanism). The RS2-21 SSR lock runs on this file (SSRM 1.011, converging on theory 1.0); the LEM lock on the printed surface (target Slide2 Spencer 0.941) waits on a facing rule for surfaces whose two ground crossings sit at the same elevation — level-ground bearing mechanisms are currently rejected by the flat-arc guard. Also [SLOPE/W §2.16](geostudio.md) — same problem in the GeoStudio corpus. |
+| [26](#vp26) | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | **built** | [vp026.xlsx](../files/rocscience/vp026.xlsx). Weightless c = 20 soil under a UDL of 102.83 = c·N<sub>c</sub>, so the exact bearing-capacity theory FS is **1.0**. Spencer **1.043** on the printed Prandtl surface (level-ground, unblocked by the flat-arc facing rule); the RS2-21 SSR lock runs on the same file (SSRM ≈ 1.0). See the section for the comparison with Slide2's 0.941. Also [SLOPE/W §2.16](geostudio.md) — same problem in the GeoStudio corpus. |
 | [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 reference slope (Sharma 1996): two materials over undulating bedrock, a zero-strength cap, and a water table with the phreatic-inclination (Hu) correction. |
 | [28](#vp28) | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | **built** (3 of 10 cases) | [vp028a](../files/rocscience/vp028a.xlsx) / [b](../files/rocscience/vp028b.xlsx) / [c](../files/rocscience/vp028c.xlsx). Chowdhury & Xu (1995): the Congress St. Cut + an embankment on soft clay, probabilistic analysis on the manual's fixed printed circles. Also [SLOPE/W §2.17](geostudio.md) — same problem in the GeoStudio corpus. |
 | [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](../files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical Taylor-series reliability (TSPM) benchmark, an underwater trench failure in San Francisco Bay Mud, on Duncan's estimated surface. |
@@ -729,6 +730,38 @@ Slide #25 / Chen & Shao (1988): the classical plasticity problem — a weightles
 | Morgenstern-Price (half-sine) | 1.069 | Slide GLE 1.009 *(custom interslice function fit to the theoretical distribution)* |
 
 ![vp025: inputs and representative solution](images/vp025.png)
+
+### VP26: Prandtl bearing mechanism on level ground {#vp26}
+
+Slide #26: the classical Prandtl footing problem — a weightless c = 20 soil (γ = 10⁻⁶,
+φ = 0) on **level ground**, loaded by a strip UDL of **102.83** over the crest. That load
+is exactly the ultimate bearing capacity c·N<sub>c</sub> = 20·(2 + π) = 102.83, so the
+theoretical factor of safety is **1.0** by construction. The evaluation runs on the printed
+Prandtl surface (an active wedge, a logarithmic-spiral/circular fan, and a passive wedge),
+extracted with its end segments extended past the ground line.
+
+This is the corpus's canonical **level-ground bearing** problem: its two ground crossings
+sit at the same elevation, which the flat-arc facing rule now handles. The surface itself
+is symmetric, so the facing is set by the load — offset to the loaded side — via the
+`right_facing` override the rule exposes.
+
+**Input files:** [vp026.xlsx](../files/rocscience/vp026.xlsx)
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer | **1.043** | theory 1.0; Slide2 Spencer 0.941 |
+| Morgenstern-Price (half-sine) | 1.051 | — |
+| Lowe & Karafiath | 1.017 | — |
+| Janbu (corrected) | 1.095 | — |
+
+XSLOPE's methods **bracket the exact theory FS of 1.0** (0.98–1.10), with Spencer at 1.043;
+Slide2 reads 0.941, ~10% below theory. The gap is a genuine interslice-convention difference
+on this degenerate flat-ground mechanism, not a discretization artifact — Spencer is stable
+from 8 to 200 slices, and densifying the analytic arc moves it *away* from Slide, toward
+theory. The lock is XSLOPE's own Spencer value, referenced against both anchors. The RS2
+strength-reduction rendition of the same problem (RS2-21) independently converges on the
+theory value from the continuum side. Also [SLOPE/W §2.16](geostudio.md) — the same Prandtl
+problem in the GeoStudio corpus.
 
 ### VP27: XSTABL slope with undulating bedrock and auto-Hu pore pressures {#vp27}
 

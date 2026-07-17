@@ -210,13 +210,20 @@ def run_lem_test(test):
     # `seed=grid` runs the circular search from an automatic grid-and-tangent sweep
     # instead of (only) the circles sheet — the global-search mode.
     seed = str(test.get('seed', 'circles')).strip().lower()
+    # `right_facing=true/false` overrides the automatic facing detection. Needed for
+    # level-ground bearing surfaces (flat arc), where the surface is symmetric and the
+    # facing is set by the load asymmetry the geometry can't see (VP26). Absent → the
+    # engine's automatic rule (unchanged for every normal slope).
+    _rf = str(test.get('right_facing', '')).strip().lower()
+    right_facing = True if _rf in ('true', '1', 'yes') else (
+        False if _rf in ('false', '0', 'no') else None)
 
     slope_data = load_slope_data(file_path)
 
     if test_type == 'single_circle':
         circle = slope_data['circles'][0]
         success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
-                                          composite=composite)
+                                          composite=composite, right_facing=right_facing)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
@@ -247,7 +254,7 @@ def run_lem_test(test):
         # Evaluate the file's specified non-circular surface as-is (no search) —
         # the "predefined slip surface" form of the verification problems.
         success, result = generate_slices(slope_data, non_circ=slope_data['non_circ'],
-                                          num_slices=num_slices)
+                                          num_slices=num_slices, right_facing=right_facing)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result

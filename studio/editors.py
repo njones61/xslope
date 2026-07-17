@@ -1726,7 +1726,10 @@ class _MaterialListView(QWidget):
                 w.blockSignals(False)
             else:
                 w.blockSignals(True)
-                w.setText("" if val is None else str(val))
+                # NaN is "unset" throughout the templates (e.g. t_res, E, area on
+                # lines that don't carry them) — render blank, never the string "nan".
+                _blank = val is None or (isinstance(val, float) and val != val)
+                w.setText("" if _blank else str(val))
                 w.blockSignals(False)
         ok = 0 <= idx < len(self._rows)
         self.setEnabled(True)
@@ -2281,7 +2284,10 @@ class _LineListView(QWidget):
                 j = w.findText(txt)
                 w.setCurrentIndex(j if j >= 0 else 0)
             else:
-                w.setText("" if val is None else str(val))
+                # NaN is "unset" throughout the templates (e.g. t_res, E, area on
+                # lines that don't carry them) — render blank, never the string "nan".
+                _blank = val is None or (isinstance(val, float) and val != val)
+                w.setText("" if _blank else str(val))
             w.blockSignals(False)
         self._form_scroll.setEnabled(ok)
         if ok:
@@ -3452,9 +3458,8 @@ class ReinforcementEditor(CategoryEditor):
                       "(Spacing divides discrete supports).",
             usage_toggles=["lem", "fem"],
             preview_caption="Preview shows the reinforcement lines on the section "
-                            "(selected line bold with its endpoints; others dimmed; the "
-                            "trial surface, if any, is drawn for crossing context). "
-                            "Click a line to select it.")
+                            "(selected line bold with its endpoints and pullout-length "
+                            "markers; others dimmed). Click a line to select it.")
 
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines

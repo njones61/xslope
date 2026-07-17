@@ -185,13 +185,25 @@ analysis, use `run_lem(method=...)` (pass plot=False to suppress its plot).
 
 For a DESIGN question ("what c gives FS = 1.5?", "vary Su between X and Y and
 show where FS hits the target") use the preloaded `design_sweep(param, low,
-high, steps=..., target_fs=..., method=...)`: param takes
+high, steps=..., target_fs=..., mode='lem', method=...)`: param takes
 `{'material': name_or_index, 'property': field}` or `{'global': 'k_seismic'}`;
-it sweeps, plots FS-vs-value with the target line, and returns the result dict —
-read `crossing` (the interpolated required value) only when `bracketed` is True;
-on a miss report `fs_range` and extend the way `extend` says, never extrapolate.
-Discover sweepable parameters with `list_params()`. For material properties
-prefer these over the callback-style `sensitivity()`.
+it sweeps, plots the OUTPUT-vs-value curve with the target line (axes auto-
+labelled), and returns the result dict — read `crossing` (the interpolated
+required value) only when `bracketed` is True; on a miss report `fs_range` and
+extend the way `extend` says, never extrapolate. Discover sweepable parameters
+with `list_params(mode=...)`. For material properties prefer these over the
+callback-style `sensitivity()`.
+`mode` picks the engine and the OUTPUT quantity `target_fs` names: 'lem'
+(output = FS, default), 'fem' (output = FS from a full SSRM solve — needs a
+finite-element mesh in slope_data['mesh'] and costs MINUTES PER STEP, so tell
+the user to expect a wait, keep `steps` tiny (2-3), and pass `fem_opts` for SSRM
+knobs), and 'seep' (output = total discharge q, so `target_fs` is a target q
+like 6e-6 — also needs a mesh; `seep_opts={'bc':1}` picks the BC set). A seep
+design study varies a hydraulic conductivity (`seep:<mat>:k1`) or a reservoir-
+head boundary (`seep_bc:<set>:<head_index>`, or the dict
+`{'seep_bc': {'set': 1, 'head_index': 0}}`) and finds the value giving the
+target q — the classic "reservoir level vs seepage discharge" study. Both mesh
+modes error with "build a mesh first" if none is present.
 """
 
 # Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.

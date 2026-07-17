@@ -67,12 +67,17 @@ class PythonKernel:
           in-snippet geometry edit (call inside sweep loops).
         - ``sensitivity(values, apply, param=..., ...)`` — callback-driven FS-vs-
           parameter sweep (you write ``apply(v)``); writes a CSV + one plot.
-        - ``list_params(slope_data=None)`` — discover every sweepable parameter as
-          a menu of canonical refs (feeds design_sweep / the engine sweepers).
-        - ``design_sweep(param, low, high, target_fs=1.5, ...)`` — vary ONE named
-          parameter and find where FS meets a target; renders one FS-vs-parameter
-          plot with the target highlighted. The engine-driven counterpart to
-          ``sensitivity`` — no callback needed, just a parameter ref or dict spec.
+        - ``list_params(slope_data=None, mode='lem')`` — discover every sweepable
+          parameter as a menu of canonical refs (feeds design_sweep / the engine
+          sweepers). mode='seep' lists the seepage set instead (each material's
+          hydraulic k fields + every specified-head boundary as a seep_bc ref).
+        - ``design_sweep(param, low, high, target_fs=1.5, mode='lem', ...)`` — vary
+          ONE named parameter and find where the OUTPUT meets a target; renders one
+          output-vs-parameter plot with the target highlighted. ``mode`` picks the
+          engine: 'lem' (output = FS, default), 'fem' (FS via SSRM — MINUTES per
+          step, needs a mesh), 'seep' (total discharge q — needs a mesh; target is a
+          q). The engine-driven counterpart to ``sensitivity`` — no callback needed,
+          just a parameter ref or dict spec.
         """
         doc = self._doc
 
@@ -212,7 +217,7 @@ class PythonKernel:
             print(f"Wrote {name}.csv and {name}.png ({len(df)} points).")
             return df
 
-        def list_params(slope_data=None):
+        def list_params(slope_data=None, mode="lem"):
             """List every sweepable parameter in the current project — the menu
             `design_sweep` and the engine sweepers draw their parameter refs from.
 
@@ -220,71 +225,102 @@ class PythonKernel:
             dicts, one per parameter, each carrying a canonical `ref`
             ("kind:name:field", e.g. "mat:Clay:c", "global:k_seismic"), a `label`,
             the current `value`, and `sigma` (the reliability std-dev if the model
-            carries one). Covers every material's option-aware strength + general
-            fields plus the global k_seismic; blank/zero fields are still listed so a
-            design sweep with explicit bounds can target them. Prints a compact table
-            and returns the list so a snippet can pick a ref programmatically.
+            carries one). In the default `mode='lem'` (also right for `'fem'`), covers
+            every material's option-aware strength + general fields plus the global
+            k_seismic. In `mode='seep'` the menu switches to the seepage-relevant set:
+            each material's hydraulic fields (k1, k2, alpha, kr0, h0) plus every
+            specified-head boundary value as a `seep_bc:<set>:<head_index>` ref.
+            Blank/zero fields are still listed so a design sweep with explicit bounds
+            can target them. Prints a compact table and returns the list so a snippet
+            can pick a ref programmatically.
 
             Hand any `ref` straight to `design_sweep(param=...)`, or use the
             LLM-friendly dict form {'material': name_or_index, 'property': field} /
-            {'global': field}.
+            {'global': field} / {'seep_bc': {'set': 1, 'head_index': 0}}.
             """
             from xslope.sensitivity import list_params as _list_params
             sd = doc.slope_data if slope_data is None else slope_data
-            params = _list_params(sd)
+            params = _list_params(sd, mode=mode)
             for p in params:
                 val = "—" if p["value"] is None else f"{p['value']:g}"
                 sig = f"   sigma={p['sigma']:g}" if p.get("sigma") else ""
                 print(f"  {p['ref']:<30} = {val}{sig}")
             return params
 
-        def design_sweep(param, low, high, steps=11, target_fs=1.5,
-                         method="spencer", search=True, num_slices=40, plot=True,
-                         slope_data=None):
+        def design_sweep(param, low, high, steps=11, target_fs=1.5, mode="lem",
+                         method="spencer", search=True, num_slices=40,
+                         fem_opts=None, seep_opts=None, plot=True, slope_data=None):
             """Design sweep: vary ONE parameter from `low` to `high` and find the
-            value at which the factor of safety meets `target_fs` — the
-            deterministic-design staple ("vary the undrained strength between X and
-            Y, plot FS vs Su, highlight where FS = 1.5").
+            value at which the OUTPUT meets `target_fs` — the deterministic-design
+            staple ("vary the undrained strength between X and Y, plot FS vs Su,
+            highlight where FS = 1.5").
 
             Thin wrapper over `xslope.sensitivity.design`. `param` is a parameter
             reference in any form the engine accepts: a "kind:name:field" string
-            (e.g. "mat:Clay:c", "global:k_seismic"), a (kind, name, field) tuple
-            (name may be a 1-based material index), or the LLM-friendly dict
-            {'material': name_or_index, 'property': field} / {'global': field}. Run
-            `list_params()` first to discover the refs.
+            (e.g. "mat:Clay:c", "global:k_seismic", "seep:Soil:k1",
+            "seep_bc:1:0"), a (kind, name, field) tuple (name may be a 1-based
+            material index), or the LLM-friendly dict {'material': name_or_index,
+            'property': field} / {'global': field} / {'seep_bc': {'set': 1,
+            'head_index': 0}}. Run `list_params(mode=...)` first to discover the refs.
+
+            `mode` selects the engine that evaluates each step and hence the OUTPUT
+            quantity the sweep targets (`target_fs` names the target VALUE of that
+            quantity, whatever it is):
+              'lem'  — limit equilibrium; output = FS (default). `method` picks the
+                       LEM method; `search` re-searches the critical surface per step.
+              'fem'  — full SSRM solve per step (xslope.fem); output = FS. Needs a
+                       finite-element mesh in slope_data['mesh'], and costs MINUTES
+                       PER STEP — keep `steps` small. `fem_opts` forwards SSRM knobs
+                       (F_min, F_max, tolerance, failure_criterion, min_slip_depth).
+              'seep' — seepage solve per step (xslope.seep); output = total discharge
+                       q (so `target_fs` is a target q, e.g. 6e-6). Needs a mesh;
+                       `seep_opts` = {'bc': 1|2, 'tol': ...}. The classic study varies
+                       a hydraulic k (seep:<mat>:k1) or a reservoir head
+                       (seep_bc:<set>:<i>) and finds the value giving a target q.
 
             Runs `steps` evenly spaced solves across [low, high], re-searching the
-            critical surface at each step by default (search=True — the critical
-            surface MOVES as the parameter changes; a fixed-surface sweep understates
-            the effect). Renders ONE FS-vs-parameter plot (via `plot_sensitivity`,
-            with FS = 1 and FS = target_fs guide lines) the same way `run_lem` shows
-            its plot — pass plot=False in a loop. Does NOT modify the project (a sweep
-            is analysis, not an edit).
+            critical surface at each step by default in LEM (search=True — the
+            critical surface MOVES as the parameter changes; a fixed-surface sweep
+            understates the effect). Renders ONE output-vs-parameter plot (via
+            `plot_sensitivity`, which labels the axes from the df's output_label — FS
+            with an FS = 1 guide, or q — and draws the target guide line) the same way
+            `run_lem` shows its plot — pass plot=False in a loop. Does NOT modify the
+            project (a sweep is analysis, not an edit).
 
             Returns the engine's result dict:
-              'crossing'  — interpolated parameter value at FS = target_fs, or None.
-              'bracketed' — True iff FS = target_fs is crossed inside [low, high].
+              'crossing'  — interpolated parameter value at output = target, or None.
+              'bracketed' — True iff output = target is crossed inside [low, high].
               'crossings' — every crossing found (list; usually one).
-              'fs_range'  — (min FS, max FS) over the successful sweep points.
+              'fs_range'  — (min, max) OUTPUT over the successful sweep points.
               'direction' — 'increasing' / 'decreasing' / 'non-monotonic'.
               'extend'    — when NOT bracketed, which way to widen the range
                             ('above {high}' / 'below {low}'). Report fs_range + this;
                             NEVER extrapolate a crossing past the swept range.
+              'output' / 'output_label' — 'FS'/'q' and the axis label.
               'message'   — one-line human summary. Also: 'df', 'param', 'base_value'.
             """
             from xslope.sensitivity import design as _design
             from xslope.plot import plot_sensitivity
             import matplotlib.pyplot as plt
             sd = doc.slope_data if slope_data is None else slope_data
+            if mode in ("fem", "seep") and sd.get("mesh") is None:
+                raise RuntimeError(
+                    f"mode='{mode}' evaluates each step with the finite-element "
+                    f"{'SSRM' if mode == 'fem' else 'seepage'} solver, which needs a "
+                    "mesh in slope_data['mesh'] — build a mesh first (Studio: the "
+                    "Mesh toolbar/menu, or xslope.mesh.build_mesh_from_polygons).")
             ok, res = _design(sd, param, low, high, steps=steps, target_fs=target_fs,
-                              method=method, search=search, num_slices=num_slices)
+                              mode=mode, method=method, search=search,
+                              num_slices=num_slices, fem_opts=fem_opts,
+                              seep_opts=seep_opts)
             if not ok:
                 raise RuntimeError(res)
+            out = res.get("output", "FS")
             print(res["message"])
             if not res["bracketed"]:
                 lo, hi = res["fs_range"]
-                print(f"  (not bracketed — FS spans [{lo:.3f}, {hi:.3f}]; extend "
-                      f"the range {res['extend']} to reach FS = {target_fs:g})")
+                print(f"  (not bracketed — {out} spans [{lo:.3g}, {hi:.3g}]; extend "
+                      f"the range {res['extend']} to reach {out} = {target_fs:g})")
             if plot:
                 plot_sensitivity(res["df"], target_fs=res["target_fs"],
                                  fig=plt.figure(figsize=(8, 5)))

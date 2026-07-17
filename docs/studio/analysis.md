@@ -61,6 +61,86 @@ reliability run) can be **cancelled** from the status bar.
 
 ---
 
+## Sensitivity / Design study
+
+In **LEM** mode a second entry point sits beside Run — **Sensitivity / Design…** — on both
+the **Run menu** and the main **toolbar**. It is available whenever a model is open in LEM
+mode (hidden in Seepage and FEM mode, and disabled while another analysis is running). Both
+modes drive the same sweep engine as the library — see
+[Sensitivity Analysis](../lem/sensitivity.md) for the engine, and the
+[`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
+
+One dialog covers two modes, chosen by the **Mode** selector. Three controls are shared by
+both: **Method** (any of the seven LEM methods), **Number of slices**, and a **Parameter**
+picker — a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a
+**Property** dropdown listing that material's option-aware sweepable fields (both drawn from
+the engine's `list_params`). A **Re-search the critical surface at each step** checkbox
+applies to both modes: on by default — the honest setting, since the critical surface moves
+as the parameter changes — and off re-solves the entered surface only (much faster, but right
+only for that prescribed surface).
+
+**Sensitivity (tornado)** sweeps several parameters and ranks them:
+
+![Sensitivity dialog](images/analysis_sensitivity_dialog.png)
+
+- A **Default ±%** and a **Points** count (points per parameter's FS-vs-value curve; the
+  tornado itself uses only the curve's two endpoints).
+- **Add parameter** appends the currently picked material/property to the table. Each row
+  shows the parameter reference, an editable **±%** overriding the default for that row, a
+  **σ** button, and a remove (✕) button.
+- The **σ** preset swaps that row's ±% range for a ±one-standard-deviation range built from
+  the model's reliability `sigma_*` columns — the same standard deviations the
+  [reliability analysis](../lem/reliability.md) uses — so a sweep can mirror a reliability
+  input band with one click. The button is disabled for a property that carries no `sigma_*`.
+
+**Design (FS vs one parameter)** sweeps the one picked parameter toward a target FS:
+
+![Design dialog](images/analysis_sensitivity_dialog_design.png)
+
+- **From** / **To** bound the swept value (seeded to ±50% of the current value the first time
+  you pick a property), **Steps** sets the number of solves, and **Target FS** is the factor
+  of safety to locate.
+
+### Running and cancelling
+
+Clicking **Run** launches the sweep on a background thread, so the window stays responsive.
+The progress bar tracks each solve (`done/total`, with the current swept value echoed in the
+status bar), the sweep log streams to the [Log pane](interface.md#the-log-pane), and the
+status-bar **Cancel** button aborts cooperatively — the in-flight solve finishes, then the
+sweep stops and the app is left consistent, with no partial result stored.
+
+### Results
+
+**Sensitivity** opens a **Sensitivity** tab with the tornado diagram — one horizontal bar per
+parameter, widest on top, with the base-case FS drawn as a labelled vertical reference line:
+
+![Sensitivity tornado](images/analysis_sensitivity_tornado.png)
+
+**Double-click a bar** to open a companion **Sensitivity · Curve** tab showing that
+parameter's full FS-vs-value curve (the base case marked, and any critical-surface jump drawn
+as an open circle):
+
+![Per-parameter FS curve](images/analysis_sensitivity_curve.png)
+
+**Design** opens a **Design** tab with the FS-vs-value curve, the FS = 1 and target-FS guide
+lines, and — when the target is bracketed — the interpolated crossing marked with a green
+diamond and annotated *property = value for FS = target*:
+
+![Design curve with crossing](images/analysis_sensitivity_design_curve.png)
+
+When the swept range never reaches the target, the result is honest about it: no crossing is
+drawn, and an amber note reports the FS span and which way to widen the range — the GUI face
+of the engine's
+[never-extrapolate discipline](../lem/sensitivity.md#design-studies-finding-the-value-that-hits-a-target-fs):
+
+![Design honest miss](images/analysis_sensitivity_design_miss.png)
+
+!!! note "Sweeps are LEM-only"
+    The Sensitivity / Design dialog sweeps the **limit-equilibrium** analyses; FEM and
+    seepage sweeps are not yet offered in the dialog.
+
+---
+
 ## Building a mesh
 
 Seepage and FEM run on a finite-element mesh, which you build explicitly. In

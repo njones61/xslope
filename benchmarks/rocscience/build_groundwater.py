@@ -81,6 +81,52 @@ def gw001():
     return 'gw001.xlsx'
 
 
+def gw007():
+    """GW#7: seepage within a layered slope (Rulon & Freeze sandbox, after
+    Fredlund & Rahardjo 1993). A medium-sand slope with a thin fine-sand lens;
+    the fine sand's ks (5.5e-5 m/s) is BELOW the applied rainfall (2.1e-4 m/s),
+    so recharge perches on the lens and daylights as a seepage face - the classic
+    perched-water-table result. Geometry from vendor RS2 groundwater #007 (a 2.4 x
+    1.0 m box, 2:1 downstream slope from crest (1.6,1.0) to toe (0,0.2)); the fine
+    lens is the y=0.6-0.7 band from the slope face to the right wall. Conductivity
+    functions are the RS2 'Custom' curves (Fig 7.2), fit by Mualem-vG here: medium
+    ks=0.0014 (vg_a=1.774, vg_n=2.328), fine ks=5.5e-5 (vg_a=1.672, vg_n=2.197).
+    BCs from the RS2 cards: rainfall 2.1e-4 'vert infilt' on the crest top
+    (1.6-2.4, y=1.0); tailwater 'total head' 0.3 on the submerged toe (0,0.2)-
+    (0.2,0.3); the rest of the slope an exit (seepage) face; base and right wall
+    no-flow. All published targets are chart curves (Fig 7.4 water table, 7.7/7.8
+    head profiles) with no tabulated value, so - as the methodology note allows for
+    GW6/GW7 - only the flowrate is locked (Q=q*L=1.68e-4, exact by construction),
+    with a head regression guarding the field. xslope reproduces the stated water
+    table (daylights at el 0.30 at the toe) and the perched zone above the lens."""
+    sd = _base_sd()
+    med = dict(sd['materials'][0])
+    med.update(name='Medium sand', k1=0.0014, k2=0.0014, alpha=0.0,
+               kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.7745, vg_n=2.3276)
+    fin = dict(med)
+    fin.update(name='Fine sand', k1=5.5e-5, k2=5.5e-5,
+               unsat='vg', vg_a=1.6722, vg_n=2.1965)
+    sd['materials'] = [med, fin]                # mat 0 = medium, mat 1 = fine lens
+    from shapely.geometry import Polygon
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon(
+            [(0.0, 0.0), (2.4, 0.0), (2.4, 0.6), (0.8, 0.6), (0.0, 0.2)])},
+        {'mat_id': 1, 'polygon': Polygon(
+            [(0.8, 0.6), (2.4, 0.6), (2.4, 0.7), (1.0, 0.7)])},
+        {'mat_id': 0, 'polygon': Polygon(
+            [(1.0, 0.7), (2.4, 0.7), (2.4, 1.0), (1.6, 1.0)])},
+    ]
+    sd['max_depth'] = None
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 0.3, 'coords': [(0.0, 0.2), (0.2, 0.3)]}],
+        'specified_fluxes': [{'flux': 2.1e-4, 'coords': [(1.6, 1.0), (2.4, 1.0)]}],
+        'exit_face': [(0.2, 0.3), (0.8, 0.6), (1.0, 0.7), (1.6, 1.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw007.xlsx'))
+    return 'gw007.xlsx'
+
+
 def gw002():
     """GW#2: confined potential flow around a cylinder (Streeter analytical;
     Desai & Kundu FE). Half-domain 8 x 4 m with a 24-segment semicircular
@@ -364,6 +410,6 @@ def gw008():
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for fn in (gw001, gw002, gw003, gw004, gw006a, gw008, gw009a, gw010,
-               gw011, gw012, gw013):
+    for fn in (gw001, gw002, gw003, gw004, gw006a, gw007, gw008, gw009a,
+               gw010, gw011, gw012, gw013):
         print(fn())

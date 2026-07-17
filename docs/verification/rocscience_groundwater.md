@@ -58,7 +58,7 @@ which the solver now supports; the four are buildable and are queued rather than
 | [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
 | 5 | Unsaturated flow behind an embankment | *no lock possible* | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. |
 | [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh. Case 4 needs the flux BC (now supported); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets. All four are deferred. |
-| 7 | Seepage within layered slope | *queued* | Rulon & Freeze layered slope: a constant infiltration rate of 2.1×10⁻⁴ m/s on the top of the slope, applied as a specified flux (the stated water table position is an output, not an input). k-charts and profile targets recorded. |
+| [7](#gw7) | Seepage within layered slope | **built** (caveat) | [gw007.xlsx](../files/rocscience_gw/gw007.xlsx). Rulon & Freeze layered slope: 2.1×10⁻⁴ m/s infiltration on the crest — above the fine-sand ks — perches a water table on the fine lens and daylights as a slope-face spring. XSLOPE reproduces the stated water table (exits at el 0.30 at the toe) and the perched zone; Q = q·L = 1.68×10⁻⁴ locked. Every published target (Fig 7.4/7.7/7.8) is a chart curve with no tabulated value, so — as the methodology note allows for GW6/GW7 — only the flowrate is locked, with a head regression guarding the field. |
 | [8](#gw8) | Flow through ditch-drained soils | **built** (discrepancy) | [gw008.xlsx](../files/rocscience_gw/gw008.xlsx). Gureghian (1981) ditch-drained aquifer — the corpus' exercise of the [specified-flux boundary](#flux-crosscheck), since the problem is driven entirely by rainfall infiltration on the top surface. The flux boundary itself is verified exactly (total inflow = *q*·*L*; the confined response matches the closed form to six figures). **The published contours cannot be reproduced from the manual's printed inputs**: the recharge mound comes out ≈10× too small, and two independent hand calculations confirm the printed numbers cannot produce the published figure. Only the flowrate is locked. |
 | [9](#gw9) | Seepage through dam | **built** (dam 1 of 2) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx). Bowles homogeneous dam via Chapuis et al. (2001): Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2 (drain) needs the source paper — its k-function and reservoir level are chart-only and the published Q implies a k two decades below the chart. |
 | [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](../files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |
@@ -277,6 +277,44 @@ daylights at the same place — see [the SEEP2D cross-check](#seep2d-crosscheck)
 regression locks XSLOPE's own values.*
 
 ![gw006a: mesh and solved heads](images/gw006a.png)
+
+### GW7: Seepage within a layered slope {#gw7}
+
+**Input file:** [gw007.xlsx](../files/rocscience_gw/gw007.xlsx)
+
+Rulon & Freeze's sandbox slope (after Fredlund & Rahardjo 1993): a medium-sand slope
+holding a thin fine-sand lens. Geometry from the vendor RS2 model (a 2.4 × 1.0 m box, a
+2:1 downstream slope from the crest at (1.6, 1.0) to the toe at (0, 0.2), and the fine
+lens as the y = 0.6–0.7 band from the slope face to the right wall); conductivity curves
+from the manual's Fig 7.2, fit here by Mualem–van Genuchten (medium ks = 1.4×10⁻³ m/s,
+fine ks = 5.5×10⁻⁵ m/s). A uniform 2.1×10⁻⁴ m/s falls on the crest; the submerged toe is
+a tailwater head of 0.3 m; the rest of the slope is a seepage face; base and right wall
+are no-flow.
+
+The infiltration rate exceeds the fine sand's saturated conductivity, so the recharge
+cannot drain vertically through the lens: it **perches** a water table on top of the fine
+band and sheds laterally to daylight as a slope-face spring — the physical result Rulon &
+Freeze observed. XSLOPE reproduces it: the perched saturated zone above the lens (the
+crowded head contours across the low-k band), the free surface daylighting on the slope,
+and the main water table exiting at el 0.30 at the toe — the "0.3 m from the toe" the
+manual reports.
+
+| Quantity | XSLOPE | Slide / Rulon & Freeze |
+|---|---|---|
+| water table at the toe | el 0.30 | 0.3 m (stated) |
+| Q, m³/s per m | 1.680×10⁻⁴ | q·L = 1.68×10⁻⁴ |
+
+Every published target is a chart curve — the water table (Fig 7.4) and the total-head
+profiles along lines 1-1 and 2-2 (Figs 7.7, 7.8) — with no tabulated number, the same
+situation the methodology note flags for GW6/GW7. So only the flowrate is locked
+(Q = q·L, exact by construction on the flux boundary), with a three-station head
+regression guarding the solved field. The conductivity fit shifts the unsaturated detail
+but not the flowrate or the perched-table topology.
+
+<!-- test: file=../files/rocscience_gw/gw007.xlsx, type=seep, target_size=0.04, max_iter=1000, expected_flowrate=1.680e-04, tolerance=0.02, benchmark=GW7-q -->
+<!-- test: file=../files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1:0.1:0.518;2:0.1:0.642;2.2:0.3:0.657, tolerance=0.02, benchmark=GW7-h -->
+
+![gw007: mesh and solved heads](images/gw007.png)
 
 ### GW8: Flow through ditch-drained soils {#gw8}
 

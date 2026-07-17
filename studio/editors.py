@@ -427,8 +427,12 @@ class GlobalEditor(CategoryEditor):
 
 
 def _new_material():
-    return {"name": "", "gamma": 0.0, "option": "mc", "c": 0.0, "phi": 0.0,
-            "cp": 0.0, "r_elev": 0.0, "d": 0.0, "psi": 0.0, "u": "none",
+    # Same key set load_slope_data produces (gsat blank -> None; the rest zeroed).
+    return {"name": "", "gamma": 0.0, "gamma_sat": None, "option": "mc",
+            "c": 0.0, "phi": 0.0, "cp": 0.0, "r_elev": 0.0, "d": 0.0, "psi": 0.0,
+            "pow_a": 0.0, "pow_b": 0.0, "pow_c": 0.0, "pow_d": 0.0,
+            "hb_sci": 0.0, "hb_gsi": 0.0, "hb_mi": 0.0, "hb_d": 0.0,
+            "u": "none", "ru": 0.0,
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
@@ -437,21 +441,32 @@ def _new_material():
 
 class MaterialsEditor(CategoryEditor):
     label = "Materials"
-    # Columns mirror the 'mat' worksheet in order: name, g, option, c, f, c/p,
-    # r-elev, d, psi, u, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2, alpha,
-    # unsat, kr0, h0, vg_a, vg_n, E, n.
+    # Columns mirror the 'mat' worksheet in order: name, g, gsat, option, c, f,
+    # c/p, r-elev, d, psi, pow_a..pow_d, hb_sci/hb_gsi/hb_mi/hb_d, u, ru, s(g),
+    # s(c), s(f), s(c/p), s(d), s(psi), k1, k2, alpha, unsat, kr0, h0, vg_a, vg_n,
+    # E, n.
     # `applies` tags mirror the template's analysis usage (input_template.md):
-    # strength (g, option, c, f, c/p, r-elev, u) is shared by LEM+FEM; d/psi are
-    # rapid-drawdown (LEM); s(...) are reliability; k1..vg_n seepage; E/n FEM.
+    # the strength block (g, gsat, option, c, f, c/p, r-elev, the pow_* power-curve
+    # and hb_* Hoek-Brown envelope parameters, u, ru) is shared by LEM+FEM; d/psi
+    # are rapid-drawdown (LEM); s(...) are reliability; k1..vg_n seepage; E/n FEM.
+    # gsat is optional (blank -> fall back to g), so it reads back as None when
+    # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
+    # always shown; option-driven show/hide grouping is a later UX pass.
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
         Field("gamma", "g", applies=LF),
+        Field("gamma_sat", "gsat", "optfloat", applies=LF),
         Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb"], applies=LF),
         Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
+        Field("pow_a", "pow_a", applies=LF), Field("pow_b", "pow_b", applies=LF),
+        Field("pow_c", "pow_c", applies=LF), Field("pow_d", "pow_d", applies=LF),
+        Field("hb_sci", "hb_sci", applies=LF), Field("hb_gsi", "hb_gsi", applies=LF),
+        Field("hb_mi", "hb_mi", applies=LF), Field("hb_d", "hb_d", applies=LF),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
+        Field("ru", "ru", applies=LF),
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),

@@ -44,8 +44,11 @@ def _blank_material(name):
     same key set ``load_slope_data`` produces. Used by DXF import, which yields
     layer names (→ material names) but no properties for the user to fill in."""
     return {
-        "name": str(name), "gamma": 0.0, "option": "", "c": 0.0, "phi": 0.0,
-        "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0, "u": "none",
+        "name": str(name), "gamma": 0.0, "gamma_sat": None, "option": "",
+        "c": 0.0, "phi": 0.0, "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0,
+        "pow_a": 0.0, "pow_b": 0.0, "pow_c": 0.0, "pow_d": 0.0,
+        "hb_sci": 0.0, "hb_gsi": 0.0, "hb_mi": 0.0, "hb_d": 0.0,
+        "u": "none", "ru": 0.0,
         "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
         "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
         "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,

@@ -34,6 +34,208 @@ def get_material_color(idx):
     # Use the colormap callable rather than relying on the (typing-unknown) `.colors` attribute.
     return cmap(idx % getattr(cmap, "N", 10))
 
+
+# Header/usage colors mirrored from studio.editors (LEM red, seepage green, FEM
+# blue) so a material's strength/kr plots read as the same color family as the
+# columns they visualize.
+_STRENGTH_COLOR = "#c00000"   # LEM
+_KR_COLOR = "#2e7d32"         # seepage
+_REF_COLOR = "#0432ff"        # reference elevation / annotation
+
+
+def _material_hint(ax, msg, title=""):
+    """A blank axes with a centered hint — shown when a strength/kr model's
+    parameters are missing, so an incomplete material draws a prompt rather than a
+    broken plot."""
+    ax.text(0.5, 0.5, msg, ha="center", va="center", transform=ax.transAxes,
+            fontsize=10, color="#555555", wrap=True)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    if title:
+        ax.set_title(title)
+    return ax
+
+
+def plot_material_strength(ax, material, n=200, sigma_max=100.0):
+    """Draw one material's shear-strength model into ``ax``, EXACTLY as the solver
+    evaluates it — no re-derivation. The four ``option`` values each get the plot
+    that confirms their model:
+
+      - ``mc``  Mohr-Coulomb line  τ = c + σ′·tan(φ)  in τ–σ′ space (slice.py).
+      - ``cp``  undrained strength profile  Sᵤ = c + cp·max(0, r_elev − y),
+                plotted vs elevation y with r_elev annotated (slice.py:1841).
+      - ``pow`` power curve  τ = a·(σ′+d)^b + cₚ  over a σ′ range, matching the
+                envelope solve._pow_update_strength re-linearizes (solve.py:2335).
+      - ``hb``  generalized Hoek-Brown envelope in τ–σₙ form, traced point-by-point
+                through hoekbrown.hb_tangent — the same instantaneous tangent the
+                LEM/FEM consume via solve._hb_update_strength (solve.py:2314).
+
+    A blank ``option`` (valid for seep-only materials) or missing parameters draw a
+    centered hint instead of a broken plot. ``sigma_max`` sets the σ′/σₙ range for
+    the mc/pow lines; the hb range is derived from σci and the cp range from the
+    c/cp gradient so each is self-scaling. Pure — takes only an Axes and a material
+    dict, so studio panels and static figures share it.
+    """
+    option = str(material.get("option", "") or "").strip().lower()
+
+    def g(key):
+        try:
+            return float(material.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    if option == "mc":
+        c, phi = g("c"), g("phi")
+        if c == 0 and phi == 0:
+            return _material_hint(ax, "enter c and φ", "Mohr–Coulomb")
+        s = np.linspace(0.0, sigma_max, n)
+        tau = c + s * np.tan(np.radians(phi))
+        ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
+        ax.set_xlabel("σ′  (effective normal stress)")
+        ax.set_ylabel("τ  (shear strength)")
+        ax.set_title(f"Mohr–Coulomb   (c={c:g}, φ={phi:g}°)")
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.grid(True, alpha=0.3)
+
+    elif option == "cp":
+        c, cp, r_elev = g("c"), g("cp"), g("r_elev")
+        if c == 0 and cp == 0:
+            return _material_hint(ax, "enter c (and cp)", "c-with-depth")
+        # Elevation window self-scaled from the gradient: show enough below r_elev
+        # for Sᵤ to change by ~c, plus a short constant band above. No geometry is
+        # available to a pure material plot, so the gradient sets the scale.
+        if cp != 0:
+            span = min(max(max(abs(c), 1.0) / abs(cp), 0.5), 50.0)
+        else:
+            span = 5.0
+        y = np.linspace(r_elev - span, r_elev + 0.2 * span, n)
+        su = c + cp * np.maximum(0.0, r_elev - y)
+        ax.plot(su, y, color=_STRENGTH_COLOR, lw=2)
+        ax.axhline(r_elev, color=_REF_COLOR, ls="--", lw=1)
+        import matplotlib.transforms as _mt
+        tr = _mt.blended_transform_factory(ax.transAxes, ax.transData)
+        ax.text(0.03, r_elev, f"r_elev = {r_elev:g}", transform=tr,
+                va="bottom", ha="left", color=_REF_COLOR, fontsize=9)
+        ax.set_xlabel("Sᵤ  (undrained strength)")
+        ax.set_ylabel("elevation, y")
+        ax.set_title(f"c-with-depth   (c={c:g}, cp={cp:g})")
+        ax.set_xlim(left=0)
+        ax.grid(True, alpha=0.3)
+
+    elif option == "pow":
+        a, b, cp_c, d = g("pow_a"), g("pow_b"), g("pow_c"), g("pow_d")
+        if a == 0:
+            return _material_hint(ax, "enter pow_a … pow_d", "Power curve")
+        s = np.linspace(0.0, sigma_max, n)
+        # Mirror solve._pow_update_strength's evaluation: (σ′+d) floored so a b<1
+        # curve stays finite near the origin.
+        s_eff = np.maximum(s + d, 1e-4 * max(1.0, sigma_max))
+        tau = a * np.power(s_eff, b) + cp_c
+        ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
+        ax.set_xlabel("σ′  (effective normal stress)")
+        ax.set_ylabel("τ  (shear strength)")
+        ax.set_title(f"Power curve   τ = {a:g}·(σ′+{d:g})^{b:g} + {cp_c:g}")
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.grid(True, alpha=0.3)
+
+    elif option == "hb":
+        sci, gsi, mi, dfac = g("hb_sci"), g("hb_gsi"), g("hb_mi"), g("hb_d")
+        if sci <= 0 or gsi <= 0 or mi <= 0:
+            return _material_hint(ax, "enter hb_sci, hb_gsi, hb_mi", "Hoek–Brown")
+        from .hoekbrown import hb_tangent
+        # Range derived from σci so both stiff rock and weak rock mass show the
+        # envelope's curvature; the low-stress end (curvature) is what matters for
+        # slopes. Evaluated through the SAME hb_tangent the solver linearizes with:
+        # τ(σₙ) = c_i + σₙ·tan(φ_i).
+        smax = max(0.2 * sci, 1.0)
+        s = np.linspace(0.0, smax, n)
+        c_i, phi_i = hb_tangent(s, sci, gsi, mi, dfac)
+        tau = c_i + s * np.tan(np.radians(phi_i))
+        ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
+        ax.set_xlabel("σₙ  (normal stress)")
+        ax.set_ylabel("τ  (shear strength)")
+        ax.set_title(f"Hoek–Brown   (σci={sci:g}, GSI={gsi:g}, mi={mi:g})")
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.grid(True, alpha=0.3)
+
+    else:
+        return _material_hint(ax, "no strength model\n(blank option)")
+
+    return ax
+
+
+def plot_material_kr(ax, material, n=200):
+    """Draw one material's unsaturated relative-conductivity curve kr vs matric
+    suction into ``ax``, using seep.py's OWN kr functions (imported, never
+    re-derived), dispatched on the material's ``unsat`` model:
+
+      - ``lf``   linear front — seep.kr_frontal_vec (params kr0, h0).
+      - ``vg``   van Genuchten–Mualem — seep.kr_vg_vec (params vg_a, vg_n).
+      - ``gard`` Gardner power form — seep.kr_gardner_vec (params vg_a=a, vg_n=n).
+
+    kr is on a log axis (it spans decades) with the suction range self-scaled to
+    each model so the full wet→dry decline is framed. Missing/invalid parameters
+    draw a centered hint. Pure — Axes + material dict only.
+    """
+    from .seep import kr_frontal_vec, kr_vg_vec, kr_gardner_vec
+    kr_min = 1e-4
+    unsat = str(material.get("unsat", "lf") or "lf").strip().lower()
+
+    def g(key):
+        try:
+            return float(material.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    if unsat == "lf":
+        kr0, h0 = g("kr0"), g("h0")
+        if not (kr0 > 0 and h0 < 0):
+            return _material_hint(ax, "enter kr0 > 0 and h0 < 0", "Linear front (lf)")
+        smax = 1.3 * abs(h0)
+        psi = np.linspace(0.0, smax, n)
+        kr = kr_frontal_vec(-psi, kr0, h0)
+        title = f"Linear front   (kr0={kr0:g}, h0={h0:g})"
+    elif unsat in ("vg", "gard"):
+        a, nn = g("vg_a"), g("vg_n")
+        if unsat == "vg":
+            if not (a > 0 and nn > 1):
+                return _material_hint(ax, "enter vg_a > 0 and vg_n > 1",
+                                      "van Genuchten (vg)")
+            smax = 20.0 / a
+            psi = np.linspace(0.0, smax, n)
+            kr = kr_vg_vec(-psi, a, nn)
+            title = f"van Genuchten   (α={a:g}, n={nn:g})"
+        else:
+            if not (a > 0 and nn > 0):
+                return _material_hint(ax, "enter vg_a > 0 and vg_n > 0",
+                                      "Gardner (gard)")
+            # Suction at which kr reaches the floor: a·ψⁿ = 1/kr_min − 1.
+            smax = 1.1 * (max(1.0 / kr_min - 1.0, 1.0) / a) ** (1.0 / nn)
+            psi = np.linspace(0.0, smax, n)
+            kr = kr_gardner_vec(-psi, a, nn)
+            title = f"Gardner   (a={a:g}, n={nn:g})"
+    else:
+        return _material_hint(ax, "no unsaturated model")
+
+    ax.plot(psi, kr, color=_KR_COLOR, lw=2)
+    ax.set_yscale("log")
+    ax.set_ylim(top=1.5)
+    # Frame the actual decline: trim the flat floor tail (kr monotone-decreasing,
+    # so the last sampled value is the asymptotic floor — kr0 for lf, kr_min for
+    # vg/gard) so a sharp curve doesn't sit in a sea of dead space.
+    floor = float(kr[-1])
+    reached = np.where(kr <= floor * 1.02 + 1e-12)[0]
+    right = psi[reached[0]] * 1.1 if len(reached) else psi[-1]
+    ax.set_xlim(0, right if right > 0 else psi[-1])
+    ax.set_xlabel("matric suction, ψ")
+    ax.set_ylabel("relative conductivity, kr")
+    ax.set_title(title)
+    ax.grid(True, which="both", alpha=0.3)
+    return ax
+
 def get_dload_legend_handler():
     """
     Creates and returns a custom legend entry for distributed loads.

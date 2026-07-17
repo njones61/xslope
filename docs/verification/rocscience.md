@@ -121,7 +121,7 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp093.xlsx, type=single_circle, num_slices=50, fs_bishop=1.017, benchmark=VP93 -->
 <!-- test: file=../files/rocscience/vp094.xlsx, type=single_circle, num_slices=50, fs_bishop=1.020, benchmark=VP94 -->
 <!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
-<!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.390, benchmark=VP99 -->
+<!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.527, benchmark=VP99 -->
 <!-- test: file=../files/rocscience/vp106a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.143, benchmark=VP106a -->
 <!-- test: file=../files/rocscience/vp106b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.540, benchmark=VP106b -->
 <!-- test: file=../files/rocscience/vp106c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.451, benchmark=VP106c -->
@@ -276,7 +276,7 @@ corpus is complete relative to what is independently verifiable.
 | [96](#vp96) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example, pool 103→24, Kc=1 envelope on a specified circle — the corpus's first Duncan-Wright-Wong 3-stage rapid-drawdown problem. Also [SLOPE/W §2.41](geostudio.md) — same problem in the GeoStudio corpus. |
 | [97](#vp97) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp097.xlsx](../files/rocscience/vp097.xlsx). Pilarcitos Dam (Duncan, Wright & Wong 1990), drawdown 72→37 ft, Kc=1 envelope from D&W eqs 9.6–9.7 — the dam that actually failed in drawdown, at FS≈1. Also [SLOPE/W §2.43](geostudio.md) — same problem in the GeoStudio corpus. |
 | [98](#vp98) | Embankment dam, (5) materials, rapid drawdown, water table | **built** | [vp098.xlsx](../files/rocscience/vp098.xlsx). Walter Bouldin Dam (Duncan, Wright & Wong 1990) — a 5-zone rolled earthfill dam that failed during a 1975 drawdown; Kc=1 envelopes from the paper's Table 2, DWW 3-stage. Also [SLOPE/W §2.40](geostudio.md) — same problem in the GeoStudio corpus. |
-| [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](../files/rocscience/vp099.xlsx). Duncan, Wright & Wong (1990) hypothetical pumped-storage dam, drawdown 285→120, geometry axis-calibrated from Slide's unlabeled figure; ~7% low, to be re-pinned from the vendor .gsz (see section). Also [SLOPE/W §2.42](geostudio.md) — same problem in the GeoStudio corpus. |
+| [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](../files/rocscience/vp099.xlsx). Duncan, Wright & Wong (1990) hypothetical pumped-storage dam, drawdown 285→120. Geometry re-pinned from the vendor GeoStudio .gsz (§2.42): DWW 3-stage Spencer 1.527 vs Slide 1.534 / SLOPE/W 1.550 / DWW 1.56. Also [SLOPE/W §2.42](geostudio.md) — same problem in the GeoStudio corpus. |
 | [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](../files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](../files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **partial** | [vp102a.xlsx](../files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](../files/rocscience/vp102b.xlsx) (initial steady seepage). Huang & Jia (2008) earth dam; only these two end members are reproducible — the rest is a transient unsaturated drawdown series XSLOPE's steady-state seepage cannot represent (see section). |
@@ -2021,16 +2021,17 @@ Slide #98: the Walter Bouldin Dam failure case — a rolled earthfill dam that f
 
 ### VP99: Pumped-storage project dam rapid drawdown (DWW 1990) {#vp99}
 
-Slide #99: the paper's hypothetical pumped-storage dam — silty clay core and random zone (c′=0, φ′=36°, Kc=1 envelope 2250 psf/20°), free-draining rockfill shells (φ′=37°), drawdown 285 ft → 120 ft (paper El 545 → 380). Slide's figure has no vertex labels, so the geometry was extracted by axis-calibrated color segmentation (the 285/120 pool dashes pin the vertical scale; the crest coincides with the initial pool).
+Slide #99: the paper's hypothetical pumped-storage dam — silty clay core and random zone (c′=0, φ′=36°, Kc=1 envelope 2250 psf/20°), free-draining rockfill shells (φ′=37°), drawdown 285 ft → 120 ft (paper El 545 → 380). The core and random zone carry identical strengths, so only the rockfill/clay boundary affects the result.
+
+The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW problem ([SLOPE/W §2.42](geostudio.md), "Staged rapid drawdown – Pumped Storage Project Dam.gsz"), read with `xslope.geostudio.read_gsz`. The original build was traced by eye from Slide's unlabeled Figure 99.1 and came out ≈19 ft short in crest-to-base height (dam 281 ft rather than 300), which left FS ≈7% low. The .gsz point table fixes it exactly: its frame, translated by y−260 to keep the 285/120 pool levels, puts the base at −10, crest at 290, and the three upstream benches at el. 60/120/190. The two vendors' figures genuinely differ (berm elevations, core width); GeoStudio's is the one that matches the published FS.
 
 **Input files:** [vp099.xlsx](../files/rocscience/vp099.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| DWW 3-stage (Spencer, circular search) | 1.390 | Slide 1.534; SLOPE/W 1.550; DWW 1.56 |
-| DWW 3-stage (Spencer, Slide's printed circle) | 1.428 | Slide 1.534 |
+| DWW 3-stage (Spencer, circular search) | 1.527 | Slide 1.534; SLOPE/W 1.550; DWW 1.56 |
 
-*≈7% low. The two vendors' own geometries differ visibly (berm elevations, core width), and the result is sensitive to the core-face position; the geometry will be re-pinned from GeoStudio's published .gsz project when available. Tagged at the current value as a regression lock.*
+*With the vendor geometry, XSLOPE lands within 0.5% of Slide (1.527 vs 1.534) and inside the Slide / SLOPE/W / DWW band (1.53–1.56), closing the earlier ≈7% gap. Tagged as a regression lock.*
 
 ![vp099: inputs and representative solution](images/vp099.png)
 

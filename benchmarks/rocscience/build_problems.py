@@ -2506,14 +2506,23 @@ def vp098():
 
 def vp099():
     """Slide #99 / Duncan, Wright & Wong (1990): hypothetical pumped-storage
-    project dam, rapid drawdown 285 ft -> 120 ft (paper El 545 -> 380). 1:3
-    bermed lower upstream face, 1:2.2 upper face, crest at 285 (= initial
-    pool in Slide's model), silty clay core + random zone (c'=0, phi'=36,
-    gamma=140, Kc=1 envelope tau0=2250 psf / 20 deg from the paper's Table
-    3), free-draining rockfill shells (phi'=37, gamma=142). Geometry traced
-    from Slide's Figure 99.1 color zones against its axis rulers (pool
-    dashes at 285/120 pin the vertical scale). DWW 3-stage: Slide 1.534,
-    paper 1.56."""
+    project dam, rapid drawdown 285 ft -> 120 ft (paper El 545 -> 380). Silty
+    clay core + random zone (c'=0, phi'=36, gamma=140, Kc=1 envelope tau0=2250
+    psf / 20 deg from the paper's Table 3), free-draining rockfill shells
+    (phi'=37, gamma=142). The core and random zone are mechanically identical,
+    so only the rockfill/clay boundary affects FS.
+
+    Geometry re-pinned (2026-07) from the vendor GeoStudio model of the same
+    DWW problem (SLOPE/W verification manual §2.42, "Staged rapid drawdown -
+    Pumped Storage Project Dam.gsz"), read with xslope.geostudio.read_gsz. The
+    original build was traced by eye from Slide's unlabeled Figure 99.1 and
+    came out ~19 ft short in the crest-to-base height (dam 281 ft instead of
+    300), leaving FS ~7% low (1.390 vs Slide 1.534). The .gsz point table
+    fixes the geometry exactly. GeoStudio's frame is translated by y-260 so the
+    pool levels stay 285/120 (GeoStudio 545/380): its base 250->-10, crest
+    550->290, benches 320/380/450->60/120/190. Region->material from the .gsz:
+    R1,R4 rockfill; R2 core; R3 random zone. DWW 3-stage: Slide 1.534, SLOPE/W
+    1.550, paper 1.56; xslope now 1.527."""
     from shapely.geometry import Polygon
     from xslope.fileio import build_ground_surface_from_polygons
     sd = load_slope_data(LEVEE_POLY)
@@ -2529,52 +2538,57 @@ def vp099():
         m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='piezo',
                  d=d, psi=psi)
         sd['materials'].append(m)
+    # GeoStudio regions (point IDs shared exactly, so the union has no slivers),
+    # translated to the builder frame (y - 260):
     zones = [
-        (0, [(490.0, 114.0), (640.0, 164.0), (658.0, 164.0), (920.0, 285.0),
-             (927.5, 285.0), (768.5, 114.0)]),
-        (0, [(947.8, 285.0), (955.0, 285.0), (1727.0, 4.0), (1269.7, 4.0)]),
-        # core carries the (768.5, 114) seam vertex so the shared edges of the
-        # upstream shell and random zone are exact (a sliver gap otherwise
-        # splits the polygon union and truncates the derived ground surface)
-        (1, [(666.2, 4.0), (768.5, 114.0), (927.5, 285.0), (947.8, 285.0),
-             (1269.7, 4.0)]),
-        (2, [(18.0, 4.0), (168.0, 54.0), (237.0, 54.0), (415.0, 114.0),
-             (768.5, 114.0), (666.2, 4.0)]),
+        # R1 rockfill, upper upstream shell
+        (0, [(1005.0, 290.0), (870.0, 120.0), (550.0, 120.0), (700.0, 190.0),
+             (770.0, 190.0)]),
+        # R4 rockfill, downstream shell
+        (0, [(1030.0, 290.0), (1800.0, -10.0), (1300.0, -10.0)]),
+        # R2 silty clay core, central / downstream-lower
+        (1, [(1005.0, 290.0), (1030.0, 290.0), (1300.0, -10.0), (770.0, -10.0),
+             (870.0, 120.0)]),
+        # R3 silty clay random zone, upstream-lower
+        (2, [(870.0, 120.0), (770.0, -10.0), (0.0, -10.0), (265.0, 60.0),
+             (320.0, 60.0), (490.0, 120.0), (550.0, 120.0)]),
     ]
     sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
     gs, dom = build_ground_surface_from_polygons(sd['polygons'])
     sd['ground_surface'], sd['domain_polygon'] = gs, dom
     sd['profile_lines'] = []
-    sd['max_depth'] = 4.0
+    sd['max_depth'] = -10.0
     sd['gamma_water'] = 62.4
     sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['line_loads'] = []; sd['pile_lines'] = []
     sd['reinforcement_lines'] = []; sd['reinforce_lines'] = []
     gw = 62.4
-    # initial steady seepage: full pool upstream, descending through the core
-    sd['piezo_line'] = [(0.0, 285.0), (890.0, 285.0), (1269.7, 4.0), (1800.0, 4.0)]
-    # post-drawdown: pool at 120 upstream, same downstream tail
-    sd['piezo_line2'] = [(0.0, 120.0), (890.0, 120.0), (1269.7, 4.0), (1800.0, 4.0)]
+    # GeoStudio piezometric surfaces (y - 260): initial full pool at 285,
+    # post-drawdown pool at 120, both descending to the downstream tail.
+    sd['piezo_line'] = [(0.0, 285.0), (980.0, 285.0), (1035.0, 285.0),
+                        (1300.0, 0.0), (1805.0, -10.0)]
+    sd['piezo_line2'] = [(0.0, 120.0), (870.0, 120.0), (1300.0, 0.0),
+                         (1805.0, -10.0)]
+    # ponded water on the submerged upstream face: Normal = gw*(pool - y) at
+    # each face vertex up to the point where the face meets the pool surface.
     sd['dloads'] = [[
-        {'X': 18.0, 'Y': 4.0, 'Normal': gw * 281.0},
-        {'X': 168.0, 'Y': 54.0, 'Normal': gw * 231.0},
-        {'X': 237.0, 'Y': 54.0, 'Normal': gw * 231.0},
-        {'X': 415.0, 'Y': 114.0, 'Normal': gw * 171.0},
-        {'X': 490.0, 'Y': 114.0, 'Normal': gw * 171.0},
-        {'X': 640.0, 'Y': 164.0, 'Normal': gw * 121.0},
-        {'X': 658.0, 'Y': 164.0, 'Normal': gw * 121.0},
-        {'X': 920.0, 'Y': 285.0, 'Normal': 0.0},
+        {'X': 0.0,    'Y': -10.0, 'Normal': gw * 295.0},
+        {'X': 265.0,  'Y': 60.0,  'Normal': gw * 225.0},
+        {'X': 320.0,  'Y': 60.0,  'Normal': gw * 225.0},
+        {'X': 490.0,  'Y': 120.0, 'Normal': gw * 165.0},
+        {'X': 550.0,  'Y': 120.0, 'Normal': gw * 165.0},
+        {'X': 700.0,  'Y': 190.0, 'Normal': gw * 95.0},
+        {'X': 770.0,  'Y': 190.0, 'Normal': gw * 95.0},
+        {'X': 993.25, 'Y': 285.0, 'Normal': 0.0},
     ]]
     sd['dloads2'] = [[
-        {'X': 18.0, 'Y': 4.0, 'Normal': gw * 116.0},
-        {'X': 168.0, 'Y': 54.0, 'Normal': gw * 66.0},
-        {'X': 237.0, 'Y': 54.0, 'Normal': gw * 66.0},
-        {'X': 415.0, 'Y': 114.0, 'Normal': gw * 6.0},
-        {'X': 490.0, 'Y': 114.0, 'Normal': gw * 6.0},
-        {'X': 508.0, 'Y': 120.0, 'Normal': 0.0},
+        {'X': 0.0,   'Y': -10.0, 'Normal': gw * 130.0},
+        {'X': 265.0, 'Y': 60.0,  'Normal': gw * 60.0},
+        {'X': 320.0, 'Y': 60.0,  'Normal': gw * 60.0},
+        {'X': 490.0, 'Y': 120.0, 'Normal': 0.0},
     ]]
     sd['circular'] = True
-    sd['circles'] = [{'Xo': 450.0, 'Yo': 400.0, 'Depth': 50.0, 'R': 350.0}]
+    sd['circles'] = [{'Xo': 450.0, 'Yo': 420.0, 'Depth': -10.0, 'R': 380.0}]
     sd['non_circ'] = []
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp099.xlsx'))
     return 'vp099.xlsx'

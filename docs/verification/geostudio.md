@@ -186,7 +186,7 @@ the 3D chapter is out of scope and not tracked here.
 | 2.39 | Loukidis – Seismic Coefficient #2 | partial | See Rocscience #63 — outline pinned from the paper, interface anchors still ambiguous. |
 | 2.40 | Rapid Drawdown – Walter Bouldin Dam | **built** | Same problem as Slide [VP98](rocscience.md#vp98): xslope DWW 3-stage 1.046 vs SLOPE/W Bishop 1.016 / Spencer 1.02, DWW 1.04. — [details](#gs-2-40) |
 | 2.41 | Rapid Drawdown – USACE Benchmark | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx) (Rocscience #96): 3-stage Spencer 1.434 / Bishop 1.432 vs published 1.44. — [details](#gs-2-41) |
-| 2.42 | Rapid Drawdown – Pumped Storage Dam | **built** | Same problem as Slide [VP99](rocscience.md#vp99): xslope 1.390 vs SLOPE/W 1.550, DWW 1.56 (~7% low; geometry to be re-pinned from the .gsz). — [details](#gs-2-42) |
+| 2.42 | Rapid Drawdown – Pumped Storage Dam | **built** | Same problem as Slide [VP99](rocscience.md#vp99): xslope 1.527 vs SLOPE/W 1.550, DWW 1.56 (geometry re-pinned from this .gsz). — [details](#gs-2-42) |
 | 2.43 | Rapid Drawdown – Pilarcitos Dam | **built** | [vp097.xlsx](../files/rocscience/vp097.xlsx) (Rocscience #97): Spencer 1.044 / Bishop 1.042. — [details](#gs-2-43) |
 | 2.44 | Probability – James Bay Case History | covered | Same problem as [Rocscience #75](rocscience.md#vp75) — the James Bay dyke (El-Ramly et al.). |
 | 2.45 | Eurocode 7 – Cutting in Clay | **built** | [gs2_45.xlsx](../files/geostudio/gs2_45.xlsx) — DA3 partial factors baked into the material (c′* = 8.0, φ′* = 23.04°); Spencer 1.173 vs SLOPE/W ODF 1.174 (−0.07%). — [details](#gs-2-45) |
@@ -746,9 +746,9 @@ Rapid drawdown (285 → 120 ft) of a hypothetical pumped-storage dam — silty-c
 
 | Method | XSLOPE | SLOPE/W | Reference |
 |---|---|---|---|
-| Spencer (DWW 3-stage) | 1.390 | 1.550 | 1.56 |
+| Spencer (DWW 3-stage) | 1.527 | 1.550 | 1.56 |
 
-XSLOPE runs ~7% low against both SLOPE/W and the DWW reference; the discrepancy is attributed to the axis-calibrated core geometry, and the model is to be re-pinned from the vendor .gsz when available.
+The geometry is re-pinned from this very .gsz (read with `xslope.geostudio.read_gsz`); the earlier eyeball trace of Slide's unlabeled figure had made the dam ≈19 ft short and left XSLOPE ~7% low. With the vendor geometry XSLOPE reads 1.527, inside the Slide / SLOPE/W / DWW band (1.53–1.56).
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.42; Duncan, Wright & Wong (1990).
 

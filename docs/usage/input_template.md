@@ -289,8 +289,6 @@ each polygon you provide:
   ID in the materials table.
 - The polygon **vertices** as XY coordinates starting in row 8, one vertex per row.
 
-![sheet_polygon.png](images/sheet_polygon.png)
-
 A few rules govern how the vertices are interpreted:
 
 - **Winding order does not matter** — vertices may be listed clockwise or counter-clockwise.

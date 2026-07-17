@@ -98,6 +98,15 @@ TAB_INACTIVE_FILL = "#DDE1E6"
 TAB_LINE = "#B7BEC6"
 TAB_ACCENT = "#1D7A46"  # Excel-ish green underline on the active tab
 
+# Framing convention (measured from Norm's original captures): frame to the
+# formatted-content bounding box, then leave one spare empty row/column of margin.
+# The sheet-tab strip is drawn at one fixed scale on every sheet (never shrunk to
+# fit a narrow grid — that is what made the piezo strip render tiny).
+MARGIN_COLS = 1          # spare empty columns kept to the right of content
+MARGIN_ROWS = 1          # spare empty rows kept above/below content (auto-rows only)
+OVERFLOW_BUFFER = 40     # empty columns probed to the right so overflow text completes
+TAB_FONT_PT = 10         # fixed sheet-tab font size (points)
+
 # Adobe "Symbol" font: ASCII letter -> Unicode Greek/misc glyph.
 SYMBOL_MAP = {
     "a": "α", "b": "β", "c": "χ", "d": "δ", "e": "ε",
@@ -422,10 +431,23 @@ def _parse_cols(spec):
     return out
 
 
+def _is_wrapped(cell):
+    a = cell.alignment
+    return bool(a and a.wrapText)
+
+
 def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
                  identity_cols=None, base_font_pt=11):
-    """Render one worksheet (optionally a row/column window, with identity columns
-    re-shown at the left) to a PNG."""
+    """Render one worksheet to a PNG that reads like an Excel screen capture.
+
+    ``rows`` / ``cols`` select a region of interest (needed for the wide ``mat``
+    sheet's three views and the ``seep bc`` split). Within that region the frame is
+    computed from the *formatted-content* bounding box (any cell with a value, fill,
+    border or merge) plus one spare row/column of margin, and the right edge is
+    auto-extended so Excel-style overflow text (the option/help legends) renders
+    complete. ``rows`` is honoured verbatim when given (so the three ``mat`` views
+    stay row-aligned); otherwise rows auto-frame to content too.
+    """
     wb_f = openpyxl.load_workbook(xlsx_path, data_only=False, rich_text=True)
     wb_v = openpyxl.load_workbook(xlsx_path, data_only=True)
     if sheet not in wb_f.sheetnames:
@@ -449,21 +471,9 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
         cell = ws.cell(row=r, column=c)
         return display_string(cell, value_at(r, c))
 
-    # ----- row/column selection ------------------------------------------- #
-    if rows:
-        r0, r1 = rows
-    else:
-        r0, r1 = 1, ws.max_row
-    if cols:
-        col_list = _parse_cols(cols)
-    else:
-        col_list = list(range(1, ws.max_column + 1))
-    if identity_cols:
-        ident = _parse_cols(identity_cols)
-        col_list = ident + [c for c in col_list if c not in ident]
-    row_list = list(range(r0, r1 + 1))
-
-    cf_rules = build_cf_rules(ws, theme)
+    fs_px = int(round(base_font_pt * PT_TO_PX * SS))
+    pad = 6 * SS
+    pad_in = 3 * SS
 
     # ----- merged cells ---------------------------------------------------- #
     merged_anchor = {}   # (r,c) -> (min_r,min_c,max_r,max_c) for the top-left cell
@@ -476,16 +486,74 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
                 else:
                     merged_covered.add((rr, cc))
 
-    fs_px = int(round(base_font_pt * PT_TO_PX * SS))
+    cf_rules = build_cf_rules(ws, theme)
 
-    # ----- auto-size column widths ---------------------------------------- #
-    # base = Excel width; expand so "contained" text (cells with a fill, or whose
-    # right neighbour is non-empty, so Excel would clip them) always fits.
-    pad = 6 * SS
-    col_px = {}
-    for c in col_list:
-        base = col_width_px(ws, c, default_cw) * SS
-        need = base
+    def align_of(cell, val, merged):
+        h = cell.alignment.horizontal if cell.alignment else None
+        if h in ("left", "center", "right"):
+            return h
+        if merged:
+            return "center"
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            return "right"
+        return "left"
+
+    def cell_visible(r, c):
+        """True if the cell belongs to the formatted-content bbox: it carries a
+        value, a solid fill, any styled border, a conditional-format fill, or is
+        part of a merge. Empty-but-bordered table cells count, so the frame keeps
+        the whole formatted table (as Norm's captures do), not just filled cells."""
+        if (r, c) in merged_anchor or (r, c) in merged_covered:
+            return True
+        cell = ws.cell(row=r, column=c)
+        if value_at(r, c) not in (None, ""):
+            return True
+        if _fill_color(cell, theme) is not None:
+            return True
+        b = cell.border
+        if any(getattr(b, s) and getattr(b, s).style
+               for s in ("left", "right", "top", "bottom")):
+            return True
+        if cf_fill_for(r, c, cf_rules, value_at) is not None:
+            return True
+        return False
+
+    # ----- region of interest --------------------------------------------- #
+    if cols:
+        roi_cols = _parse_cols(cols)
+    else:
+        roi_cols = list(range(1, ws.max_column + 1))
+    ident = _parse_cols(identity_cols) if identity_cols else []
+    if ident:
+        roi_cols = ident + [c for c in roi_cols if c not in ident]
+    roi_rows = list(range(rows[0], rows[1] + 1)) if rows else list(range(1, ws.max_row + 1))
+
+    # ----- formatted-content bbox within the ROI -------------------------- #
+    content_cols = [c for c in roi_cols if any(cell_visible(r, c) for r in roi_rows)]
+    content_rows = [r for r in roi_rows if any(cell_visible(r, c) for c in roi_cols)]
+    if not content_cols:
+        content_cols = list(roi_cols)
+    if not content_rows:
+        content_rows = list(roi_rows)
+
+    # ----- final row list -------------------------------------------------- #
+    if rows:
+        row_list = list(roi_rows)                    # explicit rows: honour verbatim
+    else:
+        top = max(1, min(content_rows) - MARGIN_ROWS)
+        row_list = list(range(top, max(content_rows) + MARGIN_ROWS + 1))
+
+    # ----- candidate columns: ROI trimmed to content, + a right buffer ----- #
+    cmax = max(content_cols)
+    left_edge = min(roi_cols)                        # keep ROI's left (1-col margin)
+    base_cols = [c for c in roi_cols if left_edge <= c <= cmax]
+    gmax = max(base_cols)
+    cand_cols = base_cols + list(range(gmax + 1, gmax + 1 + OVERFLOW_BUFFER))
+
+    # ----- base widths + "contained text" autofit -------------------------- #
+    col_px = {c: col_width_px(ws, c, default_cw) * SS for c in cand_cols}
+    for c in base_cols:
+        need = col_px[c]
         for r in row_list:
             if (r, c) in merged_covered:
                 continue
@@ -503,7 +571,7 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             # numeric cell always drives its column width; text only does so when it
             # is "contained" (a fill, or a non-empty right neighbour clips it).
             if not (is_num or has_fill or right_full):
-                continue  # free to overflow -> doesn't force width
+                continue
             runs = _cell_runs(cell, val, theme)
             need = max(need, _runs_width(runs, fs_px) + 2 * pad)
         col_px[c] = int(need)
@@ -512,9 +580,9 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     # merge boundary; grow the span's columns so it fits — the multi-column analogue
     # of the single-column autofit above (e.g. "Piezometric Line #1" over A:B).
     for (ar, ac), (mnr, mnc, mxr, mxc) in merged_anchor.items():
-        if mxc <= mnc or ar < r0 or ar > r1:
+        if mxc <= mnc or ar not in row_list:
             continue
-        cols_in = [c for c in range(mnc, mxc + 1) if c in col_px]
+        cols_in = [c for c in range(mnc, mxc + 1) if c in col_px and c in base_cols]
         if len(cols_in) < 2:
             continue
         val = value_at(ar, ac)
@@ -527,10 +595,77 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             for c in cols_in:
                 col_px[c] += per
 
+    # ----- Excel-style horizontal overflow: complete every legend string ---- #
+    # Gather left-aligned, non-wrapped text cells whose right neighbour is empty
+    # (so Excel would let the text flow rightward). Record the first non-empty cell
+    # downstream (the blocker) if any.
+    overflow = []
+    for r in row_list:
+        for c in base_cols:
+            if (r, c) in merged_covered or (r, c) in merged_anchor:
+                continue
+            val = value_at(r, c)
+            if val in (None, "") or (isinstance(val, (int, float)) and not isinstance(val, bool)):
+                continue
+            cell = ws.cell(row=r, column=c)
+            if _is_wrapped(cell) or align_of(cell, val, False) != "left":
+                continue
+            if value_at(r, c + 1) not in (None, ""):
+                continue
+            tw = _runs_width(_cell_runs(cell, val, theme), fs_px)
+            blocker = next((nc for nc in cand_cols
+                            if nc > c and value_at(r, nc) not in (None, "")), None)
+            overflow.append((r, c, tw, blocker))
+
+    def _cumx():
+        xs, x = {}, 0
+        for c in cand_cols:
+            xs[c] = x
+            x += col_px[c]
+        return xs
+
+    # (a) BLOCKED overflow (a non-empty cell lies downstream, e.g. mat's pow/hb help
+    #     capped by the pore-pressure column): widen the empty spanned columns so the
+    #     string fits before the blocker — reproducing Excel, where the real
+    #     (condensed) font fits it in that span.
+    for _ in range(6):
+        xs = _cumx()
+        changed = False
+        for (r, c, tw, blocker) in overflow:
+            if blocker is None:
+                continue
+            deficit = (xs[c] + pad_in + tw + pad_in) - xs[blocker]
+            span = [k for k in cand_cols if c < k < blocker]
+            if deficit > 1 and span:
+                per = int(deficit // len(span)) + 1
+                for k in span:
+                    col_px[k] += per
+                changed = True
+        if not changed:
+            break
+
+    # (b) UNBLOCKED overflow (nothing downstream — e.g. the piezo/circles/seep-bc
+    #     legends): extend the frame rightward with empty columns until the string
+    #     ends, then keep the standard margin.
+    xs = _cumx()
+    needed_right = xs[gmax] + col_px[gmax]
+    for (r, c, tw, blocker) in overflow:
+        if blocker is None:
+            needed_right = max(needed_right, xs[c] + pad_in + tw + pad_in)
+    extent = max((c for c in cand_cols if xs[c] < needed_right - 1), default=gmax)
+
+    col_list = [c for c in cand_cols if c <= extent]
+    for i in range(MARGIN_COLS):                      # spare empty margin column(s)
+        nc = extent + 1 + i
+        if nc in col_px and not any(cell_visible(r, nc) for r in row_list):
+            col_list.append(nc)
+        else:
+            break
+
     row_px = {r: row_height_px(ws, r, default_rh) * SS for r in row_list}
 
     # ----- canvas layout --------------------------------------------------- #
-    gutter_w = _font(fs_px, False).getbbox(str(row_list[-1]))[2] + 10 * SS
+    gutter_w = _font(fs_px, False).getbbox(str(max(row_list)))[2] + 10 * SS
     header_h = int(round(default_rh * PT_TO_PX * SS))
     grid_w = gutter_w + sum(col_px[c] for c in col_list)
     grid_h = header_h + sum(row_px[r] for r in row_list)
@@ -538,8 +673,11 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     tab_h = int(round(20 * PT_TO_PX * SS))
     tab_gap = 6 * SS
     total_h = grid_h + tab_gap + tab_h
+    # The tab strip is drawn at one fixed scale on every sheet; a narrow grid simply
+    # gets a wider canvas rather than a shrunken (unreadable) strip.
+    canvas_w = max(grid_w, _tab_strip_width(wb_f.sheetnames, sheet))
 
-    img = Image.new("RGB", (grid_w, total_h), "#FFFFFF")
+    img = Image.new("RGB", (canvas_w, total_h), "#FFFFFF")
     d = ImageDraw.Draw(img)
 
     # x/y pixel positions of each column/row boundary
@@ -621,16 +759,6 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             return None, cell
         return _cell_runs(cell, val, theme), cell
 
-    def align_of(cell, val, merged):
-        h = cell.alignment.horizontal if cell.alignment else None
-        if h in ("left", "center", "right"):
-            return h
-        if merged:
-            return "center"
-        if isinstance(val, (int, float)) and not isinstance(val, bool):
-            return "right"
-        return "left"
-
     for r in row_list:
         for c in col_list:
             if (r, c) in merged_covered:
@@ -641,28 +769,34 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             val = value_at(r, c)
             anc = merged_anchor.get((r, c))
             merged = anc is not None
+            align = align_of(cell, val, merged)
             if merged:
                 x0, y0 = xs[anc[1]], ys[anc[0]]
                 x1 = xs[anc[3]] + col_px.get(anc[3], 0)
                 y1 = ys[anc[2]] + row_px.get(anc[2], 0)
-                clip_x1 = x1
+                clip_x0, clip_x1 = x0, x1
             else:
                 x0, y0, x1, y1 = cell_box(r, c)
-                # overflow to the right across empty cells — TEXT only (Excel never
-                # overflows a number; it prints ### instead, but autofit sizes for it)
-                clip_x1 = x1
+                # Excel lets non-wrapped text overflow across EMPTY neighbours until a
+                # non-empty cell: left/general/centre rightward, right/centre leftward.
+                # Numbers never overflow (they print ### instead).
+                clip_x0, clip_x1 = x0, x1
                 is_num = isinstance(val, (int, float)) and not isinstance(val, bool)
-                if not is_num:
+                if not is_num and not _is_wrapped(cell):
                     idx = col_list.index(c)
-                    for nc in col_list[idx + 1:]:
-                        if value_at(r, nc) not in (None, ""):
-                            break
-                        clip_x1 += col_px[nc]
+                    if align in ("left", "center"):
+                        for nc in col_list[idx + 1:]:
+                            if value_at(r, nc) not in (None, ""):
+                                break
+                            clip_x1 += col_px[nc]
+                    if align in ("right", "center"):
+                        for nc in reversed(col_list[:idx]):
+                            if value_at(r, nc) not in (None, ""):
+                                break
+                            clip_x0 -= col_px[nc]
 
-            align = align_of(cell, val, merged)
             tw = _runs_width(runs, fs_px)
             th = max(_font(fs_px, b).getbbox(t or "x")[3] for t, b, _ in runs)
-            pad_in = 3 * SS
             if align == "left":
                 tx = x0 + pad_in
             elif align == "right":
@@ -671,11 +805,9 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
                 tx = x0 + (x1 - x0 - tw) / 2
             ty = y0 + (y1 - y0 - th) / 2
 
-            # Excel clips a cell's text to its own box, EXCEPT that left/general
-            # (and centered) text may overflow rightward across empty cells up to
-            # the next filled cell (clip_x1). Draw onto a per-cell RGBA layer and
-            # composite only the clip window so text never paints over a neighbour.
-            clip_l = int(x0)
+            # Draw onto a per-cell RGBA layer and composite only the clip window so
+            # text never paints over a neighbour beyond where Excel would allow it.
+            clip_l = int(min(clip_x0, x0))
             clip_r = int(max(clip_x1, x1))
             cw = max(1, clip_r - clip_l)
             layer = Image.new("RGBA", (cw, int(y1 - y0)), (0, 0, 0, 0))
@@ -716,26 +848,28 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     d.line([(gutter_w, 0), (gutter_w, header_h)], fill=HEADER_LINE, width=SS)
 
     # ----- 6. sheet-tab strip --------------------------------------------- #
-    _draw_tab_strip(d, wb_f.sheetnames, sheet, grid_w, grid_h + tab_gap, tab_h)
+    _draw_tab_strip(d, wb_f.sheetnames, sheet, grid_h + tab_gap, tab_h)
 
     # ----- downscale + save ------------------------------------------------ #
-    final = img.resize((grid_w // SS, total_h // SS), Image.LANCZOS)
+    final = img.resize((canvas_w // SS, total_h // SS), Image.LANCZOS)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     final.save(out_path)
     return out_path
 
 
-def _draw_tab_strip(d, sheetnames, active, width, y0, height):
-    tab_font_pt = 11
-    fs = int(round(tab_font_pt * PT_TO_PX * SS))
+def _tab_strip_width(sheetnames, active):
+    """Total pixel width of the sheet-tab strip at the fixed tab scale."""
+    fs = int(round(TAB_FONT_PT * PT_TO_PX * SS))
     pad = 8 * SS
-    # shrink font until all tabs fit the width, down to a floor
-    while fs > 6 * SS:
-        f = _font(fs, False)
-        total = sum(f.getbbox(n)[2] + 2 * pad for n in sheetnames)
-        if total <= width - 4 * SS:
-            break
-        fs = int(fs * 0.92)
+    total = 2 * SS
+    for name in sheetnames:
+        total += _font(fs, name == active).getbbox(name)[2] + 2 * pad
+    return total
+
+
+def _draw_tab_strip(d, sheetnames, active, y0, height):
+    fs = int(round(TAB_FONT_PT * PT_TO_PX * SS))
+    pad = 8 * SS
     f = _font(fs, False)
     fb = _font(fs, True)
     x = 2 * SS
@@ -752,8 +886,6 @@ def _draw_tab_strip(d, sheetnames, active, width, y0, height):
         d.text((x + pad, y0 + (height - th) / 2 - SS), name, font=ff,
                fill="#111111" if is_active else "#4A4A4A")
         x += w
-        if x > width:
-            break
 
 
 # --------------------------------------------------------------------------- #
@@ -843,6 +975,11 @@ def build_one(entry):
         src = os.path.join(REPO_ROOT, src)
     out = os.path.join(IMAGES_DIR, entry["out"])
     renderer = entry.get("renderer", "grid")
+    if renderer == "manual":
+        # A hand-taken capture that must not be regenerated (e.g. the live Excel
+        # chart on the 'plot' sheet, which LibreOffice rasterises badly).
+        print("-> %-22s  (keep-manual: %s)" % (entry["out"], entry.get("note", "manual capture")))
+        return out
     print("-> %-22s  %s!%s" % (entry["out"], os.path.relpath(src, REPO_ROOT), entry["sheet"]))
     if renderer == "libreoffice":
         return render_via_libreoffice(src, entry["sheet"], out)

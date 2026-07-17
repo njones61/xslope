@@ -71,6 +71,8 @@ def solve_selected(method_name, slice_df, rapid=False):
         print(f'Bishop: FS={result["FS"]:.3f}')
     elif func == spencer:
         print(f'Spencer: FS={result["FS"]:.3f}, theta={result["theta"]:.2f}')
+        for w in result.get('warnings', []):
+            print(f'  Spencer admissibility warning: {w}')
     elif func == janbu:
         print(f'Janbu Corrected FS={result["FS"]:.3f}, fo={result["fo"]:.2f}')
     elif func == corps:
@@ -1363,12 +1365,18 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             'kw'    (seismic force),
             't'     (tension crack water force),
             'p'     (reinforcement force),
+            'y_lt'  (left-top y, used with 'y_lb' by the report-only
+                     admissibility screen for the thrust-line check),
             'h_pile' (pile force, optional), 'theta_p' (pile inclination, RADIANS, optional)
 
     Returns:
         float: FS where FS_force = FS_moment
         float: beta (degrees)
         bool: converged flag
+        The results dict also carries 'warnings': a list of admissibility
+        notes (base tension on cohesionless slices, interslice tension,
+        thrust line outside the slices) — empty when the solution is clean.
+        Warnings never affect FS or convergence.
     """
 
     alpha = np.radians(slice_df['alpha'].values)  # slice base inclination, degrees
@@ -1872,13 +1880,54 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             yt_l[i+1] = yt_r[i]
     slice_df['yt_l'] = yt_l
     slice_df['yt_r'] = yt_r
-    
+
+    # --- Admissibility screen (report-only; acceptance above is unchanged) ---
+    # max_tension_ratio normalizes base tension by cohesive capacity, so a c=0
+    # slice can carry unlimited base tension without tripping it (VP30: -71 kN/m
+    # on the cohesionless crack-face sliver scores 0.0 and passes). These report
+    # the Duncan & Wright admissibility signatures that guard cannot see.
+    # Deliberately narrow — every accepted solution already satisfies the guard
+    # on cohesive slices, so re-flagging their tension would be noise:
+    #   - base tension only on COHESIONLESS slices (the guard's blind spot);
+    #   - interslice tension only against a clearly compressive field (when
+    #     every Z is negative the sign convention itself is ambiguous, e.g.
+    #     right-facing nailed walls, and no verdict is offered);
+    #   - thrust ratios that are NaN/inf count as outside.
+    warns = []
+    n_scale = float(np.max(np.abs(N_eff))) if len(N_eff) else 0.0
+    cohesionless = np.abs(c) <= 1e-9
+    bad_n = np.flatnonzero(cohesionless & (N_eff < -0.01 * n_scale))
+    if bad_n.size:
+        worst = int(bad_n[np.argmin(N_eff[bad_n])])
+        warns.append(f"base tension on {bad_n.size} cohesionless slice(s), "
+                     f"worst N' = {float(N_eff[worst]):.1f} at slice {worst + 1}")
+    Z_int = Z[1:-1]
+    if Z_int.size:
+        z_min = float(np.min(Z_int))
+        z_max = float(np.max(Z_int))
+        if z_min < 0 and z_max > 0 and -z_min > 0.10 * z_max:
+            warns.append(f"interslice tension (min Z = {z_min:.1f} vs max "
+                         f"compression {z_max:.1f})")
+    y_lt_arr = slice_df['y_lt'].values
+    y_lb_arr = slice_df['y_lb'].values
+    h_bnd = y_lt_arr[1:] - y_lb_arr[1:]          # interior boundaries 1..n-1
+    tall = h_bnd > 1e-9
+    if np.any(tall):
+        t_ratio = (yt_l[1:][tall] - y_lb_arr[1:][tall]) / h_bnd[tall]
+        inside = np.isfinite(t_ratio) & (t_ratio >= -0.05) & (t_ratio <= 1.05)
+        frac_out = 1.0 - float(np.mean(inside))
+        if frac_out > 0.10:
+            warns.append(f"line of thrust outside the slice on {frac_out:.0%} "
+                         f"of boundaries")
+    if warns and debug_level >= 1:
+        print("Spencer admissibility warnings: " + "; ".join(warns))
+
     # --- Return results ---
     results = {}
     results['method'] = 'spencer'
     results['FS'] = F
     results['theta'] = theta_opt
-
+    results['warnings'] = warns
 
     return True, results
 

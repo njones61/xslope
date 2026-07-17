@@ -267,15 +267,17 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
     # sort by x
     points = sorted(points, key=lambda p: p.x)
 
-    # if exactly two, we're done
+    # if exactly two, we're done. A flat arc (both crossings at the same
+    # elevation, e.g. a level-ground bearing-capacity prism) is NO LONGER
+    # rejected here: facing for it is resolved downstream from the surface's
+    # asymmetry (see _resolve_right_facing). For a normal slope this branch is
+    # unchanged — it returns the same two points as before.
     if len(points) == 2:
-        left, right = points[0], points[1]
-        tol = 1e-6
-        if abs(left.y - right.y) < tol:
-            return False, "Rejected: left-most and right-most intersection points have the same y-value (flat arc).", None
         return True, "", points
 
-    # more than two: decide facing
+    # more than two: decide which pair to keep. On a normal slope the higher end
+    # marks the crest side; on a flat arc (y_first == y_last) this falls to the
+    # else branch (last two), and the facing is settled downstream as above.
     y_first, y_last = points[0].y, points[-1].y
     if y_first > y_last:
         # right-facing: keep first two
@@ -286,14 +288,74 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
 
     # sort those two again by x (just in case)
     pruned = sorted(pruned, key=lambda p: p.x)
-    left, right = pruned[0], pruned[1]
-    tol = 1e-6
-    if abs(left.y - right.y) < tol:
-        return False, "Rejected: left-most and right-most intersection points have the same y-value (flat arc).", None
     return True, "", pruned
 
 
-def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None, tcrack_depth=0):
+def _resolve_right_facing(y_left, y_right, surface_coords, x_min, x_max,
+                          override=None, tol=1e-6):
+    """Decide whether a failure surface is right-facing.
+
+    ``right_facing`` is the master sliding-direction flag consumed all over
+    ``generate_slices``/``solve``. The historical, and still normal-slope,
+    definition is ``right_facing = y_left > y_right``: when the LEFT ground
+    crossing sits higher than the right one, the crest is on the left, the toe
+    on the right, and the mass slides to the RIGHT (``True``). Downstream this
+    flips the sign of the slice base angle ``alpha`` (and ``beta``, the tension-
+    crack side, and line-load horizontals), so getting it wrong mirrors the
+    whole mechanism.
+
+    A *flat arc* — both ground crossings at the same elevation, within ``tol``
+    — makes ``y_left > y_right`` undecidable and was previously rejected
+    outright. That is collateral damage for legitimate level-ground bearing-
+    capacity mechanisms (e.g. a Prandtl prism under a footing). For that case
+    only, facing is inferred from the surface's ASYMMETRY: the mass slides
+    toward the crossing nearest the deepest point of the surface.
+
+        deepest point LEFT  of the crossings' midpoint -> slides left  -> left-facing  (right_facing=False)
+        deepest point RIGHT of the crossings' midpoint -> slides right -> right-facing (right_facing=True)
+
+    A perfectly symmetric flat arc (deepest point at the midpoint) carries no
+    asymmetry to read; with no override it deterministically defaults to
+    left-facing (``right_facing=False``, which also matches what ``solve``'s own
+    ``y_lb[0] > y_rb[-1]`` recomputation yields for equal-elevation ends) and
+    returns a note so the caller can surface it.
+
+    ``override`` (a truthy/falsy value, or ``None`` for "auto") wins whenever it
+    is not ``None`` and suppresses the note — the caller asked for a specific
+    facing and should not also be warned.
+
+    IMPORTANT: for a normal slope (``abs(y_left - y_right) >= tol``) this returns
+    exactly ``y_left > y_right`` — byte-identical to the prior inline logic. The
+    asymmetry branch fires ONLY in the equal-elevation case that used to be
+    rejected. ``tol`` matches the flat-arc tolerance in ``get_sorted_intersections``.
+
+    Returns ``(right_facing: bool, note: str or None)``.
+    """
+    if override is not None:
+        return bool(override), None
+
+    if abs(y_left - y_right) >= tol:
+        # NORMAL slope: unchanged historical behavior.
+        return (y_left > y_right), None
+
+    # FLAT ARC: infer facing from surface asymmetry.
+    x_mid = 0.5 * (x_min + x_max)
+    interior = [(x, y) for (x, y) in surface_coords if x_min < x < x_max]
+    pts = interior if interior else list(surface_coords)
+    x_deep = min(pts, key=lambda p: p[1])[0]
+    if x_deep < x_mid - tol:
+        return False, None
+    if x_deep > x_mid + tol:
+        return True, None
+    note = ("Flat-arc failure surface is symmetric about its crossings' "
+            "midpoint; facing is indeterminate. Defaulted to left-facing "
+            "(right_facing=False). Pass slope_data['right_facing'] or the "
+            "generate_slices right_facing= kwarg to override.")
+    return False, note
+
+
+def generate_failure_surface(ground_surface, circular, circle=None, non_circ=None, tcrack_depth=0,
+                             right_facing=None):
     """
     Generates a failure surface based on either a circular or non-circular definition.
 
@@ -346,7 +408,10 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
 
     x_min, x_max = points[0].x, points[1].x
     y_left, y_right = points[0].y, points[1].y
-    right_facing = y_left > y_right
+    # Byte-identical to `y_left > y_right` for a normal slope; the asymmetry rule
+    # only engages on a flat arc (equal-elevation crossings, formerly rejected).
+    right_facing, _facing_note = _resolve_right_facing(
+        y_left, y_right, failure_coords, x_min, x_max, override=right_facing)
 
     # --- Step 3: If tension crack exists, find intersection with tension crack surface ---
     if tcrack_depth > 0 and not tcrack_recovered:
@@ -790,7 +855,7 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
 
 
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
-                    composite=False):
+                    composite=False, right_facing=None):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -805,6 +870,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         non_circ (list, optional): List of dicts defining a non-circular failure surface with keys 'X', 'Y', and 'Movement'.
         num_slices (int, optional): Desired number of slices to generate (default is 40).
         debug (bool, optional): Whether to print debug information (default is True).
+        right_facing (bool or None, optional): Facing override. None (default)
+            auto-detects facing (``y_left > y_right`` for a normal slope, and the
+            surface-asymmetry rule for a flat arc). A bool forces the facing and
+            wins over any auto-detection; it also accepts an in-memory
+            ``slope_data['right_facing']`` key (the kwarg takes precedence).
 
     Returns:
         tuple:
@@ -921,9 +991,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     ground_surface = LineString([(x, y) for x, y in ground_surface.coords])
 
+    # Resolve the facing override once: the explicit kwarg wins, else an
+    # in-memory slope_data['right_facing'] key, else None (auto-detect). Only
+    # ever non-None for the rare flat-arc / caller-forced case; for a normal
+    # slope this stays None and facing is detected exactly as before.
+    facing_override = right_facing if right_facing is not None else slope_data.get('right_facing')
+
     # Generate failure surface
     success, result = generate_failure_surface(ground_surface, circular, circle=circle, non_circ=non_circ,
-                                               tcrack_depth=tcrack_depth)
+                                               tcrack_depth=tcrack_depth, right_facing=facing_override)
     if success:
         x_min, x_max, y_left, y_right, clipped_surface = result
     else:
@@ -977,8 +1053,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     f"pass composite=True to truncate the circle at the bottom of the "
                     f"model and run it along the base.")
 
-    # Determine if the failure surface is right-facing
-    right_facing = y_left > y_right
+    # Determine if the failure surface is right-facing. Byte-identical to the
+    # historical `y_left > y_right` for a normal slope; the surface-asymmetry
+    # rule (and the facing override) engage ONLY on a flat arc — the equal-
+    # elevation case that used to be rejected in get_sorted_intersections.
+    right_facing, facing_note = _resolve_right_facing(
+        y_left, y_right, list(clipped_surface.coords), x_min, x_max,
+        override=facing_override)
 
     # === BEGIN : Find set of points that should correspond to slice boundaries. ===
 
@@ -1940,6 +2021,21 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         slices.append(slice_data)
 
     df = pd.DataFrame(slices)
+
+    # Surface a flat-arc facing note in the returned data (rather than guessing
+    # silently). Only set on a symmetric flat arc with no override; None otherwise.
+    df.attrs['facing_note'] = facing_note
+    if facing_note and debug:
+        print("WARNING: " + facing_note)
+
+    # Hand solve() an explicit facing ONLY when it cannot be trusted to re-derive
+    # the same one from geometry: a caller override, or a flat arc whose equal-
+    # elevation ends make each solver's own y_lb/y_cb facing test degenerate
+    # (and, worse, method-dependent). For a normal slope with no override this
+    # key is left UNSET, so every solver falls back to its historical geometric
+    # test and stays byte-identical — the flat-arc rule is inert everywhere else.
+    if facing_override is not None or abs(y_left - y_right) < 1e-6:
+        df.attrs['right_facing'] = bool(right_facing)
 
     # Slice data were built by iterating from left to right. Flip the order slice data for right-facing slopes.
     # Slice 1 should be at the bottom and slice n at the top. This makes the slice data consistent with the

@@ -306,7 +306,10 @@ def oms(slice_df, debug=False):
     # by the β sign-flip applied in generate_slices, so flip it here. The horizontal
     # D-component term (a_dy / sum_Dy) is already sign-correct via that β-flip and is
     # left untouched; likewise the seismic (a_s) and tension-crack (a_t) arms.
-    right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+    # An explicit facing from generate_slices (flat-arc / override case) wins;
+    # otherwise fall back to the historical geometric test, byte-identical.
+    right_facing = slice_df.attrs.get(
+        'right_facing', slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1])
 
     # Moment arms about (Xo, Yo). a_S == R and a_N == 0 on a true circle.
     xr, a_S, a_N = _moment_arms(slice_df, Xo, Yo, alpha, right_facing)
@@ -477,7 +480,9 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     # slopes and is not corrected by the β sign-flip in generate_slices (cosβ is
     # even in β), so flip it here. a_dy (horizontal-D-component) is already correct
     # via that β-flip; a_s/a_t track the sliding-direction convention. See oms().
-    right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+    # Explicit facing (flat-arc / override) wins; else historical test, byte-identical.
+    right_facing = slice_df.attrs.get(
+        'right_facing', slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1])
     a_dx = d_x - Xo
     if right_facing:
         a_dx = -a_dx
@@ -1339,7 +1344,9 @@ def corps(slice_df, variant=2, debug=False):
     # shipped benchmark). Without it, force-equilibrium FS is asymmetric under
     # mirroring and can violate the expected method ordering on right-facing
     # geometries.
-    right_facing = slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1]
+    # Explicit facing (flat-arc / override) wins; else historical test, byte-identical.
+    right_facing = slice_df.attrs.get(
+        'right_facing', slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1])
     if right_facing:
         theta_list = -theta_list
         theta_out = -theta_out
@@ -1371,8 +1378,8 @@ def lowe(slice_df, debug=False):
     y_rt = slice_df['y_rt'].values
     y_rb = slice_df['y_rb'].values
 
-    # determine facing
-    right_facing = (y_lb[0] > y_rb[-1])
+    # determine facing (explicit flat-arc / override wins; else historical test)
+    right_facing = slice_df.attrs.get('right_facing', (y_lb[0] > y_rb[-1]))
 
     # precompute each slice's top & bottom slopes
     widths   = (x_r - x_l)
@@ -1504,7 +1511,10 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
     tan_p = np.tan(phi)  # tan(phi)
 
-    right_facing = (y_cb[0] > y_cb[-1])
+    # Explicit facing (flat-arc / override) wins; else historical y_cb test. On a
+    # flat arc y_cb[0] and y_cb[-1] are near-equal, so this comparison is
+    # otherwise noise-driven — see generate_slices / _resolve_right_facing.
+    right_facing = slice_df.attrs.get('right_facing', (y_cb[0] > y_cb[-1]))
     # If right facing, swap angles and strengths. For most methods, you can use the normal angle conventions
     # and get the right answer. But for Spencer, due to the way that the moment equation is written,
     # you need to swap the angles and strengths if the slope is right facing.
@@ -2133,8 +2143,9 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         return False, "Morgenstern-Price needs at least 2 slices."
 
     # Facing detection mirrors spencer(); _mp_march applies the right-facing flip set.
+    # Explicit facing (flat-arc / override) wins; else the historical y_cb test.
     _ycb = slice_df['y_cb'].values
-    right_facing = bool(_ycb[0] > _ycb[-1])
+    right_facing = bool(slice_df.attrs.get('right_facing', _ycb[0] > _ycb[-1]))
 
     try:
         f_vals = _mp_f_vals(slice_df, f_type)

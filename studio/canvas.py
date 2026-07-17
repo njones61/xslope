@@ -708,3 +708,48 @@ class MplCanvas(QWidget):
             pass
         x, y = ax.transData.inverted().transform(disp)
         return float(x), float(y)
+
+
+class PreviewPane(QWidget):
+    """A debounced live preview for the input editors: an ``MplCanvas`` plus an
+    optional caption, driven by a per-editor ``draw(ax)`` hook that renders the full
+    cross-section with the object being edited highlighted (the shared mechanism
+    behind the profile-line / polygon / starting-circle previews — the Materials
+    list-view plots generalized).
+
+    Editors call :meth:`schedule` on any field / table / selection change; renders
+    are debounced (so the preview never lags typing) and ride ``render_axes``'
+    deferred, viewport-sized path. The ``draw`` hook reads the editor's LIVE pending
+    state, so the picture always reflects the latest edit. If the hook raises — a
+    half-typed, unparseable row mid-edit — ``MplCanvas`` keeps the last good pixmap,
+    so a blank cell never blanks or errors the preview."""
+
+    def __init__(self, draw_fn, caption=None, debounce_ms=140, dxf=True, parent=None):
+        super().__init__(parent)
+        self._draw_fn = draw_fn
+        self._dxf = dxf
+        self.canvas = MplCanvas()
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.addWidget(self.canvas, 1)
+        if caption:
+            cap = QLabel(caption)
+            cap.setWordWrap(True)
+            cap.setStyleSheet("color: gray; font-size: 11px;")
+            v.addWidget(cap)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(debounce_ms)
+        self._timer.timeout.connect(self._render)
+
+    def schedule(self):
+        """(Re)start the debounce so a burst of edits coalesces into one render."""
+        self._timer.start()
+
+    def refresh_now(self):
+        """Render immediately (skip the debounce) — used for the first paint."""
+        self._timer.stop()
+        self._render()
+
+    def _render(self):
+        self.canvas.render_axes(self._draw_fn, dxf=self._dxf)

@@ -116,10 +116,17 @@ class _EditableTable(QWidget):
     """A table over a list of dict records with Add/Remove rows. Unshown keys are
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
-    def __init__(self, fields, rows, new_row, parent=None, swatch_state=None):
+    def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
+                 on_change=None, on_select=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
+        # Optional live-edit hooks (used by the editor previews): on_change fires on
+        # any data edit (cell text, combo, add/remove); on_select on a row-selection
+        # change. Suppressed while the table populates so construction is silent.
+        self._on_change = on_change
+        self._on_select = on_select
+        self._suppress_notify = True
         self._bases = [dict(r) for r in rows]  # keep originals to preserve extra keys
         # Optional leading display-color swatch column (Materials editor). It is a
         # *display* column, not a data field: kept as the appended LOGICAL column
@@ -156,6 +163,11 @@ class _EditableTable(QWidget):
             self._set_row(i, row)
         if swatch_state is not None:
             self._rebuild_swatches()
+        # Notifications are wired only AFTER the initial population, and item edits
+        # go through a suppress flag, so building the table fires nothing.
+        self.table.itemChanged.connect(lambda *_: self._emit_change())
+        self.table.itemSelectionChanged.connect(self._emit_select)
+        self._suppress_notify = False
 
         bar = QHBoxLayout()
         add = QPushButton("Add row")
@@ -166,6 +178,18 @@ class _EditableTable(QWidget):
         bar.addWidget(rem)
         bar.addStretch(1)
         layout.addLayout(bar)
+
+    def _emit_change(self):
+        if not self._suppress_notify and self._on_change is not None:
+            self._on_change()
+
+    def _emit_select(self):
+        if not self._suppress_notify and self._on_select is not None:
+            self._on_select()
+
+    def selected_row(self):
+        """Index of the currently selected row, or -1 if none."""
+        return self.table.currentRow()
 
     def apply_usage_filter(self, enabled):
         """Show only columns whose ``applies`` set intersects ``enabled`` (a set of
@@ -183,6 +207,7 @@ class _EditableTable(QWidget):
                 combo.addItems(f.choices)
                 if str(val) in f.choices:
                     combo.setCurrentText(str(val))
+                combo.currentIndexChanged.connect(lambda *_: self._emit_change())
                 self.table.setCellWidget(i, j, combo)
             else:
                 self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
@@ -210,6 +235,7 @@ class _EditableTable(QWidget):
         self._bases.append(base)
         self._set_row(i, base)
         self._rebuild_swatches()
+        self._emit_change()
 
     def _remove_rows(self):
         for r in sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True):
@@ -217,6 +243,7 @@ class _EditableTable(QWidget):
             if r < len(self._bases):
                 self._bases.pop(r)
         self._rebuild_swatches()
+        self._emit_change()
 
     def result_rows(self):
         out = []
@@ -259,34 +286,298 @@ def _ok_cancel(dialog, layout):
     layout.addWidget(bb)
 
 
+# --------------------------------------------------------------------------- #
+# Editor preview drawing — the full cross-section with the object being edited
+# HIGHLIGHTED, shared by the profile-line / polygon / starting-circle editors
+# (Materials list-view plots generalized). One emphasis style + one dim style,
+# consistent across editors: emphasis is the single deliberate color choice; "dim"
+# is just reduced alpha on each feature's own (material/style-derived) color, so the
+# dimmed context still reads as itself. Each drawer renders from the editor's PENDING
+# rows; the debounced PreviewPane keeps the last good frame if a half-typed row makes
+# a drawer raise.
+# --------------------------------------------------------------------------- #
+_PREVIEW_EMPH = "#ff6d00"        # emphasis color for the selected object (saturated
+                                 # orange — stands out against the tab10 material
+                                 # palette and the red trial surfaces alike)
+_PREVIEW_EMPH_LW = 3.0           # emphasized line width
+_PREVIEW_DIM_ALPHA = 0.35        # alpha applied to non-selected context geometry
+
+
+def _doc_style(parent):
+    """The project's resolved style delta reached via the parent window's document,
+    so a preview renders with the same material colors / feature styles as the Inputs
+    plot. None (defaults) in headless/round-trip use where there is no document."""
+    doc = getattr(parent, "doc", None)
+    return getattr(doc, "style", None) if doc is not None else None
+
+
+def _finish_preview_axes(ax):
+    """Match plot_inputs' final touches so the preview frames the section the same
+    way: equal aspect (data-lim adjustable, so circles read round), no grid, a touch
+    of headroom. Titles/legends are omitted — the preview is a focused thumbnail."""
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.grid(False)
+    y0, y1 = ax.get_ylim()
+    if y1 > y0:
+        pad = 0.05 * (y1 - y0)
+        ax.set_ylim(y0, y1 + pad)
+
+
+def _material_color(style, mat_id, fallback_idx):
+    from xslope.style import material_style
+    idx = mat_id if mat_id is not None else fallback_idx
+    return material_style(style, idx)["color"]
+
+
+def _draw_input_features(ax, slope_data, style, skip=()):
+    """Draw the input *overlay* features on ``ax`` — the piezo line, distributed
+    loads, tension crack, reinforcement, piles, line loads and the trial failure
+    surface(s): everything ``plot_inputs`` layers OVER the base geometry. Uses the
+    engine's per-feature ``plot_*`` helpers (which already take an Axes) so a preview
+    shows the FULL model as context around the object being edited. Each feature is
+    drawn in its own try/except so one malformed record (a half-edited preview) can't
+    blank the rest of the model. ``skip`` omits named features — e.g. the circles
+    editor skips ``{"circles"}`` and draws its own live-edited circles on top.
+
+    Editor-side (not in xslope.plot) so it composes the display helpers without
+    touching the engine's plotting module."""
+    from xslope import plot as _p
+
+    def _try(name, fn):
+        if name in skip:
+            return
+        try:
+            fn()
+        except Exception:
+            pass
+
+    materials = slope_data.get("materials") or []
+    if any(m.get("u") == "piezo" for m in materials):
+        _try("piezo", lambda: _p.plot_piezo_line(ax, slope_data, style=style))
+    _try("dloads", lambda: _p.plot_dloads(ax, slope_data, style=style))
+    _try("tcrack", lambda: _p.plot_tcrack_surface(ax, slope_data, style=style))
+    _try("reinforcement", lambda: _p.plot_reinforcement_lines(ax, slope_data, style=style))
+    _try("piles", lambda: _p.plot_piles(ax, slope_data, style=style))
+    _try("line_loads", lambda: _p.plot_line_loads(ax, slope_data, style=style))
+    if slope_data.get("circular"):
+        _try("circles", lambda: _p.plot_circles(ax, slope_data, style=style))
+    elif slope_data.get("non_circ"):
+        _try("non_circ", lambda: _p.plot_non_circ(ax, slope_data["non_circ"], style=style))
+
+
+def _draw_profile_preview(ax, lines, selected, max_depth, slope_data, style):
+    """Preview for the profile-line editor: the PENDING profile lines drawn over the
+    otherwise-current model. The selected line is bold (emphasis color) with vertex
+    markers; the others keep their material color, thin and dimmed. The max-depth
+    base and the light surface overlays (piezo / loads / reinforcement / piles) give
+    context; trial surfaces are skipped as orthogonal clutter. Zone fills are NOT
+    re-derived here — rebuilding them from a half-edited line is fragile — so this is
+    a line preview (see the caption)."""
+    from xslope.plot import plot_max_depth
+    from xslope.style import resolve_style
+    rstyle = resolve_style(style)
+    _draw_input_features(ax, slope_data, rstyle, skip={"circles", "non_circ"})
+    if max_depth is not None:
+        drawable = [{"coords": ln["coords"]} for ln in lines if ln.get("coords")]
+        if drawable:
+            try:
+                plot_max_depth(ax, drawable, max_depth, style=rstyle)
+            except Exception:
+                pass
+    for i, ln in enumerate(lines):
+        coords = ln.get("coords") or []
+        if not coords:
+            continue
+        xs = [c[0] for c in coords]
+        ys = [c[1] for c in coords]
+        color = _material_color(rstyle, ln.get("mat_id"), i)
+        if i == selected:
+            ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
+                    marker="o", markersize=5, markerfacecolor=_PREVIEW_EMPH,
+                    markeredgecolor="white", zorder=20)
+        else:
+            ax.plot(xs, ys, color=color, linewidth=1.2, alpha=_PREVIEW_DIM_ALPHA,
+                    zorder=6)
+    _finish_preview_axes(ax)
+
+
+def _draw_polygon_preview(ax, polys, selected, slope_data, style):
+    """Preview for the polygon editor: the PENDING material zones. The selected zone
+    is filled (its material color, higher opacity + hatch) with a bold emphasis edge
+    and vertex markers; the others are dimmed fills. The domain base and light surface
+    overlays give context; trial surfaces are skipped. Rings are closed for display."""
+    from xslope.plot import plot_domain_base
+    from xslope.style import resolve_style
+    rstyle = resolve_style(style)
+    _draw_input_features(ax, slope_data, rstyle, skip={"circles", "non_circ"})
+    try:
+        plot_domain_base(ax, slope_data.get("domain_polygon"), style=rstyle)
+    except Exception:
+        pass
+    for i, pg in enumerate(polys):
+        coords = pg.get("coords") or []
+        if len(coords) < 2:
+            continue
+        xs = [c[0] for c in coords] + [coords[0][0]]   # close the ring for display
+        ys = [c[1] for c in coords] + [coords[0][1]]
+        color = _material_color(rstyle, pg.get("mat_id"), i)
+        if i == selected:
+            ax.fill(xs, ys, facecolor=color, alpha=0.55, hatch="//",
+                    edgecolor=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW, zorder=20)
+            ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
+                    marker="o", markersize=4, markerfacecolor=_PREVIEW_EMPH,
+                    markeredgecolor="white", zorder=21)
+        else:
+            ax.fill(xs, ys, facecolor=color, alpha=0.12, zorder=4)
+            ax.plot(xs, ys, color=color, linewidth=1.0, alpha=_PREVIEW_DIM_ALPHA,
+                    zorder=5)
+    _finish_preview_axes(ax)
+
+
+def _circle_radius_depth(c):
+    """(Xo, Yo, R, Depth) from a pending circle row, resolving R/Depth from the row's
+    Option EXACTLY as CirclesEditor.apply does — so the preview tracks the option live
+    (a Radius/Intercept row previews from R, a Depth row from Depth)."""
+    def f(key):
+        try:
+            return float(c.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    Xo, Yo = f("Xo"), f("Yo")
+    opt = str(c.get("Option", "Depth"))
+    if opt == "Radius":
+        R = f("R"); depth = Yo - R
+    elif opt == "Intercept":
+        R = ((f("Xi") - Xo) ** 2 + (f("Yi") - Yo) ** 2) ** 0.5
+        depth = Yo - R
+    else:
+        depth = f("Depth"); R = Yo - depth
+    return Xo, Yo, R, depth
+
+
+def _draw_circles_preview(ax, circles, selected, slope_data, style):
+    """Preview for the starting-circles editor: the full cross-section (base geometry
+    + overlays) with the PENDING circles over it. Each circle's clipped failure arc is
+    drawn as the engine does; the selected one is bold (emphasis color) with a center
+    marker, a radius line and a depth line, the others faint. The center/radius are
+    annotation-layer artists (in_layout=False, clipped) so a center far above the
+    section can't inflate the framed view — matching plot_circles."""
+    import numpy as np
+    from matplotlib.lines import Line2D
+    from xslope.plot import plot_base_geometry
+    from xslope.slice import generate_failure_surface
+    from xslope.style import resolve_style
+    rstyle = resolve_style(style)
+    plot_base_geometry(ax, slope_data, labels=False, style=rstyle)
+    _draw_input_features(ax, slope_data, rstyle, skip={"circles", "non_circ"})
+    ground_surface = slope_data.get("ground_surface")
+    tcrack_depth = slope_data.get("tcrack_depth", 0)
+
+    def _annot_line(xs, ys, **kw):
+        ln = Line2D(xs, ys, **kw)
+        ln.set_in_layout(False)          # keep an off-section center out of the
+        ln.set_clip_box(ax.bbox)         # tight-bbox layout + view autoscale
+        ln.set_clip_on(True)
+        ax.add_artist(ln)
+
+    for i, c in enumerate(circles):
+        Xo, Yo, R, depth = _circle_radius_depth(c)
+        if R <= 0:
+            continue
+        emph = (i == selected)
+        arc = None
+        if ground_surface is not None and not getattr(ground_surface, "is_empty", False):
+            try:
+                ok, res = generate_failure_surface(
+                    ground_surface, circular=True,
+                    circle={"Xo": Xo, "Yo": Yo, "Depth": depth, "R": R},
+                    tcrack_depth=tcrack_depth)
+                if ok:
+                    clipped = res[4]
+                    from shapely.geometry import LineString
+                    if not isinstance(clipped, LineString):
+                        clipped = LineString(clipped)
+                    arc = list(clipped.coords)
+            except Exception:
+                arc = None
+        if arc:
+            ax_ = [p[0] for p in arc]; ay_ = [p[1] for p in arc]
+            if emph:
+                ax.plot(ax_, ay_, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
+                        zorder=20)
+            else:
+                ax.plot(ax_, ay_, color="red", linestyle="--", linewidth=1.0,
+                        alpha=_PREVIEW_DIM_ALPHA, zorder=6)
+        if emph:
+            # Center +, radius line (down to the circle bottom) and depth line, all
+            # as annotation artists so they never blow up the framed section.
+            _annot_line([Xo], [Yo], marker="+", color=_PREVIEW_EMPH, linestyle="None",
+                        markersize=12, markeredgewidth=2)
+            _annot_line([Xo, Xo], [Yo, depth], color=_PREVIEW_EMPH, linewidth=1.2)
+            _annot_line([Xo - R, Xo + R], [depth, depth], color=_PREVIEW_EMPH,
+                        linewidth=1.0, linestyle=":")
+    _finish_preview_axes(ax)
+
+
 class TableEditorDialog(QDialog):
     """Editable table over a list of dict records.
 
     ``usage_toggles`` (a list of analysis tags, e.g. ``["lem", "fem"]``) adds a row
     of checkboxes that show/hide the columns specific to each analysis, so the user
     sees only the inputs relevant to what they're doing. The toggle state persists
-    per dialog. When omitted, a static color legend is shown instead."""
+    per dialog. When omitted, a static color legend is shown instead.
+
+    ``preview_draw`` (a hook ``draw(ax, rows, selected_index)``) attaches a live
+    preview pane on the right behind a splitter — the highlight follows the selected
+    table row. This keeps a pure-table editor a table (no list-view rewrite); only the
+    editors that pass a hook (currently starting circles) grow a preview."""
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
-                 usage_toggles=None):
+                 usage_toggles=None, preview_draw=None, preview_caption=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
+        self._preview_draw = preview_draw
+        self._preview = None
         self.resize(min(1200, 160 + 110 * len(fields)), 460)
         layout = QVBoxLayout(self)
         if help_text:
             layout.addWidget(_help_label(help_text))
-        self._editable = _EditableTable(fields, rows, new_row)
+        on_change = self._schedule_preview if preview_draw is not None else None
+        on_select = self._schedule_preview if preview_draw is not None else None
+        self._editable = _EditableTable(fields, rows, new_row,
+                                        on_change=on_change, on_select=on_select)
         if usage_toggles:
             layout.addLayout(self._build_toggle_bar(usage_toggles))
         else:
             legend = _usage_legend(fields)
             if legend:
                 layout.addWidget(legend)
-        layout.addWidget(self._editable)
+        if preview_draw is not None:
+            from .canvas import PreviewPane
+            self._preview = PreviewPane(
+                lambda ax: self._preview_draw(ax, self._editable.result_rows(),
+                                              self._editable.selected_row()),
+                caption=preview_caption)
+            split = QSplitter(Qt.Horizontal)
+            split.addWidget(self._editable)
+            split.addWidget(self._preview)
+            split.setStretchFactor(0, 1)
+            split.setStretchFactor(1, 1)
+            split.setSizes([560, 500])
+            layout.addWidget(split, 1)
+            self.resize(min(1280, 620 + 110 * len(fields)), 520)
+        else:
+            layout.addWidget(self._editable)
         _ok_cancel(self, layout)
         if usage_toggles:
             self._apply_toggles()      # set initial column visibility
+        if self._preview is not None:
+            self._preview.refresh_now()
+
+    def _schedule_preview(self, *_):
+        if self._preview is not None:
+            self._preview.schedule()
 
     def _build_toggle_bar(self, tags):
         from PySide6.QtWidgets import QCheckBox
@@ -1266,13 +1557,22 @@ class CirclesEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
+        style = _doc_style(parent)
+
+        def preview(ax, rows, selected):
+            _draw_circles_preview(ax, rows, selected, slope_data, style)
+
         return TableEditorDialog(
             "Circles", self.FIELDS, slope_data.get("circles", []), _new_circle, parent,
             help_text="Option sets how each circle's size is defined (only the matching "
                       "field is used):\n"
                       "  • Depth — elevation of the circle bottom at the center (R = Yo − Depth)\n"
                       "  • Radius — the circle radius R directly (Depth = Yo − R)\n"
-                      "  • Intercept — a point (Xi, Yi) the circle passes through")
+                      "  • Intercept — a point (Xi, Yi) the circle passes through",
+            preview_draw=preview,
+            preview_caption="Preview shows the starting circles on the section "
+                            "(selected circle bold with center, radius and depth "
+                            "lines; others faint).")
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -1706,15 +2006,18 @@ class MatGeometryDialog(QDialog):
     XY = [Field("x", "x"), Field("y", "y")]
 
     def __init__(self, title, help_text, item_label, items, materials, parent=None,
-                 select=None, max_depth=None):
+                 select=None, max_depth=None, preview_draw=None, preview_caption=None,
+                 slope_data=None, style=None):
         # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
         # select: row to pre-highlight (e.g. the double-clicked line); else first.
         # max_depth: when not None, show a "Max depth" field (profile sheet only —
         #   it has no meaning for polygon input); the bottom boundary elevation
         #   used when building zone polygons from the profile lines.
+        # preview_draw: draw(ax, lines, selected_index, max_depth) — a per-editor
+        #   hook that renders the full section with the selected item highlighted.
+        #   When given, a live preview pane is added on the right behind a splitter.
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.resize(680, 540)
         self._item_label = item_label
         self._materials = materials
         self._lines = [{"mat_id": it.get("mat_id"),
@@ -1722,6 +2025,8 @@ class MatGeometryDialog(QDialog):
                        for it in (items or [])]
         self._cur = -1
         self.table = None
+        self._preview_draw = preview_draw
+        self._preview = None
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
@@ -1735,15 +2040,16 @@ class MatGeometryDialog(QDialog):
                 "Elevation of the model's bottom boundary, used to build the zone "
                 "polygons from the profile lines.")
             self._max_depth_edit.setMaximumWidth(90)
+            self._max_depth_edit.textChanged.connect(self._schedule_preview)
             mdrow.addWidget(self._max_depth_edit)
             mdrow.addStretch(1)
             main.addLayout(mdrow)
 
-        body = QHBoxLayout()
-        main.addLayout(body, 1)
-
-        left = QVBoxLayout()
-        body.addLayout(left)
+        # Master/detail (list | material+vertex table), plus an optional preview pane
+        # on the right behind a splitter — the materials list-view layout pattern.
+        left_w = QWidget()
+        left = QVBoxLayout(left_w)
+        left.setContentsMargins(0, 0, 0, 0)
         self.list = QListWidget()
         self.list.currentRowChanged.connect(self._on_select)
         left.addWidget(self.list)
@@ -1756,8 +2062,9 @@ class MatGeometryDialog(QDialog):
         lbtns.addWidget(b_rem)
         left.addLayout(lbtns)
 
-        right = QVBoxLayout()
-        body.addLayout(right, 1)
+        right_w = QWidget()
+        right = QVBoxLayout(right_w)
+        right.setContentsMargins(0, 0, 0, 0)
         matrow = QHBoxLayout()
         matrow.addWidget(QLabel("Material:"))
         self.mat_combo = QComboBox()
@@ -1769,12 +2076,52 @@ class MatGeometryDialog(QDialog):
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
 
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(left_w)
+        splitter.addWidget(right_w)
+        if preview_draw is not None:
+            from .canvas import PreviewPane
+            self._preview = PreviewPane(
+                lambda ax: self._preview_draw(ax, self._pending_lines(), self._cur,
+                                              self.result_max_depth()),
+                caption=preview_caption)
+            splitter.addWidget(self._preview)
+            splitter.setStretchFactor(0, 0)
+            splitter.setStretchFactor(1, 0)
+            splitter.setStretchFactor(2, 1)
+            splitter.setSizes([190, 320, 470])
+            self.resize(1060, 560)
+        else:
+            splitter.setStretchFactor(0, 0)
+            splitter.setStretchFactor(1, 1)
+            self.resize(680, 540)
+        main.addWidget(splitter, 1)
+
         _ok_cancel(self, main)
 
         self._refresh_list()
         if self._lines:
             row = select if (select is not None and 0 <= select < len(self._lines)) else 0
             self.list.setCurrentRow(row)
+        if self._preview is not None:
+            self._preview.refresh_now()
+
+    def _schedule_preview(self, *_):
+        if self._preview is not None:
+            self._preview.schedule()
+
+    def _pending_lines(self):
+        """The current items with the SELECTED one's coords/material taken live from
+        the vertex table + material combo (they aren't committed to self._lines until
+        a selection change / OK), so the preview reflects the in-progress edit."""
+        lines = [{"mat_id": ln["mat_id"], "coords": list(ln["coords"])}
+                 for ln in self._lines]
+        if 0 <= self._cur < len(lines) and self.table is not None:
+            coords = [(r["x"], r["y"]) for r in self.table.result_rows()]
+            mid = self.mat_combo.currentIndex()
+            lines[self._cur] = {"mat_id": mid if mid >= 0 else lines[self._cur]["mat_id"],
+                                "coords": coords}
+        return lines
 
     def _label(self, i):
         mid = self._lines[i]["mat_id"]
@@ -1803,7 +2150,8 @@ class MatGeometryDialog(QDialog):
             return
         ln = self._lines[idx]
         rows = [{"x": x, "y": y} for (x, y) in ln["coords"]]
-        self.table = _EditableTable(self.XY, rows, _new_pt)
+        self.table = _EditableTable(self.XY, rows, _new_pt,
+                                    on_change=self._schedule_preview)
         self._holder.addWidget(self.table)
         self.mat_combo.blockSignals(True)
         mid = ln["mat_id"]
@@ -1814,6 +2162,7 @@ class MatGeometryDialog(QDialog):
         self._commit_current()
         self._cur = new_idx
         self._load(new_idx)
+        self._schedule_preview()
 
     def _on_mat_changed(self, idx):
         if 0 <= self._cur < len(self._lines) and idx >= 0:
@@ -1821,12 +2170,14 @@ class MatGeometryDialog(QDialog):
             item = self.list.item(self._cur)
             if item:
                 item.setText(self._label(self._cur))
+        self._schedule_preview()
 
     def _add_line(self):
         self._commit_current()
         self._lines.append({"mat_id": 0, "coords": []})
         self._refresh_list()
         self.list.setCurrentRow(len(self._lines) - 1)
+        self._schedule_preview()
 
     def _remove_line(self):
         idx = self.list.currentRow()
@@ -1839,6 +2190,7 @@ class MatGeometryDialog(QDialog):
             self.list.setCurrentRow(min(idx, len(self._lines) - 1))
         else:
             self._load(-1)
+        self._schedule_preview()
 
     def result_lines(self):
         self._commit_current()
@@ -1858,6 +2210,11 @@ class ProfileEditor(CategoryEditor):
     label = "Profile lines"
 
     def build(self, slope_data, parent, select=None):
+        style = _doc_style(parent)
+
+        def preview(ax, lines, selected, max_depth):
+            _draw_profile_preview(ax, lines, selected, max_depth, slope_data, style)
+
         return MatGeometryDialog(
             "Profile lines",
             "Each profile line is the top of a material layer, drawn left→right and "
@@ -1865,7 +2222,12 @@ class ProfileEditor(CategoryEditor):
             "Line",
             slope_data.get("profile_lines") or [],
             slope_data.get("materials") or [], parent,
-            select=select, max_depth=slope_data.get("max_depth") or 0.0)
+            select=select, max_depth=slope_data.get("max_depth") or 0.0,
+            preview_draw=preview,
+            preview_caption="Preview shows the pending profile lines over the current "
+                            "model (selected line highlighted). Material zones aren't "
+                            "re-filled until you save.",
+            slope_data=slope_data, style=style)
 
     def apply(self, slope_data, dlg):
         slope_data["profile_lines"] = dlg.result_lines()
@@ -1889,11 +2251,20 @@ class PolygonEditor(CategoryEditor):
             if len(coords) >= 2 and coords[0] == coords[-1]:
                 coords = coords[:-1]                       # drop the closing duplicate
             items.append({"mat_id": p.get("mat_id"), "coords": coords})
+        style = _doc_style(parent)
+
+        def preview(ax, polys, selected, _max_depth):
+            _draw_polygon_preview(ax, polys, selected, slope_data, style)
+
         return MatGeometryDialog(
             "Polygons",
             "Each polygon is a closed material zone (the ring is closed automatically, "
             "so list each vertex once). Select a polygon to edit its material and vertices.",
-            "Polygon", items, slope_data.get("materials") or [], parent, select=select)
+            "Polygon", items, slope_data.get("materials") or [], parent, select=select,
+            preview_draw=preview,
+            preview_caption="Preview shows the pending zones (selected zone filled and "
+                            "outlined, others dimmed).",
+            slope_data=slope_data, style=style)
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon

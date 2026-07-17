@@ -23,6 +23,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+# Point-to-polyline distance shared with the Inputs-canvas hit-tester — reused by the
+# preview-pane pick resolvers so a click resolves against the same geometry.
+from .picking import _line_dist
+
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
 # blue = FEM-specific inputs); seepage/reliability extend the same idea.
@@ -190,6 +194,13 @@ class _EditableTable(QWidget):
     def selected_row(self):
         """Index of the currently selected row, or -1 if none."""
         return self.table.currentRow()
+
+    def select_row(self, i):
+        """Programmatically select row ``i`` (used by the preview-pane pick). Fires
+        the normal selection-changed path, so the preview re-renders with the new
+        emphasis — the visual acknowledgement of the pick."""
+        if 0 <= i < self.table.rowCount():
+            self.table.selectRow(i)
 
     def apply_usage_filter(self, enabled):
         """Show only columns whose ``applies`` set intersects ``enabled`` (a set of
@@ -419,6 +430,30 @@ def _circle_radius_depth(c):
     return Xo, Yo, R, depth
 
 
+def _circle_arc(slope_data, Xo, Yo, R, depth):
+    """The clipped failure-surface arc for a circle, as a list of (x, y), or None —
+    exactly what the engine draws for it. Shared by the circles drawer and its pick
+    resolver so both hit-test the same geometry. Guarded: returns None on any error."""
+    ground_surface = slope_data.get("ground_surface")
+    if ground_surface is None or getattr(ground_surface, "is_empty", False):
+        return None
+    try:
+        from shapely.geometry import LineString
+        from xslope.slice import generate_failure_surface
+        ok, res = generate_failure_surface(
+            ground_surface, circular=True,
+            circle={"Xo": Xo, "Yo": Yo, "Depth": depth, "R": R},
+            tcrack_depth=slope_data.get("tcrack_depth", 0))
+        if not ok:
+            return None
+        clipped = res[4]
+        if not isinstance(clipped, LineString):
+            clipped = LineString(clipped)
+        return list(clipped.coords)
+    except Exception:
+        return None
+
+
 def _draw_circles_preview(ax, circles, selected, slope_data, style):
     """Preview for the starting-circles editor: the full cross-section (base geometry
     + overlays) with the PENDING circles over it. Each circle's clipped failure arc is
@@ -426,15 +461,11 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
     marker, a radius line and a depth line, the others faint. The center/radius are
     annotation-layer artists (in_layout=False, clipped) so a center far above the
     section can't inflate the framed view — matching plot_circles."""
-    import numpy as np
     from matplotlib.lines import Line2D
     from xslope.plot import plot_base_geometry
-    from xslope.slice import generate_failure_surface
     from xslope.style import resolve_style
     rstyle = resolve_style(style)
     plot_base_geometry(ax, slope_data, labels=False, style=rstyle)
-    ground_surface = slope_data.get("ground_surface")
-    tcrack_depth = slope_data.get("tcrack_depth", 0)
 
     def _annot_line(xs, ys, **kw):
         ln = Line2D(xs, ys, **kw)
@@ -448,21 +479,7 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
         if R <= 0:
             continue
         emph = (i == selected)
-        arc = None
-        if ground_surface is not None and not getattr(ground_surface, "is_empty", False):
-            try:
-                ok, res = generate_failure_surface(
-                    ground_surface, circular=True,
-                    circle={"Xo": Xo, "Yo": Yo, "Depth": depth, "R": R},
-                    tcrack_depth=tcrack_depth)
-                if ok:
-                    clipped = res[4]
-                    from shapely.geometry import LineString
-                    if not isinstance(clipped, LineString):
-                        clipped = LineString(clipped)
-                    arc = list(clipped.coords)
-            except Exception:
-                arc = None
+        arc = _circle_arc(slope_data, Xo, Yo, R, depth)
         if arc:
             ax_ = [p[0] for p in arc]; ay_ = [p[1] for p in arc]
             if emph:
@@ -785,6 +802,201 @@ def _draw_piezo_preview(ax, rows_per_tab, active_tab, slope_data, style):
     _finish_preview_axes(ax)
 
 
+# --------------------------------------------------------------------------- #
+# Preview-pane PICK resolvers — the inverse of the drawers above. Each maps a
+# clicked (x, y) + a data-unit tolerance (both from the canvas, tol already scaled
+# from ~8 screen px through the current zoom) to a selection target, hit-testing
+# the SAME pending geometry its drawer renders. They return None for a click beyond
+# tolerance (empty space), so the wiring leaves the selection untouched. Point-to-
+# segment/polyline distance is the shared `_line_dist`; a two-point list is a
+# single segment, so vertex/segment/polyline picks all go through it.
+# --------------------------------------------------------------------------- #
+from shapely.geometry import Point as _Point, Polygon as _Polygon
+
+
+def _pick_circles(rows, x, y, tol, slope_data):
+    """Nearest starting-circle row to the click — by its clipped failure arc (or the
+    full circle if the arc can't be built) or its center marker. Row index or None."""
+    pt = _Point(x, y)
+    best_i, best_d = None, float("inf")
+    for i, c in enumerate(rows):
+        Xo, Yo, R, depth = _circle_radius_depth(c)
+        if R <= 0:
+            continue
+        d = pt.distance(_Point(Xo, Yo))                         # center marker
+        arc = _circle_arc(slope_data, Xo, Yo, R, depth)
+        if arc:
+            d = min(d, _line_dist(pt, arc))                     # the drawn arc
+        else:
+            d = min(d, abs(((x - Xo) ** 2 + (y - Yo) ** 2) ** 0.5 - R))
+        if d < best_d:
+            best_i, best_d = i, d
+    return best_i if best_d <= tol else None
+
+
+def _pick_line_rows(rows, x, y, tol):
+    """Nearest 2-endpoint line row (reinforcement / piles): the segment or either
+    endpoint (all select the same row). Row index within tol, else None."""
+    pt = _Point(x, y)
+    best_i, best_d = None, float("inf")
+    for i, r in enumerate(rows):
+        p1, p2 = _xy(r, "x1", "y1"), _xy(r, "x2", "y2")
+        if p1 is None or p2 is None:
+            continue
+        d = _line_dist(pt, [p1, p2])
+        if d < best_d:
+            best_i, best_d = i, d
+    return best_i if best_d <= tol else None
+
+
+def _pick_line_loads(rows, x, y, tol, slope_data):
+    """Nearest line-load row — its arrow (tail→application point). Mirrors the arrow
+    geometry the drawer builds (tail length = 6% of the model span). Row or None."""
+    import numpy as np
+    pt = _Point(x, y)
+    gs = slope_data.get("ground_surface")
+    if gs is not None and not getattr(gs, "is_empty", False):
+        xs = [p[0] for p in gs.coords]
+        span = max(xs) - min(xs)
+    else:
+        span = 100.0
+    alen = 0.06 * span
+    best_i, best_d = None, float("inf")
+    for i, ll in enumerate(rows):
+        p = _xy(ll, "x", "y")
+        if p is None:
+            continue
+        try:
+            ang = np.radians(float(ll.get("angle", -90.0) or 0))
+        except (TypeError, ValueError):
+            continue
+        px, py = p
+        tx, ty = px - np.cos(ang) * alen, py - np.sin(ang) * alen
+        d = _line_dist(pt, [(tx, ty), (px, py)])
+        if d < best_d:
+            best_i, best_d = i, d
+    return best_i if best_d <= tol else None
+
+
+def _pick_noncirc(rows, x, y, tol):
+    """Non-circular surface: nearest vertex row, or (failing that) the nearest
+    segment's start-vertex row. Row index within tol, else None."""
+    pt = _Point(x, y)
+    pts, idx = [], []
+    for i, r in enumerate(rows):
+        p = _xy(r, "X", "Y")
+        if p is not None:
+            pts.append(p); idx.append(i)
+    vbest_i, vbest_d = None, float("inf")
+    for k, p in enumerate(pts):
+        d = pt.distance(_Point(p))
+        if d < vbest_d:
+            vbest_i, vbest_d = idx[k], d
+    if vbest_d <= tol:
+        return vbest_i
+    sbest_i, sbest_d = None, float("inf")
+    for k in range(len(pts) - 1):
+        d = _line_dist(pt, [pts[k], pts[k + 1]])
+        if d < sbest_d:
+            sbest_i, sbest_d = idx[k], d
+    return sbest_i if sbest_d <= tol else None
+
+
+def _pick_matgeom_lines(lines, x, y, tol, closed):
+    """Profile lines / polygons. Returns ``(feature, row|None)``: a vertex within tol
+    → (that line, that vertex row); else a segment/edge within tol → (that line,
+    None); else, for polygons (``closed``), a click inside a zone → (that zone,
+    None). None when nothing is within tolerance. Vertices win over edges/interior,
+    mirroring the emphasis the drawer gives them."""
+    pt = _Point(x, y)
+    vfeat, vrow, vd = None, None, float("inf")
+    efeat, ed = None, float("inf")
+    for fi, ln in enumerate(lines):
+        coords = ln.get("coords") or []
+        if not coords:
+            continue
+        for ri, c in enumerate(coords):
+            d = pt.distance(_Point(c[0], c[1]))
+            if d < vd:
+                vfeat, vrow, vd = fi, ri, d
+        ring = list(coords) + ([coords[0]] if closed and len(coords) >= 2 else [])
+        if len(ring) >= 2:
+            d = _line_dist(pt, ring)
+            if d < ed:
+                efeat, ed = fi, d
+    if vfeat is not None and vd <= tol:
+        return (vfeat, vrow)
+    if efeat is not None and ed <= tol:
+        return (efeat, None)
+    if closed:                              # interior: the smallest containing zone
+        cfeat, carea = None, float("inf")
+        for fi, ln in enumerate(lines):
+            coords = ln.get("coords") or []
+            if len(coords) < 3:
+                continue
+            try:
+                poly = _Polygon(coords)
+                if poly.contains(pt) and poly.area < carea:
+                    cfeat, carea = fi, poly.area
+            except Exception:
+                pass
+        if cfeat is not None:
+            return (cfeat, None)
+    return None
+
+
+def _pick_piezo(rows_per_tab, x, y, tol):
+    """Piezometric lines. Returns ``(tab, row|None)``: the tab of the nearest line and
+    the nearest vertex row on it (or None for a bare segment hit). None beyond tol.
+    A hit on the OTHER tab's line switches the active tab (its line 'becomes active')."""
+    pt = _Point(x, y)
+    vtab, vrow, vd = None, None, float("inf")
+    stab, srow, sd = None, None, float("inf")
+    for ti, rows in enumerate(rows_per_tab):
+        pts, ridx = [], []
+        for i, r in enumerate(rows):
+            p = _xy(r, "x", "y")
+            if p is not None:
+                pts.append(p); ridx.append(i)
+        for k, p in enumerate(pts):
+            d = pt.distance(_Point(p))
+            if d < vd:
+                vtab, vrow, vd = ti, ridx[k], d
+        for k in range(len(pts) - 1):
+            d = _line_dist(pt, [pts[k], pts[k + 1]])
+            if d < sd:
+                stab, srow, sd = ti, ridx[k], d
+    if vtab is not None and vd <= tol:
+        return (vtab, vrow)
+    if stab is not None and sd <= tol:
+        return (stab, srow)
+    return None
+
+
+def _pick_dloads(set_blocks, x, y, tol):
+    """Distributed loads. ``set_blocks = (blocks_set1, blocks_set2)``. Returns
+    ``(set, block)`` for the nearest block outline (its surface polyline) within tol,
+    else None. A hit in the other set switches the active tab to it."""
+    pt = _Point(x, y)
+    best = (None, None, float("inf"))
+    for si, blocks in enumerate(set_blocks):
+        for bi, block in enumerate(blocks or []):
+            coords = []
+            ok = True
+            for p in block:
+                try:
+                    coords.append((float(p["X"]), float(p["Y"])))
+                except (TypeError, ValueError, KeyError):
+                    ok = False
+                    break
+            if not ok or len(coords) < 2:
+                continue
+            d = _line_dist(pt, coords)
+            if d < best[2]:
+                best = (si, bi, d)
+    return (best[0], best[1]) if best[2] <= tol else None
+
+
 class TableEditorDialog(QDialog):
     """Editable table over a list of dict records.
 
@@ -799,12 +1011,16 @@ class TableEditorDialog(QDialog):
     editors that pass a hook (currently starting circles) grow a preview."""
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
-                 usage_toggles=None, preview_draw=None, preview_caption=None):
+                 usage_toggles=None, preview_draw=None, preview_caption=None,
+                 pick_resolve=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
         self._preview_draw = preview_draw
         self._preview = None
+        # ``pick_resolve(x, y, tol, rows) -> row_index | None`` maps a preview click
+        # to the table row to select (None = beyond tolerance, leave selection).
+        self._pick_resolve = pick_resolve
         self.resize(min(1200, 160 + 110 * len(fields)), 460)
         layout = QVBoxLayout(self)
         if help_text:
@@ -825,6 +1041,8 @@ class TableEditorDialog(QDialog):
                 lambda ax: self._preview_draw(ax, self._editable.result_rows(),
                                               self._editable.selected_row()),
                 caption=preview_caption)
+            if self._pick_resolve is not None:
+                self._preview.clicked.connect(self._on_preview_click)
             split = QSplitter(Qt.Horizontal)
             split.addWidget(self._editable)
             split.addWidget(self._preview)
@@ -844,6 +1062,14 @@ class TableEditorDialog(QDialog):
     def _schedule_preview(self, *_):
         if self._preview is not None:
             self._preview.schedule()
+
+    def _on_preview_click(self, x, y, tol):
+        """A click in the preview: resolve it to a table row and select that row
+        (the selection-changed path then re-renders the preview with the new
+        emphasis). Beyond tolerance the resolver returns None → no-op."""
+        row = self._pick_resolve(x, y, tol, self._editable.result_rows())
+        if row is not None:
+            self._editable.select_row(row)
 
     def _build_toggle_bar(self, tags):
         from PySide6.QtWidgets import QCheckBox
@@ -885,12 +1111,15 @@ class TabbedTableEditorDialog(QDialog):
     drives the preview via its ``on_change`` hook, and a tab switch reschedules it."""
 
     def __init__(self, title, tabs, parent=None, help_text=None,
-                 preview_draw=None, preview_caption=None):
+                 preview_draw=None, preview_caption=None, pick_resolve=None):
         # tabs: list of (tab_title, fields, rows, new_row)
         super().__init__(parent)
         self.setWindowTitle(title)
         self._preview_draw = preview_draw
         self._preview = None
+        # ``pick_resolve(x, y, tol, rows_per_tab) -> (tab, row|None) | None`` maps a
+        # preview click to the tab + points-table row to select.
+        self._pick_resolve = pick_resolve
         max_cols = max(len(fields) for _, fields, _, _ in tabs)
         self.resize(min(1200, 200 + 110 * max_cols), 480)
         layout = QVBoxLayout(self)
@@ -911,6 +1140,8 @@ class TabbedTableEditorDialog(QDialog):
                     ax, [et.result_rows() for et in self._editables],
                     self._tabs.currentIndex()),
                 caption=preview_caption)
+            if self._pick_resolve is not None:
+                self._preview.clicked.connect(self._on_preview_click)
             split = QSplitter(Qt.Horizontal)
             split.addWidget(self._tabs)
             split.addWidget(self._preview)
@@ -928,6 +1159,20 @@ class TabbedTableEditorDialog(QDialog):
     def _schedule_preview(self, *_):
         if self._preview is not None:
             self._preview.schedule()
+
+    def _on_preview_click(self, x, y, tol):
+        """A click in the preview: resolve to (tab, row), switch to that tab (its
+        line 'becomes active') and select the row. The tab-change / selection paths
+        re-render the preview. Beyond tolerance the resolver returns None → no-op."""
+        hit = self._pick_resolve(x, y, tol,
+                                 [et.result_rows() for et in self._editables])
+        if hit is None:
+            return
+        tab, row = hit
+        if 0 <= tab < self._tabs.count():
+            self._tabs.setCurrentIndex(tab)
+            if row is not None:
+                self._editables[tab].select_row(row)
 
     def result_rows(self, index):
         return self._editables[index].result_rows()
@@ -1894,7 +2139,8 @@ class CirclesEditor(CategoryEditor):
             preview_draw=preview,
             preview_caption="Preview shows the starting circles on the section "
                             "(selected circle bold with center, radius and depth "
-                            "lines; others faint).")
+                            "lines; others faint). Click a circle to select it.",
+            pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data))
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -1931,7 +2177,9 @@ class NonCircEditor(CategoryEditor):
             help_text="Points ordered left→right. Entry/exit points use Movement='Free'.",
             preview_draw=preview,
             preview_caption="Preview shows the non-circular surface on the section "
-                            "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed).")
+                            "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed). "
+                            "Click a vertex or the surface to select it.",
+            pick_resolve=lambda x, y, tol, rows: _pick_noncirc(rows, x, y, tol))
 
     def apply(self, slope_data, dlg):
         slope_data["non_circ"] = dlg.result_rows()
@@ -1963,7 +2211,9 @@ class PiezoEditor(CategoryEditor):
                       "analysis (the drawdown / second water table).",
             preview_draw=preview,
             preview_caption="Preview shows both piezometric lines on the section (the "
-                            "active tab's line bold with its points; the other dimmed).")
+                            "active tab's line bold with its points; the other dimmed). "
+                            "Click a line to switch to its tab; click a vertex to select it.",
+            pick_resolve=lambda x, y, tol, rpt: _pick_piezo(rpt, x, y, tol))
 
     def apply(self, slope_data, dlg):
         slope_data["piezo_line"] = [(r["x"], r["y"]) for r in dlg.result_rows(0)]
@@ -2032,7 +2282,20 @@ class DloadsEditor(CategoryEditor):
             preview,
             caption="Preview shows both load sets on the section (set 1 / set 2 in "
                     "their own colors; the active tab's selected load emphasized, the "
-                    "rest dimmed).")
+                    "rest dimmed). Click a load block to select it (switching set if "
+                    "it belongs to the other tab).")
+
+        def on_pick(x, y, tol):
+            hit = _pick_dloads((w1.pending_blocks(), w2.pending_blocks()), x, y, tol)
+            if hit is None:
+                return
+            si, bi = hit
+            tabs.setCurrentIndex(si)                 # -> the block's set becomes active
+            w = (w1, w2)[si]
+            if 0 <= bi < w.list.count():
+                w.list.setCurrentRow(bi)
+
+        dlg._preview.clicked.connect(on_pick)
         split = QSplitter(Qt.Horizontal)
         split.addWidget(tabs)
         split.addWidget(dlg._preview)
@@ -2308,7 +2571,9 @@ class PilesEditor(CategoryEditor):
             usage_toggles=["lem", "fem"],
             preview_draw=preview,
             preview_caption="Preview shows the piles on the section (selected pile bold "
-                            "with □ cap and ▽ tip markers; others dimmed).")
+                            "with □ cap and ▽ tip markers; others dimmed). "
+                            "Click a pile to select it.",
+            pick_resolve=lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol))
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -2384,7 +2649,7 @@ class MatGeometryDialog(QDialog):
 
     def __init__(self, title, help_text, item_label, items, materials, parent=None,
                  select=None, max_depth=None, preview_draw=None, preview_caption=None,
-                 slope_data=None, style=None):
+                 slope_data=None, style=None, pick_resolve=None):
         # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
         # select: row to pre-highlight (e.g. the double-clicked line); else first.
         # max_depth: when not None, show a "Max depth" field (profile sheet only —
@@ -2404,6 +2669,9 @@ class MatGeometryDialog(QDialog):
         self.table = None
         self._preview_draw = preview_draw
         self._preview = None
+        # ``pick_resolve(x, y, tol, lines) -> (feature, row|None) | None`` maps a
+        # preview click to the item (list row) and, for a vertex hit, its vertex row.
+        self._pick_resolve = pick_resolve
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
@@ -2462,6 +2730,8 @@ class MatGeometryDialog(QDialog):
                 lambda ax: self._preview_draw(ax, self._pending_lines(), self._cur,
                                               self.result_max_depth()),
                 caption=preview_caption)
+            if self._pick_resolve is not None:
+                self._preview.clicked.connect(self._on_preview_click)
             splitter.addWidget(self._preview)
             splitter.setStretchFactor(0, 0)
             splitter.setStretchFactor(1, 0)
@@ -2486,6 +2756,21 @@ class MatGeometryDialog(QDialog):
     def _schedule_preview(self, *_):
         if self._preview is not None:
             self._preview.schedule()
+
+    def _on_preview_click(self, x, y, tol):
+        """A click in the preview: resolve to (feature, row). Select that item in the
+        list (switching feature loads its vertex table via _on_select); if the hit was
+        on a vertex, also select that vertex row. Selection re-renders the preview."""
+        hit = self._pick_resolve(x, y, tol, self._pending_lines())
+        if hit is None:
+            return
+        feature, row = hit
+        if not (0 <= feature < len(self._lines)):
+            return
+        if feature != self._cur:
+            self.list.setCurrentRow(feature)     # -> _on_select rebuilds self.table
+        if row is not None and self.table is not None:
+            self.table.select_row(row)
 
     def _pending_lines(self):
         """The current items with the SELECTED one's coords/material taken live from
@@ -2603,8 +2888,10 @@ class ProfileEditor(CategoryEditor):
             preview_draw=preview,
             preview_caption="Preview shows the pending profile lines over the current "
                             "model (selected line highlighted). Material zones aren't "
-                            "re-filled until you save.",
-            slope_data=slope_data, style=style)
+                            "re-filled until you save. Click a line or vertex to select it.",
+            slope_data=slope_data, style=style,
+            pick_resolve=lambda x, y, tol, lines: _pick_matgeom_lines(
+                lines, x, y, tol, closed=False))
 
     def apply(self, slope_data, dlg):
         slope_data["profile_lines"] = dlg.result_lines()
@@ -2640,8 +2927,10 @@ class PolygonEditor(CategoryEditor):
             "Polygon", items, slope_data.get("materials") or [], parent, select=select,
             preview_draw=preview,
             preview_caption="Preview shows the pending zones (selected zone filled and "
-                            "outlined, others dimmed).",
-            slope_data=slope_data, style=style)
+                            "outlined, others dimmed). Click a zone or vertex to select it.",
+            slope_data=slope_data, style=style,
+            pick_resolve=lambda x, y, tol, lines: _pick_matgeom_lines(
+                lines, x, y, tol, closed=True))
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon
@@ -2703,7 +2992,9 @@ class ReinforcementEditor(CategoryEditor):
             preview_draw=preview,
             preview_caption="Preview shows the reinforcement lines on the section "
                             "(selected line bold with its endpoints; others dimmed; the "
-                            "trial surface, if any, is drawn for crossing context).")
+                            "trial surface, if any, is drawn for crossing context). "
+                            "Click a line to select it.",
+            pick_resolve=lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol))
 
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines
@@ -2750,7 +3041,9 @@ class LineLoadsEditor(CategoryEditor):
             preview_draw=preview,
             preview_caption="Preview shows the line loads on the section (selected "
                             "load's arrow emphasized; others dimmed). The arrow points "
-                            "in the force direction, head on the point of application.")
+                            "in the force direction, head on the point of application. "
+                            "Click a load's arrow to select it.",
+            pick_resolve=lambda x, y, tol, rows: _pick_line_loads(rows, x, y, tol, slope_data))
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()

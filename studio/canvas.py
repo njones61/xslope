@@ -86,6 +86,11 @@ class MplCanvas(QWidget):
     # tol) where tol is ~a dozen screen px expressed in data units. The Inputs
     # view connects this to open the editor for the feature under the cursor.
     picked = Signal(float, float, float)
+    # Emitted on a SINGLE click (not part of a pan/zoom-box drag) that lands inside
+    # the main axes, when click-picking is enabled (the editor preview panes). Same
+    # (data_x, data_y, tol) payload, with tol from ~8 screen px — so zooming in
+    # shrinks the pick tolerance in data units and fine picks become precise.
+    clicked = Signal(float, float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -105,6 +110,9 @@ class MplCanvas(QWidget):
         self._zoom_box_mode = False   # drag-a-rectangle zoom (vs. drag-to-pan)
         self._band_scene = None       # scene rect of the in-progress rubber band
         self._pick_enabled = False    # double-click selects a feature (Inputs view)
+        self._click_pick_enabled = False  # single-click emits `clicked` (preview panes)
+        self._press_vp = None         # viewport point of the last left-press, so a
+                                      # click can be told apart from a pan/box drag
 
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
@@ -562,6 +570,12 @@ class MplCanvas(QWidget):
         self._restore_pan_cursor()
         self._update_hint()
 
+    def set_click_pick_enabled(self, on):
+        """Enable single-click-to-select on this canvas (the editor preview panes):
+        a click that isn't part of a pan/zoom-box drag emits `clicked`. Panning
+        (drag-to-scroll) and box-zoom still work — only a stationary click picks."""
+        self._click_pick_enabled = bool(on)
+
     def _update_hint(self):
         """The double-click hint is shown only when picking is active — i.e. on
         the Inputs view and not while the zoom-box tool has taken over the drag."""
@@ -662,6 +676,23 @@ class MplCanvas(QWidget):
                 and event.button() == Qt.LeftButton and not self._zoom_box_mode):
             self._emit_pick(event.position().toPoint())
             return True
+        if (obj is self.view.viewport() and self._click_pick_enabled
+                and event.type() == QEvent.MouseButtonPress
+                and event.button() == Qt.LeftButton):
+            # Remember where the press landed so the matching release can tell a
+            # stationary click (a pick) from a pan/box drag. Don't consume — the
+            # view still needs the press to start a pan (ScrollHandDrag).
+            self._press_vp = event.position().toPoint()
+        if (obj is self.view.viewport() and self._click_pick_enabled
+                and event.type() == QEvent.MouseButtonRelease
+                and event.button() == Qt.LeftButton and not self._zoom_box_mode):
+            press, self._press_vp = self._press_vp, None
+            rel = event.position().toPoint()
+            # A click that barely moved is a pick; a drag (pan) is not. Threshold in
+            # viewport px so it's zoom-independent.
+            if press is not None and (rel - press).manhattanLength() <= 4:
+                self._emit_click_pick(rel)
+            # Don't consume — let the view finish its own release handling.
         if (obj is self.view.viewport() and self._pick_enabled
                 and event.type() == QEvent.MouseButtonRelease):
             # ScrollHandDrag resets the cursor to the open hand on release; re-assert
@@ -681,6 +712,19 @@ class MplCanvas(QWidget):
         off = self._viewport_to_data(vp_point + QPoint(12, 0))
         tol = math.hypot(x - off[0], y - off[1]) if off else 0.0
         self.picked.emit(x, y, tol)
+
+    def _emit_click_pick(self, vp_point, tol_px=8):
+        """Map a single-click viewport point to axes data coords and emit `clicked`,
+        with a tolerance from an `tol_px`-pixel offset — so the ~8px pick radius is
+        expressed in data units at the CURRENT zoom (zoomed in → tighter tolerance →
+        precise fine picks). Silent when the click falls outside the main axes."""
+        hit = self._viewport_to_data(vp_point)
+        if hit is None:
+            return
+        x, y = hit
+        off = self._viewport_to_data(vp_point + QPoint(tol_px, 0))
+        tol = math.hypot(x - off[0], y - off[1]) if off else 0.0
+        self.clicked.emit(x, y, tol)
 
     def _viewport_to_data(self, vp_point):
         """Map a point in viewport pixels to (x, y) in the main axes' data coords,
@@ -724,11 +768,18 @@ class PreviewPane(QWidget):
     half-typed, unparseable row mid-edit — ``MplCanvas`` keeps the last good pixmap,
     so a blank cell never blanks or errors the preview."""
 
+    # Forwarded from the inner canvas: a single click (not a pan/box drag) inside the
+    # axes, as (data_x, data_y, tol). Editors connect this to their pick resolver so a
+    # click in the preview selects the object/row under it.
+    clicked = Signal(float, float, float)
+
     def __init__(self, draw_fn, caption=None, debounce_ms=140, dxf=True, parent=None):
         super().__init__(parent)
         self._draw_fn = draw_fn
         self._dxf = dxf
         self.canvas = MplCanvas()
+        self.canvas.set_click_pick_enabled(True)   # click-to-select in the preview
+        self.canvas.clicked.connect(self.clicked)   # re-expose at the pane level
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
         v.addWidget(self.canvas, 1)

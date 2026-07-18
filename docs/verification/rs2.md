@@ -182,7 +182,7 @@ its reference/Slide2 figures (representative case where a problem has several).
 | 42 | Dam, safety-map example (Baker & Leshchinsky 2001) | 1.84 | Spencer non-circular 1.91 | *new* |
 | 44 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | 0.96 / 1.5 / 0.93 | — | [RS2-31](#rs2-31) |
 | 45 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | 2.65 / 2.78 / 2.63 | — | [RS2-32](#rs2-32) |
-| 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | 1.22 | — | *new* |
+| 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | 1.22 | Slide2 Spencer 1.293 / GLE 1.304 | [RS2-51](#rs2-51) (LEM, partial) |
 | 56 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | 1.26 | 8-program 1.02–1.32 | [RS2-33](#rs2-33) |
 | 57 | Layered, TC (Pockoski & Duncan slope 3) | 1.32 | 8-program ~1.40 | *new* |
 | 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | 0.98 | GOLD-NAIL 0.91, UTEXAS4 1.02 | *new* |
@@ -1099,6 +1099,55 @@ named issue for those three. Only the baseline is regression-locked; the variant
 as attempted.
 
 <!-- test: file=../files/rocscience/vp087.xlsx, type=fem_ssrm, expected_fs=0.981, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=1.3, max_iter=16000, benchmark=RS2-48 -->
+
+### RS2-51: Four-material slope, water table, tension crack, seismic — 12-method comparison (Zhu et al. 2003) {#rs2-51}
+
+**Input files:** [rs2_51.xlsx](../files/rocscience/rs2_51.xlsx) — Part 4 Verification Problem #51.
+
+> Zhu, D.Y., Lee, C.F. & Jiang, H.D. (2003). "A generalised framework of limit equilibrium
+> methods for slope stability analysis." *Géotechnique* 53(4), 377–395. *(RS2/Slide2 Slope
+> Stability Verification Manual, Part 4, Problem #51.)*
+
+A four-layer 1V:2H slope (toe (0,0) → crest (60,30)) whose strata dip parallel to the face:
+Layer 1 (top, c = 20, φ = 32°, γ = 18.2), Layer 2 (c = 25, φ = 30°, γ = 18.0), Layer 3 (the
+weak band, c = 40, **φ = 18°**, γ = 18.5) and Layer 4 (bottom, c = 40, φ = 28°, γ = 18.8). Pore
+pressure comes from a 9-point piezometric surface connected to every material; a horizontal
+seismic coefficient **k = 0.1** is applied; and a **dry tension crack** of the Rankine active
+depth *h*<sub>c</sub> = 2c/(γ√K<sub>a</sub>) ≈ 3.97 m sits in the top layer. The published task
+is the factor of safety on a **given circular surface** with 100 slices, tolerance 0.001, over
+twelve LEM methods. This is an LEM problem; the RS2 SSR value of 1.22 in the catalog is an
+independent finite-element mechanism, not the LEM target reproduced here.
+
+**Partial — reconstructed surface.** The vendor `.fez` is an RS2 SSR model that carries **no LEM
+slip surface**, and the given circle and tension-crack depth are figure-only (Figs 51.1–51.3, not
+in the `.fez` or the manual text). The circle here — centre (32, 36), tangent at y = 1.0
+(R = 35), daylighting from the lower face (x ≈ 13) to the back plateau (x ≈ 66) — was recovered
+by inversion against the rigorous methods. Geometry, materials, the piezo line and k = 0.1 are
+transcribed from `slope stability #051.fez` (k = 0.1 is the `.fea` body force bx = −0.1, which the
+importer does not auto-apply). On this surface, at 100 slices:
+
+| Method | XSLOPE | Slide2 | Zhu | Note |
+|---|---|---|---|---|
+| Ordinary (OMS) | 1.092 | 1.145 | 1.066 | lands inside the Slide2–Zhu spread |
+| Bishop simplified | 1.316 | 1.278 | 1.278 | +3.0% |
+| Janbu simplified | 1.196\* | 1.112 | 1.112 | \*XSLOPE reports Janbu **corrected** (f₀ ≈ 1.08); 1.196/1.08 ≈ **1.11** ✓ |
+| Corps of Engineers | 1.400 | 1.422 | 1.377 | inside the Slide2–Zhu spread |
+| Lowe & Karafiath | 1.244 | 1.288 | 1.290 | −3.4% |
+| **Spencer** | **1.300** | **1.293** | **1.293** | **+0.5%** |
+| GLE / Morgenstern–Price | 1.282 | 1.304 | 1.303 | −1.7% (half-sine interslice function) |
+
+Spencer — the headline LEM value the RS2 manual's Table 51.2 quotes — reproduces to +0.5%, and
+Janbu once the corrected-vs-simplified convention is undone matches to within 0.5%; OMS and Corps
+both land between the Slide2 and Zhu columns. Bishop (+3.0%), Lowe (−3.4%) and M-P (−1.7%) carry
+the residual of fitting a figure-only circle plus method-implementation differences (XSLOPE's M-P
+uses a half-sine interslice function and lands just below Spencer, where Zhu's GLE lands just
+above). An unconstrained circular search does **not** reproduce this problem — it dives into a
+spurious deep mechanism daylighting on the flats through the φ = 18° weak band (Spencer ≈ 0.99),
+so the verification is locked as a single fixed circle, not a search.
+
+<!-- test: file=../files/rocscience/rs2_51.xlsx, type=single_circle, num_slices=100, fs_oms=1.092, fs_bishop=1.316, fs_janbu=1.196, fs_corps=1.400, fs_lowe=1.244, fs_spencer=1.300, fs_mprice=1.282, benchmark=RS2-51 -->
+
+![RS2-51: four-material slope with water table, tension crack and seismic k = 0.1 (Zhu et al. 2003) — inputs (left) and the given-circle Spencer solution FS = 1.30 (right)](images/rs2_51.png)
 
 ### RS2-56: Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) {#rs2-56}
 

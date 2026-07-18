@@ -608,9 +608,78 @@ def rs2_65():
     return 'rs2_65.xlsx'
 
 
+def rs2_51():
+    """RS2 Part-4 Verification Problem #51 -- a four-material slope with a water
+    table, a tension crack in the top layer and a horizontal seismic coefficient
+    k = 0.1, evaluated on a GIVEN circular surface with twelve LEM methods, after
+
+        Zhu, D.Y., Lee, C.F. & Jiang, H.D. (2003), "Generalised framework of
+        limit equilibrium methods for slope stability analysis," Geotechnique
+        53(4), 377-395 (the RS2/Slide2 Slope Stability Verification Manual's
+        Problem #51).
+
+    Four Mohr-Coulomb layers dip parallel to the 1V:2H slope face (toe (0,0) ->
+    crest (60,30)): Layer 1 (top, c = 20, phi = 32, gamma = 18.2), Layer 2
+    (c = 25, phi = 30, gamma = 18.0), Layer 3 (the weak band, c = 40, phi = 18,
+    gamma = 18.5) and Layer 4 (bottom, c = 40, phi = 28, gamma = 18.8). Pore
+    pressure is taken from a 9-point piezometric surface connected to every
+    material; the horizontal seismic coefficient is 0.1 and a dry tension crack
+    of the Rankine active depth h_c = 2c/(gamma*sqrt(Ka)) ~ 3.97 m sits in the top
+    layer. gamma_water = 9.81; psi = 0 / E, nu placeholders (LEM only -- the
+    elastic constants are not used).
+
+    Published (manual Table 51.2) Slide2 | Zhu: Ordinary 1.145 | 1.066; Bishop
+    1.278 | 1.278; Janbu Simplified 1.112 | 1.112; Corps of Engineers 1.422 |
+    1.377; Lowe & Karafiath 1.288 | 1.290; Spencer 1.293 | 1.293; GLE/M-P 1.304 |
+    1.303. RS2 SSR (a different, FE mechanism) = 1.22.
+
+    PARTIAL reconstruction: the vendor '.fez' is an RS2 SSR model that carries NO
+    LEM slip surface, and the given circle + tension-crack depth are figure-only
+    (Figs 51.1-51.3, not in the '.fez' or the manual text). The circle here is a
+    slope-face circle recovered by inversion against the rigorous methods: centre
+    (32, 36), tangent at y = 1.0 (Depth option -> R = Yo - Depth = 35), which
+    daylights from the lower slope face (x ~ 13) to the back plateau (x ~ 66). On
+    it Spencer reproduces to +0.5% and Janbu-simplified (xslope reports Janbu-
+    corrected, so divide out fo ~ 1.08) to within 0.5%. Geometry, materials, piezo
+    line and k = 0.1 are transcribed from 'slope stability #051.fez' (k = 0.1 is
+    the '.fea' body force bx = -0.1, which the reader does not auto-import)."""
+    import math
+    zones = [
+        (2, [(-40.0, -15.0), (-40.0, 0.0), (0.0, 0.0), (10.0, 5.0), (100.0, 5.0),
+             (100.0, -5.0), (100.0, -6.25)]),                        # Layer 3 (weak)
+        (3, [(100.0, -6.25), (100.0, -30.0), (-40.0, -30.0), (-40.0, -15.0)]),  # Layer 4
+        (1, [(100.0, 20.0), (100.0, 5.0), (10.0, 5.0), (40.0, 20.0)]),          # Layer 2
+        (0, [(100.0, 25.0), (100.0, 20.0), (40.0, 20.0), (50.0, 25.0)]),        # Layer 1
+        (0, [(50.0, 25.0), (60.0, 30.0), (100.0, 30.0), (100.0, 25.0)]),        # Layer 1 (top split)
+    ]
+    materials = [
+        dict(name='Layer 1 (top)', c=20.0, phi=32.0, gamma=18.2, gamma_sat=18.2,
+             E=1.0e5, nu=0.3, u='piezo'),
+        dict(name='Layer 2', c=25.0, phi=30.0, gamma=18.0, gamma_sat=18.0,
+             E=1.0e5, nu=0.3, u='piezo'),
+        dict(name='Layer 3 (weak)', c=40.0, phi=18.0, gamma=18.5, gamma_sat=18.5,
+             E=1.0e5, nu=0.3, u='piezo'),
+        dict(name='Layer 4 (bottom)', c=40.0, phi=28.0, gamma=18.8, gamma_sat=18.8,
+             E=1.0e5, nu=0.3, u='piezo'),
+    ]
+    piezo = [(-40.0, 0.0), (0.0, 0.0), (8.0, 3.0), (20.0, 7.0), (30.0, 10.0),
+             (43.0, 12.0), (55.0, 14.0), (70.0, 15.0), (100.0, 15.0)]
+    sd = _poly_slope_data(
+        polygons=zones, materials=materials,
+        circle={'Xo': 32.0, 'Yo': 36.0, 'R': 35.0, 'Depth': 1.0},
+        max_depth=0.0, piezo_line=piezo)
+    sd['k_seismic'] = 0.1                      # .fea body force bx = -0.1 (not auto-imported)
+    # dry Rankine tension crack in the top layer (c = 20, phi = 32, gamma = 18.2)
+    ka = (1.0 - math.sin(math.radians(32.0))) / (1.0 + math.sin(math.radians(32.0)))
+    sd['tcrack_depth'] = round(2.0 * 20.0 / (18.2 * math.sqrt(ka)), 3)   # ~3.965 m
+    sd['tcrack_water'] = 0.0
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_51.xlsx'))
+    return 'rs2_51.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
-               rs2_62a, rs2_62b, rs2_62c, rs2_65):
+               rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51):
         print(fn())

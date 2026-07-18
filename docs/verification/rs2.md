@@ -156,7 +156,7 @@ its reference/Slide2 figures (representative case where a problem has several).
 | Pt4 VP | Problem | RS2 SSR | Reference / Slide2 | Corpus |
 |---:|---|---|---|---|
 | 1 | Slope, homogeneous (ACADS 1a) | 0.98 | ref 1.00 [Giam] | [RS2-1](#rs2-1) |
-| 2 | Slope, homogeneous, tension crack (ACADS 1b) | 1.63 | ref 1.65 [Giam] | [VP2](rocscience.md#vp2) (LEM) |
+| 2 | Slope, homogeneous, tension crack (ACADS 1b) | 1.63 | ref 1.65 [Giam] | [P4-VP2](#p4-vp2) (SSRM) |
 | 3 | Slope, 3 materials (ACADS 1c) | 1.34 | ref 1.39 | [RS2-2](#rs2-2) |
 | 4 | Slope, 3 materials, seismic (ACADS 1d) | 0.95 | ref 1.00 | [RS2-3](#rs2-3) |
 | 5 | Dam, 4 materials (ACADS 2a) | — | ref 1.95 | [RS2-4](#rs2-4) |
@@ -209,8 +209,9 @@ its reference/Slide2 figures (representative case where a problem has several).
 | 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | 2.43 | Spencer 2.46, ref 2.43 | *new* (cf. RS2-67) |
 
 **Part 4 in one line:** 52 problems cataloged — 35 already in the corpus as RS2-1…47 rows,
-VP2 (ACADS 1b) covered by the existing Slide2/LEM lock [VP2](rocscience.md#vp2) (its water-
-filled tension crack is an LEM construct with no SSRM counterpart) and VP64 (USACE 2003
+VP2 (ACADS 1b) now carrying its own [Part IV SSRM build](#p4-vp2) on the shared file (SSRM
+1.669 vs RS2 SSR 1.63 — no-crack, the water-filled tension crack being an LEM-only construct)
+alongside the existing [VP2](rocscience.md#vp2) LEM lock, and VP64 (USACE 2003
 Fig 4-1) by the [VP64](rocscience.md#vp64) lock (USACE's Spencer hand-verification dam,
 reproduced on its specified circle — Spencer 2.488 / Bishop 2.489 vs Slide2 2.445 / USACE
 2.44) and VP67 (USACE 2003 F-5) by the [VP67](rocscience.md#vp67) lock (end-of-construction
@@ -1659,6 +1660,45 @@ recorded as regression anchors at the values XSLOPE's circular search actually r
 ![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.433 (left) and the Spencer critical seismic surface, a broad arc dipping below the toe, FS = 1.00 (right)](images/rs2_68b.png)
 
 ![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical surface at k꜀ = 0.167 riding the weak φ = 15° middle band, FS = 1.00 (right)](images/rs2_68c.png)
+
+## Part IV SSRM builds on shared Slide2 geometry {#part-iv-ssrm}
+
+RS2's Part IV catalog above re-verifies its Slide2 problems by shear-strength reduction. Where
+a Part IV problem shares its geometry with a built Slide2/LEM lock, the same corpus file still
+gets its **own** SSRM run against RS2's published SSR — the LEM lock alone does not discharge
+the SSRM comparison that is the point of this page. These sections carry those SSRM builds on
+the shared files.
+
+### RS2 Part IV VP2: Homogeneous slope with tension crack (ACADS 1b) {#p4-vp2}
+
+Slide2/LEM counterpart: [VP2](rocscience.md#vp2) (Giam & Donald 1989, ACADS 1(b)). RS2 Part IV
+re-runs this slope by shear-strength reduction (Table 2.2), so the shared file also carries a
+real SSRM lock, not just the LEM cross-reference.
+
+**Input files:** [vp002.xlsx](../files/rocscience/vp002.xlsx)
+
+A single-material slope: c' = 32 kPa, φ' = 10°, γ = 20 kN/m³. The LEM version
+[VP2](rocscience.md#vp2) carries a water-filled tension crack (depth 2c/(γ√Ka), per Craig)
+that trims the resisting soil; the **SSRM has no geometric crack** — a continuum has no
+counterpart to that LEM construct, and RS2's own published SSR is likewise a no-crack value
+(the same finding recorded on [RS2-29](#rs2-29)). XSLOPE's SSRM is therefore compared to RS2's
+SSR 1.63, not to the crack-reduced LEM (Spencer ~1.59). ψ = 0 (the Griffiths convention this
+corpus uses); E and ν are the file's inert FEM elastics (E = 1e5, ν = 0.3).
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (1 m mesh) | 1.669 | RS2 SSR 1.63 |
+
+*Published cross-bearings: Giam & Donald reference 1.65; Slide2 Spencer 1.592.*
+
+XSLOPE's SSRM lands at **1.669**, +2.4% above RS2's SSR 1.63 and +1.2% above the Giam & Donald
+reference 1.65 — a small, consistent positive offset, the same sign and size as
+[RS2-63](#rs2-63). The value is **mesh-converged**: 1.694 / 1.681 / 1.669 / 1.669 at
+3 / 1.5 / 1.0 / 0.7 m target sizes (flat from 1.0 m down). Locked at the 1.0 m mesh.
+
+<!-- test: file=../files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.669, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, benchmark=RS2-P4-VP2 -->
+
+![RS2 Part IV VP2: ACADS 1(b) homogeneous slope (Giam & Donald 1989), SSRM 1.669 (no tension crack) vs RS2 SSR 1.63 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP2.png)
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

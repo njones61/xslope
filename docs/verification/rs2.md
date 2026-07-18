@@ -133,10 +133,10 @@ independently verifiable.
 |---:|---|---|---|
 | [59](#rs2-59) | Three-layered soil slope | **built** | [rs2_59.xlsx](../files/rocscience/rs2_59.xlsx). Görög & Török (2007) Budapest landslide. The critical mechanism is **non-circular**, riding a thin weak "waste" lens (c = 1, φ = 5) — so this is an SSRM problem (a circular search misfinds the deeper competing surface, FS ≈ 1.9). SSRM 1.553 at the 3 m lock mesh vs Slide2 1.567 / RS2 SSRM 1.57 / PLAXIS 1.6 — lands on the Slide2/RS2 cluster (−0.9% / −1.1%). Mesh-sensitive: 1.61 at coarse meshes drifts to 1.553 once the tapering lens localizes. |
 | [60](#rs2-60) | Generalized Hoek–Brown, homogeneous slope | **built** (LEM) | [rs2_60a.xlsx](../files/rocscience/rs2_60a.xlsx) / [b](../files/rocscience/rs2_60b.xlsx) / [c](../files/rocscience/rs2_60c.xlsx). Three slope angles from Li, Merifield & Lyamin (2008) at GSI = 70, the strong-rock end of the criterion. Bishop/Spencer 1.009 / 1.017 / 1.008 against Li's F = 1.0. SSRM is not locked on this problem. |
-| [61](#rs2-61) | Local and global minima, homogeneous slope | **built** (cases 1 & 3) | [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx). Cheng, Lansivaara & Wei (2007); one geometry, four search regions. Case 1 (global) Spencer 1.338 vs Slide2 1.336. Case 3 (upper-face local min) now locked with the new `circular_search` search-window limits — Spencer 1.437 vs Slide2 1.443 (−0.4 %). Cases 2 & 4 blocked: RS2's deep and near-crest SSR minima are not circular-LEM local minima here (a confined Spencer search pins at ~1.47 / ~1.63), not tuned. |
+| [61](#rs2-61) | Local and global minima, homogeneous slope | **built** (cases 1, 3, 2) | [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx). Cheng, Lansivaara & Wei (2007); one geometry, four search regions. Case 1 (global) Spencer 1.338 vs Slide2 1.336. Case 3 (upper-face local min) locked with the `circular_search` search-window limits — Spencer 1.437 vs Slide2 1.443 (−0.4 %). Case 2 (deep toe-to-crest) now locked by **constrained SSRM** with RS2's own SSR-Search-Area polygon (read verbatim from the vendor `.fez`) — 1.398 vs RS2 SSR 1.36 (+2.8 %). Case 4 measured head-to-head but blocked (SSRM ~1.50 vs 1.42, +5.5 %); the LEM route to the Cheng/Slide2 columns stays blocked, not tuned. |
 | [62](#rs2-62) | Three-layered slope with a soft band | **built** (Analysis III) | [rs2_62c.xlsx](../files/rocscience/rs2_62c.xlsx) (+ a/b built, unlocked). Cheng et al. (2007), 3 band widths × 2 dilation cases. SSRM (ψ = 0) 0.843 on the 12 m geometry vs RS2 0.81 / Plaxis 0.82 (Flac3D's ψ = 0 = 1.03 is the code-split the problem is about). The ≈ 0.4 m band must be mesh-resolved (0.998 → 0.843 from 0.5 → 0.3 m); the wider I/II domains are too costly to band-resolve for the suite, and the ψ = φ column is non-associated-only out of scope. |
 | [63](#rs2-63) | Homogeneous slope assessment | **built** | [rs2_63.xlsx](../files/rocscience/rs2_63.xlsx). Cheng et al. (2007), 11 m homogeneous slope. Spencer 1.398 and SSRM 1.409 vs Slide2 1.380 / RS2 SSRM 1.38 / Cheng 1.383 (a consistent +1.5%). |
-| [64](#rs2-64) | Three homogeneous landslides | **partial** (3 of 12) | [rs2_64a.xlsx](../files/rocscience/rs2_64a.xlsx) (+ c/e locked; b/d/f, g–l built, unlocked). Teoman, Topal & Isik (2004), Ankara clay E90 highway. **12 cases** (3 slopes × original/failed × short-/long-term). RS2 obtained each FS with the **SSR Search Area** pinned to a digitized *proposed* slip surface (manual Fig. 4); XSLOPE's SSRM is unconstrained and has no search-area analog. The 3 **short-term original** slopes match (the unconstrained minimum coincides with the pinned surface): SSRM 5.201 / 4.807 / 5.647 vs RS2 SSR 5.14 / 4.69 / 5.47 (+1–3%). The **failed**-geometry and **long-term** cases migrate off the pinned surface to a steeper/shallower local mechanism and undershoot RS2's constrained SSR by 3–51% (e.g. C6 5.32 vs 6.97, C12 0.59 vs 1.22) — blocked on the search-area constraint, not tuning. Long-term seismic (0.03 g) confirmed destabilizing (k = +0.03: 1.32 → 1.22 on C9). |
+| [64](#rs2-64) | Three homogeneous landslides | **partial** (5 of 12) | [rs2_64a.xlsx](../files/rocscience/rs2_64a.xlsx) (+ c/e locked unconstrained; g/k locked SSR-zone; b/d/f, h/i/j/l blocked). Teoman, Topal & Isik (2004), Ankara clay E90 highway. **12 cases** (3 slopes × original/failed × short-/long-term). RS2 pinned each SSR run to a digitized *proposed* slip surface (manual Fig. 4), carried in the vendor `.fez` two ways — an **SSR Search-Area polygon** and a **Mohr-Coulomb corridor** with the rest of the domain made elastic (`Plasticity: None`). XSLOPE reproduces this with `solve_ssrm`'s `ssr_zone` (RS2's polygon read verbatim), holding elements outside at full strength (an approximation of the elastic zone). The 3 **short-term originals** already matched unconstrained (5.201 / 4.807 / 5.647 vs 5.14 / 4.69 / 5.47, +1–3%). Constrained, the smooth **long-term originals** C7 (1.674 vs 1.70, −1.5%) and C11 (1.403 vs 1.46, −3.9%) now lock; C9 (+5.5%) and the scarped **short-term failed** slopes (C2/C4/C6 +9–12%, landing on the manual's Bishop column) overshoot; the **sub-unity failed** slopes C8/C12 are unstable even constrained (the failing skin lies outside the corridor). Seismic 0.03 g confirmed destabilizing (C9 1.32 → 1.22). |
 | [65](#rs2-65) | Tailings dam | **built** | [rs2_65.xlsx](../files/rocscience/rs2_65.xlsx). Tzenkov (2008) Padina dam, **8 materials**, 12 zones, phreatic surface on the 225 × 77 m section. SSRM 1.331 at the 3 m lock mesh vs Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41 — lands on Slide2's non-circular LEM and inside the published 1.29–1.41 band. Mesh-sensitive: 1.381 / 1.369 / 1.331 at 8 / 5 / 3 m, drifting down from the LEM/FEM cluster toward RS2's SSRM as the band localizes. |
 | [66](#rs2-66) | Embankment basal stability | **built** | [rs2_66a.xlsx](../files/rocscience/rs2_66a.xlsx)…e. Nakamura, Cai & Ugai (2008), 5 soft-layer thicknesses (h₁ = 2–10 m). SSRM 1.04–1.08 across the family vs Slide2 Spencer 1.05–1.16 / RS2 SSRM 1.05–1.19 / LEM–FEM ref 1.08–1.24 — a few percent low (ψ = 0 vs the reference ψ = φ; thin φ = 0 band is mesh-sensitive). Regression-locked at a common 3 m mesh. |
 | 67 | Earth dam under steady & transient unsaturated seepage | *blocked* | Transient — blocked on a transient solver. |
@@ -1365,7 +1365,8 @@ it as 15° as well: its Slide2 value for case a (1.011) reproduces Li's own F fo
 
 ### RS2-61: Local and global minima, homogeneous slope (Cheng et al. 2007) {#rs2-61}
 
-**Input files:** [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx) (one geometry; cases 1 & 3 locked, 2 & 4 blocked)
+**Input files:** [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx) (one geometry; cases 1 & 3 locked
+by circular LEM, case 2 locked by constrained SSRM, case 4 blocked)
 
 A homogeneous benched slope, after
 
@@ -1377,12 +1378,12 @@ c = 5 kPa, φ = 30°, γ = 20 kN/m³. The problem exists to show how a search se
 Polygon Search Area onto successive **local** minima. All four cases share the one geometry
 ([rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx)); only the search region changes. Published:
 
-| Case | Surface (RS2 fig.) | RS2 SSR | Cheng (ref) | Slide2 | XSLOPE Spencer |
-|---|---|---|---|---|---|
-| 1 | mid-lower face (global) | 1.35 | 1.327 | 1.336 | **1.338** (locked) |
-| 2 | deep toe-to-crest (Fig. 4) | 1.36 | 1.375 | 1.385 | *blocked* (~1.47) |
-| 3 | upper face, crest→bench (Fig. 5) | 1.42 | 1.415 | 1.443 | **1.437** (locked) |
-| 4 | shallow near-crest (Fig. 6) | 1.42 | 1.40 | 1.397 | *blocked* (~1.63) |
+| Case | Surface (RS2 fig.) | RS2 SSR | Cheng (ref) | Slide2 | XSLOPE Spencer (LEM) | XSLOPE SSRM (SSR-zone) |
+|---|---|---|---|---|---|---|
+| 1 | mid-lower face (global) | 1.35 | 1.327 | 1.336 | **1.338** (locked) | — |
+| 2 | deep toe-to-crest (Fig. 4) | 1.36 | 1.375 | 1.385 | *blocked* (~1.47) | **1.398** (locked, +2.8 %) |
+| 3 | upper face, crest→bench (Fig. 5) | 1.42 | 1.415 | 1.443 | **1.437** (locked) | — |
+| 4 | shallow near-crest (Fig. 6) | 1.42 | 1.40 | 1.397 | *blocked* (~1.63) | ~1.50 (+5.5 %, blocked) |
 
 **Case 1 (global).** Seeding the circular search with a toe-to-crest circle refines onto the
 global minimum, a mid-lower-face circle (center ≈ 18, 24; daylighting x ≈ 19–27): Spencer 1.338
@@ -1398,17 +1399,33 @@ Cheng 1.415, RS2 1.42. The bounds come from the figure's mechanism, not from tun
 the same result holds across loosened variants of the window. (This is the "grid seed traps at
 FS ≈ 1.44" family the paper illustrates — here it is deliberately selected rather than stumbled onto.)
 
-**Cases 2 and 4 (blocked, not tuned).** RS2's Case-2 (deep toe-to-crest) and Case-4 (shallow
-near-crest) minima come from a *strength-reduction* search pinned by a polygon area; they are **not
-local minima of the circular LEM problem** on this geometry. A Spencer search confined to Fig. 4's
-toe-to-crest window pins against the window edge at FS ≈ 1.47 (the deep family drains toward the
-global, with no interior minimum), and one confined to Fig. 6's near-crest window returns FS ≈ 1.63
-(a shallow c = 5 circle on the 32° upper face is genuinely stronger). Neither reproduces the
-published 1.36–1.42; forcing agreement would mean tuning the bounds to the answer, so both are left
-blocked-with-reason.
+**Cases 2 and 4 — LEM route (still blocked, not tuned).** RS2's Case-2 (deep toe-to-crest) and
+Case-4 (shallow near-crest) minima come from a *strength-reduction* search pinned by a polygon area;
+they are **not local minima of the circular LEM problem** on this geometry. A Spencer search confined
+to Fig. 4's toe-to-crest window pins against the window edge at FS ≈ 1.47 (the deep family drains
+toward the global, with no interior minimum), and one confined to Fig. 6's near-crest window returns
+FS ≈ 1.63 (a shallow c = 5 circle on the 32° upper face is genuinely stronger). Neither reproduces
+the published Cheng/Slide2 columns; forcing agreement would mean tuning the bounds to the answer, so
+the LEM route to those columns is left blocked-with-reason.
+
+**Cases 2 and 4 — FEM route, measured head-to-head against RS2's SSR column.** `solve_ssrm` now
+accepts an `ssr_zone` polygon (RS2's "SSR Search Area"): strength reduction is applied only to
+elements whose centroid lies inside the polygon, and everything outside is held at full strength.
+The constraint polygon is **RS2's own**, read verbatim from the vendor model files — the
+`SSR_polygonal_zones` block in the `.fez`/`.fea` (parsed by `benchmarks/rocscience/rs2_ssr_zones.py`
+from the native `slope stability #061_02.fez` / `#061_04.fez`); RS2-61 carries no material partition,
+so the polygon is the whole constraint. Confining the SSRM to Fig. 4's deep toe-to-crest zone reproduces Case 2: **SSRM 1.398
+vs RS2 SSR 1.36 (+2.8 %)** — inside the corpus's usual SSRM-vs-published band (cf. [RS2-63](#rs2-63)
++1.5 %) — locked at the 1.0 m tri6 mesh. Case 4's near-crest zone confines the mechanism to the
+correct shallow surface but returns **SSRM ≈ 1.50 vs RS2 SSR 1.42 (+5.5 %)**: the confined near-crest
+mechanism in c = 5/φ = 30 is genuinely stiffer in XSLOPE's SSRM than in RS2's, a gap wider than the
+±4 % band the corpus locks within, so Case 4 stays blocked head-to-head — reported, not tuned.
 
 <!-- test: file=../files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.338, num_slices=40, benchmark=RS2-61a -->
 <!-- test: file=../files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.437, num_slices=40, entry_range=42;54, exit_range=23;32, tangent_depth=16;22, benchmark=RS2-61-case3 -->
+<!-- test: file=../files/rocscience/rs2_61a.xlsx, type=fem_ssrm, expected_fs=1.398, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.0, max_iter=16000, ssr_zone=8.516;12.255;8.686;6.779;21.55;8.975;28.407;13.412;31.455;18.522;32.3046;20.2236;28.228;21.032;26.57;17.894;22.043;13.995;8.516;12.255, benchmark=RS2-61-case2 -->
+
+![RS2-61: local and global minima (Cheng et al. 2007), Case 2 (deep toe-to-crest), constrained SSRM 1.398 vs RS2 SSR 1.36 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-61-case2.png)
 
 ### RS2-62: Three-layered slope with a soft band (Cheng et al. 2007) {#rs2-62}
 
@@ -1472,7 +1489,8 @@ Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.4
 
 **Input files:** [rs2_64a.xlsx](../files/rocscience/rs2_64a.xlsx) (C1, ST orig, *locked*) ·
 [c](../files/rocscience/rs2_64c.xlsx) (C3, *locked*) · [e](../files/rocscience/rs2_64e.xlsx) (C5, *locked*) ·
-b/d/f (short-term failed) · [g](../files/rocscience/rs2_64g.xlsx)…l (long-term) — all built, only C1/C3/C5 locked.
+[g](../files/rocscience/rs2_64g.xlsx) (C7, LT orig, *locked SSRM*) · [k](../files/rocscience/rs2_64k.xlsx)
+(C11, LT orig, *locked SSRM*) · b/d/f (ST failed), h/i/j/l (long-term) — built, measured head-to-head, blocked.
 
 Three road-cut landslides in Ankara clay along the E90 highway, after
 
@@ -1488,13 +1506,25 @@ and Slide2 Bishop.
 
 The decisive detail is **how RS2 obtained its SSR column**: *"The RS2 SSR Search Area option was used to
 obtain the factor of safety for each of the proposed slip surfaces."* RS2 pinned each strength-reduction run
-to a narrow **Search Area** wrapped around a digitized *proposed* slip surface (manual Fig. 4 shows the band
-hugging the Bishop surface). That proposed surface exists in **no** vendor file — the `.fez` carry only the
-Search-Area region — and **XSLOPE's SSRM is unconstrained**, with no search-area analog (the same limitation
-that defers [RS2-61](#rs2-61) cases 2–4). XSLOPE can therefore reproduce the RS2 SSR column **only where the
-unconstrained global minimum happens to coincide with the pinned surface**.
+to a narrow band hugging a digitized *proposed* slip surface (manual Fig. 4). Reading the native `.fez`
+directly, that band is present **two ways at once**: (1) an explicit `SSR_polygonal_zones` **Search-Area
+polygon**, and (2) a **material partition** — the Mohr-Coulomb material (`rock1`) is placed only in a
+corridor along the proposed surface (≈ 10–25 % of the elements), while the rest of the domain is a second
+material (`rock2`) with *"Plasticity Specifications: None"* — linear-elastic, so it **cannot yield** under
+any strength-reduction factor. The two regions nearly coincide; both confine the mechanism to the corridor.
 
-That coincidence holds for the three **short-term Original** slopes (simple convex profiles) and nowhere else:
+XSLOPE reproduces this with `solve_ssrm`'s `ssr_zone`, using **RS2's own Search-Area polygon read verbatim**
+from each `.fez` (`benchmarks/rocscience/rs2_ssr_zones.py`; the per-element material corridor, recovered from
+the same file, gives an equivalent constraint — spot-checked to within 0.8 % on C2). One honest
+approximation remains: `ssr_zone` holds the outside-corridor elements at **full Mohr-Coulomb strength**,
+whereas the vendor makes them **elastic**. Full-strength material can still yield where the stress is high
+enough; elastic material never can. Where the base slope is stable at full strength this is immaterial and
+the confinement reproduces RS2's mechanism; where the base slope is **sub-unity** (unconstrained FS < 1), a
+failing skin *outside* the corridor cannot be suppressed by holding it at full strength, and the constrained
+solve simply reports the slope unstable (FS < 0.1) — a real limit of the approximation, not a solver fault.
+
+The unconstrained global minimum coincides with the pinned surface for the three **short-term Original**
+slopes (simple convex profiles), so those lock unconstrained:
 
 | Case | Geometry | XSLOPE SSRM | RS2 SSR | Δ | Ref (Bishop) / Slide2 |
 |---|---|---|---|---|---|
@@ -1506,28 +1536,37 @@ The +1–3% offset matches the corpus's usual SSRM-vs-published gap (cf. [RS2-63
 shrinks under refinement (C1: 5.201 → ~5.15 as the target mesh goes 1.0 → 0.7 m, onto RS2's 5.14). The three
 are locked at the 1.0 m mesh.
 
-The remaining nine cases are **built but not locked**. The **Failed**-geometry short-term slopes and **all
-long-term** cases have irregular profiles (scarps, benches) and/or a near-surface water table, so the
-unconstrained SSRM migrates off the pinned surface onto a steeper, shallower, or more localized mechanism and
-undershoots RS2's Search-Area-constrained SSR — mildly for the smooth long-term Originals, severely for the
-failed profiles:
+The remaining nine cases are now run **constrained** — SSRM with each case's `SSR_polygonal_zones` polygon
+read verbatim from its vendor `.fez` (`#064_02`…`#064_12`, matched to each `.xlsx` by content: strengths and
+domain width, not filename order) — and measured **head-to-head against RS2's SSR column**:
 
-| Case | Geometry | XSLOPE SSRM | RS2 SSR | Δ |
-|---|---|---|---|---|
-| C2 | Slope 1 ST Failed | 4.947 | 6.10 | −19% |
-| C4 | Slope 2 ST Failed | 4.505 | 4.95 | −9% |
-| C6 | Slope 3 ST Failed | 5.316 | 6.97 | −24% |
-| C7 | Slope 1 LT Original | 1.501 | 1.70 | −12% |
-| C9 | Slope 2 LT Original | 1.218 | 1.30 | −6% |
-| C11 | Slope 3 LT Original | 1.421 | 1.46 | −3% |
-| C8/C10/C12 | LT Failed | 0.811 / 1.021 / 0.592 | 0.99 / 1.09 / 1.22 | −18% / −6% / −51% |
+| Case | Geometry | XSLOPE SSRM (SSR-zone) | RS2 SSR | Δ | |
+|---|---|---|---|---|---|
+| C7 | Slope 1 LT Original | **1.674** | 1.70 | −1.5% | *locked* |
+| C11 | Slope 3 LT Original | **1.403** | 1.46 | −3.9% | *locked* |
+| C9 | Slope 2 LT Original | 1.372 | 1.30 | +5.5% | blocked |
+| C10 | Slope 2 LT Failed | 1.041 | 1.09 | −4.5% | blocked |
+| C2 | Slope 1 ST Failed | 6.700 | 6.10 | +9.8% | blocked |
+| C4 | Slope 2 ST Failed | 5.394 | 4.95 | +9.0% | blocked |
+| C6 | Slope 3 ST Failed | 7.836 | 6.97 | +12.4% | blocked |
+| C8 | Slope 1 LT Failed | *unstable* (FS < 0.1) | 0.99 | — | blocked |
+| C12 | Slope 3 LT Failed | *unstable* (FS < 0.1) | 1.22 | — | blocked |
 
-The gap is the missing **search-area constraint**, not a solver or seismic error: the seismic path is sound —
-on C9 the 0.03 g pseudo-static coefficient (RS2 `bx = +0.03`, downslope for these left-high slopes) lowers FS
-from 1.32 (k = 0) to 1.22 (k = +0.03) and *raises* it to 1.42 at k = −0.03, confirming XSLOPE applies it in
-the destabilizing +x direction. Forcing a match on the blocked cases would require either the digitized
-surfaces (absent) or a `single_noncirc` run on them, which is a different (LEM) question than the RS2 SSR
-column asks.
+The constraint puts the mechanism on the right surface every time, but agreement with RS2's SSR follows the
+**geometry**, not the constraint's presence. The smooth **long-term Original** slopes verify: C7 −1.5 % (also
+onto Slide2 Bishop 1.68) and C11 −3.9 % are inside the ±4 % band the corpus locks within, so both are
+**locked** at the 1.0 m tri6 mesh; C9 lands +5.5 %, just outside, and is blocked head-to-head. The scarped
+**short-term Failed** slopes **overshoot** — C2/C4/C6 run +9 to +12 % above RS2's SSR, in fact landing on the
+manual's own Bishop reference (e.g. C2 6.70 vs Ref 6.67 / Slide2 6.64, while RS2's own SSR 6.10 sits ~9 %
+below its Bishop column): here the confinement forces a stiffer mechanism than RS2's, so they are blocked.
+The two **sub-unity Failed** slopes (C8 unconstrained 0.81, C12 0.59) are **unstable even fully constrained**:
+their governing failing skin lies *outside* the corridor, where `ssr_zone` can only hold it at full strength,
+not make it elastic — the approximation's stated limit — so no critical SRF brackets. All seven non-locking
+cases are **reported, not tuned**.
+
+The seismic path is sound and unchanged: on C9 the 0.03 g pseudo-static coefficient (RS2 `bx = +0.03`,
+downslope for these left-high slopes) lowers FS from 1.32 (k = 0) to 1.22 (k = +0.03) and *raises* it to 1.42
+at k = −0.03, confirming XSLOPE applies it in the destabilizing +x direction.
 
 The new `circular_search` search-window limits (used to lock [RS2-61](#rs2-61) Case 3) were tried here as
 the LEM route to the manual's **Bishop** reference columns (Teoman / Slide2), the same surfaces RS2 pinned
@@ -1540,13 +1579,20 @@ those skins and recovers the intended surface, and a toe-daylighting `tangent_de
 long-term originals off the foundation, but the residual gap stays 3–13 % (e.g. C7 1.63 / C9 1.24 / C11 1.43
 vs Slide2 1.68 / 1.30 / 1.51; C6 6.48 / C12 1.30 vs 6.96 / 1.15). That residual is our circular minimum
 genuinely sitting below Teoman's digitized surface — closing it means tuning bounds to the number, so the
-nine stay blocked-with-reason. The three SSRM anchors below are unchanged.
+**LEM route to the Bishop (Teoman / Slide2) columns stays blocked-with-reason**. The five SSRM anchors below
+(three ST-Original unconstrained, two LT-Original SSR-zone) are the head-to-head matches against RS2's SSR.
 
 <!-- test: file=../files/rocscience/rs2_64a.xlsx, type=fem_ssrm, expected_fs=5.201, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.0, max_iter=16000, benchmark=RS2-64a -->
 <!-- test: file=../files/rocscience/rs2_64c.xlsx, type=fem_ssrm, expected_fs=4.807, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=3.5, f_max=6.5, max_iter=16000, benchmark=RS2-64c -->
 <!-- test: file=../files/rocscience/rs2_64e.xlsx, type=fem_ssrm, expected_fs=5.647, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.5, max_iter=16000, benchmark=RS2-64e -->
+<!-- test: file=../files/rocscience/rs2_64g.xlsx, type=fem_ssrm, expected_fs=1.674, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.5, max_iter=16000, ssr_zone=6.726;7.086;5.442;5.549;6.703;3.353;8.58;0.973;12.299;-1.186;15.538;-1.726;19.497;-1.846;22.991;0.615;19.668;1.926;17.788;0.352;12.322;1.445;9.131;3.675;6.726;7.086, benchmark=RS2-64g -->
+<!-- test: file=../files/rocscience/rs2_64k.xlsx, type=fem_ssrm, expected_fs=1.403, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=2.2, max_iter=16000, ssr_zone=3.413;5.74;2.387;4.091;3.413;2.113;5.538;0.391;9.604;-1.404;12.242;-1.404;14.0932;-0.511713;14.0932;1.014;11.839;1.014;10.593;0.465;8.175;1.454;5.831;2.699;4.45466;4.16031;3.413;5.74, benchmark=RS2-64k -->
 
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 1 (Slope 1 short-term Original), SSRM 5.196 vs RS2 SSR 5.14 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the deep rotational mechanism coinciding with RS2's pinned Search-Area surface](images/RS2-64a.png)
+
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 7 (Slope 1 long-term Original), constrained SSRM 1.674 vs RS2 SSR 1.70 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64g.png)
+
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 11 (Slope 3 long-term Original), constrained SSRM 1.403 vs RS2 SSR 1.46 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64k.png)
 
 ### RS2-65: Slope stability assessment of a tailings dam (Tzenkov 2008) {#rs2-65}
 

@@ -342,6 +342,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             # assigned per element below from the overburden estimate.
             c_by_mat[i] = 0.0
             phi_by_mat[i] = 0.0
+        elif strength_option == "elastic":
+            # Pure linear elastic / infinite strength (v16): the element is held
+            # out of plasticity ENTIRELY via elastic_mask (below), so its c/phi
+            # never enter the stress update. Carry zeros -- they are inert.
+            c_by_mat[i] = 0.0
+            phi_by_mat[i] = 0.0
         else:
             # A blank option is legal on rows that never carry strength; any
             # OTHER option is not implemented in the FEM, and the material's
@@ -351,7 +357,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 raise ValueError(
                     f"Material {i+1} ({material.get('name', f'Material {i+1}')}): "
                     f"strength option '{strength_option}' is not supported by the "
-                    f"FEM (supported: mc, cp, pow, hb).")
+                    f"FEM (supported: mc, cp, pow, hb, elastic).")
             c_by_mat[i] = material.get("c", 0.0)
             phi_by_mat[i] = material.get("phi", 0.0)
 
@@ -1265,6 +1271,18 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "nu_by_mat": nu_by_mat,
         "gamma_by_mat": gamma_by_mat,
         "material_names": material_names,
+        # v16 template-carried run-option defaults. solve_ssrm / solve_fem fall
+        # back to these when their tension_cutoff_by_material / elastic_materials
+        # (resp. tension_cap_by_elem / elastic_mask) kwargs are left None, so a file
+        # that specifies t_cut / option=elastic is honored automatically; an
+        # explicit kwarg overrides (pass {} / [] to disable). Blank t_cut is omitted
+        # (None -> no cutoff), matching the loader.
+        "tension_cutoff_by_material": {
+            m["name"]: float(m["t_cut"]) for m in materials
+            if m.get("t_cut") is not None},
+        "elastic_materials": [
+            m["name"] for m in materials
+            if str(m.get("option", "")).strip().lower() == "elastic"],
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
         "pow_flag_by_elem": pow_flag_by_elem,  # power-curve elements (tangent-linearized in the VP loop)
@@ -1514,6 +1532,28 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     fixed_nodes = fem_data.get("fixed_nodes", set())
     roller_x_nodes = fem_data.get("roller_x_nodes", set())
     roller_y_nodes = fem_data.get("roller_y_nodes", set())
+
+    # Template-carried defaults (v16): when the caller left tension_cap_by_elem /
+    # elastic_mask None, resolve them from the by-material run-option defaults that
+    # build_fem_data read off the input file (t_cut column / option=elastic). An
+    # explicit per-element kwarg wins. solve_ssrm always passes explicit arrays, so
+    # this only fires on a DIRECT solve_fem call; the resolution matches solve_ssrm's
+    # (file-derived names always exist in material_names, so no unknown-name check).
+    if tension_cap_by_elem is None:
+        _tc_by_mat = fem_data.get("tension_cutoff_by_material")
+        if _tc_by_mat:
+            _names = list(fem_data.get("material_names", []))
+            tension_cap_by_elem = np.full(len(element_materials), np.inf)
+            for _nm, _T in _tc_by_mat.items():
+                if _nm in _names:
+                    tension_cap_by_elem[element_materials == _names.index(_nm) + 1] = float(_T)
+    if elastic_mask is None:
+        _el_names = fem_data.get("elastic_materials")
+        if _el_names:
+            _names = list(fem_data.get("material_names", []))
+            _ids = [_names.index(_nm) + 1 for _nm in _el_names if _nm in _names]
+            if _ids:
+                elastic_mask = np.isin(element_materials, _ids)
 
     # Material properties
     c_by_elem = fem_data.get("c_by_elem", fem_data["c_by_mat"][element_materials - 1])
@@ -3684,6 +3724,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
 
     t_start = time.perf_counter()
 
+    # Template-carried defaults (v16): a t_cut column / an option=elastic material
+    # read from the input file populates fem_data['tension_cutoff_by_material'] /
+    # ['elastic_materials'] at build time. Honor them automatically when the caller
+    # left the run option None; an explicit kwarg wins (pass {} / [] to disable).
+    # The substituted values flow through the SAME resolution below as an explicit
+    # kwarg, so file-carried and explicitly-passed are bit-identical.
+    if tension_cutoff_by_material is None:
+        tension_cutoff_by_material = fem_data.get("tension_cutoff_by_material") or None
+    if elastic_materials is None:
+        elastic_materials = fem_data.get("elastic_materials") or None
+
     # Resolve the SSR-exclusion material names to a per-element boolean mask once,
     # up front, so every trial solve shares it. Excluded elements keep full strength
     # (F = 1) inside solve_fem; see the F_by_elem note there.
@@ -3783,9 +3834,19 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         print("!  results. The default element type quad8 is recommended.")
         print("!" * 72 + "\n")
 
+    # solve_ssrm is the SOLE auto-wiring point for the SSRM path: it resolved the
+    # (auto-wired-or-explicit) tension_cutoff_by_material / elastic_materials into
+    # the per-element arrays above and passes them to every trial explicitly. Hand
+    # the trials a fem_data with the by-material template DEFAULTS stripped, so
+    # solve_fem's own direct-call fallback cannot RE-apply them — which would both
+    # double-count and, worse, defeat an explicit disable ({} / []), where the
+    # resolved arrays are None but the defaults still sit in fem_data.
+    fem_data_trials = {k: v for k, v in fem_data.items()
+                       if k not in ("tension_cutoff_by_material", "elastic_materials")}
+
     if failure_criterion == "non_convergence":
         result = _ssrm_displacement_limit(
-            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
@@ -3798,7 +3859,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             elastic_mask=elastic_mask)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
-            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
@@ -3811,7 +3872,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             elastic_mask=elastic_mask)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
-            fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
+            fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,

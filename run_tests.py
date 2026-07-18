@@ -1187,6 +1187,84 @@ def run_deps_declared_test(test):
     return 0.0, None
 
 
+def run_fem_elastic_units_test(test):
+    """No FEM material on an English-unit corpus file may carry the metric inherited
+    unit-blind elastic default (E = 100,000, nu = 0.3).
+
+    The corpus builders historically filled every FEM material with that single
+    default. It is a sane METRIC value (100 MPa), but on an English-unit file (gamma
+    in pcf) it is read as 100,000 *psf* ~ 4.8 MPa — ~10x too soft for the rockfill,
+    sand and stiff-clay shells it lands on. The SSRM factor of safety is invariant to
+    E, so the regression locks never move and no other test notices; what the wrong
+    modulus corrupts is displacements, the displacement-vector figure panels, and
+    reliability_fem. This is the second time the bug surfaced, so guard against it:
+    the builders now assign a soil-type psf modulus via
+    elastic_props.assign_elastic_props, and this check makes sure none of the metric
+    default slipped back in on a rebuild.
+
+    A magnitude floor cannot separate the leaked default from a legitimately soft
+    English modulus (the FEM sample corpus carries a deliberate 60,000 psf soft clay),
+    so the check keys on the exact inherited sentinel (E and nu both at the default) —
+    the signature of an unmigrated file — in the file's OWN unit system.
+
+    Scope: only files that actually run the FEM (a fem_ssrm / fem_elements /
+    fem_reliability test tag). LEM-only English files legitimately leave E at the
+    metric default — it is never used — so they are out of scope. Metric FEM files
+    keep E = 100,000 kPa (100 MPa), which is correct, so only English files are
+    checked.
+
+    Returns (0.0, None) if clean, else (None, message).
+    """
+    sys.path.insert(0, str(Path(__file__).parent / 'benchmarks' / 'rocscience'))
+    from elastic_props import is_imperial, INHERITED_DEFAULT, _finite
+    from xslope.fileio import load_slope_data
+
+    tag_re = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
+    fem_types = {'fem_ssrm', 'fem_elements', 'fem_reliability'}
+    root = Path(__file__).parent
+    fem_files = set()
+    for md in sorted(root.glob('docs/**/*.md')):
+        for line in md.read_text().splitlines():
+            mt = tag_re.search(line)
+            if not mt:
+                continue
+            kv = {}
+            for part in mt.group(1).split(','):
+                if '=' in part:
+                    k, v = part.split('=', 1)
+                    kv[k.strip()] = v.strip()
+            if kv.get('type') in fem_types and 'file' in kv:
+                fem_files.add((md.parent / kv['file']).resolve())
+    if not fem_files:
+        return None, "no FEM test tags found — cannot verify elastic-property units"
+
+    E0, nu0 = INHERITED_DEFAULT
+    offenders = []
+    for fp in sorted(fem_files):
+        if not fp.exists():
+            continue
+        try:
+            sd = load_slope_data(str(fp))
+        except Exception as e:                       # pragma: no cover - defensive
+            return None, f"could not load {fp.name}: {e}"
+        mats = sd.get('materials', [])
+        if not is_imperial(mats):
+            continue                                 # metric E=100,000 kPa is 100 MPa — correct
+        for m in mats:
+            E, nu = _finite(m.get('E')), _finite(m.get('nu'))
+            if abs(E - E0) <= 1.0 and abs(nu - nu0) <= 1e-6:
+                offenders.append(f"{fp.name}:{m.get('name', '?')} (E={E:g} psf, nu={nu:g})")
+
+    if offenders:
+        return None, (
+            f"English-unit FEM material carrying the metric inherited default "
+            f"(E={E0:g}, nu={nu0:g}) — that is ~4.8 MPa read as psf, ~10x too soft; "
+            "rebuild through the classifier-wired builder "
+            "(benchmarks/rocscience/build_problems.py or build_rs2.py): "
+            + "; ".join(offenders))
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -3099,6 +3177,8 @@ def run_test(test):
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
         return run_deps_declared_test(test)
+    if test_type == 'fem_elastic_units':
+        return run_fem_elastic_units_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -3150,7 +3230,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -3382,6 +3462,11 @@ def main():
         # so `pip install xslope` yields a package that actually imports.
         tests.append({'type': 'deps_declared', 'file': 'pyproject.toml',
                       'method': '-', 'source': 'packaging'})
+        # Guard that no English-unit FEM corpus file carries the metric inherited
+        # elastic default (E=100,000 psf ~ 4.8 MPa, ~10x too soft) — the unit-blind
+        # bug that corrupts displacements and the RS2 displacement-vector panels.
+        tests.append({'type': 'fem_elastic_units', 'file': 'docs/files (FEM corpus)',
+                      'method': '-', 'source': 'fem_units'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})

@@ -192,7 +192,7 @@ its reference/Slide2 figures (representative case where a problem has several).
 | 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | [P4-VP64](#p4-vp64) (SSRM blocked) |
 | 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | 2.60 | ref 2.71 | *new* |
 | 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | 2.22 | ref 2.30 | *new* |
-| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | [P4-VP67](#p4-vp67) (SSRM, deep-mechanism gap) |
+| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | [P4-VP67](#p4-vp67) (SSRM 1.076 unconstrained / 1.303 SSR-exclusion vs 1.33) |
 | 68 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | 1.17 | ref 1.33 | *new* |
 | 69 | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | 1.94 | ref 2.01 | *new* |
 | 70 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | 1.58 | Spencer 1.60, ref 1.60 | *new* |
@@ -215,10 +215,11 @@ alongside the existing [VP2](rocscience.md#vp2) LEM lock, VP64 (USACE 2003
 Fig 4-1) whose SSRM is [blocked on the shared file](#p4-vp64) (a downstream-shell void from the
 trench-pinched sand blanket — the diagnostic value 2.36 matches RS2's SSR 2.37 once the void is
 filled) behind the standing [VP64](rocscience.md#vp64) LEM lock (Spencer 2.488), and VP67
-(USACE 2003 F-5) now carrying its own [Part IV SSRM build](#p4-vp67) — a **deep-mechanism gap**:
-the unconstrained SSRM rides the foundation/bedrock contact at 1.076, ~19% below the
-specified-circle SSR 1.33 that the [VP67](rocscience.md#vp67) LEM lock (Spencer 1.316)
-reproduces, 2 mapping to corpus rows (RS2-68 Loukidis — now **built**; RS2-28/38/39-41-43 — still planned), and **≈12
+(USACE 2003 F-5) now carrying two [Part IV SSRM builds](#p4-vp67): the unconstrained SSRM finds
+the true global minimum at 1.076 (a deep foundation mechanism, matched by XSLOPE's own
+unconstrained LEM search at Spencer 1.075), while reproducing RS2's SSR Exclusion Area below
+El. 81 lifts the mechanism onto the toe circle at 1.303, a head-to-head with RS2's constrained
+SSR 1.33, 2 mapping to corpus rows (RS2-68 Loukidis — now **built**; RS2-28/38/39-41-43 — still planned), and **≈12
 genuinely new** candidates: the ACADS 2b dam variant (VP6), the rest of the USACE 2003
 embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and soil-nail
 wall (VP57, VP60),
@@ -1765,39 +1766,54 @@ stands.
 
 ### RS2 Part IV VP67: USACE end-of-construction embankment (example F-5) {#p4-vp67}
 
-Slide2/LEM counterpart: [VP67](rocscience.md#vp67) (USACE EM 1110-2-1902 example F-5). RS2 Part
-IV publishes an SSR of **1.33** (Table 67.2; Slide2 Spencer 1.328, USACE 1.33) — evaluated,
-like the LEM lock, on USACE's **specified** toe circle. XSLOPE's unconstrained SSRM finds a
-deeper mechanism, so this is a documented **deep-mechanism gap**, not a match.
+Slide2/LEM counterpart: [VP67](rocscience.md#vp67) (USACE EM 1110-2-1902 example F-5). This
+problem has two distinct answers, and both are reproduced: the **unconstrained** critical SRF
+(a deep foundation mechanism) and the **toe-circle** SRF that RS2 forces with an SSR Exclusion
+Area to obtain its published SSR of **1.33**.
 
-**Input files:** [vp067.xlsx](../files/rocscience/vp067.xlsx)
+**Input files:** [vp067.xlsx](../files/rocscience/vp067.xlsx) (unconstrained) ·
+[vp067c.xlsx](../files/rocscience/vp067c.xlsx) (SSR exclusion below El. 81)
 
 A 91-ft embankment (c = 1780 psf, φ = 5°, γ = 135 pcf) on a 100-ft soft, undrained foundation
 (c = 1600 psf, φ = 2°, γ = 127 pcf) over a rigid base, at end of construction. ψ = 0; E and ν
-are the file's inert FEM elastics.
+come from the elastic classifier.
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM (8 m mesh) | 1.076 | RS2 SSR 1.33 |
+| SSRM, unconstrained (8 m mesh) | 1.076 | — (true global minimum) |
+| SSRM, SSR exclusion below El. 81 (8 m mesh) | 1.303 | RS2 SSR 1.33 |
 
-*Published cross-bearings: Slide2 Spencer 1.328, USACE 1.33 — both on USACE's specified toe
-circle; XSLOPE LEM Spencer 1.316 on the same circle.*
+*Cross-bearings on the specified toe circle: Slide2 Spencer 1.328, USACE 1.33, XSLOPE LEM
+Spencer 1.316. XSLOPE's unconstrained LEM circular search (Spencer 1.075) confirms the deep
+minimum independently.*
 
-USACE's F-5 (and the Slide2/RS2 values that follow it) evaluate a single **specified** circle
-centred 259 ft above the toe (R = 278), which bottoms only ~19 ft into the 100-ft foundation.
-XSLOPE's SSRM is unconstrained, and it finds a **deep translational mechanism riding the
-foundation/bedrock contact** through the soft φ = 2° clay — daylighting near the upstream toe,
-sliding along the base, and rising through the downstream face — at FS ≈ **1.08**, ~19% below
-the specified-circle SSR 1.33. The mechanism is **bedrock-contact-pinned** and essentially
-mesh-independent (1.076 at both 8 and 4 m target sizes), so it is locked as a **regression**
-anchor at the 8 m mesh. This is the same true-global-minimum divergence recorded on
-[RS2-4](#rs2-4) (Talbingo): the SSRM finds the critical mechanism that a single specified
-surface does not probe. The [VP67](rocscience.md#vp67) LEM lock (Spencer 1.316, on the
-specified circle) stands as the specified-surface anchor.
+**Unconstrained minimum (1.076).** With every zone reduced, the SSRM finds a deep translational
+mechanism riding the foundation/bedrock contact through the soft φ = 2° clay — daylighting near
+the upstream toe, sliding along the base, and rising through the downstream face. It is
+bedrock-contact-pinned and essentially mesh-independent (1.076 at both 8 and 4 m target sizes).
+XSLOPE's own unconstrained LEM circular search finds the same deep family (Spencer 1.075), so
+the two solvers agree on the true global minimum. This is the mechanism a single USACE
+specified circle — centred 259 ft above the toe (R = 278), bottoming only ~19 ft into the
+foundation — does not probe.
+
+**Toe-circle SRF (1.303) vs RS2's 1.33.** RS2's published 1.33 is likewise not the unconstrained
+minimum: it is obtained by barring strength reduction in the foundation below the lowest point
+of the specified circle (≈ El. 81), an **SSR Exclusion Area** that forces the mechanism up onto
+the toe circle (RS2 manual Part 4, p. 124, figs 67.2/67.3). RS2 documents the technique on its
+VP78 example: *"To force RS2 to iterate for SRF associated with a failure surface passing
+through the toe of the slope, a SSR Exclusion Area was used."* Reproducing that constraint —
+vp067c splits the foundation at El. 81 into identical upper and lower zones and excludes the
+lower zone from reduction — XSLOPE's SSRM gives **1.303**, matching RS2's constrained SSR 1.33
+(and the specified-circle LEM Spencer 1.316). The critical shear band moves up into the
+embankment and shallow foundation (El. 97–159), the toe-circle family, confirming the
+exclusion redirected the mechanism away from the deep foundation.
 
 <!-- test: file=../files/rocscience/vp067.xlsx, type=fem_ssrm, expected_fs=1.076, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=RS2-P4-VP67 -->
+<!-- test: file=../files/rocscience/vp067c.xlsx, type=fem_ssrm, expected_fs=1.303, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.2, f_max=1.5, max_iter=16000, ssr_exclude=Foundation lower, benchmark=RS2-P4-VP67c -->
 
 ![RS2 Part IV VP67: USACE F-5 embankment on soft foundation (end of construction), unconstrained SSRM 1.076 riding the foundation/bedrock contact vs the specified-circle SSR 1.33 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP67.png)
+
+![RS2 Part IV VP67c: the same embankment with an SSR Exclusion Area below El. 81, SSRM 1.303 on the toe-circle family matching RS2's constrained SSR 1.33 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP67c.png)
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

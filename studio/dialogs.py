@@ -48,14 +48,60 @@ FEM_FAILURE_CRITERIA = [
 ]
 
 
+class SsrExcludeDialog(QDialog):
+    """Pick material zones to EXCLUDE from strength reduction (RS2's per-material
+    Apply_SSR flag / "SSR Exclusion Area"). Excluded zones keep their full c and
+    tan(phi) at every trial F, forcing the mechanism up into the reduced zones.
+
+    One checkbox per zone; CHECKED = included (reduced), the default. Unchecking a
+    zone excludes it. Returns the list of excluded names."""
+
+    def __init__(self, parent=None, material_names=None, excluded=None):
+        super().__init__(parent)
+        self.setWindowTitle("SSR exclusions")
+        material_names = list(material_names or [])
+        excluded = set(excluded or [])
+
+        layout = QVBoxLayout(self)
+        note = QLabel(
+            "Uncheck a material zone to hold it at FULL strength during the SSRM "
+            "(an SSR exclusion). Excluded zones are not divided by the trial factor, "
+            "so the failure mechanism is forced up into the reduced zones — used, for "
+            "example, to keep a stiff foundation from carrying the critical surface.")
+        note.setWordWrap(True)
+        note.setMaximumWidth(360)
+        layout.addWidget(note)
+
+        self._checks = []
+        if not material_names:
+            layout.addWidget(QLabel("No material zones found."))
+        for name in material_names:
+            cb = QCheckBox(name)
+            cb.setChecked(name not in excluded)      # checked = included (reduced)
+            layout.addWidget(cb)
+            self._checks.append((name, cb))
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+    def excluded(self):
+        """Names of zones left UNchecked = excluded from reduction."""
+        return [name for name, cb in self._checks if not cb.isChecked()]
+
+
 class RunFemDialog(QDialog):
     """Solve parameters for an FEM run (single trial or SSRM). Display options
     (plot type, deformation scale) live on the FEM Results view."""
 
-    def __init__(self, parent=None, defaults=None):
+    def __init__(self, parent=None, defaults=None, material_names=None):
         super().__init__(parent)
         self.setWindowTitle("Run FEM")
         defaults = defaults or {}
+        self._material_names = list(material_names or [])
+        self._ssr_exclude = [n for n in (defaults.get("ssr_exclude") or [])
+                             if n in self._material_names]
 
         layout = QVBoxLayout(self)
         # Fit the dialog to its content so showing/hiding the reliability note
@@ -142,6 +188,21 @@ class RunFemDialog(QDialog):
                                        "in model length units.")
         form.addRow("Min slip depth", self.min_slip_depth)
 
+        # SSR exclusions: material zones held at full strength during reduction.
+        # The button opens a checkbox picker; the label summarises the current set.
+        self.ssr_exclude_btn = QPushButton("SSR exclusions…")
+        self.ssr_exclude_btn.setToolTip(
+            "Hold selected material zones at full strength during the SSRM "
+            "(RS2's SSR Exclusion Area). Default: every zone reduced.")
+        self.ssr_exclude_btn.clicked.connect(self._edit_ssr_exclude)
+        self.ssr_exclude_label = QLabel()
+        _ssr_row = QHBoxLayout()
+        _ssr_row.setContentsMargins(0, 0, 0, 0)
+        _ssr_row.addWidget(self.ssr_exclude_btn)
+        _ssr_row.addWidget(self.ssr_exclude_label, 1)
+        form.addRow("SSR exclusions", _ssr_row)
+        self._refresh_ssr_label()
+
         layout.addLayout(form)
         self._rel_note = QLabel(
             "Reliability uses the bracket above only to find the most-likely-value "
@@ -180,6 +241,21 @@ class RunFemDialog(QDialog):
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())
+        # SSR exclusions apply to the SSRM criterion only.
+        self.ssr_exclude_btn.setEnabled(a == "ssrm" and bool(self._material_names))
+
+    def _refresh_ssr_label(self):
+        if self._ssr_exclude:
+            self.ssr_exclude_label.setText("excluded: " + ", ".join(self._ssr_exclude))
+        else:
+            self.ssr_exclude_label.setText("none (all zones reduced)")
+
+    def _edit_ssr_exclude(self):
+        dlg = SsrExcludeDialog(self, material_names=self._material_names,
+                               excluded=self._ssr_exclude)
+        if dlg.exec():
+            self._ssr_exclude = dlg.excluded()
+            self._refresh_ssr_label()
 
     def options(self):
         return {
@@ -193,6 +269,7 @@ class RunFemDialog(QDialog):
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()
                                and self.min_slip_depth.value() > 0 else None),
+            "ssr_exclude": list(self._ssr_exclude) or None,
         }
 
 

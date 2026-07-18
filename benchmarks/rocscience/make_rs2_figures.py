@@ -122,12 +122,19 @@ def build_and_solve(tag):
     """
     sd, fem_data = _build(tag)
 
+    # SSR-exclusion material names (semicolon-separated within the tag value,
+    # since tag key=value pairs are comma-split) — held at full strength.
+    ssr_exclude = None
+    if tag.get('ssr_exclude'):
+        ssr_exclude = [s.strip() for s in str(tag['ssr_exclude']).split(';') if s.strip()]
+
     with contextlib.redirect_stdout(io.StringIO()):
         sol = solve_ssrm(fem_data,
                          F_min=float(tag.get('f_min', 0.5)),
                          F_max=float(tag.get('f_max', 3.0)),
                          tolerance=float(tag.get('tolerance', 0.02)),
                          max_iterations=int(tag.get('max_iter', 4000)),
+                         ssr_exclude=ssr_exclude,
                          debug_level=0)
     if not sol.get('converged'):
         raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')

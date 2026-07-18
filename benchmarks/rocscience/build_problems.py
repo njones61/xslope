@@ -3514,6 +3514,44 @@ def vp067():
     return 'vp067.xlsx'
 
 
+def vp067c():
+    """VP67 with an SSR Exclusion Area, for the constrained-SSRM head-to-head
+    against RS2's published SSR 1.33.
+
+    Mechanically IDENTICAL to vp067 (same geometry, strengths, circle): the
+    100-ft foundation is merely split into two stacked zones at El. 81 — the
+    lowest point of the USACE specified circle (Yo - R = 359 - 278 = 81) —
+    'Foundation' above and 'Foundation lower' below, carrying the SAME
+    properties (c=1600, phi=2, gamma=127). The split is inert to an
+    unconstrained solve; its only purpose is to give the runner a named zone
+    ('Foundation lower') to pass to ssr_exclude, holding the deep foundation at
+    full strength so the mechanism is forced up onto the toe circle — RS2's
+    'SSR Exclusion Area' construction (Part 4 p.124, figs 67.2/67.3). E and nu
+    come from the elastic classifier (same soil type -> identical in both
+    zones), so they are not hand-set here. Do NOT edit vp067.xlsx."""
+    import math
+    sd = load_slope_data(ACADS_1A)
+    m0 = dict(sd['materials'][0]); m1 = dict(sd['materials'][0]); m2 = dict(sd['materials'][0])
+    m0.update(name='Embankment', c=1780.0, phi=5.0, gamma=135.0, option='mc', u='none')
+    m1.update(name='Foundation', c=1600.0, phi=2.0, gamma=127.0, option='mc', u='none')
+    m2.update(name='Foundation lower', c=1600.0, phi=2.0, gamma=127.0, option='mc', u='none')
+    sd['materials'] = [m0, m1, m2]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(-100.0, 100.0), (0.0, 100.0), (174.0, 158.0),
+                                 (257.0, 191.0), (301.0, 191.0), (400.0, 150.0)]},
+        {'mat_id': 1, 'coords': [(-100.0, 100.0), (400.0, 100.0)]},
+        {'mat_id': 2, 'coords': [(-100.0, 81.0), (400.0, 81.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    R = math.hypot(101.0, 259.0)
+    sd['circles'] = [{'Xo': 101.0, 'Yo': 359.0, 'Depth': 359.0 - R, 'R': R}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp067c.xlsx'))
+    return 'vp067c.xlsx'
+
+
 def vp065():
     """Slide #65 / USACE EM 1110-2-1902 Figure 4-2: the #64 dam under
     upstream low-pool steady conditions (pool el 20, no tension crack),
@@ -4206,7 +4244,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

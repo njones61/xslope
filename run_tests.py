@@ -494,6 +494,11 @@ def run_fem_test(test):
         kwargs['tension_cutoff'] = True
     if 'char_x' in test and 'char_y' in test:
         kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
+    # SSR-exclusion material names. Tags split on commas, so the material names
+    # within ssr_exclude are separated by SEMICOLONS: ssr_exclude=Name1;Name2.
+    if 'ssr_exclude' in test:
+        kwargs['ssr_exclude'] = [s.strip() for s in str(test['ssr_exclude']).split(';')
+                                 if s.strip()]
     result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
                         debug_level=0, **kwargs)
 

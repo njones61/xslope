@@ -1339,7 +1339,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
-              early_exit=True, progress_callback=None, min_slip_depth=None):
+              early_exit=True, progress_callback=None, min_slip_depth=None,
+              ssr_exclude_mask=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1445,6 +1446,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             a single viscoplastic solve rather than only between solves. ``frac`` is
             a pessimistic estimate — a trial that converges or exits early snaps to
             its step boundary before reaching 1.0. Never allowed to break the solve.
+        ssr_exclude_mask (array of bool or None): Per-element mask (length n_elements)
+            of elements to hold at FULL strength during reduction — their c and
+            tan(phi) are divided by 1.0 rather than F. This is the SSR-exclusion
+            mechanism; solve_ssrm builds it from material names. None (default) =
+            every element reduced by F (bit-identical to the un-excluded path).
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1502,8 +1508,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # Apply strength reduction (Griffiths & Lane 1999): c_r = c/F, phi_r = atan(tan(phi)/F)
     # Note: Only soil strength (c, phi) is reduced by F. Reinforcement properties
     # (T_allow, T_res, EA/L) are NOT reduced — they are structural capacities.
-    c_reduced = c_by_elem / F
-    tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F
+    #
+    # Per-element reduction factor. Elements flagged by ssr_exclude_mask keep FULL
+    # strength (F = 1) while the rest are reduced by the trial F — the SSR-exclusion
+    # semantics (RS2's per-material Apply_SSR / "SSR Exclusion Area"): a stiff
+    # foundation kept at full strength forces the mechanism up into the reducible
+    # zones. With no mask every entry equals F, so F_by_elem is exactly the scalar F
+    # and the result is bit-identical to the un-excluded path.
+    F_by_elem = np.full(n_elements, float(F))
+    if ssr_exclude_mask is not None:
+        F_by_elem[np.asarray(ssr_exclude_mask, dtype=bool)] = 1.0
+    c_reduced = c_by_elem / F_by_elem
+    tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F_by_elem
     phi_reduced = np.arctan(tan_phi_reduced)  # radians
 
     if debug_level >= 1:
@@ -1812,6 +1828,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             'dof': np.array([elem_gp_data[e][g]['dof_indices'] for e, g in _pairs], dtype=int),
             'c_r': np.array([c_reduced[e] for e, g in _pairs]),
             'phi_r': np.array([phi_reduced[e] for e, g in _pairs]),
+            'F': np.array([F_by_elem[e] for e, g in _pairs]),
             'dt_t': np.array([dt_t[e] for e, g in _pairs]),
             'evp': np.zeros((G, 4)),
         }
@@ -2064,12 +2081,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 # envelope). Guards mirror solve._pow_update_strength.
                 pm = grp.get('pow_m')
                 if pm is not None:
+                    Fpm = grp['F'][pm]           # per-GP F (1.0 where SSR-excluded)
                     s_n = np.maximum(-(sx[pm] + sy[pm]) * 0.5, 0.0)
                     ref = max(1.0, float(s_n.mean()) if s_n.size else 1.0)
                     s_ef = np.maximum(s_n + grp['pow_d'][pm], 1e-4 * ref)
                     bb = grp['pow_b'][pm]
-                    slope_t = grp['pow_a'][pm] * bb * s_ef ** (bb - 1.0) / F
-                    tau_F = (grp['pow_a'][pm] * s_ef ** bb + grp['pow_cp'][pm]) / F
+                    slope_t = grp['pow_a'][pm] * bb * s_ef ** (bb - 1.0) / Fpm
+                    tau_F = (grp['pow_a'][pm] * s_ef ** bb + grp['pow_cp'][pm]) / Fpm
                     phi_t = np.arctan(slope_t)
                     grp['c_r'][pm] = tau_F - s_n * slope_t
                     grp['snph'][pm] = np.sin(phi_t)
@@ -2122,9 +2140,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     # function by F divides its tangent's slope and intercept by F. The HB
                     # constants themselves are NOT reduced -- sigma_ci/F is a different
                     # envelope, because of the exponent a.
-                    slope_t = np.tan(np.radians(phi_i)) / F
+                    Fhm = grp['F'][hm]           # per-GP F (1.0 where SSR-excluded)
+                    slope_t = np.tan(np.radians(phi_i)) / Fhm
                     phi_t = np.arctan(slope_t)
-                    grp['c_r'][hm] = c_i / F
+                    grp['c_r'][hm] = c_i / Fhm
                     grp['snph'][hm] = np.sin(phi_t)
                     grp['csph'][hm] = np.cos(phi_t)
 
@@ -2616,8 +2635,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                        1e-4 * max(1.0, _sn))
             _a = fem_data["pow_a_by_elem"][elem_idx]
             _b = fem_data["pow_b_by_elem"][elem_idx]
-            _sl = _a * _b * _sef ** (_b - 1.0) / F
-            _c_rep = (_a * _sef ** _b + fem_data["pow_cp_by_elem"][elem_idx]) / F \
+            _Fe = F_by_elem[elem_idx]           # 1.0 where SSR-excluded
+            _sl = _a * _b * _sef ** (_b - 1.0) / _Fe
+            _c_rep = (_a * _sef ** _b + fem_data["pow_cp_by_elem"][elem_idx]) / _Fe \
                      - _sn * _sl
             _phi_rep = np.arctan(_sl)
         elif hb_flag_by_elem[elem_idx]:
@@ -2633,10 +2653,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             _a_hb = fem_data["hb_a_by_elem"][elem_idx]
             _c_rep, _phi_rep = 0.0, 0.0
             _sn = _s_prime                      # seed at the circle centre
+            _Fe = F_by_elem[elem_idx]           # 1.0 where SSR-excluded
             for _ in range(40):
                 _ci, _phii = hb_tangent_const(_sn, _sci, _mb, _s, _a_hb, iters=40)
-                _c_rep = float(_ci) / F
-                _phi_rep = np.arctan(np.tan(np.radians(float(_phii))) / F)
+                _c_rep = float(_ci) / _Fe
+                _phi_rep = np.arctan(np.tan(np.radians(float(_phii))) / _Fe)
                 _sn_new = max(_s_prime * np.cos(_phi_rep) ** 2
                               - _c_rep * np.sin(_phi_rep) * np.cos(_phi_rep), 0.0)
                 if abs(_sn_new - _sn) <= 1e-9 * max(1.0, abs(_sn)):
@@ -3384,7 +3405,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-               grid=None, min_slip_depth=None):
+               grid=None, min_slip_depth=None, ssr_exclude=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3453,12 +3474,40 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "displacement_increase" measure. Default None = automatic
             selection after the coarse sweep.
         n_sweep (int): Number of points in coarse sweep for "displacement_increase". Default 10.
+        ssr_exclude (list of str or None): Names of material zones to EXCLUDE from
+            strength reduction. Excluded zones keep their full c and tan(phi) at
+            every trial F while the rest are reduced — RS2's per-material Apply_SSR
+            flag / "SSR Exclusion Area". Used to force the mechanism up out of a
+            zone (e.g. a stiff foundation) so the SSR is evaluated on the surface
+            of interest instead of a deeper true-global minimum. Names must match
+            the fem_data material names exactly; an unknown name raises ValueError.
+            Default None = every zone reduced (today's behavior, bit-identical).
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
     """
 
     t_start = time.perf_counter()
+
+    # Resolve the SSR-exclusion material names to a per-element boolean mask once,
+    # up front, so every trial solve shares it. Excluded elements keep full strength
+    # (F = 1) inside solve_fem; see the F_by_elem note there.
+    ssr_exclude_mask = None
+    if ssr_exclude:
+        material_names = list(fem_data.get("material_names", []))
+        element_materials = fem_data["element_materials"]
+        wanted = [str(n).strip() for n in ssr_exclude]
+        unknown = [n for n in wanted if n not in material_names]
+        if unknown:
+            raise ValueError(
+                f"ssr_exclude names not found in the model materials {material_names}: "
+                f"{unknown}. Names must match a material's 'name' field exactly.")
+        excluded_ids = {material_names.index(n) + 1 for n in wanted}  # 1-based mat IDs
+        ssr_exclude_mask = np.isin(element_materials, list(excluded_ids))
+        if debug_level >= 1:
+            print(f"  SSR exclusion: {wanted} "
+                  f"({int(ssr_exclude_mask.sum())}/{len(element_materials)} elements "
+                  f"held at full strength)")
 
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']
@@ -3486,7 +3535,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth)
+            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
+            ssr_exclude_mask=ssr_exclude_mask)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3496,7 +3546,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
-            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth)
+            max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
+            ssr_exclude_mask=ssr_exclude_mask)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3505,7 +3556,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             convergence_tol=convergence_tol, n_sweep=n_sweep,
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
-            min_slip_depth=min_slip_depth)
+            min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -3531,7 +3582,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-                 grid=None, min_slip_depth=None):
+                 grid=None, min_slip_depth=None, ssr_exclude_mask=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -3580,6 +3631,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          max_disp_factor=max_disp_factor, staged=staged,
                          tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
+                         ssr_exclude_mask=ssr_exclude_mask,
                          progress_callback=_fem_progress(step, prefix))
 
     F_left = F_min
@@ -3753,7 +3805,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                                  tension_cutoff=False, char_point=None,
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
-                 min_slip_depth=None):
+                 min_slip_depth=None, ssr_exclude_mask=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -3819,6 +3871,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         oob_window=oob_window, min_slip_depth=min_slip_depth,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
+                        ssr_exclude_mask=ssr_exclude_mask,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks

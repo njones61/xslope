@@ -1640,7 +1640,10 @@ class MainWindow(QMainWindow):
         if self.doc.slope_data.get("mesh") is None:
             QMessageBox.information(self, "Run FEM", "Build a mesh first (Build Mesh…).")
             return
-        dlg = RunFemDialog(self, defaults=self._last_fem_opts)
+        material_names = [m.get("name", f"Material {i + 1}")
+                          for i, m in enumerate(self.doc.slope_data.get("materials", []))]
+        dlg = RunFemDialog(self, defaults=self._last_fem_opts,
+                           material_names=material_names)
         if not dlg.exec():
             return
         opts = dlg.options()

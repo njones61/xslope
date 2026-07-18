@@ -196,6 +196,7 @@ class FemRunner(QThread):
                     tolerance=opts.get("tolerance", 0.01), debug_level=1,
                     failure_criterion=opts.get("failure_criterion", "non_convergence"),
                     min_slip_depth=opts.get("min_slip_depth"),
+                    ssr_exclude=opts.get("ssr_exclude"),
                     cancel_check=self._cancel.is_set, progress_callback=cb)
                 if not result.get("converged", False):
                     self.failed.emit(f"SSRM did not converge: "

@@ -725,6 +725,38 @@ def domain_lower_envelope(domain):
     return pts
 
 
+def _elastic_cores(slope_data):
+    """Cached (material name, shrunken-core Polygon) for every ``option='elastic'``
+    zone. An elastic material is impenetrable (v16): a failure surface may RIDE
+    ALONG its boundary (a slide daylighting on the top of bedrock) but may not cut
+    into its interior. The core is the zone buffered inward by a small tolerance, so
+    a surface on the boundary misses it while one dipping inside hits it.
+
+    Empty list for the overwhelmingly common no-elastic model, so the crossing
+    check that uses it is a zero-cost early-out there.
+    """
+    if '_elastic_cores' not in slope_data:
+        mats = slope_data.get('materials') or []
+        domain = slope_data.get('domain_polygon')
+        if domain is not None:
+            minx, miny, maxx, maxy = domain.bounds
+            tol = max(1e-6, 1e-4 * max(maxx - minx, maxy - miny))
+        else:
+            tol = 1e-6
+        cores = []
+        for p in slope_data.get('polygons') or []:
+            mid = p.get('mat_id')
+            if mid is None or not (0 <= mid < len(mats)):
+                continue
+            if str(mats[mid].get('option', '')).strip().lower() != 'elastic':
+                continue
+            core = p['polygon'].buffer(-tol)
+            if not core.is_empty:
+                cores.append((mats[mid].get('name', f'Material {mid + 1}'), core))
+        slope_data['_elastic_cores'] = cores
+    return slope_data['_elastic_cores']
+
+
 def _domain_floor(slope_data):
     """Cached (xs, ys) arrays of the domain's lower boundary, for np.interp.
 
@@ -1052,6 +1084,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     f"the domain (y={y_bot:.3f}). Raise the surface, lower max_depth, or "
                     f"pass composite=True to truncate the circle at the bottom of the "
                     f"model and run it along the base.")
+
+    # An elastic material is impenetrable (v16): the surface may ride along its
+    # boundary but may not cut into it. Reject a surface that penetrates one, the
+    # same way a below-floor surface is rejected above; inside circular_search this
+    # scores the trial circle fs_fail and drops it (the search-side rejection).
+    for _elastic_name, _core in _elastic_cores(slope_data):
+        if _core.intersects(clipped_surface):
+            return False, (
+                f"Failure surface crosses elastic (impenetrable) material "
+                f"'{_elastic_name}'. An elastic zone cannot fail; keep the surface "
+                f"above it (it may run along its boundary).")
 
     # Determine if the failure surface is right-facing. Byte-identical to the
     # historical `y_left > y_right` for a normal slope; the surface-asymmetry

@@ -766,10 +766,199 @@ def rs2_68c():
     return 'rs2_68c.xlsx'
 
 
+# ======================================================================================
+# RS2 #64 -- Slope Stability Assessment of Three Homogeneous Landslides (Ankara E90),
+# after Teoman, M.B., Topal, T. & Isik, N.S. (2004), and the RS2 Slope Stability
+# Verification Manual Part III Problem 64 (pp. 219-227).
+#
+# Twelve cases: three Ankara-clay road-cut landslides (Slopes 1/2/3), each in its
+# ORIGINAL and its FAILED (post-slide, with scarp) geometry, evaluated SHORT-TERM
+# (total-stress, dry, no seismic; cases 1-6) and LONG-TERM (effective-stress with a
+# piezometric line + a 0.03 g horizontal pseudo-static coefficient; cases 7-12).
+# Each model is a SINGLE homogeneous Mohr-Coulomb zone; strengths are Tables 1-2 and
+# are read straight from the vendor '.fez'. The manual reports three FS columns: RS2
+# SSR, the Teoman reference (Bishop on a digitized PROPOSED slip surface), and Slide2
+# Bishop on that same surface. The proposed surface exists in NO vendor file -- the
+# '.fez' carry only an SSR Search-Area region -- so XSLOPE can reproduce ONLY the RS2
+# SSR column (an SSRM run); the Ref/Slide2 Bishop columns are recorded as context.
+#
+# Elastic constants are the corpus convention (E = 14000 kPa, nu = 0.3, psi = 0 --
+# Griffiths non-associated): the '.fez' reader imports E/nu = 0. The 0.03 g seismic is
+# stored in the '.fez' as a per-element 'seismic forces: bx 0.03' body force that the
+# reader does not extract (it returns k_seismic = 0), so it is set here by hand. For
+# these LEFT-high slopes (crest at x = 0, toe descending to +x) RS2's bx = +0.03
+# points downslope (+x = destabilizing); XSLOPE's FEM applies +k_seismic in +x, so the
+# sign carries over directly (k_seismic = +0.03). Geometry (external boundary) and the
+# piezo line are transcribed from 'slope stability #064_NN.fez' via read_fez (dev-side
+# cross-check, hard-coded so the corpus rebuilds without the vendor files); the circle
+# is an inert placeholder the loader requires (SSRM only -- no LEM surface is defined).
+# ======================================================================================
+
+def _rs2_64_slope_data(poly, c, phi, gamma, piezo=None, k=0.0):
+    """One RS2 #64 case: a single homogeneous Mohr-Coulomb zone. ``poly`` is the
+    external boundary; ``piezo`` (long-term cases) a piezometric line -> u='piezo';
+    ``k`` the horizontal seismic coefficient (long-term = 0.03, set by hand)."""
+    u = 'piezo' if piezo else 'none'
+    sd = _poly_slope_data(
+        polygons=[(0, poly)],
+        materials=[dict(name='soil', c=float(c), phi=float(phi), gamma=float(gamma),
+                        gamma_sat=float(gamma), E=14000.0, nu=0.3, u=u)],
+        circle={'Xo': 8.0, 'Yo': 16.0, 'Depth': -4.0, 'R': 20.0},
+        max_depth=0.0,
+        piezo_line=list(piezo) if piezo else None)
+    if k:
+        sd['k_seismic'] = float(k)
+    return sd
+
+
+# Short-term (dry, total-stress) external boundaries -- cases 1-6.
+_RS2_64A = [(25.5, -4.0), (25.5, 0.16), (20.915, 0.16), (4.111, 7.0), (0.0, 7.0),
+            (0.0, -4.0), (4.111, -4.0), (20.915, -4.0)]
+_RS2_64B = [(29.5, -4.0), (29.52, 0.641), (24.488, 0.641), (22.045, 1.663),
+            (19.42, 2.812), (8.23, 5.016), (4.115, 6.995), (0.001, 6.995),
+            (0.001, -4.047)]
+_RS2_64C = [(23.0, -4.0), (23.0, 0.041), (18.062, 0.041), (6.607, 5.67), (4.161, 6.0),
+            (0.0, 6.0), (0.0, -4.0), (4.161, -4.0), (6.607, -4.0), (18.062, -4.0)]
+_RS2_64D = [(23.0, -4.0), (23.0, 0.0), (18.0, 0.0), (16.245, 1.909), (12.963, 2.833),
+            (11.475, 2.833), (9.526, 3.961), (3.678, 4.885), (2.755, 6.0), (0.0, 6.0),
+            (0.0, -4.0), (2.755, -4.0), (3.678, -4.0), (9.526, -4.0), (11.475, -4.0),
+            (12.963, -4.0), (16.245, -4.0), (18.0, -4.0)]
+_RS2_64E = [(18.0, -4.0), (18.0, 0.0), (13.0, 0.0), (3.02, 4.585), (0.0, 4.585),
+            (0.0, -4.0), (3.02, -4.0), (13.0, -4.0)]
+_RS2_64F = [(20.0, -4.0), (20.0, 0.352), (14.698, 0.352), (12.844, 1.647),
+            (8.653, 2.83), (6.554, 2.495), (3.579, 2.786), (3.105, 4.491),
+            (0.0, 4.491), (0.0, -4.0)]
+
+# Long-term (saturated + 0.03 g) external boundaries and piezo lines -- cases 7-12.
+_RS2_64G = [(26.111, -4.0), (26.111, -0.06), (20.975, -0.06), (9.294, 4.529),
+            (3.669, 6.739), (0.0, 6.739), (0.0, -4.0)]
+_RS2_64G_PZ = [(0.0, 4.529), (9.294, 4.529), (20.975, -0.06), (26.111, -2.093)]
+_RS2_64H = [(28.445, -4.0), (28.445, 0.65), (23.359, 0.65), (20.877, 0.93),
+            (18.627, 2.68), (7.814, 5.055), (6.927, 5.5), (3.938, 7.0), (0.0, 7.0),
+            (0.0, -4.0), (3.938, -4.0), (6.927, -4.0), (7.814, -4.0), (18.627, -4.0),
+            (20.877, -4.0), (23.359, -4.0)]
+_RS2_64H_PZ = [(0.0, 5.5), (6.927, 5.5), (7.814, 5.055), (18.627, 2.68),
+               (20.877, 0.93), (28.445, -2.162)]
+_RS2_64I = [(23.07, -4.0), (23.07, 0.08), (18.055, 0.08), (9.27, 4.532), (6.042, 6.167),
+            (3.29, 6.45), (0.0, 6.45), (0.0, -4.0)]
+_RS2_64I_PZ = [(0.0, 4.532), (9.27, 4.532), (18.055, 0.08), (23.07, -1.973)]
+_RS2_64J = [(22.8, -4.0), (22.8, 0.055), (18.017, 0.055), (16.214, 1.602), (12.8, 2.79),
+            (11.437, 2.79), (8.968, 3.892), (3.822, 4.922), (3.551, 4.922),
+            (2.859, 6.0), (0.0, 6.0), (0.0, -4.0)]
+_RS2_64J_PZ = [(0.0, 4.922), (3.822, 4.922), (8.968, 3.892), (11.437, 2.79),
+               (12.8, 2.79), (16.214, 1.602), (18.017, 0.055), (22.8, -2.053)]
+_RS2_64K = [(18.0, -4.0), (18.0, 0.0), (12.823, 0.0), (6.07, 3.357), (3.57, 4.6),
+            (0.0, 4.6), (0.0, -4.0)]
+_RS2_64K_PZ = [(0.0, 3.357), (6.07, 3.357), (12.823, 0.0), (18.0, -2.086)]
+_RS2_64L = [(20.0, -4.0), (20.0, 0.566), (14.424, 0.566), (12.074, 1.634),
+            (8.995, 2.457), (7.457, 2.868), (5.531, 2.457), (3.668, 2.457),
+            (3.603, 2.745), (3.144, 4.8), (0.0, 4.8), (0.0, -4.0)]
+_RS2_64L_PZ = [(0.0, 2.745), (3.603, 2.745), (3.668, 2.457), (5.531, 2.457),
+               (8.995, 2.457), (12.074, 1.634), (14.424, 0.566), (20.0, -0.783)]
+
+
+def rs2_64a():
+    """RS2 #64 Case 1 -- Slope 1 ORIGINAL, short-term (dry). c = 40.9, phi = 40.2,
+    gamma = 20.5. Published: RS2 SSR 5.14 | Ref 5.25 | Slide2 5.24."""
+    sd = _rs2_64_slope_data(_RS2_64A, 40.9, 40.2, 20.5)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64a.xlsx'))
+    return 'rs2_64a.xlsx'
+
+
+def rs2_64b():
+    """RS2 #64 Case 2 -- Slope 1 FAILED, short-term (dry). c = 27.8, phi = 34,
+    gamma = 20.5. Published: RS2 SSR 6.10 | Ref 6.67 | Slide2 6.64."""
+    sd = _rs2_64_slope_data(_RS2_64B, 27.8, 34.0, 20.5)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64b.xlsx'))
+    return 'rs2_64b.xlsx'
+
+
+def rs2_64c():
+    """RS2 #64 Case 3 -- Slope 2 ORIGINAL, short-term (dry). c = 33.6, phi = 41.4,
+    gamma = 20. Published: RS2 SSR 4.69 | Ref 4.87 | Slide2 4.89."""
+    sd = _rs2_64_slope_data(_RS2_64C, 33.6, 41.4, 20.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64c.xlsx'))
+    return 'rs2_64c.xlsx'
+
+
+def rs2_64d():
+    """RS2 #64 Case 4 -- Slope 2 FAILED, short-term (dry). c = 28.4, phi = 33,
+    gamma = 20. Published: RS2 SSR 4.95 | Ref 5.32 | Slide2 5.32."""
+    sd = _rs2_64_slope_data(_RS2_64D, 28.4, 33.0, 20.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64d.xlsx'))
+    return 'rs2_64d.xlsx'
+
+
+def rs2_64e():
+    """RS2 #64 Case 5 -- Slope 3 ORIGINAL, short-term (dry). c = 33.6, phi = 41.4,
+    gamma = 20. Published: RS2 SSR 5.47 | Ref 5.44 | Slide2 5.45."""
+    sd = _rs2_64_slope_data(_RS2_64E, 33.6, 41.4, 20.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64e.xlsx'))
+    return 'rs2_64e.xlsx'
+
+
+def rs2_64f():
+    """RS2 #64 Case 6 -- Slope 3 FAILED, short-term (dry). c = 28.4, phi = 33,
+    gamma = 20. Published: RS2 SSR 6.97 | Ref 7.02 | Slide2 6.96."""
+    sd = _rs2_64_slope_data(_RS2_64F, 28.4, 33.0, 20.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64f.xlsx'))
+    return 'rs2_64f.xlsx'
+
+
+def rs2_64g():
+    """RS2 #64 Case 7 -- Slope 1 ORIGINAL, long-term (saturated + 0.03 g). c = 12,
+    phi = 26, gamma = 20.5. Published: RS2 SSR 1.7 | Ref 1.79 | Slide2 1.68."""
+    sd = _rs2_64_slope_data(_RS2_64G, 12.0, 26.0, 20.5, piezo=_RS2_64G_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64g.xlsx'))
+    return 'rs2_64g.xlsx'
+
+
+def rs2_64h():
+    """RS2 #64 Case 8 -- Slope 1 FAILED, long-term (saturated + 0.03 g). c = 3,
+    phi = 19, gamma = 20.5. Published: RS2 SSR 0.99 | Ref 1.13 | Slide2 1.09."""
+    sd = _rs2_64_slope_data(_RS2_64H, 3.0, 19.0, 20.5, piezo=_RS2_64H_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64h.xlsx'))
+    return 'rs2_64h.xlsx'
+
+
+def rs2_64i():
+    """RS2 #64 Case 9 -- Slope 2 ORIGINAL, long-term (saturated + 0.03 g). c = 7,
+    phi = 32, gamma = 20. Published: RS2 SSR 1.30 | Ref 1.30 | Slide2 1.30."""
+    sd = _rs2_64_slope_data(_RS2_64I, 7.0, 32.0, 20.0, piezo=_RS2_64I_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64i.xlsx'))
+    return 'rs2_64i.xlsx'
+
+
+def rs2_64j():
+    """RS2 #64 Case 10 -- Slope 2 FAILED, long-term (saturated + 0.03 g). c = 4,
+    phi = 25, gamma = 20. Published: RS2 SSR 1.09 | Ref 1.08 | Slide2 1.07."""
+    sd = _rs2_64_slope_data(_RS2_64J, 4.0, 25.0, 20.0, piezo=_RS2_64J_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64j.xlsx'))
+    return 'rs2_64j.xlsx'
+
+
+def rs2_64k():
+    """RS2 #64 Case 11 -- Slope 3 ORIGINAL, long-term (saturated + 0.03 g). c = 7,
+    phi = 32, gamma = 20. Published: RS2 SSR 1.46 | Ref 1.51 | Slide2 1.51."""
+    sd = _rs2_64_slope_data(_RS2_64K, 7.0, 32.0, 20.0, piezo=_RS2_64K_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64k.xlsx'))
+    return 'rs2_64k.xlsx'
+
+
+def rs2_64l():
+    """RS2 #64 Case 12 -- Slope 3 FAILED, long-term (saturated + 0.03 g). c = 2,
+    phi = 25, gamma = 20. Published: RS2 SSR 1.22 | Ref 1.13 | Slide2 1.15."""
+    sd = _rs2_64_slope_data(_RS2_64L, 2.0, 25.0, 20.0, piezo=_RS2_64L_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64l.xlsx'))
+    return 'rs2_64l.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
-               rs2_68a, rs2_68b, rs2_68c):
+               rs2_68a, rs2_68b, rs2_68c,
+               rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
+               rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l):
         print(fn())

@@ -48,7 +48,7 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp020.xlsx, type=circular_search, num_slices=50, fs_bishop=1.086, fs_spencer=1.091, benchmark=VP20-circ -->
 <!-- test: file=../files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
 <!-- test: file=../files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
-<!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.433, fs_bishop=1.433, benchmark=VP24 -->
+<!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.435, fs_bishop=1.435, benchmark=VP24 -->
 <!-- test: file=../files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
 <!-- test: file=../files/rocscience/vp026.xlsx, type=single_noncirc, num_slices=60, right_facing=true, fs_spencer=1.043, benchmark=VP26 -->
 <!-- test: file=../files/rocscience/vp027.xlsx, type=single_circle, num_slices=50, fs_bishop=1.369, fs_spencer=1.375, fs_janbu=1.365, fs_mprice=1.371, fs_corps=1.388, fs_lowe=1.386, benchmark=VP27 -->
@@ -68,7 +68,7 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp032a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.218, fs_spencer=1.218, benchmark=VP32a -->
 <!-- test: file=../files/rocscience/vp032b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.216, fs_spencer=1.216, benchmark=VP32b -->
 <!-- test: file=../files/rocscience/vp032c.xlsx, type=single_circle, num_slices=60, fs_bishop=0.981, fs_spencer=0.981, benchmark=VP32c -->
-<!-- test: file=../files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.299, benchmark=VP33 -->
+<!-- test: file=../files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.320, benchmark=VP33 -->
 <!-- test: file=../files/rocscience/vp034.xlsx, type=single_noncirc, num_slices=60, fs_spencer=2.423, fs_mprice=2.384, benchmark=VP34 -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
 <!-- test: file=../files/rocscience/vp039a.xlsx, type=single_circle, num_slices=60, fs_spencer=0.968, benchmark=VP39a -->
@@ -122,7 +122,7 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp090.xlsx, type=single_circle, num_slices=50, fs_bishop=1.012, benchmark=VP90 -->
 <!-- test: file=../files/rocscience/vp091.xlsx, type=single_circle, num_slices=50, fs_spencer=0.960, benchmark=VP91 -->
 <!-- test: file=../files/rocscience/vp092.xlsx, type=single_circle, num_slices=50, fs_bishop=1.010, benchmark=VP92 -->
-<!-- test: file=../files/rocscience/vp093.xlsx, type=single_circle, num_slices=50, fs_bishop=1.017, benchmark=VP93 -->
+<!-- test: file=../files/rocscience/vp093.xlsx, type=single_circle, num_slices=50, fs_bishop=0.961, benchmark=VP93 -->
 <!-- test: file=../files/rocscience/vp094.xlsx, type=single_circle, num_slices=50, fs_bishop=1.020, benchmark=VP94 -->
 <!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
 <!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.527, benchmark=VP99 -->
@@ -205,7 +205,7 @@ corpus is complete relative to what is independently verifiable.
 | [21](#vp21) | Slope, homogenous, ru pore pressure | **built** | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry) / [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub>=0.25) / [vp021c.xlsx](../files/rocscience/vp021c.xlsx) (water table). Fredlund & Krahn (1977) classic homogeneous slope, fixed circle (120, 90, R=80), imperial units. All three F&K pore-pressure cases; the case-3 phreatic line (0,40)-(140,20)-(180,20) is read from the vendor Slide2 model. |
 | [22](#vp22) | Slope, (2) materials, weak layer, ru pore pressure | **built** | [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry) / [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub>=0.25). The Fredlund & Krahn (1977) slope of [#21](#vp21) with a weak seam — the corpus's first composite-surface problem (F&K's circle truncates on the base and runs along the seam). |
 | [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
-| [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.433 / Bishop 1.433 vs Slide 1.439 / 1.439; Low reference 1.44. |
+| [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.435 / Bishop 1.435 vs Slide 1.439 / 1.439; Low reference 1.44. |
 | [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope (Chen & Shao 1988), surface constructed analytically as a 45° wedge + tangent fan arc. Also [SLOPE/W §2.15](geostudio.md) — same problem in the GeoStudio corpus. |
 | [26](#vp26) | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | **built** | [vp026.xlsx](../files/rocscience/vp026.xlsx). Weightless c = 20 soil under a UDL of 102.83 = c·N<sub>c</sub>, so the exact bearing-capacity theory FS is **1.0**. Spencer **1.043** on the printed Prandtl surface (level-ground, unblocked by the flat-arc facing rule); the RS2-21 SSR lock runs on the same file (SSRM ≈ 1.0). See the section for the comparison with Slide2's 0.941. Also [SLOPE/W §2.16](geostudio.md) — same problem in the GeoStudio corpus. |
 | [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 reference slope (Sharma 1996): two materials over undulating bedrock, a zero-strength cap, and a water table with the phreatic-inclination (Hu) correction. |
@@ -274,7 +274,7 @@ corpus is complete relative to what is independently verifiable.
 | [90](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp090.xlsx](../files/rocscience/vp090.xlsx). Two reinforcement types (7.5 upper 8 / 11.0 lower 7): Bishop 1.012 vs Slide 1.004. |
 | [91](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp091.xlsx](../files/rocscience/vp091.xlsx). Weak foundation (c=0, φ=18): deep bearing circle, Spencer 0.960 vs Slide 0.964. |
 | [92](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp092.xlsx](../files/rocscience/vp092.xlsx). Water table 3 m above foundation (drained fill + pond): with Ta=10, Bishop 1.039 vs Slide 1.037; at the paper's Ta=9.25: 1.010 ≈ L&H 1.01. |
-| [93](#vp87) | Retaining wall, (3) materials, distributed load, geotextile | **built** | [vp093.xlsx](../files/rocscience/vp093.xlsx). 20 kPa crest surcharge: at the paper's Ta=11.6, Bishop 1.017 ≈ L&H 1.02; with Ta=10, 0.961 vs Slide 0.958. |
+| [93](#vp87) | Retaining wall, (3) materials, distributed load, geotextile | **built** | [vp093.xlsx](../files/rocscience/vp093.xlsx). 20 kPa crest surcharge, Ta=10 (Slide's and the RS2 vendor `.fez`'s value): Bishop 0.961 vs Slide 0.958. At the L&H paper's design Ta=11.6, Bishop is 1.017 ≈ L&H 1.02. |
 | [94](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp094.xlsx](../files/rocscience/vp094.xlsx). Five 1.8-m tiers (Ta=10.1): Bishop 1.020 on Slide's printed circle vs Slide 1.040. |
 | 95 | Embankment dam, homogenous, rapid drawdown, water table | *not supported* | USACE EM 1110-2-1902 (1970) App. G example, analyzed with the **Corps 2-stage** rapid-drawdown method and its R-envelope (Slide 1.347, USACE 1.35). XSLOPE does not support the 2-stage method: it implements the Duncan, Wright & Wong (1990) 3-stage procedure that superseded it, verified on the same dam and six other drawdown problems in VP96–VP102. |
 | [96](#vp96) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example, pool 103→24, Kc=1 envelope on a specified circle — the corpus's first Duncan-Wright-Wong 3-stage rapid-drawdown problem. Also [SLOPE/W §2.41](geostudio.md) — same problem in the GeoStudio corpus. |
@@ -716,8 +716,11 @@ Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular search. Slid
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| Ordinary | 1.433 | Slide 1.439; Low 1.44 |
-| Bishop | 1.433 | Slide 1.439; Low 1.44 |
+| Ordinary | 1.435 | Slide 1.439; Low 1.44 |
+| Bishop | 1.435 | Slide 1.439; Low 1.44 |
+
+*Geometry follows the RS2 vendor `.fez`: three equal 4.5 m layers (crest y = 13.5, bench
+y = 7.5, slope break x = 33.5).*
 
 ![vp024: inputs and representative solution](images/vp024.png)
 
@@ -961,22 +964,25 @@ El-Ramly, Morgenstern & Cruden (2003)'s simplified probabilistic model of a Sync
 tailings dyke: a cohesionless section (tailing sand over glacio-fluvial sands and tills,
 all φ = 34°) resting on a presheared disturbed clay-shale with φ = 7.5° ± 2.1°. The
 critical mechanism rides the clay-shale: Slide's drawn circle (center (327.5, 394),
-R = 124) is tangent to el. 270 — twenty meters below the model base at el. 290 — so the
-surface is **composite**, truncated at the base and running flat inside the weak band.
+R = 124) is tangent to el. 270 — about nineteen meters below the model base (the vendor
+`.fez` places the base near el. 289, gently sloping) — so the surface is **composite**,
+truncated at the base and running flat inside the weak band.
 This is the [composite-surface option](../lem/overview.md#composite-failure-surfaces) exercised
 on a published benchmark.
 
 | | XSLOPE (composite) | Slide | El-Ramly et al. |
 |---|---|---|---|
-| Bishop, Slide's circle | 1.299 | 1.305 | 1.31 |
-| Bishop, critical search | 1.253 | — | — |
+| Bishop, Slide's circle | 1.320 | 1.305 | 1.31 |
+| Bishop, critical search | 1.261 | — | — |
 
 *Modeling notes: Slide assigns three piezometric lines to different materials; XSLOPE's
 single piezometric line uses the lowest (the one Slide assigns to the glacio-fluvial
 sand) everywhere — applying each of Slide's lines everywhere brackets the factor of
 safety within 1–3%, so the simplification is well inside the digitizing tolerance. The
-clayey till's properties are not printed in the manual and are taken equal to the sandy
-till's; no competitive surface enters its zone. The published probability of failure
+clayey till's properties are not printed in the manual; the geometry and material zonation
+(including the clayey till's φ = 7.5°, matching the clay-shale, and the diagonal wedge cut
+that separates the two) follow the RS2 vendor `.fez` for this problem. The published
+probability of failure
 (1.5–1.6×10⁻³ by Monte Carlo) is reported here without a regression lock: it rests on
 the paper's spatial-averaging variance treatment, which a single slope-scale σ does not
 reproduce.*

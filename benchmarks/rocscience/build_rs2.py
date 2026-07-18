@@ -164,17 +164,18 @@ def _rs2_60_slope_data(beta_deg, sci, H=1.0, dfound=2.0, flat=4.0):
 
     THE MANUAL DOES NOT STATE sigma_ci. RS2's Table 1 gives only H = 1 m,
     gamma = 23 kN/m3, nu = 0.3, GSI = 70, mi = 15 (and D = 0 comes from Li's text).
-    sigma_ci is back-computed from Li's Table 1, which tabulates the CRITICAL ratio
-    (sigma_ci / gamma H)_crit -- the value at which collapse has just occurred, i.e.
-    F = 1. So sigma_ci is *chosen* to put the slope at limiting equilibrium, and
+    sigma_ci is taken directly from the RS2 vendor .fez model (the material's
+    Generalized Hoek-Brown `ucs` field), which is the value RS2/Slide2 actually
+    solved. Li's Table 1 tabulates a CRITICAL ratio (sigma_ci / gamma H)_crit -- the
+    value at which collapse has just occurred, i.e. F = 1 -- and only case a's ratio
+    reproduces the vendor sigma_ci; cases b and c do not (Li's 0.075 / 0.176 give
+    1.725 / 4.048 kPa, but the vendor files carry 1.61 / 4.37 kPa, i.e. ratios of
+    0.070 / 0.190). Using the vendor values makes the reconstruction faithful to the
+    RS2 model and reproduces Slide2's own Spencer results for cases b and c.
 
-        THE VERIFICATION TARGET IS FS = 1.0 BY CONSTRUCTION.
-
-    It is not an independently computed reference factor of safety.
-
-        beta = 15 deg -> (sci/gH)crit = 0.026 -> sci = 0.598 kPa
-        beta = 30 deg -> (sci/gH)crit = 0.075 -> sci = 1.725 kPa
-        beta = 45 deg -> (sci/gH)crit = 0.176 -> sci = 4.048 kPa
+        beta = 15 deg -> vendor ucs = 0.598 kPa  (== Li ratio 0.026 * 23)
+        beta = 30 deg -> vendor ucs = 1.61  kPa  (Li ratio 0.075 -> 1.725 does NOT match)
+        beta = 45 deg -> vendor ucs = 4.37  kPa  (Li ratio 0.176 -> 4.048 does NOT match)
 
     UNITS. These look absurd for rock, and that is the trap. H = 1 m makes
     gamma*H = 23 kPa, and the critical ratio is LESS THAN ONE, so sigma_ci is a
@@ -221,22 +222,22 @@ def _rs2_60_slope_data(beta_deg, sci, H=1.0, dfound=2.0, flat=4.0):
 
 
 def rs2_60a():
-    """RS2 #60 case 1: beta = 15 deg, sigma_ci = 0.598 kPa. Base failure (Li)."""
-    sd = _rs2_60_slope_data(15.0, 0.026 * 23.0)
+    """RS2 #60 case 1: beta = 15 deg, vendor sigma_ci = 0.598 kPa. Base failure (Li)."""
+    sd = _rs2_60_slope_data(15.0, 0.598)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_60a.xlsx'))
     return 'rs2_60a.xlsx'
 
 
 def rs2_60b():
-    """RS2 #60 case 2: beta = 30 deg, sigma_ci = 1.725 kPa."""
-    sd = _rs2_60_slope_data(30.0, 0.075 * 23.0)
+    """RS2 #60 case 2: beta = 30 deg, vendor sigma_ci = 1.61 kPa (.fez #060_02)."""
+    sd = _rs2_60_slope_data(30.0, 1.61)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_60b.xlsx'))
     return 'rs2_60b.xlsx'
 
 
 def rs2_60c():
-    """RS2 #60 case 3: beta = 45 deg, sigma_ci = 4.048 kPa."""
-    sd = _rs2_60_slope_data(45.0, 0.176 * 23.0)
+    """RS2 #60 case 3: beta = 45 deg, vendor sigma_ci = 4.37 kPa (.fez #060_03)."""
+    sd = _rs2_60_slope_data(45.0, 4.37)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_60c.xlsx'))
     return 'rs2_60c.xlsx'
 

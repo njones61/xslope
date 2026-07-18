@@ -697,7 +697,13 @@ def vp017():
 
 def vp024():
     """Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular
-    search. Slide2: Ordinary 1.439, Bishop 1.439; Low reference 1.44 both."""
+    search. Slide2: Ordinary 1.439, Bishop 1.439; Low reference 1.44 both.
+
+    Geometry from the RS2 vendor .fez (`slope stability #019.fez`): three EQUAL
+    4.5 m layers (crest at y=13.5, bench at y=7.5, internal boundaries at y=9
+    and y=4.5, slope break at x=33.5). Earlier this file carried unequal 5/4/5 m
+    layers with the crest at y=14; the vendor geometry makes the weak Middle
+    layer (c=20) a full 4.5 m thick rather than 4.0 m."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Upper Layer', 30.0), ('Middle Layer', 20.0), ('Bottom Layer', 150.0)]
@@ -707,9 +713,9 @@ def vp024():
         m.update(name=name, c=c, phi=0.0, gamma=18.0, option='mc', u='none')
         sd['materials'].append(m)
     sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(0.0, 14.0), (20.0, 14.0), (34.0, 9.0), (38.0, 8.0), (60.0, 8.0)]},
-        {'mat_id': 1, 'coords': [(0.0, 9.0), (34.0, 9.0), (38.0, 8.0), (60.0, 8.0)]},
-        {'mat_id': 2, 'coords': [(0.0, 5.0), (60.0, 5.0)]},
+        {'mat_id': 0, 'coords': [(0.0, 13.5), (20.0, 13.5), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)]},
+        {'mat_id': 1, 'coords': [(0.0, 9.0), (33.5, 9.0), (38.0, 7.5), (60.0, 7.5)]},
+        {'mat_id': 2, 'coords': [(0.0, 4.5), (60.0, 4.5)]},
     ]
     sd['max_depth'] = 0.0
     sd['circles'] = [{'Xo': 28.0, 'Yo': 20.0, 'Depth': 5.0, 'R': 15.0}]
@@ -1378,9 +1384,14 @@ def _vp032_slope_data(case):
     sd['dloads'] = []
     sd['circular'] = True
     sd['non_circ'] = []
-    lines = [{'x1': -35.605, 'y1': 0.9, 'x2': -1.107, 'y2': 0.9,
+    # Vendor .fez (#024_01 / #024_02): the geotextile (cbeam1) runs the full
+    # 48.9 m from x=-50 to x=-1.107, EA=200,000 kN/m, Ft=200. (Its residual
+    # Ftr=0 -- brittle rupture -- is not carried here: t_res stays unset, i.e.
+    # elastic-perfectly-plastic; xslope's FEM reinforcement has no brittle-drop
+    # path, so this is a documented residual-law difference, not a schema value.)
+    lines = [{'x1': -50.0, 'y1': 0.9, 'x2': -1.107, 'y2': 0.9,
               't_max': 200.0, 't_res': float('nan'), 'lp1': 1.3, 'lp2': 1.3,
-              'E': 2e4, 'area': 0.1, 'label': 'geosynthetic',
+              'E': 2e6, 'area': 0.1, 'label': 'geosynthetic',
               'type': 'geosynthetic', 'dir': 'axial', 'appl': 'passive',
               'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0}]
     sd['reinforcement_lines'] = lines
@@ -1420,16 +1431,24 @@ def vp033():
     tailings dyke (simplified probabilistic case). Cohesionless section over a
     presheared disturbed clay-shale (Kca, phi 7.5 +- 2.1); the critical
     surface is COMPOSITE - Slide's drawn circle (center (327.5, 394), R 124)
-    is tangent to el 270, 20 m below the model base at 290, so it truncates at
+    is tangent to el 270, ~19 m below the model base (~289), so it truncates at
     the base and runs flat inside the Kca band. Slide assigns three
-    piezometric lines per-material; xslope's single line uses the lower (WT4)
+    piezometric lines per-material; xslope's single line follows the lower (WT5)
     line everywhere - bracketing both lines everywhere moves FS only 1-3%.
-    Pgc is absent from the manual's material table (assumed = Pgs; no
-    competitive surface enters its zone). Targets (composite, Bishop): Slide
+
+    Geometry, material zonation and unit weights (TS gamma 20; Pf4/Pgs/Pgc/Kca
+    gamma 17) are taken from the RS2 vendor .fez (`slope stability #025.fez`):
+    the 15-vertex external boundary, the four internal material interfaces, and
+    the DIAGONAL Pgc/Kca wedge cut (233.679, 288.999)->(249.262, 295.287) - a
+    small left-hand Pgc wedge with the large Kca zone to its right. The vendor
+    file gives Clayey till (Pgc) phi = 7.5 (identical to Kca), not the earlier
+    'assumed = Pgs' phi = 34; corrected here. Targets (composite, Bishop): Slide
     1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
     1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
     which a slope-scale sigma reproduces only qualitatively."""
-    sd = load_slope_data(ACADS_1A)
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)   # polygon-mode base (diagonal wedge needs it)
     base = dict(sd['materials'][0])
     mats = []
     def mat(name, gamma, phi, sigma_phi=0.0):
@@ -1441,26 +1460,30 @@ def vp033():
     mats.append(mat('Tailing sand (TS)', 20.0, 34.0))
     mats.append(mat('Glacio-fluvial sand (Pf4)', 17.0, 34.0))
     mats.append(mat('Sandy till (Pgs)', 17.0, 34.0, sigma_phi=2.0))
-    mats.append(mat('Clayey till (Pgc) [assumed = Pgs]', 17.0, 34.0))
+    mats.append(mat('Clayey till (Pgc)', 17.0, 7.5, sigma_phi=2.1))
     mats.append(mat('Disturbed clay-shale (Kca)', 17.0, 7.5, sigma_phi=2.1))
     sd['materials'] = mats
-    sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(125.0, 347.6), (200.0, 340.0), (250.0, 335.2),
-                                 (300.0, 327.9), (330.0, 322.8), (354.0, 318.0),
-                                 (359.0, 317.3), (372.0, 317.3), (392.0, 308.0),
-                                 (475.0, 308.0)]},                      # TS
-        {'mat_id': 1, 'coords': [(125.0, 302.4), (390.0, 308.0),
-                                 (475.0, 308.0)]},                      # Pf4
-        {'mat_id': 2, 'coords': [(125.0, 300.0), (475.0, 306.3)]},      # Pgs
-        {'mat_id': 3, 'coords': [(125.0, 295.4), (236.5, 295.4),
-                                 (236.5, 290.0)]},                      # Pgc (left)
-        {'mat_id': 4, 'coords': [(236.5, 290.0), (236.5, 295.4),
-                                 (475.0, 295.4)]},                      # Kca (right)
-    ]
-    sd['max_depth'] = 290.0
+    # Vendor .fez v6 geometry: 15-vertex external boundary + 4 internal material
+    # interfaces, incl. the DIAGONAL Pgc/Kca wedge (233.679,288.999)->(249.262,295.287).
+    # TS pinches out at x=394.557; base slopes (125,288.558)->(475,289.978).
+    ts  = [(125.0, 348.294), (274.714, 333.179), (360.008, 318.063),
+           (372.244, 318.063), (394.557, 308.346), (125.0, 302.611)]
+    pf4 = [(125.0, 302.611), (394.557, 308.346), (475.0, 309.0),
+           (475.0, 306.164), (125.0, 299.722)]
+    pgs = [(125.0, 299.722), (475.0, 306.164), (475.0, 295.748),
+           (249.262, 295.287), (125.0, 295.033)]
+    pgc = [(125.0, 295.033), (249.262, 295.287), (233.679, 288.999),
+           (125.0, 288.558)]
+    kca = [(249.262, 295.287), (475.0, 295.748), (475.0, 289.978),
+           (233.679, 288.999)]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': i}
+                      for i, p in enumerate([ts, pf4, pgs, pgc, kca])]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['gamma_water'] = 9.81
-    sd['piezo_line'] = [(125.0, 319.7), (350.0, 310.8), (392.0, 308.0),
-                        (475.0, 308.0)]
+    # vendor piezo line 5 (assigned to Pf4/Pgs/Pgc/Kca; the controlling band)
+    sd['piezo_line'] = [(124.28, 319.503), (394.557, 308.346), (475.0, 309.0)]
     sd['dloads'] = []
     sd['circular'] = True
     sd['non_circ'] = []
@@ -2267,6 +2290,11 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
     mats = []
     # the paper's hw is the water level above the FOUNDATION soil: the MSE
     # fill and blocks drain (u=0); only the foundation carries pore pressure.
+    # (This follows L&H (2004) and Slide2's VP92 model, which this file is
+    # locked against. The RS2 vendor .fez #053 instead applies the piezo-line
+    # pore pressure mesh-wide, wetting the granular fill below the pond as well;
+    # adopting that drops the Slide2 Bishop lock from 1.010 to 0.885 vs Slide's
+    # published 1.037, so it is not used here -- documented in the wall section.)
     for name, (c, phi) in (('Reinforced and retained fill', fill),
                            ('Foundation soil', fnd), ('Blocks', (2.5, 34.0))):
         m = dict(base)
@@ -2321,10 +2349,11 @@ def _lh_wall_slope_data(n_tiers=3, tier_h=3.0, offset=1.2, fill=(0.0, 34.0),
             rows.append({'x1': faces[t] + 0.05, 'y1': y, 'x2': faces[t] + L, 'y2': y,
                          't_max': ta, 't_res': float('nan'),
                          'lp1': ta / (po * d1), 'lp2': ta / (po * d2),
-                         # EA = 2e3 kN/m (the RS2 SSRM geotextile-truss convention,
-                         # same as the vp032/RS2-24 files) so the same file runs the
-                         # FEM SSRM as well as the LEM; the LEM ignores E/area.
-                         'E': 2e4, 'area': 0.1,
+                         # EA = 6300 kN/m: the geotextile stiffness in the RS2
+                         # vendor .fez (cbeam1) for this wall family, so the file
+                         # runs the FEM SSRM faithfully as well as the LEM; the
+                         # LEM ignores E/area.
+                         'E': 6.3e4, 'area': 0.1,
                          'label': f'T{t + 1}L{k + 1}', 'type': 'geosynthetic',
                          'dir': 'axial', 'appl': 'passive',
                          'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
@@ -2414,9 +2443,10 @@ def vp092():
 
 
 def vp093():
-    """Slide #93, surcharge case: q=20 kPa on the uppermost tier, Ta=11.6.
+    """Slide #93, surcharge case: q=20 kPa on the uppermost tier, Ta=10.0
+    (the RS2 vendor .fez #054 value; earlier carried at the Slide2 11.6).
     Slide circular Bishop 0.958; L&H 1.02/1.00."""
-    sd = _lh_wall_slope_data(ta_of=lambda i, n: 11.6, surcharge=20.0)
+    sd = _lh_wall_slope_data(ta_of=lambda i, n: 10.0, surcharge=20.0)
     # Slide's printed critical circle: (-8.825, 23.102) R=22.603, spencer 0.957
     sd['circles'] = [{'Xo': -8.825, 'Yo': 23.102, 'Depth': 23.102 - 22.603, 'R': 22.603}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp093.xlsx'))
@@ -3304,10 +3334,42 @@ def vp027():
 
 
 def vp027_fem():
-    """SSRM variant of Slide #27 (= RS2 #22, published SSR 1.52): the crest cap
-    carries Soil 1's strength so the continuum is posable. Everything else —
-    undulating bedrock, phreatic (Hu) water table, unit weights — is unchanged."""
+    """SSRM variant of Slide #27 (= RS2 #22, published SSR 1.52), rebuilt to the
+    RS2 vendor .fez (`slope stability #022.fez`). The vendor does NOT mesh the
+    crest cap as a material; it applies the cap's dead weight as two boundary
+    distributed loads on a single-material continuum:
+
+      - a triangular taper 0 -> 1280 psf over the crest from x=101 to x=137.997
+        (the cap thinning to zero at the crest edge), and
+      - a uniform 1280 psf from x=137.997 to x=200 (11 ft of fill at 116.4 pcf).
+
+    The continuum carries a single constant total unit weight gamma = 124.2 pcf
+    (the vendor's value everywhere, no moist/saturated split), with the pore
+    pressure supplied explicitly by the phreatic (Hu-corrected) water table read
+    from the vendor .fez's 9-vertex piezo line."""
+    from xslope.fileio import build_ground_surface_from_polygons
     sd = _vp027_slope_data(zero_strength_cap=False)
+    # single continuum at the vendor's constant total unit weight
+    m = dict(sd['materials'][0])
+    m.update(name='soil', gamma=124.2, gamma_sat=124.2)
+    sd['materials'] = [m]
+    # drop the meshed cap polygon; keep only the Soil-1 continuum (tops at (200,99))
+    sd['polygons'] = [{'polygon': p['polygon'], 'mat_id': 0}
+                      for p in sd['polygons'] if p['mat_id'] == 0]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    # the cap weight as the vendor's two crest surcharge loads (continuous:
+    # 0 at the crest edge x=101, 1280 psf from x=137.997 to the right edge)
+    sd['dloads'] = [
+        [{'X': 101.0, 'Y': 88.0, 'Normal': 0.0},
+         {'X': 137.997, 'Y': 92.111, 'Normal': 1280.0}],
+        [{'X': 137.997, 'Y': 92.111, 'Normal': 1280.0},
+         {'X': 200.0, 'Y': 99.0, 'Normal': 1280.0}],
+    ]
+    # vendor .fez piezo line (9 vertices) - ~1-1.7 ft below the earlier trace
+    sd['piezo_line'] = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0),
+                        (63.027, 72.931), (83.0, 78.0), (104.0, 82.0),
+                        (122.0, 85.0), (140.0, 87.0), (200.0, 93.0)]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp027_fem.xlsx'))
     return 'vp027_fem.xlsx'
 
@@ -3450,8 +3512,15 @@ def vp064():
     Janbu corrected 2.430. xslope Spencer 2.488 (+1.8%; Slide's figure is
     vertex-unlabeled, so the crest/toe placement carries a small
     uncertainty)."""
-    sd = load_slope_data(ACADS_1A)
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)   # polygon mode: the sand blanket must tile
     base = dict(sd['materials'][0])
+    # USACE Fig 4-1 unit weights: moist above the water table / saturated below,
+    # both total (S.G. Wright: explicit water, never buoyant). This is the source
+    # problem's formulation; the RS2 Slide2-Import .fez collapses it to a single
+    # bulk value, but that conversion is not the native Part IV model that
+    # published SSR 2.37 (which the tiling-fix diagnostic reproduces at moist/sat).
     props = [('Embankment', 1000.0, 5.0, 115.0, 120.0),
              ('Sand', 0.0, 35.0, 125.0, 130.0),
              ('Foundation Clay', 3000.0, 0.0, 110.0, 115.0),
@@ -3462,22 +3531,31 @@ def vp064():
         m.update(name=name, c=c, phi=phi, gamma=gm, gamma_sat=gs,
                  option='mc', u='piezo')
         sd['materials'].append(m)
-    # crest half-width 17 / toes at 217 (4H:1V): pinned by reconciling
-    # USACE's Fig 4-1 slice table (slice 1 width 23 ft, avg height 16 ft;
-    # total slice span 173 ft matches the crack-truncated arc)
-    sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(-225.0, 0.0), (-217.0, 0.0), (-17.0, 50.0),
-                                 (17.0, 50.0), (217.0, 0.0), (225.0, 0.0)]},
-        {'mat_id': 1, 'coords': [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0),
-                                 (8.0, -10.0), (17.0, 0.0), (225.0, 0.0)]},
-        {'mat_id': 2, 'coords': [(-225.0, -10.0), (225.0, -10.0)]},
-        {'mat_id': 3, 'coords': [(-225.0, -37.0), (225.0, -37.0)]},
-    ]
+    # 4H:1V embankment (50 ft high, crest half-width 17, toes at +-217; the run
+    # 217-17 = 200 = 4x50 is exactly 4:1, matching USACE Fig 4-1 and the slice
+    # table), core trench through the sand narrowing to +-8 at the clay (el -10),
+    # clay/rock contact at -37. POLYGON mode so the sand blanket tiles on BOTH
+    # sides of the trench -- the profile-line stack pinched it to zero thickness
+    # at the trench and get_material_polygons dropped the downstream wedge,
+    # leaving a void that blocked the FEM SSRM.
+    embankment = [(-17.0, 50.0), (17.0, 50.0), (217.0, 0.0), (17.0, 0.0),
+                  (8.0, -10.0), (-8.0, -10.0), (-17.0, 0.0), (-217.0, 0.0)]
+    sand_up = [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0), (-225.0, -10.0)]
+    sand_dn = [(17.0, 0.0), (225.0, 0.0), (225.0, -10.0), (8.0, -10.0)]
+    clay = [(-225.0, -10.0), (225.0, -10.0), (225.0, -37.0), (-225.0, -37.0)]
+    rock = [(-225.0, -37.0), (225.0, -37.0), (225.0, -40.0), (-225.0, -40.0)]
+    zones = [(0, embankment), (1, sand_up), (1, sand_dn), (2, clay), (3, rock)]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
     sd['max_depth'] = -40.0
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['gamma_water'] = 62.4
     sd['tcrack_depth'] = 7.0
     sd['piezo_line'] = [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0),
                         (8.0, -10.0), (17.0, 0.0), (225.0, 0.0)]
+    sd['dloads'] = []
     sd['circular'] = True
     sd['circles'] = [{'Xo': 102.0, 'Yo': 163.0, 'Depth': 0.0, 'R': 163.0}]
     sd['non_circ'] = []

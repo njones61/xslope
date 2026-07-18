@@ -505,6 +505,14 @@ def run_fem_test(test):
     if 'ssr_zone' in test:
         _z = [float(v) for v in str(test['ssr_zone']).split(';') if v.strip() != '']
         kwargs['ssr_zone'] = list(zip(_z[0::2], _z[1::2]))
+    # Elastic-materials: names of materials held PURE LINEAR ELASTIC (skip plasticity
+    # entirely, cannot yield) — RS2's "Plasticity Specifications: None". Distinct from
+    # ssr_exclude (full strength but still yields). Tags split on commas, so the names
+    # are SEMICOLON-separated: elastic_materials=Name1;Name2.
+    if 'elastic_materials' in test:
+        kwargs['elastic_materials'] = [s.strip() for s in
+                                       str(test['elastic_materials']).split(';')
+                                       if s.strip()]
     result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
                         debug_level=0, **kwargs)
 

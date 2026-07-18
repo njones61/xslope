@@ -1341,7 +1341,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
-              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False):
+              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
+              elastic_mask=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1472,6 +1473,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             (RS2's ``tensilestrength_SRF=1``: tensile strength shrinks with the
             SRF). If False (default) the cap is held at its fixed value regardless
             of F (RS2's flag = 0). No effect on the T = 0 global cutoff (0/F = 0).
+        elastic_mask (array of bool or None): Per-element mask (length n_elements)
+            marking elements that are PURE LINEAR ELASTIC — held out of the
+            plastic-correction loop entirely. A True element accumulates no
+            viscoplastic strain: it never yields, is never tension-relaxed, and is
+            never flagged in plastic_elements. Its converged stress is the linear
+            elastic D*B*u, even where that state lies outside the Mohr-Coulomb
+            envelope. This mirrors RS2's "Plasticity Specifications: None" placed
+            materials. It is DISTINCT from ssr_exclude_mask: an SSR-excluded element
+            keeps FULL (un-reduced) strength but STILL yields once its stress
+            reaches that full envelope, whereas an elastic_mask element has no
+            strength surface at all and cannot yield under any stress. The two masks
+            are independent and compose freely. None (default) = no elastic
+            elements (bit-identical to the pre-existing path).
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1559,6 +1573,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     if tension_srf:
         _red = np.isfinite(t_cap_by_elem) & (t_cap_by_elem > 0.0)
         t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
+
+    # Elements designated pure linear elastic (elastic_mask) are held out of the
+    # plastic-correction loop entirely: they never yield, never tension-relax, and
+    # are never flagged plastic (see the elastic_mask docstring). Distinct from
+    # ssr_exclude_mask, whose elements keep full strength but STILL yield. Built
+    # once here; masked into the group data below and applied in the VP loop. None
+    # (default) = no elastic elements (bit-identical to the pre-existing path).
+    elastic_by_elem = (np.asarray(elastic_mask, dtype=bool)
+                       if elastic_mask is not None else None)
 
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
@@ -1874,6 +1897,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
         grp['has_cap'] = bool(np.isfinite(grp['t_cap']).any())
+        if elastic_by_elem is not None:
+            _em = np.array([elastic_by_elem[e] for e, g in _pairs])
+            if _em.any():
+                grp['elastic'] = _em
+                grp['has_elastic'] = True
         if has_pow:
             _pm = np.array([pow_flag_by_elem[e] for e, g in _pairs])
             if _pm.any():
@@ -2203,6 +2231,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                      - grp['c_r'] * grp['csph'])
 
                 m = (f > 0) & (dsbar > 1e-20)
+                if grp.get('has_elastic'):
+                    # Pure-elastic elements are held out of plasticity entirely:
+                    # drop their Gauss points from the yielding set so they never
+                    # accrue viscoplastic strain (evpg stays 0 -> elastic stress).
+                    m = m & ~grp['elastic']
                 n_yielding += int(np.count_nonzero(m))
                 if np.any(m):
                     # vectorized MOCOUQ flow, psi = 0 (dq1 = 0); corner freeze
@@ -2234,6 +2267,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     # this is bit-identical to the pre-existing behaviour there.
                     cap = grp['t_cap']
                     tm = sigm > cap
+                    if grp.get('has_elastic'):
+                        # Pure-elastic elements do not tension-relax either.
+                        tm = tm & ~grp['elastic']
                     if np.any(tm):
                         evpg[tm] += ((sigm[tm] - cap[tm]) * grp['dt_t'][tm])[:, None] * \
                             np.array([1.0/3.0, 1.0/3.0, 0.0, 1.0/3.0])
@@ -2713,6 +2749,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         f_yield = mc_yield_invariants(sigm, dsbar, theta, _c_rep, _phi_rep)
         yield_function_out[elem_idx] = f_yield
         plastic_elements[elem_idx] = f_yield > 1e-8
+
+    # Pure-elastic elements never entered the plastic loop, so they carry no
+    # viscoplastic strain; but their linear elastic stress can still lie outside
+    # the Mohr-Coulomb envelope, which the per-element yield check above would read
+    # as "plastic". Force the failure flag off — RS2's "Plasticity: None" materials
+    # never show as yielded. No-op when elastic_mask is None (bit-identical).
+    if elastic_by_elem is not None:
+        plastic_elements[elastic_by_elem] = False
 
     strains = compute_strains(nodes, elements, element_types, u, dof_offset=dof_offset)
 
@@ -3485,7 +3529,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
-               tension_cutoff_by_material=None, tension_srf=False):
+               tension_cutoff_by_material=None, tension_srf=False,
+               elastic_materials=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3586,6 +3631,20 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             SRF (RS2's ``tensilestrength_SRF``). True: T -> T/F each trial, like c
             and tan(phi). False (default): T held fixed. Only affects materials
             named in tension_cutoff_by_material.
+        elastic_materials (list of str or None): Material names whose elements are
+            treated as PURE LINEAR ELASTIC — they skip the plastic-correction loop
+            entirely and can never yield, mirroring RS2's "Plasticity
+            Specifications: None" placed materials. Their stress is the linear
+            elastic D*B*u throughout the reduction; they carry no strength surface,
+            are never reduced, and never appear as failed. This is DISTINCT from
+            ssr_exclude: an ssr_exclude material keeps its FULL strength but STILL
+            yields once its (un-reduced) envelope is reached, so it can shed load
+            and localize a mechanism; an elastic_materials material has no envelope
+            at all and cannot fail under any stress. Composes with ssr_exclude and
+            ssr_zone (independent masks). Names must match a material 'name'
+            exactly (unknown names raise ValueError). None (default) = no elastic
+            materials (bit-identical to the path without it). RUN OPTION only — it
+            reads nothing from the material template.
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
@@ -3652,6 +3711,29 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                   f"({int(np.isfinite(tension_cap_by_elem).sum())}/"
                   f"{len(element_materials)} elements capped)")
 
+    # Resolve the elastic-materials names to a per-element boolean mask once, up
+    # front (like ssr_exclude_mask). These materials are held out of plasticity
+    # ENTIRELY inside solve_fem — pure linear elastic, cannot yield. DISTINCT from
+    # ssr_exclude (full strength but still yields); composes independently with it
+    # and with ssr_zone. inf/True = elastic.
+    elastic_mask = None
+    if elastic_materials:
+        material_names = list(fem_data.get("material_names", []))
+        element_materials = fem_data["element_materials"]
+        wanted = [str(n).strip() for n in elastic_materials]
+        unknown = [n for n in wanted if n not in material_names]
+        if unknown:
+            raise ValueError(
+                f"elastic_materials names not found in the model materials "
+                f"{material_names}: {unknown}. Names must match a material's 'name' "
+                f"field exactly.")
+        elastic_ids = {material_names.index(n) + 1 for n in wanted}  # 1-based IDs
+        elastic_mask = np.isin(element_materials, list(elastic_ids))
+        if debug_level >= 1:
+            print(f"  Elastic (no plasticity): {wanted} "
+                  f"({int(elastic_mask.sum())}/{len(element_materials)} elements "
+                  f"held pure linear elastic)")
+
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']
     has_linear = any(t in (3, 4) for t in element_types)
@@ -3680,7 +3762,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
-            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf)
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+            elastic_mask=elastic_mask)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3692,7 +3775,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
-            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf)
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+            elastic_mask=elastic_mask)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3702,7 +3786,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
-            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf)
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+            elastic_mask=elastic_mask)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -3729,7 +3814,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
-                 tension_cap_by_elem=None, tension_srf=False):
+                 tension_cap_by_elem=None, tension_srf=False, elastic_mask=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -3780,7 +3865,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          early_exit=(max_disp_factor is None),
                          ssr_exclude_mask=ssr_exclude_mask,
                          tension_cap_by_elem=tension_cap_by_elem,
-                         tension_srf=tension_srf,
+                         tension_srf=tension_srf, elastic_mask=elastic_mask,
                          progress_callback=_fem_progress(step, prefix))
 
     F_left = F_min
@@ -3955,7 +4040,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  min_slip_depth=None, ssr_exclude_mask=None,
-                 tension_cap_by_elem=None, tension_srf=False):
+                 tension_cap_by_elem=None, tension_srf=False, elastic_mask=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -4023,7 +4108,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         max_disp_factor=early_term_factor,
                         ssr_exclude_mask=ssr_exclude_mask,
                         tension_cap_by_elem=tension_cap_by_elem,
-                        tension_srf=tension_srf,
+                        tension_srf=tension_srf, elastic_mask=elastic_mask,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks

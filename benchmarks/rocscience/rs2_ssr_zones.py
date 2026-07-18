@@ -157,6 +157,64 @@ def zone_to_tag(verts):
     return ";".join(f"{v:g}" for xy in verts for v in xy)
 
 
+def corridor_centerline(verts, n=40):
+    """Medial line between the two long edges of a thin corridor polygon.
+
+    RS2's SSR Search-Area / material corridor is a narrow band hugging Teoman's
+    (unpublished) digitized slip surface: a closed ring that runs down one long
+    edge and back along the other. This returns the band's centerline — a simple,
+    reproducible medial line usable as a non-circular LEM surface.
+
+    Method (deliberately simple, no medial-axis library):
+
+    1. Drop any closing duplicate vertex; take the ring vertices.
+    2. Principal axis (PCA/SVD) of the vertex cloud = the band's long direction.
+       Project every vertex onto it ("station" along the band).
+    3. The two band tips are the vertices at min / max station.
+    4. Split the ring into its two chains between the tips (the two long edges),
+       orient both tip_lo -> tip_hi.
+    5. At ``n`` equal stations, interpolate each edge's (x, y) vs station and
+       average the two -> the medial point at that station.
+
+    Returns ``[(x, y), ...]`` ordered left-to-right (ascending x), the slip
+    surface approximation. Valid for a monotone (crest-to-toe) band, which is
+    exactly the RS2 #64 case; a strongly re-entrant band would need a true
+    medial axis and is out of scope here.
+    """
+    import numpy as np
+    P = np.asarray([(float(x), float(y)) for x, y in verts], float)
+    if len(P) > 1 and np.allclose(P[0], P[-1]):
+        P = P[:-1]
+    m = P.mean(axis=0)
+    _, _, vt = np.linalg.svd(P - m, full_matrices=False)
+    axis = vt[0]
+    proj = (P - m) @ axis
+    i_lo, i_hi = int(proj.argmin()), int(proj.argmax())
+    k = len(P)
+
+    def _chain(a, b):
+        out, i = [a], a
+        while i != b:
+            i = (i + 1) % k
+            out.append(i)
+        return out
+
+    A = P[_chain(i_lo, i_hi)]              # one long edge, tip_lo -> tip_hi
+    B = P[_chain(i_hi, i_lo)][::-1]        # other long edge, tip_lo -> tip_hi
+
+    def _interp(edge, stations):
+        s = (edge - m) @ axis
+        order = np.argsort(s)
+        return np.column_stack([np.interp(stations, s[order], edge[order, 0]),
+                                np.interp(stations, s[order], edge[order, 1])])
+
+    stations = np.linspace(proj[i_lo], proj[i_hi], n)
+    center = 0.5 * (_interp(A, stations) + _interp(B, stations))
+    if center[0, 0] > center[-1, 0]:      # order left-to-right
+        center = center[::-1]
+    return [(float(x), float(y)) for x, y in center]
+
+
 def summarize(path):
     """One-line-per-entity summary of a vendor file: materials (name/c/phi/gamma)
     and each SSR polygon's vertex count and bounding box. For case matching."""

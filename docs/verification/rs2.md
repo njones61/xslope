@@ -1554,7 +1554,9 @@ Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.4
 **Input files:** [rs2_64a.xlsx](../files/rocscience/rs2_64a.xlsx) (C1, ST orig, *locked*) ·
 [c](../files/rocscience/rs2_64c.xlsx) (C3, *locked*) · [e](../files/rocscience/rs2_64e.xlsx) (C5, *locked*) ·
 [g](../files/rocscience/rs2_64g.xlsx) (C7, LT orig, *locked SSRM*) · [k](../files/rocscience/rs2_64k.xlsx)
-(C11, LT orig, *locked SSRM*) · b/d/f (ST failed), h/i/j/l (long-term) — built, measured head-to-head, blocked.
+(C11, LT orig, *locked SSRM*) · b/d/f (ST failed), h/i/j/l (long-term) — built, measured head-to-head, blocked ·
+[h_split](../files/rocscience/rs2_64h_split.xlsx) / [l_split](../files/rocscience/rs2_64l_split.xlsx)
+(C8/C12 rebuilt as the vendor material partition for the `elastic_materials` run option).
 
 Three road-cut landslides in Ankara clay along the E90 highway, after
 
@@ -1585,7 +1587,14 @@ whereas the vendor makes them **elastic**. Full-strength material can still yiel
 enough; elastic material never can. Where the base slope is stable at full strength this is immaterial and
 the confinement reproduces RS2's mechanism; where the base slope is **sub-unity** (unconstrained FS < 1), a
 failing skin *outside* the corridor cannot be suppressed by holding it at full strength, and the constrained
-solve simply reports the slope unstable (FS < 0.1) — a real limit of the approximation, not a solver fault.
+solve reports the slope unstable (FS < 0.1). The two sub-unity cases (C8, C12) are therefore rebuilt as the
+explicit **material partition** RS2 uses: `solve_ssrm`'s `elastic_materials` run option (RS2's "Plasticity
+Specifications: None") makes the outside-corridor material genuinely linear-elastic — it cannot yield under
+any strength-reduction factor. The corridor is the vendor's per-element `rock1` footprint, read verbatim from
+the `.fez` (`benchmarks/rocscience/rs2_ssr_zones.read_mc_footprint`) and hard-coded into `rs2_64h_split.xlsx`
+/ `rs2_64l_split.xlsx`; the elastic outer zone is the domain minus that corridor, an identical-strength
+material named at solve time. This is orthogonal to `ssr_zone` (full strength but still yields); the vendor's
+material partition alone confines the mechanism, so no SSR polygon is composed.
 
 The unconstrained global minimum coincides with the pinned surface for the three **short-term Original**
 slopes (simple convex profiles), so those lock unconstrained:
@@ -1613,8 +1622,8 @@ domain width, not filename order) — and measured **head-to-head against RS2's 
 | C2 | Slope 1 ST Failed | 6.700 | 6.10 | +9.8% | blocked |
 | C4 | Slope 2 ST Failed | 5.394 | 4.95 | +9.0% | blocked |
 | C6 | Slope 3 ST Failed | 7.836 | 6.97 | +12.4% | blocked |
-| C8 | Slope 1 LT Failed | *unstable* (FS < 0.1) | 0.99 | — | blocked |
-| C12 | Slope 3 LT Failed | *unstable* (FS < 0.1) | 1.22 | — | blocked |
+| C8 | Slope 1 LT Failed | **0.883** (elastic split) | 0.99 | −10.8% | blocked |
+| C12 | Slope 3 LT Failed | *no equilibrium* (elastic split) | 1.22 | — | blocked |
 
 The constraint puts the mechanism on the right surface every time, but agreement with RS2's SSR follows the
 **geometry**, not the constraint's presence. The smooth **long-term Original** slopes verify: C7 −1.5 % (also
@@ -1623,10 +1632,15 @@ onto Slide2 Bishop 1.68) and C11 −3.9 % are inside the ±4 % band the corpus l
 **short-term Failed** slopes **overshoot** — C2/C4/C6 run +9 to +12 % above RS2's SSR, in fact landing on the
 manual's own Bishop reference (e.g. C2 6.70 vs Ref 6.67 / Slide2 6.64, while RS2's own SSR 6.10 sits ~9 %
 below its Bishop column): here the confinement forces a stiffer mechanism than RS2's, so they are blocked.
-The two **sub-unity Failed** slopes (C8 unconstrained 0.81, C12 0.59) are **unstable even fully constrained**:
-their governing failing skin lies *outside* the corridor, where `ssr_zone` can only hold it at full strength,
-not make it elastic — the approximation's stated limit — so no critical SRF brackets. All seven non-locking
-cases are **reported, not tuned**.
+The two **sub-unity Failed** slopes (C8 unconstrained 0.81, C12 0.59) are rebuilt as the vendor **material
+partition** (`rs2_64h_split` / `rs2_64l_split`), the outside held linear-elastic by the `elastic_materials`
+option. With the outside now genuinely elastic, C8 **does** bracket a critical SRF — SSRM **0.883** vs RS2
+0.99 (−10.8 %), where `ssr_zone` reached only FS < 0.1 — but the −10.8 % is outside the ±4 % band, so it is
+blocked head-to-head. C12 does not bracket: the thin saturated Mohr-Coulomb corridor, confined by the
+surrounding elastic material, does not reach equilibrium at any strength-reduction factor under the long-term
+pore pressure. A dry check of the same partition brackets ≈ 1.4, consistent with RS2's wet 1.22 once water is
+added — the partition geometry is sound; the constrained saturated corridor is where the viscoplastic solve
+stops short. All seven non-locking cases are **reported, not tuned**.
 
 The seismic path is sound and unchanged: on C9 the 0.03 g pseudo-static coefficient (RS2 `bx = +0.03`,
 downslope for these left-high slopes) lowers FS from 1.32 (k = 0) to 1.22 (k = +0.03) and *raises* it to 1.42

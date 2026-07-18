@@ -876,6 +876,81 @@ _RS2_64L = [(20.0, -4.0), (20.0, 0.566), (14.424, 0.566), (12.074, 1.634),
 _RS2_64L_PZ = [(0.0, 2.745), (3.603, 2.745), (3.668, 2.457), (5.531, 2.457),
                (8.995, 2.457), (12.074, 1.634), (14.424, 0.566), (20.0, -0.783)]
 
+# --- Vendor MATERIAL PARTITION corridors (elastic-materials run option) -----------
+# The RS2 #64 long-term-Failed sub-unity cases C8/C12 constrain their SSR two ways at
+# once: an SSR_polygonal_zones search area AND a material partition — the Mohr-Coulomb
+# material ('rock1') is placed only in a corridor hugging the proposed slip surface,
+# while the rest is 'rock2' with "Plasticity Specifications: None" (linear-elastic,
+# cannot yield). ssr_zone can only hold the outside at FULL STRENGTH, so for these
+# sub-unity slopes the failing skin outside the corridor could not be suppressed and
+# no critical SRF bracketed (see rs2.md). solve_ssrm's elastic_materials option now
+# makes the outside genuinely elastic, replicating rock2. These two corridors are the
+# per-element rock1 footprints of 'slope stability #064_08.fez' / '#064_12.fez',
+# recovered via rs2_ssr_zones.read_mc_footprint (the vendor 'elements:' material tags),
+# simplified (Douglas-Peucker 0.2) and snapped to the domain boundary, then hard-coded
+# so the corpus rebuilds without the vendor files. The elastic outer zone is the domain
+# MINUS the corridor (shapely difference), an identical-strength material named for
+# elastic_materials at solve time. Do NOT edit the single-material rs2_64h/rs2_64l.
+_RS2_64H_MC = [(8.532, 3.477), (8.192, 4.244), (7.805, 4.196), (7.385, 4.659),
+               (7.814, 5.055), (10.217, 4.527), (10.219, 4.058), (12.086, 3.872),
+               (12.206, 3.631), (12.62, 3.999), (12.752, 3.411), (13.832, 3.421),
+               (13.881, 3.045), (14.622, 3.559), (15.269, 2.726), (15.371, 3.072),
+               (17.458, 2.613), (17.619, 2.256), (17.961, 2.504), (18.627, 2.68),
+               (19.094, 1.749), (19.27, 2.18), (20.877, 0.93), (22.532, 0.743),
+               (22.398, 0.287), (21.917, 0.417), (20.937, -0.246), (20.808, 0.184),
+               (19.806, -0.003), (19.743, 0.62), (18.17, 0.286), (18.145, 0.814),
+               (17.165, 0.704), (16.961, 1.179), (15.96, 0.976), (14.865, 1.695),
+               (14.473, 1.238), (14.233, 1.648), (11.87, 1.959), (11.695, 2.411),
+               (11.228, 2.239), (11.026, 2.822), (10.763, 2.493), (9.797, 2.884),
+               (9.857, 3.25)]
+_RS2_64L_MC = [(7.716, 1.02), (7.608, 1.692), (7.17, 1.672), (7.457, 2.868),
+               (8.995, 2.457), (9.611, 2.292), (10.155, 1.505), (12.323, 0.635),
+               (13.249, 1.1), (14.424, 0.566), (15.663, 0.566), (15.746, 0.205),
+               (14.68, -0.023), (14.799, -0.355), (13.802, -0.582), (12.351, -0.392),
+               (12.338, -0.739), (11.976, -0.701), (10.905, -0.511), (10.953, -0.115),
+               (9.299, -0.0), (9.125, 0.485), (8.786, 0.138), (8.123, 0.715),
+               (8.228, 0.991)]
+
+
+def _rs2_64_split_slope_data(ext, mc_poly, c, phi, g_mc, g_el, piezo, k=0.03,
+                             min_frac=0.02):
+    """One RS2 #64 long-term case as a two-material PARTITION: the Mohr-Coulomb
+    material ('rock1') fills only the corridor ``mc_poly``; the elastic outer
+    zone(s) ('rock2', 'rock2b', ...) are the domain MINUS the corridor, carrying
+    IDENTICAL strength but designated pure linear elastic at solve time via
+    ``solve_ssrm(elastic_materials=['rock2', ...])``. The outer region is split
+    into simple tiling polygons by shapely difference so gmsh meshes one conforming
+    domain (the corridor is snapped to the boundary, so no interior hole/sliver is
+    produced). Any outer fragment below ``min_frac`` of the domain (a sub-mesh-scale
+    skin) is dropped into the corridor. Unit weights are the vendor's per-zone values
+    (rock1 = g_mc, rock2 = g_el)."""
+    dom = Polygon(ext)
+    corr = Polygon(mc_poly)
+    diff = dom.difference(corr)
+    pieces = list(diff.geoms) if diff.geom_type == 'MultiPolygon' else [diff]
+    pieces = [p for p in pieces if p.area > min_frac * dom.area]
+
+    def _ring(p):
+        return [(round(x, 3), round(y, 3)) for x, y in list(p.exterior.coords)[:-1]]
+
+    polygons = [(0, _ring(corr))]
+    mats = [dict(name='rock1', c=float(c), phi=float(phi), gamma=float(g_mc),
+                 gamma_sat=float(g_mc), E=14000.0, nu=0.3, u='piezo')]
+    elastic_names = []
+    for i, p in enumerate(pieces):
+        nm = 'rock2' if len(pieces) == 1 else f'rock2{chr(ord("a") + i)}'
+        polygons.append((i + 1, _ring(p)))
+        mats.append(dict(name=nm, c=float(c), phi=float(phi), gamma=float(g_el),
+                         gamma_sat=float(g_el), E=14000.0, nu=0.3, u='piezo'))
+        elastic_names.append(nm)
+    sd = _poly_slope_data(
+        polygons=polygons, materials=mats,
+        circle={'Xo': 8.0, 'Yo': 16.0, 'Depth': -4.0, 'R': 20.0}, max_depth=0.0,
+        piezo_line=list(piezo))
+    if k:
+        sd['k_seismic'] = float(k)
+    return sd
+
 
 def rs2_64a():
     """RS2 #64 Case 1 -- Slope 1 ORIGINAL, short-term (dry). c = 40.9, phi = 40.2,
@@ -973,6 +1048,30 @@ def rs2_64l():
     return 'rs2_64l.xlsx'
 
 
+def rs2_64h_split():
+    """RS2 #64 Case 8 (Slope 1 FAILED, long-term) as the VENDOR MATERIAL PARTITION:
+    rock1 Mohr-Coulomb corridor (c=3, phi=19, gamma=20.5) + rock2 elastic-None outer
+    (identical strength, gamma=20.0). Run constrained via
+    solve_ssrm(elastic_materials=['rock2']). Published RS2 SSR 0.99. Separate from the
+    single-material rs2_64h.xlsx (unchanged)."""
+    sd = _rs2_64_split_slope_data(_RS2_64H, _RS2_64H_MC, 3.0, 19.0, 20.5, 20.0,
+                                  _RS2_64H_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64h_split.xlsx'))
+    return 'rs2_64h_split.xlsx'
+
+
+def rs2_64l_split():
+    """RS2 #64 Case 12 (Slope 3 FAILED, long-term) as the VENDOR MATERIAL PARTITION:
+    rock1 Mohr-Coulomb corridor (c=2, phi=25, gamma=20.0) + rock2 elastic-None outer
+    (identical strength, gamma=20.0). Run constrained via
+    solve_ssrm(elastic_materials=['rock2']). Published RS2 SSR 1.22. Separate from the
+    single-material rs2_64l.xlsx (unchanged)."""
+    sd = _rs2_64_split_slope_data(_RS2_64L, _RS2_64L_MC, 2.0, 25.0, 20.0, 20.0,
+                                  _RS2_64L_PZ, k=0.03)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64l_split.xlsx'))
+    return 'rs2_64l_split.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
@@ -980,5 +1079,6 @@ if __name__ == '__main__':
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
                rs2_68a, rs2_68b, rs2_68c,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
-               rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l):
+               rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,
+               rs2_64h_split, rs2_64l_split):
         print(fn())

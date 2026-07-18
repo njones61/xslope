@@ -189,7 +189,7 @@ its reference/Slide2 figures (representative case where a problem has several).
 | 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | 1.34 / 1.45 | Baker 1.35 / 1.48 | [RS2-34](#rs2-34) |
 | 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | 0.96 | — | [RS2-68](#rs2-68) |
 | 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | 0.99 | — | [RS2-68](#rs2-68) |
-| 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | [VP64](rocscience.md#vp64) (LEM) |
+| 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | [P4-VP64](#p4-vp64) (SSRM blocked) |
 | 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | 2.60 | ref 2.71 | *new* |
 | 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | 2.22 | ref 2.30 | *new* |
 | 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | [VP67](rocscience.md#vp67) (LEM) |
@@ -211,10 +211,11 @@ its reference/Slide2 figures (representative case where a problem has several).
 **Part 4 in one line:** 52 problems cataloged — 35 already in the corpus as RS2-1…47 rows,
 VP2 (ACADS 1b) now carrying its own [Part IV SSRM build](#p4-vp2) on the shared file (SSRM
 1.669 vs RS2 SSR 1.63 — no-crack, the water-filled tension crack being an LEM-only construct)
-alongside the existing [VP2](rocscience.md#vp2) LEM lock, and VP64 (USACE 2003
-Fig 4-1) by the [VP64](rocscience.md#vp64) lock (USACE's Spencer hand-verification dam,
-reproduced on its specified circle — Spencer 2.488 / Bishop 2.489 vs Slide2 2.445 / USACE
-2.44) and VP67 (USACE 2003 F-5) by the [VP67](rocscience.md#vp67) lock (end-of-construction
+alongside the existing [VP2](rocscience.md#vp2) LEM lock, VP64 (USACE 2003
+Fig 4-1) whose SSRM is [blocked on the shared file](#p4-vp64) (a downstream-shell void from the
+trench-pinched sand blanket — the diagnostic value 2.36 matches RS2's SSR 2.37 once the void is
+filled) behind the standing [VP64](rocscience.md#vp64) LEM lock (Spencer 2.488), and VP67
+(USACE 2003 F-5) by the [VP67](rocscience.md#vp67) lock (end-of-construction
 embankment on its specified toe circle — Spencer 1.316 / Bishop 1.320 vs Slide2 1.328 /
 USACE 1.33), 2 mapping to corpus rows (RS2-68 Loukidis — now **built**; RS2-28/38/39-41-43 — still planned), and **≈12
 genuinely new** candidates: the ACADS 2b dam variant (VP6), the rest of the USACE 2003
@@ -1699,6 +1700,34 @@ reference 1.65 — a small, consistent positive offset, the same sign and size a
 <!-- test: file=../files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.669, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, benchmark=RS2-P4-VP2 -->
 
 ![RS2 Part IV VP2: ACADS 1(b) homogeneous slope (Giam & Donald 1989), SSRM 1.669 (no tension crack) vs RS2 SSR 1.63 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP2.png)
+
+### RS2 Part IV VP64: USACE end-of-construction dam (Fig 4-1) — SSRM blocked {#p4-vp64}
+
+Slide2/LEM counterpart: [VP64](rocscience.md#vp64) (USACE EM 1110-2-1902 Fig 4-1). RS2 Part IV
+publishes an SSR of **2.37** (Table 64.2; Slide2 Spencer 2.445). The SSRM run on the shared
+file is **blocked** — not by strength or convergence, but by the continuum tiling of the shared
+geometry.
+
+**Input files:** [vp064.xlsx](../files/rocscience/vp064.xlsx)
+
+The dam is a symmetric 50-ft embankment (c = 1000 psf, φ = 5°) over a 10-ft sand blanket
+(c = 0, φ = 35°), foundation clay (c = 3000, φ = 0°) and rock, with an embankment core trench
+cutting through the sand to the clay. In the file the sand is a stacked profile pinched to zero
+thickness at the trench, which splits it into an upstream and a downstream wedge. XSLOPE's
+polygon extraction (`get_material_polygons`) keeps only the upstream wedge, so the downstream
+sand (x ≈ 17…225, y = −10…0) is dropped, leaving a **~10-ft void under the downstream shell**.
+The FEM then has an unsupported region and collapses under gravity at any strength: SSRM finds
+no equilibrium even at F = 0.10 (10× the strength), both saturated and dry — a tiling defect,
+not a real instability.
+
+The defect, and the physics, are confirmed by a diagnostic: injecting the missing downstream
+sand polygon in memory (not editing the file) fills the void, and the SSRM then converges to
+**2.362** at a 6 m mesh — RS2's SSR 2.37 to within −0.3%. So the SSRM verifies once the domain
+tiles; the blocker is purely that the shared LEM file — valid for slice-based LEM, which never
+touches the void — does not form a closed FEM continuum. A lock would require rebuilding the
+sand geometry (a corpus-builder change, out of scope for this reuse-the-file pass), so VP64 is
+recorded here as a documented gap. The [VP64](rocscience.md#vp64) LEM lock (Spencer 2.488)
+stands.
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

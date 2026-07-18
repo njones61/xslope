@@ -161,6 +161,11 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         ax.set_ylim(bottom=0)
         ax.grid(True, alpha=0.3)
 
+    elif option == "elastic":
+        # Elastic / infinite strength (v16): no shear envelope — it cannot fail.
+        return _material_hint(ax, "elastic — no strength model\n(cannot fail)",
+                              "Elastic")
+
     else:
         return _material_hint(ax, "no strength model\n(blank option)")
 

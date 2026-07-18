@@ -1333,7 +1333,7 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
-            "E": 0.0, "nu": 0.0}
+            "t_cut": None, "E": 0.0, "nu": 0.0}
 
 
 # --------------------------------------------------------------------------- #
@@ -2060,7 +2060,7 @@ class MaterialsEditor(CategoryEditor):
         # via _choice; document._blank_material produces it for DXF imports). Offer
         # it as an empty combo entry so the editor round-trips it instead of
         # normalizing blank -> 'mc'. Kept last so the default (first choice) stays 'mc'.
-        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", ""], applies=LF),
+        Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
         Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
@@ -2080,6 +2080,9 @@ class MaterialsEditor(CategoryEditor):
         Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
+        # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
+        # None (no cutoff), never 0.0 (which would mean "no tension").
+        Field("t_cut", "t_cut", "optfloat", usage="fem"),
         Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
     ]
 

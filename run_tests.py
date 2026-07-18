@@ -883,14 +883,16 @@ _EDITOR_MANAGED_KEYS = {
 }
 
 
-def _editor_full_material(name, option, u, unsat):
+def _editor_full_material(name, option, u, unsat, t_cut=4.0):
     """A material with EVERY loader-produced key set to a distinct non-default
     value, so a dropped key is caught; option/u/unsat carry the enum value under
-    test. Together the fixture's rows exercise every accepted option (mc/cp/pow/hb),
-    u (none/piezo/seep/ru) and unsat (lf/vg/gard) value."""
+    test. Together the fixture's rows exercise every accepted option (mc/cp/pow/hb/
+    elastic), u (none/piezo/seep/ru) and unsat (lf/vg/gard) value, and the v16
+    t_cut column (a distinct non-None value, so a dropped t_cut is caught)."""
     return {
         "name": name, "gamma": 120.0, "gamma_sat": 125.0, "option": option,
         "c": 100.0, "phi": 30.0, "cp": 0.5, "r_elev": 12.0, "d": 3.0, "psi": 5.0,
+        "t_cut": t_cut,
         "pow_a": 1.1, "pow_b": 0.9, "pow_c": 2.0, "pow_d": 4.0,
         "u": u, "ru": 0.35,
         "sigma_gamma": 1.0, "sigma_c": 2.0, "sigma_phi": 3.0, "sigma_cp": 0.1,
@@ -917,6 +919,11 @@ def _editor_fixture():
         # loader). Locks the MaterialsEditor combo's empty entry: without it the
         # combo would normalize blank -> 'mc' and drop the seep-only classification.
         _editor_full_material("m-blank-seep-vg", "",    "seep",  "vg"),
+        # v16: an elastic material (with a BLANK t_cut, the common case), so the
+        # editor round-trip locks both the new 'elastic' option-combo entry and a
+        # None t_cut surviving unchanged (the combo would corrupt 'elastic' if it
+        # weren't a choice; a dropped/zeroed t_cut would be caught by the mc rows).
+        _editor_full_material("m-elastic-none-lf", "elastic", "none", "lf", t_cut=None),
     ]
 
     def pile(x1, y1, x2, y2, appl="active"):
@@ -1146,6 +1153,65 @@ def run_template_sync_test(test):
     if not filecmp.cmp(master, copy, shallow=False):
         return None, (f"packaged copy differs from master — run: "
                       f"cp {master} {copy}")
+    return 0.0, None
+
+
+# === v16 backward-compatibility guard ==================================== #
+# The v16 mat-sheet reshuffle moved E/nu (to columns M/N) and inserted t_cut (L).
+# The loader keys every material column BY NAME, so a pre-v16 file — where E/nu sit
+# wherever they did and there is no t_cut column — must still load to exactly the
+# same slope_data, save for the new t_cut key (None, i.e. no cutoff). Two REAL
+# pre-v16 corpus files are frozen here, materials key-by-key, captured from the
+# loader BEFORE the v16 change. A regression that hardcodes a column position, or
+# breaks the by-name E/nu lookup, would read E/nu back as 0.0 and trip this.
+_V16_BACKCOMPAT_EXPECTED = {
+    # docs/files/rocscience/vp039c.xlsx — v13 FEM file (E/nu present; E at old col AF)
+    'docs/files/rocscience/vp039c.xlsx': [
+        {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+    ],
+    # docs/inputs/slope/xslope_dam.xlsx — v12 LEM file (piezo u; blank gsat -> None)
+    'docs/inputs/slope/xslope_dam.xlsx': [
+        {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 300.0, 'psi': 20.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 100.0, 'psi': 19.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+    ],
+}
+
+
+def run_v16_backcompat_test(test):
+    """A pre-v16 file loads to the same materials as before v16, plus t_cut=None.
+
+    Loads two frozen pre-v16 corpus files and asserts, key-by-key, that every
+    material matches its captured baseline once the new t_cut key (which must be
+    None — no cutoff) is set aside, and that no material is 'elastic'. This is the
+    load-side proof that the column reshuffle is transparent to old files.
+
+    Returns (0.0, None) on success, or (None, message) naming the divergences.
+    """
+    from xslope.fileio import load_slope_data
+    problems = []
+    for fp, expected in _V16_BACKCOMPAT_EXPECTED.items():
+        if not os.path.exists(fp):
+            problems.append(f"{fp}: file missing")
+            continue
+        sd = load_slope_data(fp)
+        mats = sd.get("materials", [])
+        if len(mats) != len(expected):
+            problems.append(f"{fp}: {len(mats)} materials, expected {len(expected)}")
+            continue
+        for i, (m, exp) in enumerate(zip(mats, expected)):
+            if "t_cut" not in m:
+                problems.append(f"{fp}[{i}]: missing new t_cut key")
+            elif m.get("t_cut") is not None:
+                problems.append(f"{fp}[{i}].t_cut: {m.get('t_cut')!r}, expected None")
+            if str(m.get("option", "")).strip().lower() == "elastic":
+                problems.append(f"{fp}[{i}]: unexpectedly 'elastic'")
+            stripped = {k: v for k, v in m.items() if k != "t_cut"}
+            problems += _roundtrip_diff(exp, stripped, f"{os.path.basename(fp)}[{i}]")
+    if problems:
+        return None, "v16 back-compat mismatch: " + "; ".join(problems[:6])
     return 0.0, None
 
 
@@ -3214,6 +3280,8 @@ def run_test(test):
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
         return run_deps_declared_test(test)
+    if test_type == 'v16_backcompat':
+        return run_v16_backcompat_test(test)
     if test_type == 'fem_elastic_units':
         return run_fem_elastic_units_test(test)
     if test_type == 'gsat_pair':
@@ -3267,7 +3335,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'gsat_pair', 'seep_head'):
@@ -3499,6 +3567,11 @@ def main():
         # so `pip install xslope` yields a package that actually imports.
         tests.append({'type': 'deps_declared', 'file': 'pyproject.toml',
                       'method': '-', 'source': 'packaging'})
+        # Guard that pre-v16 files still load identically after the v16 mat-sheet
+        # reshuffle (E/nu moved, t_cut inserted) — the column move is header-name-
+        # keyed and so must be transparent to old files (plus a new t_cut=None).
+        tests.append({'type': 'v16_backcompat', 'file': '(pre-v16 corpus files)',
+                      'method': '-', 'source': 'v16_backcompat'})
         # Guard that no English-unit FEM corpus file carries the metric inherited
         # elastic default (E=100,000 psf ~ 4.8 MPa, ~10x too soft) — the unit-blind
         # bug that corrupts displacements and the RS2 displacement-vector panels.

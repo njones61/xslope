@@ -50,10 +50,13 @@ class Field:
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": ""}
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
-                 usage=None, applies=None):
+                 usage=None, applies=None, tooltip=None):
         self.key = key
         self.header = header
         self.kind = kind
+        # Optional hover help — shown on the table column header and on the list-view
+        # cell label/edit. None (the default) leaves the field un-annotated.
+        self.tooltip = tooltip
         self.choices = [str(c) for c in (choices or [])]
         # `applies`: the set of analyses this field is used in — drives the
         # show/hide column toggles; None = universal (geometry/identity, always
@@ -121,7 +124,7 @@ class _EditableTable(QWidget):
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
-                 on_change=None, on_select=None):
+                 on_change=None, on_select=None, dim_rule=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
@@ -130,6 +133,10 @@ class _EditableTable(QWidget):
         # change. Suppressed while the table populates so construction is silent.
         self._on_change = on_change
         self._on_select = on_select
+        # Optional per-row disable rule: row_dict -> set of field keys to gray out
+        # (kept read-only, value retained). The Materials editor uses it to mirror
+        # the mat-sheet conditional formatting for an option=elastic row.
+        self._dim_rule = dim_rule
         self._suppress_notify = True
         self._bases = [dict(r) for r in rows]  # keep originals to preserve extra keys
         # Optional leading display-color swatch column (Materials editor). It is a
@@ -147,13 +154,16 @@ class _EditableTable(QWidget):
         self.table.setHorizontalHeaderLabels([f.header for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         for j, f in enumerate(fields):  # color usage-tagged headers (red=LEM, blue=FEM, …)
+            hi = self.table.horizontalHeaderItem(j)
+            if hi is None:
+                continue
             if f.usage:
-                hi = self.table.horizontalHeaderItem(j)
-                if hi is not None:
-                    hi.setForeground(QColor(USAGE_COLOR[f.usage]))
-                    fnt = hi.font()
-                    fnt.setBold(True)
-                    hi.setFont(fnt)
+                hi.setForeground(QColor(USAGE_COLOR[f.usage]))
+                fnt = hi.font()
+                fnt.setBold(True)
+                hi.setFont(fnt)
+            if f.tooltip:
+                hi.setToolTip(f.tooltip)
         if swatch_state is not None:
             col = len(fields)
             hdr = QTableWidgetItem("\U0001F3A8")   # palette glyph — no data header text
@@ -167,6 +177,7 @@ class _EditableTable(QWidget):
             self._set_row(i, row)
         if swatch_state is not None:
             self._rebuild_swatches()
+        self._apply_dim_all()      # gray inapplicable cells (e.g. an elastic row)
         # Notifications are wired only AFTER the initial population, and item edits
         # go through a suppress flag, so building the table fires nothing.
         self.table.itemChanged.connect(lambda *_: self._emit_change())
@@ -218,7 +229,11 @@ class _EditableTable(QWidget):
                 combo.addItems(f.choices)
                 if str(val) in f.choices:
                     combo.setCurrentText(str(val))
-                combo.currentIndexChanged.connect(lambda *_: self._emit_change())
+                # A combo edit (e.g. the strength 'option') can change which cells are
+                # applicable, so re-evaluate the disable rule for every row, then
+                # notify. Re-dimming all rows keeps this correct across add/remove
+                # without capturing a stale row index.
+                combo.currentIndexChanged.connect(lambda *_: self._on_combo_changed())
                 self.table.setCellWidget(i, j, combo)
             else:
                 self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
@@ -239,6 +254,53 @@ class _EditableTable(QWidget):
             btn.colorChanged.connect(lambda h, idx=i: self._swatch.set(idx, h))
             self.table.setCellWidget(i, col, btn)
 
+    def _on_combo_changed(self):
+        self._apply_dim_all()
+        self._emit_change()
+
+    def _row_values(self, i):
+        """Current widget values for row ``i`` as a dict — enough for the dim rule to
+        read the row's ``option`` (and any other driver) at signal time."""
+        vals = {}
+        for j, f in enumerate(self._fields):
+            w = self.table.cellWidget(i, j)
+            if isinstance(w, QComboBox):
+                vals[f.key] = w.currentText()
+            else:
+                it = self.table.item(i, j)
+                vals[f.key] = it.text() if it is not None else ""
+        return vals
+
+    def _apply_dim_all(self):
+        if self._dim_rule is None:
+            return
+        prev = self._suppress_notify
+        self._suppress_notify = True     # flag edits from setFlags fire nothing
+        try:
+            for i in range(self.table.rowCount()):
+                self._apply_dim_row(i)
+        finally:
+            self._suppress_notify = prev
+
+    def _apply_dim_row(self, i):
+        """Gray (disable, keep value) the fields the dim rule marks inapplicable for
+        this row; restore the rest to normal editable/enabled state."""
+        dim = self._dim_rule(self._row_values(i))
+        for j, f in enumerate(self._fields):
+            dimmed = f.key in dim
+            w = self.table.cellWidget(i, j)
+            if isinstance(w, QComboBox):
+                w.setEnabled(not dimmed)
+            else:
+                it = self.table.item(i, j)
+                if it is None:
+                    continue
+                if dimmed:
+                    it.setFlags(Qt.ItemIsSelectable)
+                else:
+                    it.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                                | Qt.ItemIsEditable)
+
     def _add_row(self):
         i = self.table.rowCount()
         self.table.insertRow(i)
@@ -246,6 +308,7 @@ class _EditableTable(QWidget):
         self._bases.append(base)
         self._set_row(i, base)
         self._rebuild_swatches()
+        self._apply_dim_all()
         self._emit_change()
 
     def _remove_rows(self):
@@ -254,6 +317,7 @@ class _EditableTable(QWidget):
             if r < len(self._bases):
                 self._bases.pop(r)
         self._rebuild_swatches()
+        self._apply_dim_all()
         self._emit_change()
 
     def result_rows(self):
@@ -1352,9 +1416,28 @@ _MAT_SIGMA = {"gamma": "sigma_gamma", "c": "sigma_c", "phi": "sigma_phi",
 # the selected option's are visible; blank shows none, per bc0999d).
 _MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"],
                       "pow": ["pow_a", "pow_b", "pow_c", "pow_d"],
-                      "hb": ["hb_sci", "hb_gsi", "hb_mi", "hb_d"], "": []}
+                      "hb": ["hb_sci", "hb_gsi", "hb_mi", "hb_d"],
+                      "elastic": [], "": []}
 _MAT_ALL_OPTION_FIELDS = ["c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c",
                           "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d"]
+
+# v16: an option=elastic material cannot fail — the mat sheet grays every strength
+# column, t_cut, the dilation pair, u/ru and the strength standard deviations for
+# such a row (CF ranges F..L, O..P, Z..AD on $E="elastic"). g/gsat, E/ν, s(γ) and
+# the seepage block stay live. The editor mirrors that: these keys read-only/gray
+# on both views when the row's option is elastic.
+_MAT_ELASTIC_DIM = frozenset(
+    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "t_cut", "u", "ru",
+                              "sigma_c", "sigma_phi", "sigma_cp",
+                              "sigma_d", "sigma_psi"])
+
+
+def _mat_dim_keys(row):
+    """Field keys to gray for a material row — the elastic inert set, else none."""
+    opt = str(row.get("option", "") or "").strip().lower()
+    return _MAT_ELASTIC_DIM if opt == "elastic" else frozenset()
+
+
 # Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py).
 _MAT_UNSAT_FIELDS = {"lf": ["kr0", "h0"], "vg": ["vg_a", "vg_n"],
                      "gard": ["vg_a", "vg_n"]}
@@ -1524,6 +1607,11 @@ class _MaterialListView(QWidget):
         edit = self._make_edit(key)
         edit.setMinimumWidth(44)
         h.addWidget(edit, 1)
+        f = self._field_by_key.get(key)
+        tip = getattr(f, "tooltip", None) if f is not None else None
+        if tip:
+            lab.setToolTip(tip)
+            edit.setToolTip(tip)
         if sigma and key in _MAT_SIGMA:
             skey = _MAT_SIGMA[key]
             slab = QLabel("± σ")
@@ -1627,6 +1715,8 @@ class _MaterialListView(QWidget):
         gv.addSpacing(4)
         gv.addWidget(self._pair(self._cell("d (dil.)", "d", sigma=True, label_w=52),
                                 self._cell("ψ", "psi", sigma=True, label_w=18)))
+        # v16: tensile cutoff (file order t_cut, E, nu), then the elastic E/ν pair.
+        gv.addWidget(self._cell("t_cut", "t_cut", label_w=52))
         gv.addWidget(self._pair(self._cell("E", "E", label_w=18),
                                 self._cell("ν", "nu", label_w=18)))
         v.addWidget(g)
@@ -1643,6 +1733,7 @@ class _MaterialListView(QWidget):
         self._u_combo = self._make_edit("u")
         self._u_combo.currentIndexChanged.connect(self._on_u_changed)
         uh.addWidget(self._u_combo, 1)
+        self._u_cell = u_cell            # grayed whole for an elastic material
         gv.addWidget(u_cell)
         gv.addWidget(self._cell("ru", "ru"))
         v.addWidget(g)
@@ -1747,6 +1838,7 @@ class _MaterialListView(QWidget):
             self._update_u_visibility()
             self._update_unsat_visibility()
             self._update_sigma_visibility()
+            self._update_elastic_disable()
             self._refresh_plots()
         else:
             self._clear_plots()
@@ -1768,6 +1860,20 @@ class _MaterialListView(QWidget):
         shown = set(_MAT_OPTION_FIELDS.get(opt, []))
         for key in _MAT_ALL_OPTION_FIELDS:
             self._cell_widgets[key].setVisible(key in shown)
+
+    def _update_elastic_disable(self):
+        """Gray the fields inert for an option=elastic material (mirrors the mat-sheet
+        conditional formatting): t_cut, the dilation pair d/ψ and the pore-pressure
+        model u/ru go read-only; g/gsat, E/ν and the seepage block stay live. The
+        strength-option cells are already hidden for 'elastic' (empty option set), so
+        only the always-shown cells need graying. Disabling a whole d/ψ cell also
+        grays its s(d)/s(ψ) — matching the template, which grays those too."""
+        elastic = self._opt_combo.currentText().strip().lower() == "elastic"
+        for key in ("t_cut", "d", "psi", "ru"):
+            w = self._cell_widgets.get(key)
+            if w is not None:
+                w.setEnabled(not elastic)
+        self._u_cell.setEnabled(not elastic)
 
     def _update_u_visibility(self):
         self._cell_widgets["ru"].setVisible(
@@ -1801,6 +1907,7 @@ class _MaterialListView(QWidget):
     def _on_option_changed(self):
         self._commit()
         self._update_option_visibility()
+        self._update_elastic_disable()
         self._plot_timer.start()
 
     def _on_u_changed(self):
@@ -1966,7 +2073,7 @@ class MaterialsDialog(QDialog):
             self._table.setParent(None)
             self._table.deleteLater()
         self._table = _EditableTable(self._fields, self._rows, self._new_row,
-                                     swatch_state=self._color)
+                                     swatch_state=self._color, dim_rule=_mat_dim_keys)
         self._table_lay.addWidget(self._table)
         self._table.apply_usage_filter(self._enabled_usage())
 
@@ -2040,18 +2147,22 @@ class MaterialsDialog(QDialog):
 
 class MaterialsEditor(CategoryEditor):
     label = "Materials"
-    # Columns mirror the 'mat' worksheet in order: name, g, gsat, option, c, f,
-    # c/p, r-elev, d, psi, pow_a..pow_d, hb_sci/hb_gsi/hb_mi/hb_d, u, ru, s(g),
-    # s(c), s(f), s(c/p), s(d), s(psi), k1, k2, alpha, unsat, kr0, h0, vg_a, vg_n,
-    # E, n.
+    # Columns mirror the v16 'mat' worksheet IN FILE ORDER: name, g, gsat, option,
+    # c, f, c/p, r-elev, d, psi, t_cut, E, nu, u, ru, pow_a..pow_d,
+    # hb_sci/hb_gsi/hb_mi/hb_d, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2,
+    # alpha, unsat, kr0, h0, a(vg_a), n(vg_n).  v16 inserted t_cut (col L) and moved
+    # E/nu (cols M/N) up beside the strength values, with u/ru following.
     # `applies` tags mirror the template's analysis usage (input_template.md):
     # the strength block (g, gsat, option, c, f, c/p, r-elev, the pow_* power-curve
     # and hb_* Hoek-Brown envelope parameters, u, ru) is shared by LEM+FEM; d/psi
-    # are rapid-drawdown (LEM); s(...) are reliability; k1..vg_n seepage; E/n FEM.
+    # are rapid-drawdown (LEM); s(...) are reliability; k1..vg_n seepage; t_cut/E/nu FEM.
     # gsat is optional (blank -> fall back to g), so it reads back as None when
     # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
     # always shown; option-driven show/hide grouping is a later UX pass.
     LF = {"lem", "fem"}
+    _T_CUT_TIP = ("Tensile cutoff (Rankine). Blank = no cutoff; 0 = no tension. "
+                  "FEM only. Caution: in reinforced fills, T=0 may prevent "
+                  "equilibrium; leave blank or use a small nonzero value.")
     FIELDS = [
         Field("name", "name", "str"),
         Field("gamma", "g", applies=LF),
@@ -2059,17 +2170,22 @@ class MaterialsEditor(CategoryEditor):
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
         # it as an empty combo entry so the editor round-trips it instead of
-        # normalizing blank -> 'mc'. Kept last so the default (first choice) stays 'mc'.
+        # normalizing blank -> 'mc'. 'elastic' (v16): infinite strength — the row's
+        # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
         Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
         Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
+        # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
+        # None (no cutoff), never 0.0 (which would mean "no tension").
+        Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=_T_CUT_TIP),
+        Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
+        Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
+        Field("ru", "ru", applies=LF),
         Field("pow_a", "pow_a", applies=LF), Field("pow_b", "pow_b", applies=LF),
         Field("pow_c", "pow_c", applies=LF), Field("pow_d", "pow_d", applies=LF),
         Field("hb_sci", "hb_sci", applies=LF), Field("hb_gsi", "hb_gsi", applies=LF),
         Field("hb_mi", "hb_mi", applies=LF), Field("hb_d", "hb_d", applies=LF),
-        Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
-        Field("ru", "ru", applies=LF),
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
@@ -2080,10 +2196,6 @@ class MaterialsEditor(CategoryEditor):
         Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
-        # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
-        # None (no cutoff), never 0.0 (which would mean "no tension").
-        Field("t_cut", "t_cut", "optfloat", usage="fem"),
-        Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
     ]
 
     def build(self, slope_data, parent):

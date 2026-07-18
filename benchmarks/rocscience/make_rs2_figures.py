@@ -128,6 +128,12 @@ def build_and_solve(tag):
     if tag.get('ssr_exclude'):
         ssr_exclude = [s.strip() for s in str(tag['ssr_exclude']).split(';') if s.strip()]
 
+    # SSR search-area polygon (RS2's "SSR Search Area"): flat x1;y1;x2;y2;... list.
+    ssr_zone = None
+    if tag.get('ssr_zone'):
+        _z = [float(v) for v in str(tag['ssr_zone']).split(';') if v.strip() != '']
+        ssr_zone = list(zip(_z[0::2], _z[1::2]))
+
     with contextlib.redirect_stdout(io.StringIO()):
         sol = solve_ssrm(fem_data,
                          F_min=float(tag.get('f_min', 0.5)),
@@ -135,6 +141,7 @@ def build_and_solve(tag):
                          tolerance=float(tag.get('tolerance', 0.02)),
                          max_iterations=int(tag.get('max_iter', 4000)),
                          ssr_exclude=ssr_exclude,
+                         ssr_zone=ssr_zone,
                          debug_level=0)
     if not sol.get('converged'):
         raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')

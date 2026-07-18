@@ -20,7 +20,8 @@ from math import degrees, sin, cos, sqrt, asin, tan
 import numpy as np
 from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import splu
-from shapely.geometry import LineString, Point
+import shapely
+from shapely.geometry import LineString, Point, Polygon
 
 from .hoekbrown import hb_constants, hb_tangent_const
 
@@ -3397,6 +3398,39 @@ def _ssrm_bisect_steps(width, tolerance):
     return max(1, int(np.ceil(np.log2(width / tolerance))))
 
 
+def _element_centroids(fem_data):
+    """(n_elements, 2) array of element centroids: the mean of each element's active
+    nodes, matching the convention used when writing element results (save_fem_results)."""
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    centroids = np.zeros((len(elements), 2))
+    for i, elem_nodes in enumerate(elements):
+        active = elem_nodes[:element_types[i]]
+        centroids[i] = np.mean(nodes[active], axis=0)
+    return centroids
+
+
+def _ssr_zone_exclusion_mask(fem_data, zone):
+    """Per-element boolean mask flagging elements to EXCLUDE from strength reduction
+    because their centroid lies OUTSIDE the SSR search-area polygon ``zone``.
+
+    ``zone`` is an (x, y) vertex list (RS2's "SSR Search Area"; strength reduction
+    applies only INSIDE it). Elements whose centroid is inside get mask = False
+    (reduced); those outside get mask = True (held at full strength) — the same
+    True = excluded convention as ssr_exclude_mask, so the two compose by union.
+    """
+    poly = Polygon([(float(x), float(y)) for x, y in zone])
+    if not poly.is_valid:
+        poly = poly.buffer(0)
+    if poly.is_empty or poly.area <= 0:
+        raise ValueError("ssr_zone polygon is degenerate (zero area); "
+                         "supply at least three non-collinear vertices.")
+    cen = _element_centroids(fem_data)
+    inside = shapely.contains_xy(poly, cen[:, 0], cen[:, 1])
+    return ~np.asarray(inside, dtype=bool)
+
+
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
                oob_window=10,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
@@ -3405,7 +3439,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-               grid=None, min_slip_depth=None, ssr_exclude=None):
+               grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3482,6 +3516,18 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             of interest instead of a deeper true-global minimum. Names must match
             the fem_data material names exactly; an unknown name raises ValueError.
             Default None = every zone reduced (today's behavior, bit-identical).
+        ssr_zone (list of (x, y) or None): An "SSR Search Area" polygon — strength
+            reduction is applied ONLY to elements whose centroid lies INSIDE this
+            polygon; everything outside keeps full strength (F = 1). This is RS2's
+            SSR-Search-Area constraint, whose native models store it as an exact
+            vertex polygon; it confines the strength-reduction mechanism to a chosen
+            region (e.g. a band around a proposed slip surface, or one local-minimum
+            face) instead of searching the whole domain. Given as a vertex list
+            [(x1, y1), (x2, y2), ...] in the model's coordinate system (a closing
+            repeat of the first vertex is allowed; the ring is closed automatically).
+            Composes with ssr_exclude by UNION of exclusions: an element is held at
+            full strength if it is named-excluded OR outside the zone. Default None
+            = no search-area constraint (every element eligible, bit-identical).
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
@@ -3508,6 +3554,20 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             print(f"  SSR exclusion: {wanted} "
                   f"({int(ssr_exclude_mask.sum())}/{len(element_materials)} elements "
                   f"held at full strength)")
+
+    # An "SSR Search Area" polygon confines strength reduction to its INTERIOR:
+    # elements whose centroid lies OUTSIDE the zone keep full strength (mask = True),
+    # matching RS2's SSR-Search-Area semantics. Same True = excluded convention as
+    # ssr_exclude_mask, so the two compose by union (an element is held at full
+    # strength if it is named-excluded OR outside the zone).
+    if ssr_zone is not None:
+        zone_mask = _ssr_zone_exclusion_mask(fem_data, ssr_zone)
+        ssr_exclude_mask = (zone_mask if ssr_exclude_mask is None
+                            else (ssr_exclude_mask | zone_mask))
+        if debug_level >= 1:
+            print(f"  SSR search area: {len(list(ssr_zone))}-vertex polygon "
+                  f"({int(zone_mask.sum())}/{len(zone_mask)} elements outside, held "
+                  f"at full strength)")
 
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']

@@ -499,6 +499,12 @@ def run_fem_test(test):
     if 'ssr_exclude' in test:
         kwargs['ssr_exclude'] = [s.strip() for s in str(test['ssr_exclude']).split(';')
                                  if s.strip()]
+    # SSR search-area polygon (RS2's "SSR Search Area"): a flat x1;y1;x2;y2;... list
+    # of the constraint polygon's vertices (semicolon-separated, since tags split on
+    # commas). Strength reduction is confined to elements inside the polygon.
+    if 'ssr_zone' in test:
+        _z = [float(v) for v in str(test['ssr_zone']).split(';') if v.strip() != '']
+        kwargs['ssr_zone'] = list(zip(_z[0::2], _z[1::2]))
     result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
                         debug_level=0, **kwargs)
 

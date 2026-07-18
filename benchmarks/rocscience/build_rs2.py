@@ -222,7 +222,8 @@ def rs2_60c():
     return 'rs2_60c.xlsx'
 
 
-def _poly_slope_data(polygons, materials, circle, max_depth):
+def _poly_slope_data(polygons, materials, circle, max_depth,
+                     piezo_line=None, piezo_phreatic=False):
     """Assemble a polygon-input slope_data for RS2 Part-III problems whose
     geometry is a set of material zones (not stacked profile lines).
 
@@ -231,7 +232,12 @@ def _poly_slope_data(polygons, materials, circle, max_depth):
     field the loader expects is present); ``circle`` a single starting circle for
     the LEM search; ``max_depth`` the search floor. Geometry coordinates are
     transcribed from the vendor RS2 .fez models (dev-side cross-check only) and
-    hard-coded here so the corpus rebuilds without them."""
+    hard-coded here so the corpus rebuilds without them.
+
+    ``piezo_line`` optionally supplies a single piezometric surface [(x, y), ...];
+    when given, each material spec should carry ``u='piezo'`` and pore pressure is
+    computed from the surface. ``piezo_phreatic`` sets the phreatic-inclination
+    (cos^2) correction flag, matching the RS2 groundwater 'phreatic' surface type."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     mats = []
@@ -248,7 +254,8 @@ def _poly_slope_data(polygons, materials, circle, max_depth):
     sd['gamma_water'] = 9.81
     sd['dloads'] = []
     sd['dloads2'] = []
-    sd['piezo_line'] = []
+    sd['piezo_line'] = list(piezo_line) if piezo_line else []
+    sd['piezo_phreatic'] = bool(piezo_phreatic)
     sd['circular'] = True
     sd['non_circ'] = []
     sd['circles'] = [circle]
@@ -451,9 +458,103 @@ def rs2_62c():
     return 'rs2_62c.xlsx'
 
 
+# RS2 #65 -- eight materials of the Padina tailings dam (Table 1 / the .fez).
+# c, phi, gamma are Table 1 = the .fez densities (g/cm3 x 10); E, nu are Table 1
+# (absent from the .fez, which imports E = 0). psi = 0 (Griffiths convention).
+# For a static-groundwater effective-stress run the pore pressure comes from the
+# piezometric surface, so gamma_sat = gamma (one unit weight + explicit water).
+_RS2_65_SOILS = [
+    dict(name='Rockfill Lyulyaka', c=20.0, phi=38.0, gamma=18.6, gamma_sat=18.6,
+         E=75000.0, nu=0.30, u='piezo'),
+    dict(name='Fill', c=22.5, phi=33.7, gamma=18.9, gamma_sat=18.9,
+         E=70000.0, nu=0.31, u='piezo'),
+    dict(name='Rockfill G.Sakar', c=20.0, phi=38.0, gamma=18.6, gamma_sat=18.6,
+         E=75000.0, nu=0.30, u='piezo'),
+    dict(name='Counterfill', c=22.5, phi=33.7, gamma=18.9, gamma_sat=18.9,
+         E=70000.0, nu=0.31, u='piezo'),
+    dict(name='Tailings', c=0.0, phi=34.8, gamma=13.3, gamma_sat=13.3,
+         E=16100.0, nu=0.35, u='piezo'),
+    dict(name='Alluvial Clay', c=0.0, phi=24.65, gamma=19.8, gamma_sat=19.8,
+         E=16300.0, nu=0.34, u='piezo'),
+    dict(name='Marly Clay', c=0.0, phi=19.5, gamma=22.2, gamma_sat=22.2,
+         E=38000.0, nu=0.33, u='piezo'),
+    dict(name='Marl', c=30.0, phi=24.5, gamma=24.0, gamma_sat=24.0,
+         E=75000.0, nu=0.30, u='piezo'),
+]
+
+# The 14-point phreatic surface (RS2 groundwater, 'phreatic' type -> cos^2 flag).
+_RS2_65_PIEZO = [
+    (-70.0, 9.0), (-17.5, 9.0), (-1.769, 12.739), (15.821, 13.65),
+    (80.77, 13.65), (79.941, 16.754), (82.344, 21.909), (87.613, 28.198),
+    (94.921, 34.997), (103.165, 40.181), (106.171, 42.117), (107.511, 42.117),
+    (116.167, 46.0), (155.5, 46.0),
+]
+
+
+def rs2_65():
+    """RS2 #65 (Part III) -- Slope Stability Assessment of a Tailings Dam, the
+    Padina tailings dam after Tzenkov (2008), RS2 Slope Stability Verification
+    Manual Part III Problem 65 (Table 1, pp. 230-231).
+
+    A 225 m wide x 77 m tall cross-section of an eight-material tailings dam with a
+    phreatic surface. Twelve zones tile the domain (union area = domain area =
+    13262 m2, no gaps/overlaps): a Marl base (mat 7), Marly-Clay and Alluvial-Clay
+    bands (mat 6, 5), a Counterfill body (mat 3), the Tailings core (mat 4) and the
+    Rockfill/Fill embankment shells (mats 0-2). Pore pressure is applied from a
+    single 14-point phreatic surface connected to every material (static
+    groundwater; the .fez carries no FE seepage solution to read).
+
+    Published (manual results table): RS2 SSRM 1.29 (the FE target) | Slide2
+    circular 1.41 | Slide2 non-circular 1.33 | reference LEM 1.39 | reference FEM
+    1.41. Geometry + phreatic line transcribed from 'slope stability #065.fez' via
+    the .fez zone polygonizer; the circle is an inert placeholder the loader
+    requires (SSRM only -- no LEM surface is defined on an RS2 SSR model)."""
+    zones = [
+        (7, [(155.5, 6.808), (155.5, -30.0), (-70.0, -30.0), (-70.0, -11.429),
+             (-37.925, -8.257), (31.51, -1.914), (86.672, 3.183), (111.139, 4.769),
+             (155.5, 6.808)]),
+        (6, [(155.5, 8.766), (155.5, 6.808), (111.139, 4.769), (86.672, 3.183),
+             (31.51, -1.914), (-37.925, -8.257), (-70.0, -11.429), (-70.0, -2.367),
+             (-55.142, -1.008), (-3.377, 3.07), (49.746, 5.335), (115.103, 7.488),
+             (155.5, 8.766)]),
+        (5, [(155.5, 10.933), (155.5, 8.766), (115.103, 7.488), (49.746, 5.335),
+             (-3.377, 3.07), (-55.142, -1.008), (-70.0, -2.367), (-70.0, 9.0),
+             (-17.5, 9.0), (10.263, 9.896), (36.87, 10.265), (84.954, 10.933),
+             (155.5, 10.933)]),
+        (4, [(101.0, 46.0), (116.167, 46.0), (155.5, 46.0), (155.5, 10.933),
+             (84.954, 10.933), (66.734, 22.767), (66.734, 23.868), (74.159, 23.868),
+             (64.72, 30.287), (79.823, 30.287), (69.754, 36.957), (92.786, 36.957),
+             (84.102, 42.117), (103.165, 42.117), (107.511, 42.117), (101.0, 46.0)]),
+        (1, [(96.01, 47.0), (100.0, 47.0), (101.0, 46.0), (107.511, 42.117),
+             (103.165, 42.117), (96.01, 47.0)]),
+        (2, [(82.5, 43.0), (89.0, 47.0), (96.01, 47.0), (103.165, 42.117),
+             (84.102, 42.117), (82.5, 43.0)]),
+        (2, [(68.0, 37.5), (76.0, 43.0), (82.5, 43.0), (84.102, 42.117),
+             (92.786, 36.957), (69.754, 36.957), (68.0, 37.5)]),
+        (0, [(44.0, 30.0), (56.0, 37.5), (68.0, 37.5), (69.754, 36.957),
+             (79.823, 30.287), (64.72, 30.287), (44.0, 30.0)]),
+        (0, [(23.0, 18.5), (40.5, 30.0), (44.0, 30.0), (55.037, 22.767),
+             (36.87, 10.265), (10.263, 9.896), (23.0, 18.5)]),
+        (3, [(-17.5, 9.0), (-2.0, 18.5), (23.0, 18.5), (10.263, 9.896),
+             (-17.5, 9.0)]),
+        (0, [(84.954, 10.933), (36.87, 10.265), (55.037, 22.767), (66.734, 22.767),
+             (84.954, 10.933)]),
+        (0, [(64.72, 30.287), (74.159, 23.868), (66.734, 23.868), (66.734, 22.767),
+             (55.037, 22.767), (44.0, 30.0), (64.72, 30.287)]),
+    ]
+    sd = _poly_slope_data(
+        polygons=zones,
+        materials=[dict(m) for m in _RS2_65_SOILS],
+        circle={'Xo': 75.0, 'Yo': 70.0, 'Depth': 0.0, 'R': 70.0},
+        max_depth=0.0,
+        piezo_line=_RS2_65_PIEZO, piezo_phreatic=True)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_65.xlsx'))
+    return 'rs2_65.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
-               rs2_62a, rs2_62b, rs2_62c):
+               rs2_62a, rs2_62b, rs2_62c, rs2_65):
         print(fn())

@@ -137,7 +137,7 @@ independently verifiable.
 | [62](#rs2-62) | Three-layered slope with a soft band | **built** (Analysis III) | [rs2_62c.xlsx](../files/rocscience/rs2_62c.xlsx) (+ a/b built, unlocked). Cheng et al. (2007), 3 band widths × 2 dilation cases. SSRM (ψ = 0) 0.843 on the 12 m geometry vs RS2 0.81 / Plaxis 0.82 (Flac3D's ψ = 0 = 1.03 is the code-split the problem is about). The ≈ 0.4 m band must be mesh-resolved (0.998 → 0.843 from 0.5 → 0.3 m); the wider I/II domains are too costly to band-resolve for the suite, and the ψ = φ column is non-associated-only out of scope. |
 | [63](#rs2-63) | Homogeneous slope assessment | **built** | [rs2_63.xlsx](../files/rocscience/rs2_63.xlsx). Cheng et al. (2007), 11 m homogeneous slope. Spencer 1.398 and SSRM 1.409 vs Slide2 1.380 / RS2 SSRM 1.38 / Cheng 1.383 (a consistent +1.5%). |
 | 64 | Three homogeneous landslides | *blocked* | Teoman, Topal & Isik (2004), Ankara clay E90 highway. **12 cases** (3 slopes × original/failed × short/long-term), each a Bishop FS on a *proposed* (digitized) non-circular slip surface — RS2 SSR 0.99–6.97 vs Slide2 Bishop. Tranche-2 finding: the vendor .fez carry an SSR *Search Area* region, **not** the digitized surface, so `single_noncirc` has no surface to load; an unconstrained SSRM will not equilibrate the very stable dry short-term slopes (FS 5–7, fails at the strong end); and cases 7–12 add full saturation + 0.03 g pseudo-static seismic. Blocked pending the digitized surfaces and a seismic path. |
-| 65 | Tailings dam | *planned* | Tzenkov (2008) Padina dam, **8 materials**. Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41. Tranche-2 finding: the vendor .fez imports cleanly through xslope's `.fez` zone polygonizer (12 valid zones, 8 materials, phreatic surface) — geometry is no longer the blocker. Deferred on cost: the 225 × 77 m section needs a band-fine SSRM mesh with water-table pore pressures, too heavy to iterate/lock in this tranche. |
+| [65](#rs2-65) | Tailings dam | **built** | [rs2_65.xlsx](../files/rocscience/rs2_65.xlsx). Tzenkov (2008) Padina dam, **8 materials**, 12 zones, phreatic surface on the 225 × 77 m section. SSRM 1.331 at the 3 m lock mesh vs Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41 — lands on Slide2's non-circular LEM and inside the published 1.29–1.41 band. Mesh-sensitive: 1.381 / 1.369 / 1.331 at 8 / 5 / 3 m, drifting down from the LEM/FEM cluster toward RS2's SSRM as the band localizes. |
 | [66](#rs2-66) | Embankment basal stability | **built** | [rs2_66a.xlsx](../files/rocscience/rs2_66a.xlsx)…e. Nakamura, Cai & Ugai (2008), 5 soft-layer thicknesses (h₁ = 2–10 m). SSRM 1.04–1.08 across the family vs Slide2 Spencer 1.05–1.16 / RS2 SSRM 1.05–1.19 / LEM–FEM ref 1.08–1.24 — a few percent low (ψ = 0 vs the reference ψ = φ; thin φ = 0 band is mesh-sensitive). Regression-locked at a common 3 m mesh. |
 | 67 | Earth dam under steady & transient unsaturated seepage | *blocked* | Transient — blocked on a transient solver. |
 | 68 | Seismically loaded slopes | *planned* | Loukidis, Bandini & Salgado (2003). Publishes a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — Slide2 Bishop/Spencer k꜀ 0.118–0.431 vs limit-analysis bounds. Tranche-2: needs a k꜀-search harness (invert seismic k for FS = 1), which the current tags do not provide. |
@@ -1350,6 +1350,45 @@ Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.4
 <!-- test: file=../files/rocscience/rs2_63.xlsx, type=fem_ssrm, expected_fs=1.409, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, benchmark=RS2-63 -->
 
 ![RS2-63: homogeneous slope (Cheng et al. 2007), SSRM 1.409 — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-63.png)
+
+### RS2-65: Slope stability assessment of a tailings dam (Tzenkov 2008) {#rs2-65}
+
+**Input files:** [rs2_65.xlsx](../files/rocscience/rs2_65.xlsx)
+
+The Padina tailings dam, after
+
+> Tzenkov, A. (2008). *(as cited in the RS2 Slope Stability Verification Manual, Part III,
+> Problem 65, "Slope Stability Assessment of a Tailings Dam", Table 1, pp. 230–231).*
+
+A 225 m wide × 77 m tall cross-section of an **eight-material** tailings dam with a
+**phreatic surface**. Twelve zones tile the domain with no gaps or overlaps (union area =
+domain area = 13 262 m²): a Marl base, Marly-Clay and Alluvial-Clay bands, a Counterfill
+body, the Tailings core (c = 0, φ = 34.8°) and the Rockfill/Fill embankment shells. Pore
+pressure is applied from a single 14-point phreatic surface connected to every material
+(static groundwater — the vendor `.fez` carries no FE seepage solution to read). Strength
+parameters are Table 1 = the `.fez`; the elastic constants E, ν are Table 1 (the `.fez`
+imports E = 0, so they must be supplied for the FE build); ψ = 0 (the Griffiths convention
+this corpus uses).
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (3 m mesh) | 1.331 | RS2 SSRM 1.29 |
+
+*Published cross-bearings: Slide2 circular LEM 1.41; Slide2 non-circular LEM 1.33; reference
+LEM 1.39; reference FEM 1.41.*
+
+XSLOPE's SSRM lands at **1.331**, matching Slide2's non-circular LEM (1.33) exactly and sitting
+inside the published 1.29–1.41 band. The value is **mesh-sensitive**: the tailings/embankment
+shear band keeps localizing as the elements shrink, so FS drifts down with refinement —
+**1.381 / 1.369 / 1.331** at target sizes 8 / 5 / 3 m. Coarse meshes read on the LEM/FEM/Slide2-
+circular cluster (1.39–1.41); the 3 m lock has drifted onto the Slide2 non-circular value and
+toward RS2's own SSRM (1.29), which is the low member of the published set. It is therefore
+locked as a **regression** anchor at the 3 m mesh (a full solve on the 225 m section), not
+advertised as converged, consistent with the mesh discipline stated at the top of this page.
+
+<!-- test: file=../files/rocscience/rs2_65.xlsx, type=fem_ssrm, expected_fs=1.331, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.1, f_max=1.5, max_iter=16000, benchmark=RS2-65 -->
+
+![RS2-65: Padina tailings dam (Tzenkov 2008), 8 materials + phreatic surface, SSRM 1.331 at the 3 m mesh — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-65.png)
 
 ### RS2-66: Embankment basal stability (Nakamura et al. 2008) {#rs2-66}
 

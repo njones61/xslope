@@ -136,10 +136,14 @@ live dict (every list is `[]` for a fresh one) — just build the lists directly
 Do NOT call `doc.new()` or reassign `doc.slope_data`; your edits are detected and
 the canvas re-renders automatically.
 
-- materials[i]: name, gamma, option ('mc' Mohr-Coulomb | 'cp'), c, phi, cp, r_elev,
-  d, psi, u ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if
-  unused), k1, k2, alpha, kr0, h0 (seepage), E, nu (FEM). Minimal MC example:
-  {'name':'Clay','gamma':130.0,'option':'mc','c':400.0,'phi':0.0,'u':'none',
+- materials[i]: name, gamma, option ('mc' Mohr-Coulomb | 'cp' | 'elastic' — infinite strength,
+  cannot fail; ignores every strength key below, uses only gamma/gsat/E/nu (+ seepage); LEM
+  treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
+  cutoff, stress units; None/blank = no cutoff (pre-v16 default), 0 = no tension; FEM only,
+  LEM ignores it), u ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if
+  unused), k1, k2, alpha, kr0, h0 (seepage), E, nu (FEM; also the sole mechanical properties
+  when option='elastic'). Minimal MC example:
+  {'name':'Clay','gamma':130.0,'option':'mc','c':400.0,'phi':0.0,'t_cut':None,'u':'none',
    'cp':0.0,'r_elev':0.0,'d':0,'psi':0,'sigma_gamma':0.0,'sigma_c':0.0,
    'sigma_phi':0.0,'sigma_cp':0.0,'sigma_d':0.0,'sigma_psi':0.0,'k1':0.0,'k2':0.0,
    'alpha':0.0,'kr0':0.0,'h0':0.0,'E':0.0,'nu':0.0}

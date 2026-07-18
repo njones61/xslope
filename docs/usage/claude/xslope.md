@@ -32,7 +32,8 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    **Always required:**
    - Units (English or Metric) — if not stated, ask
    - Unit weight (gamma) for every material
-   - Strength parameters for every material (c and phi, or Su for undrained)
+   - Strength parameters for every material (c and phi, or Su for undrained) — except a
+     material with `option='elastic'` (infinite strength, cannot fail), which needs none
 
    **Required for LEM:**
    - At least one starting circle or non-circular surface definition
@@ -45,10 +46,11 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, `unsat="vg"` (van Genuchten) with vg_a/vg_n, or `unsat="gard"` (Gardner power form) reusing the same vg_a/vg_n pair
 
    **Required for reliability:**
-   - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns L-Q). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
+   - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns Y-AD). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
 
    **Required for FEM:**
-   - Young's modulus (E) and Poisson's ratio (nu) for every material
+   - Young's modulus (E) and Poisson's ratio (nu) for every material (also the sole mechanical
+     inputs for an `option='elastic'` material)
 
    When asking, be specific about exactly what is missing:
    > "I can see the slope geometry and friction angles, but the diagram doesn't specify:
@@ -217,7 +219,8 @@ slope_data['materials'] = [
         'name':  'clay',
         'gamma': 120.0,
         'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),
-                                 #   'pow' (power curve), or 'hb' (generalized Hoek-Brown)
+                                 #   'pow' (power curve), 'hb' (generalized Hoek-Brown), or
+                                 #   'elastic' (infinite strength, cannot fail — see below)
         'c':     200.0,          # cohesion
         'phi':   28.0,           # friction angle (degrees)
         'u':     'piezo',        # pore pressure: 'none', 'piezo', 'seep', or 'ru'; set slope_data['piezo_phreatic']=True for the phreatic cos^2 correction (piezo sheet Type)
@@ -232,9 +235,23 @@ slope_data['materials'] = [
         'hb_gsi': 0.0,           # Geological Strength Index, in (0, 100]
         'hb_mi':  0.0,           # intact Hoek-Brown constant (rock type)
         'hb_d':   0.0,           # disturbance factor, in [0, 1]
+        # --- option='elastic' only (v16): infinite strength, cannot fail. FEM holds it out of
+        #     plasticity entirely; LEM treats it as impenetrable (a failure surface may not
+        #     cross it). Uses gamma/gsat/E/nu + seepage columns only — every strength key above
+        #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut) is ignored (loader warns if any is set).
+        #     Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength", SLOPE/W
+        #     "Bedrock (Impenetrable)".
         # --- rapid drawdown only (Kc=1 envelope) ---
         'd':     0.0,            # cohesion intercept
         'psi':   0.0,            # friction angle
+        # --- tensile-strength cutoff (v16): Rankine cap on the major principal stress, stress
+        #     units. Read by mc/cp/pow/hb (NOT 'elastic', which cannot fail regardless). None/
+        #     blank = no cutoff — unbounded tension, exactly pre-v16 behavior; 0 = soil carries
+        #     no tension. FEM only; LEM ignores it (model a tension crack instead). On 'mc', a
+        #     t_cut at or above the cone apex c/tan(phi) never binds (inert). Caution: in a
+        #     reinforced fill, t_cut=0 can block continuum equilibrium (the tension belongs to
+        #     the reinforcement, not the soil) — leave None or use a small nonzero value there.
+        't_cut': None,
         # --- seepage ---
         'k1':    0.5, 'k2': 0.2, 'alpha': 0.0,   # conductivities + tensor angle
         'unsat': 'lf',           # unsaturated model: 'lf' (linear front, default),
@@ -243,7 +260,7 @@ slope_data['materials'] = [
         'vg_a':  0.0,  'vg_n': 0.0,              # curve params for BOTH 'vg' and 'gard'
                                                  #   (vg: alpha & n; gard: a & n in kr=1/(1+a*psi^n))
                                                  #   these are the 'a'/'n' columns on the mat sheet
-        # --- FEM ---
+        # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,
         # --- reliability std deviations (only when running reliability) ---
         'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0,
@@ -257,6 +274,11 @@ Common strength setups:
 - **Total stress / undrained (Su):** `option='mc', c=Su, phi=0, u='none'`.
 - **Effective stress with a piezometric line:** `option='mc', c=c', phi=phi', u='piezo'`.
 - **Effective stress with a seepage solution:** `option='mc', c=c', phi=phi', u='seep'`.
+- **Rigid / infinite-strength zone (bedrock, a retaining wall):** `option='elastic'` — only
+  gamma/gsat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
+  key is ignored, and the LEM search treats the zone as impenetrable.
+- **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
+  any mc/cp/pow/hb material; leave `t_cut=None` for the pre-v16 unbounded-tension default.
 
 #### Geometry — `profile_lines` OR `polygons` (mutually exclusive)
 
@@ -1051,7 +1073,7 @@ state on dedicated sheets whose layouts mirror the first set:
 | Drawn-down piezometric line | **piezo** sheet, columns D-E (Piezo Line 2) | data from row 4 |
 | Drawn-down reservoir load | **dloads (2)** sheet | same block layout as dloads |
 | Drawn-down seepage BCs | **seep bc (2)** sheet | same layout as seep bc |
-| Undrained (Kc=1) envelope | **mat** sheet columns I (d) and J (psi) | per material |
+| Undrained (Kc=1) envelope | **mat** sheet columns J (d) and K (psi) | per material |
 
 Rules:
 - Materials with `d`/`psi` BLANK are treated as **free-draining** (drained strength in all
@@ -1088,7 +1110,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
 
 2. **Profile lines go top-to-bottom.** The first profile line is the ground surface or the shallowest layer. Each subsequent line defines a deeper layer boundary. Points within each line go left-to-right. **A profile line must only span where its material exists** — where an upper layer pinches out (e.g. embankment fill ending at the toe), end the line there; never run it horizontally coincident with the line below, or you create an invalid zero-thickness polygon (see the Sheet: profile pinch-out rule). For geometries where this is awkward (irregular bedrock, lenses, zoned dams), use the **polygon** sheet instead — see "Sheet: polygon". Fill in profile OR polygon, never both.
 
-3. **Material numbering is 1-based** in the Excel file. Mat ID 1 in the profile sheet references row 9 (first data row) of the mat sheet.
+3. **Material numbering is 1-based** in the Excel file. Mat ID 1 in the profile sheet references row 11 (first data row) of the mat sheet.
 
 4. **Max Depth (profile-line input only)** sets a horizontal rigid base at that literal
    elevation — failure surfaces cannot pass below it (0 means elevation zero; there is no

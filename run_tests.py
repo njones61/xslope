@@ -219,6 +219,23 @@ def run_lem_test(test):
     right_facing = True if _rf in ('true', '1', 'yes') else (
         False if _rf in ('false', '0', 'no') else None)
 
+    # Optional circular_search window constraints (Slide2 "search limits" semantics).
+    # Values are semicolon-separated (commas already split the tag): center_box has 4
+    # numbers, entry_range/exit_range/tangent_depth have 2. Absent -> None (the
+    # unconstrained global search, unchanged). See xslope.search.circular_search.
+    def _bounds(key, n):
+        raw = test.get(key)
+        if raw is None or str(raw).strip() == '':
+            return None
+        parts = [float(v) for v in str(raw).split(';') if v.strip() != '']
+        if len(parts) != n:
+            raise ValueError(f"{key} needs {n} ';'-separated numbers, got {raw!r}")
+        return tuple(parts)
+    center_box = _bounds('center_box', 4)
+    entry_range = _bounds('entry_range', 2)
+    exit_range = _bounds('exit_range', 2)
+    tangent_depth = _bounds('tangent_depth', 2)
+
     slope_data = load_slope_data(file_path)
 
     if test_type == 'single_circle':
@@ -241,7 +258,8 @@ def run_lem_test(test):
     elif test_type == 'circular_search':
         fs_cache, converged, search_path, circle_cache = circular_search(
             slope_data, method, num_slices=num_slices, rapid=rapid, composite=composite,
-            seed=seed
+            seed=seed, center_box=center_box, entry_range=entry_range,
+            exit_range=exit_range, tangent_depth=tangent_depth
         )
         if not fs_cache or fs_cache[0]['FS'] >= 9999:
             return None, "circular_search found no valid surface"

@@ -102,6 +102,76 @@ def _base_tension_too_extensive(df_slices):
     return len(N) > 0 and float((N < 0).mean()) > MAX_BASE_TENSION_FRAC
 
 
+# === Optional search-window constraints (Slide2 "search limits" semantics) ===
+# All three default to None, which is exactly the historical unconstrained search
+# (the helpers below short-circuit to True and add no behaviour). When set, they
+# confine the adaptive circular search to a region of the geometry so it settles on
+# a chosen local minimum instead of the global one — the LEM analog of RS2's SSR
+# Polygon Search Area / Slide2's entry-and-exit and slip-centre limits.
+
+
+def _center_in_box(x, y, center_box):
+    """True if the trial circle CENTRE ``(x, y)`` lies within ``center_box`` —
+    an ``(x1, y1, x2, y2)`` rectangle whose corners may be given in any order.
+    ``None`` disables the box (every centre passes)."""
+    if center_box is None:
+        return True
+    x1, y1, x2, y2 = center_box
+    return (min(x1, x2) <= x <= max(x1, x2)) and (min(y1, y2) <= y <= max(y1, y2))
+
+
+def _tangent_depth_ok(depth, tangent_depth):
+    """True if the circle's lowest point — elevation ``depth`` (= Yo - R, the
+    tangent line of the arc) — lies within the ``tangent_depth`` = ``(ymin, ymax)``
+    elevation band. ``None`` disables the band."""
+    if tangent_depth is None:
+        return True
+    ymin, ymax = tangent_depth
+    return min(ymin, ymax) <= depth <= max(ymin, ymax)
+
+
+def _endpoints_in_ranges(failure_surface, entry_range, exit_range):
+    """True if the failure surface's two trace endpoints satisfy the entry/exit
+    x-range limits. Following Slide2's convention the ENTRY endpoint is the
+    crest-side (higher-ground) trace point and the EXIT endpoint is the toe-side
+    (lower-ground) trace point, so the limits are independent of slope facing.
+    Either range may be ``None`` (that end is unconstrained); both ``None`` passes
+    every surface."""
+    if entry_range is None and exit_range is None:
+        return True
+    if failure_surface is None:
+        return False
+    coords = list(failure_surface.coords)
+    if len(coords) < 2:
+        return False
+    (xl, yl), (xr, yr) = coords[0], coords[-1]
+    # crest side = the endpoint sitting on higher ground; toe side = the lower one.
+    if yl >= yr:
+        entry_x, exit_x = xl, xr
+    else:
+        entry_x, exit_x = xr, xl
+    if entry_range is not None:
+        a, b = entry_range
+        if not (min(a, b) <= entry_x <= max(a, b)):
+            return False
+    if exit_range is not None:
+        a, b = exit_range
+        if not (min(a, b) <= exit_x <= max(a, b)):
+            return False
+    return True
+
+
+def _validate_search_bounds(center_box, entry_range, exit_range, tangent_depth):
+    """Shape-check the optional search-window tuples, raising a clear ValueError on
+    a malformed bound. ``None`` bounds are left untouched."""
+    if center_box is not None and len(tuple(center_box)) != 4:
+        raise ValueError("center_box must be a 4-tuple (x1, y1, x2, y2)")
+    for name, rng in (("entry_range", entry_range), ("exit_range", exit_range),
+                      ("tangent_depth", tangent_depth)):
+        if rng is not None and len(tuple(rng)) != 2:
+            raise ValueError(f"{name} must be a 2-tuple (lo, hi)")
+
+
 class AnalysisCancelled(Exception):
     """Raised by a search/reliability run when its ``cancel_check`` asks it to stop.
 
@@ -118,7 +188,8 @@ def _check_cancel(cancel_check):
 def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                        rapid=False, composite=False, nx=10, ny=5, n_tangents=6,
                        keep=4, diagnostic=False, cancel_check=None, circle_cache=None,
-                       min_slip_depth=None):
+                       min_slip_depth=None, center_box=None, entry_range=None,
+                       exit_range=None, tangent_depth=None):
     """Coarse grid-and-tangent sweep that SEEDS the adaptive circular search.
 
     The adaptive 9-point search is a local optimizer: it refines whatever
@@ -186,6 +257,13 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 R = yc - yt
                 if R <= 0:
                     continue
+                # Honour the optional search window: centres outside center_box and
+                # tangent lines outside tangent_depth are not candidates (skipped,
+                # never clamped). None bounds pass everything -> unchanged sweep.
+                if not _center_in_box(xc, yc, center_box):
+                    continue
+                if not _tangent_depth_ok(yt, tangent_depth):
+                    continue
                 circle = {'Xo': float(xc), 'Yo': float(yc), 'Depth': float(yt), 'R': float(R)}
                 success, result = generate_slices(slope_data, circle=circle,
                                                   num_slices=sweep_slices,
@@ -194,7 +272,8 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                     continue
                 df_slices, failure_surface = result
                 if (_net_driving_too_small(df_slices) or _too_thin(df_slices, H, MIN_THICKNESS_FRAC)
-                        or _too_shallow(df_slices, min_slip_depth)):
+                        or _too_shallow(df_slices, min_slip_depth)
+                        or not _endpoints_in_ranges(failure_surface, entry_range, exit_range)):
                     continue
                 if rapid:
                     ok, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
@@ -232,7 +311,8 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None, composite=False,
-                    seed='circles', min_slip_depth=None):
+                    seed='circles', min_slip_depth=None, center_box=None, entry_range=None,
+                    exit_range=None, tangent_depth=None):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -275,12 +355,37 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     both to keep an LEM/SSRM comparison on the same mechanism. Off by default, so the
     reported surface is the true minimum unless the caller opts in.
 
+    ``center_box``, ``entry_range``, ``exit_range`` and ``tangent_depth`` are optional
+    SEARCH-WINDOW constraints, all default None = today's unconstrained search
+    (byte-for-byte identical). They confine the adaptive refinement to a region of the
+    geometry so it settles on a chosen LOCAL minimum rather than the global one — the
+    LEM analog of RS2's SSR Polygon Search Area and Slide2's slip-centre / entry-and-
+    exit limits (a benched slope has several competing minima; see RS2-61):
+
+      * ``center_box=(x1, y1, x2, y2)`` confines candidate circle CENTRES to a
+        rectangle (corners in any order). The refined grid stays inside the box —
+        grid points that fall outside are dropped, so the search cannot walk out of
+        it. A starting circle whose centre lies outside the box is clamped to the box
+        for its launch only (a seed, not a reported candidate).
+      * ``entry_range=(xa, xb)`` / ``exit_range=(xc, xd)`` confine the surface trace
+        endpoints, in x, to the given ranges. ENTRY is the crest-side (higher-ground)
+        endpoint and EXIT the toe-side (lower-ground) one, independent of facing. A
+        trial whose endpoints fall outside is REJECTED (scored fs_fail), never
+        clamped, so the reported minimum genuinely honours the window.
+      * ``tangent_depth=(ymin, ymax)`` confines the circle's lowest point (its tangent
+        elevation) to an elevation band; out-of-band trials are rejected.
+
+    All four survive the grid refinement and the grid-seed sweep. A malformed bound
+    raises ValueError.
+
     Returns:
         list of dict: sorted fs_cache by FS
         bool: convergence flag
         list of dict: search path
         list of dict: circle_cache - all circles tested during search
     """
+
+    _validate_search_bounds(center_box, entry_range, exit_range, tangent_depth)
 
     if seed != 'grid' and not slope_data.get('circles'):
         raise ValueError(
@@ -337,7 +442,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             slope_data, method_name, num_slices=num_slices, fs_fail=fs_fail,
             rapid=rapid, composite=composite, diagnostic=diagnostic,
             cancel_check=cancel_check, circle_cache=circle_cache,
-            min_slip_depth=min_slip_depth)
+            min_slip_depth=min_slip_depth, center_box=center_box,
+            entry_range=entry_range, exit_range=exit_range, tangent_depth=tangent_depth)
         circles = circles + list(slope_data.get('circles') or [])
         if not circles:
             return [], False, [], circle_cache
@@ -377,8 +483,12 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                 else:
                     df_slices, failure_surface = result
                     if (_net_driving_too_small(df_slices) or _too_thin(df_slices, h_ground, thin_frac)
-                            or _too_shallow(df_slices, min_slip_depth)):
-                        FS = fs_fail  # degenerate (near-zero driving; grid mode also drops skins)
+                            or _too_shallow(df_slices, min_slip_depth)
+                            or not _tangent_depth_ok(d, tangent_depth)
+                            or not _endpoints_in_ranges(failure_surface, entry_range, exit_range)):
+                        # degenerate (near-zero driving; grid mode also drops skins),
+                        # or the trial falls outside the optional search window
+                        FS = fs_fail
                         solver_result = None
                     else:
                         if rapid:
@@ -432,6 +542,12 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         points = [(x, y) for y in Ys for x in Xs]
 
         for i, (x, y) in enumerate(points):
+            # center_box confines candidate centres: grid points outside the box are
+            # dropped, so the refined grid can never walk out of it. None = no box.
+            if not _center_in_box(x, y, center_box):
+                if diagnostic:
+                    print(f"[out of box] grid pt {i + 1}/9 at (x={x:.2f}, y={y:.2f}) — skipped")
+                continue
             if (x, y) in fs_cache:
                 result = fs_cache[(x, y)]
                 if diagnostic:
@@ -473,11 +589,22 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         _check_cancel(cancel_check)
         x0 = start_circle['Xo']
         y0 = start_circle['Yo']
-        r0 = y0 - start_circle['Depth']
+        depth_guess = start_circle['Depth']
+        # With a search window, a seed circle from the input may sit outside it. The
+        # SEED is only a launch point, not a reported candidate, so clamp its centre
+        # into center_box (and its tangent into the tangent_depth band) so the first
+        # grid begins inside the window. Candidates are still rejected, never clamped.
+        if center_box is not None:
+            x1, y1, x2, y2 = center_box
+            x0 = min(max(x0, min(x1, x2)), max(x1, x2))
+            y0 = min(max(y0, min(y1, y2)), max(y1, y2))
+        if tangent_depth is not None:
+            tlo, thi = min(tangent_depth), max(tangent_depth)
+            depth_guess = min(max(depth_guess, tlo), thi)
+        r0 = y0 - depth_guess
         if diagnostic:
             print(f"\n[⏱ starting circle {i+1}] x={x0:.2f}, y={y0:.2f}, r={r0:.2f}")
         grid_size = r0 * 0.15
-        depth_guess = start_circle['Depth']
         fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
         all_starts.append((start_circle, best_point))
 

@@ -165,7 +165,8 @@ def parse_test_tags(md_path):
             params['file2'] = str(md_dir / params['file2'])
 
         # Convert numeric fields
-        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta']:
+        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta',
+                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol']:
             if key in params:
                 params[key] = float(params[key])
         if 'num_slices' in params:
@@ -273,6 +274,95 @@ def run_lem_test(test):
 
     else:
         return None, f"Unknown LEM test type: {test_type}"
+
+
+def run_critical_kc_test(test):
+    """Find the CRITICAL seismic coefficient k_c — the horizontal pseudo-static
+    coefficient at which the searched minimum factor of safety equals 1.0 — and
+    compare it to the published k_c. This is the verification target for RS2 #68
+    (Loukidis, Bandini & Salgado 2003), which publishes k_c, not an FS.
+
+    Tag keys: file, method, expected_kc, k_min, k_max, num_slices (default 40),
+    fs_tol (confirming-search FS band, default 0.005), kc_tol (the comparison
+    tolerance, via _expected_and_tol), max_outer (default 3).
+
+    Algorithm (cheap and honest): FS decreases monotonically as k rises, so k_c is
+    a single crossing. A full circular search at the bracket midpoint fixes a near-
+    critical circle; k is then bisected on that FIXED circle with fast single-circle
+    solves (~0.1 s each) until FS = 1; a confirming FULL search at that k re-checks
+    that the true minimum surface there is also FS ≈ 1. If a more critical surface
+    has emerged (the critical circle migrates with k), it is adopted and the inner
+    bisection repeats — so the result converges to the search-minimised k_c from
+    above, at the cost of ~2 full searches rather than one per bisection step.
+    Returns the k_c (compared to expected_kc within kc_tol by the framework)."""
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+    from xslope.search import circular_search
+
+    method = test['method']
+    num_slices = int(test.get('num_slices', 40))
+    k_min = float(test['k_min'])
+    k_max = float(test['k_max'])
+    fs_tol = float(test.get('fs_tol', 0.005))
+    max_outer = int(test.get('max_outer', 3))
+
+    slope_data = load_slope_data(test['file'])
+
+    def search_min(k):
+        """Full circular search at coefficient k → (min_FS, critical circle)."""
+        slope_data['k_seismic'] = k
+        fs_cache, _conv, _path, _cc = circular_search(
+            slope_data, method, num_slices=num_slices)
+        if not fs_cache or fs_cache[0]['FS'] >= 9999:
+            return None, None
+        b = fs_cache[0]
+        return b['FS'], {'Xo': b['Xo'], 'Yo': b['Yo'], 'Depth': b['Depth'],
+                         'R': b['Yo'] - b['Depth']}
+
+    def fs_on(circle, k):
+        """FS on a FIXED circle at coefficient k (one single_circle solve)."""
+        slope_data['k_seismic'] = k
+        ok, res = generate_slices(slope_data, circle=circle, num_slices=num_slices)
+        if not ok:
+            return None
+        slice_df, _fs = res
+        out = solve_selected(method, slice_df)
+        if isinstance(out, str):
+            return None
+        return out['FS']
+
+    _fs_mid, circle = search_min(0.5 * (k_min + k_max))
+    if circle is None:
+        return None, f"circular search found no surface at k={0.5*(k_min+k_max):.4f}"
+
+    kc = 0.5 * (k_min + k_max)
+    for _outer in range(max_outer):
+        lo, hi = k_min, k_max
+        fs_lo, fs_hi = fs_on(circle, lo), fs_on(circle, hi)
+        if fs_lo is None or fs_hi is None:
+            return None, "fixed-circle solve failed at a bracket endpoint"
+        if not (fs_hi <= 1.0 <= fs_lo):
+            return None, (f"k_c is not bracketed on the critical circle: "
+                          f"FS({lo})={fs_lo:.3f}, FS({hi})={fs_hi:.3f} "
+                          f"(need FS(k_min)>=1>=FS(k_max)) — widen k_min/k_max")
+        fs = fs_hi
+        for _inner in range(50):
+            kc = 0.5 * (lo + hi)
+            fs = fs_on(circle, kc)
+            if fs > 1.0:
+                lo = kc            # too stable — raise k
+            else:
+                hi = kc            # unstable — lower k
+            if abs(fs - 1.0) <= 1e-4:
+                break
+        fs_chk, circle_chk = search_min(kc)
+        if circle_chk is None:
+            return None, f"confirming search found no surface at k={kc:.4f}"
+        if abs(fs_chk - 1.0) <= fs_tol:
+            return kc, None        # the true minimum surface at k_c is also FS≈1
+        circle = circle_chk        # critical circle migrated — adopt and re-bisect
+    return kc, None                # best estimate after max_outer iterations
 
 
 def run_design_test(test):
@@ -3035,6 +3125,8 @@ def run_test(test):
         return run_reliability_test(test)
     elif test_type == 'design_search':
         return run_design_test(test)
+    elif test_type == 'critical_kc':
+        return run_critical_kc_test(test)
     elif test_type == 'sensitivity':
         return run_sensitivity_test(test)
     else:
@@ -3050,6 +3142,9 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('reliability', 'fem_reliability'):
         expected = test.get('expected_beta')
         tol = test.get('tolerance', 0.02)
+    elif test_type == 'critical_kc':
+        expected = test.get('expected_kc')
+        tol = test.get('kc_tol', 0.01)
     elif test_type == 'sensitivity':
         # the runner checks base/low/high internally; the framework-level
         # comparison re-checks the base row
@@ -3070,7 +3165,7 @@ def _expected_and_tol(test, default_tolerance):
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
 _COST_RANK = {'fem_reliability': 6, 'fem_ssrm': 5, 'fem_elements': 5,
-              'reliability': 4, 'seep_elements': 3, 'seep': 3,
+              'reliability': 4, 'critical_kc': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2}
 
 

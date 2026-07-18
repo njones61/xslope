@@ -677,9 +677,99 @@ def rs2_51():
     return 'rs2_51.xlsx'
 
 
+def rs2_68a():
+    """RS2 #68 Case 1 (Ru = 0.5, homogeneous) -- Stability of Seismically Loaded
+    Slopes, after Loukidis, Bandini & Salgado (2003), Geotechnique 53(5), 463-479.
+
+    The verification target is a CRITICAL seismic coefficient k_c: the horizontal
+    pseudo-static coefficient at which the slope is just stable (searched minimum
+    FS = 1). It is not an FS -- the `critical_kc` test type bisects k until the
+    circular search returns FS = 1 and locks the resulting k_c. The builder must
+    therefore NOT set k_seismic; the harness sweeps it.
+
+    A 25 m high homogeneous slope, 1V:3H face (toe (35, 25) -> crest (110, 50)),
+    c = 25 kPa, phi = 30 deg, gamma = 20 kN/m3. Case 1 carries a pore-pressure
+    ratio r_u = 0.5 (u = r_u * sigma_v) -- the manual's Case-1 condition, which the
+    RS2 SSR .fez does not carry through the reader (it imports r_u = 0), so it is
+    set here from the manual. Left-facing (ground descends leftward); the seismic
+    auto-direction drives the failure.
+
+    Published k_c (Slide2 LEM columns are the XSLOPE targets): Slide2 Bishop 0.118,
+    Spencer 0.132; RS2 SSR 0.125; reference FEM 0.132 / Bishop 0.127 / Spencer 0.131
+    / log-spiral 0.132; limit-analysis UB 0.145 / LB 0.126. Geometry transcribed
+    from the RS2 vendor model 'slope stability #068_01.fez'."""
+    poly = [(0.0, 0.0), (0.0, 25.0), (35.0, 25.0), (110.0, 50.0), (300.0, 50.0),
+            (300.0, 0.0)]
+    sd = _poly_slope_data(
+        polygons=[(0, poly)],
+        materials=[dict(name='rock1', c=25.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
+                        E=1.0e5, nu=0.3, u='ru', ru=0.5)],
+        circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
+        max_depth=0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68a.xlsx'))
+    return 'rs2_68a.xlsx'
+
+
+def rs2_68b():
+    """RS2 #68 Case 2 (Ru = 0, homogeneous) -- same 25 m, 1V:3H, c = 25 / phi = 30
+    / gamma = 20 slope as Case 1 (rs2_68a) but dry (u = none). Critical seismic
+    coefficient k_c is the verification target (see rs2_68a).
+
+    Published k_c: Slide2 Bishop 0.425, Spencer 0.431; RS2 SSR 0.413; reference FEM
+    0.433 / Bishop 0.426 / Spencer 0.431 / log-spiral 0.432; UB 0.454 / LB 0.423.
+    Geometry from 'slope stability #068_02.fez' (200 m wide domain vs Case 1's
+    300 m; the critical mechanism is near the slope, so the extra width is inert)."""
+    poly = [(0.0, 0.0), (0.0, 25.0), (35.0, 25.0), (110.0, 50.0), (200.0, 50.0),
+            (200.0, 0.0)]
+    sd = _poly_slope_data(
+        polygons=[(0, poly)],
+        materials=[dict(name='rock1', c=25.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
+                        E=1.0e5, nu=0.3, u='none')],
+        circle={'Xo': 72.0, 'Yo': 85.0, 'Depth': 20.0, 'R': 65.0},
+        max_depth=0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68b.xlsx'))
+    return 'rs2_68b.xlsx'
+
+
+def rs2_68c():
+    """RS2 #68 Case 3 (Ru = 0, non-homogeneous 3-layer) -- a benched slope in three
+    dipping rock bands, dry. Critical seismic coefficient k_c is the target (see
+    rs2_68a). Materials (mat_id 0/1/2): rock1 c = 4 / phi = 30 / gamma = 17 (upper
+    wedge), rock2 c = 25 / phi = 15 / gamma = 19 (the weak-friction middle band that
+    the mechanism rides), rock3 c = 15 / phi = 45 / gamma = 19 (strong base). Ground
+    (-30, 20) -> (150, 55); left-facing.
+
+    Published k_c: Slide2 Bishop 0.155, Spencer 0.151; RS2 SSR 0.161; reference FEM
+    0.161 / Bishop 0.155 / UB 0.172 / LB 0.148. Zone polygons transcribed from the
+    RS2 vendor model 'slope stability #068_03.fez' via the .fez zone polygonizer."""
+    zones = [
+        (0, [(74.693, 41.077), (109.5, 55.0), (150.0, 55.0), (150.0, 44.5),
+             (74.693, 41.077)]),                                        # rock1 (upper)
+        (1, [(150.0, 44.5), (150.0, 33.0), (35.6, 27.8), (60.0, 40.0), (72.0, 40.0),
+             (74.693, 41.077)]),                                        # rock2 (weak band)
+        (2, [(150.0, 33.0), (150.0, -20.0), (-30.0, -20.0), (-30.0, 20.0),
+             (20.0, 20.0), (35.6, 27.8)]),                              # rock3 (base)
+    ]
+    sd = _poly_slope_data(
+        polygons=zones,
+        materials=[
+            dict(name='rock1', c=4.0, phi=30.0, gamma=17.0, gamma_sat=17.0,
+                 E=1.0e5, nu=0.3, u='none'),
+            dict(name='rock2', c=25.0, phi=15.0, gamma=19.0, gamma_sat=19.0,
+                 E=1.0e5, nu=0.3, u='none'),
+            dict(name='rock3', c=15.0, phi=45.0, gamma=19.0, gamma_sat=19.0,
+                 E=1.0e5, nu=0.3, u='none'),
+        ],
+        circle={'Xo': 78.0, 'Yo': 82.0, 'Depth': 27.0, 'R': 55.0},
+        max_depth=0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_68c.xlsx'))
+    return 'rs2_68c.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
-               rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51):
+               rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
+               rs2_68a, rs2_68b, rs2_68c):
         print(fn())

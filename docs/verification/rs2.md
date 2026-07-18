@@ -140,7 +140,7 @@ independently verifiable.
 | [65](#rs2-65) | Tailings dam | **built** | [rs2_65.xlsx](../files/rocscience/rs2_65.xlsx). Tzenkov (2008) Padina dam, **8 materials**, 12 zones, phreatic surface on the 225 × 77 m section. SSRM 1.331 at the 3 m lock mesh vs Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41 — lands on Slide2's non-circular LEM and inside the published 1.29–1.41 band. Mesh-sensitive: 1.381 / 1.369 / 1.331 at 8 / 5 / 3 m, drifting down from the LEM/FEM cluster toward RS2's SSRM as the band localizes. |
 | [66](#rs2-66) | Embankment basal stability | **built** | [rs2_66a.xlsx](../files/rocscience/rs2_66a.xlsx)…e. Nakamura, Cai & Ugai (2008), 5 soft-layer thicknesses (h₁ = 2–10 m). SSRM 1.04–1.08 across the family vs Slide2 Spencer 1.05–1.16 / RS2 SSRM 1.05–1.19 / LEM–FEM ref 1.08–1.24 — a few percent low (ψ = 0 vs the reference ψ = φ; thin φ = 0 band is mesh-sensitive). Regression-locked at a common 3 m mesh. |
 | 67 | Earth dam under steady & transient unsaturated seepage | *blocked* | Transient — blocked on a transient solver. |
-| 68 | Seismically loaded slopes | *planned* | Loukidis, Bandini & Salgado (2003). Publishes a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — Slide2 Bishop/Spencer k꜀ 0.118–0.431 vs limit-analysis bounds. Tranche-2: needs a k꜀-search harness (invert seismic k for FS = 1), which the current tags do not provide. |
+| [68](#rs2-68) | Seismically loaded slopes | **built** | [rs2_68a.xlsx](../files/rocscience/rs2_68a.xlsx) / [b](../files/rocscience/rs2_68b.xlsx) / [c](../files/rocscience/rs2_68c.xlsx). Loukidis, Bandini & Salgado (2003). Target is a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — locked via a new `critical_kc` bisection harness. Homogeneous Cases 1/2 (r<sub>u</sub> = 0.5 / dry): k꜀ 0.127–0.432 (Bishop/Spencer) on the Slide2/reference LEM to ~0.001; Case 3 (3-layer, band-riding) 0.167–0.169 vs Slide2 0.151–0.155 — high by ~10% (circular can't ride the φ = 15° band as tightly as non-circular) but inside the UB/LB bracket [0.148, 0.172] and on RS2 SSR/FEM 0.161. |
 
 ### Part IV — RS2 *Slope Stability Verification Manual, Pt 4* (catalog)
 
@@ -187,8 +187,8 @@ its reference/Slide2 figures (representative case where a problem has several).
 | 57 | Layered, TC (Pockoski & Duncan slope 3) | 1.32 | 8-program ~1.40 | *new* |
 | 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | 0.98 | GOLD-NAIL 0.91, UTEXAS4 1.02 | *new* |
 | 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | 1.34 / 1.45 | Baker 1.35 / 1.48 | [RS2-34](#rs2-34) |
-| 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | 0.96 | — | RS2-68 *(planned)* |
-| 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | 0.99 | — | RS2-68 *(planned)* |
+| 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | 0.96 | — | [RS2-68](#rs2-68) |
+| 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | 0.99 | — | [RS2-68](#rs2-68) |
 | 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | [VP64](rocscience.md#vp64) (LEM) |
 | 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | 2.60 | ref 2.71 | *new* |
 | 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | 2.22 | ref 2.30 | *new* |
@@ -215,7 +215,7 @@ Fig 4-1) by the [VP64](rocscience.md#vp64) lock (USACE's Spencer hand-verificati
 reproduced on its specified circle — Spencer 2.488 / Bishop 2.489 vs Slide2 2.445 / USACE
 2.44) and VP67 (USACE 2003 F-5) by the [VP67](rocscience.md#vp67) lock (end-of-construction
 embankment on its specified toe circle — Spencer 1.316 / Bishop 1.320 vs Slide2 1.328 /
-USACE 1.33), 2 mapping to planned rows (RS2-68 Loukidis, RS2-28/38/39-41-43), and **≈12
+USACE 1.33), 2 mapping to corpus rows (RS2-68 Loukidis — now **built**; RS2-28/38/39-41-43 — still planned), and **≈12
 genuinely new** candidates: the ACADS 2b dam variant (VP6), the rest of the USACE 2003
 embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and soil-nail
 wall (VP57, VP60),
@@ -1529,6 +1529,69 @@ of this page.
 ![RS2-66: embankment basal stability (Nakamura et al. 2008), thinnest (h₁ = 2 m, SSRM 1.081) and thickest (h₁ = 10 m, SSRM 1.056) soft-band cases — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-66a.png)
 
 ![RS2-66 (h₁ = 10 m)](images/RS2-66e.png)
+
+### RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003) {#rs2-68}
+
+**Input files:** [rs2_68a.xlsx](../files/rocscience/rs2_68a.xlsx) (Case 1, r<sub>u</sub> = 0.5) ·
+[b](../files/rocscience/rs2_68b.xlsx) (Case 2, dry) · [c](../files/rocscience/rs2_68c.xlsx) (Case 3, 3-layer)
+
+The one problem on this page whose target is **not a factor of safety** but a
+**critical seismic coefficient** k꜀, after
+
+> Loukidis, D., Bandini, P., & Salgado, R. (2003). "Stability of seismically loaded slopes
+> using limit analysis." *Géotechnique*, 53(5), 463–479. *(RS2 Slope Stability Verification
+> Manual, Part III, Problem 68.)*
+
+k꜀ is the horizontal pseudo-static coefficient at which the slope is **just stable** — the k
+for which the searched minimum FS = 1. Three cases share a 25 m, 1V:3H homogeneous slope
+(c = 25 kPa, φ = 30°, γ = 20 kN/m³) except where noted: **Case 1** adds a pore-pressure ratio
+r<sub>u</sub> = 0.5; **Case 2** is dry; **Case 3** replaces the homogeneous body with three
+dipping rock bands on a benched profile — an upper wedge (c = 4, φ = 30, γ = 17), a
+weak-friction middle band (c = 25, **φ = 15**, γ = 19) that the mechanism rides, and a strong
+base (c = 15, φ = 45, γ = 19).
+
+XSLOPE reproduces k꜀ with a `critical_kc` harness: FS falls monotonically as k rises, so k꜀ is
+a single crossing. A circular search at the bracket midpoint fixes the near-critical circle;
+k is then bisected on that fixed circle (fast single-circle solves) until FS = 1, and a
+confirming full search at that k re-checks that the true minimum surface there is also FS ≈ 1
+(adopting the migrated circle and re-bisecting if not). The pseudo-static direction is set
+automatically from the (left-facing) slope.
+
+| Case | Method | XSLOPE k꜀ | Slide2 | Reference |
+|---|---|---|---|---|
+| 1 (r<sub>u</sub> = 0.5) | Bishop | 0.127 | 0.118 | Bishop 0.127, FEM 0.132, UB 0.145 / LB 0.126 |
+| 1 (r<sub>u</sub> = 0.5) | Spencer | 0.132 | 0.132 | Spencer 0.131, log-spiral 0.132, RS2 SSR 0.125 |
+| 2 (dry) | Bishop | 0.426 | 0.425 | Bishop 0.426, FEM 0.433, UB 0.454 / LB 0.423 |
+| 2 (dry) | Spencer | 0.433 | 0.431 | Spencer 0.431, log-spiral 0.432, RS2 SSR 0.413 |
+| 3 (3-layer) | Bishop | 0.169 | 0.155 | RS2 SSR 0.161, FEM 0.161, UB 0.172 / LB 0.148 |
+| 3 (3-layer) | Spencer | 0.167 | 0.151 | UB 0.172 / LB 0.148, RS2 SSR 0.161 |
+
+The homogeneous cases land squarely on the reference: Case 1 Spencer (0.132) and Case 2 both
+methods (0.426 / 0.433) match the Slide2 and reference LEM columns to ~0.001–0.002, and Case 1
+Bishop (0.127) sits exactly on the reference Bishop (0.127) — it is Slide2's own Bishop
+(0.118) that is the low outlier there. The homogeneous critical mechanism is a **deep,
+large-radius** arc (for the gentle 1V:3H face the seismic surface reaches well below the toe),
+consistent with the published failure-surface figures.
+
+**Case 3 runs high** against the Slide2 LEM (0.169 / 0.167 vs 0.155 / 0.151, +9–10%). The
+governing surface rides the thin φ = 15° band, which is intrinsically **non-circular**; a
+circular search cannot follow the band as tightly as Slide2's rigorous non-circular surface,
+so it settles on a slightly less critical mechanism and therefore a higher k꜀. The XSLOPE
+values still fall inside the reference upper/lower-bound bracket [0.148, 0.172] and sit on
+RS2's own SSR and the reference FEM (0.161), so they are honest circular-search k꜀ — the gap
+is the known circular-vs-band limitation, not a solver error. These are **k꜀ locks (not FS)**,
+recorded as regression anchors at the values XSLOPE's circular search actually returns.
+
+<!-- test: file=../files/rocscience/rs2_68a.xlsx, type=critical_kc, method=bishop, expected_kc=0.127, k_min=0.08, k_max=0.18, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-bishop -->
+<!-- test: file=../files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, expected_kc=0.132, k_min=0.08, k_max=0.18, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-spencer -->
+<!-- test: file=../files/rocscience/rs2_68b.xlsx, type=critical_kc, method=bishop, expected_kc=0.426, k_min=0.38, k_max=0.48, kc_tol=0.01, num_slices=40, benchmark=RS2-68b-bishop -->
+<!-- test: file=../files/rocscience/rs2_68b.xlsx, type=critical_kc, method=spencer, expected_kc=0.433, k_min=0.38, k_max=0.48, kc_tol=0.01, num_slices=40, benchmark=RS2-68b-spencer -->
+<!-- test: file=../files/rocscience/rs2_68c.xlsx, type=critical_kc, method=bishop, expected_kc=0.169, k_min=0.11, k_max=0.20, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-bishop -->
+<!-- test: file=../files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, expected_kc=0.167, k_min=0.11, k_max=0.20, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-spencer -->
+
+![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.433 (left) and the Spencer critical seismic surface, a broad arc dipping below the toe, FS = 1.00 (right)](images/rs2_68b.png)
+
+![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical surface at k꜀ = 0.167 riding the weak φ = 15° middle band, FS = 1.00 (right)](images/rs2_68c.png)
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

@@ -60,6 +60,30 @@ On the James Bay dyke verification problem ([VP75](../verification/rocscience.md
 
 In XSLOPE Studio, grid seeding is the **Grid search** toggle in the Run LEM dialog, available when the analysis is an automated circular search.
 
+### Search-Window Limits
+
+By default, `circular_search()` explores the whole model and reports the true global minimum. Four optional keyword arguments — `center_box`, `entry_range`, `exit_range`, and `tangent_depth` — narrow that exploration to a chosen region instead, the LEM analog of Slide2's slip-centre / entry-and-exit search limits and RS2's SSR Polygon Search Area. All four default to `None` (unconstrained — the ordinary behavior of `circular_search()`); passing any of them confines the search to a region so it settles on a chosen **local** minimum rather than the global one.
+
+- `center_box=(x1, y1, x2, y2)` restricts candidate circle **centers** to a rectangle (corners in any order). Grid points outside the box are dropped outright, so refinement can never walk out of it; a starting circle whose center lies outside is clamped in only for its own launch point, not reported as a result.
+- `entry_range=(xa, xb)` / `exit_range=(xc, xd)` restrict where the failure surface crosses the ground surface, in x. Entry is the crest-side (higher-ground) endpoint and exit the toe-side one, independent of slope facing. A trial whose endpoints fall outside its range is **rejected** (scored at `fs_fail`), never clamped, so the reported minimum genuinely honors the window.
+- `tangent_depth=(ymin, ymax)` restricts the elevation of the circle's lowest (tangent) point to a band; out-of-band trials are rejected the same way.
+
+All four constraints survive both the adaptive 9-point refinement and the `seed='grid'` sweep, and a malformed bound raises `ValueError`.
+
+```python
+fs_cache, converged, search_path, circle_cache = circular_search(
+    slope_data, 'spencer',
+    entry_range=(42, 54),
+    exit_range=(23, 32),
+    tangent_depth=(16, 22),
+)
+```
+
+Use these limits when a slope has several competing local minima and the question at hand is about a specific one of them, not whichever is lowest. [RS2-61](../verification/rs2.md#rs2-61) is a worked example: the same homogeneous-slope geometry has a global minimum (Spencer 1.338, matching Slide2's 1.336) and a separate upper-face local minimum (Spencer 1.437, matching Slide2's 1.443) that an unconstrained search never reports, because it always finds the lower global value first. An `entry_range` / `exit_range` / `tangent_depth` window isolates the upper-face family instead.
+
+!!! note "No Studio UI yet"
+    These search-window limits are available at the `circular_search()` / test-tag level only — there is currently no dialog control for them in XSlope Studio. Set them from the API, or via a `circular_search` test tag (`center_box`, `entry_range`, `exit_range`, `tangent_depth`, each a `;`-separated list of numbers).
+
 ## Non-Circular Failure Surfaces
 
 The non-circular search algorithm (`noncircular_search()` in xslope/search.py) takes a fundamentally different approach from the circular search, as it must optimize the positions of multiple control points that define an arbitrary failure surface rather than just optimizing a center and depth. The algorithm begins with a user-defined initial failure surface specified as a sequence of points in the slope_data['non_circ'] array. Each point in this sequence is characterized by its x and y coordinates along with a movement constraint that controls how the point is allowed to move during the optimization process.

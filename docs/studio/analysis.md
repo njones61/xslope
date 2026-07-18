@@ -222,6 +222,22 @@ the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
 
+For an SSRM run, the **SSR exclusions…** button opens a checkbox picker — one row per
+material zone in the model, checked (included) by default:
+
+![SSR exclusions dialog](images/analysis_ssr_exclude_dialog.png)
+
+Unchecking a zone holds it at full strength through every trial factor instead of
+dividing its c and tan(φ) like the rest of the model — RS2's per-material *Apply_SSR*
+flag / SSR Exclusion Area. The mechanism is pushed up and out of an excluded zone, which
+is useful for keeping a non-participating zone (a stiff foundation, say) from carrying
+the failure, and for reproducing a vendor analysis that constrains the mechanism the same
+way — see [SSR Exclusion Zones](../fem/overview.md#ssr-exclusion-zones) for the
+engineering rationale and a worked comparison against RS2. The button and the summary
+label next to it are gated to the SSRM analysis; the choice is a run option, not a model
+property, so it lives with the rest of the dialog's settings (remembered for the session
+to prefill the next run) rather than being saved into the input file.
+
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
 **FEM · Results** (deformation, shear strain, displacement vectors). An SSRM run
 reports the factor of safety and can be **cancelled** mid-run. The solution is

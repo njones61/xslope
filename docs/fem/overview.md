@@ -595,6 +595,30 @@ The key parameters of `solve_ssrm()` are:
 
 The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. The `last_solution` can be passed directly to `plot_fem_results()` for visualization of the failure mechanism at the critical state.
 
+### SSR Exclusion Zones
+
+Some vendor SSR analyses constrain where the failure mechanism is allowed to develop by holding one or more material zones at full strength throughout the reduction — RS2 exposes this as a per-material **Apply_SSR** flag, presented in its interface as an "SSR Exclusion Area." XSLOPE reproduces the same mechanism through the optional **`ssr_exclude`** parameter on `solve_ssrm()`.
+
+`ssr_exclude` takes a list of material zone names. At every trial factor $F$, every zone *not* named still has its $c$ and $\tan\phi$ divided by $F$ as usual, but a named zone keeps its full, unreduced strength — it can never itself yield, so the developing shear band is forced up and out of it. This has two related uses: reproducing a vendor analysis that constrains where the mechanism may localize, so the two solutions can be compared surface-for-surface, and excluding a zone that the model includes for load transfer but that isn't meant to participate in the failure — a stiff foundation, a rock unit, or any layer the analysis calls non-participating.
+
+```python
+from xslope.fem import solve_ssrm
+
+result = solve_ssrm(
+    fem_data,
+    F_min=1.2,
+    F_max=1.5,
+    tolerance=0.02,
+    ssr_exclude=["Foundation lower"],
+)
+```
+
+Names must match a material's `name` field in the input exactly; an unknown name raises `ValueError` rather than silently reducing nothing. The default, `None`, reduces every zone — today's ordinary behavior, unchanged.
+
+Because the excluded zone can never fail, the reported factor of safety is conditional on that constraint rather than a true global minimum — run the unconstrained case too (`ssr_exclude=None`) so the comparison is explicit. [RS2-P4-VP67](../verification/rs2.md#p4-vp67) works through exactly this pair on a USACE end-of-construction embankment: an unconstrained SSRM of 1.076 riding a deep foundation mechanism, against 1.303 with the foundation's lower zone excluded, landing on the same toe-circle family RS2 reports at 1.33 under its own SSR Exclusion Area.
+
+In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run FEM dialog (SSRM only) — see [Finite element (FEM)](../studio/analysis.md#finite-element-fem).
+
 ## Element Type Selection and Volumetric Locking
 
 ### The Problem: Volumetric Locking in Low-Order Elements

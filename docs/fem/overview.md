@@ -127,6 +127,15 @@ This principal stress formulation allows direct evaluation of the yield function
 
 The implementation of this failure criterion within the finite element framework will be discussed after the basic finite element formulation is presented.
 
+**Elastic-only materials.** A material can be marked pure linear-elastic on the mat sheet by setting its
+**option** column to `elastic` (template version 16): none of its elements are ever checked against the yield
+criterion above, so they cannot yield regardless of stress state — the elastic constitutive relation $[D_e]$ from
+the previous section is the complete stress-strain law for them, for every strength reduction factor in an SSRM
+run. Only $\gamma$/$\gamma_{sat}$, $E$, and $\nu$ are meaningful for such a material; its strength columns are
+ignored. `solve_fem()` and `solve_ssrm()` take the affected material names through the `elastic_materials`
+argument, auto-wired from the template's **option** column when left unset. See
+[Worksheet: mat](../usage/input_template.md#worksheet-mat) in the Input Template for the full column semantics.
+
 ### Curved Failure Envelopes
 
 Two of XSLOPE's strength options are not straight lines in $\tau$–$\sigma'_n$ space: the power curve (`pow`) and the
@@ -401,7 +410,7 @@ Each iteration builds a corrected load vector and solves the full system:
 >- **Time step** $\Delta t$: A numerical parameter (not physical time) that controls stability. Following Smith & Griffiths (their Program 6.1 form): $\Delta t = \dfrac{4(1+\nu)}{3E}$. The Mohr-Coulomb stability bound $\Delta t = \dfrac{4(1+\nu)(1-2\nu)}{E(1-2\nu+\sin^2\phi)}$ is ~2.6× larger and was found to drive a sustained limit cycle at Gauss points in mild effective tension beneath reservoir loading (the per-iteration redistribution overshoots and never settles); the smaller value is in the stable regime. Note that the per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and failure criterion are calibrated jointly with it.<br>
 >- **Flow rule** $\dfrac{\partial Q}{\partial \sigma}$: non-associated flow with dilation angle $\psi = 0$ (no plastic volume change), evaluated from the full invariant form with Lode-angle corner treatment as described above. The gradient implementation is verified against finite differences of $Q$ to machine precision.<br>
 >- **Maximum iterations**: 3000 (true equilibria near the critical factor settle slowly; Griffiths & Lane used a ceiling near 1000, but hundreds to a few thousand iterations may be needed just below failure)<br>
->- **Tension cutoff** (optional, default off): a second viscoplastic mechanism that relaxes effective mean tension volumetrically. The $\psi = 0$ flow is purely deviatoric and cannot return a stress state near or beyond the Mohr-Coulomb apex. With the effective-stress pore-pressure formulation such states rarely arise below failure; the option remains for genuine tension zones (e.g., steep crests at low confinement). Griffiths & Lane (1999) include no tension treatment.
+>- **Tension cutoff** (optional, default off; `tension_cutoff` parameter): a second viscoplastic yield surface, a **Rankine cutoff** $F_t = \sigma_1' - T$ that caps the major (most-tensile) principal effective stress at $T$, applied by the same damped viscoplastic mechanism as the Mohr-Coulomb surface above (the two are combined by Koiter's rule at a corner where both are active). The global `tension_cutoff` flag is the $T = 0$ case (no principal tension permitted anywhere); a per-material cap is set through the mat sheet's **t_cut** column (blank = no cutoff; see [Worksheet: mat](../usage/input_template.md#worksheet-mat) in the Input Template) and is auto-wired into `solve_fem()`/`solve_ssrm()` the same way `elastic_materials` is. The $\psi = 0$ Mohr-Coulomb flow is purely deviatoric and cannot on its own return a stress state near or beyond the Mohr-Coulomb apex; this surface handles it. With the effective-stress pore-pressure formulation such states rarely arise below failure — the cutoff matters most for genuine tension zones (e.g., steep crests at low confinement) or fills with a low or zero apex. Griffiths & Lane (1999) include no tension treatment.
 
 **Key Points:**<br>
 >- **Constant stiffness**: $[K]$ never changes — all nonlinearity enters through the body load corrections<br>

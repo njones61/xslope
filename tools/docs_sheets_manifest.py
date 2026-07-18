@@ -41,16 +41,22 @@ SHEETS = [
     {"out": "sheet_plot.png", "src": RAPID, "sheet": "plot",
      "renderer": "manual", "note": "live Excel chart; manual capture stays"},
 
-    # mat — one wide sheet shown as three views, each re-showing the mat/name
-    # identity columns: strength, variability, seepage+stiffness. Rows auto-frame to
-    # each view's own content (the row-number gutter keeps the material rows aligned
-    # across views); the option legends ride along at the top where they exist.
+    # mat (v16, 38 cols A:AL) — one wide sheet shown as three views, each matching
+    # one of the sheet's own row-9 band headers exactly, so the split needs no
+    # hand-picked column break: "Shear Strength/Stiffness" (C:X, which now also
+    # carries t_cut/E/nu and so all four option legends: strength options, the
+    # color legend, pore-pressure options, and the elastic row), "Standard
+    # Deviations" (Y:AD), and "Seepage" (AE:AL, which carries the unsat-model
+    # legend). Each view re-shows the mat/name identity columns on the left; rows
+    # auto-frame to that view's own content (the row-number gutter keeps the
+    # material rows aligned across views by absolute row number, not by shared
+    # framing top).
     {"out": "sheet_mat1.png", "src": MAT, "sheet": "mat",
-     "cols": "C:U", "identity_cols": "A:B"},
+     "cols": "C:X", "identity_cols": "A:B"},
     {"out": "sheet_mat2.png", "src": MAT, "sheet": "mat",
-     "cols": "V:AA", "identity_cols": "A:B"},
+     "cols": "Y:AD", "identity_cols": "A:B"},
     {"out": "sheet_mat3.png", "src": MAT, "sheet": "mat",
-     "cols": "AB:AK", "identity_cols": "A:B"},
+     "cols": "AE:AL", "identity_cols": "A:B"},
 
     # profile / dloads carry many blank table slots; select the filled tables and
     # let the renderer keep their full (bordered) height.

@@ -45,18 +45,25 @@ OUT_DIR = os.path.join(REPO_ROOT, "docs", "usage", "sample_sheets")
 # Each material is a {header-key: value} dict; header keys match mat_header_cols()
 # (underscore-stripped: 'powa', 'hbsci', 's(g)', ...). Only keys present are
 # written; everything else is left blank.
+#
+# t_cut (v16) shows all three tri-state readings across the showcase: a positive
+# Rankine cap on Embankment, the RS2 VP2-style T=0 "no tension" idiom on the
+# phi=0 Soft Clay (cp) envelope (see the dependency-matrix note in the docs),
+# and blank (today's unbounded-tension default) on the rest.
 MAT_SHOWCASE = [
     # Embankment fill — Mohr-Coulomb, moist+saturated unit weights, a Kc=1
-    # rapid-drawdown envelope (d, psi), and two reliability std deviations.
+    # rapid-drawdown envelope (d, psi), a Rankine tension cutoff, and two
+    # reliability std deviations.
     {"name": "Embankment", "g": 125, "gsat": 128, "option": "mc",
-     "c": 50, "f": 32, "d": 300, "psi": 20, "u": "piezo",
+     "c": 50, "f": 32, "d": 300, "psi": 20, "tcut": 20, "u": "piezo",
      "s(c)": 15, "s(f)": 3,
      "k1": 5e-5, "k2": 5e-5, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
      "E": 30000, "nu": 0.33},
     # Soft foundation clay — c/p undrained strength increasing below a reference
-    # elevation.
+    # elevation. t_cut=0 is the RS2 VP2 crack-layer idiom: a phi=0 envelope
+    # implies unlimited tension unless explicitly capped at zero.
     {"name": "Soft Clay", "g": 118, "gsat": 122, "option": "cp",
-     "c": 600, "c/p": 12, "r-elev": 95, "u": "piezo",
+     "c": 600, "c/p": 12, "r-elev": 95, "tcut": 0, "u": "piezo",
      "s(c)": 60, "s(c/p)": 2,
      "k1": 1e-7, "k2": 1e-7, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
      "E": 8000, "nu": 0.40},
@@ -76,6 +83,12 @@ MAT_SHOWCASE = [
      "c": 0, "f": 34, "u": "ru", "ru": 0.15,
      "k1": 5e-2, "k2": 5e-2, "alpha": 0, "unsat": "vg", "a": 0.05, "n": 1.8,
      "E": 40000, "nu": 0.30},
+    # Sound bedrock — option='elastic' (cannot fail): only g/gsat, E, nu, and the
+    # seepage columns are read; strength columns are left blank (conditional
+    # formatting greys them out automatically).
+    {"name": "Bedrock", "g": 165, "gsat": 168, "option": "elastic", "u": "none",
+     "k1": 1e-8, "k2": 1e-8, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
+     "E": 2_000_000, "nu": 0.22},
 ]
 
 

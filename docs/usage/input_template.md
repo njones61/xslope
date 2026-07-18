@@ -61,7 +61,7 @@ The following sections describe each worksheet in detail, including the data str
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **15**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates.
+- **Template version**: Tracks template format for compatibility. The current version is **16**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option (see [Worksheet: mat](#worksheet-mat)); older files load unchanged, with `t_cut` blank (no cutoff) for every material.
 - **Unit weight of water** (γw): Used in pore pressure calculations
 - **Tension crack parameters**: Depth and water level within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh): Horizontal seismic acceleration coefficient for pseudo-static earthquake analysis
@@ -105,7 +105,7 @@ the horizontal scale.
 
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
-The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left: the **strength** columns (above), the **variability** columns for reliability analysis, and the **seepage** and **stiffness** columns (both further below). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out.
+The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, and the FEM properties E and ν, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability and the unsaturated-flow model, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -113,17 +113,21 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 - **$\gamma_{sat}$**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
   with depth below a reference elevation; `pow` = nonlinear power-curve envelope; `hb` = generalized Hoek-Brown
-  (rock).
+  (rock); `elastic` = elastic / infinite strength — the material cannot fail (added in template version 16; see
+  below).
 - **c** (cohesion) and **φ** (friction angle): Mohr-Coulomb shear strength parameters (option = `mc`).
 - **c**, **cp**, and **r-elev** (option = `cp`): undrained strength that increases linearly below a reference
   elevation — see the formula below.
 - **d**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
+- **t_cut**: tensile-strength cutoff, added in template version 16 — see below.
+- **E**: Young's modulus (FEM only).
+- **ν**: Poisson's ratio (FEM only).
+- **u**: pore pressure option
+- **$r_u$**: pore pressure ratio (u = `ru`) — see below.
 - **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — see the formula below.
 - **hb_sci**, **hb_gsi**, **hb_mi**, **hb_d** (option = `hb`): generalized Hoek-Brown parameters — see the
   formula below.
-- **u**: pore pressure option
-- **$r_u$**: pore pressure ratio (u = `ru`) — see below.
 
 For the **mc** strength option — the Mohr-Coulomb envelope, and the option you will use most of the time — the
 shear strength is a straight line in terms of the effective normal stress $\sigma'_n$ on the failure surface:
@@ -181,6 +185,47 @@ between principal stresses, so XSLOPE converts Eq. (3) to an equivalent Mohr env
 transformation and linearizes it at the operative normal stress into an instantaneous $(c_i, \phi_i)$ tangent.
 This happens automatically and iteratively — see [Hoek-Brown strength](../lem/overview.md#hoek-brown-strength).
 
+For the **elastic** strength option, the material is treated as linear-elastic with infinite strength — it cannot
+fail, regardless of stress state. In the FEM its elements are never checked against a yield criterion, so no
+plasticity ever develops in them (see [Elastic-only materials](../fem/overview.md#mohr-coulomb-failure-criterion)
+in the FEM overview). In the LEM, a trial failure surface may not cross into the material's interior — it may
+still ride along its boundary (e.g. a slide daylighting on top of bedrock), but a surface that cuts through it is
+rejected. This mirrors the "impenetrable" or "plasticity: none" material other slope-stability packages offer for
+bedrock or a structural foundation that is not itself part of the stability question. Only **$\gamma$**,
+**$\gamma_{sat}$**, **E**, and **ν** are read for an elastic material — the strength columns (**c** … **hb_d**,
+including **t_cut**) and the standard-deviation columns are ignored and greyed out automatically. The pore-pressure
+option is accepted but has no effect (leave it `none`).
+
+**Tensile-strength cutoff (t_cut).** Added in template version 16, **t_cut** is a Rankine cap on the major
+principal stress, in stress units, honored by the **FEM only** — the LEM ignores it (use the
+[tension crack](#worksheet-main) global parameters instead if that is the effect wanted in LEM). It layers on top
+of whichever shear envelope the material's `option` defines and never changes the envelope itself:
+
+- **Blank** (the default): no cutoff — unbounded tension, exactly today's behavior. Every existing input file is
+  unaffected.
+- **0**: the material carries no tension at all.
+- **A positive value**: the major principal stress is capped at that value.
+
+| option | `t_cut` read? | Blank `t_cut` = native tensile behavior |
+|--------|:---:|---|
+| `mc` | Yes — the primary use case | Tension permitted up to the envelope's own apex, $\sigma' = -c/\tan\phi$ |
+| `cp` | Yes — physically the most important case | Unlimited: a $\phi = 0$ envelope has no tensile limit of its own |
+| `pow` | Yes, rarely needed | The envelope's own $pow_d$ intercept already terminates tension at a finite value |
+| `hb` | Yes, rarely needed | The native Hoek-Brown tensile strength already applies; `t_cut` adds a further cap |
+| `elastic` | No — ignored (a warning is issued if strength values, including `t_cut`, are present) | Not applicable — the material cannot fail |
+
+The `cp` row is why **t_cut = 0** is a common setting for a soft, undrained clay: without it, the $\phi = 0$
+envelope carries tension without limit, which is rarely realistic for a layer prone to cracking.
+
+!!! warning "Reinforced fills"
+    In a reinforced fill (e.g. a geotextile-wrapped wall), the reinforcement carries most of the tension, but the
+    soil between layers still needs some tensile tolerance to reach equilibrium. Setting `t_cut = 0` on a
+    reinforced-fill material can prevent the FEM from converging. Leave `t_cut` blank, or use a small nonzero
+    value, for reinforced-fill materials.
+
+See [Tension cutoff](../fem/overview.md#elastic-plastic-behavior-viscoplastic-algorithm) in the FEM overview for
+how the FEM applies the cutoff during the viscoplastic solve.
+
 **Pore Pressure Options** (column labeled **u**):
 
 - **piezo**: Use piezometric line from **piezo** worksheet
@@ -196,7 +241,7 @@ This happens automatically and iteratively — see [Hoek-Brown strength](../lem/
 
 ![sheet_mat2.png](images/sheet_mat2.png)
 
-The remaining columns hold the seepage and stiffness properties, shown in the third view below.
+The remaining columns hold the seepage properties, shown in the third view below.
 
 ![sheet_mat3.png](images/sheet_mat3.png)
 
@@ -221,11 +266,6 @@ values by soil texture, and the unit convention for α, are tabulated in the
 [seepage overview](../seep/overview.md#van-genuchten-model).
 
 These parameters are defined in more detail in the [seepage analysis](../seep/overview.md) section.
-
-**Stiffness** (for FEM analysis):
-
-- **E**: Young's modulus
-- **ν**: Poisson's ratio
 
 ---
 

@@ -24,6 +24,8 @@ E and nu are picked from the table in docs/fem/overview.md by soil type, which w
     Soft Rock      1,000,000 - 10,000,000  0.15-0.30
 """
 
+import math
+
 KPA_TO_PSF = 20.8854342
 
 # (name, E_kPa, nu) — E is the midpoint of the published range
@@ -37,10 +39,20 @@ _ROCK_FILL   = ('Rock Fill',    175_000.0, 0.28)
 _SOFT_ROCK   = ('Soft Rock',    5_500_000.0, 0.22)
 
 
+def _finite(x):
+    """A finite float, or 0.0 for None / NaN / inf / non-numeric — so an unset or
+    NaN cell (fileio reads a blank as NaN) reads as 'no value', not a real number."""
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if (math.isnan(v) or math.isinf(v)) else v
+
+
 def is_imperial(materials):
     """Unit system from unit weight: metric gamma ~ 15-25 kN/m3, imperial ~ 90-160 pcf.
     The two bands are far apart, so a single threshold is safe."""
-    gammas = [float(m.get('gamma', 0) or 0) for m in materials]
+    gammas = [_finite(m.get('gamma')) for m in materials]
     gammas = [g for g in gammas if g > 0]
     if not gammas:
         return False
@@ -84,15 +96,25 @@ INHERITED_DEFAULT = (100_000.0, 0.3)
 
 
 def assign_elastic_props(materials, force=False):
-    """Set E and nu in place on materials still carrying the inherited unit-blind default.
+    """Set E and nu in place on every material that does NOT already carry a
+    deliberately-set, non-default value — i.e. one whose E is unset (None / 0 / NaN)
+    or still equal to the inherited unit-blind default. Materials that carry a real,
+    non-default E/nu (vendor .fez models, the rs2_56/57/58 Poisson study pair, HB
+    rock) are left untouched unless force=True.
 
-    Returns a list of (name, soil_type, E, nu, changed)."""
+    Idempotent: once a material has been given a physical soil-type E it reads as
+    deliberate on the next call and is preserved, so a plain rebuild reproduces the
+    same file.
+
+    Returns a list of (name, soil_type_or_status, E, nu, changed)."""
     imperial = is_imperial(materials)
     out = []
     for m in materials:
-        E_old = float(m.get('E', 0) or 0)
-        nu_old = float(m.get('nu', 0) or 0)
-        deliberate = (round(E_old, 3), round(nu_old, 3)) != INHERITED_DEFAULT
+        E_old = _finite(m.get('E'))
+        nu_old = _finite(m.get('nu'))
+        unset = E_old <= 0.0
+        inherited = (round(E_old, 3), round(nu_old, 3)) == INHERITED_DEFAULT
+        deliberate = not (unset or inherited)
         soil, E, nu = classify(m, imperial)
         if deliberate and not force:
             out.append((str(m.get('name', '?')), 'KEPT (set deliberately)', E_old, nu_old, False))

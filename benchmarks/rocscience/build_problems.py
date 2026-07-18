@@ -21,9 +21,11 @@ import warnings
 
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from elastic_props import assign_elastic_props  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -39,30 +41,26 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
 
 
 def save_slope_data_to_xlsx(slope_data, path):
-    """Write an input file, defaulting the SSR elastic constants on any material
-    that does not carry its own.
+    """Write an input file, assigning physically reasonable FEM elastic constants
+    (E, nu) by soil type to any material that does not carry deliberately-set values.
 
-    The corpus files are LEM-first, so most builders never mention E/nu/psi — but
-    the FEM refuses to run without E > 0, and the SSR factor is insensitive to the
-    elastic constants anyway. Filling them here keeps the builders the single
-    source of truth: they used to be patched straight into the .xlsx after the
-    fact, so a plain rebuild silently wiped them and broke the SSRM tags.
+    The corpus files are LEM-first, so most builders never mention E/nu/psi — but the
+    FEM refuses to run without E > 0. Historically these were filled with a single
+    unit-blind default (E = 100,000, nu = 0.3): a reasonable METRIC value (100 MPa)
+    that on an English-unit file (gamma in pcf) reads as 100,000 psf ~ 4.8 MPa —
+    ~10x too soft, producing absurd displacements. It does NOT change the SSRM factor
+    of safety, which is invariant to the elastic constants, but it corrupts the
+    deformation output and the displacement-vector figure panels.
 
-    The Griffiths convention is E = 10^5 kPa, nu = 0.3; gamma_water picks the unit
-    system, so imperial problems get the psf equivalent. A material that sets E
-    explicitly (e.g. the Pruska cases, which publish theirs) is left alone. psi is
-    deliberately untouched: it doubles as the modified-envelope angle for the 'cp'
-    strength option, and fileio already reads a blank cell as zero.
+    assign_elastic_props() (elastic_props.py) instead picks E and nu from the
+    docs/fem/overview table by soil type, in the file's OWN unit system (unit detected
+    from the unit weights: pcf ~ 90-160 vs kN/m3 ~ 15-25). A material that carries a
+    deliberately-set, non-default E/nu (e.g. the Pruska cases, which publish theirs,
+    or a vendor .fez model) is left alone. psi is deliberately untouched: it doubles
+    as the modified-envelope angle for the 'cp' strength option, and fileio already
+    reads a blank cell as zero.
     """
-    imperial = float(slope_data.get('gamma_water', 9.81) or 9.81) > 30.0
-    e_default = 2.0e6 if imperial else 1.0e5
-    for m in slope_data.get('materials', []):
-        e = m.get('E')
-        if e is None or not e or (isinstance(e, float) and math.isnan(e)):
-            m['E'] = e_default
-        nu = m.get('nu')
-        if nu is None or not nu or (isinstance(nu, float) and math.isnan(nu)):
-            m['nu'] = 0.3
+    assign_elastic_props(slope_data.get('materials', []))
     return _write_xlsx(slope_data, path)
 
 

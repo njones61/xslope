@@ -10,10 +10,29 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from shapely.geometry import Polygon  # noqa: E402
 
-from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+from xslope.fileio import load_slope_data  # noqa: E402
+from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from elastic_props import assign_elastic_props  # noqa: E402
+
+
+def save_slope_data_to_xlsx(slope_data, path):
+    """Write an input file, assigning physical FEM elastic constants (E, nu) by soil
+    type to any material lacking deliberately-set values, then delegating to fileio.
+
+    Most RS2 builders set E/nu explicitly (published vendor .fez values, the Pruska
+    Poisson-ratio study, HB rock), and those non-default values are preserved by
+    assign_elastic_props(); only a material still carrying the inherited unit-blind
+    default (E = 100,000, nu = 0.3) or no E at all is (re)assigned a soil-type value
+    in the file's own unit system. See build_problems.save_slope_data_to_xlsx and
+    elastic_props.py for the full rationale.
+    """
+    assign_elastic_props(slope_data.get('materials', []))
+    return _write_xlsx(slope_data, path)
+
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
                    'docs', 'files', 'rocscience')

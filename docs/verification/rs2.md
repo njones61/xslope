@@ -131,7 +131,7 @@ independently verifiable.
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
-| 59 | Three-layered soil slope | *planned* | Görög & Török (2007) Budapest landslide, vs Slide2 1.567 / RS2 SSRM 1.57 / PLAXIS 1.6. Tranche-2: the critical mechanism rides a thin weak "waste" lens (c = 1, φ = 5) and is **non-circular** — a circular search only finds the deeper competing surface (FS ≈ 1.9); needs an authored non-circular surface along the lens, or an SSRM run on the ~415 m-wide domain. |
+| [59](#rs2-59) | Three-layered soil slope | **built** | [rs2_59.xlsx](../files/rocscience/rs2_59.xlsx). Görög & Török (2007) Budapest landslide. The critical mechanism is **non-circular**, riding a thin weak "waste" lens (c = 1, φ = 5) — so this is an SSRM problem (a circular search misfinds the deeper competing surface, FS ≈ 1.9). SSRM 1.553 at the 3 m lock mesh vs Slide2 1.567 / RS2 SSRM 1.57 / PLAXIS 1.6 — lands on the Slide2/RS2 cluster (−0.9% / −1.1%). Mesh-sensitive: 1.61 at coarse meshes drifts to 1.553 once the tapering lens localizes. |
 | [60](#rs2-60) | Generalized Hoek–Brown, homogeneous slope | **built** (LEM) | [rs2_60a.xlsx](../files/rocscience/rs2_60a.xlsx) / [b](../files/rocscience/rs2_60b.xlsx) / [c](../files/rocscience/rs2_60c.xlsx). Three slope angles from Li, Merifield & Lyamin (2008) at GSI = 70, the strong-rock end of the criterion. Bishop/Spencer 1.009 / 1.017 / 1.008 against Li's F = 1.0. SSRM is not locked on this problem. |
 | [61](#rs2-61) | Local and global minima, homogeneous slope | **built** (case 1) | [rs2_61a.xlsx](../files/rocscience/rs2_61a.xlsx). Cheng, Lansivaara & Wei (2007). Case 1 (global minimum) Spencer 1.338 vs Slide2 1.336, Cheng 1.327, RS2 SSRM 1.35. Cases 2–4 fence a Polygon Search Area onto local minima — deferred, gated on a search-area constraint. |
 | [62](#rs2-62) | Three-layered slope with a soft band | **built** (Analysis III) | [rs2_62c.xlsx](../files/rocscience/rs2_62c.xlsx) (+ a/b built, unlocked). Cheng et al. (2007), 3 band widths × 2 dilation cases. SSRM (ψ = 0) 0.843 on the 12 m geometry vs RS2 0.81 / Plaxis 0.82 (Flac3D's ψ = 0 = 1.03 is the code-split the problem is about). The ≈ 0.4 m band must be mesh-resolved (0.998 → 0.843 from 0.5 → 0.3 m); the wider I/II domains are too costly to band-resolve for the suite, and the ψ = φ column is non-associated-only out of scope. |
@@ -1211,6 +1211,50 @@ Case 5 of the H = 14 m slope is the one outlier (−7.4% against a tight publish
 cluster; the same materials at H = 10.5 m agree within 1.6%) — it is reported here and
 excluded from the regression locks pending an explanation. Each slope's locks bracket
 its family (the weakest and strongest case).
+
+### RS2-59: Stability of a three-layered soil slope (Görög & Török 2007) {#rs2-59}
+
+**Input files:** [rs2_59.xlsx](../files/rocscience/rs2_59.xlsx)
+
+The Budapest (Rózsadomb) landslide, after
+
+> Görög, P. & Török, Á. (2007). *Slope stability assessment of weathered clay by using
+> field data and computer modelling: a case study from Budapest.* Natural Hazards 45
+> (as presented in the RS2 Slope Stability Verification Manual, Part III, Problem 59,
+> "Stability of a Three-Layered Soil Slope", pp. 200–201).
+
+A ~415 m wide × ~75 m tall real-coordinate hillslope in three layers: a YellowClay/Debris
+cover (c = 50, φ = 15°, γ = 19), a thin weak **waste lens** (c = 1, φ = 5°, γ = 14) and a
+strong GreyClay base (c = 250, φ = 30°, γ = 22). The waste lens is a wedge confined to the
+left ~136 m — ~12.6 m thick at the toe face, tapering to zero at x = 136 — that daylights on
+the toe. The critical mechanism is a **non-circular** translational slip riding the top of
+the lens, which is what makes this an SSRM (not a circular-search) problem: an unconstrained
+circular search misfinds the deeper competing surface (FS ≈ 1.9), whereas the SSRM localizes
+the shear band through the c = 1 / φ = 5 lens on its own. Dry — no water table, tension crack,
+seismic or loads. Elastic constants are the published Case-1 values (E = 50 000 kPa, ν = 0.4;
+the vendor `.fez` reader does not parse E/ν); ψ = 0 (the Griffiths convention this corpus uses).
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (3 m mesh) | 1.553 | RS2 SSRM 1.57 |
+
+*Published cross-bearings: Slide2 1.567; PLAXIS 1.6.*
+
+The published problem also runs a **Case 2** with varying moduli (GreyClay 20 000, YellowClay/
+Debris 18 000, Waste 2 000 kPa) — RS2 SSR 1.56 / Slide2 1.567 / PLAXIS 1.6. Since SSRM FS is
+insensitive to the elastic constants (an E-only change), Case 2 is not a separate XSLOPE case.
+
+XSLOPE's SSRM lands at **1.553**, on the Slide2 1.567 / RS2 SSRM 1.57 cluster (−0.9% / −1.1%)
+and just below PLAXIS 1.6. The value is **mesh-sensitive** through the tapering lens: coarse
+meshes read ≈ **1.61** (1.6125 / 1.609 at 8 / 4 m target sizes, near PLAXIS) and drift down to
+**1.553** at the 3 m mesh once the lens localizes (≈ 2 elements through its thinning thickness).
+It is locked as a **regression** anchor at the 3 m mesh (a full solve on the ~415 m section),
+landing on the LEM/RS2 cluster rather than advertised as converged, consistent with the mesh
+discipline stated at the top of this page.
+
+<!-- test: file=../files/rocscience/rs2_59.xlsx, type=fem_ssrm, expected_fs=1.553, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.3, f_max=1.9, max_iter=16000, benchmark=RS2-59 -->
+
+![RS2-59: Budapest three-layered soil slope (Görög & Török 2007), critical slip riding a thin weak waste lens (c = 1, φ = 5), SSRM 1.553 at the 3 m mesh — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-59.png)
 
 ### RS2-60: Generalized Hoek-Brown, homogeneous slope (Li et al. 2008) {#rs2-60}
 

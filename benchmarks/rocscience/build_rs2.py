@@ -262,6 +262,62 @@ def _poly_slope_data(polygons, materials, circle, max_depth,
     return sd
 
 
+def rs2_59():
+    """RS2 #59 (Part III) -- Stability of a Three-Layered Soil Slope, the Budapest
+    (Rozsadomb) landslide after
+
+        Gorog, P. & Torok, A. (2007), "Slope stability assessment of weathered clay
+        by using field data and computer modelling: a case study from Budapest,"
+        Natural Hazards 45.
+
+    A ~415 m wide x ~75 m tall real-coordinate hillslope in three layers: a
+    YellowClay/Debris cover (c = 50, phi = 15, gamma = 19), a thin weak WASTE lens
+    (c = 1, phi = 5, gamma = 14) and a strong GreyClay base (c = 250, phi = 30,
+    gamma = 22). The waste lens is a wedge that exists only in the left ~136 m,
+    ~12.6 m thick at the toe face and tapering to zero at x = 136; it daylights on
+    the toe and the critical mechanism is a NON-CIRCULAR translational slip riding
+    the top of the lens. A circular search misfinds the deeper competing surface
+    (FS ~ 1.9), so this is an SSRM problem -- the SSRM localizes the shear band
+    through the c = 1 / phi = 5 lens on its own.
+
+    Published (manual results table, Case 1 constant E = 50000 kPa, nu = 0.4):
+    Slide2 1.567 | RS2 SSR 1.57 | PLAXIS 1.6. Case 2 (varying E: GreyClay 20000,
+    YellowClay/Debris 18000, Waste 2000) reports RS2 SSR 1.56 / Slide2 1.567 /
+    PLAXIS 1.6 -- an E-only change that SSRM FS is insensitive to, so it is not a
+    separate XSLOPE case. Elastic constants are the published Case-1 values (the
+    .fez reader does not parse E/nu); psi = 0 (Griffiths convention). Dry -- no
+    water table, tension crack, seismic or loads in the model.
+
+    Geometry transcribed from the RS2 vendor model 'slope stability #059_01.fez'
+    via the .fez zone polygonizer; the circle is an inert placeholder the loader
+    requires (SSRM only -- no LEM surface is defined on an RS2 SSR model)."""
+    zones = [
+        (0, [(0.858, 120.076), (0.858, 122.016), (115.713, 126.355),
+             (132.493, 136.770), (147.248, 136.192), (267.021, 157.022),
+             (359.600, 164.833), (414.986, 175.537), (414.986, 158.868),
+             (350.052, 148.921), (223.914, 135.613), (135.965, 116.229)]),
+        (1, [(0.858, 107.469), (0.858, 120.076), (135.965, 116.229),
+             (73.474, 106.682)]),
+        (2, [(414.986, 158.868), (414.986, 100.317), (0.858, 100.317),
+             (0.858, 107.469), (73.474, 106.682), (135.965, 116.229),
+             (223.914, 135.613), (350.052, 148.921)]),
+    ]
+    sd = _poly_slope_data(
+        polygons=zones,
+        materials=[
+            dict(name='YellowClay/Debris', c=50.0, phi=15.0, gamma=19.0,
+                 gamma_sat=19.0, E=50000.0, nu=0.4),
+            dict(name='Waste', c=1.0, phi=5.0, gamma=14.0, gamma_sat=14.0,
+                 E=50000.0, nu=0.4),
+            dict(name='GreyClay', c=250.0, phi=30.0, gamma=22.0, gamma_sat=22.0,
+                 E=50000.0, nu=0.4),
+        ],
+        circle={'Xo': 100.0, 'Yo': 160.0, 'Depth': 100.0, 'R': 60.0},
+        max_depth=0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_59.xlsx'))
+    return 'rs2_59.xlsx'
+
+
 def rs2_63():
     """RS2 #63 -- Slope Stability Assessment of a Homogeneous Slope, after Cheng,
     Lansivaara & Wei (2007). An 11 m homogeneous slope (c = 10 kPa, phi = 30 deg,
@@ -554,7 +610,7 @@ def rs2_65():
 
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
-               rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_63,
+               rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65):
         print(fn())

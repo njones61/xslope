@@ -192,7 +192,7 @@ its reference/Slide2 figures (representative case where a problem has several).
 | 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | [VP64](rocscience.md#vp64) (LEM) |
 | 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | 2.60 | ref 2.71 | *new* |
 | 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | 2.22 | ref 2.30 | *new* |
-| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | *new* |
+| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | [VP67](rocscience.md#vp67) (LEM) |
 | 68 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | 1.17 | ref 1.33 | *new* |
 | 69 | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | 1.94 | ref 2.01 | *new* |
 | 70 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | 1.58 | Spencer 1.60, ref 1.60 | *new* |
@@ -213,9 +213,12 @@ VP2 (ACADS 1b) covered by the existing Slide2/LEM lock [VP2](rocscience.md#vp2) 
 filled tension crack is an LEM construct with no SSRM counterpart) and VP64 (USACE 2003
 Fig 4-1) by the [VP64](rocscience.md#vp64) lock (USACE's Spencer hand-verification dam,
 reproduced on its specified circle — Spencer 2.488 / Bishop 2.489 vs Slide2 2.445 / USACE
-2.44), 2 mapping to planned rows (RS2-68 Loukidis, RS2-28/38/39-41-43), and **≈13 genuinely
-new** candidates: the ACADS 2b dam variant (VP6), the rest of the USACE 2003 embankment set
-(VP65–69, five problems), the Pockoski & Duncan slope 3 and soil-nail wall (VP57, VP60),
+2.44) and VP67 (USACE 2003 F-5) by the [VP67](rocscience.md#vp67) lock (end-of-construction
+embankment on its specified toe circle — Spencer 1.316 / Bishop 1.320 vs Slide2 1.328 /
+USACE 1.33), 2 mapping to planned rows (RS2-68 Loukidis, RS2-28/38/39-41-43), and **≈12
+genuinely new** candidates: the ACADS 2b dam variant (VP6), the rest of the USACE 2003
+embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and soil-nail
+wall (VP57, VP60),
 Zhu's 12-method slope (VP51), the Baker/Jiang power-curve and Baker–Leshchinsky safety-map
 problems (VP41, VP42), the Duncan & Wright submerged slope (VP70), and the Huang & Jia
 rapid-drawdown dam (VP102). None are built in tranche 1.

@@ -56,8 +56,11 @@ Documentation = "https://xslope.readthedocs.io/en/latest/"
 Source = "https://github.com/njones61/xslope"
 Issues = "https://github.com/njones61/xslope/issues"
 
-[tool.setuptools]
-packages = ["xslope", "studio"]
+[tool.setuptools.packages.find]
+# Recurse so current AND future subpackages (e.g. studio.ai) always ship.
+# An explicit list like ["xslope", "studio"] does NOT recurse and silently
+# dropped studio/ai from the wheel — see the v0.1.57 packaging fix.
+include = ["xslope*", "studio*"]
 
 [tool.setuptools.package-data]
 xslope = ["resources/*"]

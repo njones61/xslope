@@ -1341,7 +1341,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
-              ssr_exclude_mask=None):
+              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1452,6 +1452,26 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             tan(phi) are divided by 1.0 rather than F. This is the SSR-exclusion
             mechanism; solve_ssrm builds it from material names. None (default) =
             every element reduced by F (bit-identical to the un-excluded path).
+        tension_cap_by_elem (array of float or None): Per-element tensile-stress
+            cap T (length n_elements, problem stress units) for the volumetric
+            tension-relaxation mechanism. A finite entry means "relax mean
+            effective stress back down to T whenever it rises above T"; an inf (or
+            NaN) entry turns the mechanism off for that element. This is the SAME
+            mechanism the global ``tension_cutoff`` flag uses — that flag is simply
+            the special case T = 0 for every element (relax all mean tension to
+            zero), folded in here so there is ONE mechanism, not two. A per-element
+            cap overrides the global value element by element. It is the per-material
+            tensile cutoff of RS2/PLAXIS/FLAC (solve_ssrm builds this array from a
+            material-name -> T dict). NOTE: the cap is on the MEAN effective stress
+            (the existing xslope tension primitive), not a Rankine cap on the major
+            principal tensile stress, so at a given T it is more permissive than a
+            principal-stress cutoff. None (default) = mechanism governed solely by
+            ``tension_cutoff`` (bit-identical to the pre-existing path).
+        tension_srf (bool): If True, the tensile cap T is divided by the trial
+            strength-reduction factor each solve, exactly as c and tan(phi) are
+            (RS2's ``tensilestrength_SRF=1``: tensile strength shrinks with the
+            SRF). If False (default) the cap is held at its fixed value regardless
+            of F (RS2's flag = 0). No effect on the T = 0 global cutoff (0/F = 0).
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1522,6 +1542,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     c_reduced = c_by_elem / F_by_elem
     tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F_by_elem
     phi_reduced = np.arctan(tan_phi_reduced)  # radians
+
+    # Per-element tensile-stress cap for the volumetric tension-relaxation
+    # mechanism (see the tension_cap_by_elem docstring). inf = mechanism off.
+    # The legacy GLOBAL tension_cutoff flag is the special case T = 0 everywhere;
+    # a per-material cap overrides it element by element. Built once per solve
+    # (F is fixed within a solve_fem call) so tension_srf can reduce it with F
+    # here, alongside c/F and tan(phi)/F.
+    t_cap_by_elem = np.full(n_elements, np.inf)
+    if tension_cutoff:
+        t_cap_by_elem[:] = 0.0
+    if tension_cap_by_elem is not None:
+        _tc = np.asarray(tension_cap_by_elem, dtype=float)
+        _have = np.isfinite(_tc)
+        t_cap_by_elem[_have] = _tc[_have]
+    if tension_srf:
+        _red = np.isfinite(t_cap_by_elem) & (t_cap_by_elem > 0.0)
+        t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
 
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
@@ -1831,10 +1868,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             'phi_r': np.array([phi_reduced[e] for e, g in _pairs]),
             'F': np.array([F_by_elem[e] for e, g in _pairs]),
             'dt_t': np.array([dt_t[e] for e, g in _pairs]),
+            't_cap': np.array([t_cap_by_elem[e] for e, g in _pairs]),
             'evp': np.zeros((G, 4)),
         }
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
+        grp['has_cap'] = bool(np.isfinite(grp['t_cap']).any())
         if has_pow:
             _pm = np.array([pow_flag_by_elem[e] for e, g in _pairs])
             if _pm.any():
@@ -2187,10 +2226,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     flow = C2[:, None] * a2 + C3[:, None] * a3
                     evpg[m] += (f[m] * dt)[:, None] * flow
 
-                if tension_cutoff:
-                    tm = sigm > 0.0
+                if grp['has_cap']:
+                    # Relax any mean effective stress ABOVE the per-element cap
+                    # back down to the cap (inf entries are never selected, so
+                    # capless elements are untouched). The global tension_cutoff
+                    # flag is the cap = 0 case, giving excess = sigm exactly, so
+                    # this is bit-identical to the pre-existing behaviour there.
+                    cap = grp['t_cap']
+                    tm = sigm > cap
                     if np.any(tm):
-                        evpg[tm] += (sigm[tm] * grp['dt_t'][tm])[:, None] * \
+                        evpg[tm] += ((sigm[tm] - cap[tm]) * grp['dt_t'][tm])[:, None] * \
                             np.array([1.0/3.0, 1.0/3.0, 0.0, 1.0/3.0])
 
                 # body-load correction: B^T (D4 evp)[:3] * w, scattered to dofs
@@ -3439,7 +3484,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-               grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None):
+               grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
+               tension_cutoff_by_material=None, tension_srf=False):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3528,6 +3574,18 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             Composes with ssr_exclude by UNION of exclusions: an element is held at
             full strength if it is named-excluded OR outside the zone. Default None
             = no search-area constraint (every element eligible, bit-identical).
+        tension_cutoff_by_material (dict or None): Per-material tensile-strength
+            cutoff as {material name -> T} (T in the model's stress units). Each
+            named material's elements get a cap on their mean effective stress at
+            T, via the volumetric tension-relaxation mechanism (see solve_fem's
+            tension_cap_by_elem). Names must match a material 'name' exactly.
+            None (default) = no per-material cutoff (bit-identical to the path
+            without it). This is a RUN OPTION only — it reads nothing from the
+            material template.
+        tension_srf (bool): Whether the tensile cutoff T is reduced with the trial
+            SRF (RS2's ``tensilestrength_SRF``). True: T -> T/F each trial, like c
+            and tan(phi). False (default): T held fixed. Only affects materials
+            named in tension_cutoff_by_material.
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
@@ -3569,6 +3627,31 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                   f"({int(zone_mask.sum())}/{len(zone_mask)} elements outside, held "
                   f"at full strength)")
 
+    # Resolve the per-material tensile-strength cutoff dict {name -> T} to a
+    # per-element cap array once, up front (like ssr_exclude_mask). inf = no cap.
+    # solve_fem reduces it with the trial F when tension_srf is set, so it is built
+    # here at full (un-reduced) value.
+    tension_cap_by_elem = None
+    if tension_cutoff_by_material:
+        material_names = list(fem_data.get("material_names", []))
+        element_materials = fem_data["element_materials"]
+        wanted = {str(n).strip(): float(T) for n, T in tension_cutoff_by_material.items()}
+        unknown = [n for n in wanted if n not in material_names]
+        if unknown:
+            raise ValueError(
+                f"tension_cutoff_by_material names not found in the model materials "
+                f"{material_names}: {unknown}. Names must match a material's 'name' "
+                f"field exactly.")
+        tension_cap_by_elem = np.full(len(element_materials), np.inf)
+        for name, T in wanted.items():
+            mid = material_names.index(name) + 1  # 1-based material ID
+            tension_cap_by_elem[element_materials == mid] = T
+        if debug_level >= 1:
+            print(f"  Tensile cutoff (SRF={'on' if tension_srf else 'off'}): "
+                  f"{wanted} "
+                  f"({int(np.isfinite(tension_cap_by_elem).sum())}/"
+                  f"{len(element_materials)} elements capped)")
+
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']
     has_linear = any(t in (3, 4) for t in element_types)
@@ -3596,7 +3679,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
-            ssr_exclude_mask=ssr_exclude_mask)
+            ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3607,7 +3691,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
-            ssr_exclude_mask=ssr_exclude_mask)
+            ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3616,7 +3701,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             convergence_tol=convergence_tol, n_sweep=n_sweep,
             tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
-            min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask)
+            min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -3642,7 +3728,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
-                 grid=None, min_slip_depth=None, ssr_exclude_mask=None):
+                 grid=None, min_slip_depth=None, ssr_exclude_mask=None,
+                 tension_cap_by_elem=None, tension_srf=False):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -3692,6 +3779,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
                          ssr_exclude_mask=ssr_exclude_mask,
+                         tension_cap_by_elem=tension_cap_by_elem,
+                         tension_srf=tension_srf,
                          progress_callback=_fem_progress(step, prefix))
 
     F_left = F_min
@@ -3865,7 +3954,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                                  tension_cutoff=False, char_point=None,
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
-                 min_slip_depth=None, ssr_exclude_mask=None):
+                 min_slip_depth=None, ssr_exclude_mask=None,
+                 tension_cap_by_elem=None, tension_srf=False):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -3932,6 +4022,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,
                         ssr_exclude_mask=ssr_exclude_mask,
+                        tension_cap_by_elem=tension_cap_by_elem,
+                        tension_srf=tension_srf,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks

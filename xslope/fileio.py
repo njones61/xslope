@@ -370,7 +370,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 15
+SUPPORTED_TEMPLATE_VERSION = 16
 
 
 def _read_seep_bc_sheet(seep_df, sheet_name):
@@ -661,12 +661,14 @@ def load_slope_data(filepath):
 
         # Strength model. Blank is allowed -- seep-only material rows carry no
         # strength -- but slice.py raises if a blank one reaches a failure surface.
+        # 'elastic' (v16): infinite strength / cannot fail -- the FEM holds it out
+        # of plasticity entirely and the LEM treats it as impenetrable.
         option_val = _choice(row.get('option'), '')
-        if option_val not in ('', 'mc', 'cp', 'pow', 'hb'):
+        if option_val not in ('', 'mc', 'cp', 'pow', 'hb', 'elastic'):
             raise ValueError(
                 f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has an "
                 f"unrecognized strength option option='{option_val}'. "
-                "Expected one of: mc, cp, pow, hb."
+                "Expected one of: mc, cp, pow, hb, elastic."
             )
 
         # v12 columns, read by header name. Older templates lack them entirely:
@@ -722,6 +724,41 @@ def load_slope_data(filepath):
                     f"option='hb' but has hb_d = {hb_d_val}. The disturbance factor must "
                     "lie in [0, 1] (0 = undisturbed, 1 = heavily blast-damaged).")
 
+        # Tensile-strength cutoff (v16). Rankine cap on the major principal stress,
+        # in stress units. BLANK -> None (no cutoff, unbounded tension -- exactly the
+        # pre-v16 behavior); 0 -> the soil carries no tension. FEM only; the LEM
+        # ignores it (a tension crack is modeled separately). Read by header name
+        # ('t_cut' normalizes to 'tcut'), so pre-v16 sheets without the column load
+        # as None.
+        _tcut_num = pd.to_numeric(row.get('tcut'), errors='coerce')
+        t_cut_val = float(_tcut_num) if pd.notna(_tcut_num) else None
+
+        # --- load-time validation warnings (v16) ---
+        if option_val == 'elastic':
+            # (b) elastic materials ignore every strength input (they cannot fail);
+            # (c) t_cut is meaningless on an elastic material.
+            _strength_present = any(_num(row.get(h, 0)) for h in (
+                'c', 'f', 'c/p', 'powa', 'powb', 'powc', 'powd',
+                'hbsci', 'hbgsi', 'hbmi', 'hbd', 'psi'))
+            if _strength_present:
+                print(f"WARNING: Material '{material_name}' (mat sheet, Excel row "
+                      f"{excel_row}) is elastic (cannot fail); its strength values are "
+                      "ignored.")
+            if t_cut_val is not None:
+                print(f"WARNING: Material '{material_name}' (mat sheet, Excel row "
+                      f"{excel_row}) is elastic; its t_cut is ignored.")
+        elif option_val == 'mc' and t_cut_val is not None:
+            # (a) an mc t_cut at/above the cone apex c/tan(phi) never binds -- the
+            # shear envelope caps tension there first, so the Rankine cap is inert.
+            _c = _num(row.get('c', 0))
+            _phi = _num(row.get('f', 0))
+            if _phi > 0 and _c > 0:
+                apex = _c / np.tan(np.radians(_phi))
+                if t_cut_val >= apex - 1e-9:
+                    print(f"WARNING: Material '{material_name}' (mat sheet, Excel row "
+                          f"{excel_row}) has t_cut = {t_cut_val:g} >= the Mohr-Coulomb "
+                          f"apex c/tan(phi) = {apex:g}; the cutoff never binds (inert).")
+
         materials.append({
             "name": str(material_name).strip(),
             "gamma": gamma_val,
@@ -733,6 +770,8 @@ def load_slope_data(filepath):
             "r_elev": _num(row.get('r-elev', 0)),
             "d": _num(row.get('d', 0)) if pd.notna(row.get('d')) else 0,
             "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
+            # v16: tensile-strength cutoff. None = blank (no cutoff); FEM-only.
+            "t_cut": t_cut_val,
             "pow_a": pow_a_val,
             "pow_b": pow_b_val,
             "pow_c": pow_c_val,
@@ -1463,8 +1502,9 @@ MAT_NUM_HEADERS = [
     ('E', 'E'), ('nu', 'nu'),
 ]
 # Optional numerics: written only when set (None must stay a blank cell -- e.g.
-# a blank gsat means "fall back to gamma", which 0.0 would not).
-MAT_OPT_NUM_HEADERS = [('gamma_sat', 'gsat')]
+# a blank gsat means "fall back to gamma", which 0.0 would not; a blank t_cut
+# means "no cutoff", which 0.0 -- "no tension" -- would not).
+MAT_OPT_NUM_HEADERS = [('gamma_sat', 'gsat'), ('t_cut', 't_cut')]
 MAT_STR_HEADERS = [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]
 
 # The 'mat' header row is located by scanning for its sentinel cells rather than

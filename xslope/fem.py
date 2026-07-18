@@ -1426,14 +1426,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             magnitude ~(1-2*nu)/(1-nu)*u at submerged boundaries (the lateral
             elastic response to the water load is nu/(1-nu) of it while u
             subtracts all of it), which yields and creeps indefinitely.
-        tension_cutoff (bool): If True (default False), states with effective mean
-            TENSION are relaxed volumetrically as a second viscoplastic mechanism
-            (damped, ~10% per iteration). The psi=0 Mohr-Coulomb flow is purely
-            deviatoric and cannot return near-apex tensile states to the envelope.
-            Equivalent in spirit to the tension cutoff used by commercial SSRM
-            codes; Griffiths & Lane (1999) include no tension treatment. Rarely
-            needed now that dt uses the stable p61 value (the apparent tension
-            stall was a dt-induced limit cycle), but retained as an option.
+        tension_cutoff (bool): If True (default False), applies a RANKINE tension
+            cutoff at T = 0 everywhere: the major principal (most-tensile) stress is
+            capped at zero via a second viscoplastic yield surface F_t = sigma_1 - 0
+            (damped, ~10% per iteration; see tension_cap_by_elem for the mechanism).
+            No principal tensile stress is permitted anywhere. The psi=0
+            Mohr-Coulomb flow is purely deviatoric and cannot return near-apex
+            tensile states to the envelope; this surface handles them. Equivalent in
+            spirit to the tension cutoff used by commercial SSRM codes; Griffiths &
+            Lane (1999) include no tension treatment. This is the T = 0 special case
+            of the per-element cap below.
         staged (bool): If True and the model has water loads (applied boundary
             forces and/or pore pressures), solve in two stages: stage 1 applies
             gravity only (dry), stage 2 adds the water loads and pore pressures,
@@ -1453,21 +1455,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             tan(phi) are divided by 1.0 rather than F. This is the SSR-exclusion
             mechanism; solve_ssrm builds it from material names. None (default) =
             every element reduced by F (bit-identical to the un-excluded path).
-        tension_cap_by_elem (array of float or None): Per-element tensile-stress
-            cap T (length n_elements, problem stress units) for the volumetric
-            tension-relaxation mechanism. A finite entry means "relax mean
-            effective stress back down to T whenever it rises above T"; an inf (or
-            NaN) entry turns the mechanism off for that element. This is the SAME
-            mechanism the global ``tension_cutoff`` flag uses — that flag is simply
-            the special case T = 0 for every element (relax all mean tension to
-            zero), folded in here so there is ONE mechanism, not two. A per-element
-            cap overrides the global value element by element. It is the per-material
-            tensile cutoff of RS2/PLAXIS/FLAC (solve_ssrm builds this array from a
-            material-name -> T dict). NOTE: the cap is on the MEAN effective stress
-            (the existing xslope tension primitive), not a Rankine cap on the major
-            principal tensile stress, so at a given T it is more permissive than a
-            principal-stress cutoff. None (default) = mechanism governed solely by
-            ``tension_cutoff`` (bit-identical to the pre-existing path).
+        tension_cap_by_elem (array of float or None): Per-element tensile-strength
+            cap T (length n_elements, problem stress units) for the RANKINE tension
+            cutoff. A finite entry T caps the major (most-tensile) principal stress
+            at T through a second viscoplastic yield surface F_t = sigma_1 - T
+            (associated flow, damped by dt_r; summed with the Mohr-Coulomb shear
+            flow at the corner by Koiter's rule). An inf (or NaN) entry turns the
+            cutoff off for that element. This is the SAME mechanism the global
+            ``tension_cutoff`` flag uses — that flag is simply T = 0 for every
+            element (no principal tension allowed) — so there is ONE mechanism, not
+            two. A per-element cap overrides the global value element by element. It
+            is the principal-stress (Rankine) tensile cutoff of RS2/PLAXIS/FLAC
+            (solve_ssrm builds this array from a material-name -> T dict). None
+            (default) = cutoff governed solely by ``tension_cutoff`` (bit-identical
+            to the pre-existing path when that is also False).
         tension_srf (bool): If True, the tensile cap T is divided by the trial
             strength-reduction factor each solve, exactly as c and tan(phi) are
             (RS2's ``tensilestrength_SRF=1``: tensile strength shrinks with the
@@ -1557,9 +1558,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F_by_elem
     phi_reduced = np.arctan(tan_phi_reduced)  # radians
 
-    # Per-element tensile-stress cap for the volumetric tension-relaxation
-    # mechanism (see the tension_cap_by_elem docstring). inf = mechanism off.
-    # The legacy GLOBAL tension_cutoff flag is the special case T = 0 everywhere;
+    # Per-element tensile-strength cap T for the Rankine tension cutoff (caps the
+    # major principal stress; see the tension_cap_by_elem docstring). inf = off.
+    # The GLOBAL tension_cutoff flag is the special case T = 0 everywhere;
     # a per-material cap overrides it element by element. Built once per solve
     # (F is fixed within a solve_fem call) so tension_srf can reduce it with F
     # here, alongside c/F and tan(phi)/F.
@@ -1716,7 +1717,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # tolerance and the SSRM failure criterion are calibrated to this dt (see
     # docs/fem/overview.md).
     dt = 1.0e15
-    dt_t = np.zeros(n_elements)   # tension-cutoff (volumetric) timestep per element
+    # Rankine tension-cutoff pseudo-timestep per element (used by the second,
+    # tensile, viscoplastic surface F_t = sigma_1 - T; see the tension block in
+    # the VP loop). Damped so one iteration relaxes ~10% of the tension
+    # overshoot: the stiffest associated-flow direction is uniaxial (n=[1,0,0,0]),
+    # whose direct plane-strain stiffness is D4[0,0] = E(1-nu)/((1+nu)(1-2nu)),
+    # and dt_r*D4[0,0] = 0.1. A full single-step return (=1) pumps against the
+    # elastic re-solve and oscillates at the MC/tension corner; gentle relaxation
+    # lets the surrounding field re-equilibrate and the tensile zone converge.
+    dt_r = np.zeros(n_elements)
     for elem_idx in range(n_elements):
         mat_id = element_materials[elem_idx] - 1
         E = E_by_mat[mat_id]
@@ -1724,12 +1733,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         ddt = 4.0 * (1.0 + nu) / (3.0 * E)
         if ddt < dt:
             dt = ddt
-        # volumetric stiffness K = E/(3(1-2nu)). Damped relaxation: relax ~10%
-        # of the mean tension per iteration (dt_t*K = 0.1). A full single-step
-        # return (dt_t*K = 1) pumps against the elastic re-solve at water-
-        # pressure boundaries and never settles; gentle relaxation lets the
-        # surrounding field re-equilibrate and the zone converge.
-        dt_t[elem_idx] = 0.3 * (1.0 - 2.0 * nu) / E
+        dt_r[elem_idx] = 0.1 * (1.0 + nu) * (1.0 - 2.0 * nu) / (E * (1.0 - nu))
 
     dt *= dt_scale
 
@@ -1890,7 +1894,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             'c_r': np.array([c_reduced[e] for e, g in _pairs]),
             'phi_r': np.array([phi_reduced[e] for e, g in _pairs]),
             'F': np.array([F_by_elem[e] for e, g in _pairs]),
-            'dt_t': np.array([dt_t[e] for e, g in _pairs]),
+            'dt_r': np.array([dt_r[e] for e, g in _pairs]),
             't_cap': np.array([t_cap_by_elem[e] for e, g in _pairs]),
             'evp': np.zeros((G, 4)),
         }
@@ -2260,19 +2264,47 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     evpg[m] += (f[m] * dt)[:, None] * flow
 
                 if grp['has_cap']:
-                    # Relax any mean effective stress ABOVE the per-element cap
-                    # back down to the cap (inf entries are never selected, so
-                    # capless elements are untouched). The global tension_cutoff
-                    # flag is the cap = 0 case, giving excess = sigm exactly, so
-                    # this is bit-identical to the pre-existing behaviour there.
+                    # ---- Rankine tension cutoff (second yield surface) ----
+                    # Cap the MAJOR (most-tensile) in-plane principal stress at the
+                    # per-element cap T (tension-positive): F_t = sigma_1 - T. Where
+                    # F_t > 0, accrue viscoplastic strain along the ASSOCIATED flow
+                    # normal n = d(sigma_1)/d(sigma), damped by dt_r. This is a
+                    # principal-stress (Rankine) cap, the form RS2/PLAXIS/FLAC use,
+                    # and a SEPARATE surface from the Mohr-Coulomb shear surface
+                    # above: where both are active the two contributions simply SUM
+                    # into evpg (Koiter's rule for the MC/tension corner). The psi=0
+                    # MC flow is purely deviatoric and cannot relax a near-apex
+                    # tensile state, which is exactly what this surface handles.
+                    # Capping the in-plane major also bounds sigma_z
+                    # (sigma_z <= sigma_1 in plane strain, since sigma_1 >= sx,sy and
+                    # sigma_z = nu(sx+sy) here), so EVERY principal stress is held
+                    # <= T. inf caps never fire, so capless elements are untouched;
+                    # the global tension_cutoff flag is the T = 0 special case
+                    # (no principal tension permitted anywhere).
+                    # Refs: Smith & Griffiths (viscoplastic Mohr-Coulomb, Ch.6,
+                    # Progs 6.11-6.13) for the initial-strain framework; Koiter
+                    # (1960) / Owen & Hinton (1980) for multi-surface (corner)
+                    # summation of viscoplastic flows.
                     cap = grp['t_cap']
-                    tm = sigm > cap
+                    ctr = 0.5 * (sx + sy)                        # circle centre
+                    Rc = np.sqrt((0.5 * (sx - sy))**2 + txy**2)  # circle radius
+                    s1 = ctr + Rc                                # major principal (tension +)
+                    tm = s1 > cap
                     if grp.get('has_elastic'):
                         # Pure-elastic elements do not tension-relax either.
                         tm = tm & ~grp['elastic']
                     if np.any(tm):
-                        evpg[tm] += ((sigm[tm] - cap[tm]) * grp['dt_t'][tm])[:, None] * \
-                            np.array([1.0/3.0, 1.0/3.0, 0.0, 1.0/3.0])
+                        # n = d(sigma_1)/d(sx,sy,txy); txy is the direct derivative
+                        # (engineering-shear conjugacy, matching a2/a3 above), and
+                        # d(sigma_1)/d(sz) = 0. The radius is floored so n stays
+                        # bounded at the biaxial apex Rc -> 0 (there sx-sy -> 0 too,
+                        # so n -> [1/2, 1/2, 0, 0], an isotropic in-plane relaxation).
+                        Rf = np.maximum(Rc[tm], 1e-10)
+                        half = 0.5 * (sx[tm] - sy[tm])
+                        Ft = (s1[tm] - cap[tm]) * grp['dt_r'][tm]
+                        evpg[tm, 0] += Ft * (0.5 + 0.5 * half / Rf)
+                        evpg[tm, 1] += Ft * (0.5 - 0.5 * half / Rf)
+                        evpg[tm, 2] += Ft * (txy[tm] / Rf)
 
                 # body-load correction: B^T (D4 evp)[:3] * w, scattered to dofs
                 s4 = np.einsum('gij,gj->gi', D4g, evpg)
@@ -3621,8 +3653,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             = no search-area constraint (every element eligible, bit-identical).
         tension_cutoff_by_material (dict or None): Per-material tensile-strength
             cutoff as {material name -> T} (T in the model's stress units). Each
-            named material's elements get a cap on their mean effective stress at
-            T, via the volumetric tension-relaxation mechanism (see solve_fem's
+            named material's elements get a RANKINE cap on their major principal
+            stress at T (second viscoplastic yield surface; see solve_fem's
             tension_cap_by_elem). Names must match a material 'name' exactly.
             None (default) = no per-material cutoff (bit-identical to the path
             without it). This is a RUN OPTION only — it reads nothing from the

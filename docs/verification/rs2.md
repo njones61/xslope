@@ -1198,7 +1198,23 @@ mechanism with the same rigor as RS2-4's sweep. The published RS2 SSRM 1.53 evid
 reports a deeper mechanism (which one its mesh resolved is not stated in its manual);
 XSLOPE reports the more critical toe skin as the true global minimum.
 
-*The FE-seepage case is blocked — tri6 seepage does not converge on the high-contrast thick core (the documented tri3/tri6 trade).*
+*The FE-seepage sub-case (vp077a: pore pressures from a finite-element seepage solve
+rather than a drawn piezometric line; D&W Table 7.9 lists PHASE2 SRF 1.57 alongside
+Spencer 1.67–1.70) remains blocked, but the reason is now resolved to the downstream
+seepage face rather than the core. The seepage sidecar is node-aligned to the SSRM mesh,
+so seepage and SSRM share one mesh: the seepage solve converges cleanly on tri3 (447
+iterations, exit face stable, q ≈ 8.2×10⁻⁶) but SSRM requires tri6, on which the
+quadratic midside relative-conductivity sampling whips the daylighting front. Refining
+the two core boundaries — a 100× k-jump between the clay core (k = 1.67×10⁻⁷) and the
+shell (1.67×10⁻⁵) — with an interface-aware mesh size field halves the tri6 residual
+floor (to ≈1.1×10⁻⁴, at the 1×10⁻⁴ tolerance), which confirms the core contrast was a
+genuine contributor; it does not converge the solve. The remaining obstruction is the
+downstream free-surface exit face, not the core: the seepage-face active set never
+settles (it cycles among 5–11 of 97 exit-face nodes at the daylighting toe), every
+toggle spikes the head-change residual and restarts the decay, and the flow-closure
+ratio stays O(10–100) against its 1×10⁻³ tolerance throughout. Tolerances were not
+loosened. This is the tri3/tri6 trade at its sharpest — a converged seepage field needs
+tri3 while a trustworthy SSRM needs tri6, and one shared mesh cannot be both.*
 
 <!-- test: file=../files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.126, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, benchmark=RS2-40 -->
 

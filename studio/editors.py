@@ -1837,7 +1837,7 @@ class _MaterialListView(QWidget):
             gv.addWidget(self._cell(self._label_for(key), key,
                                     sigma=key in _MAT_SIGMA))
         gv.addSpacing(4)
-        gv.addWidget(self._pair(self._cell("d (dil.)", "d", sigma=True, label_w=52),
+        gv.addWidget(self._pair(self._cell("d", "d", sigma=True, label_w=52),
                                 self._cell("ψ", "psi", sigma=True, label_w=18)))
         # v16: tensile cutoff (file order t_cut, E, nu), then the elastic E/ν pair.
         gv.addWidget(self._cell("t_cut", "t_cut", label_w=52))

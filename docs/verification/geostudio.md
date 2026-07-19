@@ -588,14 +588,14 @@ inputs are deferred to the linked Rocscience detail — where this problem's
 | Spencer, Baker's surface | 1.792 | — | Baker & Leshchinsky (2001) 1.91 |
 
 SLOPE/W's own solved critical Spencer (1.934, read from the `.gsz`) lands squarely on the
-published Baker & Leshchinsky (1.91) and Slide (1.925) values, while XSLOPE's rigorous
-statics reads ~19% lower (1.572 / 1.792). This is the same statics-convention gap
-documented at [VP42](rocscience.md#vp42): the published side omits the seepage forces of
-the ~28 m phreatic drop (equivalent to the classical buoyant-weight shortcut, exact only
-when the water is static), whereas XSLOPE applies total unit weights, pore pressures from
-the piezometric line, and the reservoir as an explicit hydrostatic load. SLOPE/W's own
-number is a third independent confirmation of that convention rather than a disagreement
-in arithmetic; the XSLOPE value is regression-locked as VP42. The B&L (2001) paper — held
+published Baker & Leshchinsky (1.91) and Slide (1.925) values, while XSLOPE
+reads ~13–19% lower (1.572 / 1.792). Per the re-adjudicated [VP42](rocscience.md#vp42)
+section: the published side uses the same total-unit-weight + phreatic-pore-pressure
+convention XSLOPE uses (confirmed verbatim from B&L 2001 and by inspection of this
+model's own materials), so the gap is not a weight convention — it is a difference in
+how the slice statics carry the large reservoir load over the submerged toe. SLOPE/W's
+own 1.934 makes three tightly clustered references against XSLOPE's outlier value;
+the XSLOPE value is regression-locked as VP42. The B&L (2001) paper — held
 in the reference library — supplies the phreatic geometry the vendor manuals leave
 unlabeled (its Fig. 5(a)) and reports the dam's global minimum Fmin = 1.91 by Spencer's
 method, computed with total unit weight and pore pressure taken from the vertical distance

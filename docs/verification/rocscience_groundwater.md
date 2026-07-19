@@ -220,10 +220,45 @@ Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 ups
 |---|---|---|---|---|
 | Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ | 1.37×10⁻³ | 1.10–1.28×10⁻³ |
 
-The manual's second dam (with a chimney-and-blanket drain) is not built: its
-conductivity function and reservoir level exist only as chart pixels, and the published
-flowrate implies a fill conductivity two decades below the chart — resolving that needs
-the source paper (Chapuis et al. 2001, Can. Geotech. J. 38:1113).
+**Dam 2 — Bowles' example 9.5b, "dam with an impervious core"** (Slide manual §9.2,
+Fig 9.5; Chapuis et al. 2001, Fig 5) — is **not locked**: its published flowrate is
+inconsistent, by nearly three decades, with the body conductivity the same sources state.
+
+*Inputs.* Base 190 m; crest 10 m wide at el. 45; symmetric 2:1 faces (upstream and
+downstream horizontal runs 90 m each); reservoir head 40 m (Slide Fig 9.5, all dimensions
+printed). A coarse toe drain fills the downstream-toe triangle (100, 0)–(190, 0)–(145, 22.5)
+— base 90 m, apex at mid-height of the downstream slope. The body is called "impervious" at
+saturated k = 2.0×10⁻⁶ m/s and the drain at k = 1.0×10⁻⁴ m/s (Chapuis Fig 5 caption); the
+shared unsaturated k(u) curve is Chapuis Fig 3, whose *k(dam)* branch actually plateaus at
+6.67×10⁻⁶ m/s — the dam-1 material, a decade above the caption. Published Q agrees across
+three sources: Bowles' flow net 3.8×10⁻⁶, and both Chapuis's SEEP/W (2328 elements) and
+Slide 4.23×10⁻⁶ m³/(min·m).
+
+*The two-decade gap, resolved.* XSLOPE reproduces dam 1's published Q to 0.1%, so the solver
+is calibrated; run on dam 2 with the paper's own body k it gives a flowrate two to three
+decades too high:
+
+| Dam-2 body k (m/s) | XSLOPE Q, m³/(min·m) | ÷ published 4.23×10⁻⁶ |
+|---|---|---|
+| 2.0×10⁻⁶ (Fig 5 caption) | 2.38×10⁻³ | 560× (2.75 decades high) |
+| 6.67×10⁻⁶ (Fig 3 plot) | 6.95×10⁻³ | 1640× (3.2 decades high) |
+| 3.5×10⁻⁹ (back-fit) | 4.2×10⁻⁶ | 1.0× |
+
+The published flowrate is reproduced only at a body k of ≈3.5×10⁻⁹ m/s — about 2.75 decades
+below the stated 2.0×10⁻⁶ and 3.3 below the plotted 6.67×10⁻⁶. Casagrande's toe-drain flow
+net reads the same: Bowles' own 3.8×10⁻⁶ m³/(min·m) requires k on the order of 10⁻⁸ m/s. The
+likely explanation is that Bowles' 9.5b uses a genuinely impervious core (k ≈ 10⁻⁸–10⁻⁹ m/s,
+as the name says) and the "2.0×10⁻⁶" printed in Chapuis's Fig 5 caption is an exponent typo
+— all three published Q's agree because they used the low core k, and only the caption/chart
+values are off (the Slide manual's own Fig 9.6 chart draws the earth-dam curve near 2×10⁻⁷,
+midway between). The true core conductivity cannot be confirmed without Bowles (1984), and
+matching it by lowering k three decades would be tuning rather than verification — so dam 2
+stays unlocked.
+
+*Vendor check.* The RS2 Groundwater Verification set ships only `groundwater #009_01.fez`,
+which is dam 1 (one groundwater material, k(u) saturating at 6.67×10⁻⁶ m/s, no drain); it
+carries no dam-2 model. The Slide manual points dam 2 to `Groundwater#09_2.sli`, which is not
+in the distributed model set — so no vendor model resolves the core conductivity either.
 
 ![gw009a: mesh and solved heads](images/gw009a.png)
 

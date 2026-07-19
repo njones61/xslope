@@ -15,8 +15,9 @@ shared [References](references.md) page.
 
 ## Building these problems
 
-Most of the entries below were built by transcribing the manual's geometry figures by hand — which is why several
-rows are still `planned` or `partial`, blocked on a figure that is ambiguous or a source paper we do not have.
+Most of the entries below were built by transcribing the manual's geometry figures by hand. The few rows that are
+not built are held up by a strength model XSLOPE does not yet have (§2.47) or a measured pressure grid with no flow
+field to regenerate (§2.10) — not by a missing source document.
 
 That is no longer the only route. Seequent publishes the **models** behind the manual, not just the figures, on a
 public CDN — no login, no license:
@@ -131,10 +132,9 @@ problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged
 
 **Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
 row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no
-seepage solution can regenerate it — a final gap it shares with the Slide2 corpus. The *blocked* / *partial*
-rows are each tracked against a named gap: a strength or geometry model XSLOPE does not yet have (§2.47's
-dip-relative anisotropic/compound strength), or a source document not yet in hand (§2.25's B&L paper, the
-§2.35–2.37/2.39 Pockoski & Duncan and Loukidis reports). §2.16's level-ground Prandtl mechanism no longer
+seepage solution can regenerate it — a final gap it shares with the Slide2 corpus. The one remaining
+*blocked* row (§2.47) is tracked against a named gap XSLOPE does not yet have: a dip-relative
+anisotropic/compound strength model. §2.16's level-ground Prandtl mechanism no longer
 belongs on that list: the `right_facing` override built for Rocscience VP26 unblocks the flat-arc facing
 guard, so it is covered by that shared build. Everything else is built and verified, or covered by the
 regression-locked Rocscience build; the corpus is complete relative to what is independently verifiable.
@@ -189,7 +189,7 @@ the 3D chapter is out of scope and not tracked here.
 | 2.36 | Pockoski & Duncan – Reinforcement | covered | Same problem as [Rocscience #59](rocscience.md#vp59) — P&D (2000) single-row tieback in sand, under-designed (FS < 1). XSLOPE Janbu 0.579 / Corps 0.577 vs SLOPE/W's own Janbu 0.575 / Lowe 0.587. — [details](#gs-2-36) |
 | 2.37 | Pockoski & Duncan – Soil Nails | covered | Same problem as [Rocscience #60](rocscience.md#vp60) — P&D (2000) soil-nailed wall. XSLOPE Spencer 1.010 vs SLOPE/W's own 1.000 and Slide 1.009. — [details](#gs-2-37) |
 | 2.38 | Loukidis – Seismic Coefficient | **built** | [vp062a/b.xlsx](../files/rocscience/vp062a.xlsx) (Rocscience #62): Spencer 1.001 (both cases) vs SLOPE/W 1.00 — exact. — [details](#gs-2-38) |
-| 2.39 | Loukidis – Seismic Coefficient #2 | partial | See Rocscience #63 — outline pinned from the paper, interface anchors still ambiguous. |
+| 2.39 | Loukidis – Seismic Coefficient #2 | covered | Same problem as [Rocscience #63](rocscience.md#vp63) / [RS2 #68 Case 3](rs2.md#rs2-68) — Loukidis (2003) example 2, three-layer seismic slope. A critical-k꜀ problem: XSLOPE FS 1.001 at the paper's k꜀ = 0.155; critical_kc harness returns k꜀ 0.167 (Spencer) / 0.169 (Bishop). — [details](#gs-2-39) |
 | 2.40 | Rapid Drawdown – Walter Bouldin Dam | **built** | Same problem as Slide [VP98](rocscience.md#vp98): xslope DWW 3-stage 1.046 vs SLOPE/W Bishop 1.016 / Spencer 1.02, DWW 1.04. — [details](#gs-2-40) |
 | 2.41 | Rapid Drawdown – USACE Benchmark | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx) (Rocscience #96): 3-stage Spencer 1.434 / Bishop 1.432 vs published 1.44. — [details](#gs-2-41) |
 | 2.42 | Rapid Drawdown – Pumped Storage Dam | **built** | Same problem as Slide [VP99](rocscience.md#vp99): xslope 1.527 vs SLOPE/W 1.550, DWW 1.56 (geometry re-pinned from this .gsz). — [details](#gs-2-42) |
@@ -844,6 +844,39 @@ A homogeneous slope loaded pseudo-statically at its critical seismic coefficient
 XSLOPE's Spencer factor of safety is 1.001 in both cases, matching SLOPE/W's 1.00 exactly.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.38; Loukidis, Bandini & Salgado (2003).
+
+### 2.39 — Loukidis – Seismic Coefficient #2 {#gs-2-39}
+
+Loukidis, Bandini & Salgado (2003)'s second example: a three-layer dry slope — a light
+c = 4 kPa cap (φ = 30°, γ = 17), a weak c = 25 kPa / **φ = 15°** middle band (γ = 19) that
+the mechanism rides, and a strong φ = 45° base (c = 15, γ = 19). The target is not a
+factor of safety but the **critical seismic coefficient** k꜀, the horizontal pseudo-static
+coefficient at which the searched minimum FS = 1. It shares the Loukidis example-2 geometry
+with the Rocscience and RS2 corpora, so the full geometry is deferred to the linked details.
+
+**Input:** [vp063.xlsx](../files/rocscience/vp063.xlsx) · **Rocscience detail:** [VP63](rocscience.md#vp63) · **RS2 detail (critical_kc):** [RS2-68 Case 3](rs2.md#rs2-68)
+
+![vp063: inputs and representative solution](images/vp063.png)
+
+| Target | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | — (file saved unsolved) | Loukidis 1.000 (by definition of k꜀) |
+| Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | — | Loukidis Spencer 0.155, FEM 0.161, UB 0.172 / LB 0.148; Slide2 0.151 / 0.155 |
+
+Two locks cover this problem. [VP63](rocscience.md#vp63) fixes k at the paper's 0.155 and
+confirms the slope is just stable there (noncircular Spencer 1.001). The
+[RS2-68 Case 3](rs2.md#rs2-68) `critical_kc` bisection harness instead solves for k꜀
+directly and returns 0.167 (Spencer) / 0.169 (Bishop) — ~10% above the paper's 0.155
+because the governing surface rides the thin φ = 15° band, which is intrinsically
+non-circular, and a circular search cannot follow it as tightly as the log-spiral. The
+XSLOPE values still fall inside the paper's rigorous upper/lower-bound bracket [0.148,
+0.172] and sit on the reference FEM (0.161). The vendor `.gsz` was saved unsolved, so
+SLOPE/W's own k꜀ is not in the file. The Loukidis (2003) paper — held in the reference
+library — supplies the three-layer section (Fig. 9(a): a 15 m upper block over a 20 m
+lower face, φ = 15° band) and Table 3's k꜀ values that de-stale the "interface anchors
+ambiguous" note.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.39; Loukidis, Bandini & Salgado (2003).
 
 ### 2.40 — Rapid Drawdown – Walter Bouldin Dam {#gs-2-40}
 

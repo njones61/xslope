@@ -56,10 +56,14 @@ nav:
     - Piles and Concrete Piers: lem/piles.md
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md
-    - Reliability Analysis: lem/reliability.md
     - Parametric Studies: lem/sensitivity.md
     - Slope Design: lem/design.md
     - Sample Problems: lem/samples.md
+  - Reliability:
+    - Overview: reliability/index.md
+    - Taylor Series (TSPM): reliability/taylor.md
+    - Monte Carlo: reliability/monte_carlo.md
+    - FEM Reliability (SSRM): reliability/fem.md
   - Seepage Analysis:
     - Overview: seep/overview.md
     - Seep-Slope Integration: seep/seep_slope.md
@@ -69,7 +73,6 @@ nav:
     - Soil Reinforcement: fem/reinforcement.md
     - Piles and Concrete Piers: fem/piles.md
     - Mesh Generation: fem/mesh.md
-    - Reliability Analysis: fem/reliability.md
     - Sample Problems: fem/samples.md
   - Verification:
     - Overview: verification/index.md

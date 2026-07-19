@@ -3,15 +3,15 @@
 Reliability analysis quantifies the probability that a slope will *not* fail by
 propagating the uncertainty in the soil parameters through to the factor of
 safety. This page describes the **finite-element** reliability analysis, which is
-identical in method to the [limit-equilibrium reliability analysis](../lem/reliability.md)
-but computes each factor of safety with the finite-element Shear Strength
-Reduction Method (SSRM) instead of a limit-equilibrium search.
+identical in method to the [Taylor Series Probability Method](taylor.md) used for
+limit equilibrium, but computes each factor of safety with the finite-element Shear
+Strength Reduction Method (SSRM) instead of a limit-equilibrium search.
 
 Because the method, the parameter-uncertainty guidance (standard deviation and
 COV estimation, typical COV values), and the reliability equations are the same,
-they are **not repeated here** — see the [LEM Reliability Analysis](../lem/reliability.md)
-page for the full theory. This page covers only what is specific to the FEM
-version.
+they are **not repeated here** — see the [Reliability Analysis](index.md) overview
+and the [Taylor Series Probability Method](taylor.md) page for the full theory.
+This page covers only what is specific to the FEM version.
 
 ## Method
 
@@ -29,7 +29,7 @@ The analysis uses the same **Taylor Series Probability Method (TSPM)**:
 The analysis runs $1 + 2N$ SSRM solves (one at the most-likely values plus a
 $F^+$/$F^-$ pair for each of the $N$ uncertain parameters), all on a **single
 shared mesh** — only the material-to-element mapping is rebuilt per perturbation.
-The [auto-expanding SSRM bracket](overview.md) is what makes this practical:
+The [auto-expanding SSRM bracket](../fem/overview.md) is what makes this practical:
 each perturbation shifts the factor of safety, and the bracket adjusts itself so a
 fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 
@@ -53,7 +53,7 @@ proportionally larger change in $\beta$, enough to flip the last shown digit of 
 reliability between two bracket choices.
 
 To remove that entirely, `reliability_fem` runs each SSRM on a **fixed global grid**
-(`grid = tolerance`, default 0.001; see [`solve_ssrm`](overview.md)). Instead of
+(`grid = tolerance`, default 0.001; see [`solve_ssrm`](../fem/overview.md)). Instead of
 halving your bracket, it locates the single global grid cell that straddles the
 failure threshold — a fact of the slope and mesh, not of the bracket — so *every*
 starting bracket lands in the same cell. The result is **identical to every decimal
@@ -109,7 +109,7 @@ analyses.
 ## Data Input
 
 Provide the standard deviations for the uncertain strength parameters in the
-Materials table exactly as for the [LEM reliability analysis](../lem/reliability.md#data-input)
+Materials table exactly as for [Taylor series reliability](taylor.md#data-input)
 — the main parameter values are the most-likely values, and `sigma_c`,
 `sigma_phi` / `sigma_cp`, and `sigma_gamma` give their standard deviations. At
 least one non-zero standard deviation is required. As in the LEM case, a standard

@@ -19,7 +19,7 @@ This is the geotechnical staple — Duncan & Wright present exactly these charts
 parameter, and tornado diagrams comparing several parameters at their low/high bounds) —
 and half of slope-stability judgment is knowing *which* parameter matters on a given slope.
 
-Sensitivity is deliberately distinct from [reliability analysis](reliability.md): the
+Sensitivity is deliberately distinct from [reliability analysis](../reliability/taylor.md): the
 Taylor-series method perturbs parameters by ±σ to estimate the *distribution* of FS,
 which requires the parameters to be independent. A sensitivity sweep asserts nothing
 statistical — it simply evaluates the model across a range — which also makes it the
@@ -259,7 +259,7 @@ plot_spider(sweeps)
 
 When the model carries standard deviations, `variance_contribution()` asks *which
 uncertainties actually drive the scatter in FS*. It reuses the Taylor-series
-[reliability](reliability.md) machinery — each parameter's variance term is
+[reliability](../reliability/taylor.md) machinery — each parameter's variance term is
 $\left(\dfrac{\partial F}{\partial p}\,\sigma_p\right)^2$, exactly the $(\Delta F/2)^2$ the
 TSPM already computes — normalizes each to a percent of $\mathrm{Var}(F)$, and
 `plot_variance_pareto()` draws them descending with a cumulative line:
@@ -282,7 +282,7 @@ per-σ scaling above is the bridge between the two.
 
 ### Monte Carlo rank correlation
 
-`mc_rank_correlation()` runs a Monte Carlo [reliability](reliability.md) campaign and computes
+`mc_rank_correlation()` runs a Monte Carlo [reliability](../reliability/monte_carlo.md) campaign and computes
 the **Spearman rank correlation** between each sampled input and the resulting FS.
 `plot_mc_rank_correlation()` draws them signed and sorted:
 

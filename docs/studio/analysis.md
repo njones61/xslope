@@ -111,7 +111,7 @@ material automatically. The plots themselves are shown, with worked examples, on
   **σ** button, and a remove (✕) button.
 - The **σ** preset swaps that row's ±% range for a ±one-standard-deviation range built from
   the model's reliability `sigma_*` columns — the same standard deviations the
-  [reliability analysis](../lem/reliability.md) uses — so a sweep can mirror a reliability
+  [reliability analysis](../reliability/index.md) uses — so a sweep can mirror a reliability
   input band with one click. The button is disabled for a property that carries no `sigma_*`.
 
 **Design** sweeps the one picked parameter toward a target FS:
@@ -238,7 +238,7 @@ follows the engine:
 
 The engines are the same ones the library exposes — `reliability` (the front door),
 `reliability_taylor`, `reliability_mc`, and `reliability_fem`; see
-[Reliability Analysis](../lem/reliability.md) for the theory and worked examples.
+[Reliability Analysis](../reliability/index.md) for the theory and worked examples.
 
 ---
 

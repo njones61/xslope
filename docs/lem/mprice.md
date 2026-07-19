@@ -193,7 +193,7 @@ constant inclination ($f(x)=1$) it reduces exactly to Spencer's expression.
 
 Morgenstern–Price is available as the method name `mprice` everywhere a method is
 selected — in `solve_selected()`, the automated [search algorithms](search.md), and
-[reliability analysis](reliability.md):
+[reliability analysis](../reliability/index.md):
 
 ```python
 from xslope.solve import mprice

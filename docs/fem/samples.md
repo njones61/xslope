@@ -216,9 +216,9 @@ more sharply the band through the 2-ft layer is resolved.
 ### 4. Reliability Analysis: Two-Layer c–φ Slope
 
 This example demonstrates a **finite-element reliability analysis** — the same
-Taylor Series Probability Method as the [LEM reliability analysis](../lem/reliability.md),
+Taylor Series Probability Method as the [LEM reliability analysis](../reliability/taylor.md),
 but with each factor of safety computed by SSRM. See
-[Reliability Analysis (FEM)](reliability.md) for the method.
+[Reliability Analysis (FEM)](../reliability/fem.md) for the method.
 
 ![two_layer_slope.png](images/two_layer_slope.png){width=600}
 
@@ -275,7 +275,7 @@ contribution directly.
     **fixed mesh**, though, the reliability is fully reproducible: `reliability_fem`
     runs each SSRM on a fixed global grid, so the result is identical to every
     decimal regardless of the `F_min`/`F_max` bracket — see
-    [Numerical precision](reliability.md#numerical-precision-and-reproducibility).
+    [Numerical precision](../reliability/fem.md#numerical-precision-and-reproducibility).
 
 <!-- FEM reliability regression (marginally-stable two-layer slope). 13 SSRM solves, so it runs
      on a deliberately coarse 205-element mesh (target_size=5): at 2.4 this one test WAS the suite's

@@ -747,7 +747,7 @@ Solution (critical surface with the tension crack, Spencer's method):
 ### 15. Reliability Analysis (Submerged Slope)
 
 XSLOPE can run a **reliability analysis** with any of the limit equilibrium methods
-(see [Reliability Analysis](reliability.md)). Instead of a single factor of safety,
+(see [Taylor Series Probability Method](../reliability/taylor.md)). Instead of a single factor of safety,
 each uncertain input is given a most-likely value (MLV) and a standard deviation
 ($\sigma$) on the **mat** sheet. XSLOPE perturbs each variable to estimate the
 standard deviation of the factor of safety ($\sigma_F$) and its coefficient of

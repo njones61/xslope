@@ -32,6 +32,7 @@ Run from the repo root:  PYTHONPATH=. python3 benchmarks/mesh_refine_guard.py
 Exits non-zero on any failure.
 """
 import hashlib
+import math
 import sys
 
 import numpy as np
@@ -41,6 +42,24 @@ from xslope.mesh import (build_mesh_from_polygons, detect_crack_tips,
 
 SQUARE = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
 REINF_LINE = [(2.0, 5.0), (8.0, 5.0)]     # interior, horizontal at y = 5
+
+# Wall-rooted, inclined, long constraint line — a VP60 soil nail in miniature. Rooted
+# on the left vertical face at (0, 20), diving in at 15 deg for 16 units. The geo-kernel
+# embed cannot recover such a line (its nodes float inside 2D triangles -> orphans ->
+# singular stiffness); the OCC-fragment fallback must make it conform.
+WALL_DOMAIN = [(0.0, 0.0), (20.0, 0.0), (20.0, 24.0), (0.0, 24.0)]
+_c15, _s15 = math.cos(math.radians(15)), math.sin(math.radians(15))
+WALL_LINE = [(0.0, 20.0), (16.0 * _c15, 20.0 - 16.0 * _s15)]
+
+
+def _orphan_1d(mesh):
+    """Count 1D-element corner nodes not shared with any 2D element (should be 0 for a
+    conforming reinforcement mesh)."""
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        return 0
+    used = set(int(n) for n in np.unique(np.asarray(mesh["elements"])))
+    return len({int(nd) for e in e1d for nd in e[:2] if int(nd) not in used})
 
 
 def _digest(mesh):
@@ -167,6 +186,31 @@ def main():
         failures.append("unknown refine_features entry did not raise")
     except ValueError:
         print("[guard] refine_factor<=1 and unknown feature both rejected")
+
+    # (6) WALL-ROOTED LINE CONFORMITY. A long inclined constraint line rooted on a
+    # vertical face (a VP60 soil nail in miniature) must conform into the 2D mesh —
+    # zero orphan 1D nodes — via the OCC-fragment fallback, deterministically. The
+    # interior horizontal line (which the primary embed handles) must stay conforming
+    # too, so the fallback logic never disturbs a line that already worked.
+    wall_poly = [{"coords": WALL_DOMAIN, "mat_id": 0}]
+    m_wall = build_mesh_from_polygons(wall_poly, target_size=1.5, element_type="tri6",
+                                      lines=[WALL_LINE])
+    m_wall2 = build_mesh_from_polygons(wall_poly, target_size=1.5, element_type="tri6",
+                                       lines=[WALL_LINE])
+    orph = _orphan_1d(m_wall)
+    if orph:
+        failures.append(f"wall-rooted line left {orph} orphan 1D nodes (did not conform)")
+    elif _digest(m_wall) != _digest(m_wall2):
+        failures.append(f"wall-rooted conforming mesh not deterministic: "
+                        f"{_digest(m_wall)} vs {_digest(m_wall2)}")
+    elif _orphan_1d(build_mesh_from_polygons(
+            [{"coords": SQUARE, "mat_id": 0}], target_size=ts, element_type="tri6",
+            lines=[REINF_LINE])) != 0:
+        failures.append("interior reinforcement line regressed to orphan 1D nodes")
+    else:
+        print(f"[conform] wall-rooted inclined nail conforms (0 orphan 1D nodes, "
+              f"{len(m_wall['nodes'])} nodes, deterministic {_digest(m_wall)}); "
+              f"interior line still conforms")
 
     if failures:
         print("\nFAILED:")

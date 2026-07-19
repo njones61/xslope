@@ -458,6 +458,165 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
     return len(fields)
 
 
+def _has_orphan_1d_nodes(mesh):
+    """True if any embedded 1D-element node is not shared with a 2D element.
+
+    An orphan 1D node means the constraint line did not conform into the 2D mesh —
+    the node floats inside a triangle instead of sitting on element edges — which
+    makes the assembled reinforcement/2D stiffness singular. This is the symptom of
+    the geo-kernel embed failing to recover a long inclined line rooted on / crossing
+    a boundary (VP60's wall-rooted soil nails); it is the trigger for the OCC-fragment
+    fallback below. Read-only; a mesh that conformed returns False and is untouched.
+    """
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        return False
+    elems = mesh.get("elements")
+    if elems is None or len(elems) == 0:
+        return True
+    used = set(int(n) for n in np.unique(np.asarray(elems)))
+    for e in e1d:
+        for nd in e[:2]:                      # corner nodes of the 1D element
+            if int(nd) not in used:
+                return True
+    return False
+
+
+def _remesh_with_occ_fragment(polygon_coords, region_ids, lines, target_size,
+                              base_element_type, debug=False):
+    """Conforming fallback mesher for constraint lines the geo-kernel embed cannot
+    recover — long inclined reinforcement rooted on / crossing boundary or material
+    edges (VP60's soil nails root on the vertical wall face at 15 deg).
+
+    The geo-kernel path adds the lines and calls ``gmsh.model.mesh.embed`` + edge
+    recovery; for those lines recovery fails and the 1D nodes end up floating inside
+    2D triangles (orphans -> singular stiffness). Here the OCC kernel's boolean
+    ``fragment`` SPLITS the material surfaces along the lines, so every line segment
+    becomes a real edge of the 2D mesh — node sharing is guaranteed by construction,
+    no edge recovery involved. Produces a LINEAR tri3 mesh + 2-node 1D elements in
+    the same dict shape as the primary path; the caller's quadratic conversion then
+    lifts tri3 -> tri6.
+
+    Only invoked when the primary path left orphan 1D nodes / no elements, so a mesh
+    that already conformed never reaches this code and stays byte-identical.
+    """
+    gmsh = _get_gmsh()
+    gmsh.initialize()
+    try:
+        gmsh.option.setNumber("General.Terminal", 1 if debug else 0)
+        gmsh.model.add("occ_fragment_fallback")
+        occ = gmsh.model.occ
+
+        # 1. Each material zone as an OCC plane surface (in polygon order).
+        surf_tags = []
+        for coords in polygon_coords:
+            ring = remove_duplicate_endpoint(list(coords))
+            pts = [occ.addPoint(x, y, 0.0) for x, y in ring]
+            ls = [occ.addLine(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
+            surf_tags.append(occ.addPlaneSurface([occ.addCurveLoop(ls)]))
+
+        # 2. Each constraint line as a chain of OCC line segments.
+        line_inputs = []  # (line_idx, [segment curve tags])
+        for li, line in enumerate(lines):
+            pl = remove_duplicate_endpoint(list(line))
+            seg_tags = []
+            p_prev = occ.addPoint(pl[0][0], pl[0][1], 0.0)
+            for (x, y) in pl[1:]:
+                p_cur = occ.addPoint(x, y, 0.0)
+                seg_tags.append(occ.addLine(p_prev, p_cur))
+                p_prev = p_cur
+            line_inputs.append((li, seg_tags))
+
+        # 3. Fragment surfaces by lines. out_map[i] holds the output entities derived
+        #    from input dimtag i, in the input order [surfaces..., line segments...].
+        surf_dimtags = [(2, s) for s in surf_tags]
+        line_dimtags = [(1, t) for _, seg_tags in line_inputs for t in seg_tags]
+        _out, out_map = occ.fragment(surf_dimtags, line_dimtags,
+                                     removeObject=True, removeTool=True)
+        occ.synchronize()
+
+        # Surface fragment -> region id. Material zones tile without overlap, so each
+        # output surface derives from exactly one input surface.
+        surf_region = {}
+        for j in range(len(surf_dimtags)):
+            for (d, t) in out_map[j]:
+                if d == 2:
+                    surf_region[t] = region_ids[j]
+        # Line-segment fragment -> line index (entries after the surfaces in out_map).
+        line_frag = {}
+        k = len(surf_dimtags)
+        for (li, seg_tags) in line_inputs:
+            for _seg in seg_tags:
+                for (d, t) in out_map[k]:
+                    if d == 1:
+                        line_frag.setdefault(t, li)
+                k += 1
+
+        for t, rid in surf_region.items():
+            gmsh.model.addPhysicalGroup(2, [t])
+
+        gmsh.option.setNumber("Mesh.MeshSizeMin", target_size)
+        gmsh.option.setNumber("Mesh.MeshSizeMax", target_size)
+        gmsh.option.setNumber("Mesh.Algorithm", 6)      # Frontal-Delaunay (tri)
+        gmsh.option.setNumber("Mesh.ElementOrder", 1)   # linear; caller lifts to tri6
+        gmsh.model.mesh.generate(2)
+        gmsh.model.mesh.removeDuplicateNodes()
+
+        node_tags, coords, _ = gmsh.model.mesh.getNodes()
+        nodes = np.array(coords).reshape(-1, 3)[:, :2]
+        tag2idx = {t: i for i, t in enumerate(node_tags)}
+
+        elements, mat_ids, node_counts = [], [], []
+        for surf, rid in surf_region.items():
+            etypes, _etags, enodes = gmsh.model.mesh.getElements(2, surf)
+            for et, _tg, nn in zip(etypes, _etags, enodes):
+                if et == 2:  # 3-node triangle
+                    for tri in np.array(nn).reshape(-1, 3):
+                        idx = [tag2idx[int(x)] for x in tri]
+                        elements.append(idx + [0] * 6)
+                        mat_ids.append(rid)
+                        node_counts.append(3)
+
+        e1d, mat_1d, counts_1d = [], [], []
+        for curve, li in line_frag.items():
+            etypes, _etags, enodes = gmsh.model.mesh.getElements(1, curve)
+            for et, _tg, nn in zip(etypes, _etags, enodes):
+                if et == 1:  # 2-node line
+                    for ln in np.array(nn).reshape(-1, 2):
+                        i1, i2 = tag2idx[int(ln[0])], tag2idx[int(ln[1])]
+                        if i1 == i2:
+                            continue
+                        c1, c2 = nodes[i1], nodes[i2]
+                        if ((c2[0] - c1[0]) ** 2 + (c2[1] - c1[1]) ** 2) ** 0.5 < 1e-6:
+                            continue
+                        e1d.append([i1, i2, 0])
+                        mat_1d.append(li)
+                        counts_1d.append(2)
+    finally:
+        gmsh.finalize()
+
+    elements = np.array(elements, dtype=int)
+    element_types = np.array(node_counts, dtype=int)
+    element_materials = np.array(mat_ids, dtype=int) + 1  # 1-based, like the geo path
+    ensure_ccw_elements(nodes, elements, element_types)
+
+    mesh = {
+        "nodes": nodes,
+        "elements": elements,
+        "element_types": element_types,
+        "element_materials": element_materials,
+    }
+    if e1d:
+        mesh["elements_1d"] = np.array(e1d, dtype=int)
+        mesh["element_types_1d"] = np.array(counts_1d, dtype=int)
+        mesh["element_materials_1d"] = np.array(mat_1d, dtype=int) + 1
+    if debug:
+        orphan = _has_orphan_1d_nodes(mesh)
+        print(f"[occ-fallback] nodes={len(nodes)} tri3={len(elements)} "
+              f"el1d={len(e1d)} orphan_1d={orphan}")
+    return mesh
+
+
 def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None):
     """
     Build a finite element mesh with material regions using Gmsh.
@@ -1426,6 +1585,23 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         mesh["elements_1d"] = elements_1d_array
         mesh["element_types_1d"] = element_types_1d
         mesh["element_materials_1d"] = element_materials_1d
+
+    # Conforming fallback for constraint lines the geo-kernel embed could not recover.
+    # Long inclined reinforcement rooted on / crossing a boundary or material edge —
+    # VP60's soil nails root on the vertical wall face — leaves 1D nodes floating
+    # inside 2D triangles (orphans -> singular stiffness) or produces no elements at
+    # all. Detect that and rebuild via the OCC kernel's boolean fragment, which splits
+    # the surfaces along the lines so they become real, conforming mesh edges. Only
+    # triangular meshes are rebuilt (the reinforcement corpus is tri3/tri6); this is
+    # gated on FAILURE, so a mesh that already conformed is byte-identical (it never
+    # enters this branch).
+    if (lines is not None and base_element_type == 'tri3'
+            and (len(mesh.get("elements", [])) == 0 or _has_orphan_1d_nodes(mesh))):
+        if debug:
+            print("Primary embed left orphan 1D nodes / no elements — rebuilding "
+                  "with OCC boolean fragment (conforming fallback)")
+        mesh = _remesh_with_occ_fragment(polygon_coords, region_ids, lines,
+                                         target_size, base_element_type, debug=debug)
 
     # Post-process to convert linear elements to quadratic if requested
     if quadratic:

@@ -211,7 +211,7 @@ candidates.
 | 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | **built** | → [RS2-51](#rs2-51) (LEM, partial). RS2 SSR 1.22 vs Slide2 Spencer 1.293 / GLE 1.304. |
 | 56 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | **built** | → [RS2-33](#rs2-33). RS2 SSR 1.26 vs 8-program 1.02–1.32. |
 | 57 | Layered, TC (Pockoski & Duncan slope 3) | **built** | → [P4-VP57](#p4-vp57) (own SSRM build, 1.301). RS2 SSR 1.32 vs 8-program ~1.40. |
-| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | *blocked* | Five passive soil-nail rows in undrained φ=0 clay. The builder now gives the nails an FEM axial rigidity (EA ≈ 2000·T_max, grouted-nail convention) and the soil unit-correct moduli, so the LEM lock (Spencer 1.010 / Janbu 1.043) is unchanged and the file is FEM-ready; bond-slip load transfer is available, though for φ=0 clay the bond is adhesion-governed (stress-independent) and reduces to the fixed pull-out ramp. The SSRM still cannot be evaluated — the inclined nail lines rooted on the vertical wall face do not conform into the 2D mesh (orphan nail nodes → singular stiffness), a mesh-generation gap independent of the reinforcement model. RS2 SSR 0.98 vs GOLD-NAIL 0.91, UTEXAS4 1.02. |
+| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | **built** | → [P4-VP60](#p4-vp60) (own SSRM build, 1.009, matching XSLOPE LEM Spencer 1.010). Five passive soil-nail rows in undrained φ=0 clay with the heads on the vertical wall face; the inclined wall-rooted nails conform into the FEM mesh (OCC-fragment build for lines the geo-kernel embed cannot recover). RS2 SSR 0.98 vs GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | **built** | → [RS2-34](#rs2-34). RS2 SSR 1.34 / 1.45 vs Baker 1.35 / 1.48. |
 | 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | **built** | → [RS2-68](#rs2-68). RS2 SSR 0.96. |
 | 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | **built** | → [RS2-68](#rs2-68). RS2 SSR 0.99. |
@@ -2194,6 +2194,41 @@ stable across the seam (~1.30 at 3.0 and 2.0 m). Locked at 3.0 m. ψ = 0.
 <!-- test: file=../files/rocscience/vp057.xlsx, type=fem_ssrm, expected_fs=1.301, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, benchmark=RS2-P4-VP57 -->
 
 ![RS2 Part IV VP57: layered slope with weak seam (P&D slope 3), SSRM 1.301 vs RS2 SSR 1.32 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP57.png)
+
+### RS2 Part IV VP60: Soil-nailed wall (Pockoski & Duncan slope 7) {#p4-vp60}
+
+Slide2/LEM counterpart: [VP60](rocscience.md#vp60). RS2 Part IV re-runs this nailed wall by
+shear-strength reduction.
+
+**Input files:** [vp060.xlsx](../files/rocscience/vp060.xlsx)
+
+A near-vertical wall in undrained sandy clay (c = 800 psf, φ = 0, γ = 120 pcf) retained by five
+passive soil-nail rows (15° declination, heads on the wall face at El. 23 / 18 / 13 / 8 / 3),
+with a dry 7-ft tension crack and overlapping crest surcharges (250 psf full-width + 500 psf over
+the first 7.3 ft). The nails carry an FEM axial rigidity (EA ≈ 2000·T_max, the grouted-nail
+convention); the classifier sets the soil moduli in the file's own units.
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM (2.0 m mesh) | 1.009 | RS2 SSR 0.98 (+3.0%) |
+
+*Cross-bearings: XSLOPE LEM Spencer 1.010 / Janbu 1.043 (on Slide's printed circle); Slide2
+Spencer 1.009 / Janbu 1.041; UTEXAS4 1.02 / 1.08; GOLD-NAIL 0.91. The published SSR spread is
+0.91–1.02.*
+
+The inclined nails root **on the vertical wall face**. A long inclined 1D line rooted on a domain
+boundary is meshed by splitting the soil surface along the line (an OCC boolean-fragment build) so
+the nail nodes are shared with the 2D mesh by construction, rather than embedded and edge-recovered
+— which leaves such wall-rooted lines non-conforming. With the nails conforming, XSLOPE's SSRM
+lands at **1.009** — squarely inside the published 0.91–1.02 spread and matching XSLOPE's own LEM
+Spencer 1.010 to three figures. For undrained φ = 0 clay the nail bond is adhesion-governed
+(stress-independent), so the standard fixed-ramp pull-out is faithful and no bond-slip envelope is
+needed. Mesh-stable (1.009 at both 2.0 and 1.5 m); the conforming mesh equilibrates at a uniform
+size without feature refinement. ψ = 0.
+
+<!-- test: file=../files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=1.009, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, benchmark=RS2-P4-VP60 -->
+
+![RS2 Part IV VP60: soil-nailed wall (P&D slope 7), SSRM 1.009 vs RS2 SSR 0.98 — FEM inputs, mesh with the wall-rooted nails conforming into the 2D mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP60.png)
 
 ### RS2 Part IV VP64: USACE end-of-construction dam (Fig 4-1) {#p4-vp64}
 

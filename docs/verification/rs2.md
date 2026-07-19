@@ -1498,9 +1498,19 @@ New corpus files. Built (5 of 6).
 |---|---|---|
 | SSRM (rs2_58a — case 1, weakest; lock) | 0.328 | RS2 SSRM 0.33 |
 | SSRM (rs2_58b — case 6, strongest; lock) | 1.029 | RS2 SSRM 1.06 |
-| SSRM (case 5, c = 5, φ = 30; unlocked) | 0.667 | RS2 SSRM 0.72 |
+| SSRM (case 5, c = 5, φ = 30; unlocked — mesh-dependent localization) | 0.667 | RS2 SSRM 0.72 |
 
-*Four of the six land within ±3.6%; the two locks bracket the family. Case 5 reads 0.667 against a tight published 0.72–0.75 cluster (RS2 0.72, Z-Soil 0.75, PLAXIS 0.74, GEO FEM 0.73, Slide2 0.73) and is reported unlocked pending explanation. Full case-by-case tables in [the Pruska cross-bearing section](#pruska).*
+*Four of the six land within ±3.6%; the two locks bracket the family. Case 5 reads 0.667 against a
+tight published 0.72–0.75 cluster (RS2 0.72, Z-Soil 0.75, PLAXIS 0.74, GEO FEM 0.73, Slide2 0.73)
+and stays unlocked — **it is a mesh-dependent shallow-skin localization, not a converged FS**: on
+this tallest slope (H = 14 m) case 5 is the steepest, most cohesionless material (c = 5, φ = 30 on
+the 54.5° face), and its critical mechanism is a surface-parallel band that **sharpens rather than
+converges** with refinement — SSRM 0.672 → 0.634 → 0.616 at 0.8 / 0.5 / 0.35 m target sizes (the
+c ≈ 0 skin pattern of [RS2-40](#rs2-40) / VP69). The identical material one slope
+down (H = 10.5 m, 46.4° face) instead converges and agrees (0.944 vs RS2 0.96), so this is the
+steep-face-plus-low-cohesion geometry localizing, not a setup error. Matching RS2's coarser-mesh
+0.72 would mean coarsening to the answer, so it is left reported-with-reason. Full case-by-case
+tables in [the Pruska cross-bearing section](#pruska).*
 
 <!-- test: file=../files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.328, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=16000, benchmark=RS2-58a -->
 <!-- test: file=../files/rocscience/rs2_58b.xlsx, type=fem_ssrm, expected_fs=1.029, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.71, f_max=1.51, max_iter=16000, benchmark=RS2-58b -->
@@ -1556,10 +1566,15 @@ paper's published E = 5,000 kPa and per-case ν, not the corpus's usual conventi
 | 5 | 0.667 | 0.72 | 0.75 | 0.74 | 0.73 | 0.73 |
 | 6 | 1.057 | 1.06 | 1.07 | 1.06 | 1.10 | 1.08 |
 
-Case 5 of the H = 14 m slope is the one outlier (−7.4% against a tight published
-cluster; the same materials at H = 10.5 m agree within 1.6%) — it is reported here and
-excluded from the regression locks pending an explanation. Each slope's locks bracket
-its family (the weakest and strongest case).
+Case 5 of the H = 14 m slope is the one outlier (−7.4% against a tight published cluster; the same
+materials at H = 10.5 m agree within 1.6%). The cause is now identified: on this tallest slope,
+case 5 (c = 5, φ = 30) is steep enough (54.5° face) and cohesionless enough that the SSRM localizes
+a **shallow surface-parallel band that sharpens with mesh refinement** rather than converging —
+FS 0.672 → 0.634 → 0.616 at 0.8 / 0.5 / 0.35 m — the c ≈ 0-skin behaviour of [RS2-40](#rs2-40)/VP69.
+The same material at the gentler H = 10.5 m face (46.4°) converges and agrees (0.944 vs RS2 0.96),
+confirming it is the steep-face geometry, not the inputs. It is therefore reported and **excluded
+from the regression locks as a mesh-dependent localization** (matching RS2's coarser 0.72 would mean
+tuning the mesh to the answer). Each slope's locks bracket its family (the weakest and strongest case).
 
 ### RS2-59: Stability of a three-layered soil slope (Görög & Török 2007) {#rs2-59}
 

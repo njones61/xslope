@@ -70,6 +70,8 @@ independently verifiable.
 
 ### Part I (1–34)
 
+<div class="corpus-summary" markdown>
+
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
 | [1](#rs2-1) | Simple slope stability assessment | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx). SSRM 0.958 vs RS2 SSRM 0.99, Slide Bishop 0.987, ACADS referee 1.00. |
@@ -107,7 +109,11 @@ independently verifiable.
 | [33](#rs2-33) | Homogeneous slope with tension crack and water table (P&D test slope 2) | **built** (caveat) | [vp056.xlsx](../files/rocscience/vp056.xlsx). SSRM 1.244 vs RS2 SSRM 1.28 and an eight-program LEM table spanning 1.03–1.32. |
 | [34](#rs2-34) | M-C vs power curve III (Baker 2003 ex. 3, London clay) | **built** (both halves) | [vp061a](../files/rocscience/vp061a.xlsx) / [vp061b](../files/rocscience/vp061b.xlsx). M-C SSRM 1.345 vs RS2 1.38; power-curve SSRM 1.478 vs RS2 1.47 / Slide2 Spencer 1.47 / Baker 1.48 (+0.5%). |
 
+</div>
+
 ### Part II (35–58)
+
+<div class="corpus-summary" markdown>
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
@@ -127,7 +133,11 @@ independently verifiable.
 | [57](#rs2-57) | Pruska H = 10.5 m, 6 cases | **built** | [rs2_57a](../files/rocscience/rs2_57a.xlsx) / [b](../files/rocscience/rs2_57b.xlsx). All six within ±3.6% of RS2's M-C; locks 0.440 / 1.389. Full tables in [the Pruska section](#pruska). |
 | [58](#rs2-58) | Pruska H = 14 m, 6 cases | **built** (5 of 6) | [rs2_58a](../files/rocscience/rs2_58a.xlsx) / [b](../files/rocscience/rs2_58b.xlsx). Four within ±3.6%; case 5 reads 0.667 vs a published 0.72–0.75 cluster and is unlocked pending explanation; locks 0.328 / 1.029. |
 
+</div>
+
 ### Part III (59–68)
+
+<div class="corpus-summary" markdown>
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
@@ -141,6 +151,8 @@ independently verifiable.
 | [66](#rs2-66) | Embankment basal stability | **built** | [rs2_66a.xlsx](../files/rocscience/rs2_66a.xlsx)…e. Nakamura, Cai & Ugai (2008), 5 soft-layer thicknesses (h₁ = 2–10 m). SSRM 1.04–1.08 across the family vs Slide2 Spencer 1.05–1.16 / RS2 SSRM 1.05–1.19 / LEM–FEM ref 1.08–1.24 — a few percent low (ψ = 0 vs the reference ψ = φ; thin φ = 0 band is mesh-sensitive). Regression-locked at a common 3 m mesh. |
 | 67 | Earth dam under steady & transient unsaturated seepage | *blocked* | Transient — blocked on a transient solver. |
 | [68](#rs2-68) | Seismically loaded slopes | **built** | [rs2_68a.xlsx](../files/rocscience/rs2_68a.xlsx) / [b](../files/rocscience/rs2_68b.xlsx) / [c](../files/rocscience/rs2_68c.xlsx). Loukidis, Bandini & Salgado (2003). Target is a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — locked via a new `critical_kc` bisection harness. Homogeneous Cases 1/2 (r<sub>u</sub> = 0.5 / dry): k꜀ 0.127–0.432 (Bishop/Spencer) on the Slide2/reference LEM to ~0.001; Case 3 (3-layer, band-riding) 0.167–0.169 vs Slide2 0.151–0.155 — high by ~10% (circular can't ride the φ = 15° band as tightly as non-circular) but inside the UB/LB bracket [0.148, 0.172] and on RS2 SSR/FEM 0.161. |
+
+</div>
 
 ### Part IV — RS2 *Slope Stability Verification Manual, Pt 4* (catalog)
 
@@ -156,6 +168,8 @@ build section below (VP2 / VP64 / VP67), or a *new* / *planned* marker — follo
 manual's published RS2 SSR and its reference/Slide2 figures (representative case where a
 problem has several). The **new** rows (no existing corpus counterpart) are tranche-2+ build
 candidates.
+
+<div class="corpus-summary" markdown>
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
@@ -211,6 +225,8 @@ candidates.
 | 82 | Earth embankment, water table (D&W Fig 14.20-a) | **built** | → [RS2-44](#rs2-44). RS2 SSR 1.50 vs Spencer 1.54. |
 | 83 | Embankment wall (D&W Fig 14.20-b) | **built** | → [RS2-45](#rs2-45). RS2 SSR 1.29 / 1.30 vs Spencer 1.28 / 1.33. |
 | 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | *new* | RS2 SSR 2.43 vs Spencer 2.46, ref 2.43. (cf. RS2-67.) |
+
+</div>
 
 **Part 4 in one line:** 52 problems cataloged — 35 already in the corpus as RS2-1…47 rows,
 VP2 (ACADS 1b) now carrying its own [Part IV SSRM build](#p4-vp2) on the shared file (SSRM

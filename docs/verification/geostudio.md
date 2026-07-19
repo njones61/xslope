@@ -146,6 +146,8 @@ either. The 2025.2 edition also adds an 11-problem "Verifications – 3D" chapte
 piezometric cases, and the Kettleman Hills case history. XSLOPE is a 2D formulation, so
 the 3D chapter is out of scope and not tracked here.
 
+<div class="corpus-summary" markdown>
+
 | § | Problem | Status | XSLOPE file / results vs SLOPE/W |
 |---:|---|---|---|
 | 2.1 | ACADS Simple Slope | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx): Bishop 0.985 vs SLOPE/W 0.963, Slide 0.987; ACADS reference 1.00. — [details](#gs-2-1) |
@@ -195,6 +197,8 @@ the 3D chapter is out of scope and not tracked here.
 | 2.45 | Eurocode 7 – Cutting in Clay | **built** | [gs2_45.xlsx](../files/geostudio/gs2_45.xlsx) — DA3 partial factors baked into the material (c′* = 8.0, φ′* = 23.04°); Spencer 1.173 vs SLOPE/W ODF 1.174 (−0.07%). — [details](#gs-2-45) |
 | 2.46 | Eurocode 7 – Earth Dam | **built** | [gs2_46.xlsx](../files/geostudio/gs2_46.xlsx) — DA1-C2 factors + XSLOPE FE seepage; on SLOPE/W's own circle M-P 1.099 vs 1.101 (−0.19%), free-search minimum 1.073 ≈ the Smith textbook 1.07. — [details](#gs-2-46) |
 | 2.47 | Compound Strength vs Anisotropic Function | blocked | Needs an orientation-dependent (dip-relative) strength model XSLOPE does not have: AnisotropicFn/CompoundStrength interpolate strength by slice-base angle against a discontinuity dip over angle ranges A/B (the .gsz importer already flags exactly this on import). SLOPE/W: Anisotropic 1.113, Compound 1.118 — solved on the *same* surface these differ by 0.4%, so the gap is the strength model, not the search. The 21-material faulted section has no printed coordinate table (a secondary blocker). |
+
+</div>
 
 ## Problem details
 

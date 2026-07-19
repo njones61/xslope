@@ -123,6 +123,8 @@ material automatically. The plots themselves are shown, with worked examples, on
   you pick a property), **Steps** sets the number of solves, and **Target FS** is the factor
   of safety to locate.
 
+![Back-Analysis dialog](images/analysis_sensitivity_dialog_backanalysis.png)
+
 **Back-Analysis** is the same single-parameter sweep as Design, framed for a failure
 investigation: because a slide has occurred, the target defaults to **FS = 1.0**, and the
 result is read as the parameter value consistent with the observed failure (the

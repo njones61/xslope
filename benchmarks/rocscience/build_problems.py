@@ -1124,6 +1124,55 @@ def vp045b():
     return 'vp045b.xlsx'
 
 
+def vp046():
+    """Slide #46 / Baker (1993) three-stage validation dam, STAGE 1 (dry /
+    end-of-construction, empty reservoir).
+
+    A small compacted-clay embankment (crest el 101, upstream toe x=80,
+    downstream toe x=128, both el 95) sits on a deep natural-clay foundation;
+    downstream of the embankment the natural-clay ground drops on a 4H:1V face
+    from (128,95) to the toe bench (148,90) and runs flat out to x=220. Geometry
+    from Figure 46.1 (axis-tick-calibrated vertex extraction; the 4H:1V
+    downstream face is the value that makes the closed-form check below exact).
+    Materials (Table 46.1): compacted clay c'=6.5 kPa, phi'=40, gamma=18;
+    natural clay c'=0, phi'=32, gamma=18. Dry — no water table this stage.
+
+    The critical mechanism is the cohesionless (c'=0) downstream natural-clay
+    face. For c'=0 the infinite-slope factor of safety FS = tan(phi')/tan(beta)
+    is depth-independent; on the 4H:1V face (beta = atan(1/4) = 14.04 deg) that
+    is tan(32)/tan(14.04) = 2.50 exactly — the manual's "Theoretical FS = 2.5".
+    XSLOPE's circular search rides that face (every slice base ~14 deg) and lands
+    on 2.50 for every method (Spencer/Bishop/Corps/Lowe 2.4995, Janbu 2.502).
+    Slide's published Spencer 2.534 is a minimum-depth-5m noncircular random
+    search that sits ~1.4% above the pure infinite-slope minimum; Baker (1993)
+    2.41; theory 2.5.
+
+    Stages 2 (steady seepage, Slide Spencer 7.003) and 3 (rapid drawdown, Slide
+    Spencer 2.181) stay literature/vendor-gated: they need Baker's estimated
+    clay permeabilities plus the <Compacted Clay.fn6>/<Natural Clay.fn6> discrete
+    drawdown-strength functions, which ship only with a Slide2 install (absent
+    from every held archive — the RS2 .fez "Slide2 Import" set skips #046)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Compacted clay', c=6.5, phi=40.0, gamma=18.0,
+                               gamma_sat=18.0, option='mc', u='none')
+    m1 = dict(base); m1.update(name='Natural clay', c=0.0, phi=32.0, gamma=18.0,
+                               gamma_sat=18.0, option='mc', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(80.0, 95.0), (100.0, 101.0), (128.0, 95.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 95.0), (80.0, 95.0), (128.0, 95.0),
+                                 (148.0, 90.0), (220.0, 90.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['circular'] = True
+    sd['circles'] = [{'Xo': 145.0, 'Yo': 120.0, 'Depth': 85.0, 'R': 35.0}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp046.xlsx'))
+    return 'vp046.xlsx'
+
+
 def _vp028_ex1_slope_data():
     """Slide #28 Ex 1 geometry/materials (Congress St. Cut, Ireland 1954)."""
     sd = load_slope_data(ACADS_1A)
@@ -4467,7 +4516,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

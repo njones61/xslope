@@ -232,7 +232,7 @@ corpus is complete relative to what is independently verifiable.
 | [43](#vp43) | Slope, homogenous, planar surface, RocPlane comparison | **built** | [vp043.xlsx](../files/rocscience/vp043.xlsx). Baker (2001) planar-slip benchmark (c'=30, φ'=30, γ=20, dry) on the critical toe plane; the SLOPE/W model pins the crest-offset geometry. Also [SLOPE/W §2.26](geostudio.md#gs-2-26) — same problem in the GeoStudio corpus. |
 | [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](../files/rocscience/vp044a.xlsx) (power curve) / [vp044b.xlsx](../files/rocscience/vp044b.xlsx) (Mohr-Coulomb) / [vp044c.xlsx](../files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: a 43° slope with three strength models fitted to the same triaxial data. |
 | [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](../files/rocscience/vp045a.xlsx) (Mohr-Coulomb) / [vp045b.xlsx](../files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: a linear vs non-linear strength envelope on the same 4:1 slope. |
-| 46 | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | partial | Baker (1993) three-stage dam (dry / steady-state seep / rapid drawdown). The manual itself calls this a validation problem: permeabilities were estimated by Rocscience and the stage-3 undrained strengths live in discrete .fn6 functions. Stage 1 (dry, Spencer 2.534 / Baker 2.41 / theory 2.5) buildable once Figure 46.1 coordinates are read; stages 2-3 map onto xslope's seep + rapid-drawdown pipeline but need those source functions. *Archive recheck (2026-07-19): no VP46 model file in any held archive — the RS2 `.fez` "Slide2 Import" set skips #046 (the RS2-native "#046 (cz=…)" is a different, cohesion-with-depth problem under RS2's own numbering), so the `.fn6` drawdown-strength functions would have to come from the Slide2-install verification models.* |
+| [46](#vp46) | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | **partial** (stage 1 built) | [vp046.xlsx](../files/rocscience/vp046.xlsx). Baker (1993) three-stage validation dam. **Stage 1 (dry)** now built: the c′ = 0 downstream natural-clay face is a 4H:1V infinite-slope skin, so XSLOPE's circular search lands on the closed form FS = tan 32°/tan 14.04° = **2.50** (Spencer/Bishop) — exactly the manual's theoretical 2.5, vs Slide's min-depth-5m noncircular Spencer 2.534 (−1.4%) and Baker 2.41. Stages 2 (steady seep, Spencer 7.003) & 3 (rapid drawdown, Spencer 2.181) stay literature/vendor-gated: they need Baker's estimated permeabilities and the discrete `.fn6` drawdown-strength functions (Slide2-install only; absent from every held archive — the RS2 `.fez` "Slide2 Import" set skips #046, and the RS2-native "#046 (cz=…)" is a different cohesion-with-depth problem). |
 | [47](#vp47) | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | **built** | [vp047.xlsx](../files/rocscience/vp047.xlsx). Sheahan & Ho (2003) Amherst test wall: a 6 m undrained cut with 2 soil-nail rows (FHWA capacity envelope) + a shotcrete line load, on planar surfaces through the toe. Also [SLOPE/W §2.27](geostudio.md) — same problem in the GeoStudio corpus. |
 | [48](#vp48) | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | **built** | [vp048.xlsx](../files/rocscience/vp048.xlsx). Clouterre full-scale test wall: 7 nail rows (constant 15 kN tension), planar surfaces through the toe at 45–70°; Janbu/Spencer within 0.3% of Slide at 55–70°. Also [SLOPE/W §2.28](geostudio.md) — same problem in the GeoStudio corpus. |
 | [49](#vp49) | Retaining wall, (2) materials, grouted tiebacks, soldier piles | **built** | [vp049.xlsx](../files/rocscience/vp049.xlsx). SNAILZ reference-manual soldier-pile tieback wall on the given bilinear wedge (two tieback rows + the soldier pile as a face micro-pile). Also [SLOPE/W §2.29](geostudio.md) — same problem in the GeoStudio corpus. |
@@ -1322,6 +1322,27 @@ Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's A=0.58, n=0.86, 
 ![vp045a: inputs and representative solution](images/vp045a.png)
 
 ![vp045b: inputs and representative solution](images/vp045b.png)
+
+### VP46: Baker (1993) three-stage dam — stage 1, dry {#vp46}
+
+Slide #46 / Baker (1993): a three-loading-stage validation dam — (1) end-of-construction with an empty reservoir, (2) steady-state seepage with a full reservoir, (3) rapid drawdown. The manual states outright that this is a *validation* problem: several natural-clay permeabilities were not given in Baker's paper and were estimated by Rocscience, and the stage-3 undrained strengths live in Baker's own discrete functions (`Compacted Clay.fn6` / `Natural Clay.fn6`). Only **stage 1 (dry)** is buildable from the published figure alone.
+
+A small compacted-clay embankment (crest el 101, toes at x = 80 and x = 128, both el 95) sits on a deep natural-clay foundation; downstream, the natural-clay ground drops on a **4H:1V** face from (128, 95) to the toe bench (148, 90) and runs flat to x = 220. Geometry from Figure 46.1 (axis-tick-calibrated vertex extraction). Materials (Table 46.1): compacted clay c′ = 6.5 kPa, φ′ = 40°, γ = 18; natural clay c′ = 0, φ′ = 32°, γ = 18.
+
+**Input files:** [vp046.xlsx](../files/rocscience/vp046.xlsx) (stage 1, dry)
+
+The critical mechanism is the cohesionless (c′ = 0) downstream natural-clay face. For c′ = 0 the infinite-slope factor of safety FS = tan φ′ / tan β is depth-independent; on the 4H:1V face (β = atan(1/4) = 14.04°) that is the closed form tan 32° / tan 14.04° = **2.50** — the manual's "Theoretical FS = 2.5". XSLOPE's circular search rides that face (every slice base ≈ 14°) and lands on it:
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| Spencer (circular) | 2.500 | Slide 2.534; Baker 2.41; theory 2.5 |
+| Bishop (circular) | 2.500 | — |
+
+XSLOPE reproduces the theoretical infinite-slope value exactly. Slide's published Spencer 2.534 is a **minimum-depth-5m** noncircular random search, which rides a 5-m slab slightly off the pure infinite-slope minimum and so reads ~1.4% high; Baker (1993) 2.41 sits ~3.6% below theory. XSLOPE brackets both, on theory.
+
+**Stages 2 and 3 remain literature/vendor-gated.** Stage 2 (steady seepage, Slide Spencer 7.003) needs Baker's estimated clay permeabilities; stage 3 (rapid drawdown, Slide Spencer 2.181) needs the `.fn6` discrete drawdown-strength functions. Both ship only with a Slide2 install — confirmed absent from every held archive (the RS2 `.fez` "Slide2 Import" set skips #046; the RS2-native "#046 (cz=…)" is a different cohesion-with-depth problem under RS2's own numbering).
+
+<!-- test: file=../files/rocscience/vp046.xlsx, type=circular_search, num_slices=40, fs_spencer=2.500, fs_bishop=2.500, benchmark=VP46-dry -->
 
 ### VP47: Soil-nailed wall in clay (Amherst test wall) {#vp47}
 

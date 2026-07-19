@@ -3007,13 +3007,15 @@ def vp042():
                      {'X': 265.0, 'Y': 0.0, 'Normal': 9.81 * 30.0}]]
     sd['circular'] = True
     # circles[0] = Slide's printed critical (safety-map global minimum, Figure
-    # 42.3 info box). NOTE the published FS values use a different statics
-    # convention: with rigorous total-weight + u + reservoir-load statics this
-    # circle reads Spencer 1.572; Baker's SSA (and Slide, matching Baker) used
-    # the buoyant-weight shortcut (gamma' below the phreatic, no u, no pond),
-    # which an independent hand integral reproduces at 1.87 vs their 1.91-1.925.
-    # The two differ by the seepage forces of the inclined phreatic. See the
-    # corpus page.
+    # 42.3 info box). XSLOPE reads Spencer 1.572 here vs the published cluster
+    # (Slide 1.925, Baker 1.91, SLOPE/W-own 1.934). The gap is NOT a weight
+    # convention: B&L (2001, p.142) state total unit weight + pore pressure from
+    # the phreatic surface, and the SLOPE/W .gsz carries total weights + a piezo
+    # line within ~1-2 m of this one (no buoyant weights). On SLOPE/W's OWN
+    # critical circle (234.9,207.1,R=204.4) XSLOPE reads 1.691 vs SLOPE/W 1.934
+    # on the identical surface; every XSLOPE method sits low. The residual is the
+    # large reservoir (ponded-water) load statics, not a buoyant shortcut. See
+    # the corpus page.
     sd['circles'] = [{'Xo': 233.762, 'Yo': 188.495, 'Depth': 188.495 - 187.195, 'R': 187.195}]
     # Baker's noncircular surface, fully labeled in Figure 42.2
     # Slide prints its endpoints pulled slightly inside the ground, and the top

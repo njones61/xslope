@@ -19,6 +19,12 @@ shared [References](references.md) page.
 <!-- test: file=../files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.147, expected_flowrate=5.462e-06, tolerance=0.05, benchmark=GW4-q -->
 <!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.437e-07, tolerance=0.05, benchmark=GW6a-q -->
 <!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
+<!-- test: file=../files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.639e-06, tolerance=0.05, benchmark=GW6b-q -->
+<!-- test: file=../files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.573;26:2:6.738;26:4:7.191;26:6:7.789, tolerance=0.05, benchmark=GW6b-h -->
+<!-- test: file=../files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.502e-08, tolerance=0.05, benchmark=GW6c-q -->
+<!-- test: file=../files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.602;26:2:6.056;26:4:6.678;26:6:7.478, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=../files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.686e-07, tolerance=0.05, benchmark=GW6e-q -->
+<!-- test: file=../files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.337;26:2:8.348;26:4:8.386;26:6:8.446, tolerance=0.05, benchmark=GW6e-h -->
 <!-- test: file=../files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
 <!-- test: file=../files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
 <!-- test: file=../files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
@@ -70,7 +76,7 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 | [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](../files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
 | [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
 | 5 | Unsaturated flow behind an embankment | *no lock possible* | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. |
-| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (case 1 of 5, caveat) | [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx). Fredlund & Rahardjo isotropic dam with a 12 m drain: the pressure-head profile along the crest centerline matches Slide/F&R in shape exactly but sits +0.3 m high — insensitive to the conductivity fit and the mesh. Case 4 needs the flux BC (now supported); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face) are buildable with chart targets. All four are deferred. |
+| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (4 of 5 cases) | [gw006a](../files/rocscience_gw/gw006a.xlsx) (isotropic) / [gw006b](../files/rocscience_gw/gw006b.xlsx) (9:1 anisotropy) / [gw006c](../files/rocscience_gw/gw006c.xlsx) (core) / [gw006e](../files/rocscience_gw/gw006e.xlsx) (seepage face). Fredlund & Rahardjo saturated–unsaturated dam, five cases sharing the same 12 m dam. The pressure-head profile along line 1-1 is a chart-only target (no tabulated value), so XSLOPE's own flowrate + total-head field are locked. Cases 2 and 5 reproduce the Slide/F&R curve almost exactly; cases 1 and 3 sit ~0.3–0.5 m high (the free-surface family, mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3). Case 4 (steady infiltration) remains deferred on the flux-BC exit-face convergence. |
 | [7](#gw7) | Seepage within layered slope | **built** (caveat) | [gw007.xlsx](../files/rocscience_gw/gw007.xlsx). Rulon & Freeze layered slope: 2.1×10⁻⁴ m/s infiltration on the crest — above the fine-sand ks — perches a water table on the fine lens and daylights as a slope-face spring. XSLOPE reproduces the stated water table (exits at el 0.30 at the toe) and the perched zone; Q = q·L = 1.68×10⁻⁴ locked. Every published target (Fig 7.4/7.7/7.8) is a chart curve with no tabulated value, so — as the methodology note allows for GW6/GW7 — only the flowrate is locked, with a head regression guarding the field. |
 | [8](#gw8) | Flow through ditch-drained soils | **built** (discrepancy) | [gw008.xlsx](../files/rocscience_gw/gw008.xlsx). Gureghian (1981) ditch-drained aquifer — the corpus' exercise of the [specified-flux boundary](#flux-crosscheck), since the problem is driven entirely by rainfall infiltration on the top surface. The flux boundary itself is verified exactly (total inflow = *q*·*L*; the confined response matches the closed form to six figures). **The published contours cannot be reproduced from the manual's printed inputs**: the recharge mound comes out ≈10× too small, and two independent hand calculations confirm the printed numbers cannot produce the published figure. Only the flowrate is locked. |
 | [9](#gw9) | Seepage through dam | **built** (dam 1 of 2) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx). Bowles homogeneous dam via Chapuis et al. (2001): Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2 (drain) needs the source paper — its k-function and reservoir level are chart-only and the published Q implies a k two decades below the chart. |
@@ -266,7 +272,21 @@ The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (
 
 ### GW6: Steady-state seepage through saturated–unsaturated soils {#gw6}
 
-**Input files:** [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx) (case 1 of 5)
+**Input files:** [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx) (case 1, isotropic) /
+[gw006b.xlsx](../files/rocscience_gw/gw006b.xlsx) (case 2, 9:1 anisotropy) /
+[gw006c.xlsx](../files/rocscience_gw/gw006c.xlsx) (case 3, core) /
+[gw006e.xlsx](../files/rocscience_gw/gw006e.xlsx) (case 5, seepage face)
+
+This manual problem runs the same 12 m dam through five cases. The published target in every
+case is the pressure-head profile along **line 1-1** (the crest centerline, x = 26) — a chart
+curve (Figs 6.6 / 6.9 / 6.14 / 6.23) with no tabulated value — so, as the methodology note
+allows for GW6/GW7, each case locks XSLOPE's own flowrate and total-head field. The case-2/3/5
+material and boundary data were read verbatim from the vendor RS2 groundwater models
+(`groundwater #006_02/03/05.slw` in the RS2 Groundwater zip): case 2's `condx:1 condy:0.111111`
+(kₕ = 9e-7, k_v = 1e-7), case 3's 100×-lower core over the mesh's material-2 footprint (a
+rectangle x ∈ [24, 28], y ∈ [0, 10]), and case 5's crest-plus-downstream-slope seepage face.
+
+**Case 1 — isotropic dam with a 12 m horizontal drain.**
 
 Fredlund & Rahardjo (1993)'s saturated–unsaturated earth dam (12 m high, symmetric 2:1
 faces, reservoir at 10 m, a 12 m horizontal drain at the downstream toe), case 1:
@@ -292,6 +312,61 @@ daylights at the same place — see [the SEEP2D cross-check](#seep2d-crosscheck)
 regression locks XSLOPE's own values.*
 
 ![gw006a: mesh and solved heads](images/gw006a.png)
+
+**Case 2 — anisotropic dam (kₕ = 9 kᵥ) with the horizontal drain.** The horizontal
+conductivity is nine times the vertical (vendor `condx:1 condy:0.111111`, so kₕ = 9×10⁻⁷,
+kᵥ = 10⁻⁷ m/s), which spreads the flow and lowers the phreatic surface; the unsaturated
+relative shape is identical to case 1, so the same Mualem–vG fit is reused. Here XSLOPE
+reproduces the published curve **almost exactly**:
+
+| Elevation on line 1-1 | XSLOPE pressure head | Slide / F&R (Fig 6.9) |
+|---|---|---|
+| 0 | 6.52 | ≈6.5 |
+| 2 | 4.74 | ≈4.7 |
+| 4 | 3.19 | ≈3.2 |
+| 6 | 1.79 | ≈1.85 |
+| 8 | 0.42 | ≈0.4 |
+
+Flowrate 1.639×10⁻⁶ m³/s per m (locked with the total-head field).
+
+**Case 3 — isotropic dam with a low-permeability core and the horizontal drain.** A
+rectangular central core (x ∈ [24, 28], y ∈ [0, 10], read from the vendor mesh's material-2
+footprint) with saturated k = 10⁻⁹ m/s — 100× lower than the 10⁻⁷ shell — is tiled into the
+dam as four non-overlapping polygons (three shell pieces + the core). The core forces almost
+the whole head drop across its 4 m width (Fig 6.13's crowded contours), throttling the
+flowrate to 2.502×10⁻⁸ m³/s per m. Along line 1-1 (now inside the core) XSLOPE reproduces the
+profile shape and sits at the high end of the published scatter:
+
+| Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.14) | Ref[1] |
+|---|---|---|---|
+| 0 | 5.55 | ≈5.9 | ≈5.8 |
+| 2 | 4.06 | ≈3.9 | ≈3.9 |
+| 4 | 2.68 | ≈2.1 | ≈2.1 |
+| 6 | 1.48 | ≈0.4 | ≈0.7 |
+| 8 | 0.28 | ≈−1.2 | ≈−0.3 |
+
+*The published Slide and Ref[1] curves themselves diverge ~1.5 m near the crest; XSLOPE
+tracks the shape and sits above both up high — the same +0.5 m free-surface family as case 1.
+Locked at XSLOPE's own values.*
+
+**Case 5 — isotropic dam with a downstream seepage face (no drain).** The horizontal toe
+drain is replaced by the "unknown boundary condition": the crest and the whole downstream
+slope are a seepage face where the phreatic surface may daylight (vendor seepage-face nodes
+(22,11)→(50,1)). Without the drain the phreatic surface rides higher. XSLOPE again reproduces
+the published curve **almost exactly**:
+
+| Elevation on line 1-1 | XSLOPE pressure head | Slide / F&R (Fig 6.23) |
+|---|---|---|
+| 0 | 8.29 | ≈8.4 |
+| 2 | 6.35 | ≈6.4 |
+| 4 | 4.39 | ≈4.5 |
+| 6 | 2.45 | ≈2.5 |
+| 8 | 0.50 | ≈0.55 |
+
+Flowrate 1.686×10⁻⁷ m³/s per m (locked with the total-head field).
+
+*Case 4 (steady-state infiltration, a 10⁻⁸ m/s flux over the whole dam surface) stays
+deferred — the same flux-BC / exit-face convergence gap tracked elsewhere in this corpus.*
 
 ### GW7: Seepage within a layered slope {#gw7}
 

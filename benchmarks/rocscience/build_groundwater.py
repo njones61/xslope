@@ -369,6 +369,109 @@ def gw006a():
     return 'gw006a.xlsx'
 
 
+def gw006b():
+    """GW#6 case 2: the case-1 dam made ANISOTROPIC — horizontal conductivity
+    nine times the vertical. From the vendor RS2 model (groundwater #006_02.slw:
+    ``condx: 1 condy: 0.111111`` with the saturated k-function scaled to 9e-7),
+    the saturated conductivities are kh = 9e-7, kv = 1e-7 m/s (ratio 9), kangle 0.
+    The unsaturated relative shape is identical to case 1 (the whole custom
+    k-function is 9x case 1), so the case-1 Mualem-vG fit is reused. Same 12 m
+    dam, 2:1 faces, 12 m toe drain, reservoir at 10 m.
+
+    The extra horizontal conductivity spreads the flow and lowers the phreatic
+    surface. Target: pressure head along line 1-1 (crest centerline x=26, Fig
+    6.9). Here xslope reproduces the Slide/F&R curve almost exactly: pressure
+    head 6.52 / 4.74 / 3.19 / 1.79 / 0.42 m at elevations 0 / 2 / 4 / 6 / 8 vs
+    the chart's 6.5 / 4.7 / 3.2 / 1.85 / 0.4. Chart-only target (no tabulated
+    value), so xslope's own flowrate and total-head field are locked."""
+    sd = _base_sd(k1=9e-7)
+    m = sd['materials'][0]
+    m.update(name='Dam fill', c=10.0, phi=30.0, k1=9e-7, k2=1e-7, alpha=0.0,
+             kr0=0.0, h0=0.0, unsat='vg', vg_a=0.4029, vg_n=1.9156)
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
+                                                    (28.0, 12.0), (52.0, 0.0)]}]
+    sd['max_depth'] = 0.0
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 10.0, 'coords': [(0.0, 0.0), (20.0, 10.0)]}],
+        'exit_face': [(40.0, 0.0), (52.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006b.xlsx'))
+    return 'gw006b.xlsx'
+
+
+def gw006c():
+    """GW#6 case 3: the case-1 dam with a low-permeability CORE plus the toe
+    drain. From the vendor RS2 model (groundwater #006_03.slw + mesh material-2
+    footprint) the core is a rectangular central block x in [24, 28] (the full
+    crest width), y in [0, 10] (base up to 2 m below the crest), and its
+    saturated k is 1e-9 m/s — exactly 100x lower than the 1e-7 shell, with the
+    identical unsaturated relative shape (both custom functions are parallel).
+    Same 12 m dam, 2:1 faces, 12 m toe drain, reservoir at 10 m.
+
+    The domain is tiled by four non-overlapping polygons (three shell pieces +
+    the core) so the core is a true internal zone. The low-k core forces almost
+    the entire hydraulic-head drop across its 4 m width (the crowded contours of
+    Fig 6.13). Target: pressure head along line 1-1 (x=26, now inside the core,
+    Fig 6.14). xslope reproduces the profile shape and sits at the high end of
+    the published scatter (the Slide and Ref[1] curves themselves diverge ~1.5 m
+    near the crest) — the same +0.5 m free-surface-family bias case 1 shows.
+    Chart-only target, so xslope's own flowrate and total-head field are locked."""
+    from shapely.geometry import Polygon
+    sd = _base_sd(k1=1e-7)
+    shell = sd['materials'][0]
+    shell.update(name='Shell', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
+                 kr0=0.0, h0=0.0, unsat='vg', vg_a=0.4029, vg_n=1.9156)
+    core = dict(shell)
+    core.update(name='Core', k1=1e-9, k2=1e-9)
+    sd['materials'] = [shell, core]
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 12.0)])},
+        {'mat_id': 0, 'polygon': Polygon([(24.0, 10.0), (28.0, 10.0),
+                                          (28.0, 12.0), (24.0, 12.0)])},
+        {'mat_id': 0, 'polygon': Polygon([(28.0, 0.0), (52.0, 0.0), (28.0, 12.0)])},
+        {'mat_id': 1, 'polygon': Polygon([(24.0, 0.0), (28.0, 0.0),
+                                          (28.0, 10.0), (24.0, 10.0)])},
+    ]
+    sd['max_depth'] = None
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 10.0, 'coords': [(0.0, 0.0), (20.0, 10.0)]}],
+        'exit_face': [(40.0, 0.0), (52.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006c.xlsx'))
+    return 'gw006c.xlsx'
+
+
+def gw006e():
+    """GW#6 case 5: the case-1 isotropic dam with a downstream SEEPAGE FACE
+    instead of the horizontal toe drain — the "unknown boundary condition" that
+    lets the phreatic surface daylight on the slope. From the vendor RS2 model
+    (groundwater #006_05.slw) the seepage-face nodes cover the crest and the
+    whole downstream face (22,11)->(50,1); there is no drain. Same 12 m dam,
+    2:1 faces, reservoir at 10 m; isotropic k = 1e-7 (case-1 material).
+
+    Without the drain the phreatic surface rides higher and exits on the
+    downstream slope. Target: pressure head along line 1-1 (x=26, Fig 6.23).
+    xslope reproduces the Slide/F&R curve almost exactly: pressure head 8.29 /
+    6.35 / 4.39 / 2.45 / 0.5 m at elevations 0 / 2 / 4 / 6 / 8 vs the chart's
+    8.4 / 6.4 / 4.5 / 2.5 / 0.55. Chart-only target, so xslope's own flowrate
+    and total-head field are locked."""
+    sd = _base_sd(k1=1e-7)
+    m = sd['materials'][0]
+    m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
+             kr0=0.0, h0=0.0, unsat='vg', vg_a=0.4029, vg_n=1.9156)
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
+                                                    (28.0, 12.0), (52.0, 0.0)]}]
+    sd['max_depth'] = 0.0
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 10.0, 'coords': [(0.0, 0.0), (20.0, 10.0)]}],
+        # no toe drain: the crest + whole downstream slope is the seepage face
+        'exit_face': [(20.0, 10.0), (24.0, 12.0), (28.0, 12.0), (52.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006e.xlsx'))
+    return 'gw006e.xlsx'
+
+
 def gw008():
     """GW#8: flow through ditch-drained soils (Gureghian 1981), the corpus'
     first specified-flux (Neumann) problem. Fig 8.1 (p.34): half-drain
@@ -410,6 +513,6 @@ def gw008():
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for fn in (gw001, gw002, gw003, gw004, gw006a, gw007, gw008, gw009a,
-               gw010, gw011, gw012, gw013):
+    for fn in (gw001, gw002, gw003, gw004, gw006a, gw006b, gw006c, gw006e,
+               gw007, gw008, gw009a, gw010, gw011, gw012, gw013):
         print(fn())

@@ -52,6 +52,7 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 from .fileio import build_ground_surface_from_polygons
+from .water import ponded_water_dload
 
 
 # Slide2 material "type" codes and whether xslope can represent them. Only the
@@ -540,6 +541,27 @@ def slide2_to_slope_data(d, scenario=None):
     for mat in materials:
         mat.pop("_props", None)
 
+    # --- ponded water ------------------------------------------------------------
+    # Slide2, like SLOPE/W, stores no ponded-water object: where the water table rises
+    # above the ground surface it simply carries the water's weight. xslope needs that
+    # weight as an explicit distributed load, or the reservoir is lost from the statics
+    # (the silent-drop this fix closes). Synthesize it from the water table and gamma_w
+    # with the shared xslope.water routine — the same one the .gsz importer uses.
+    # Slide2's own external loads live in the 'forces' section and are NOT imported
+    # (reported separately as a caveat), so this water-table load is the only
+    # distributed load added and cannot double-count one of them.
+    dloads = []
+    ponded = ponded_water_dload(ground_surface, piezo_line, gamma_water)
+    if ponded:
+        deepest = max(p["Normal"] for b in ponded for p in b) / (gamma_water or 1.0)
+        dloads.extend(ponded)
+        caveats.append(
+            f"the water table rises above the ground surface — that is ponded water, "
+            f"and Slide2 carries its weight implicitly. It has been added as "
+            f"{len(ponded)} distributed load(s), up to {deepest:.2f} deep "
+            f"({gamma_water * deepest:.1f} pressure at the deepest point). Do not "
+            f"re-create it by hand")
+
     # --- failure surface ---------------------------------------------------------
     circles, non_circ = [], []
     for ln in sections.get("centers", []):
@@ -662,7 +684,7 @@ def slide2_to_slope_data(d, scenario=None):
         "circular": bool(circles),
         "circles": circles,
         "non_circ": non_circ,
-        "dloads": [],
+        "dloads": dloads,
         "dloads2": [],
         "reinforce_lines": [],
         "reinforcement_lines": [],

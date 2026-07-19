@@ -877,3 +877,323 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
 
     print(f"\nReliability (FEM) analysis completed in {time.time() - start_time:.2f} seconds.")
     return True, result
+
+
+# Monte Carlo reliability defaults. MC_DEFAULT_SEED is a FIXED CONSTANT (never
+# time-based): a given input file must reproduce the same beta and probability of
+# failure on every run so the regression suite can lock them. Override per-call
+# with reliability_mc(rng_seed=..., n_samples=...).
+MC_DEFAULT_SEED = 20240117
+MC_DEFAULT_SAMPLES = 10000
+
+# Physical floor each sampled parameter is truncated to (a strength or unit weight
+# cannot go negative). This truncation IS the phi>=0 bound that governs the
+# high-COV problems (e.g. VP34's Phase I fill, COV 124%): a plain normal would
+# draw negative friction angles, and clamping them at zero is exactly how the
+# published Monte Carlo treatments handle that bound.
+_MC_FLOOR = {'gamma': 1e-6, 'c': 0.0, 'phi': 0.0, 'cp': 0.0}
+
+
+def _mc_param_info(materials):
+    """Uncertain strength/weight parameters for Monte Carlo, as a list of dicts
+    (material_id, param, mlv, std). Same parameter set as the Taylor-series path
+    (:func:`_reliability_param_info`) but WITHOUT its mean-minus-sigma>=0 rejection:
+    Monte Carlo handles COV>100% by truncating samples at the physical floor, so a
+    high-COV parameter that TSPM must decline is admissible here. Returns
+    (param_info, error); error is a message when no sigmas are set."""
+    has_std = any(
+        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
+        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
+        for m in materials)
+    if not has_std:
+        return None, ("Reliability analysis requires standard deviations for at least one "
+                      "material property (columns L-Q in the mat sheet). None were provided.")
+    param_info = []
+    for i, material in enumerate(materials):
+        mat_name = material.get('name', f'Material_{i+1}')
+        for param, std_key in _strength_param_mapping(material, mat_name).items():
+            if std_key in material and material[std_key] > 0:
+                param_info.append({'material_id': i + 1, 'material_name': mat_name,
+                                   'param': param, 'mlv': material[param],
+                                   'std': material[std_key]})
+    return param_info, None
+
+
+def _mc_sampled_slope_data(slope_data, materials, param_info, values):
+    """A shallow copy of slope_data whose materials are copied and every uncertain
+    parameter set to its sampled value for this trial. Uses the same
+    ``_set_material_field`` mutation path as the TSPM perturbation, so the
+    gamma/gamma_sat coupling is applied identically."""
+    from .sensitivity import _set_material_field
+    sd = slope_data.copy()
+    sd['materials'] = [m.copy() for m in materials]
+    for p, v in zip(param_info, values):
+        idx = p['material_id'] - 1
+        if idx < len(sd['materials']):
+            _set_material_field(sd, idx, p['param'], float(v))
+    return sd
+
+
+def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0,
+                   n_samples=MC_DEFAULT_SAMPLES, rng_seed=MC_DEFAULT_SEED,
+                   distribution='normal', search=True, num_slices=40,
+                   progress_callback=None, cancel_check=None,
+                   fs_tol=None, tol=None, max_iter=None, composite=False,
+                   seed='circles'):
+    """Monte Carlo reliability analysis — the sampling counterpart to the
+    Taylor-series :func:`reliability`.
+
+    Draws ``n_samples`` independent realizations of every uncertain material
+    parameter from the standard deviations in the mat sheet (s(g), s(c), s(f),
+    s(c/p)), evaluates the factor of safety of each realization on a FIXED failure
+    surface, and reports the sample statistics.
+
+    **Limit-equilibrium only.** This is deliberately an LEM path: a Monte Carlo
+    campaign needs 10^4 factor-of-safety evaluations, which is affordable with a
+    limit-equilibrium solve but not with the finite-element SSRM. FEM reliability
+    stays on the Taylor series (:func:`reliability_fem`, 1+2N solves). ``method``
+    must therefore name an LEM solver ('bishop', 'spencer', ...).
+
+    **The failure surface is never randomized.** The slip surface is a decision
+    variable, not a random variable, so its geometry is held fixed across all
+    realizations (the given surface with ``search=False``, or the most-likely-values
+    critical surface with ``search=True``). This fixed-surface campaign is the
+    analogue of Slide2's "Global Minimum" probabilistic method and matches what
+    every published benchmark did (a prescribed or deterministic-critical surface).
+    See the Reliability documentation for the surface-treatment discussion and the
+    optional per-realization-minimum mode.
+
+    Parameters
+    ----------
+    method : str
+        Limit-equilibrium method name ('bishop', 'spencer', ...).
+    n_samples : int
+        Number of realizations (default 10000).
+    rng_seed : int
+        Seed for ``numpy.random.default_rng`` — a fixed constant by default, so the
+        result is bit-reproducible. Pass a different int to see sampling scatter.
+    distribution : {'normal', 'lognormal'}
+        Per-parameter input distribution. Default 'normal' (mean = MLV, std =
+        sigma), the same interpretation the Taylor-series method places on the
+        sigma columns. 'lognormal' matches the same mean and std (method of
+        moments) and requires a positive mean. Every parameter is truncated at its
+        physical floor (>= 0), which is how the friction-angle >= 0 bound is handled
+        on high-COV problems.
+    search : bool
+        With ``search=False`` the specified surface (``circles[0]`` or ``non_circ``)
+        is evaluated for every realization — the right mode when a benchmark
+        prescribes the slip surface (VP28, VP34). With ``search=True`` the critical
+        surface is found once at the most-likely values and then held fixed across
+        all realizations (a full re-search per realization is not performed —
+        prohibitive at 10^4 samples). Noncircular ``search=True`` is not supported.
+    num_slices : int
+        Slice count for each evaluation (default 40, matching ``reliability``'s
+        fixed-surface path so the MC mean FS and the TSPM F_MLV are comparable).
+
+    Returns
+    -------
+    (success, result) : tuple
+        On success ``result`` carries ``mean_FS``, ``sigma_F``, ``COV_F``, both
+        reliability-index conventions (``beta_normal`` = (mean-1)/sigma_F,
+        ``beta_ln`` = lognormal from the sample moments), the empirical probability
+        of failure ``pf_empirical`` (fraction of realizations with FS<1), the
+        distribution-fitted ``pf_normal`` / ``pf_lognormal``, and the raw
+        ``fs_samples``.
+    """
+    from .search import circular_search, noncircular_search, _check_cancel
+    from .slice import generate_slices
+    from . import solve
+
+    def _progress(done, total, label):
+        if progress_callback is not None:
+            try:
+                progress_callback(done, total, label)
+            except Exception:
+                pass
+
+    start_time = time.time()
+    materials = slope_data['materials']
+
+    param_info, err = _mc_param_info(materials)
+    if err:
+        return False, err
+
+    _LEM_METHODS = {'oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer', 'mprice'}
+    if method not in _LEM_METHODS:
+        return False, (f"Monte Carlo reliability is limit-equilibrium only; '{method}' "
+                       f"is not an LEM solver. Use one of {sorted(_LEM_METHODS)}. FEM "
+                       "reliability uses the Taylor series (reliability_fem).")
+    solver = getattr(solve, method)
+
+    # Only forward tolerances the caller actually set.
+    _search_kwargs = {}
+    if fs_tol is not None:
+        _search_kwargs['fs_tol'] = fs_tol
+    if max_iter is not None:
+        _search_kwargs['max_iter'] = max_iter
+    _circ_kwargs = dict(_search_kwargs)
+    if tol is not None:
+        _circ_kwargs['tol'] = tol
+    if composite:
+        _circ_kwargs['composite'] = True
+    if seed != 'circles':
+        _circ_kwargs['seed'] = seed
+
+    # ---- Resolve the fixed evaluation surface -----------------------------
+    fixed_circle = None
+    fixed_noncirc = None
+    if not search:
+        if circular:
+            circs = slope_data.get('circles')
+            if not circs:
+                return False, "Monte Carlo (search=False): no circle is specified in the input."
+            fixed_circle = circs[0]
+        else:
+            fixed_noncirc = slope_data.get('non_circ')
+            if not fixed_noncirc:
+                return False, "Monte Carlo (search=False): no non-circular surface is specified."
+    else:
+        if not circular:
+            return False, ("Monte Carlo with search=True is only supported for circular "
+                           "surfaces; specify the surface and use search=False for "
+                           "noncircular problems.")
+        if debug_level >= 1:
+            print("Finding the critical circle at the most-likely values…")
+        fs_cache, _conv, _path, ccache = circular_search(
+            slope_data, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
+        if not fs_cache:
+            return False, "Monte Carlo: critical-surface search failed."
+        crit = (ccache[0] if ccache else fs_cache[0])
+        fixed_circle = {'Xo': crit['Xo'], 'Yo': crit['Yo'], 'R': crit['R'],
+                        'Depth': crit.get('Depth')}
+
+    def _eval(sd):
+        if circular:
+            ok, res = generate_slices(sd, circle=fixed_circle, num_slices=num_slices,
+                                      composite=composite)
+        else:
+            ok, res = generate_slices(sd, non_circ=fixed_noncirc, num_slices=num_slices)
+        if not ok:
+            return None
+        ok2, r = solver(res[0])
+        if not ok2:
+            return None
+        fs = r.get('FS')
+        if fs is None or not np.isfinite(fs):
+            return None
+        return float(fs)
+
+    F_MLV = _eval(slope_data)
+    if F_MLV is None:
+        return False, "Monte Carlo: evaluation at the most-likely values failed."
+
+    if debug_level >= 1:
+        print("=== MONTE CARLO RELIABILITY ANALYSIS ===")
+        print(f"Method: {method} | samples: {n_samples} | seed: {rng_seed} | "
+              f"distribution: {distribution}")
+        print(f"F at most-likely values: {F_MLV:.4f}")
+
+    # ---- Draw the sample matrix (n_samples x n_params) --------------------
+    rng = np.random.default_rng(rng_seed)
+    npar = len(param_info)
+    sample_matrix = np.empty((n_samples, npar))
+    for j, p in enumerate(param_info):
+        mlv, std = p['mlv'], p['std']
+        if distribution == 'lognormal':
+            if mlv <= 0:
+                return False, (f"lognormal distribution requires a positive mean "
+                               f"(material {p['material_id']} {p['param']} mean={mlv}).")
+            s_ln = np.sqrt(np.log(1.0 + (std / mlv) ** 2))
+            m_ln = np.log(mlv) - 0.5 * s_ln ** 2
+            col = rng.lognormal(m_ln, s_ln, n_samples)
+        elif distribution == 'normal':
+            col = rng.normal(mlv, std, n_samples)
+        else:
+            return False, f"Unknown distribution '{distribution}'. Use 'normal' or 'lognormal'."
+        col = np.maximum(col, _MC_FLOOR.get(p['param'], 0.0))
+        if p['param'] == 'phi':
+            col = np.minimum(col, 89.0)
+        sample_matrix[:, j] = col
+
+    # ---- Evaluate every realization on the fixed surface ------------------
+    fs_vals = np.empty(n_samples)
+    valid = np.ones(n_samples, dtype=bool)
+    report_every = max(1, n_samples // 20)
+    for k in range(n_samples):
+        if k % report_every == 0:
+            _check_cancel(cancel_check)
+            _progress(k, n_samples, f"Monte Carlo sample {k}/{n_samples}")
+        sd_k = _mc_sampled_slope_data(slope_data, materials, param_info, sample_matrix[k])
+        fk = _eval(sd_k)
+        if fk is None:
+            valid[k] = False
+            fs_vals[k] = np.nan
+        else:
+            fs_vals[k] = fk
+    _progress(n_samples, n_samples, "Monte Carlo complete")
+
+    fs_ok = fs_vals[valid]
+    n_valid = int(fs_ok.size)
+    n_invalid = n_samples - n_valid
+    if n_valid < 2:
+        return False, ("Monte Carlo: fewer than two admissible realizations — the "
+                       "sampled surface is non-analyzable for almost every draw.")
+
+    mean_FS = float(np.mean(fs_ok))
+    sigma_F = float(np.std(fs_ok, ddof=1))
+    COV_F = sigma_F / mean_FS if mean_FS else 0.0
+
+    # Empirical probability of failure over the admissible realizations. An
+    # inadmissible draw (no analyzable surface) is not counted as FS<1 — it is
+    # reported separately so a large invalid fraction is never hidden inside PF.
+    n_fail = int(np.count_nonzero(fs_ok < 1.0))
+    pf_empirical = n_fail / n_valid
+
+    beta_normal = (mean_FS - 1.0) / sigma_F if sigma_F > 0 else float('inf')
+    pf_normal = float(norm.cdf(-beta_normal))
+    if COV_F > 0:
+        beta_ln = float(np.log(mean_FS / np.sqrt(1 + COV_F ** 2)) /
+                        np.sqrt(np.log(1 + COV_F ** 2)))
+    else:
+        beta_ln = float('inf')
+    pf_lognormal = float(norm.cdf(-beta_ln))
+
+    if debug_level >= 0:
+        print("\n=== MONTE CARLO RELIABILITY RESULTS ===")
+        table = [[f"Mat {p['material_id']} {p['param']}", f"{p['mlv']:.3f}",
+                  f"{p['std']:.3f}", f"{p['std'] / p['mlv'] * 100:.1f}%" if p['mlv'] else "—"]
+                 for p in param_info]
+        print(tabulate(table, headers=["Parameter", "MLV", "σ", "COV"],
+                       tablefmt="grid", colalign=["left", "center", "center", "center"]))
+        print(f"\nSamples: {n_samples} (valid {n_valid}, invalid {n_invalid}) | "
+              f"seed {rng_seed} | {distribution}")
+        print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
+        print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
+        print(f"PF empirical: {pf_empirical*100:.3f}%   "
+              f"PF normal: {pf_normal*100:.3f}%   PF lognormal: {pf_lognormal*100:.3f}%")
+
+    result = {
+        'method': f'{method}_reliability_mc',
+        'F_MLV': F_MLV,
+        'mean_FS': mean_FS,
+        'sigma_F': sigma_F,
+        'COV_F': COV_F,
+        'beta_ln': beta_ln,
+        'beta_normal': beta_normal,
+        'reliability': 1.0 - pf_empirical,
+        'prob_failure': pf_empirical,
+        'pf_empirical': pf_empirical,
+        'pf_normal': pf_normal,
+        'pf_lognormal': pf_lognormal,
+        'n_samples': n_samples,
+        'n_valid': n_valid,
+        'n_invalid': n_invalid,
+        'rng_seed': rng_seed,
+        'distribution': distribution,
+        'param_info': param_info,
+        'fs_samples': fs_vals,
+    }
+
+    print(f"\nMonte Carlo reliability analysis completed in "
+          f"{time.time() - start_time:.2f} seconds.")
+    return True, result

@@ -166,11 +166,13 @@ def parse_test_tags(md_path):
 
         # Convert numeric fields
         for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta',
-                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor']:
+                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor',
+                    'expected_pf', 'pf_tol']:
             if key in params:
                 params[key] = float(params[key])
-        if 'num_slices' in params:
-            params['num_slices'] = int(params['num_slices'])
+        for key in ['num_slices', 'n_samples', 'rng_seed']:
+            if key in params:
+                params[key] = int(params[key])
 
         params['source'] = str(md_path)
 
@@ -782,6 +784,45 @@ def run_reliability_test(test):
                                            search=do_search)
     if not success:
         return None, f"reliability failed: {result}"
+    return result['beta_ln'], None
+
+
+def run_reliability_mc_test(test):
+    """Monte Carlo reliability regression: sample the material sigmas, evaluate the
+    factor of safety of each realization on the fixed surface, and return the
+    lognormal reliability index beta_ln (compared to expected_beta). The seed is a
+    fixed constant, so a given (file, n_samples, seed) is bit-reproducible. An
+    optional expected_pf/pf_tol pair additionally checks the empirical probability
+    of failure."""
+    from xslope.fileio import load_slope_data
+    from xslope.advanced import reliability_mc
+
+    file_path = test['file']
+    method = test.get('method', 'spencer')
+    circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
+    do_search = str(test.get('search', 'true')).lower() not in ('false', '0', 'no')
+    n_samples = int(test.get('n_samples', 10000))
+    distribution = test.get('distribution', 'normal')
+    num_slices = int(test.get('num_slices', 40))
+    composite = str(test.get('composite', 'false')).lower() in ('true', '1', 'yes')
+    kw = {}
+    if 'rng_seed' in test:
+        kw['rng_seed'] = int(test['rng_seed'])
+
+    slope_data = load_slope_data(file_path)
+    success, result = reliability_mc(slope_data, method, circular=circular, search=do_search,
+                                     n_samples=n_samples, distribution=distribution,
+                                     num_slices=num_slices, composite=composite,
+                                     debug_level=-1, **kw)
+    if not success:
+        return None, f"reliability_mc failed: {result}"
+
+    exp_pf = test.get('expected_pf')
+    if exp_pf is not None:
+        pf_tol = float(test.get('pf_tol', 0.02))
+        if abs(result['pf_empirical'] - float(exp_pf)) > pf_tol:
+            return None, (f"pf_empirical {result['pf_empirical']:.4f} vs expected "
+                          f"{float(exp_pf):.4f} (tol {pf_tol})")
     return result['beta_ln'], None
 
 
@@ -3344,6 +3385,8 @@ def run_test(test):
         return run_seep_head_test(test)
     elif test_type == 'reliability':
         return run_reliability_test(test)
+    elif test_type == 'reliability_mc':
+        return run_reliability_mc_test(test)
     elif test_type == 'design_search':
         return run_design_test(test)
     elif test_type == 'critical_kc':
@@ -3360,7 +3403,7 @@ def _expected_and_tol(test, default_tolerance):
     if test_type == 'seep':
         expected = test.get('expected_flowrate')
         tol = test.get('tolerance', 0.05) * abs(expected) if expected else 0
-    elif test_type in ('reliability', 'fem_reliability'):
+    elif test_type in ('reliability', 'fem_reliability', 'reliability_mc'):
         expected = test.get('expected_beta')
         tol = test.get('tolerance', 0.02)
     elif test_type == 'critical_kc':
@@ -3385,7 +3428,7 @@ def _expected_and_tol(test, default_tolerance):
 
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
-_COST_RANK = {'fem_reliability': 6, 'fem_ssrm': 5, 'fem_elements': 5,
+_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'fem_ssrm': 5, 'fem_elements': 5,
               'reliability': 4, 'critical_kc': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2}
 

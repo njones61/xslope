@@ -16,8 +16,8 @@ import math
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
+    QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter,
     QStackedWidget, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
     QWidget,
@@ -213,6 +213,23 @@ class _EditableTable(QWidget):
         if 0 <= i < self.table.rowCount():
             self.table.selectRow(i)
 
+    def column_at(self, widget):
+        """Logical column index for a focused ``widget``: the current column when
+        the table itself holds focus, else the column of the cell widget that owns
+        ``widget`` (a combo, or the swatch button), else the current column. Lets
+        the help strip name the field under focus in the table view."""
+        tbl = self.table
+        if widget is tbl:
+            return tbl.currentColumn()
+        w = widget
+        while w is not None and w is not tbl:
+            for r in range(tbl.rowCount()):
+                for c in range(tbl.columnCount()):
+                    if tbl.cellWidget(r, c) is w:
+                        return c
+            w = w.parentWidget()
+        return tbl.currentColumn()
+
     def apply_usage_filter(self, enabled):
         """Show only columns whose ``applies`` set intersects ``enabled`` (a set of
         analysis tags). Universal columns (applies=None) are always shown. Hidden
@@ -339,6 +356,97 @@ def _help_label(text):
     lbl = QLabel(text)
     lbl.setWordWrap(True)
     return lbl
+
+
+# --------------------------------------------------------------------------- #
+# Context-sensitive help strip — a persistent, focus-driven one/two-line pane at
+# the bottom of an editor dialog that shows the currently-focused field's help
+# text. Built as a reusable widget (_HelpStrip) + a wiring helper (attach_help)
+# so any editor can adopt it by supplying a field->text mapping and a resolver
+# that names the field for a focused widget; the Materials editor is the pilot.
+# --------------------------------------------------------------------------- #
+class _HelpStrip(QFrame):
+    """A subtle, fixed-height (~2 line) strip of dim help text with a top border.
+
+    Empty by default; ``set_help`` swaps in a field's help string (or clears it
+    when focus is nowhere useful). Word-wrapped so a longer string flows onto the
+    second line rather than being cut; kept concise so two lines always suffice."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QFrame.NoFrame)
+        # Subtle separation from the editing area: a single top hairline, dim text.
+        self.setStyleSheet(
+            "_HelpStrip { border-top: 1px solid palette(mid); }"
+            "_HelpStrip QLabel { color: palette(placeholder-text); }")
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(8, 4, 8, 4)
+        lay.setSpacing(0)
+        self._label = QLabel("")
+        self._label.setWordWrap(True)
+        self._label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        f = self._label.font()
+        if f.pointSizeF() > 0:
+            f.setPointSizeF(f.pointSizeF() * 0.9)   # a touch smaller than body text
+        self._label.setFont(f)
+        lay.addWidget(self._label, 1)
+        # Fix the height at two text lines (+ the layout margins) so the strip is
+        # always present and never reflows the dialog as text changes length.
+        fm = self._label.fontMetrics()
+        self.setFixedHeight(fm.lineSpacing() * 2 + 8 + 2)
+
+    def set_help(self, text):
+        self._label.setText(text or "")
+
+
+def attach_help(dialog, mapping, resolver):
+    """Wire a context-sensitive :class:`_HelpStrip` into ``dialog``.
+
+    ``mapping`` is the field-key -> help-text dict (the single source of truth for
+    the dialog's help). ``resolver`` is ``focused_widget -> key | None``: it names
+    the field a focused widget belongs to (or returns None when focus is on
+    something without help). The strip is inserted at the bottom of the dialog's
+    layout — just above the button box if the last item is one — and updated on
+    every ``QApplication.focusChanged`` whose new focus lands inside the dialog.
+
+    Returns the created strip; also stored on ``dialog._help_strip`` so callers can
+    push updates from signals a focus change doesn't cover (e.g. a table's
+    ``currentCellChanged`` when arrow keys move the current cell without moving
+    keyboard focus off the table). Reusable by any editor without refactoring:
+    supply a mapping and a resolver for that editor's widgets."""
+    strip = _HelpStrip(dialog)
+    lay = dialog.layout()
+    idx = lay.count()
+    # Sit above a trailing button box (the conventional last row) if present.
+    last = lay.itemAt(idx - 1) if idx else None
+    if last is not None and isinstance(last.widget(), QDialogButtonBox):
+        idx -= 1
+    lay.insertWidget(idx, strip)
+    dialog._help_strip = strip
+
+    def _update(widget):
+        if widget is None:
+            return
+        # Only react to focus inside this dialog; leave the strip as-is otherwise
+        # (e.g. focus moving to another window shouldn't blank the help).
+        w = widget
+        while w is not None:
+            if w is dialog:
+                break
+            w = w.parentWidget()
+        if w is None:
+            return
+        key = resolver(widget)
+        strip.set_help(mapping.get(key, "") if key else "")
+
+    app = QApplication.instance()
+    if app is not None:
+        slot = lambda _old, now: _update(now)
+        app.focusChanged.connect(slot)
+        # Drop the global connection when the dialog dies so the slot can't fire
+        # against a deleted dialog.
+        dialog.destroyed.connect(lambda *_: app.focusChanged.disconnect(slot))
+    return strip
 
 
 def _usage_legend(fields):
@@ -1535,6 +1643,7 @@ class _MaterialListView(QWidget):
         self._loading = False     # suppress color write-through while populating a row
         self._cur = -1
         self._edits = {}          # key -> QLineEdit / QComboBox
+        self._edit_keys = {}      # focusable widget -> key (help-strip resolver)
         self._cell_widgets = {}   # key -> the labeled cell QWidget (for show/hide)
         self._sigma_widgets = {}  # base key -> (sigma label, sigma edit)
 
@@ -1590,7 +1699,21 @@ class _MaterialListView(QWidget):
             w = QLineEdit()
             w.editingFinished.connect(self._on_edit)
         self._edits[key] = w
+        self._edit_keys[w] = key      # reverse lookup for the help strip
         return w
+
+    def help_key_for_widget(self, widget):
+        """The material field key the focused ``widget`` edits, or None. Climbs a
+        few parent levels so a combo/color-button focus proxy still resolves."""
+        w = widget
+        for _ in range(4):
+            if w is None:
+                break
+            key = self._edit_keys.get(w)
+            if key is not None:
+                return key
+            w = w.parentWidget()
+        return None
 
     def _cell(self, label, key, sigma=False, label_w=80):
         """A [label | value | (± σ | sigma value)] cell as a QWidget, registered by
@@ -1648,6 +1771,7 @@ class _MaterialListView(QWidget):
                        "style override, not a 'mat' property.")
         h.addWidget(lab)
         self._color_btn = ColorButton("#000000", palette=MATERIAL_PALETTE)
+        self._edit_keys[self._color_btn] = "_swatch"    # help-strip resolver
         self._color_btn.colorChanged.connect(self._on_color_changed)
         h.addWidget(self._color_btn)
         reset = QPushButton("Reset")
@@ -1968,6 +2092,56 @@ class _MaterialListView(QWidget):
         return [dict(r) for r in self._rows]
 
 
+# Single source of truth for the Materials editor's field help — one short,
+# semantics-first line per field, wording aligned with the v16 'mat' worksheet
+# legend (docs/usage/input_template.md) and the existing t_cut tooltip. Shown in
+# the context-sensitive help strip (both views) and reused as the t_cut hover
+# tooltip. Keyed by the material field keys plus '_swatch' for the display-color
+# control. Kept concise so the two-line strip never clips.
+MATERIALS_HELP = {
+    "name": "Material name — identity only; also labels this material's zone on the Inputs plot.",
+    "gamma": "Moist/total unit weight (above the piezometric line).",
+    "gamma_sat": "Saturated unit weight (below the piezometric line; blank = use g).",
+    "option": "Strength model — determines which strength columns apply.",
+    "c": "Cohesion intercept (mc: Mohr-Coulomb c; cp: undrained strength at r-elev).",
+    "phi": "Friction angle φ, degrees (mc option).",
+    "cp": "Rate of undrained-strength increase per unit elevation below r-elev (cp option).",
+    "r_elev": "Reference elevation; at or above it the strength equals c (cp option).",
+    "d": "Rapid-drawdown R-envelope cohesion intercept (LEM rapid-drawdown only).",
+    "psi": "Rapid-drawdown R-envelope friction angle (LEM rapid-drawdown only).",
+    "t_cut": ("Tensile cutoff (Rankine). Blank = no cutoff; 0 = no tension. "
+              "FEM only. Caution: in reinforced fills, T=0 may prevent "
+              "equilibrium; leave blank or use a small nonzero value."),
+    "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
+    "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
+    "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",
+    "ru": "Pore-pressure ratio; u = ru·σv on the soil column only (u = ru option).",
+    "pow_a": "Power-curve envelope coefficient a in τ = a·(σ'n + d)^b + c (pow option).",
+    "pow_b": "Power-curve exponent b; b = 1 collapses to Mohr-Coulomb (pow option).",
+    "pow_c": "Power-curve additive strength term c (pow option).",
+    "pow_d": "Power-curve normal-stress offset d (pow option).",
+    "hb_sci": "σci — uniaxial compressive strength of the intact rock (hb option).",
+    "hb_gsi": "GSI — Geological Strength Index, (0, 100] (hb option).",
+    "hb_mi": "mi — intact Hoek-Brown constant, a rock-type property (hb option).",
+    "hb_d": "D — disturbance factor, 0 (undisturbed) to 1 (blast-damaged) (hb option).",
+    "sigma_gamma": "Reliability: standard deviation of g.",
+    "sigma_c": "Reliability: standard deviation of c.",
+    "sigma_phi": "Reliability: standard deviation of φ.",
+    "sigma_cp": "Reliability: standard deviation of cp.",
+    "sigma_d": "Reliability: standard deviation of d.",
+    "sigma_psi": "Reliability: standard deviation of ψ.",
+    "k1": "Seepage: major hydraulic conductivity (k1 = kx when alpha = 0).",
+    "k2": "Seepage: minor hydraulic conductivity (k2 = ky when alpha = 0).",
+    "alpha": "Seepage: orientation angle of the permeability tensor (degrees).",
+    "unsat": "Seepage: unsaturated relative-permeability model — lf, vg, or gard.",
+    "kr0": "Relative conductivity kr0 at suction head h0 (linear-front, unsat = lf).",
+    "h0": "Suction head at which k = kr0 (linear-front, unsat = lf).",
+    "vg_a": "Curve parameter a (vg: α in 1/length; gard: power-form a).",
+    "vg_n": "Curve parameter n (van Genuchten / Gardner, unsat = vg or gard).",
+    "_swatch": "Display color on the Inputs plot — a style override, not a 'mat' property.",
+}
+
+
 class MaterialsDialog(QDialog):
     """The materials editor dialog: a segmented Table/List view toggle over a
     QStackedWidget. Both views bind to ``self._rows`` (the single source of truth):
@@ -2040,8 +2214,44 @@ class MaterialsDialog(QDialog):
 
         _ok_cancel(self, layout)
 
+        # Context-sensitive help strip: one source-of-truth mapping, one resolver
+        # that names the field under focus in whichever view is active. Attached
+        # before the first _set_mode so _build_table can wire its cell-tracking.
+        attach_help(self, MATERIALS_HELP, self._help_key_for)
+
         initial = _LAST_MATERIALS_VIEW if _LAST_MATERIALS_VIEW in ("table", "list") else "table"
         self._set_mode(initial)
+
+    # --- context-sensitive help ------------------------------------------
+    def _help_key_for(self, widget):
+        """The material field key the focused ``widget`` belongs to, or None.
+
+        Table view: derive the column from the focused cell/cell-widget (falling
+        back to the current column) and map it to its field. List view: defer to
+        the list view's own widget->key lookup."""
+        if self._mode == "table" and self._table is not None:
+            col = self._table.column_at(widget)
+            return self._help_key_for_col(col)
+        if self._mode == "list" and self._list_view is not None:
+            return self._list_view.help_key_for_widget(widget)
+        return None
+
+    def _help_key_for_col(self, col):
+        """Field key for a logical table column, or '_swatch' for the trailing
+        display-color column, or None for no/invalid column."""
+        if col is None or col < 0:
+            return None
+        if 0 <= col < len(self._fields):
+            return self._fields[col].key
+        return "_swatch"        # the appended (logical-last) swatch column
+
+    def _help_from_col(self, col):
+        """Push the help for a table column into the strip (for currentCellChanged,
+        which fires as arrow keys move the current cell without changing focus)."""
+        strip = getattr(self, "_help_strip", None)
+        if strip is not None:
+            key = self._help_key_for_col(col)
+            strip.set_help(MATERIALS_HELP.get(key, "") if key else "")
 
     # --- toggles ---------------------------------------------------------
     def _reliability_on(self):
@@ -2076,6 +2286,11 @@ class MaterialsDialog(QDialog):
                                      swatch_state=self._color, dim_rule=_mat_dim_keys)
         self._table_lay.addWidget(self._table)
         self._table.apply_usage_filter(self._enabled_usage())
+        # Track the current cell so the help strip follows keyboard navigation
+        # across columns (focus stays on the table, so focusChanged won't fire).
+        if getattr(self, "_help_strip", None) is not None:
+            self._table.table.currentCellChanged.connect(
+                lambda cr, cc, pr, pc: self._help_from_col(cc))
 
     def _ensure_list(self):
         if self._list_view is None:
@@ -2093,6 +2308,9 @@ class MaterialsDialog(QDialog):
             self._seg[mode].setChecked(True)
             return
         self._harvest()                      # pull current edits into self._rows
+        strip = getattr(self, "_help_strip", None)
+        if strip is not None:
+            strip.set_help("")               # drop the other view's stale help text
         if mode == "table":
             self._build_table()
             self._stack.setCurrentIndex(0)
@@ -2160,9 +2378,6 @@ class MaterialsEditor(CategoryEditor):
     # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
     # always shown; option-driven show/hide grouping is a later UX pass.
     LF = {"lem", "fem"}
-    _T_CUT_TIP = ("Tensile cutoff (Rankine). Blank = no cutoff; 0 = no tension. "
-                  "FEM only. Caution: in reinforced fills, T=0 may prevent "
-                  "equilibrium; leave blank or use a small nonzero value.")
     FIELDS = [
         Field("name", "name", "str"),
         Field("gamma", "g", applies=LF),
@@ -2178,7 +2393,7 @@ class MaterialsEditor(CategoryEditor):
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
         # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
         # None (no cutoff), never 0.0 (which would mean "no tension").
-        Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=_T_CUT_TIP),
+        Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
         Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
         Field("ru", "ru", applies=LF),

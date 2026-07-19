@@ -604,6 +604,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     sin_theta_1d = np.zeros(n_1d_elements)
     dof_indices_1d = np.zeros((n_1d_elements, 4), dtype=int)
     K_global_1d_elems = []
+    # Per-1D-element geometry retained for the OPTIONAL bond-slip load-transfer
+    # model (solve_fem/solve_ssrm bond_slip=...). Zero for pile elements and for
+    # elements this loop skips; the bond-slip helper only ever reads reinforcement
+    # rows it was explicitly asked to cap. Unused by the default (end-ramp) path.
+    elem_length_1d = np.zeros(n_1d_elements)
+    dist_end1_1d = np.zeros(n_1d_elements)   # centroid -> line end 1
+    dist_end2_1d = np.zeros(n_1d_elements)   # centroid -> line end 2
+    t_max_1d = np.zeros(n_1d_elements)       # material tensile capacity (axial cap)
+    centroid_1d = np.zeros((n_1d_elements, 2))
 
     if n_1d_elements > 0 and "reinforcement_lines" in slope_data:
         reinforcement_lines = slope_data["reinforcement_lines"]
@@ -645,8 +654,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     dist_to_left = np.linalg.norm(elem_centroid - [x1, y1])
                     dist_to_right = np.linalg.norm(elem_centroid - [x2, y2])
 
+                    # Retain geometry for the optional bond-slip model.
+                    elem_length_1d[elem_idx] = elem_length
+                    dist_end1_1d[elem_idx] = dist_to_left
+                    dist_end2_1d[elem_idx] = dist_to_right
+                    centroid_1d[elem_idx] = elem_centroid
+
                     # Get reinforcement properties
                     t_max = line_data.get("t_max", 0.0)
+                    t_max_1d[elem_idx] = t_max
                     # NaN = unset: no post-peak drop (elastic-perfectly-plastic).
                     # An explicit 0.0 is different — it means brittle rupture.
                     t_res = line_data.get("t_res", float('nan'))
@@ -728,6 +744,42 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     K_global_1d_elems.append(np.zeros((4, 4)))
             else:
                 K_global_1d_elems.append(np.zeros((4, 4)))
+
+    # Local vertical overburden at each reinforcement 1D element centroid, for the
+    # OPTIONAL bond-slip model (sigma_n in tau_bond = bond_c + sigma_n*tan(bond_phi)).
+    # Same ray-cast definition as the ru pore-pressure overburden above: integrate
+    # moist gamma of the soil column above the centroid. Computed only when there are
+    # reinforcement 1D elements, and never consumed unless a bond_slip run option is
+    # passed — so it cannot perturb the default (end-ramp) solve, which is bit-identical.
+    sigma_v_1d = np.zeros(n_1d_elements)
+    reinforce_line_labels = [ln.get("label") for ln in
+                             slope_data.get("reinforcement_lines", [])]
+    _reinf_1d = (n_1d_elements > 0 and "reinforcement_lines" in slope_data
+                 and np.any(elem_length_1d > 0))
+    if _reinf_1d:
+        from shapely.geometry import LineString as _RayLS2, Polygon as _RayPoly2
+        from .mesh import get_material_polygons as _gmp2
+        _rp2 = []
+        for _pi2, _pd2 in enumerate(_gmp2(slope_data)):
+            _mid2 = _pd2.get('mat_id')
+            _midx2 = _mid2 if (_mid2 is not None and 0 <= _mid2 < len(materials)) else _pi2
+            _rp2.append((_RayPoly2(_pd2['coords']),
+                         float(materials[_midx2].get('gamma', 0.0))))
+        _ytop2 = float(np.max(nodes[:, 1])) + 1.0
+        for _i2 in range(n_1d_elements):
+            if elem_length_1d[_i2] <= 0:
+                continue
+            _x2c, _y2c = float(centroid_1d[_i2, 0]), float(centroid_1d[_i2, 1])
+            _ray2 = _RayLS2([(_x2c, _y2c), (_x2c, _ytop2)])
+            _sv2 = 0.0
+            for _poly2, _g2 in _rp2:
+                _minx2, _miny2, _maxx2, _maxy2 = _poly2.bounds
+                if _x2c < _minx2 or _x2c > _maxx2 or _y2c >= _maxy2:
+                    continue
+                _int2 = _ray2.intersection(_poly2)
+                if not _int2.is_empty:
+                    _sv2 += _g2 * _int2.length
+            sigma_v_1d[_i2] = _sv2
 
     # === PILE BEAM ELEMENTS ===
     # Pile 1D elements are identified by element_materials_1d values that exceed
@@ -1304,6 +1356,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "t_allow_by_1d_elem": t_allow_by_1d_elem,
         "t_res_by_1d_elem": t_res_by_1d_elem,
         "k_by_1d_elem": k_by_1d_elem,
+        # Geometry + local overburden for the optional bond-slip load-transfer model.
+        "elem_length_1d": elem_length_1d,
+        "dist_end1_1d": dist_end1_1d,
+        "dist_end2_1d": dist_end2_1d,
+        "t_max_1d": t_max_1d,
+        "sigma_v_1d": sigma_v_1d,
+        "reinforce_line_labels": reinforce_line_labels,
         "cos_theta_1d": cos_theta_1d,
         "sin_theta_1d": sin_theta_1d,
         "dof_indices_1d": dof_indices_1d,
@@ -1342,6 +1401,94 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     return fem_data
 
 
+def _resolve_bond_slip_lines(bond_slip, reinforce_line_labels, n_reinf_lines):
+    """Resolve a bond_slip dict {line_key: (bond_c, bond_phi_deg, perimeter)} into
+    {line_id_0based: (bond_c, bond_phi_deg, perimeter)}.
+
+    line_key may be a reinforcement line LABEL (str), a 1-based line id (int), or
+    '*' (every reinforcement line). An unknown label / out-of-range id raises
+    ValueError rather than silently no-opping (mirrors tension_cutoff_by_material).
+    """
+    resolved = {}
+    for key, params in bond_slip.items():
+        try:
+            bond_c, bond_phi, perim = params
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"bond_slip['{key}'] must be a 3-tuple (bond_c, bond_phi_deg, "
+                f"perimeter); got {params!r}")
+        if isinstance(key, str) and key.strip() == '*':
+            targets = list(range(n_reinf_lines))
+        elif isinstance(key, str):
+            if key not in reinforce_line_labels:
+                raise ValueError(
+                    f"bond_slip references reinforcement line '{key}', which is not "
+                    f"among the model's lines {reinforce_line_labels}")
+            targets = [i for i, lbl in enumerate(reinforce_line_labels) if lbl == key]
+        else:
+            lid = int(key) - 1   # 1-based -> 0-based
+            if lid < 0 or lid >= n_reinf_lines:
+                raise ValueError(
+                    f"bond_slip references reinforcement line id {key}, outside the "
+                    f"1..{n_reinf_lines} range of the model's reinforcement lines")
+            targets = [lid]
+        for lid in targets:
+            resolved[lid] = (float(bond_c), float(bond_phi), float(perim))
+    return resolved
+
+
+def _bond_slip_caps(fem_data, bond_slip):
+    """Effective per-1D-element tensile cap under the bond-slip load-transfer model.
+
+    Returns a copy of ``t_allow_by_1d_elem`` in which every element of a bond-slip
+    reinforcement line is re-capped by the Coulomb bond envelope, REPLACING that
+    line's fixed end-ramp (lp1/lp2) taper. For an element at centroid arc-length s
+    on a line, the bond force that can be anchored against pull-out toward either
+    free end is the integral of the bond capacity per unit length
+
+        q(s) = perimeter * max(0, bond_c + sigma_n(s) * tan(bond_phi))
+
+    from that end to s (sigma_n = local vertical overburden, sigma_v_1d). The force
+    at s cannot exceed the smaller of the two one-sided integrals, and is finally
+    capped by the material axial capacity t_max:
+
+        t_bond(s) = min( INT_end1^s q,  INT_s^end2 q )
+        t_cap(s)  = min( t_max, t_bond(s) )
+
+    In the constant-q, single-material limit this reduces to q*min(d1, d2) — exactly
+    the classical double-ended pull-out ramp, with slope q instead of t_max/lp.
+    """
+    element_materials_1d = fem_data["element_materials_1d"]
+    t_allow = fem_data["t_allow_by_1d_elem"]
+    labels = fem_data.get("reinforce_line_labels", [])
+    n_reinf_lines = len(labels)
+    resolved = _resolve_bond_slip_lines(bond_slip, labels, n_reinf_lines)
+
+    length = fem_data["elem_length_1d"]
+    d1 = fem_data["dist_end1_1d"]
+    t_max = fem_data["t_max_1d"]
+    sv = fem_data["sigma_v_1d"]
+
+    t_cap = np.array(t_allow, dtype=float, copy=True)
+    for lid, (bond_c, bond_phi, perim) in resolved.items():
+        # 1-based material id in element_materials_1d
+        idxs = np.where(element_materials_1d == (lid + 1))[0]
+        idxs = idxs[length[idxs] > 0.0]
+        if idxs.size == 0:
+            continue
+        order = np.argsort(d1[idxs], kind="stable")   # end1 -> end2 along the line
+        ido = idxs[order]
+        tanphi = np.tan(np.radians(bond_phi))
+        q = perim * np.maximum(0.0, bond_c + sv[ido] * tanphi)   # force / length
+        qlen = q * length[ido]
+        cum = np.cumsum(qlen)
+        c1 = cum - 0.5 * qlen                 # bond from end1 up to each centroid
+        c2 = (cum[-1] - cum) + 0.5 * qlen     # bond from each centroid to end2
+        t_bond = np.minimum(c1, c2)
+        t_cap[ido] = np.maximum(0.0, np.minimum(t_max[ido], t_bond))
+    return t_cap
+
+
 # Implementation of Perzyna Visco-Plastic Algorithm for Slope Stability
 #
 # Based on:
@@ -1360,7 +1507,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
-              elastic_mask=None):
+              elastic_mask=None, bond_slip=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1505,6 +1652,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             strength surface at all and cannot yield under any stress. The two masks
             are independent and compose freely. None (default) = no elastic
             elements (bit-identical to the pre-existing path).
+        bond_slip (dict or None): OPT-IN bond-slip load-transfer model for 1D
+            reinforcement, as {line_key: (bond_c, bond_phi_deg, perimeter)}. For each
+            named line, the fixed end-ramp (lp1/lp2) pull-out taper is REPLACED by a
+            Coulomb bond envelope: the tension a bar can carry at any point is the
+            integral of the bond capacity per unit length
+            q = perimeter*(bond_c + sigma_n*tan(bond_phi)) from the nearer free end
+            to that point (sigma_n = local vertical overburden at the element), still
+            capped by the material axial capacity t_max. line_key is a reinforcement
+            line label (str), a 1-based line id (int), or '*' (all reinforcement
+            lines); an unknown reference raises ValueError. None (default) = the
+            end-ramp path, bit-identical. See _bond_slip_caps.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1641,6 +1799,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         sin_theta_1d = fem_data["sin_theta_1d"]
         dof_indices_1d = fem_data["dof_indices_1d"]
 
+        # Effective tensile cap per 1D element. Default: the end-ramp envelope
+        # t_allow_by_1d_elem (SAME object — the default path is bit-identical). With
+        # the optional bond-slip load-transfer model, reinforcement lines named in
+        # bond_slip are re-capped by the Coulomb bond envelope (see _bond_slip_caps),
+        # replacing their fixed lp1/lp2 pull-out ramp; other lines keep t_allow.
+        if bond_slip:
+            t_cap_1d = _bond_slip_caps(fem_data, bond_slip)
+        else:
+            t_cap_1d = t_allow_by_1d_elem
+
         # Tracking arrays for 1D element status
         forces_1d = np.zeros(n_1d_elements)
         failed_1d = np.zeros(n_1d_elements, dtype=bool)
@@ -1655,7 +1823,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # elastic-perfectly-plastic and holds t_allow forever.
         softened_1d = np.zeros(n_1d_elements, dtype=bool)
         can_soften_1d = (np.isfinite(t_res_by_1d_elem)
-                         & (t_res_by_1d_elem < t_allow_by_1d_elem - 1e-12))
+                         & (t_res_by_1d_elem < t_cap_1d - 1e-12))
         n_soften_rounds = 0
 
         if debug_level >= 1:
@@ -2398,7 +2566,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     # comment at softened_1d for why.
                     T_cap = (t_res_by_1d_elem[elem_idx_1d]
                              if softened_1d[elem_idx_1d]
-                             else t_allow_by_1d_elem[elem_idx_1d])
+                             else t_cap_1d[elem_idx_1d])
                     T_true = min(max(T, 0.0), T_cap)
 
                     if T < 0:
@@ -2696,7 +2864,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 if has_1d_elements and can_soften_1d.any():
                     demand = forces_1d
                     newly = (~softened_1d & can_soften_1d
-                             & (demand > t_allow_by_1d_elem + 1e-9))
+                             & (demand > t_cap_1d + 1e-9))
                     if newly.any() and n_soften_rounds < n_1d_elements:
                         softened_1d |= newly
                         n_soften_rounds += 1
@@ -2859,10 +3027,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             T = k * delta
 
             # Report the force the bar actually delivers, under the same law that
-            # was enforced in the viscoplastic loop: tension-only, yielding at
-            # t_allow — or at t_res if the bar ended up in the softened set.
+            # was enforced in the viscoplastic loop: tension-only, yielding at the
+            # effective cap (end-ramp t_allow or the bond-slip envelope) — or at
+            # t_res if the bar ended up in the softened set.
             cap = (t_res_by_1d_elem[elem_idx_1d] if softened_1d[elem_idx_1d]
-                   else t_allow_by_1d_elem[elem_idx_1d])
+                   else t_cap_1d[elem_idx_1d])
             forces_1d[elem_idx_1d] = min(max(T, 0.0), cap)
 
     # ---- Step 10c: Compute final pile beam element forces (capped at capacity) ----
@@ -3602,7 +3771,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
                tension_cutoff_by_material=None, tension_srf=False,
-               elastic_materials=None):
+               elastic_materials=None, bond_slip=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3717,6 +3886,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             exactly (unknown names raise ValueError). None (default) = no elastic
             materials (bit-identical to the path without it). RUN OPTION only — it
             reads nothing from the material template.
+        bond_slip (dict or None): OPT-IN bond-slip load-transfer model for 1D
+            reinforcement, {line_key: (bond_c, bond_phi_deg, perimeter)}, passed
+            unchanged to every solve_fem trial. Replaces the fixed lp1/lp2 pull-out
+            ramp of each named line with a stress-dependent Coulomb bond envelope
+            (df/ds <= perimeter*(bond_c + sigma_n*tan(bond_phi)), sigma_n = local
+            overburden), still capped by t_max. line_key is a line label (str),
+            1-based id (int), or '*' (all lines); unknown references raise ValueError.
+            None (default) = the end-ramp path, bit-identical. See solve_fem.
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
@@ -3817,6 +3994,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                   f"({int(elastic_mask.sum())}/{len(element_materials)} elements "
                   f"held pure linear elastic)")
 
+    # Validate bond-slip line references once, up front, so an unknown line name /
+    # id raises here rather than inside the first trial (fail fast, clear message).
+    if bond_slip:
+        _resolve_bond_slip_lines(bond_slip, fem_data.get("reinforce_line_labels", []),
+                                 len(fem_data.get("reinforce_line_labels", [])))
+        if debug_level >= 1:
+            print(f"  Bond-slip load transfer on lines: {list(bond_slip.keys())}")
+
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']
     has_linear = any(t in (3, 4) for t in element_types)
@@ -3856,7 +4041,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask)
+            elastic_mask=elastic_mask, bond_slip=bond_slip)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3869,7 +4054,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask)
+            elastic_mask=elastic_mask, bond_slip=bond_slip)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -3880,7 +4065,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             cancel_check=cancel_check, progress_callback=progress_callback,
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask)
+            elastic_mask=elastic_mask, bond_slip=bond_slip)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -3907,7 +4092,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
-                 tension_cap_by_elem=None, tension_srf=False, elastic_mask=None):
+                 tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
+                 bond_slip=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -3959,6 +4145,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          ssr_exclude_mask=ssr_exclude_mask,
                          tension_cap_by_elem=tension_cap_by_elem,
                          tension_srf=tension_srf, elastic_mask=elastic_mask,
+                         bond_slip=bond_slip,
                          progress_callback=_fem_progress(step, prefix))
 
     F_left = F_min
@@ -4133,7 +4320,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                  pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  min_slip_depth=None, ssr_exclude_mask=None,
-                 tension_cap_by_elem=None, tension_srf=False, elastic_mask=None):
+                 tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
+                 bond_slip=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -4202,6 +4390,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         ssr_exclude_mask=ssr_exclude_mask,
                         tension_cap_by_elem=tension_cap_by_elem,
                         tension_srf=tension_srf, elastic_mask=elastic_mask,
+                        bond_slip=bond_slip,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks

@@ -211,7 +211,7 @@ candidates.
 | 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | **built** | → [RS2-51](#rs2-51) (LEM, partial). RS2 SSR 1.22 vs Slide2 Spencer 1.293 / GLE 1.304. |
 | 56 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | **built** | → [RS2-33](#rs2-33). RS2 SSR 1.26 vs 8-program 1.02–1.32. |
 | 57 | Layered, TC (Pockoski & Duncan slope 3) | **built** | → [P4-VP57](#p4-vp57) (own SSRM build, 1.301). RS2 SSR 1.32 vs 8-program ~1.40. |
-| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | *blocked* | Five passive soil-nail rows in undrained φ=0 clay; the SSRM does not model soil-nail reinforcement the way RS2's SSR does (distinct from the geotextile tensile cap of RS2-24/29), and the LEM file's materials carry no FEM elastic modulus. RS2 SSR 0.98 vs GOLD-NAIL 0.91, UTEXAS4 1.02. |
+| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | *blocked* | Five passive soil-nail rows in undrained φ=0 clay. The builder now gives the nails an FEM axial rigidity (EA ≈ 2000·T_max, grouted-nail convention) and the soil unit-correct moduli, so the LEM lock (Spencer 1.010 / Janbu 1.043) is unchanged and the file is FEM-ready; bond-slip load transfer is available, though for φ=0 clay the bond is adhesion-governed (stress-independent) and reduces to the fixed pull-out ramp. The SSRM still cannot be evaluated — the inclined nail lines rooted on the vertical wall face do not conform into the 2D mesh (orphan nail nodes → singular stiffness), a mesh-generation gap independent of the reinforcement model. RS2 SSR 0.98 vs GOLD-NAIL 0.91, UTEXAS4 1.02. |
 | 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | **built** | → [RS2-34](#rs2-34). RS2 SSR 1.34 / 1.45 vs Baker 1.35 / 1.48. |
 | 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | **built** | → [RS2-68](#rs2-68). RS2 SSR 0.96. |
 | 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | **built** | → [RS2-68](#rs2-68). RS2 SSR 0.99. |
@@ -761,7 +761,12 @@ The two cases resolve differently under the per-node criterion:
   tan 33°/tan 39.1° = 0.799 (lower); the stiff geotextile lifts the SSRM above that band to
   0.905, with the out-of-balance nodes still hugging the face. RS2's 1.15 is the deep
   reinforced mechanism, which it isolates with a "can't-fail" elastic skin zone along the
-  face (a pending xslope SSR-exclusion feature); here `min_slip_depth` recovers it.
+  face (a pending xslope SSR-exclusion feature); here `min_slip_depth` recovers it. Applying
+  the vendor geotextile's stress-dependent bond as a
+  [bond-slip](../fem/reinforcement.md#bond-slip-load-transfer-optional) load-transfer
+  envelope (joint c = 0, φ = 30.96°) leaves the SSRM at 0.905 to every decimal — the governing
+  failure is the unreinforced cohesionless face skin, which the geotextile bond does not
+  restrain, so the gap to RS2's 1.15 is the missing skin zone, not the bond model.
 - **vp032c fails as a shallow toe/foundation mechanism** at 0.946 (−0.4% vs RS2's 0.95). The
   face-skin closed form (0.80–0.86) does *not* govern at the tag mesh (2.2 m under-resolves
   the face band); at finer meshes it may, as it does for vp032a.
@@ -1319,7 +1324,15 @@ lowest, vp091, is the c = 0/φ = 18° foundation case that fails in bearing, whe
 likewise drops to 0.86). Three do not reach equilibrium on this mesh — vp089 (short 4.2 m
 reinforcement), vp090 (dual geotextile type) and vp093 (crest surcharge) drop to the
 auto-bracket floor — a mesh/reinforcement-geometry convergence gap that is now the remaining
-named issue for those three. Only the baseline is regression-locked; the variants are recorded
+named issue for those three. With feature-aware mesh refinement near the reinforcement lines
+(`refine_factor`), all three do reach equilibrium, but at refinement-sensitive rather than
+mesh-converged factors — vp089 0.923 (factor 3) / 0.863 (factor 4), vp090 0.908 / 0.277,
+vp093 0.824 / (no equilibrium at factor 4) — so none is lockable. The bond-slip load-transfer
+model ([Bond-Slip Load Transfer](../fem/reinforcement.md#bond-slip-load-transfer-optional))
+does not change this: on these wished-in-place walls the geotextile bars are not mobilized to
+their pull-out capacity at the incipient failure state, so re-capping the pull-out envelope
+leaves every one of those factors byte-identical. The stragglers remain a mesh-resolution gap,
+not a reinforcement-model one. Only the baseline is regression-locked; the variants are recorded
 as attempted.
 
 <!-- test: file=../files/rocscience/vp087.xlsx, type=fem_ssrm, expected_fs=0.969, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=1.3, max_iter=16000, benchmark=RS2-48 -->

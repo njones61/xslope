@@ -946,13 +946,23 @@ def vp060():
     pts[0] = (0.0, 0.0)
     sd['non_circ'] = [{'X': x, 'Y': y, 'Movement': 'Free'} for x, y in pts]
     c15, s15 = math.cos(math.radians(15)), math.sin(math.radians(15))
+    # FEM axial rigidity for the grouted steel nails (the LEM ignores E/Area — it
+    # applies the tensile/pullout envelope directly — but the FEM models each nail as
+    # a bar and needs EA). E is steel (29e6 psi = 4.176e9 psf); Area is set per unit
+    # width to EA/Tmax ~ 2000, the mid-range of the grouted-soil-nail convention in
+    # docs/fem/reinforcement.md (well above the ~100-200x mobilization plateau, at the
+    # stiff end wished-in-place SSRM needs). t_max is already the per-unit-width value
+    # (per-nail 25918.14 lb/ft over the 5 ft spacing), so Area is per unit width too.
+    E_nail = 4.176e9
+    tmax_nail = 25918.14 / 5.0
+    area_nail = 2000.0 * tmax_nail / E_nail
     lines = []
     for k, L in enumerate((40.0, 40.0, 40.0, 33.0, 25.5)):
         hy = 23.0 - 5.0 * k
         lines.append({'x1': 0.0, 'y1': hy, 'x2': L * c15, 'y2': hy - L * s15,
-                      't_max': 25918.14 / 5.0, 't_res': float('nan'), 'lp1': 0.0,
-                      'lp2': 25918.14 / 1508.0, 'E': float('nan'),
-                      'area': float('nan'), 'label': f'nail {k+1}',
+                      't_max': tmax_nail, 't_res': float('nan'), 'lp1': 0.0,
+                      'lp2': 25918.14 / 1508.0, 'E': E_nail,
+                      'area': area_nail, 'label': f'nail {k+1}',
                       'type': 'nail', 'dir': 'axial', 'appl': 'passive',
                       'tend1': 0.0, 'tend2': 0.0, 'spacing': 1.0})
     sd['reinforcement_lines'] = lines
@@ -4322,7 +4332,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

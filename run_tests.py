@@ -529,6 +529,25 @@ def run_fem_test(test):
         kwargs['elastic_materials'] = [s.strip() for s in
                                        str(test['elastic_materials']).split(';')
                                        if s.strip()]
+    # Bond-slip load transfer for 1D reinforcement (opt-in). Tags split on commas,
+    # so line entries are SEMICOLON-separated and their fields COLON-separated:
+    # bond_slip=<line>:<bond_c>:<bond_phi_deg>:<perimeter>[;<line>:...]. <line> is a
+    # reinforcement line label, a 1-based id, or '*' (all lines). Off by default.
+    if 'bond_slip' in test:
+        bs = {}
+        for entry in str(test['bond_slip']).split(';'):
+            entry = entry.strip()
+            if not entry:
+                continue
+            key, c, phi, perim = entry.split(':')
+            key = key.strip()
+            # numeric key => 1-based line id; otherwise a label (or '*')
+            try:
+                key = int(key)
+            except ValueError:
+                pass
+            bs[key] = (float(c), float(phi), float(perim))
+        kwargs['bond_slip'] = bs
     result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
                         debug_level=0, **kwargs)
 

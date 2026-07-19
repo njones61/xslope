@@ -266,6 +266,53 @@ These equations are a general guide that can be used to come up with reasonable 
 | **Geotextiles** | 0.5 - 1.5 | Depends on normal stress and surface texture |
 | **Geogrid** | 1.0 - 2.0 | Depends on aperture size and bearing resistance |
 
+### Bond-Slip Load Transfer (optional)
+
+The pullout ramp above uses a **fixed** development length $L_p$ at each end: the available
+tension rises linearly from zero at the end to $T_{max}$ at a distance $L_p$, regardless of
+where the element sits in the slope. This is a good first approximation, but the pullout
+resistance actually depends on the **local normal stress** — a bar segment under deep
+overburden can develop force faster than one near the surface, so the development length is
+not really constant along the line.
+
+The optional **bond-slip** model makes this explicit. Instead of a fixed $L_p$, it caps the
+rate at which tension can develop along the bar by a stress-dependent Coulomb bond per unit
+length:
+
+>>$\dfrac{dT}{ds} \leq q(s) = P\,\big(c_{bond} + \sigma_n(s)\,\tan\phi_{bond}\big)$
+
+where $P$ is the bonded perimeter per unit width (2 for a geotextile sheet — friction on both
+faces; $\pi D / S$ for a nail of diameter $D$ at horizontal spacing $S$), $c_{bond}$ and
+$\phi_{bond}$ are the interface cohesion and friction angle, and $\sigma_n(s)$ is the local
+vertical overburden at the segment (integrated soil column above it — the same quantity used
+for $r_u$ pore pressures). The available tension at a point is the smaller of the two one-sided
+integrals of $q$ from each free end, still capped by the material axial capacity:
+
+>>$T_{allow}(s) = \min\!\Big(T_{max},\; \int_{\text{end 1}}^{s} q\,ds',\; \int_{s}^{\text{end 2}} q\,ds'\Big)$
+
+In the constant-$\sigma_n$, single-soil limit this reduces exactly to the fixed double-ended
+ramp with slope $q$ in place of $T_{max}/L_p$ — the two models agree where the overburden is
+uniform, and diverge where it is not (a face-parallel geotextile whose upslope end lies under
+a thick fill develops force faster there than the fixed ramp allows). The bond parameters map
+directly onto a grouted-joint interface property in continuum codes (RS2's stress-dependent
+joint, for example).
+
+Bond-slip is a **run option**, off by default:
+
+```python
+solve_ssrm(fem_data, bond_slip={"geotextile 1": (0.0, 28.35, 2.0)})
+#                                 line label     c_bond  φ_bond  P
+```
+
+The dictionary is keyed by reinforcement line **label** (a string), **1-based id** (an
+integer), or `"*"` (every reinforcement line); each value is the tuple
+`(bond_c, bond_phi_deg, perimeter)`. Only the named lines switch from the fixed $L_p$ ramp to
+the bond envelope — unnamed lines keep their ramp. With `bond_slip=None` (the default) the
+solve is bit-identical to the fixed-ramp path. The same option is available on `solve_fem`,
+and from a verification tag as `bond_slip=<line>:<c>:<phi_deg>:<perimeter>` (semicolon-separated
+for several lines). The invariant (off ≡ fixed ramp), the closed-form envelope, the axial cap,
+and unknown-name rejection are asserted by `benchmarks/bondslip_guard.py`.
+
 ### Wished-in-Place Analysis and EA Selection
 
 XSLOPE currently uses a **wished-in-place** approach: the entire slope (all soil layers and all reinforcement) is

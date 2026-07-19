@@ -628,6 +628,8 @@ Because the excluded zone can never fail, the reported factor of safety is condi
 
 In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run FEM dialog (SSRM only) — see [Finite element (FEM)](../studio/analysis.md#finite-element-fem).
 
+A second reinforcement-side run option, **`bond_slip`** on `solve_fem()`/`solve_ssrm()`, replaces a reinforcement line's fixed pullout ramp with a stress-dependent Coulomb bond that caps the force gradient along the embedded length ($dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$). It is off by default (fixed ramp, bit-identical). See [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
+
 ## Element Type Selection and Volumetric Locking
 
 ### The Problem: Volumetric Locking in Low-Order Elements

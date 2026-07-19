@@ -1760,6 +1760,49 @@ def vp036():
     return 'vp036.xlsx'
 
 
+def vp037():
+    """Slide #37 / XSTABL v5 reference manual (Sharma 1996) sec. 3.8
+    "Reinforcement Example", Fig. 3.15 (printed p.57), after Koerner (1991):
+    a 12 m high, 45 deg cohesionless slope under a 40 kPa crest surcharge.
+    Material properties are printed verbatim on XSTABL's Fig. 3.15 (which the
+    Slide2 manual does NOT reproduce): phi=36 deg, gamma=20 kN/m3, c=0. Geometry
+    is read from Slide's coordinate-labeled Fig. 37.1: ground surface
+    (0,5)-(5,5)-(17,17)-(40,17) with the domain base at y=0, so the slope is the
+    12 m, 45 deg face from the toe (5,5) to the crest edge (17,17). The 40 kPa
+    surcharge sits on the crest from the edge (17,17) to (30,17) (XSTABL's
+    13 m-wide crest load; the exact right extent is immaterial - every candidate
+    surface exits at x<=25, inside the loaded zone).
+
+    This file is the base (UNREINFORCED) slope. Evaluated on Slide's printed
+    critical circle (center -11.410, 35.264, R 34.426; Fig. 37.3), Bishop = 0.764
+    reproduces Slide's printed 0.764 exactly (XSTABL Fcrit 0.734); a toe-focus,
+    2 m-minimum-depth search lands on that same circle unaided. The required
+    support-force back-analysis (part a) and the reinforced-zone length (part b)
+    are documented, not baked, in the VP37 section - see there for why the
+    concentrated-force required-load does not reproduce exactly."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='Sand', c=0.0, phi=36.0, gamma=20.0, gamma_sat=20.0,
+             option='mc', u='none')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 5.0), (5.0, 5.0), (17.0, 17.0), (40.0, 17.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = []
+    sd['dloads'] = [[{'X': 17.0, 'Y': 17.0, 'Normal': 40.0},
+                     {'X': 30.0, 'Y': 17.0, 'Normal': 40.0}]]
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # Slide's printed critical circle (Fig. 37.3): toe exit (5,5), crest entry
+    # (17.773, 17), Bishop FS 0.764.
+    sd['circles'] = [{'Xo': -11.410, 'Yo': 35.264, 'Depth': 35.264 - 34.426,
+                      'R': 34.426}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp037.xlsx'))
+    return 'vp037.xlsx'
+
+
 def _vp039_slope_data(fill, clay, tcrack_water, circle, t_geo):
     """Slide #39 / Tandjiria (2002) problem 1 shared geometry: half-embankment
     (centerline x=0) on soft clay, tension crack to el 7, geosynthetic at the
@@ -4516,7 +4559,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

@@ -186,7 +186,7 @@ candidates.
 | 3 | Slope, 3 materials (ACADS 1c) | **built** | → [RS2-2](#rs2-2). RS2 SSR 1.34 vs ref 1.39. |
 | 4 | Slope, 3 materials, seismic (ACADS 1d) | **built** | → [RS2-3](#rs2-3). RS2 SSR 0.95 vs ref 1.00. |
 | 5 | Dam, 4 materials (ACADS 2a) | **built** | → [RS2-4](#rs2-4). RS2 SSR —; ref 1.95. |
-| 6 | Dam, 4 materials, predefined surface (ACADS 2b) | *blocked* (→ [RS2-4](#rs2-4)) | Same Talbingo dam as [RS2-4](#rs2-4); its unconstrained SSRM finds the true global minimum (1.678). RS2's SSR 2.15 uses an SSR Search Area to hold the mechanism on ACADS 2(b)'s specified upstream circle — reproducing it needs RS2's search-area polygon, which the shared file does not carry. |
+| 6 | Dam, 4 materials, predefined surface (ACADS 2b) | **built** | → [P4-VP6](#p4-vp6) (own SSRM build, constrained). Same Talbingo dam as [RS2-4](#rs2-4); its unconstrained SSRM finds the true global minimum (1.678, downstream bench). Confining strength reduction to RS2's SSR Search Area (read verbatim from the vendor `#006.fez`, 37 vertices) holds the mechanism on ACADS 2(b)'s upstream circle: SSRM 2.145 vs RS2 SSR 2.15. |
 | 7 | Slope, 2 materials, weak layer (ACADS 3a) | **built** | → [RS2-5](#rs2-5). RS2 SSR 1.24 vs ref 1.24–1.27. |
 | 9 | Weak layer, water table, load (ACADS 4) | **built** | → [RS2-6](#rs2-6). RS2 SSR 0.76 vs ref 0.78. |
 | 10 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | **built** | → [RS2-7](#rs2-7). RS2 SSR 1.46 vs ref 1.53. |
@@ -248,10 +248,12 @@ standing [VP64](rocscience.md#vp64) LEM lock (Spencer 2.488), and VP67
 the true global minimum at 1.076 (a deep foundation mechanism, matched by XSLOPE's own
 unconstrained LEM search at Spencer 1.075), while reproducing RS2's SSR Exclusion Area below
 El. 81 lifts the mechanism onto the toe circle at 1.303, a head-to-head with RS2's constrained
-SSR 1.33, 2 mapping to corpus rows (RS2-68 Loukidis — now **built**; RS2-28/38/39-41-43 — still planned), and **≈12
-genuinely new** candidates: the ACADS 2b dam variant (VP6), the rest of the USACE 2003
-embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and soil-nail
-wall (VP57, VP60),
+SSR 1.33, and VP6 (ACADS 2b Talbingo) now carrying a [Part IV SSRM build](#p4-vp6) confined to
+RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.145 vs RS2 SSR 2.15)
+alongside the [VP6](rocscience.md#vp6) LEM lock, 2 mapping to corpus rows (RS2-68 Loukidis — now
+**built**; RS2-28/38/39-41-43 — still planned), and **≈12 genuinely new** candidates: the rest of
+the USACE 2003 embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and
+soil-nail wall (VP57, VP60),
 Zhu's 12-method slope (VP51), the Baker/Jiang power-curve and Baker–Leshchinsky safety-map
 problems (VP41, VP42), the Duncan & Wright submerged slope (VP70), and the Huang & Jia
 rapid-drawdown dam (VP102). None are built in tranche 1.
@@ -336,6 +338,10 @@ mechanism its mesh resolved. Both faces are correct
 infinite-slope answers; XSLOPE reports the more critical one. The seeded LEM search
 ([VP5](rocscience.md#vp5)) stays on the upstream circle in the input file and locks 1.955, so
 the LEM and SSRM entries for this dam report different faces by construction, not a discrepancy.
+[RS2 Part IV VP6](#p4-vp6) runs the **constrained** SSRM on this same dam: confining strength
+reduction to RS2's upstream SSR Search Area (read verbatim from the vendor `#006.fez`) lifts the
+factor from this 1.678 downstream minimum to **2.145** on the upstream circle, reproducing RS2's
+ACADS 2(b) SSR 2.15 — so the two answers are one mechanism choice apart, not a disagreement.
 
 *Closed-form check: across φ = 35–45° (c = 0 materials only) the SSRM tracks tan φ / tan 30.9° to 0.3%.*
 
@@ -2140,6 +2146,48 @@ reference 1.65 — a small, consistent positive offset, the same sign and size a
 <!-- test: file=../files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.669, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, benchmark=RS2-P4-VP2 -->
 
 ![RS2 Part IV VP2: ACADS 1(b) homogeneous slope (Giam & Donald 1989), SSRM 1.669 (no tension crack) vs RS2 SSR 1.63 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP2.png)
+
+### RS2 Part IV VP6: Talbingo dam, specified upstream circle (ACADS 2b) {#p4-vp6}
+
+Slide2/LEM counterpart: [VP6](rocscience.md#vp6) (ACADS 2(b), Giam & Donald 1989). This is the
+**same four-zone Talbingo dam** as [RS2-4](#rs2-4) (ACADS 2(a)); the two problems differ only in
+which mechanism is sought. RS2-4's **unconstrained** SSRM finds the true global minimum — the
+steeper 30.9° downstream bench (**1.678**, a surface-parallel infinite-slope slide). ACADS 2(b)
+instead asks for the factor on a **single specified upstream circle**, and RS2 obtains its
+published SSR of **2.15** by confining strength reduction to an **SSR Search Area** hugging that
+upstream face.
+
+**Input files:** [vp006.xlsx](../files/rocscience/vp006.xlsx) — the same dam as
+[vp005.xlsx](../files/rocscience/vp005.xlsx), carrying the ACADS 2(b) specified circle.
+
+The constraint polygon is **RS2's own**, read verbatim from the vendor model file (the
+`SSR_polygonal_zones` block of `slope stability #006.fez`, parsed by
+`benchmarks/rocscience/rs2_ssr_zones.py`): a 37-vertex ring over the upstream face and core, in
+the same coordinate frame as the corpus file (both span x [0, 648], y [0, 162]). `solve_ssrm`'s
+`ssr_zone` confines strength reduction to elements inside it and holds the downstream shell and
+deep interior at full strength — redirecting the mechanism off the downstream infinite-slope
+minimum and onto the upstream circle through the cohesive core (c = 85 kPa). The vendor `.fez`
+additionally makes its abutment/foundation blocks linear-elastic (`Plasticity: None`); `ssr_zone`
+approximates that by holding the outside-polygon elements at full Mohr-Coulomb strength — the same
+approximation stated for [RS2-61](#rs2-61)/[RS2-64](#rs2-64). ψ = 0; E and ν are the file's inert
+FEM elastics.
+
+| Method | XSLOPE | Published |
+|---|---|---|
+| SSRM, unconstrained (→ [RS2-4](#rs2-4)) | 1.678 | — (downstream bench, true global min) |
+| SSRM, SSR Search Area (upstream circle) | 2.145 | RS2 SSR 2.15 |
+
+*Cross-bearings on the specified upstream circle: Slide2 Bishop 2.208 / Spencer 2.292 / GLE 2.301;
+Giam & Donald reference 2.29.*
+
+XSLOPE's constrained SSRM lands at **2.145**, −0.2% on RS2's SSR 2.15. Locked at the RS2-4 mesh
+(6.5 m tri6). The upstream-face confinement lifts the factor from the unconstrained 1.678
+(downstream bench) to the upstream-circle 2.145, reproducing RS2's ACADS 2(b) answer — confirming
+that the [RS2-4](#rs2-4) 1.678 / 2.15 split is a **mechanism choice, not a discrepancy**.
+
+<!-- test: file=../files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.145, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, benchmark=RS2-P4-VP6 -->
+
+![RS2 Part IV VP6: ACADS 2(b) Talbingo dam (Giam & Donald 1989), constrained SSRM 2.145 vs RS2 SSR 2.15 — the mechanism confined to RS2's upstream SSR-Search-Area polygon read verbatim from the vendor model; FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP6.png)
 
 ### RS2 Part IV VP41: Homogeneous slope, power curve + r<sub>u</sub> (Jiang, Baker & Yamagami 2003) {#p4-vp41}
 

@@ -2857,6 +2857,22 @@ def run_slide2_import_test(test):
             problems.append(f"materials take u={[m['u'] for m in mats]}, expected "
                             f"['piezo', 'piezo'] — a 'hu' water table is a piezo line")
 
+        # Ponded water: the water table (y=9) stands above the left ground (y=6), so
+        # the reservoir weight must import as a distributed load, not silently drop.
+        # Peak intensity is the closed-form hydrostatic gamma_w * max_depth,
+        # 9.81 * (9 - 6) = 29.43, tapering to zero where the water meets the ground.
+        dloads = sd["dloads"]
+        if not dloads:
+            problems.append("the ponded water above the ground was dropped (dloads "
+                            "empty) — the reservoir weight is lost from the statics")
+        else:
+            peak = max(pt["Normal"] for b in dloads for pt in b)
+            if round(peak, 2) != round(9.81 * 3.0, 2):
+                problems.append(f"ponded-water peak Normal {peak:.2f}, expected "
+                                f"{9.81 * 3.0:.2f} (gamma_w * max_depth)")
+        if not any("ponded water" in c for c in caveats):
+            problems.append("the ponded-water import was not reported as a caveat")
+
         # A specified circle is imported; a search would not be.
         if len(sd["circles"]) != 1:
             problems.append(f"{len(sd['circles'])} circles, expected 1")
@@ -2891,6 +2907,9 @@ def run_slide2_import_test(test):
                 problems.append("the circle did not survive the .xlsx round-trip")
             if len(reloaded.get("piezo_line") or []) != 2:
                 problems.append("the piezo line did not survive the .xlsx round-trip")
+            if len(reloaded.get("dloads") or []) != 1:
+                problems.append("the ponded-water load did not survive the .xlsx "
+                                "round-trip")
         if not isinstance(rcav, list):
             problems.append("import_slmd did not return a caveat list")
 
@@ -3014,6 +3033,97 @@ v6 geometry start:
     vertices end:
   boundary 2 end:
 v6 geometry end:
+
+new distributed loads start:
+  num distributed loads: 3
+  distributed load 1 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D1}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 0, 0
+        1: 20, 0
+      dpoint array end:
+    vertices end:
+    strLoadName: "Ponded Water Load 1"
+    Dist Load Settings start:
+      type: "normal"
+      triangular: no
+      angle_to_bound: 0
+      angle: 0
+      flip angle: no
+      magnitude1: 1
+      magnitude2: 1
+      is staged: no
+      is_groundwater: yes
+      use_calculated_pwp: no
+      usesPiezos: yes
+      usesGrids: no
+      piezoID: 1
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 1 end:
+  distributed load 2 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D2}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 25, 18
+        1: 35, 18
+      dpoint array end:
+    vertices end:
+    strLoadName: "Surcharge"
+    Dist Load Settings start:
+      type: "normal"
+      triangular: no
+      angle_to_bound: 0
+      angle: 0
+      flip angle: no
+      magnitude1: 40
+      magnitude2: 40
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 2 end:
+  distributed load 3 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D3}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 20, 18
+        1: 25, 18
+      dpoint array end:
+    vertices end:
+    strLoadName: "Angled Load"
+    Dist Load Settings start:
+      type: "normal"
+      triangular: no
+      angle_to_bound: 0
+      angle: 30
+      flip angle: no
+      magnitude1: 10
+      magnitude2: 10
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 3 end:
+new distributed loads end:
 """
 
 
@@ -3036,6 +3146,9 @@ def run_rs2_import_test(test):
       - an external boundary cut by one material boundary polygonises into two zones,
         each labelled by its material-mesh seed triangle;
       - a piezometric line becomes the piezo line and the materials draw from it;
+      - RS2's explicit ponded-water / distributed loads are PRICED into dloads
+        (water pressure gamma_w*depth via the referenced piezo; plain loads direct;
+        angled/non-normal loads reported-not-imported), never count-and-dropped;
       - the SSR settings are surfaced as metadata, never turned into an LEM search;
       - NO failure surface is imported (an SSR analysis has none), and that is said;
       - the model round-trips through the .xlsx writer and load_slope_data.
@@ -3086,6 +3199,28 @@ def run_rs2_import_test(test):
             problems.append(f"materials take u={[m['u'] for m in mats]}, expected "
                             f"['piezo', 'piezo']")
 
+        # Distributed loads: RS2 stores ponded water as explicit load objects, and the
+        # importer must PRICE them, not count-and-drop them. The fixture carries three:
+        #   1. a piezo-driven ponded-water load on the y=0 boundary — priced as the
+        #      water pressure gamma_w * (piezo_head 6 - y 0) = 9.81 * 6 = 58.86;
+        #   2. a plain numeric normal load (a surcharge) of 40 — imported directly;
+        #   3. an angled (30 deg) load — reported, NOT imported (perpendicular-only).
+        dloads = sd["dloads"]
+        if len(dloads) != 2:
+            problems.append(f"{len(dloads)} distributed load(s) imported, expected 2 "
+                            f"(ponded water + a plain load; the angled load is skipped)")
+        else:
+            peak = max(pt["Normal"] for b in dloads for pt in b)
+            if round(peak, 2) != round(9.81 * 6.0, 2):
+                problems.append(f"ponded-water peak Normal {peak:.2f}, expected "
+                                f"{9.81 * 6.0:.2f} (gamma_w * depth)")
+            if not any(all(round(pt["Normal"], 3) == 40.0 for pt in b) for b in dloads):
+                problems.append("the plain numeric distributed load (40) did not import")
+        if not any("ponded-water load" in c for c in caveats):
+            problems.append("the ponded-water load import was not reported as a caveat")
+        if not any("were NOT imported" in c and "perpendicular" in c for c in caveats):
+            problems.append("the skipped angled load was not reported as a caveat")
+
         # An RS2 model imports NO failure surface, and must say so.
         if sd["circles"] or sd["non_circ"]:
             problems.append("an RS2 model imported a failure surface it should not have")
@@ -3109,6 +3244,8 @@ def run_rs2_import_test(test):
             problems.append("the two zones did not survive the .xlsx round-trip")
         if len(reloaded.get("piezo_line") or []) != 2:
             problems.append("the piezo line did not survive the .xlsx round-trip")
+        if len(reloaded.get("dloads") or []) != 2:
+            problems.append("the distributed loads did not survive the .xlsx round-trip")
 
         # import_fez writes an .xlsx and returns the caveat list (the surface-less file
         # it writes is intentionally incomplete — an SSR model has no LEM surface).
@@ -3121,6 +3258,27 @@ def run_rs2_import_test(test):
 
     if problems:
         return None, "RS2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+def run_submerged_oracle_test(test):
+    """Dry-buoyant still-water oracle (benchmarks/submerged_oracle_guard.py).
+
+    A fully submerged slope under still water must read identically to the same slope
+    run dry with gamma' = gamma_sat - gamma_w. This is the exact effective-stress
+    equivalence that validates the perpendicular-distributed-load water convention the
+    Slide2 and RS2 importers now convert ponded water into. Returns (0.0, None) on
+    pass, else (None, message). File-less: builds on xslope_acads_simple.xlsx."""
+    import importlib
+    bench = str(Path(__file__).parent / 'benchmarks')
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    mod = importlib.import_module('submerged_oracle_guard')
+    if not os.path.exists(mod._BASE_XLSX):
+        return 0.0, None                      # engine-only clone without the docs file
+    failures = mod.check()
+    if failures:
+        return None, "submerged oracle: " + "; ".join(failures[:4])
     return 0.0, None
 
 
@@ -3353,6 +3511,8 @@ def run_test(test):
         return run_slide2_import_test(test)
     if test_type == 'rs2':
         return run_rs2_import_test(test)
+    if test_type == 'submerged_oracle':
+        return run_submerged_oracle_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -3417,7 +3577,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                       'gsat_pair', 'seep_head'):
+                       'submerged_oracle', 'gsat_pair', 'seep_head'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -3634,6 +3794,12 @@ def main():
         if Path(DRAWDOWN_GUARD_FILE).exists():
             tests.append({'type': 'drawdown_guard', 'file': DRAWDOWN_GUARD_FILE,
                           'method': 'stage1 FS>=1', 'source': 'drawdown_guard'})
+        # Dry-buoyant still-water oracle: the exact effective-stress equivalence that
+        # validates the perpendicular-dload water convention the vendor importers convert
+        # ponded water into. File-less (builds on xslope_acads_simple).
+        tests.append({'type': 'submerged_oracle',
+                      'file': 'dry-buoyant still-water oracle',
+                      'method': 'bishop/spencer', 'source': 'submerged_oracle'})
 
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.

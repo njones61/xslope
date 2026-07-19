@@ -132,11 +132,12 @@ problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged
 **Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
 row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no
 seepage solution can regenerate it — a final gap it shares with the Slide2 corpus. The *blocked* / *partial*
-rows are each tracked against a named gap: a strength or geometry model XSLOPE does not yet have (§2.16's
-flat-ground bearing mechanism behind the flat-arc guard, §2.47's dip-relative anisotropic/compound strength),
-or a source document not yet in hand (§2.25's B&L paper, the §2.35–2.37/2.39 Pockoski & Duncan and Loukidis
-reports). Everything else is built and verified, or covered by the regression-locked Rocscience build; the
-corpus is complete relative to what is independently verifiable.
+rows are each tracked against a named gap: a strength or geometry model XSLOPE does not yet have (§2.47's
+dip-relative anisotropic/compound strength), or a source document not yet in hand (§2.25's B&L paper, the
+§2.35–2.37/2.39 Pockoski & Duncan and Loukidis reports). §2.16's level-ground Prandtl mechanism no longer
+belongs on that list: the `right_facing` override built for Rocscience VP26 unblocks the flat-arc facing
+guard, so it is covered by that shared build. Everything else is built and verified, or covered by the
+regression-locked Rocscience build; the corpus is complete relative to what is independently verifiable.
 
 **Manual edition.** The manual tracked here is the **2025.2 edition**. Its 47
 two-dimensional problems (chapter 2, "Verifications – 2D", §2.1–2.47) are carried
@@ -165,7 +166,7 @@ the 3D chapter is out of scope and not tracked here.
 | 2.13 | Greco Layered Slope | **built** | [vp019.xlsx](../files/rocscience/vp019.xlsx): circular Spencer 1.429 vs SLOPE/W M-P 1.389, Greco 1.40-1.42. — [details](#gs-2-13) |
 | 2.14 | Greco Weak Layer | **built** | [vp020.xlsx](../files/rocscience/vp020.xlsx): noncircular Spencer 1.082, circular 1.091 vs SLOPE/W Spencer 1.054, Greco 1.08. — [details](#gs-2-14) |
 | 2.15 | Chen & Shao Frictionless Slope | covered | Same problem as [Rocscience #25](rocscience.md#vp25) — [vp025.xlsx](../files/rocscience/vp025.xlsx), Prandtl mechanism on a 60° weightless slope: Spencer 1.052 vs SLOPE/W 1.036, Slide 1.051, theory 1.0. — [details](#gs-2-15) |
-| 2.16 | Prandtl Bearing Capacity | blocked | Same as [Rocscience #26](rocscience.md) — the flat-ground bearing mechanism is rejected by the flat-arc guard (a feature gap, not a data gap). The SLOPE/W model is a public download (see above), and its critical surface is fully specified, so it will import once the guard is relaxed. |
+| 2.16 | Prandtl Bearing Capacity | covered | Same problem as [Rocscience #26](rocscience.md#vp26) — [vp026.xlsx](../files/rocscience/vp026.xlsx), the level-ground Prandtl mechanism unblocked by the `right_facing` override: Spencer 1.043 vs theory 1.0, Slide2 0.941. SLOPE/W's own model solves the exact fully-specified (non-circular) mechanism at 0.960 by Morgenstern-Price, read from the file — the `.gsz` importer does not yet rebuild a fully-specified surface, so that number is quoted, not reproduced. — [details](#gs-2-16) |
 | 2.17 | Chowdhury & Xu (1995), 5 examples | covered | Same problem as [Rocscience #28](rocscience.md#vp28) — Congress St. Cut + embankment on soft clay, 3 of 10 cases built and reliability-tagged. |
 | 2.18 | Borges & Cardoso Geosynthetic Emb. #2 | **built** | [gs2_18.xlsx](../files/geostudio/gs2_18.xlsx) — geosynthetic-reinforced embankment on depth-varying soft clay (SFnDepth → XSLOPE `cp`). M-P 1.153 vs SLOPE/W 1.171 (−1.5%) and Borges & Cardoso 1.15 (+0.3%). — [details](#gs-2-18) |
 | 2.19 | Borges & Cardoso Geosynthetic Emb. #3 | covered | Same problem as [Rocscience #32](rocscience.md#vp32) / [RS2 #24](rs2.md#rs2-24) — [vp032a](../files/rocscience/vp032a.xlsx) (7 m) / [vp032c](../files/rocscience/vp032c.xlsx) (8.75 m): identical materials, foundation and embankment geometry (verified to <1 cm); the reinforcement-friction difference between vendor sources (39.6° vs 31.0°) is immaterial because the fully-embedded bar develops its full 200 kN/m either way. SLOPE/W's own solves (1.229 / 0.972) bracket the vp032 locks (1.218 / 0.981). |
@@ -476,6 +477,26 @@ The classical Prandtl bearing mechanism on a weightless, frictionless 60° slope
 XSLOPE's Spencer FS of 1.052 matches Slide (1.051) and sits just above SLOPE/W (1.036), all close to the theoretical value of 1.0 for this frictionless mechanism.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.15; Chen & Shao (1988).
+
+### 2.16 — Prandtl Bearing Capacity {#gs-2-16}
+
+The classical Prandtl bearing mechanism on level ground: a weightless (γ ≈ 0), c = 20 kPa, φ = 0 soil under a strip surcharge of 102.83 kPa — exactly c·N<sub>c</sub>, so the theoretical factor of safety is 1.0 by construction. Both ground crossings of the slip surface sit at the same elevation, which used to trip the flat-arc facing guard; the `right_facing` override built for this problem (Rocscience VP26) resolves that, so the surface — an active wedge, a log-spiral/circular fan, and a passive wedge — solves cleanly. This is the same problem as the Rocscience corpus, sharing XSLOPE input [vp026.xlsx](../files/rocscience/vp026.xlsx); see the linked Rocscience detail for the full geometry and slip-surface construction.
+
+SLOPE/W's own file was also checked directly: its "Fully Specified" analysis solves the identical, non-circular Prandtl surface at FS = 0.960 (Morgenstern-Price) — read straight from the model's saved results via `read_gsz_results`. That number is quoted rather than reproduced, because the `.gsz` importer does not yet rebuild a fully-specified (non-circular) surface into an XSLOPE slip surface; that is a separate, narrower gap than the flat-arc guard, and unrelated to it.
+
+**Input:** [vp026.xlsx](../files/rocscience/vp026.xlsx) · **Rocscience detail:** [VP26](rocscience.md#vp26)
+
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Spencer | 1.043 | 0.960* | theory 1.0; Slide2 0.941 |
+
+\* SLOPE/W's own Morgenstern-Price solve of its fully-specified surface, not an XSLOPE re-solve — see above.
+
+XSLOPE's Spencer (1.043) and SLOPE/W's own Morgenstern-Price (0.960) bracket the theoretical FS of 1.0 from
+opposite sides, about 4% apart each way — the same interslice-convention spread already documented for VP26
+against Slide2 (0.941), not a new discrepancy.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.16; Prandtl (1921).
 
 ### 2.18 — Borges & Cardoso – Geosynthetic Embankment #2 {#gs-2-18}
 

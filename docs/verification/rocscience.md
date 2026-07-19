@@ -1344,6 +1344,8 @@ XSLOPE reproduces the theoretical infinite-slope value exactly. Slide's publishe
 
 <!-- test: file=../files/rocscience/vp046.xlsx, type=circular_search, num_slices=40, fs_spencer=2.500, fs_bishop=2.500, benchmark=VP46-dry -->
 
+![vp046: inputs and representative solution](images/vp046.png)
+
 ### VP47: Soil-nailed wall in clay (Amherst test wall) {#vp47}
 
 Slide #47 / Sheahan & Ho (2003): 6 m vertical cut in undrained Amherst clay (cᵤ = 25 kPa, γ = 18.9 kN/m³), two nail rows at 20° declination (L = 4.9 m, tensile 118 kN, plate 86 kN, bond 15 kN/m, sₕ = 1.5 m) and the shotcrete facing weight applied as a 14.6 kN/m vertical line load at the crest. The wall failed in the field test; the published analyses sweep planar surfaces through the toe. Nails are modeled axial/passive with the FHWA-style capacity envelope (plate strength at the head, bond-strength taper at the tip).

@@ -29,17 +29,18 @@ from xslope.fileio import default_template_path
 
 from .canvas import MplCanvas
 from .dialogs import (
-    BuildMeshDialog, DxfImportDialog, GszImportDialog, RunFemDialog, RunLemDialog,
-    RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
+    BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
+    RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
 )
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
-    MeshDisplayPanel, ReliabilityDisplayPanel, SearchDisplayPanel,
-    SeepDisplayPanel, SolutionDisplayPanel,
+    MeshDisplayPanel, ReliabilityDisplayPanel, ReliabilityMcDisplayPanel,
+    SearchDisplayPanel, SeepDisplayPanel, SolutionDisplayPanel,
 )
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
-from .runners import FemRunner, LemRunner, MeshWorker, SeepRunner, SensitivityRunner
+from .runners import (FemRunner, LemRunner, MeshWorker, ReliabilityRunner,
+                      SeepRunner, SensitivityRunner)
 
 APP_NAME = "XSlope Studio"
 ORG_NAME = "XSlope"
@@ -286,6 +287,7 @@ class MainWindow(QMainWindow):
         self.search_canvas = None
         self.solution_canvas = None
         self.reliability_canvas = None
+        self.reliability_hist_canvas = None      # Monte Carlo FS histogram
         # Sensitivity / design study result tabs.
         self.sens_canvas = None            # tornado
         self.sens_curve_canvas = None      # click-through FS-vs-value curve
@@ -304,10 +306,12 @@ class MainWindow(QMainWindow):
         self._seep_runner = None
         self._fem_runner = None
         self._sens_runner = None
+        self._rel_runner = None
         self._mesh_busy = False
         self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
         self._last_sens_opts = {}          # keyed by engine mode (lem/fem/seep)
+        self._last_rel_opts = {}           # keyed by engine mode (lem/fem)
         self._last_mesh_opts = {}
         self._last_seep_opts = {}
         self._last_fem_opts = {}
@@ -549,6 +553,8 @@ class MainWindow(QMainWindow):
         self.act_run = QAction("Run &LEM…", self, enabled=False, triggered=self.run_current)
         self.act_sensitivity = QAction("&Parametric…", self, enabled=False,
                                        triggered=self.run_sensitivity)
+        self.act_reliability = QAction("&Reliability…", self, enabled=False,
+                                       triggered=self.run_reliability)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
 
@@ -581,6 +587,7 @@ class MainWindow(QMainWindow):
         m_run.addSeparator()
         m_run.addAction(self.act_run)
         m_run.addAction(self.act_sensitivity)
+        m_run.addAction(self.act_reliability)
 
         m_view = mb.addMenu("&View")
         m_view.addAction(self.inputs_dock.toggleViewAction())
@@ -618,6 +625,9 @@ class MainWindow(QMainWindow):
         # The Parametric study lives on the toolbar too (Norm's ask); the action's
         # existing mode-visibility hides the button where it does not apply.
         tb.addAction(self.act_sensitivity)
+        # Reliability is a sibling of Parametric: deterministic what-ifs vs the
+        # probabilistic (β / probability-of-failure) study.
+        tb.addAction(self.act_reliability)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
@@ -1207,7 +1217,7 @@ class MainWindow(QMainWindow):
         open_ = self.doc.is_open
         busy = (self._runner is not None or self._seep_runner is not None
                 or self._fem_runner is not None or self._sens_runner is not None
-                or self._mesh_busy)
+                or self._rel_runner is not None or self._mesh_busy)
         has_mesh = open_ and self.doc.slope_data.get("mesh") is not None
         # The Parametric study has a version for every mode (LEM: FS; FEM: FS via
         # SSRM; Seep: discharge q). Always visible; the FEM/Seep sweeps run on the
@@ -1219,6 +1229,17 @@ class MainWindow(QMainWindow):
         else:
             self.act_sensitivity.setEnabled(open_ and has_mesh and not busy)
             self.act_sensitivity.setToolTip(
+                "" if has_mesh else "Build a mesh first (Build Mesh…).")
+        # Reliability is probabilistic; it applies to LEM (Taylor / Monte Carlo) and
+        # FEM (Taylor / SSRM), but not to a seepage analysis. Hidden in Seep mode;
+        # the FEM sweep runs on the mesh, so gate it on a built mesh like Run.
+        self.act_reliability.setVisible(mode in ("lem", "fem"))
+        if mode == "lem":
+            self.act_reliability.setEnabled(open_ and not busy)
+            self.act_reliability.setToolTip("")
+        elif mode == "fem":
+            self.act_reliability.setEnabled(open_ and has_mesh and not busy)
+            self.act_reliability.setToolTip(
                 "" if has_mesh else "Build a mesh first (Build Mesh…).")
         if mode == "lem":
             self.act_run.setEnabled(open_ and not busy)
@@ -1665,8 +1686,8 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_fem_opts = opts
-        # SSRM and reliability (a series of SSRM solves) both support cooperative cancel.
-        supports_cancel = opts["analysis"] in ("ssrm", "reliability")
+        # SSRM supports cooperative cancel (a single-trial solve is quick).
+        supports_cancel = opts["analysis"] == "ssrm"
         self.statusBar().showMessage("Running FEM …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -1700,23 +1721,7 @@ class MainWindow(QMainWindow):
         self._show_fem_results()
         if self.fem_results_canvas is not None:
             self.view_tabs.setCurrentWidget(self.fem_results_canvas)
-        if bundle.get("analysis") == "reliability" and bundle.get("reliability"):
-            r = bundle["reliability"]
-            self.statusBar().showMessage(
-                f"FEM reliability done — F_MLV = {r['F_MLV']:.3f}, "
-                f"reliability = {r['reliability'] * 100:.2f}%, "
-                f"Pf = {r['prob_failure'] * 100:.2f}%")
-            QMessageBox.information(
-                self, "FEM Reliability",
-                f"F_MLV = {r['F_MLV']:.3f}\n"
-                f"σ_F = {r['sigma_F']:.3f}\n"
-                f"COV_F = {r['COV_F']:.3f}\n"
-                f"β (lognormal) = {r['beta_ln']:.3f}\n"
-                f"Reliability = {r['reliability'] * 100:.2f}%\n"
-                f"Probability of failure = {r['prob_failure'] * 100:.2f}%\n\n"
-                "The per-parameter ΔF table is in the Log pane; the FEM Results "
-                "view shows the deformation at the most-likely values.")
-        elif bundle.get("FS") is not None:
+        if bundle.get("FS") is not None:
             self.statusBar().showMessage(f"FEM done — SSRM FS = {bundle['FS']:.3f}")
         else:
             conv = bundle["solution"].get("converged")
@@ -1789,10 +1794,8 @@ class MainWindow(QMainWindow):
         opts = dlg.options()
         self._last_lem_opts = opts
         self.act_run.setEnabled(False)
-        verb = {"auto_search": "Searching", "reliability": "Running reliability"}.get(
-            opts["analysis"], "Running")
+        verb = {"auto_search": "Searching"}.get(opts["analysis"], "Running")
         self.statusBar().showMessage(f"{verb} {opts['method']} …")
-        # Show a busy bar immediately; reliability switches it to determinate.
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
         self.cancel_btn.setEnabled(True)
@@ -1806,7 +1809,8 @@ class MainWindow(QMainWindow):
         self._runner.start()
 
     def _cancel_run(self):
-        runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner)
+        runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner,
+                                   self._rel_runner)
                        if r is not None and r.isRunning()), None)
         if runner is not None:
             runner.cancel()
@@ -1827,26 +1831,15 @@ class MainWindow(QMainWindow):
         self.doc.results["lem_solution"] = bundle
         if bundle.get("search"):
             self._show_search(bundle["search"])
-        if bundle.get("reliability"):
-            self._show_reliability(bundle["reliability"])
         if isinstance(bundle.get("results"), dict):
             self._show_solution(bundle)
         # Lead with the most specific result view produced by this run.
-        lead = (self.reliability_canvas if bundle.get("reliability")
-                else self.search_canvas if bundle.get("search")
-                else self.solution_canvas)
+        lead = (self.search_canvas if bundle.get("search") else self.solution_canvas)
         if lead is not None:
             self.view_tabs.setCurrentWidget(lead)
-        if bundle.get("reliability"):
-            r = bundle["reliability"]
-            self.statusBar().showMessage(
-                f"Reliability done — F_MLV = {r['F_MLV']:.3f}, "
-                f"reliability = {r['reliability'] * 100:.2f}%, "
-                f"Pf = {r['prob_failure'] * 100:.2f}%")
-        else:
-            res = bundle["results"]
-            self.statusBar().showMessage(
-                f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
+        res = bundle["results"]
+        self.statusBar().showMessage(
+            f"LEM done — {res.get('method')} FS = {res.get('FS'):.3f}")
 
     def _on_lem_failed(self, message):
         QMessageBox.warning(self, "LEM run failed", message)
@@ -1897,15 +1890,157 @@ class MainWindow(QMainWindow):
         self._rerender_reliability()
 
     def _rerender_reliability(self):
-        bundle = self.doc.results.get("lem_solution")
+        """Re-render the Taylor-series LEM reliability surface plot (fs_cache of the
+        MLV / F± surfaces). Only the LEM Taylor engine produces those surfaces."""
+        bundle = self.doc.results.get("reliability")
         rel = bundle.get("reliability") if bundle else None
         panel = self._display_panels.get(self.reliability_canvas)
-        if rel and panel and self.reliability_canvas is not None:
+        if (rel and panel and self.reliability_canvas is not None
+                and rel.get("fs_cache")):
             try:
                 self.reliability_canvas.render_reliability(
                     self.doc.slope_data, rel, panel.options(), style=self.doc.style or None)
             except Exception:
                 traceback.print_exc()
+
+    def _show_reliability_histogram(self):
+        if self.reliability_hist_canvas is None:
+            self.reliability_hist_canvas = MplCanvas(self)
+            self.view_tabs.insertTab(1, self.reliability_hist_canvas,
+                                     "Reliability · MC")
+            panel = ReliabilityMcDisplayPanel()
+            panel.changed.connect(self._rerender_reliability_histogram)
+            self.display_stack.addWidget(panel)
+            self._display_panels[self.reliability_hist_canvas] = panel
+        self._rerender_reliability_histogram()
+
+    def _rerender_reliability_histogram(self):
+        bundle = self.doc.results.get("reliability")
+        rel = bundle.get("reliability") if bundle else None
+        panel = self._display_panels.get(self.reliability_hist_canvas)
+        if (rel and panel and self.reliability_hist_canvas is not None
+                and rel.get("fs_samples") is not None):
+            try:
+                self.reliability_hist_canvas.render_reliability_histogram(
+                    rel, panel.options())
+            except Exception:
+                traceback.print_exc()
+
+    # --- reliability run -------------------------------------------------
+    def run_reliability(self):
+        """Open the Reliability dialog and start a probabilistic run (the sibling of
+        the Parametric study). LEM offers Taylor series / Monte Carlo; FEM offers the
+        Taylor series over SSRM solves."""
+        if not self.doc.is_open or self._rel_runner is not None:
+            return
+        if self._mode not in ("lem", "fem"):
+            return
+        if self._mode == "fem" and self.doc.slope_data.get("mesh") is None:
+            QMessageBox.warning(self, "No mesh",
+                                "Build a finite-element mesh first (Build Mesh…) — "
+                                "FEM reliability runs on the mesh.")
+            return
+        dlg = ReliabilityDialog(self, defaults=self._last_rel_opts.get(self._mode, {}),
+                                slope_data=self.doc.slope_data, app_mode=self._mode)
+        if not dlg.exec():
+            return
+        opts = dlg.options()
+        self._last_rel_opts[self._mode] = opts
+        self.act_reliability.setEnabled(False)
+        self.act_run.setEnabled(False)
+        eng = {"taylor": "Taylor series", "mc": "Monte Carlo"}.get(opts["engine"],
+                                                                   opts["engine"])
+        self.statusBar().showMessage(f"Reliability ({eng}) …")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
+        self._rel_runner = ReliabilityRunner(self.doc.slope_data, opts, parent=self)
+        self._rel_runner.succeeded.connect(self._on_rel_succeeded)
+        self._rel_runner.failed.connect(self._on_rel_failed)
+        self._rel_runner.cancelled.connect(self._on_rel_cancelled)
+        self._rel_runner.progress.connect(self._on_run_progress)
+        self._rel_runner.finished.connect(self._on_rel_finished)
+        self._update_run_actions()
+        self._rel_runner.start()
+
+    def _on_rel_succeeded(self, bundle):
+        self.doc.results["reliability"] = bundle
+        rel = bundle["reliability"]
+        engine = bundle.get("engine")
+        app_mode = bundle.get("app_mode")
+        if engine == "mc":
+            self._show_reliability_histogram()
+            lead = self.reliability_hist_canvas
+        elif app_mode == "fem":
+            # Reuse the FEM Data / Results views for the deformation at the mean values.
+            self.doc.results["fem_solution"] = {
+                "fem_data": bundle["fem_data"], "solution": bundle["solution"],
+                "FS": bundle["FS"], "analysis": "reliability", "reliability": rel}
+            self._show_fem_data(bundle["fem_data"])
+            self._show_fem_results()
+            lead = self.fem_results_canvas
+        else:  # LEM Taylor — the MLV / F± surface plot
+            self._show_reliability(rel)
+            lead = self.reliability_canvas
+        if lead is not None:
+            self.view_tabs.setCurrentWidget(lead)
+        self.statusBar().showMessage(self._reliability_status(rel, engine))
+        QMessageBox.information(self, "Reliability results",
+                                self._reliability_summary(rel, engine, app_mode))
+
+    def _on_rel_failed(self, message):
+        QMessageBox.warning(self, "Reliability run failed", message)
+        self.statusBar().showMessage("Reliability run failed.")
+
+    def _on_rel_cancelled(self):
+        self.statusBar().showMessage("Reliability run cancelled.")
+
+    def _on_rel_finished(self):
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.cancel_btn.setVisible(False)
+        if self._rel_runner is not None:
+            self._rel_runner.deleteLater()
+            self._rel_runner = None
+        self._update_run_actions()
+
+    @staticmethod
+    def _reliability_status(rel, engine):
+        if engine == "mc":
+            return (f"Reliability (MC) — mean FS = {rel['mean_FS']:.3f}, "
+                    f"β_ln = {rel['beta_ln']:.3f}, "
+                    f"Pf = {rel['pf_empirical'] * 100:.2f}%")
+        return (f"Reliability — F_MLV = {rel['F_MLV']:.3f}, "
+                f"β_ln = {rel['beta_ln']:.3f}, "
+                f"Pf = {rel['prob_failure'] * 100:.2f}%")
+
+    @staticmethod
+    def _reliability_summary(rel, engine, app_mode):
+        if engine == "mc":
+            return (
+                f"Monte Carlo ({rel.get('distribution', 'normal')}, "
+                f"{rel.get('n_valid')} of {rel.get('n_samples')} valid)\n\n"
+                f"mean FS = {rel['mean_FS']:.3f}\n"
+                f"σ_F = {rel['sigma_F']:.3f}    COV_F = {rel['COV_F']:.3f}\n"
+                f"β (normal) = {rel['beta_normal']:.3f}\n"
+                f"β (lognormal) = {rel['beta_ln']:.3f}\n"
+                f"Pf (empirical) = {rel['pf_empirical'] * 100:.2f}%\n"
+                f"Pf (normal) = {rel['pf_normal'] * 100:.2f}%    "
+                f"Pf (lognormal) = {rel['pf_lognormal'] * 100:.2f}%\n\n"
+                "The FS histogram is on the Reliability · MC tab; the per-parameter "
+                "table is in the Log pane.")
+        tag = "FEM (SSRM)" if app_mode == "fem" else "Taylor series (TSPM)"
+        extra = ("\n\nThe FEM Results view shows the deformation at the most-likely "
+                 "values." if app_mode == "fem" else "")
+        return (
+            f"{tag}\n\n"
+            f"F_MLV = {rel['F_MLV']:.3f}\n"
+            f"σ_F = {rel['sigma_F']:.3f}    COV_F = {rel['COV_F']:.3f}\n"
+            f"β (lognormal) = {rel['beta_ln']:.3f}\n"
+            f"Reliability = {rel['reliability'] * 100:.2f}%\n"
+            f"Probability of failure = {rel['prob_failure'] * 100:.2f}%"
+            + extra + "\n\nThe per-parameter ΔF table is in the Log pane.")
 
     def _show_solution(self, bundle):
         if self.solution_canvas is None:
@@ -2117,8 +2252,9 @@ class MainWindow(QMainWindow):
         """Drop result views (e.g. on opening another file) so they don't show
         stale results from the previous project."""
         single = ("mesh_canvas", "search_canvas", "solution_canvas",
-                  "reliability_canvas", "sens_canvas", "sens_curve_canvas",
-                  "design_canvas", "fem_data_canvas", "fem_results_canvas")
+                  "reliability_canvas", "reliability_hist_canvas", "sens_canvas",
+                  "sens_curve_canvas", "design_canvas", "fem_data_canvas",
+                  "fem_results_canvas")
         # The seep canvases are per-BC dicts; flatten them in with the rest.
         canvases = [getattr(self, a) for a in single]
         canvases += list(self.seep_data_canvas.values())

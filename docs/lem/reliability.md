@@ -19,6 +19,32 @@ where:
 
 In reliability analysis, we consider the uncertainties in the parameters that affect the stability of the slope. These uncertainties can arise from various sources, such as variations in soil properties, loading conditions, and environmental factors. By incorporating these uncertainties into our analysis, we can obtain a more comprehensive understanding of the slope's stability. The **xslope** package provides a function to calculate the reliability of a slope using the limit equilibrium method. This function takes into account the uncertainties in the soil properties ($\gamma$, $c$, $\phi$, etc.) and provides a probability of failure (Pf) and reliability (R) for the slope. It can be used with any of the limit equilibrium methods implemented in the package, such as Bishop's method, Janbu's method, or Spencer's method. It can also be combined with a rapid drawdown analysis.
 
+## The reliability family
+
+All of the methods described on this page are reached through a single front door:
+
+>>`reliability(slope_data, method, engine='taylor')`
+
+The `engine` argument selects the analysis engine. `engine='taylor'` (the default)
+runs the Taylor Series Probability Method; `engine='mc'` runs a Monte Carlo campaign.
+Because the default is the Taylor series, an existing call such as
+`reliability(slope_data, 'bishop')` keeps its exact meaning. The two engines are also
+public directly, under their own honest names, so a script can call whichever it wants:
+
+| Function | Method | Solver | Cost |
+|----------|--------|--------|------|
+| `reliability_taylor` | Taylor Series Probability Method | limit equilibrium | 1 + 2N searches |
+| `reliability_mc`     | Monte Carlo                      | limit equilibrium | N (≈ 10⁴) evaluations |
+| `reliability_fem`    | Taylor Series Probability Method | finite-element SSRM | 1 + 2N solves |
+
+`reliability_fem` is the finite-element counterpart of the Taylor series — each factor
+of safety comes from a strength-reduction (SSRM) solve rather than a limit-equilibrium
+search (see [Reliability Analysis (FEM)](../fem/reliability.md)). Monte Carlo is a
+limit-equilibrium path only, for the compute reason discussed under
+[Monte Carlo in xslope](#monte-carlo-in-xslope). All three engines read the *same*
+inputs — the material most-likely values and the standard-deviation columns of the mat
+sheet — so choosing an engine never changes the data you enter.
+
 ## Parameter Uncertainty
 
 In order to perform reliability analysis, we need to consider the uncertainties in the parameters that affect the stability of the slope. These parameters can include soil properties such as unit weight ($\gamma$), cohesion ($c$), and angle of internal friction ($\phi$). The uncertainties in these parameters can be represented using probability distributions, such as normal or lognormal distributions. Uncertainty is typically represented by a standard deviation or a coefficient of variation (COV), which is the ratio of the standard deviation to the mean. The standard deviation provides a measure of the spread of the parameter values, while the COV provides a measure of the relative variability of the parameter. The standard deviation is defined as:
@@ -222,6 +248,43 @@ The Taylor Series Probability Method (TSPM) is a more efficient approach for cal
 >>$\sigma_F = \sqrt{\left(\dfrac{\Delta F_1}{2} \right)^2 + \left(\dfrac{\Delta F_2}{2} \right)^2 + \ldots + \left(\dfrac{\Delta F_n}{2} \right)^2}$
 
 >>$COV_F = \dfrac{\sigma_F}{F_{MLV}}$
+
+## How commercial software does it
+
+xslope's two-engine split mirrors what the established geotechnical packages do, and
+the split falls along the solver, not the software. The commercial **limit-equilibrium**
+codes do reliability by direct **Monte Carlo**: Rocscience **Slide2** and GeoStudio
+**SLOPE/W** both sample the strength and pore-pressure inputs from user-specified
+distributions, evaluate the factor of safety of each realization, and report the
+probability of failure as the fraction of realizations with FoS < 1 — the same
+fixed-surface campaign as xslope's `reliability_mc`. Both offer **Latin Hypercube**
+sampling as a more efficient alternative to plain Monte Carlo (SLOPE/W added it in
+GeoStudio 2024.1), and Slide2 adds a machine-learning **response surface** to
+accelerate the sampling and a **spatial-variability** (random-field) mode
+([Slide2 Probabilistic Analysis](https://www.rocscience.com/help/slide2/documentation/slide-model/project-settings/statistics/probabilistic-analysis);
+[Advancing Slope Stability Analysis with Probabilistic Methods in Slide2 and Slide3](https://www.rocscience.com/learning/advancing-slope-stability-analysis-with-probabilistic-methods-in-slide2-and-slide3);
+[Stability Modeling with SLOPE/W (Seequent)](https://files.seequent.com/PDFs/Geostudio-Stability%20Modeling-Oct2022.pdf)).
+On the **finite-element** side the economics change — 10⁴ full FE solves is
+impractical — so the FE codes do *not* rely on brute-force sampling. Rocscience **RS2**
+offers the Rosenblueth **point-estimate method** (two point estimates per variable, at
+±1σ, explicitly recommended for problems with only a few random variables, ≈ 2–6), a
+**response-surface** method, and Monte Carlo / Latin Hypercube over that surface
+([RS2 Probabilistic Analysis](https://www.rocscience.com/help/rs2/documentation/rs2-model/project-settings/statistics/probabilistic-analysis)).
+**PLAXIS**'s reliability module likewise provides Monte Carlo, Latin Hypercube and an
+(alternative) point-estimate method with sensitivity analysis
+([New Developments in PLAXIS: Material Point Method and Reliability Analysis, TU Delft](https://research.tudelft.nl/en/publications/new-developments-in-plaxis-material-point-method-and-reliability-)).
+xslope's `reliability_fem` sits squarely in this point-estimate family: its 1 + 2N
+Taylor-series perturbation is a two-point-per-variable estimate of the factor-of-safety
+variance — the same economical strategy the FE vendors adopt in place of mass sampling.
+
+!!! note "Future: response-surface Monte Carlo over the FEM solves"
+    The 1 + 2N SSRM solves that `reliability_fem` already runs trace out a first-order
+    response surface of the factor of safety in the uncertain parameters. A natural
+    extension — recorded here, not yet built — is to fit that surface and run a Monte
+    Carlo campaign *on the surface* (thousands of samples, no additional finite-element
+    solves), yielding an empirical FEM probability of failure and a full FS
+    distribution. That is exactly the response-surface strategy RS2 exposes; it would
+    complement, not replace, the Taylor-series index.
 
 ## Data Input
 

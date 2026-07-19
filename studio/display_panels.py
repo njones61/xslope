@@ -226,6 +226,12 @@ class ReliabilityDisplayPanel(_CheckboxPanel):
     _WITH_LEGEND = True
 
 
+class ReliabilityMcDisplayPanel(_CheckboxPanel):
+    """Display options for the Monte Carlo reliability FS histogram: a toggle for
+    the fitted normal / lognormal overlays (plus the shared title/legend toggles)."""
+    _FIELDS = (("show_fits", "Fitted normal / lognormal overlays", True),)
+
+
 class InputsDisplayPanel(QWidget):
     """Display options for the Inputs view: the material-property table (and its
     placement) plus legend column layout."""

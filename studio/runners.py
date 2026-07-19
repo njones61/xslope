@@ -150,34 +150,7 @@ class FemRunner(QThread):
             fem_data = build_fem_data(sd, mesh)
             opts = self._options
             analysis = opts.get("analysis", "ssrm")
-            if analysis == "reliability":
-                from xslope.advanced import reliability_fem
-
-                def rel_cb(done, total, label):
-                    self.progress.emit(int(done), int(total) if total else -1, str(label))
-
-                print(f"Running FEM reliability (SSRM, F in "
-                      f"[{opts.get('F_min', 1.0):g}, {opts.get('F_max', 2.0):g}])…")
-                # Reliability uses its own tight bisection tolerance (the dialog's
-                # "Reliability tol" field, not the single-run "Tolerance"): TSPM
-                # amplifies FS imprecision, so a coarse band would make
-                # beta/reliability jitter between runs.
-                success, result = reliability_fem(
-                    sd, mesh=mesh, F_min=opts.get("F_min", 1.0),
-                    F_max=opts.get("F_max", 2.0),
-                    tolerance=opts.get("reliability_tol", 0.001),
-                    failure_criterion=opts.get("failure_criterion", "non_convergence"),
-                    debug_level=1, cancel_check=self._cancel.is_set,
-                    progress_callback=rel_cb)
-                if not success:
-                    self.failed.emit(f"Reliability failed: {result}")
-                    return
-                self.succeeded.emit({
-                    "fem_data": fem_data,
-                    "solution": result["mlv_solution"]["last_solution"],
-                    "FS": result["F_MLV"], "analysis": "reliability",
-                    "reliability": result})
-            elif analysis == "single":
+            if analysis == "single":
                 F = opts.get("F", 1.0)
                 print(f"Solving FEM (single trial, F={F:g})…")
 
@@ -273,9 +246,7 @@ class LemRunner(QThread):
     def run(self):
         from xslope.search import AnalysisCancelled
         try:
-            if self._analysis == "reliability":
-                self._run_reliability()
-            elif self._analysis == "auto_search":
+            if self._analysis == "auto_search":
                 self._run_search()
             else:
                 self._run_single()
@@ -373,42 +344,6 @@ class LemRunner(QThread):
         self.succeeded.emit({"slice_df": critical.get("slices"),
                              "failure_surface": critical.get("failure_surface"),
                              "results": results, "search": search})
-
-    # --- reliability -----------------------------------------------------
-    def _run_reliability(self):
-        from xslope.advanced import reliability
-
-        sd = self._sd
-        circular = self._surface == "circular"
-        if circular and not (sd.get("circular") and sd.get("circles")):
-            self.failed.emit("Reliability (circular) needs at least one starting circle.")
-            return
-        if not circular and not sd.get("non_circ"):
-            self.failed.emit("Reliability (non-circular) needs a starting "
-                             "non-circular surface.")
-            return
-        print(f"Running reliability — {self._method.upper()}, "
-              f"{'circular' if circular else 'non-circular'}{self._rapid_tag()}…")
-
-        def cb(done, total, label):
-            self.progress.emit(int(done), int(total) if total is not None else -1, str(label))
-
-        ok, result = reliability(sd, self._method, rapid=self._rapid, circular=circular,
-                                 debug_level=1 if self._diagnostic else 0,
-                                 progress_callback=cb, cancel_check=self._cancel.is_set,
-                                 fs_tol=self._fs_tol, tol=self._tol,
-                                 max_iter=self._max_iter, composite=self._composite,
-                                 seed=self._seed)
-        if not ok:
-            self.failed.emit(str(result))
-            return
-        # The MLV entry carries the standard solver_result for the Solution view.
-        mlv = result["fs_cache"][0]["result"] if result.get("fs_cache") else None
-        solver = mlv.get("solver_result") if isinstance(mlv, dict) else None
-        self.succeeded.emit({"reliability": result,
-                             "slice_df": result.get("critical_slices"),
-                             "failure_surface": result.get("critical_surface"),
-                             "results": solver, "search": None})
 
     def _rapid_tag(self):
         return " (rapid drawdown)" if self._rapid else ""
@@ -639,3 +574,123 @@ class SensitivityRunner(QThread):
               f"of {res.get('n_samples')} samples.")
         self.succeeded.emit({"kind": "sensitivity", "plot_type": "rank",
                              "rank": res, "method": method})
+
+
+class ReliabilityRunner(QThread):
+    """Runs a probabilistic reliability analysis off the GUI thread — the sibling
+    of ``SensitivityRunner`` for the Reliability toolbar button.
+
+    Dispatches on the dialog options:
+
+      * app_mode 'lem', engine 'taylor' -> ``reliability(engine='taylor')`` (TSPM).
+      * app_mode 'lem', engine 'mc'      -> ``reliability(engine='mc')`` (Monte Carlo).
+      * app_mode 'fem'                   -> ``reliability_fem`` (Taylor / SSRM).
+
+    Emits ``succeeded`` with a bundle ``{engine, app_mode, reliability, ...}``,
+    ``failed`` with a message, ``cancelled``, or ``progress``. The engines stream
+    their per-parameter tables to the Log pane via the stdout tee.
+    """
+
+    succeeded = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+    progress = Signal(int, int, str)   # done, total (-1 = indeterminate), label
+
+    def __init__(self, slope_data, options, parent=None):
+        super().__init__(parent)
+        self._sd = slope_data
+        self._opts = options
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
+
+    def run(self):
+        from xslope.search import AnalysisCancelled
+        try:
+            if self._opts.get("app_mode") == "fem":
+                self._run_fem()
+            elif self._opts.get("engine") == "mc":
+                self._run_mc()
+            else:
+                self._run_taylor()
+        except AnalysisCancelled:
+            print("Reliability run cancelled.")
+            self.cancelled.emit()
+        except Exception:
+            traceback.print_exc()   # streams to the Log pane via the stdout tee
+            self.failed.emit("Reliability run failed — see the Log pane for details.")
+
+    def _progress_cb(self):
+        def cb(done, total, label):
+            self.progress.emit(int(done), int(total) if total else -1, str(label))
+        return cb
+
+    def _run_taylor(self):
+        from xslope.reliability import reliability
+        o, sd = self._opts, self._sd
+        circular = o.get("surface", "circular") == "circular"
+        if circular and not (sd.get("circular") and sd.get("circles")):
+            self.failed.emit("Reliability (circular) needs at least one starting circle.")
+            return
+        if not circular and not sd.get("non_circ"):
+            self.failed.emit("Reliability (non-circular) needs a starting "
+                             "non-circular surface.")
+            return
+        print(f"Running Taylor-series reliability — {o['method'].upper()}, "
+              f"{'circular' if circular else 'non-circular'}"
+              f"{' (rapid drawdown)' if o.get('rapid') else ''}…")
+        ok, result = reliability(
+            sd, o["method"], engine="taylor", rapid=o.get("rapid", False),
+            circular=circular, search=o.get("search", True), debug_level=0,
+            progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(result))
+            return
+        self.succeeded.emit({"engine": "taylor", "app_mode": "lem",
+                             "reliability": result})
+
+    def _run_mc(self):
+        from xslope.reliability import reliability
+        o, sd = self._opts, self._sd
+        circular = o.get("surface", "circular") == "circular"
+        print(f"Running Monte Carlo reliability — {o['method'].upper()}, "
+              f"{o.get('n_samples')} samples, seed {o.get('rng_seed')}, "
+              f"{o.get('distribution', 'normal')}…")
+        ok, result = reliability(
+            sd, o["method"], engine="mc", rapid=o.get("rapid", False),
+            circular=circular, search=o.get("search", True),
+            n_samples=int(o.get("n_samples", 10000)),
+            rng_seed=int(o.get("rng_seed", 20240117)),
+            distribution=o.get("distribution", "normal"),
+            num_slices=int(o.get("num_slices", 40)), debug_level=0,
+            progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(result))
+            return
+        self.succeeded.emit({"engine": "mc", "app_mode": "lem",
+                             "reliability": result})
+
+    def _run_fem(self):
+        from xslope.reliability import reliability_fem
+        from xslope.fem import build_fem_data
+        o, sd = self._opts, self._sd
+        mesh = sd.get("mesh")
+        if mesh is None:
+            self.failed.emit("No mesh available — build a mesh first.")
+            return
+        print(f"Running FEM reliability (SSRM, F in "
+              f"[{o.get('F_min', 0.7):g}, {o.get('F_max', 2.0):g}])…")
+        ok, result = reliability_fem(
+            sd, mesh=mesh, F_min=o.get("F_min", 0.7), F_max=o.get("F_max", 2.0),
+            tolerance=o.get("reliability_tol", 0.001), debug_level=1,
+            progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(f"Reliability failed: {result}")
+            return
+        fem_data = build_fem_data(sd, mesh)
+        self.succeeded.emit({
+            "engine": "taylor", "app_mode": "fem", "reliability": result,
+            "fem_data": fem_data,
+            "solution": result["mlv_solution"]["last_solution"],
+            "FS": result["F_MLV"]})

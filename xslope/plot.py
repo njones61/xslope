@@ -3020,6 +3020,108 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
         plt.show()
     return fig
 
+
+def plot_reliability_histogram(result, figsize=(9, 5.5), bins='auto', show_fits=True,
+                               save_png=False, dpi=300, show_title=True,
+                               show_legend=True, fig=None, style=None):
+    """Histogram of the Monte Carlo factor-of-safety samples from
+    :func:`xslope.reliability.reliability_mc`.
+
+    Draws the distribution of FS over the admissible realizations, marks the
+    FS = 1 failure line and the sample mean, shades the FS < 1 (failure) tail, and
+    — when ``show_fits`` and the spread is well conditioned — overlays the fitted
+    normal and lognormal PDFs (method of moments on the sample mean/σ). The title
+    carries the mean FS, σ_F, both reliability-index conventions (β normal and β
+    lognormal) and the empirical probability of failure.
+
+    ``result`` is the dict returned by ``reliability_mc`` (it reads ``fs_samples``
+    and the summary statistics), or a bare array/sequence of FS samples.
+    """
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
+
+    # Accept either the reliability_mc result dict or a bare sample array.
+    if isinstance(result, dict):
+        samples = np.asarray(result.get('fs_samples', []), dtype=float)
+    else:
+        samples = np.asarray(result, dtype=float)
+        result = {}
+    fs = samples[np.isfinite(samples)]
+
+    if fs.size < 2:
+        ax.text(0.5, 0.5, "Not enough admissible Monte Carlo samples to plot.",
+                ha='center', va='center', transform=ax.transAxes)
+        ax.set_axis_off()
+        if own_fig:
+            plt.show()
+        return fig
+
+    # Prefer the engine's reported statistics; fall back to the samples themselves
+    # so a bare array still plots sensibly.
+    mean_FS = float(result.get('mean_FS', np.mean(fs)))
+    sigma_F = float(result.get('sigma_F', np.std(fs, ddof=1)))
+    beta_normal = result.get('beta_normal')
+    beta_ln = result.get('beta_ln')
+    pf = result.get('pf_empirical', result.get('prob_failure'))
+    if pf is None:
+        pf = float(np.count_nonzero(fs < 1.0)) / fs.size
+
+    ax.hist(fs, bins=bins, density=True, color='#4c78a8', alpha=0.75,
+            edgecolor='white', linewidth=0.4, label='FS samples')
+
+    # Shade the FS < 1 (failure) tail and mark the failure line + mean.
+    ax.axvspan(min(fs.min(), 1.0), 1.0, color='#d62728', alpha=0.06, zorder=0)
+    ax.axvline(1.0, color='#d62728', linewidth=1.6, linestyle='-',
+               label='FS = 1 (failure)')
+    ax.axvline(mean_FS, color='black', linewidth=1.3, linestyle='--',
+               label=f'mean FS = {mean_FS:.3f}')
+
+    # Fitted normal / lognormal overlays (method of moments), guarded against a
+    # degenerate spread or a non-positive mean (lognormal only).
+    if show_fits and sigma_F > 0:
+        from scipy.stats import norm as _norm, lognorm as _lognorm
+        xs = np.linspace(fs.min(), fs.max(), 400)
+        ax.plot(xs, _norm.pdf(xs, mean_FS, sigma_F), color='#f58518', lw=1.8,
+                label='normal fit')
+        if mean_FS > 0:
+            s_ln = np.sqrt(np.log(1.0 + (sigma_F / mean_FS) ** 2))
+            scale = mean_FS / np.sqrt(1.0 + (sigma_F / mean_FS) ** 2)
+            ax.plot(xs, _lognorm.pdf(xs, s_ln, scale=scale), color='#54a24b',
+                    lw=1.8, linestyle='--', label='lognormal fit')
+
+    ax.set_xlabel('Factor of Safety')
+    ax.set_ylabel('Probability density')
+    ax.grid(True, axis='y', alpha=0.3)
+
+    if show_title:
+        bits = [f"mean FS = {mean_FS:.3f}", f"$\\sigma_F$ = {sigma_F:.3f}"]
+        beta_bits = []
+        if beta_normal is not None and np.isfinite(beta_normal):
+            beta_bits.append(f"$\\beta_{{normal}}$ = {beta_normal:.3f}")
+        if beta_ln is not None and np.isfinite(beta_ln):
+            beta_bits.append(f"$\\beta_{{ln}}$ = {beta_ln:.3f}")
+        line2 = ", ".join(beta_bits + [f"$P_f$ = {pf * 100:.2f}%"])
+        n_txt = ""
+        if result.get('n_valid') is not None:
+            n_txt = f"   (n = {result.get('n_valid')})"
+        ax.set_title("Monte Carlo Reliability — FS distribution\n"
+                     + ", ".join(bits) + n_txt + "\n" + line2)
+
+    if show_legend:
+        ax.legend(loc='best', fontsize=8, framealpha=0.9)
+
+    fig.tight_layout()
+    if save_png:
+        fig.savefig('plot_reliability_histogram.png', dpi=dpi, bbox_inches='tight')
+    if own_fig:
+        plt.show()
+    return fig
+
+
 def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Plot the finite element mesh with material regions.

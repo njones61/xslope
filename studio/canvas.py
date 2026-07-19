@@ -240,6 +240,14 @@ class MplCanvas(QWidget):
             slope_data, reliability_data,
             legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig, style=style))
 
+    def render_reliability_histogram(self, reliability_data, opts=None, style=None):
+        opts = opts or {}
+        from xslope.plot import plot_reliability_histogram
+        self._draw(lambda fig: plot_reliability_histogram(
+            reliability_data, show_fits=opts.get("show_fits", True),
+            show_title=opts.get("show_title", True),
+            show_legend=opts.get("show_legend", True), fig=fig, style=style), dxf=False)
+
     def render_mesh(self, mesh, materials=None, opts=None, style=None):
         opts = opts or {}
         self._draw(lambda fig: plot_mesh(

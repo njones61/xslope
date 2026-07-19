@@ -18,7 +18,9 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
 
 - **Method** — OMS, Bishop, Janbu, Corps of Engineers, Lowe & Karafiath, Spencer,
   or Morgenstern–Price.
-- **Analysis** — single surface, automated search, or reliability.
+- **Analysis** — single surface or automated search. (Probabilistic
+  **reliability** analysis has its own toolbar button — see
+  [Reliability analysis](#reliability-analysis) below.)
 - **Surface** — circular or non-circular (shown only when the file has both).
 - **Number of slices**, the **rapid drawdown** flag, and a **diagnostic** toggle.
 - **Composite surfaces** — lets a circle deeper than the bottom of the model be
@@ -32,7 +34,7 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
 - **Grid search** — seeds the circular search from an automatic
   grid-and-tangent sweep instead of (only) the circles sheet (see
   [Grid Seeding](../lem/search.md#grid-seeding-global-search)). Off by default,
-  available for circular auto-search and reliability. Turn it on to protect
+  available for circular auto-search. Turn it on to protect
   against the local-minimum trap of a single starting circle — a seed in the
   wrong family can converge 20% or more too high with no warning — or when you
   have no idea where the critical circle is (the circles sheet may even be
@@ -47,7 +49,6 @@ The result depends on the analysis type:
 | --- | --- |
 | **Single surface** | **LEM · Solution** — the surface with slices, base stresses, and thrust line. |
 | **Automated search** | **LEM · Search** (all trial surfaces + critical + search path) *and* **LEM · Solution** (the critical surface). |
-| **Reliability** | **LEM · Reliability** plus the **Solution** for the most-likely-value surface. A determinate progress bar tracks the `1 + 2N` searches. |
 
 ![LEM Search view](images/analysis_lem_search.png)
 
@@ -67,10 +68,8 @@ Warnings](../lem/spencer.md#interpreting-the-admissibility-warnings). A clean
 solution shows no strip.
 
 Both circular and non-circular surfaces are supported for single solves and
-searches. Search iteration progress streams to the Log pane, and a search (or a
-reliability run) can be **cancelled** from the status bar.
-
-![LEM Reliability view](images/analysis_lem_reliability.png)
+searches. Search iteration progress streams to the Log pane, and a search can be
+**cancelled** from the status bar.
 
 ---
 
@@ -188,6 +187,58 @@ set and convergence tolerance, with the design target a discharge **q** rather t
 ![Parametric dialog in FEM mode](images/analysis_sensitivity_dialog_fem.png)
 
 ![Parametric dialog in Seepage mode](images/analysis_sensitivity_dialog_seep.png)
+
+---
+
+## Reliability analysis
+
+A **Reliability…** button sits beside **Parametric…** on the **Run menu** and the
+**toolbar** — its probabilistic sibling. Where the Parametric study answers
+deterministic what-ifs, Reliability turns the material standard deviations (the
+`s(·)` columns of the mat sheet) into a reliability index **β** and a **probability
+of failure**. It is available in **LEM** and **FEM** modes (not Seepage); the FEM run
+needs a built mesh, like Run.
+
+The dialog offers a **Method** selector with two engines:
+
+![Reliability dialog (LEM)](images/analysis_reliability_dialog_lem.png)
+
+- **Taylor series (TSPM)** — the mean-value factor of safety plus a ±σ perturbation
+  of each uncertain parameter (`1 + 2N` solves). Available in both modes; in **FEM**
+  each factor of safety comes from an SSRM solve.
+- **Monte Carlo** — samples every uncertain parameter and evaluates the factor of
+  safety of each realization on a fixed surface, reported as an FS histogram. Monte
+  Carlo needs ~10⁴ solves, which is affordable with a limit-equilibrium solve but not
+  with the finite-element SSRM, so it is **disabled in FEM mode** (a one-line note
+  explains why, and FEM reliability stays on the Taylor series):
+
+![Reliability dialog (FEM)](images/analysis_reliability_dialog_fem.png)
+
+Below the engine controls, a read-only **Standard deviations in this file** summary
+lists every `s(·)` column with its value, σ, and COV, so you can confirm what the run
+will vary. **LEM** adds the solver method, surface, slice count, rapid-drawdown flag,
+and a *search the critical surface at the mean values* toggle; **Monte Carlo** adds an
+**MC samples** count, a **seed** (fixed by default, so the result is reproducible), and
+a normal / lognormal **distribution** choice. **FEM** shows the SSRM `F_min` / `F_max`
+bracket and a tight reliability tolerance. Settings are remembered for the session.
+
+The run reports β, the probability of failure, and the mean / σ of the factor of
+safety in a summary, with the per-parameter table in the Log pane. The result view
+follows the engine:
+
+| Engine | Result tab |
+| --- | --- |
+| **Taylor series (LEM)** | **LEM · Reliability** — the most-likely-value surface with the F⁺/F⁻ perturbation surfaces. |
+| **Monte Carlo (LEM)** | **Reliability · MC** — the FS histogram with the FS = 1 line, the mean, and fitted normal / lognormal overlays (a display-panel toggle). β in both conventions and the probability of failure are in the title. |
+| **Taylor series (FEM)** | **FEM · Results** — the deformation at the most-likely values; β and the probability of failure are in the run summary. |
+
+![LEM Reliability view](images/analysis_lem_reliability.png)
+
+![Monte Carlo reliability histogram](images/analysis_reliability_mc_histogram.png)
+
+The engines are the same ones the library exposes — `reliability` (the front door),
+`reliability_taylor`, `reliability_mc`, and `reliability_fem`; see
+[Reliability Analysis](../lem/reliability.md) for the theory and worked examples.
 
 ---
 

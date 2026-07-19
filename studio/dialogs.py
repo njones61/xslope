@@ -2,8 +2,9 @@
 
 ``RunLemDialog`` collects the options for an LEM solve: method, number of slices,
 analysis type (single surface / auto-search), surface type (circular /
-non-circular), rapid drawdown, and a diagnostic-output toggle. Reliability is the
-remaining analysis type (next increment).
+non-circular), rapid drawdown, and a diagnostic-output toggle. Probabilistic
+reliability analysis has its own dialog (``ReliabilityDialog``), a sibling of the
+Parametric study rather than an LEM/FEM run option.
 """
 
 from __future__ import annotations
@@ -26,8 +27,7 @@ LEM_METHODS = [
     ("mprice", "Morgenstern-Price"),
 ]
 
-ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search"),
-                  ("reliability", "Reliability")]
+ANALYSIS_TYPES = [("single_surface", "Single surface"), ("auto_search", "Auto search")]
 SURFACE_TYPES = [("circular", "Circular"), ("noncircular", "Non-circular")]
 
 MESH_ELEMENT_TYPES = [
@@ -39,8 +39,7 @@ MESH_ELEMENT_TYPES = [
 ]
 
 
-FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)"),
-                      ("reliability", "Reliability")]
+FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
 FEM_FAILURE_CRITERIA = [
     ("non_convergence", "Non-convergence"),
     ("displacement_limit", "Displacement limit"),
@@ -104,7 +103,7 @@ class RunFemDialog(QDialog):
                              if n in self._material_names]
 
         layout = QVBoxLayout(self)
-        # Fit the dialog to its content so showing/hiding the reliability note
+        # Fit the dialog to its content so showing/hiding the min-slip and SSR rows
         # resizes the window instead of squeezing the fields.
         from PySide6.QtWidgets import QLayout
         layout.setSizeConstraint(QLayout.SetFixedSize)
@@ -141,17 +140,6 @@ class RunFemDialog(QDialog):
         self.tolerance.setRange(0.0001, 1.0)
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
         form.addRow("Tolerance (SSRM)", self.tolerance)
-
-        self.reliability_tol = QDoubleSpinBox()
-        self.reliability_tol.setDecimals(4)
-        self.reliability_tol.setRange(0.0001, 0.1)
-        self.reliability_tol.setSingleStep(0.0005)
-        self.reliability_tol.setValue(float(defaults.get("reliability_tol", 0.001)))
-        self.reliability_tol.setToolTip(
-            "Bisection tolerance for the reliability SSRM solves — tighter than a "
-            "single run (default 0.001). TSPM amplifies factor-of-safety "
-            "imprecision, so a tight tolerance keeps the reliability index stable.")
-        form.addRow("Tolerance (Reliability)", self.reliability_tol)
 
         self.failure_criterion = QComboBox()
         for key, label in FEM_FAILURE_CRITERIA:
@@ -204,16 +192,6 @@ class RunFemDialog(QDialog):
         self._refresh_ssr_label()
 
         layout.addLayout(form)
-        self._rel_note = QLabel(
-            "Reliability uses the bracket above only to find the most-likely-value "
-            "factor of safety; the ±σ perturbations then auto-bracket around it. It "
-            "uses the material standard deviations (sigma columns) and runs 1+2N "
-            "SSRM solves at Tolerance (Reliability).")
-        self._rel_note.setWordWrap(True)
-        # Cap the note to the form's width so it wraps (grows taller) instead of
-        # widening the whole dialog under the SetFixedSize constraint.
-        self._rel_note.setMaximumWidth(form.sizeHint().width())
-        layout.addWidget(self._rel_note)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText("Run")
@@ -228,16 +206,12 @@ class RunFemDialog(QDialog):
     def _sync_enabled(self):
         a = self.analysis.currentData()
         single = a == "single"
-        # Single: only F. SSRM: F_min/F_max + the single-run tolerance. Reliability:
-        # the bracket (used ONLY to find F_MLV — the perturbations auto-centre on it)
-        # plus its own tighter tolerance; the single-run Tolerance does not apply.
+        # Single: only F. SSRM: F_min/F_max + the single-run tolerance.
         self.F.setEnabled(single)
         self.F_min.setEnabled(not single)
         self.F_max.setEnabled(not single)
         self.failure_criterion.setEnabled(not single)
         self.tolerance.setEnabled(a == "ssrm")
-        self.reliability_tol.setEnabled(a == "reliability")
-        self._rel_note.setVisible(a == "reliability")   # note only applies to reliability
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())
@@ -264,7 +238,6 @@ class RunFemDialog(QDialog):
             "F_min": self.F_min.value(),
             "F_max": self.F_max.value(),
             "tolerance": self.tolerance.value(),
-            "reliability_tol": self.reliability_tol.value(),
             "failure_criterion": self.failure_criterion.currentData(),
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()
@@ -577,7 +550,7 @@ class RunLemDialog(QDialog):
         return self._fixed_surface or self.surface.currentData()
 
     def _sync_tols(self):
-        is_search = self.analysis.currentData() in ("auto_search", "reliability")
+        is_search = self.analysis.currentData() == "auto_search"
         self.tol_group.setEnabled(is_search)
         circular = self._surface_value() == "circular"
         # Geometric tol applies to circular search only.
@@ -593,11 +566,9 @@ class RunLemDialog(QDialog):
         if not circular:
             self.composite.setChecked(False)
         # The surficial-failure filter rejects too-shallow trials, so it only has
-        # meaning for the auto-search (single-surface just evaluates the given
-        # surface; the reliability path does not thread it through).
-        auto_search = self.analysis.currentData() == "auto_search"
-        self.min_slip_on.setEnabled(auto_search)
-        self.min_slip_depth.setEnabled(auto_search and self.min_slip_on.isChecked())
+        # meaning for the auto-search (single-surface just evaluates the given surface).
+        self.min_slip_on.setEnabled(is_search)
+        self.min_slip_depth.setEnabled(is_search and self.min_slip_on.isChecked())
 
     def options(self):
         return {
@@ -1148,6 +1119,235 @@ class SensitivityDialog(QDialog):
         if idx >= 0:
             combo.setCurrentIndex(idx)
         return combo
+
+
+RELIABILITY_ENGINES = [("taylor", "Taylor series (TSPM)"),
+                       ("mc", "Monte Carlo")]
+MC_DISTRIBUTIONS = [("normal", "Normal"), ("lognormal", "Lognormal")]
+
+
+class ReliabilityDialog(QDialog):
+    """Probabilistic reliability analysis — the sibling of the Parametric study.
+
+    Where the Parametric study answers deterministic what-ifs, this dialog turns
+    the material standard deviations (the ``s(·)`` columns of the mat sheet) into a
+    reliability index and a probability of failure. It offers two engines:
+
+    - **Taylor series (TSPM)** — ``1 + 2N`` limit-equilibrium searches (or FEM SSRM
+      solves in FEM mode): the mean-value factor of safety plus a ±σ perturbation
+      per uncertain parameter.
+    - **Monte Carlo** — ``N`` sampled realizations of every uncertain parameter,
+      each evaluated on a fixed failure surface, reported as an FS histogram. Monte
+      Carlo needs ~10⁴ factor-of-safety evaluations, which is affordable with a
+      limit-equilibrium solve but not with the finite-element SSRM, so it is
+      disabled in FEM mode (FEM reliability stays on the Taylor series).
+
+    A read-only summary lists the file's σ columns so the user can confirm what the
+    analysis will vary before running.
+    """
+
+    def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem"):
+        super().__init__(parent)
+        self.app_mode = "fem" if app_mode == "fem" else "lem"
+        self.setWindowTitle("Reliability analysis"
+                            + (" (FEM · SSRM)" if self.app_mode == "fem" else " (LEM)"))
+        defaults = defaults or {}
+        slope_data = slope_data or {}
+
+        from xslope.sensitivity import list_params
+        params = list_params(slope_data, mode="lem")
+        self._sigma_params = [e for e in params if e.get("sigma")]
+        self._has_sigma = bool(self._sigma_params)
+
+        layout = QVBoxLayout(self)
+        from PySide6.QtWidgets import QLayout
+        layout.setSizeConstraint(QLayout.SetFixedSize)
+        form = QFormLayout()
+
+        # --- engine (method) selector --------------------------------------
+        self.engine = QComboBox()
+        for key, label in RELIABILITY_ENGINES:
+            self.engine.addItem(label, key)
+        # Monte Carlo is limit-equilibrium only; grey it out in FEM mode.
+        if self.app_mode == "fem":
+            mc_idx = self.engine.findData("mc")
+            item = self.engine.model().item(mc_idx)
+            item.setEnabled(False)
+            item.setToolTip("Monte Carlo needs ~10^4 solves — limit-equilibrium only.")
+        want = defaults.get("engine", "taylor")
+        if self.app_mode == "fem":
+            want = "taylor"
+        eidx = self.engine.findData(want)
+        if eidx >= 0:
+            self.engine.setCurrentIndex(eidx)
+        form.addRow("Method", self.engine)
+
+        self._mc_disabled_note = QLabel(
+            "Monte Carlo is disabled for FEM — ~10⁴ SSRM solves is prohibitive; FEM "
+            "reliability uses the Taylor series.")
+        self._mc_disabled_note.setWordWrap(True)
+        self._mc_disabled_note.setVisible(self.app_mode == "fem")
+
+        # --- LEM solver + surface (LEM mode only) --------------------------
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        if self.app_mode == "lem":
+            form.addRow("LEM method", self.method)
+
+        has_circ = bool(slope_data.get("circular") and slope_data.get("circles"))
+        has_ncirc = bool(slope_data.get("non_circ"))
+        if self.app_mode == "lem":
+            if has_circ != has_ncirc:                  # exactly one defined
+                self._fixed_surface = "circular" if has_circ else "noncircular"
+                self.surface = None
+                form.addRow("Surface", QLabel(dict(SURFACE_TYPES)[self._fixed_surface]))
+            else:
+                self._fixed_surface = None
+                self.surface = self._combo(SURFACE_TYPES,
+                                           defaults.get("surface", "circular"))
+                form.addRow("Surface", self.surface)
+        else:
+            self._fixed_surface = None
+            self.surface = None
+
+        self.num_slices = QSpinBox()
+        self.num_slices.setRange(5, 500)
+        self.num_slices.setValue(int(defaults.get("num_slices", 40)))
+        if self.app_mode == "lem":
+            form.addRow("Number of slices", self.num_slices)
+
+        self.rapid = QCheckBox("Rapid drawdown")
+        self.rapid.setChecked(bool(defaults.get("rapid", False)))
+        if self.app_mode == "lem":
+            form.addRow("", self.rapid)
+
+        self.search = QCheckBox("Search the critical surface at the mean values")
+        self.search.setChecked(bool(defaults.get("search", True)))
+        self.search.setToolTip(
+            "On (default): find the critical surface at the most-likely (mean) values, "
+            "then hold it fixed while the parameters vary.\n\n"
+            "Off: evaluate the entered circle / non-circular surface as-is.")
+        if self.app_mode == "lem":
+            form.addRow("", self.search)
+
+        # --- Monte Carlo controls (LEM only) -------------------------------
+        self.n_samples = QSpinBox()
+        self.n_samples.setRange(100, 500000)
+        self.n_samples.setSingleStep(1000)
+        self.n_samples.setValue(int(defaults.get("n_samples", 10000)))
+        self.n_samples.setToolTip("Number of sampled realizations (10000 by default).")
+        self.seed = QSpinBox()
+        self.seed.setRange(0, 2_000_000_000)
+        self.seed.setValue(int(defaults.get("rng_seed", 20240117)))
+        self.seed.setToolTip("Random seed — a fixed value makes the run reproducible.")
+        self.distribution = self._combo(MC_DISTRIBUTIONS,
+                                        defaults.get("distribution", "normal"))
+        if self.app_mode == "lem":
+            form.addRow("MC samples", self.n_samples)
+            form.addRow("MC seed", self.seed)
+            form.addRow("MC distribution", self.distribution)
+
+        # --- FEM SSRM bracket + tolerance (FEM only) -----------------------
+        self.f_min = QDoubleSpinBox()
+        self.f_min.setRange(0.1, 10.0)
+        self.f_min.setSingleStep(0.05)
+        self.f_min.setValue(float(defaults.get("F_min", 0.7)))
+        self.f_max = QDoubleSpinBox()
+        self.f_max.setRange(0.1, 20.0)
+        self.f_max.setSingleStep(0.05)
+        self.f_max.setValue(float(defaults.get("F_max", 2.0)))
+        self.reliability_tol = QDoubleSpinBox()
+        self.reliability_tol.setDecimals(4)
+        self.reliability_tol.setRange(0.0001, 0.1)
+        self.reliability_tol.setSingleStep(0.0005)
+        self.reliability_tol.setValue(float(defaults.get("reliability_tol", 0.001)))
+        self.reliability_tol.setToolTip(
+            "Bisection tolerance for the reliability SSRM solves — tighter than a "
+            "single run (default 0.001). TSPM amplifies factor-of-safety imprecision, "
+            "so a tight tolerance keeps the reliability index stable.")
+        if self.app_mode == "fem":
+            form.addRow("F min (SSRM)", self.f_min)
+            form.addRow("F max (SSRM)", self.f_max)
+            form.addRow("Tolerance (SSRM)", self.reliability_tol)
+
+        layout.addLayout(form)
+        if self.app_mode == "fem":
+            layout.addWidget(self._mc_disabled_note)
+
+        # --- read-only σ summary -------------------------------------------
+        sigma_box = QGroupBox("Standard deviations in this file")
+        sform = QVBoxLayout(sigma_box)
+        if self._has_sigma:
+            for e in self._sigma_params:
+                val, sig = e.get("value"), e.get("sigma")
+                cov = (f"  (COV {sig / val * 100:.0f}%)"
+                       if val not in (None, 0) else "")
+                lbl = QLabel(f"• {e['ref']} = {('' if val is None else f'{val:g}')} "
+                             f"± {sig:g}{cov}")
+                sform.addWidget(lbl)
+        else:
+            warn = QLabel("No standard deviations (s-columns) are set in the mat "
+                          "sheet — reliability needs at least one.")
+            warn.setWordWrap(True)
+            sform.addWidget(warn)
+        layout.addWidget(sigma_box)
+
+        note = QLabel(
+            "Reliability turns the σ columns into a reliability index β and a "
+            "probability of failure. The Taylor series runs 1+2N solves; Monte Carlo "
+            "samples the σ's and reports an FS histogram.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self._ok = bb.button(QDialogButtonBox.Ok)
+        self._ok.setText("Run")
+        self._ok.setEnabled(self._has_sigma)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+        self.engine.currentIndexChanged.connect(self._sync_enabled)
+        self._sync_enabled()
+
+    @staticmethod
+    def _combo(items, selected):
+        combo = QComboBox()
+        for key, label in items:
+            combo.addItem(label, key)
+        idx = combo.findData(selected)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        return combo
+
+    def _engine_value(self):
+        return self.engine.currentData()
+
+    def _surface_value(self):
+        return self._fixed_surface or (self.surface.currentData()
+                                       if self.surface is not None else "circular")
+
+    def _sync_enabled(self):
+        mc = self._engine_value() == "mc" and self.app_mode == "lem"
+        # Monte Carlo controls only matter for the MC engine.
+        for w in (self.n_samples, self.seed, self.distribution):
+            w.setEnabled(mc)
+
+    def options(self):
+        return {
+            "engine": self._engine_value(),
+            "app_mode": self.app_mode,
+            "method": self.method.currentData(),
+            "surface": self._surface_value(),
+            "num_slices": self.num_slices.value(),
+            "rapid": self.rapid.isChecked(),
+            "search": self.search.isChecked(),
+            "n_samples": self.n_samples.value(),
+            "rng_seed": self.seed.value(),
+            "distribution": self.distribution.currentData(),
+            "F_min": self.f_min.value(),
+            "F_max": self.f_max.value(),
+            "reliability_tol": self.reliability_tol.value(),
+        }
 
 
 # Import targets shown in the wizard (label, cad.DXF_TARGETS key). "Ignore" first

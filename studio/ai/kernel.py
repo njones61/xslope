@@ -91,6 +91,15 @@ class PythonKernel:
         - ``parametric_back_analysis(param, low, high, target_fs=1.0, ...)`` — forensic
           back-analysis: the value that makes the slope limiting (FS = 1.0), i.e.
           ``design_sweep`` framed for a failure investigation.
+
+        The Reliability family (probabilistic; turns the σ columns into β / P_f):
+
+        - ``reliability_taylor(method='bishop', ...)`` — Taylor Series Probability
+          Method (1+2N solves); renders the MLV / F± surface plot.
+        - ``reliability_mc(method='bishop', n_samples=..., ...)`` — Monte Carlo
+          sampling on a fixed surface; renders the FS histogram.
+        - ``reliability(method='bishop', engine='taylor'|'mc')`` — the front door
+          (kept under the plain name for back-compat).
         """
         doc = self._doc
 
@@ -476,12 +485,84 @@ class PythonKernel:
         # back-compatible alias (older skill recipes and saved snippets call it).
         parametric_design = design_sweep
 
+        def reliability_taylor(method="bishop", rapid=False, circular=True,
+                               search=True, plot=True, slope_data=None, **kwargs):
+            """Taylor Series Probability Method (TSPM) reliability — the probabilistic
+            counterpart to the deterministic Parametric study.
+
+            Turns the material standard deviations (the s(·) columns) into a
+            reliability index and probability of failure by ``1 + 2N`` limit-
+            equilibrium analyses: the factor of safety at the most-likely values, then
+            a ±σ perturbation of every uncertain parameter. Thin wrapper over
+            `xslope.reliability.reliability_taylor`. `method` is any LEM solver; extra
+            keyword arguments (e.g. `fs_tol`, `tol`, `max_iter`, `composite`, `seed`)
+            pass straight through. Renders the MLV / F± surface plot when `plot=True`.
+            Returns the reliability result dict (`F_MLV`, `sigma_F`, `COV_F`,
+            `beta_ln`, `reliability`, `prob_failure`, `param_info`, …).
+            """
+            from xslope.reliability import reliability_taylor as _rt
+            from xslope.plot import plot_reliability_results
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            ok, res = _rt(sd, method, rapid=rapid, circular=circular, search=search,
+                          **kwargs)
+            if not ok:
+                raise RuntimeError(res)
+            if plot and res.get("fs_cache"):
+                plot_reliability_results(sd, res, fig=plt.figure(figsize=(11, 6)))
+            return res
+
+        def reliability_mc(method="bishop", n_samples=None, rng_seed=None,
+                           distribution="normal", rapid=False, circular=True,
+                           search=True, num_slices=40, plot=True, slope_data=None,
+                           **kwargs):
+            """Monte Carlo reliability — draws `n_samples` realizations of every
+            uncertain parameter from its standard deviation, evaluates the factor of
+            safety of each on a FIXED failure surface, and reports the sample
+            statistics and an FS histogram (limit-equilibrium only). Thin wrapper over
+            `xslope.reliability.reliability_mc`. `rng_seed` is a fixed constant by
+            default (reproducible). Renders the FS histogram when `plot=True`. Returns
+            the result dict (`mean_FS`, `sigma_F`, `beta_normal`, `beta_ln`,
+            `pf_empirical`, `fs_samples`, …).
+            """
+            from xslope.reliability import reliability_mc as _rmc
+            from xslope.plot import plot_reliability_histogram
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            kw = dict(kwargs)
+            if n_samples is not None:
+                kw["n_samples"] = int(n_samples)
+            if rng_seed is not None:
+                kw["rng_seed"] = int(rng_seed)
+            ok, res = _rmc(sd, method, rapid=rapid, circular=circular, search=search,
+                           distribution=distribution, num_slices=num_slices, **kw)
+            if not ok:
+                raise RuntimeError(res)
+            if plot:
+                plot_reliability_histogram(res, fig=plt.figure(figsize=(9, 5.5)))
+            return res
+
+        def reliability(method="bishop", engine="taylor", **kwargs):
+            """Front door to the reliability family (mirrors
+            `xslope.reliability.reliability`): `engine='taylor'` (default) runs the
+            Taylor Series Probability Method, `engine='mc'` runs Monte Carlo. Kept
+            under the plain name for back-compat; prefer `reliability_taylor` /
+            `reliability_mc` directly.
+            """
+            if str(engine).lower().replace("-", "_") in ("mc", "monte_carlo",
+                                                          "montecarlo"):
+                return reliability_mc(method=method, **kwargs)
+            return reliability_taylor(method=method, **kwargs)
+
         return {"run_lem": run_lem, "resync_geometry": resync_geometry,
                 "sensitivity": sensitivity, "list_params": list_params,
                 "design_sweep": design_sweep,
                 "parametric_sweep": parametric_sweep,
                 "parametric_design": parametric_design,
-                "parametric_back_analysis": parametric_back_analysis}
+                "parametric_back_analysis": parametric_back_analysis,
+                "reliability": reliability,
+                "reliability_taylor": reliability_taylor,
+                "reliability_mc": reliability_mc}
 
     @staticmethod
     def _normalize(code):

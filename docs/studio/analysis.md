@@ -80,7 +80,7 @@ and the main **toolbar**, in all three modes (LEM, Seepage, FEM). It is availabl
 a model is open — in Seepage and FEM mode it additionally needs a built mesh, exactly like
 Run — and is disabled while another analysis is running. Every version of it drives the
 same sweep engine as the library — see
-[Parametric Studies](../lem/sensitivity.md) for the engine, and the
+[Parametric Studies](../parametric/index.md) for the engine, and the
 [`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
 
 One dialog covers three study modes, chosen by its **Mode** selector — **Sensitivity**,
@@ -100,7 +100,7 @@ model carries reliability standard deviations — a **variance Pareto** and a **
 correlation** (with an **MC samples** count). The tornado, scaled, and spider plots sweep the
 parameters listed in the table; the variance and rank plots instead use every σ-carrying
 material automatically. The plots themselves are shown, with worked examples, on the
-[Parametric Studies](../lem/sensitivity.md#sensitivity-plots) engine page.
+[Sensitivity](../parametric/sensitivity.md#sensitivity-plots) engine page.
 
 ![Sensitivity dialog](images/analysis_sensitivity_dialog.png)
 
@@ -153,7 +153,7 @@ critical-surface jump drawn as an open circle):
 
 The other plot types render into the same **Sensitivity** tab — the scaled-sensitivity bars,
 the spider plot, the variance-contribution Pareto, and the Monte Carlo rank-correlation bars
-(the [Parametric Studies](../lem/sensitivity.md#sensitivity-plots) page shows each with a
+(the [Sensitivity](../parametric/sensitivity.md#sensitivity-plots) page shows each with a
 worked example). The double-click click-through is a tornado affordance; the other plots do
 not offer it.
 
@@ -167,7 +167,7 @@ same tab, with the target at FS = 1.0):
 When the swept range never reaches the target, the result is honest about it: no crossing is
 drawn, and an amber note reports the FS span and which way to widen the range — the GUI face
 of the engine's
-[never-extrapolate discipline](../lem/sensitivity.md#design-mode-finding-the-value-that-hits-a-target-fs):
+[never-extrapolate discipline](../parametric/design.md#honest-about-misses):
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
 

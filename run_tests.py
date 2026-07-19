@@ -732,7 +732,7 @@ def run_fem_elements_test(test):
 
 
 def run_sensitivity_test(test):
-    """Run a sensitivity-sweep regression (docs/lem/sensitivity.md tags).
+    """Run a sensitivity-sweep regression (docs/parametric/sensitivity.md tags).
 
     Tag keys: file, param, method, num_slices, n, rel_range, fs_base, fs_low,
     fs_high, tolerance. Runs sensitivity() with a searched sweep and checks
@@ -3675,9 +3675,10 @@ def main():
         lem_design = Path('docs/lem/design.md')
         if lem_design.exists():
             tests.extend(parse_test_tags(lem_design))
-        lem_sens = Path('docs/lem/sensitivity.md')
-        if lem_sens.exists():
-            tests.extend(parse_test_tags(lem_sens))
+        # Parametric studies (sensitivity/design/back-analysis) live under
+        # docs/parametric/ as three pages; scan all of them for tags.
+        for parametric_md in sorted(Path('docs/parametric').glob('*.md')):
+            tests.extend(parse_test_tags(parametric_md))
 
     if run_fem:
         fem_samples = Path('docs/fem/samples.md')

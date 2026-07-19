@@ -2559,8 +2559,13 @@ def vp098():
                  d=d, psi=psi)
         sd['materials'].append(m)
     zones = [
+        # Zone 0's lower boundary follows the SAME kinked interface as the zones
+        # beneath it — (158,51)->(95.6,30)->(5.3,0) — where Micaceous Sand (zone 1)
+        # pinches out to the left and Cretaceous Clay (zone 2) takes over. Without
+        # the (95.6,30) vertex a straight chord (158,51)->(5.3,0) rides ~0.16 above
+        # that kink, leaving a thin unfilled lens along the whole interface.
         (0, [(0.0, 0.0), (100.0, 40.0), (104.0, 40.0), (144.0, 60.0),
-             (180.0, 60.0), (180.0, 51.0), (158.0, 51.0), (5.3, 0.0)]),
+             (180.0, 60.0), (180.0, 51.0), (158.0, 51.0), (95.6, 30.0), (5.3, 0.0)]),
         (1, [(95.6, 30.0), (158.0, 51.0), (180.0, 51.0), (180.0, 30.0)]),
         (2, [(5.3, 0.0), (95.6, 30.0), (180.0, 30.0), (180.0, 17.0),
              (58.0, 17.0), (11.0, 0.0)]),

@@ -449,6 +449,42 @@ def attach_help(dialog, mapping, resolver):
     return strip
 
 
+def _table_help_resolver(get_table, get_fields):
+    """Build an ``attach_help`` resolver for a table-based dialog: derive the
+    logical column from the focused widget (via ``_EditableTable.column_at``) and
+    map it to that column's field key. ``get_table``/``get_fields`` are callables
+    (not the values themselves) so the resolver keeps working when the active
+    table is rebuilt or swapped — e.g. a tabbed dialog whose "current" table
+    changes with the active tab."""
+    def resolver(widget):
+        table = get_table()
+        if table is None:
+            return None
+        fields = get_fields()
+        col = table.column_at(widget)
+        if col is None or not (0 <= col < len(fields)):
+            return None
+        return fields[col].key
+    return resolver
+
+
+def _wire_cell_help(strip, table, fields, mapping):
+    """Push ``table``'s current-cell help into ``strip`` on every
+    ``currentCellChanged``. Arrow-key navigation moves the table's current cell
+    without moving keyboard focus off the table, so the ``focusChanged``-driven
+    strip (``attach_help``) alone would miss it — this covers that gap, mirroring
+    the Materials table's ``currentCellChanged`` wiring. No-op if either
+    ``strip`` or ``table`` is None (e.g. help wasn't requested for this dialog)."""
+    if strip is None or table is None:
+        return
+
+    def _push(cr, cc, pr, pc):
+        key = fields[cc].key if 0 <= cc < len(fields) else None
+        strip.set_help(mapping.get(key, "") if key else "")
+
+    table.table.currentCellChanged.connect(_push)
+
+
 def _usage_legend(fields):
     """A colored legend for any usage-tagged columns, or None if there are none."""
     present = [u for u in ("lem", "fem", "seep", "rel")
@@ -1184,15 +1220,19 @@ class TableEditorDialog(QDialog):
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
-                 pick_resolve=None):
+                 pick_resolve=None, field_help=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
+        self._fields = fields
         self._preview_draw = preview_draw
         self._preview = None
         # ``pick_resolve(x, y, tol, rows) -> row_index | None`` maps a preview click
         # to the table row to select (None = beyond tolerance, leave selection).
         self._pick_resolve = pick_resolve
+        # Optional field-key -> help-text mapping for the context-sensitive help
+        # strip (see attach_help). None (the default) leaves the dialog without one.
+        self._field_help = field_help
         self.resize(min(1200, 160 + 110 * len(fields)), 460)
         layout = QVBoxLayout(self)
         if help_text:
@@ -1230,6 +1270,10 @@ class TableEditorDialog(QDialog):
             self._apply_toggles()      # set initial column visibility
         if self._preview is not None:
             self._preview.refresh_now()
+        if self._field_help is not None:
+            attach_help(self, self._field_help,
+                       _table_help_resolver(lambda: self._editable, lambda: self._fields))
+            _wire_cell_help(self._help_strip, self._editable, self._fields, self._field_help)
 
     def _schedule_preview(self, *_):
         if self._preview is not None:
@@ -1283,7 +1327,8 @@ class TabbedTableEditorDialog(QDialog):
     drives the preview via its ``on_change`` hook, and a tab switch reschedules it."""
 
     def __init__(self, title, tabs, parent=None, help_text=None,
-                 preview_draw=None, preview_caption=None, pick_resolve=None):
+                 preview_draw=None, preview_caption=None, pick_resolve=None,
+                 field_help=None):
         # tabs: list of (tab_title, fields, rows, new_row)
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -1292,6 +1337,11 @@ class TabbedTableEditorDialog(QDialog):
         # ``pick_resolve(x, y, tol, rows_per_tab) -> (tab, row|None) | None`` maps a
         # preview click to the tab + points-table row to select.
         self._pick_resolve = pick_resolve
+        # Optional field-key -> help-text mapping for the context-sensitive help
+        # strip; each tab keeps its OWN fields list (usually identical across tabs,
+        # e.g. piezo's x/y), so the resolver looks up the ACTIVE tab's fields.
+        self._field_help = field_help
+        self._tab_fields = [fields for _, fields, _, _ in tabs]
         max_cols = max(len(fields) for _, fields, _, _ in tabs)
         self.resize(min(1200, 200 + 110 * max_cols), 480)
         layout = QVBoxLayout(self)
@@ -1327,6 +1377,33 @@ class TabbedTableEditorDialog(QDialog):
         _ok_cancel(self, layout)
         if self._preview is not None:
             self._preview.refresh_now()
+        if self._field_help is not None:
+            attach_help(self, self._field_help,
+                       _table_help_resolver(self._active_table, self._active_fields))
+            for et, flds in zip(self._editables, self._tab_fields):
+                _wire_cell_help(self._help_strip, et, flds, self._field_help)
+            self._tabs.currentChanged.connect(self._push_active_col_help)
+
+    def _active_table(self):
+        i = self._tabs.currentIndex()
+        return self._editables[i] if 0 <= i < len(self._editables) else None
+
+    def _active_fields(self):
+        i = self._tabs.currentIndex()
+        return self._tab_fields[i] if 0 <= i < len(self._tab_fields) else []
+
+    def _push_active_col_help(self, *_):
+        """On a tab switch, refresh the strip for the newly-active tab's current
+        cell — a tab change doesn't itself move keyboard focus, so focusChanged
+        wouldn't otherwise fire."""
+        strip = getattr(self, "_help_strip", None)
+        if strip is None:
+            return
+        table = self._active_table()
+        fields = self._active_fields()
+        col = table.table.currentColumn() if table is not None else -1
+        key = fields[col].key if 0 <= col < len(fields) else None
+        strip.set_help(self._field_help.get(key, "") if key else "")
 
     def _schedule_preview(self, *_):
         if self._preview is not None:
@@ -1367,6 +1444,12 @@ class _BlockListWidget(QWidget):
         self._blocks = [[dict(r) for r in blk] for blk in (blocks or [])]
         self._cur = -1
         self.table = None
+        # Context-sensitive help: set by the owning dialog AFTER construction (it
+        # needs the dialog's layout/button box built first — see attach_help), then
+        # applied retroactively via _wire_help() to whichever table exists then and
+        # to every one built afterward (_load rebuilds the table per block).
+        self._help_strip = None
+        self._field_help = None
 
         body = QHBoxLayout(self)
         body.setContentsMargins(0, 0, 0, 0)
@@ -1410,6 +1493,17 @@ class _BlockListWidget(QWidget):
         self.table = _EditableTable(self._fields, self._blocks[idx], self._new_row,
                                     on_change=self._notify)
         self._holder.addWidget(self.table)
+        self._wire_help()
+
+    def help_key_for_widget(self, widget):
+        """The field key ``widget`` edits in the current block's table, or None."""
+        if self.table is None:
+            return None
+        col = self.table.column_at(widget)
+        return self._fields[col].key if 0 <= col < len(self._fields) else None
+
+    def _wire_help(self):
+        _wire_cell_help(self._help_strip, self.table, self._fields, self._field_help or {})
 
     def _notify(self):
         if self._on_change is not None:
@@ -2487,6 +2581,7 @@ class _LineListView(QWidget):
         self._pick_resolve = pick_resolve
         self._cur = -1
         self._edits = {}          # key -> QLineEdit / QComboBox
+        self._edit_keys = {}      # focusable widget -> key (help-strip resolver)
 
         from .canvas import PreviewPane
         list_pane = self._build_list_pane()
@@ -2544,7 +2639,21 @@ class _LineListView(QWidget):
             w = QLineEdit()
             w.editingFinished.connect(self._on_edit)
         self._edits[key] = w
+        self._edit_keys[w] = key      # reverse lookup for the help strip
         return w
+
+    def help_key_for_widget(self, widget):
+        """The field key ``widget`` edits, or None. Climbs a few parent levels so a
+        combo's internal focus proxy still resolves (mirrors _MaterialListView)."""
+        w = widget
+        for _ in range(4):
+            if w is None:
+                break
+            key = self._edit_keys.get(w)
+            if key is not None:
+                return key
+            w = w.parentWidget()
+        return None
 
     def _cell(self, key, label_w=58):
         f = self._field_by_key[key]
@@ -2701,7 +2810,8 @@ class _LineEditorDialog(QDialog):
 
     def __init__(self, title, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, view_state, parent=None,
-                 help_text=None, usage_toggles=None, preview_caption=None):
+                 help_text=None, usage_toggles=None, preview_caption=None,
+                 field_help=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -2713,6 +2823,9 @@ class _LineEditorDialog(QDialog):
         self._pick_resolve = pick_resolve
         self._preview_caption = preview_caption
         self._view_state = view_state
+        # Field-key -> help-text mapping for the context-sensitive help strip
+        # (see attach_help); shared by both the table and list views.
+        self._field_help = field_help
         self._rows = [dict(r) for r in rows]
         self._mode = None
         self._table = None
@@ -2766,8 +2879,40 @@ class _LineEditorDialog(QDialog):
 
         _ok_cancel(self, layout)
 
+        # Attached before the first _set_mode so _build_table can wire its
+        # cell-tracking (mirrors MaterialsDialog).
+        if self._field_help is not None:
+            attach_help(self, self._field_help, self._help_key_for)
+
         last = _last_line_view(self._view_state)
         self._set_mode(last if last in ("table", "list") else "list")
+
+    # --- context-sensitive help ------------------------------------------
+    def _help_key_for(self, widget):
+        """The field key the focused ``widget`` belongs to, or None.
+
+        Table view: derive the column from the focused cell (falling back to the
+        current column) and map it to its field. List view: defer to the list
+        view's own widget->key lookup (the widget-map pattern)."""
+        if self._mode == "table" and self._table is not None:
+            col = self._table.column_at(widget)
+            return self._help_key_for_col(col)
+        if self._mode == "list" and self._list_view is not None:
+            return self._list_view.help_key_for_widget(widget)
+        return None
+
+    def _help_key_for_col(self, col):
+        if col is None or col < 0 or col >= len(self._fields):
+            return None
+        return self._fields[col].key
+
+    def _help_from_col(self, col):
+        """Push the help for a table column into the strip (for currentCellChanged,
+        which fires as arrow keys move the current cell without changing focus)."""
+        strip = getattr(self, "_help_strip", None)
+        if strip is not None:
+            key = self._help_key_for_col(col)
+            strip.set_help((self._field_help or {}).get(key, "") if key else "")
 
     # --- toggles ---------------------------------------------------------
     def _enabled_usage(self):
@@ -2820,6 +2965,11 @@ class _LineEditorDialog(QDialog):
         self._table_lay.addWidget(split)
         self._table.apply_usage_filter(self._enabled_usage())
         self._table_preview.refresh_now()
+        # Track the current cell so the help strip follows keyboard navigation
+        # across columns (focus stays on the table, so focusChanged won't fire).
+        if getattr(self, "_help_strip", None) is not None:
+            self._table.table.currentCellChanged.connect(
+                lambda cr, cc, pr, pc: self._help_from_col(cc))
 
     def _ensure_list(self):
         if self._list_view is None:
@@ -2838,6 +2988,9 @@ class _LineEditorDialog(QDialog):
             self._seg[mode].setChecked(True)
             return
         self._harvest()                      # pull current edits into self._rows
+        strip = getattr(self, "_help_strip", None)
+        if strip is not None:
+            strip.set_help("")               # drop the other view's stale help text
         if mode == "table":
             self._build_table()
             self._stack.setCurrentIndex(0)
@@ -2860,6 +3013,18 @@ class _LineEditorDialog(QDialog):
 def _new_circle():
     return {"Xo": 0.0, "Yo": 0.0, "Option": "Depth", "Depth": 0.0,
             "Xi": 0.0, "Yi": 0.0, "R": 0.0}
+
+
+CIRCLES_HELP = {
+    "Xo": "X-coordinate of the circle center.",
+    "Yo": "Y-coordinate of the circle center.",
+    "Option": "How the circle's size is defined — Depth, Radius, or Intercept; "
+              "only the matching field below is used.",
+    "Depth": "Depth of the circle bottom below the center (R = Yo − Depth). Option = Depth.",
+    "Xi": "X-coordinate of a point the circle passes through. Option = Intercept.",
+    "Yi": "Y-coordinate of a point the circle passes through. Option = Intercept.",
+    "R": "Circle radius, specified directly. Option = Radius.",
+}
 
 
 class CirclesEditor(CategoryEditor):
@@ -2888,7 +3053,8 @@ class CirclesEditor(CategoryEditor):
             preview_caption="Preview shows the starting circles on the section "
                             "(selected circle bold with center, radius and depth "
                             "lines; others faint). Click a circle to select it.",
-            pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data))
+            pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data),
+            field_help=CIRCLES_HELP)
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -2909,6 +3075,14 @@ def _new_ncpt():
     return {"X": 0.0, "Y": 0.0, "Movement": "Free"}
 
 
+NONCIRC_HELP = {
+    "X": "X-coordinate of a point on the failure surface, listed left→right.",
+    "Y": "Y-coordinate of a point on the failure surface.",
+    "Movement": "Movement constraint used by the automated search — Free "
+               "(unrestricted), Horiz (horizontal only), or Fixed (does not move).",
+}
+
+
 class NonCircEditor(CategoryEditor):
     label = "Non-circular surface"
     FIELDS = [Field("X", "X"), Field("Y", "Y"),
@@ -2927,7 +3101,8 @@ class NonCircEditor(CategoryEditor):
             preview_caption="Preview shows the non-circular surface on the section "
                             "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed). "
                             "Click a vertex or the surface to select it.",
-            pick_resolve=lambda x, y, tol, rows: _pick_noncirc(rows, x, y, tol))
+            pick_resolve=lambda x, y, tol, rows: _pick_noncirc(rows, x, y, tol),
+            field_help=NONCIRC_HELP)
 
     def apply(self, slope_data, dlg):
         slope_data["non_circ"] = dlg.result_rows()
@@ -2935,6 +3110,12 @@ class NonCircEditor(CategoryEditor):
 
 def _new_pt():
     return {"x": 0.0, "y": 0.0}
+
+
+PIEZO_HELP = {
+    "x": "X-coordinate of a point on this piezometric line, listed left→right.",
+    "y": "Y-coordinate (elevation) of a point on this piezometric line.",
+}
 
 
 class PiezoEditor(CategoryEditor):
@@ -2961,7 +3142,8 @@ class PiezoEditor(CategoryEditor):
             preview_caption="Preview shows both piezometric lines on the section (the "
                             "active tab's line bold with its points; the other dimmed). "
                             "Click a line to switch to its tab; click a vertex to select it.",
-            pick_resolve=lambda x, y, tol, rpt: _pick_piezo(rpt, x, y, tol))
+            pick_resolve=lambda x, y, tol, rpt: _pick_piezo(rpt, x, y, tol),
+            field_help=PIEZO_HELP)
 
     def apply(self, slope_data, dlg):
         slope_data["piezo_line"] = [(r["x"], r["y"]) for r in dlg.result_rows(0)]
@@ -2990,6 +3172,14 @@ def _apply_set_selection(widgets, tabs, select):
     w = widgets[s]
     if row is not None and 0 <= row < w.list.count():
         w.list.setCurrentRow(row)
+
+
+DLOADS_HELP = {
+    "X": "X-coordinate of a point on the load's distribution line, listed left→right.",
+    "Y": "Y-coordinate of a point on the load's distribution line.",
+    "Normal": "Normal stress (force per unit area) at this point, acting "
+              "perpendicular to the line.",
+}
 
 
 class DloadsEditor(CategoryEditor):
@@ -3052,6 +3242,18 @@ class DloadsEditor(CategoryEditor):
         split.setSizes([560, 500])
         layout.addWidget(split, 1)
         _ok_cancel(dlg, layout)
+
+        def _help_key_for(widget):
+            active = tabs.currentIndex()
+            w = (w1, w2)[active] if active in (0, 1) else w1
+            return w.help_key_for_widget(widget)
+
+        strip = attach_help(dlg, DLOADS_HELP, _help_key_for)
+        for w in (w1, w2):
+            w._help_strip = strip
+            w._field_help = DLOADS_HELP
+            w._wire_help()          # the block table built during __init__ needs it too
+
         dlg._sets = (w1, w2)
         _apply_set_selection((w1, w2), tabs, select)
         dlg.resize(1160, 560)
@@ -3089,6 +3291,12 @@ class _SeepBcSetWidget(QWidget):
         self._exit = [tuple(c) for c in (bc.get("exit_face") or [])]
         self._cur = -1
         self.table = None
+        # Context-sensitive help: set by the owning dialog AFTER construction (it
+        # needs the dialog's layout/button box built first — see attach_help), then
+        # applied retroactively via _wire_help() to whichever table exists then and
+        # to every one built afterward (_load rebuilds the table per selection).
+        self._help_strip = None
+        self._field_help = None
 
         body = QHBoxLayout(self)
         body.setContentsMargins(0, 0, 0, 0)
@@ -3201,6 +3409,23 @@ class _SeepBcSetWidget(QWidget):
             rows = [{"x": x, "y": y} for (x, y) in self._exit]
         self.table = _EditableTable(XY_FIELDS, rows, _new_pt)
         self._holder.addWidget(self.table)
+        self._wire_help()
+
+    def help_key_for_widget(self, widget):
+        """The field key ``widget`` edits: 'head'/'flux' for the value edits, else
+        the point table's column key (x/y), or None."""
+        if widget is self.head_edit:
+            return "head"
+        if widget is self.flux_edit:
+            return "flux"
+        if self.table is not None:
+            col = self.table.column_at(widget)
+            if 0 <= col < len(XY_FIELDS):
+                return XY_FIELDS[col].key
+        return None
+
+    def _wire_help(self):
+        _wire_cell_help(self._help_strip, self.table, XY_FIELDS, self._field_help or {})
 
     def _on_select(self, idx):
         self._commit()
@@ -3248,6 +3473,16 @@ class _SeepBcSetWidget(QWidget):
                 "exit_face": list(self._exit)}
 
 
+SEEPBC_HELP = {
+    "head": "Total head at this boundary — the height of water above the datum "
+           "(length units).",
+    "flux": "Specified flux — the normal Darcy velocity across the boundary "
+           "(length/time); positive = inflow (infiltration/recharge).",
+    "x": "X-coordinate of a point on this boundary (or the exit face).",
+    "y": "Y-coordinate of a point on this boundary (or the exit face).",
+}
+
+
 class SeepBcEditor(CategoryEditor):
     label = "Seep BC"
 
@@ -3268,6 +3503,18 @@ class SeepBcEditor(CategoryEditor):
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
         layout.addWidget(tabs)
         _ok_cancel(dlg, layout)
+
+        def _help_key_for(widget):
+            active = tabs.currentIndex()
+            w = (w1, w2)[active] if active in (0, 1) else w1
+            return w.help_key_for_widget(widget)
+
+        strip = attach_help(dlg, SEEPBC_HELP, _help_key_for)
+        for w in (w1, w2):
+            w._help_strip = strip
+            w._field_help = SEEPBC_HELP
+            w._wire_help()          # the point table built during __init__ needs it too
+
         dlg._sets = (w1, w2)
         _apply_set_selection((w1, w2), tabs, select)
         return dlg
@@ -3308,6 +3555,36 @@ def _pile_item_label(i, row):
         return f"{i + 1}. {name}"
 
 
+# Wording mirrors the 'piles' worksheet section of input_template.md. Where a field
+# is genuinely single-analysis (matching its column's usage tag / header color) the
+# text says so explicitly; D and S feed both (LEM force auto-computation AND FEM
+# I/Area defaults), so neither is tagged "LEM only" despite the red header.
+PILES_HELP = {
+    "label": "Name used in error messages, summaries, and plots (optional).",
+    "x1": "Pile top X-coordinate.",
+    "y1": "Pile top Y-coordinate.",
+    "x2": "Pile tip (bottom) X-coordinate.",
+    "y2": "Pile tip (bottom) Y-coordinate.",
+    "H": "Pile force per unit width of slope (force/length). Blank = auto-computed "
+        "via Ito & Matsui from D and S (vertical piles only).",
+    "D_pile": "Pile diameter. Required for the Ito & Matsui auto-computation of H; "
+             "also derives I and Area for FEM when those are left blank.",
+    "S": "Center-to-center pile spacing. Required for Ito & Matsui and for "
+        "Vcap/Mcap (both per-pile); lets xslope report per-pile forces.",
+    "E": "Young's modulus of the pile material. FEM only.",
+    "I": "Moment of inertia. FEM only; auto-computed from D for a solid circular "
+        "section when left blank.",
+    "area": "Cross-sectional area. FEM only; auto-computed from D for a solid "
+           "circular section when left blank.",
+    "V_cap": "Shear capacity of a single pile (force units). LEM only; requires S.",
+    "M_cap": "Moment capacity of a single pile (force×length). LEM only; requires S.",
+    "appl": "Force application — Active: H is an allowable force, not divided by "
+           "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
+    "fixity": "Pile head rotation boundary condition — free (default, can rotate) "
+             "or fixed (zero rotation). FEM only.",
+}
+
+
 class PilesEditor(CategoryEditor):
     label = "Piles"
     FIELDS = [
@@ -3345,7 +3622,8 @@ class PilesEditor(CategoryEditor):
             usage_toggles=["lem", "fem"],
             preview_caption="Preview shows the piles on the section (selected pile bold "
                             "with □ cap and ▽ tip markers; others dimmed). "
-                            "Click a pile to select it.")
+                            "Click a pile to select it.",
+            field_help=PILES_HELP)
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -3421,7 +3699,7 @@ class MatGeometryDialog(QDialog):
 
     def __init__(self, title, help_text, item_label, items, materials, parent=None,
                  select=None, max_depth=None, preview_draw=None, preview_caption=None,
-                 slope_data=None, style=None, pick_resolve=None):
+                 slope_data=None, style=None, pick_resolve=None, field_help=None):
         # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
         # select: row to pre-highlight (e.g. the double-clicked line); else first.
         # max_depth: when not None, show a "Max depth" field (profile sheet only —
@@ -3444,6 +3722,9 @@ class MatGeometryDialog(QDialog):
         # ``pick_resolve(x, y, tol, lines) -> (feature, row|None) | None`` maps a
         # preview click to the item (list row) and, for a vertex hit, its vertex row.
         self._pick_resolve = pick_resolve
+        # Optional field-key -> help-text mapping ("x"/"y"/"mat_id", + "max_depth"
+        # when shown) for the context-sensitive help strip.
+        self._field_help = field_help
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
@@ -3518,12 +3799,35 @@ class MatGeometryDialog(QDialog):
 
         _ok_cancel(self, main)
 
+        if self._field_help is not None:
+            # Attached before the first _load (below), so the initial vertex table
+            # picks up cell-tracking help immediately, exactly as the later ones do.
+            attach_help(self, self._field_help, self._help_key_for)
+
         self._refresh_list()
         if self._lines:
             row = select if (select is not None and 0 <= select < len(self._lines)) else 0
             self.list.setCurrentRow(row)
         if self._preview is not None:
             self._preview.refresh_now()
+
+    def _help_key_for(self, widget):
+        """The field key ``widget`` edits: 'mat_id' for the material combo,
+        'max_depth' for that edit (profile only), else the vertex table's column
+        key (x/y), or None."""
+        if widget is self.mat_combo:
+            return "mat_id"
+        if self._max_depth_edit is not None and widget is self._max_depth_edit:
+            return "max_depth"
+        if self.table is not None:
+            col = self.table.column_at(widget)
+            if 0 <= col < len(self.XY):
+                return self.XY[col].key
+        return None
+
+    def _wire_help(self):
+        _wire_cell_help(getattr(self, "_help_strip", None), self.table, self.XY,
+                        self._field_help or {})
 
     def _schedule_preview(self, *_):
         if self._preview is not None:
@@ -3587,6 +3891,7 @@ class MatGeometryDialog(QDialog):
         self.table = _EditableTable(self.XY, rows, _new_pt,
                                     on_change=self._schedule_preview)
         self._holder.addWidget(self.table)
+        self._wire_help()
         self.mat_combo.blockSignals(True)
         mid = ln["mat_id"]
         self.mat_combo.setCurrentIndex(mid if (mid is not None and 0 <= mid < self.mat_combo.count()) else 0)
@@ -3640,6 +3945,16 @@ class MatGeometryDialog(QDialog):
             return None
 
 
+PROFILE_HELP = {
+    "x": "X-coordinate of a point on this profile line, listed left→right.",
+    "y": "Y-coordinate (elevation) of a point on this profile line.",
+    "mat_id": "Material assigned to the layer below this line and above the next "
+             "profile line down.",
+    "max_depth": "Elevation of the model's bottom boundary (bedrock). Profile "
+                "lines and the failure surface cannot go below it.",
+}
+
+
 class ProfileEditor(CategoryEditor):
     label = "Profile lines"
 
@@ -3663,7 +3978,8 @@ class ProfileEditor(CategoryEditor):
                             "re-filled until you save. Click a line or vertex to select it.",
             slope_data=slope_data, style=style,
             pick_resolve=lambda x, y, tol, lines: _pick_matgeom_lines(
-                lines, x, y, tol, closed=False))
+                lines, x, y, tol, closed=False),
+            field_help=PROFILE_HELP)
 
     def apply(self, slope_data, dlg):
         slope_data["profile_lines"] = dlg.result_lines()
@@ -3671,6 +3987,14 @@ class ProfileEditor(CategoryEditor):
         if md is not None:
             slope_data["max_depth"] = md
         _resync_geometry(slope_data)  # rebuild polygons / ground surface / t-crack
+
+
+POLYGON_HELP = {
+    "x": "X-coordinate of a polygon vertex (CW or CCW order; the ring closes "
+        "automatically — don't repeat the start point).",
+    "y": "Y-coordinate of a polygon vertex.",
+    "mat_id": "Material assigned to this closed zone.",
+}
 
 
 class PolygonEditor(CategoryEditor):
@@ -3702,7 +4026,8 @@ class PolygonEditor(CategoryEditor):
                             "outlined, others dimmed). Click a zone or vertex to select it.",
             slope_data=slope_data, style=style,
             pick_resolve=lambda x, y, tol, lines: _pick_matgeom_lines(
-                lines, x, y, tol, closed=True))
+                lines, x, y, tol, closed=True),
+            field_help=POLYGON_HELP)
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon
@@ -3743,6 +4068,39 @@ def _reinf_item_label(i, row):
                 f"→{float(row.get('x2', 0) or 0):g})")
     except (TypeError, ValueError):
         return f"{i + 1}. {typ}"
+
+
+# Wording mirrors the 'reinforce' worksheet section of input_template.md. Tmax,
+# Lp1/Lp2, Tend1/Tend2 and Spacing form the capacity envelope used by BOTH LEM and
+# FEM (fem.py caps the truss yield force at the same envelope) even though their
+# header color is "LEM only" red — so they aren't tagged that way here. Type/Dir/
+# Appl are truly LEM only (FEM ignores them); Tres/E/Area are truly FEM only.
+REINFORCE_HELP = {
+    "x1": "Start point X-coordinate.",
+    "y1": "Start point Y-coordinate.",
+    "x2": "End point X-coordinate.",
+    "y2": "End point Y-coordinate.",
+    "type": "Support-type preset — fills Dir and Appl automatically (Geosynthetic, "
+           "Nail, Tieback, Anchor); blank = generic line. LEM only.",
+    "dir": "Force direction at the slip surface — Tangent (flexible, e.g. "
+          "geosynthetics) or Axial (rigid, e.g. nails/tiebacks). LEM only.",
+    "appl": "Force application — Active: allowable force on the driving side, not "
+           "divided by FS (default). Passive: ultimate capacity on the resisting "
+           "side, divided by FS. LEM only.",
+    "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
+            "supports: enter the per-element capacity with Spacing). Caps both the "
+            "LEM force and the FEM yield force.",
+    "t_res": "Residual tensile force after yield (post-peak). FEM only; blank = "
+            "elastic-perfectly-plastic (holds capacity), 0 = brittle rupture.",
+    "tend1": "Anchorage/connection capacity at end 1 (0 = friction only).",
+    "tend2": "Anchorage/connection capacity at end 2 (0 = friction only).",
+    "lp1": "Pullout bond length at end 1 — tapers the mobilized force toward that end.",
+    "lp2": "Pullout bond length at end 2 — tapers the mobilized force toward that end.",
+    "spacing": "Out-of-plane spacing for discrete supports (nails, tiebacks); leave "
+              "blank or 1 for geosynthetics (already per unit width).",
+    "E": "Elastic modulus of the reinforcement. FEM only (models the line as a 1D truss).",
+    "area": "Cross-sectional area of the reinforcement. FEM only.",
+}
 
 
 class ReinforcementEditor(CategoryEditor):
@@ -3789,7 +4147,8 @@ class ReinforcementEditor(CategoryEditor):
             usage_toggles=["lem", "fem"],
             preview_caption="Preview shows the reinforcement lines on the section "
                             "(selected line bold with its endpoints and pullout-length "
-                            "markers; others dimmed). Click a line to select it.")
+                            "markers; others dimmed). Click a line to select it.",
+            field_help=REINFORCE_HELP)
 
     def apply(self, slope_data, dlg):
         from xslope.fileio import build_reinforce_lines
@@ -3804,6 +4163,18 @@ def _new_lload():
     # Same key set load_slope_data produces (fileio.py:1325-1330). Angle defaults
     # to -90° (straight down), mirroring the loader's blank-angle fallback.
     return {"x": 0.0, "y": 0.0, "P": 0.0, "angle": -90.0, "label": "Load"}
+
+
+LLOADS_HELP = {
+    "label": "Name used in error messages, summaries, and plots (optional).",
+    "x": "X-coordinate of the point of application — must lie on the ground "
+        "surface (snapped on save).",
+    "y": "Y-coordinate of the point of application — must lie on the ground "
+        "surface (snapped on save).",
+    "P": "Force magnitude, per unit width of slope (force/length).",
+    "angle": "Direction of the force from horizontal, degrees (−90 = straight "
+            "down, the default).",
+}
 
 
 class LineLoadsEditor(CategoryEditor):
@@ -3838,7 +4209,8 @@ class LineLoadsEditor(CategoryEditor):
                             "load's arrow emphasized; others dimmed). The arrow points "
                             "in the force direction, head on the point of application. "
                             "Click a load's arrow to select it.",
-            pick_resolve=lambda x, y, tol, rows: _pick_line_loads(rows, x, y, tol, slope_data))
+            pick_resolve=lambda x, y, tol, rows: _pick_line_loads(rows, x, y, tol, slope_data),
+            field_help=LLOADS_HELP)
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()

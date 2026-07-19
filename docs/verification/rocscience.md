@@ -57,10 +57,13 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=../files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
 <!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
+<!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.761, tolerance=0.02, expected_pf=0.219, pf_tol=0.02, benchmark=VP28a-mc -->
 <!-- test: file=../files/rocscience/vp028b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.158, benchmark=VP28b -->
 <!-- test: file=../files/rocscience/vp028b.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.787, tolerance=0.03, benchmark=VP28b-beta -->
+<!-- test: file=../files/rocscience/vp028b.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.794, tolerance=0.02, expected_pf=0.208, pf_tol=0.02, benchmark=VP28b-mc -->
 <!-- test: file=../files/rocscience/vp028c.xlsx, type=single_circle, num_slices=60, fs_bishop=1.177, benchmark=VP28c -->
 <!-- test: file=../files/rocscience/vp028c.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.798, tolerance=0.03, benchmark=VP28c-beta -->
+<!-- test: file=../files/rocscience/vp028c.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.783, tolerance=0.02, expected_pf=0.211, pf_tol=0.02, benchmark=VP28c-mc -->
 <!-- test: file=../files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
 <!-- test: file=../files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
 <!-- test: file=../files/rocscience/vp030a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.679, benchmark=VP30a -->
@@ -217,11 +220,11 @@ corpus is complete relative to what is independently verifiable.
 | 31 | Reinforced embankment, (5) materials, geosynthetic | covered | Borges & Cardoso (2002) Case 2 — the same problem is built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) ([gs2_18.xlsx](../files/geostudio/gs2_18.xlsx)): identical embankment (c'=0, φ'=35, γ=20), the four depth-varying soft-clay layers (Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding) and the unanchored 200 kN/m geosynthetic (δ=33.7°). M-P 1.153 / Bishop 1.154 vs SLOPE/W 1.171 / 1.170 and B&C 1.15 — the same reference as Slide2's Circle A/B (Slide 1.18 / 1.16, Borges 1.19 / 1.15). The reverse-curvature blocker noted for VP30 does not arise on the critical circle. |
 | [32](#vp32) | Reinforced embankment, (7) materials, geosynthetic | **built** | [vp032a](../files/rocscience/vp032a.xlsx) / [b](../files/rocscience/vp032b.xlsx) / [c](../files/rocscience/vp032c.xlsx). Borges & Cardoso (2002) case 3 geosynthetic-reinforced embankment (two fill stages), geometry from the RS2 manual's fully labeled figures. |
 | [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](../files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke; the critical surface is composite (circle truncated at the base, running flat in the presheared clay-shale). Also [SLOPE/W §2.20](geostudio.md) — same problem in the GeoStudio corpus. |
-| [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H prescribed noncircular surface, polygon-zone geometry with a chimney drain; deterministic lock only (the Phase I COV of 124% is outside TSPM's domain — see section). Also [SLOPE/W §2.21](geostudio.md) — same problem in the GeoStudio corpus. |
+| [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H prescribed noncircular surface, polygon-zone geometry with a chimney drain; deterministic lock (the Phase I COV of 124% is outside the Taylor series' domain, but Monte Carlo reproduces the probabilistic case — see section). Also [SLOPE/W §2.21](geostudio.md) — same problem in the GeoStudio corpus. |
 | [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](../files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the benchmark where the minimum-reliability-index surface is not the minimum-FS surface, reproduced by procedure. Also [SLOPE/W §2.22](geostudio.md) — same problem in the GeoStudio corpus. |
 | [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, r<sub>u</sub>=0.2). Also [SLOPE/W §2.23](geostudio.md) — same problem in the GeoStudio corpus. |
-| 37 | Slope, homogenous, distributed load, back analysis of required support force and length | planned |  |
-| 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | planned |  |
+| 37 | Slope, homogenous, distributed load, back analysis of required support force and length | *blocked* | XSTABL (1999) back-analysis of the support force that raises a cohesionless slope to FS = 1.5 (Slide 351 kN / XSTABL 345 kN). The method maps cleanly onto [`design()`](../lem/design.md) — sweep the support force to a target factor of safety — and Figure 37.1 is fully coordinate-labeled with the 40 kN/m² crest load, but the Slide2 manual prints no material properties (φ, γ) for the soil and the XSTABL Reference Manual source is not in hand, so the inputs are incomplete and no benchmark can be built without guessing them. Part (b) — the minimum reinforced-zone length via an elevated-friction zone — additionally needs a variable-length material zone that a single-scalar design sweep does not express. |
+| 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | *blocked* | Ng & Shi (1998) Hong Kong cut: FE steady-state seepage produces matric suction (negative pore pressure) above the water table, and the stability uses the extended Mohr-Coulomb criterion with a *distinct* suction-strength angle φᵇ = 15° (τ = c′ + (σ − uₐ)tan φ′ + (uₐ − u_w)tan φᵇ). XSLOPE carries neither ingredient: the LEM slice pore pressure taken from a seepage solution is clamped non-negative (`u = max(0, u_val)` in `slice.py`), so suction contributes zero strength, and there is no φᵇ parameter — the single friction angle would in any case apply tan 38° to the suction term instead of tan 15°. Two feature gaps (suction transmission into strength + a φᵇ term), not a data gap — vendor `.fez` models exist, but the physics is not carried. |
 | [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](../files/rocscience/vp039a.xlsx)/[b](../files/rocscience/vp039b.xlsx)/[c](../files/rocscience/vp039c.xlsx)/[d](../files/rocscience/vp039d.xlsx). Tandjiria (2002): the geosynthetic force required to restore FS=1.35 on a half-embankment, as clay and as sand fill (noncircular cases not locked — see section). Also [SLOPE/W §2.24](geostudio.md) — same problem in the GeoStudio corpus. |
 | [40](#vp40) | Slope, homogenous, sensitivity analysis | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). Perry (1993) power-curve strength slope on the specified surface — the corpus's first sensitivity benchmark, sweeping the A and b parameters through `sensitivity()`. |
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with r<sub>u</sub>=0.3 — exercises the `pow` and `ru` options together. |
@@ -805,11 +808,18 @@ two different layer boundaries. Slide's manual prints the critical circle (cente
 radius) for every case; those circles are evaluated here as fixed surfaces with Bishop's
 method, and reliability uses the Taylor-series procedure on the same surfaces.
 
-| Case | XSLOPE FS | Slide FS | C&X FS | XSLOPE β_ln / PF | Slide RI_ln / MC PF | C&X PF |
-|---|---|---|---|---|---|---|
-| Congress St., tangent clay-2 base | 1.129 | 1.128 | 1.128 | 0.768 / 22.1% | 0.650 / 24.6% | 26.6% |
-| Embankment, tangent interface | 1.158 | 1.160 | 1.1625 | 0.787 / 21.6% | 0.799 / 21.2% | 20.2% |
-| Embankment, tangent foundation base | 1.177 | 1.185 | 1.1479 | 0.798 / 21.2% | 0.820 / 19.9% | 19.7% |
+| Case | XSLOPE FS | Slide FS | C&X FS | XSLOPE TSPM β_ln / PF | XSLOPE MC β_ln / PF | Slide RI_ln / MC PF | C&X PF |
+|---|---|---|---|---|---|---|---|
+| Congress St., tangent clay-2 base | 1.129 | 1.128 | 1.128 | 0.768 / 22.1% | 0.761 / 21.9% | 0.650 / 24.6% | 26.6% |
+| Embankment, tangent interface | 1.158 | 1.160 | 1.1625 | 0.787 / 21.6% | 0.794 / 20.8% | 0.799 / 21.2% | 20.2% |
+| Embankment, tangent foundation base | 1.177 | 1.185 | 1.1479 | 0.798 / 21.2% | 0.783 / 21.1% | 0.820 / 19.9% | 19.7% |
+
+The **XSLOPE MC** column is a 10,000-sample Monte Carlo run on the same fixed circles and the
+same normal input distributions the Taylor series uses (seeded, so the values are
+regression-locked). It is the adjudication of the cross-source disagreement below: our own
+Taylor series and Monte Carlo, given identical inputs, land on top of each other — σ_F 0.163
+vs 0.164 and β_ln 0.768 vs 0.761 on the Congress St. circle, and within ±0.015 of β_ln on all
+three cases.
 
 *Input provenance: C&X's paper states no unit weights; the manual notes Rocscience selected
 clay unit weights to reproduce the published deterministic FS, and the sand unit weight
@@ -820,8 +830,13 @@ not state, and the deterministic FS there is too sensitive to that layer (roughl
 per unit cohesion) for a defensible benchmark; Examples 2–4 rerun the same geometry with
 re-tuned statistics and inherit the same indeterminacy. On the probabilistic side the three
 sources' σ_F span 26% on the Congress St. problem (Taylor series 0.163, Slide's Monte
-Carlo 0.190, C&X 0.205) while the deterministic FS agrees to 0.1% — as with VP29 and VP36,
-the probabilistic inputs and estimator dominate the PF comparison, not the mechanics.*
+Carlo 0.190, C&X 0.205) while the deterministic FS agrees to 0.1%. The adjudication settles
+which the spread follows: running both estimators ourselves on the same normal inputs, the
+Taylor series (σ_F 0.163) and Monte Carlo (σ_F 0.164) agree to 0.6%, so the 26% cross-source
+spread is not first-order-vs-sampling — at these factor-of-safety COVs (~15–19%) the two
+estimators coincide. What differs between the published sources is the input treatment (the
+distribution family and the assumed COVs), not the estimator or the mechanics — the same
+conclusion VP29 and VP36 reach from the σ-input side.*
 
 ![vp028a: inputs and representative solution](images/vp028a.png)
 ![vp028b: inputs and representative solution](images/vp028b.png)
@@ -989,7 +1004,15 @@ that separates the two) follow the RS2 vendor `.fez` for this problem. The publi
 probability of failure
 (1.5–1.6×10⁻³ by Monte Carlo) is reported here without a regression lock: it rests on
 the paper's spatial-averaging variance treatment, which a single slope-scale σ does not
-reproduce.*
+reproduce. The size of that gap is now measured rather than asserted. Running the
+probabilistic analysis on the point-scale σ (φ = 7.5° ± 2.1° along the clay-shale) both
+ways — Taylor series and a 10,000-sample Monte Carlo — gives PF ≈ 2.2% (β_ln ≈ 2.02) and
+PF ≈ 3.5% (β_ln ≈ 2.03) respectively: the two estimators agree with each other, and both
+sit roughly twenty times above El-Ramly et al.'s 0.15%. That factor is exactly the
+variance reduction El-Ramly obtain by averaging φ over the length of the slip surface
+(their autocorrelation model), a spatial-variability feature XSLOPE does not carry — so
+the missing ingredient is a correlation-length treatment, not the estimator. Faking it
+with a smaller lumped σ is declined.*
 
 ![vp033: inputs and representative solution](images/vp033.png)
 
@@ -1027,7 +1050,20 @@ one-sided φ derivative and W&H's correlation coefficients gives β 1.54 / PF
 6.2×10⁻² under their normal-FS treatment, against W&H's point-estimate 4.55×10⁻²
 and Slide's Monte-Carlo 3.55×10⁻³ — the two published values themselves differ by
 13×, the sampling treatment of the φ ≥ 0 bound on a COV-124% variable dwarfing
-the estimator choice.*
+the estimator choice. Monte Carlo is the right tool past that boundary, and XSLOPE's
+`reliability_mc` now demonstrates it: sampling each parameter normally and truncating
+the negative φ draws at zero — exactly the φ ≥ 0 bound the published samplers apply —
+a 10,000-sample run on W&H's noncircular surface (Spencer) returns a mean FS of 2.54,
+σ_F ≈ 0.81, and an empirical probability of failure of about 2% (2–3% depending on
+whether the ~1% of realizations whose extreme low-strength draws drive Spencer to
+non-convergence are counted as failures). That lands inside the 0.36%–6.2% band the
+three published estimates span, confirming the case is reproducible once the estimator
+is switched. It is reported rather than regression-locked: at COV 124% the admissible
+subset shifts with solver convergence on the pathological draws, so the empirical PF is
+not a stable lock target — the same reason VP33's PF is documented without a lock. The
+deterministic factor of safety remains the locked benchmark, and the Taylor-series-domain
+note stands, now demonstrated on both sides — TSPM correctly declines the negative-φ
+evaluation, Monte Carlo carries it.*
 
 ![vp034: inputs and representative solution](images/vp034.png)
 

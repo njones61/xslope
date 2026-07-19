@@ -3282,6 +3282,27 @@ def run_submerged_oracle_test(test):
     return 0.0, None
 
 
+def run_no_void_test(test):
+    """Corpus material-tiling void guard (benchmarks/void_guard.py).
+
+    Every corpus input file's material polygons must tile its domain with no
+    interior void — no enclosed column-gap that is both wide and tall. This is the
+    defect that excised Slide2 VP42's downstream toe wedge and starved its
+    reservoir-side surfaces of resisting material. Returns (0.0, None) on a clean
+    corpus, else (None, message). File-less: sweeps the corpus itself."""
+    import importlib
+    bench = str(Path(__file__).parent / 'benchmarks')
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    mod = importlib.import_module('void_guard')
+    if not mod.corpus_files():
+        return 0.0, None                      # engine-only clone without the docs corpus
+    failures = mod.check()
+    if failures:
+        return None, "corpus void: " + "; ".join(failures[:4])
+    return 0.0, None
+
+
 def run_vg_kr_test(test):
     """Unit check for the van Genuchten relative-permeability function and the
     kr-model dispatch (xslope.seep). Verifies kr_vg_vec against an independent
@@ -3513,6 +3534,8 @@ def run_test(test):
         return run_rs2_import_test(test)
     if test_type == 'submerged_oracle':
         return run_submerged_oracle_test(test)
+    if test_type == 'no_void':
+        return run_no_void_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -3801,6 +3824,12 @@ def main():
         tests.append({'type': 'submerged_oracle',
                       'file': 'dry-buoyant still-water oracle',
                       'method': 'bishop/spencer', 'source': 'submerged_oracle'})
+        # No-void tiling guard: every corpus file's material zones must tile its
+        # domain with no interior material void (the VP42 toe-wedge class). Sweeps
+        # the corpus itself; file-less.
+        tests.append({'type': 'no_void',
+                      'file': 'corpus material-tiling void audit',
+                      'method': '-', 'source': 'no_void'})
 
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.

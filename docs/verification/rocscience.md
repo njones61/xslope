@@ -180,6 +180,8 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp022a.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.297, fs_bishop=1.380, fs_spencer=1.379, fs_mprice=1.370, benchmark=VP22-dry -->
 <!-- test: file=../files/rocscience/vp022b.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.037, fs_bishop=1.121, fs_spencer=1.122, fs_mprice=1.112, benchmark=VP22-ru -->
 
+<div class="corpus-summary" markdown>
+
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
 | [1](#vp1) | Slope, homogenous | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx). ACADS 1(a): seven-method comparison vs the ACADS consensus 1.00; Bishop 0.985 vs Slide 0.987. Also [SLOPE/W §2.1](geostudio.md) — same problem in the GeoStudio corpus. |
@@ -293,6 +295,8 @@ corpus is complete relative to what is independently verifiable.
 | [109](#vp109) | Retaining walls, gabion walls, weak layers | **built** | [vp109.xlsx](../files/rocscience/vp109.xlsx). The VP108 wall with weak joint bands (c=20.4, φ=37.8) between courses: Bishop 1.790 / Spencer 1.797 on the deep circle vs Slide's block search along the joints 1.799 / 1.803 — the joints don't govern overall stability. |
 | 110 | Retaining walls, equivalent fluid pressure | *blocked* | Verifies Slide's EFP support type against a triangular distributed load (Spencer 2.566 both ways). The manual prints neither soil properties nor coordinates (the model is Slide's tutorial file), so there is nothing independent to lock; the equivalence it demonstrates — wall restraint as a boundary pressure — is how XSLOPE models EFP walls directly (`dloads`). |
 | [111](#vp111) | Helical anchor | *no lock possible* | Slide's problem 111 verifies its helical-anchor capacity envelope (Perko 2009), not a slope — no slope and no factor of safety to lock. Helically anchored slopes are analyzed in XSLOPE by entering the governing capacity as a standard anchor force — see the [worked note](#vp111). |
+
+</div>
 
 ---
 

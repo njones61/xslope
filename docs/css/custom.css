@@ -45,3 +45,51 @@
   width: 600px !important;
   max-width: 600px !important;
 }*/
+
+
+/* PROTOTYPE — standard layout for corpus verification-page summary tables. */
+/* Wrap the summary table markdown in <div class="corpus-summary" markdown> ... </div> */
+/* (md_in_html required — see markdown_extensions in mkdocs.yml). Applied to */
+/* docs/verification/rocscience.md as the one demo page; awaiting Norm's OK to roll out. */
+
+/* Fixed layout so column widths are stable instead of growing with content;
+   full width of the content column so the table doesn't look cramped. */
+.corpus-summary table {
+  table-layout: fixed;
+  width: 100%;
+  font-size: 0.85em;
+}
+
+/* Left-align by default; wrap long cell text instead of stretching the column. */
+.corpus-summary th,
+.corpus-summary td {
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Col 1: problem # - narrow and centered */
+.corpus-summary th:nth-child(1),
+.corpus-summary td:nth-child(1) {
+  width: 7%;
+  text-align: center;
+}
+
+/* Col 2: problem title / description */
+.corpus-summary th:nth-child(2),
+.corpus-summary td:nth-child(2) {
+  width: 48%;
+}
+
+/* Col 3: status */
+.corpus-summary th:nth-child(3),
+.corpus-summary td:nth-child(3) {
+  width: 12%;
+}
+
+/* Col 4: notes / results - remaining width */
+.corpus-summary th:nth-child(4),
+.corpus-summary td:nth-child(4) {
+  width: 33%;
+}

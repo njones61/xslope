@@ -1248,7 +1248,7 @@ class TableEditorDialog(QDialog):
         from PySide6.QtCore import QSettings
         s = QSettings("XSlope", "XSlope Studio")
         bar = QHBoxLayout()
-        bar.addWidget(QLabel("Show columns for:"))
+        bar.addWidget(QLabel("Show parameters for:"))
         self._toggles = {}
         for t in tags:
             cb = QCheckBox(USAGE_TOGGLE_LABEL[t])
@@ -2185,7 +2185,7 @@ class MaterialsDialog(QDialog):
             self._seg[mode] = b
             top.addWidget(b)
         top.addSpacing(24)
-        top.addWidget(QLabel("Show columns for:"))
+        top.addWidget(QLabel("Show parameters for:"))
         from PySide6.QtCore import QSettings
         s = QSettings("XSlope", "XSlope Studio")
         self._toggles = {}
@@ -2741,7 +2741,7 @@ class _LineEditorDialog(QDialog):
         s = QSettings("XSlope", "XSlope Studio")
         self._toggles = {}
         if usage_toggles:
-            top.addWidget(QLabel("Show columns for:"))
+            top.addWidget(QLabel("Show parameters for:"))
         for t in (usage_toggles or []):
             cb = QCheckBox(USAGE_TOGGLE_LABEL[t])
             cb.setChecked(bool(s.value(f"editor_toggles/{self._title}/{t}",

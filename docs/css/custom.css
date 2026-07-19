@@ -73,24 +73,24 @@
 /* Col 1: problem # - narrow and centered */
 .corpus-summary th:nth-child(1),
 .corpus-summary td:nth-child(1) {
-  width: 7%;
+  width: 4%;
   text-align: center;
 }
 
 /* Col 2: problem title / description */
 .corpus-summary th:nth-child(2),
 .corpus-summary td:nth-child(2) {
-  width: 48%;
+  width: 32%;
 }
 
 /* Col 3: status */
 .corpus-summary th:nth-child(3),
 .corpus-summary td:nth-child(3) {
-  width: 12%;
+  width: 10%;
 }
 
 /* Col 4: notes / results - remaining width */
 .corpus-summary th:nth-child(4),
 .corpus-summary td:nth-child(4) {
-  width: 33%;
+  width: 54%;
 }

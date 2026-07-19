@@ -185,9 +185,9 @@ the 3D chapter is out of scope and not tracked here.
 | 2.32 | Zhu & Lee – Heterogeneous Slope | **built** | [vp052a/b.xlsx](../files/rocscience/vp052a.xlsx) (Rocscience #52): wet deep-family Spencer 1.189 matches Slide exactly; see that row. — [details](#gs-2-32) |
 | 2.33 | Priest – Rigid Blocks | **built** | [gs2_33.xlsx](../files/geostudio/gs2_33.xlsx) — Janbu 1.049 / M-P 1.049 vs Priest (hand) 1.049 and SLOPE/W 1.049, exact. — [details](#gs-2-33) |
 | 2.34 | Yamagami – Stabilizing Piles | **built** | [vp054a/b.xlsx](../files/rocscience/vp054a.xlsx) (Rocscience #54): no-pile Bishop 1.100 vs SLOPE/W 1.102 — exact; with-pile 1.185 vs SLOPE/W 1.223, Slide 1.193, Yamagami 1.20 (pile-force conventions differ program-to-program). — [details](#gs-2-34) |
-| 2.35 | Pockoski & Duncan – Tie-Back Wall | partial | P&D series — blocked on the CGPR report (see Rocscience #55-63 note). |
-| 2.36 | Pockoski & Duncan – Reinforcement | partial | Same. |
-| 2.37 | Pockoski & Duncan – Soil Nails | partial | Same. |
+| 2.35 | Pockoski & Duncan – Tie-Back Wall | covered | Same problem as [Rocscience #58](rocscience.md#vp58) — P&D (2000) 8-layer tied-back wall. XSLOPE Bishop 1.142 / Spencer 1.140 vs Slide 1.147 / 1.145, UTEXAS4 1.14; the vendor .gsz was saved unsolved. — [details](#gs-2-35) |
+| 2.36 | Pockoski & Duncan – Reinforcement | covered | Same problem as [Rocscience #59](rocscience.md#vp59) — P&D (2000) single-row tieback in sand, under-designed (FS < 1). XSLOPE Janbu 0.579 / Corps 0.577 vs SLOPE/W's own Janbu 0.575 / Lowe 0.587. — [details](#gs-2-36) |
+| 2.37 | Pockoski & Duncan – Soil Nails | covered | Same problem as [Rocscience #60](rocscience.md#vp60) — P&D (2000) soil-nailed wall. XSLOPE Spencer 1.010 vs SLOPE/W's own 1.000 and Slide 1.009. — [details](#gs-2-37) |
 | 2.38 | Loukidis – Seismic Coefficient | **built** | [vp062a/b.xlsx](../files/rocscience/vp062a.xlsx) (Rocscience #62): Spencer 1.001 (both cases) vs SLOPE/W 1.00 — exact. — [details](#gs-2-38) |
 | 2.39 | Loukidis – Seismic Coefficient #2 | partial | See Rocscience #63 — outline pinned from the paper, interface anchors still ambiguous. |
 | 2.40 | Rapid Drawdown – Walter Bouldin Dam | **built** | Same problem as Slide [VP98](rocscience.md#vp98): xslope DWW 3-stage 1.046 vs SLOPE/W Bishop 1.016 / Spencer 1.02, DWW 1.04. — [details](#gs-2-40) |
@@ -748,6 +748,86 @@ A homogeneous slope stabilized by a row of micro-piles, verifying pile-reinforce
 The unreinforced case matches SLOPE/W essentially exactly (1.100 vs 1.102), while the reinforced FS spreads because pile-force conventions differ program-to-program.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.34; Yamagami.
+
+### 2.35 — Pockoski & Duncan – Tie-Back Wall {#gs-2-35}
+
+Pockoski & Duncan (2000)'s tied-back excavation wall: a 44-ft wall in eight horizontal
+soil layers (granular and cohesive fills over organic silt, an over-consolidated crust,
+marine clays and glaciomarine deposits), water table at grade in front and el. 102.5
+behind, retained by three tieback rows at 20° whose capacity is bond-governed at 40,000
+lb/ft of wall. It shares the `vp058.xlsx` XSLOPE input with the Rocscience corpus, so the
+full geometry, layer strengths and anchor layout are deferred to the linked Rocscience
+detail.
+
+**Input:** [vp058.xlsx](../files/rocscience/vp058.xlsx) · **Rocscience detail:** [VP58](rocscience.md#vp58)
+
+![vp058: inputs and representative solution](images/vp058.png)
+
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Bishop | 1.142 | — (file saved unsolved) | Slide 1.147; UTEXAS4 1.14; P&D SLOPE/W 1.14 |
+| Spencer | 1.140 | — | Slide 1.145; UTEXAS4 1.14 |
+
+The vendor `.gsz` was saved unsolved, so SLOPE/W's own critical factor of safety is not in
+the file; the SLOPE/W reference is the value Pockoski & Duncan themselves reported for it
+(1.14). XSLOPE's Bishop and Spencer (1.142 / 1.140) sit within the published cluster. The
+P&D (2000) report — held in the reference library — supplies the eight-layer section,
+strengths and anchor capacities that de-stale this row.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.35; Pockoski & Duncan (2000).
+
+### 2.36 — Pockoski & Duncan – Reinforcement {#gs-2-36}
+
+Pockoski & Duncan (2000)'s single-row tieback wall in homogeneous sand (c′ = 0, φ′ = 30°)
+with the water table drawn down to the wall face — under-designed on purpose, so every
+published factor of safety is below 1. It shares the `vp059.xlsx` XSLOPE input with the
+Rocscience corpus, so the full geometry and inputs are deferred to the linked Rocscience
+detail.
+
+**Input:** [vp059.xlsx](../files/rocscience/vp059.xlsx) · **Rocscience detail:** [VP59](rocscience.md#vp59)
+
+![vp059: inputs and representative solution](images/vp059.png)
+
+| Method | XSLOPE | SLOPE/W (own solve) | Reference |
+|---|---|---|---|
+| Janbu simplified | 0.579 | 0.575 | Slide 0.583; P&D SLOPE/W 0.61 |
+| Corps / Lowe-Karafiath | 0.577 | 0.587 (Lowe) | Slide 0.588 |
+
+XSLOPE's force-family lock (Janbu 0.579, Corps 0.577) matches SLOPE/W's own current solve
+(Janbu 0.575, Lowe-Karafiath 0.587) to within 1–2% — tighter than the historical
+inter-program spread this problem was built to expose (published Bishop values alone span
+0.56–0.74). Spencer and Morgenstern-Price are inadmissible on the prescribed non-circular
+surface in XSLOPE (base normals near the wall go into tension), so the force-equilibrium
+methods carry the lock; SLOPE/W's own search rides a circular critical surface where its
+Spencer converges at 0.564 and Bishop at 0.531. The P&D (2000) report supplies the sand
+strengths, drawn-down water table and anchor layout.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.36; Pockoski & Duncan (2000).
+
+### 2.37 — Pockoski & Duncan – Soil Nails {#gs-2-37}
+
+Pockoski & Duncan (2000)'s 25-ft soil-nailed wall in undrained sandy clay (c = 800 psf,
+φ = 0) under a 250-psf crest surcharge plus a 500-psf strip, with a dry 7-ft tension crack
+and five passive nail rows at 15°. It shares the `vp060.xlsx` XSLOPE input with the
+Rocscience corpus, so the full geometry, surcharges and nail capacities are deferred to
+the linked Rocscience detail.
+
+**Input:** [vp060.xlsx](../files/rocscience/vp060.xlsx) · **Rocscience detail:** [VP60](rocscience.md#vp60)
+
+![vp060: inputs and representative solution](images/vp060.png)
+
+| Method | XSLOPE | SLOPE/W (own solve) | Reference |
+|---|---|---|---|
+| Spencer | 1.010 | 1.000 | Slide 1.009; P&D SLOPE/W 1.02 |
+| Janbu simplified | 1.043 | — | Slide 1.041; P&D SLOPE/W 1.07 |
+| Bishop | — | 0.995 | — |
+
+XSLOPE's Spencer (1.010) matches SLOPE/W's own solved Spencer (1.000) to 1% and Slide
+(1.009) essentially exactly; the nailed wall is designed for a factor of safety near 1.
+The P&D (2000) report supplies the surcharge pattern, tension-crack depth and five-row
+nail layout that de-stale this row.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.37; Pockoski & Duncan (2000).
 
 ### 2.38 — Loukidis – Seismic Coefficient {#gs-2-38}
 

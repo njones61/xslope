@@ -46,10 +46,15 @@ class MeshWorker(QObject):
                 target = options.get("target_size", 1.0)
             extra = (f", {n_reinf} reinforcement + {n_pile} pile line(s)"
                      if (n_reinf + n_pile) else "")
-            print(f"Building {element_type} mesh, target size {target:.3g}{extra}…")
+            refine = None
+            if options.get("refine_near_features", False):
+                refine = float(options.get("refine_factor", 3.0))
+            refine_msg = f", refine x{refine:g} near features" if refine else ""
+            print(f"Building {element_type} mesh, target size {target:.3g}{extra}{refine_msg}…")
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
-                                            lines=constraint_lines or None)
+                                            lines=constraint_lines or None,
+                                            refine_factor=refine)
             n1d = len(mesh.get("elements_1d", []))
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "
                   f"elements" + (f", {n1d} 1D elements" if n1d else "") + ".")

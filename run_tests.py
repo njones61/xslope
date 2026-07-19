@@ -166,7 +166,7 @@ def parse_test_tags(md_path):
 
         # Convert numeric fields
         for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta',
-                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol']:
+                    'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor']:
             if key in params:
                 params[key] = float(params[key])
         if 'num_slices' in params:
@@ -188,6 +188,21 @@ def parse_test_tags(md_path):
             tests.append(params)
 
     return tests
+
+
+def _refine_kwargs(test):
+    """Optional feature-aware mesh-refinement knobs from a test tag, as build-mesh
+    kwargs. ``refine_factor=N`` turns it on (None/absent = OFF = byte-identical mesh);
+    ``refine_features=a;b`` (semicolon-delimited, since the tag splits on commas)
+    selects feature classes, defaulting to all. Returns {} when no refinement."""
+    rf = test.get('refine_factor')
+    if rf is None:
+        return {}
+    kw = {'refine_factor': float(rf)}
+    feats = test.get('refine_features')
+    if feats:
+        kw['refine_features'] = [s.strip() for s in str(feats).split(';') if s.strip()]
+    return kw
 
 
 def run_lem_test(test):
@@ -472,7 +487,8 @@ def run_fem_test(test):
         mesh = build_mesh_from_polygons(
             polygons, target_size=target_size, element_type=element_type,
             lines=constraint_lines,
-            point_constraints=extract_point_constraints(slope_data)
+            point_constraints=extract_point_constraints(slope_data),
+            **_refine_kwargs(test)
         )
 
     fem_data = build_fem_data(slope_data, mesh)
@@ -537,7 +553,8 @@ def run_seep_test(test):
     if target_size is None:
         x_coords = [x for x, _ in slope_data['ground_surface'].coords]
         target_size = (max(x_coords) - min(x_coords)) / 120
-    mesh = build_mesh_from_polygons(polygons, target_size, element_type)
+    mesh = build_mesh_from_polygons(polygons, target_size, element_type,
+                                    **_refine_kwargs(test))
 
     seep_data = build_seep_data(mesh, slope_data)
     solution = run_seepage_analysis(seep_data, tol=1e-4,

@@ -231,7 +231,234 @@ def make_polygons_conforming(polygon_coords, tol=1e-8, debug=False):
     return polygon_coords
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None):
+# ---------------------------------------------------------------------------
+# Feature-aware mesh refinement (gmsh native size fields)
+#
+# When build_mesh_from_polygons is called with refine_factor set, the local
+# element size is driven down to target_size/refine_factor near model features
+# (reinforcement/pile lines, crack/notch tips, and thin material zones) using
+# gmsh Distance+Threshold size fields composed with a Min background field. The
+# refinement is OPT-IN: with refine_factor=None (the default) no size field is
+# created and the mesh is byte-identical to the historical output. The feature
+# classes and the numeric constants below are corpus-tuned and are NOT part of
+# the public surface — only refine_factor and refine_features are.
+# ---------------------------------------------------------------------------
+
+_REFINE_FEATURES = ('reinforcement', 'piles', 'cracks', 'thin_zones')
+_REFINE_GROWTH_RATIO = 1.3      # element-to-element size growth away from a feature
+_REFINE_BAND_ELEMS = 2.0        # full-refinement band radius = 2 local element widths
+_REFINE_CRACK_TIP_MULT = 2.0    # crack tips refine 2x stronger than the base factor
+_REFINE_THIN_MIN_ELEMS = 3      # fit >= 3 elements across a thin zone's local width
+_REFINE_CRACK_ANGLE_DEG = 30.0  # a polygon vertex sharper than this is a notch/crack tip
+
+
+def _refine_threshold_band(gmsh, in_field, size_min, size_max):
+    """Add a gmsh Threshold field over ``in_field`` (a Distance field): refine to
+    ``size_min`` within a band of _REFINE_BAND_ELEMS local widths, then grow to
+    ``size_max`` over a transition sized so the element-to-element growth stays near
+    _REFINE_GROWTH_RATIO. Returns the new field tag."""
+    band = _REFINE_BAND_ELEMS * size_min
+    trans = (size_max - size_min) / (_REFINE_GROWTH_RATIO - 1.0)
+    ft = gmsh.model.mesh.field.add("Threshold")
+    gmsh.model.mesh.field.setNumber(ft, "InField", in_field)
+    gmsh.model.mesh.field.setNumber(ft, "SizeMin", size_min)
+    gmsh.model.mesh.field.setNumber(ft, "SizeMax", size_max)
+    gmsh.model.mesh.field.setNumber(ft, "DistMin", band)
+    gmsh.model.mesh.field.setNumber(ft, "DistMax", band + trans)
+    return ft
+
+
+def detect_crack_tips(polygon_coords, angle_thresh_deg=_REFINE_CRACK_ANGLE_DEG):
+    """Detect V-notch / crack tips in the material polygons.
+
+    A boundary vertex whose two incident edges meet at an interior angle sharper
+    than ``angle_thresh_deg`` forms a thin re-entrant spike — exactly the wall-crack
+    idiom the seepage sheet-pile / clay-blanket samples build (a ground surface that
+    dips straight to the wall tip and back up, leaving a narrow slit; the tip is the
+    deepest vertex of that notch). Returns a de-duplicated, sorted list of ``(x, y)``
+    tip coordinates so downstream field construction is deterministic.
+    """
+    import math
+    cos_thresh = math.cos(math.radians(angle_thresh_deg))
+    tips = {}
+    for poly in polygon_coords:
+        pts = remove_duplicate_endpoint(list(poly))
+        n = len(pts)
+        if n < 3:
+            continue
+        for i in range(n):
+            a = pts[(i - 1) % n]
+            v = pts[i]
+            b = pts[(i + 1) % n]
+            ux, uy = a[0] - v[0], a[1] - v[1]
+            wx, wy = b[0] - v[0], b[1] - v[1]
+            lu = math.hypot(ux, uy)
+            lw = math.hypot(wx, wy)
+            if lu < 1e-12 or lw < 1e-12:
+                continue
+            # cos(angle) near 1 => the two edges point nearly the same way from v,
+            # i.e. a narrow spike (a crack/notch tip), not an ordinary corner.
+            cos_ang = (ux * wx + uy * wy) / (lu * lw)
+            if cos_ang > cos_thresh:
+                tips[(round(v[0], 9), round(v[1], 9))] = (v[0], v[1])
+    return [tips[k] for k in sorted(tips.keys())]
+
+
+def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_ELEMS):
+    """Detect thin material zones — pinches and slender (possibly inclined) bands whose
+    local width is too small to fit ``min_elems`` elements at ``target_size``.
+
+    Erosion test: a material polygon that vanishes when eroded by ``min_elems*target_size/2``
+    is thin EVERYWHERE (its local width < ``min_elems*target_size``) — a soft band is the
+    canonical case. Because such a band is often inclined, its axis-aligned bounding box is
+    a poor proxy; it is flagged as a ``'whole'`` zone so the caller can restrict a size
+    field to the polygon's own surface and follow its shape exactly.
+
+    For polygons that survive erosion, a morphological opening (erode then dilate back)
+    isolates any LOCAL pinch — the residue ``polygon - opening`` keeps only the parts
+    thinner than ``min_elems*target_size``. A pinch is emitted as a ``'box'`` zone ONLY
+    when it is compact (both bbox dimensions within a few element sizes); spread-out
+    residues of otherwise-thick polygons are corner artifacts and are skipped, since an
+    axis-aligned box over them would explode the node count without resolving a real
+    feature.
+
+    Returns a deterministic list of dicts. ``'whole'`` zones:
+    ``{kind:'whole', poly_index:i, width, size}``. ``'box'`` zones:
+    ``{kind:'box', bbox:(xmin,ymin,xmax,ymax), width, size}``. ``size = width/min_elems``.
+    """
+    from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
+    w_half = min_elems * target_size / 2.0
+    min_area = target_size ** 2            # ignore residues smaller than one element
+    max_box = _REFINE_BAND_ELEMS * min_elems * target_size   # compactness limit for a pinch box
+    whole, boxes = [], []
+    for idx, poly in enumerate(polygon_coords):
+        pts = remove_duplicate_endpoint(list(poly))
+        if len(pts) < 3:
+            continue
+        try:
+            P = Polygon(pts)
+            if not P.is_valid:
+                P = P.buffer(0)
+            if P.is_empty or P.area <= 0 or P.length <= 0:
+                continue
+            eroded = P.buffer(-w_half)
+        except Exception:
+            continue
+        if eroded.is_empty:
+            # Thin everywhere -> whole-polygon zone (handles inclined bands exactly).
+            width = 2.0 * P.area / P.length
+            whole.append({'kind': 'whole', 'poly_index': idx,
+                          'width': width, 'size': width / min_elems})
+            continue
+        # Survived erosion: isolate any compact local pinch.
+        try:
+            residue = P.difference(eroded.buffer(+w_half))
+        except Exception:
+            continue
+        if residue.is_empty:
+            continue
+        geoms = residue.geoms if isinstance(residue, (MultiPolygon, GeometryCollection)) else [residue]
+        for g in geoms:
+            area = getattr(g, 'area', 0.0)
+            length = getattr(g, 'length', 0.0)
+            if area < min_area or length < 1e-9:
+                continue
+            xmin, ymin, xmax, ymax = g.bounds
+            if (xmax - xmin) > max_box or (ymax - ymin) > max_box:
+                continue                    # not a localized pinch — skip (node-safety)
+            width = 2.0 * area / length
+            boxes.append({'kind': 'box',
+                          'bbox': (round(xmin, 9), round(ymin, 9),
+                                   round(xmax, 9), round(ymax, 9)),
+                          'width': width, 'size': width / min_elems})
+    whole.sort(key=lambda d: d['poly_index'])
+    boxes.sort(key=lambda d: d['bbox'])
+    return whole + boxes
+
+
+def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
+                              polygon_coords, line_curve_tags, point_map,
+                              surface_tags_by_polygon, debug=False):
+    """Install gmsh native size fields for feature-aware refinement as the background
+    mesh: a Distance+Threshold band per line/crack feature and a surface-restricted
+    (or boxed) size per thin zone, all composed with a Min field. Only called when
+    ``refine_factor`` is not None. Returns the number of fields added."""
+    fields = []
+    base_min = target_size / refine_factor
+    floor = base_min / _REFINE_CRACK_TIP_MULT     # finest size any feature may request
+
+    # Reinforcement + pile lines: at the mesher both arrive as embedded `lines`
+    # (curve tags), indistinguishable here, so either feature flag refines all of
+    # them — a Distance field to the nearest polyline, then a Threshold band.
+    if line_curve_tags and ({'reinforcement', 'piles'} & refine_set):
+        fd = gmsh.model.mesh.field.add("Distance")
+        gmsh.model.mesh.field.setNumbers(fd, "CurvesList", sorted(line_curve_tags))
+        gmsh.model.mesh.field.setNumber(fd, "Sampling", 200)
+        fields.append(_refine_threshold_band(gmsh, fd, base_min, target_size))
+
+    # Crack / notch tips: strongest refinement (base factor x _REFINE_CRACK_TIP_MULT).
+    if 'cracks' in refine_set:
+        tip_tags = []
+        for (x, y) in detect_crack_tips(polygon_coords):
+            t = point_map.get((x, y))
+            if t is not None:
+                tip_tags.append(t)
+        if tip_tags:
+            fd = gmsh.model.mesh.field.add("Distance")
+            gmsh.model.mesh.field.setNumbers(fd, "PointsList", sorted(tip_tags))
+            fields.append(_refine_threshold_band(gmsh, fd, floor, target_size))
+
+    # Thin material zones: whole-thin polygons get a size field restricted to their
+    # own surface (follows an inclined band exactly, no over-refinement); compact
+    # local pinches get a Box. Both are clamped to [floor, target_size].
+    if 'thin_zones' in refine_set:
+        for zone in detect_thin_zones(polygon_coords, target_size):
+            size = min(max(zone['size'], floor), target_size)
+            if zone['kind'] == 'whole':
+                surf = None
+                if 0 <= zone['poly_index'] < len(surface_tags_by_polygon):
+                    surf = surface_tags_by_polygon[zone['poly_index']]
+                if surf is None:
+                    continue
+                fc = gmsh.model.mesh.field.add("Constant")
+                gmsh.model.mesh.field.setNumber(fc, "VIn", size)
+                gmsh.model.mesh.field.setNumber(fc, "VOut", 1e22)   # inert outside the zone
+                gmsh.model.mesh.field.setNumbers(fc, "SurfacesList", [surf])
+                gmsh.model.mesh.field.setNumber(fc, "IncludeBoundary", 1)
+                fields.append(fc)
+            else:
+                xmin, ymin, xmax, ymax = zone['bbox']
+                fb = gmsh.model.mesh.field.add("Box")
+                gmsh.model.mesh.field.setNumber(fb, "VIn", size)
+                gmsh.model.mesh.field.setNumber(fb, "VOut", target_size)
+                gmsh.model.mesh.field.setNumber(fb, "XMin", xmin)
+                gmsh.model.mesh.field.setNumber(fb, "XMax", xmax)
+                gmsh.model.mesh.field.setNumber(fb, "YMin", ymin)
+                gmsh.model.mesh.field.setNumber(fb, "YMax", ymax)
+                gmsh.model.mesh.field.setNumber(fb, "ZMin", -1.0)
+                gmsh.model.mesh.field.setNumber(fb, "ZMax", 1.0)
+                gmsh.model.mesh.field.setNumber(fb, "Thickness", max(zone['width'], size))
+                fields.append(fb)
+
+    if not fields:
+        if debug:
+            print("[refine] no features detected for "
+                  f"features={sorted(refine_set)} — mesh unchanged")
+        return 0
+    fmin = gmsh.model.mesh.field.add("Min")
+    gmsh.model.mesh.field.setNumbers(fmin, "FieldsList", sorted(fields))
+    gmsh.model.mesh.field.setAsBackgroundMesh(fmin)
+    # Let the size fields (not boundary extension) govern the interior: without this,
+    # a finely-divided feature boundary bleeds its small size deep into neighbouring
+    # zones, exploding the node count for a long thin band. OFF path is untouched.
+    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+    if debug:
+        print(f"[refine] installed {len(fields)} size field(s), factor={refine_factor}, "
+              f"features={sorted(refine_set)}")
+    return len(fields)
+
+
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -247,6 +474,15 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
         target_size_1d : Optional target size for 1D elements (default None, which is set to target_size if None)
         profile_lines: Optional list of profile line dicts with 'mat_id' keys for material assignment
+        refine_factor: Optional feature-aware auto-refinement. None (default) = OFF; the
+                      mesh is byte-identical to the historical output. A value > 1 drives the
+                      local element size down to target_size/refine_factor near model features
+                      (reinforcement/pile lines, crack/notch tips, thin material zones) using
+                      gmsh native size fields, growing smoothly back to target_size away from
+                      them. Crack tips refine twice as strongly.
+        refine_features: Optional list selecting which feature classes to refine near, from
+                      {'reinforcement','piles','cracks','thin_zones'}. None = all four. Ignored
+                      when refine_factor is None.
 
     Returns:
         mesh dict containing:
@@ -268,6 +504,25 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         target_size_1d = target_size
         if debug:
             print(f"Using default target_size_1d = target_size = {target_size_1d}")
+
+    # Validate / normalize feature-aware refinement. refine_factor is None => OFF
+    # and NOTHING below changes (byte-identical to the historical mesh).
+    if refine_factor is not None:
+        if not (refine_factor > 1.0):
+            raise ValueError(
+                "refine_factor must be > 1.0 (local size = target_size/refine_factor); "
+                f"got {refine_factor!r}. Use None to disable refinement.")
+        if refine_features is None:
+            refine_set = set(_REFINE_FEATURES)
+        else:
+            refine_set = set(refine_features)
+            unknown = refine_set - set(_REFINE_FEATURES)
+            if unknown:
+                raise ValueError(
+                    f"refine_features contains unknown entries {sorted(unknown)}; "
+                    f"valid options are {sorted(_REFINE_FEATURES)}")
+    else:
+        refine_set = set()
 
     # Normalize polygons to coordinate lists and optional mat_id
     polygon_coords = []
@@ -379,6 +634,31 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         """Get canonical edge key (always smaller point first)"""
         return (min(pt1, pt2), max(pt1, pt2))
 
+    # Feature-aware refinement, thin-zone boundary sizing (opt-in). A whole-thin
+    # material polygon (e.g. a soft band) refines to a finer element size, but the
+    # long-edge transfinite constraints below would otherwise pin its boundary at
+    # the coarse target size and block the size field from resolving across it. So
+    # pre-compute a finer transfinite element size for the boundary edges of each
+    # whole-thin polygon, keyed by the (rounded) coordinate pair, and honor it when
+    # the long-edge transfinite constraint is set. Empty (no override) when OFF.
+    thin_edge_size = {}
+    if refine_factor is not None and 'thin_zones' in refine_set:
+        _floor = target_size / (refine_factor * _REFINE_CRACK_TIP_MULT)
+        for _zone in detect_thin_zones(polygon_coords, target_size):
+            if _zone['kind'] != 'whole':
+                continue
+            _i = _zone['poly_index']
+            if not (0 <= _i < len(polygon_coords)):
+                continue
+            _size = min(max(_zone['size'], _floor), target_size)
+            _ring = remove_duplicate_endpoint(list(polygon_coords[_i]))
+            for _j in range(len(_ring)):
+                _a = _ring[_j]
+                _b = _ring[(_j + 1) % len(_ring)]
+                _key = frozenset([(round(_a[0], 9), round(_a[1], 9)),
+                                  (round(_b[0], 9), round(_b[1], 9))])
+                thin_edge_size[_key] = min(thin_edge_size.get(_key, _size), _size)
+
     # First pass: Create all points and identify short edges
     polygon_data = []
     short_edge_points = set()  # Points that are endpoints of short edges
@@ -468,6 +748,15 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             if edge_length > adjusted_target_size * 3:  # Long edge
                 # Calculate how many elements should be along this edge
                 num_elements = max(3, int(edge_length / adjusted_target_size))
+                # Feature-aware refinement: a whole-thin polygon's boundary edge is
+                # divided at its finer element size so the size field can resolve
+                # across the band instead of being pinned to the coarse target.
+                if thin_edge_size:
+                    _ek = frozenset([(round(pt1_coords[0], 9), round(pt1_coords[1], 9)),
+                                     (round(pt2_coords[0], 9), round(pt2_coords[1], 9))])
+                    _sz = thin_edge_size.get(_ek)
+                    if _sz:
+                        num_elements = max(num_elements, int(round(edge_length / _sz)))
                 try:
                     gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, num_elements)
                     if debug:
@@ -684,28 +973,34 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
 
     # Third pass: Create surfaces using the shared lines
     surface_to_region = {}
-    
+    # Surface tag per polygon (in polygon_coords order); None where creation failed.
+    # Used by feature-aware thin-zone refinement to Restrict a size field to a
+    # whole-thin material polygon's own surface (follows an inclined band exactly).
+    surface_tags_by_polygon = []
+
     for poly_data in polygon_data:
         region_id = poly_data['region_id']
         edges = poly_data['edges']
-        
+
         line_tags = []
         for pt1, pt2, edge_key, forward in edges:
             line_tag = edge_map[edge_key]
-            
+
             # Use positive or negative line tag based on orientation
             if forward:
                 line_tags.append(line_tag)
             else:
                 line_tags.append(-line_tag)
-        
+
         # Create curve loop and surface
         try:
             loop = gmsh.model.geo.addCurveLoop(line_tags)
             surface = gmsh.model.geo.addPlaneSurface([loop])
             surface_to_region[surface] = region_id
+            surface_tags_by_polygon.append(surface)
         except Exception as e:
             print(f"Warning: Could not create surface for region {region_id}: {e}")
+            surface_tags_by_polygon.append(None)
             continue
 
     # Synchronize geometry
@@ -823,7 +1118,18 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     gmsh.option.setNumber("Mesh.ToleranceInitialDelaunay", 1e-12)
     
     # Short edge control is now handled by point sizing during geometry creation
-    
+
+    # Feature-aware auto refinement (opt-in). With refine_factor is None this block
+    # is skipped entirely and no size field is installed, so the generated mesh is
+    # byte-identical to the historical output. When set, native gmsh size fields
+    # drive the element size down near features; gmsh composes them with the existing
+    # point/boundary sizing by taking the minimum, so far-field sizing is unchanged.
+    if refine_factor is not None:
+        all_line_curve_tags = [t for info in line_data for t in info['line_tags']]
+        _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
+                                  polygon_coords, all_line_curve_tags, point_map,
+                                  surface_tags_by_polygon, debug=debug)
+
     # Generate mesh
     gmsh.model.mesh.generate(2)
     

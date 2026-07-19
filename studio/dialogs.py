@@ -365,6 +365,21 @@ class BuildMeshDialog(QDialog):
         self.target_size.setValue(float(defaults.get("target_size", 1.0)))
         form.addRow("Target element size", self.target_size)
 
+        self.refine_near_features = QCheckBox("Refine near features")
+        self.refine_near_features.setChecked(bool(defaults.get("refine_near_features", False)))
+        self.refine_near_features.setToolTip(
+            "Shrink elements near reinforcement/pile lines, crack tips and thin "
+            "material zones, growing back to the target size away from them.")
+        form.addRow("", self.refine_near_features)
+
+        self.refine_factor = QDoubleSpinBox()
+        self.refine_factor.setRange(1.1, 100.0)
+        self.refine_factor.setDecimals(1)
+        self.refine_factor.setSingleStep(0.5)
+        self.refine_factor.setValue(float(defaults.get("refine_factor", 3.0)))
+        self.refine_factor.setToolTip("Local element size = target size / factor at features.")
+        form.addRow("Refinement factor", self.refine_factor)
+
         layout.addLayout(form)
         note = QLabel("Auto-size sets the target element size to the slope width "
                       "divided by the number of divisions.")
@@ -378,12 +393,14 @@ class BuildMeshDialog(QDialog):
         layout.addWidget(bb)
 
         self.auto_size.toggled.connect(self._sync_enabled)
+        self.refine_near_features.toggled.connect(self._sync_enabled)
         self._sync_enabled()
 
     def _sync_enabled(self):
         auto = self.auto_size.isChecked()
         self.size_divisions.setEnabled(auto)
         self.target_size.setEnabled(not auto)
+        self.refine_factor.setEnabled(self.refine_near_features.isChecked())
 
     def options(self):
         return {
@@ -391,6 +408,8 @@ class BuildMeshDialog(QDialog):
             "auto_size": self.auto_size.isChecked(),
             "size_divisions": self.size_divisions.value(),
             "target_size": self.target_size.value(),
+            "refine_near_features": self.refine_near_features.isChecked(),
+            "refine_factor": self.refine_factor.value(),
         }
 
 

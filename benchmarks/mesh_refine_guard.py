@@ -1,0 +1,182 @@
+"""Guard for feature-aware auto mesh refinement in ``build_mesh_from_polygons``.
+
+The mesher accepts an optional ``refine_factor`` (with an optional ``refine_features``
+list): when set, gmsh native size fields (Distance + Threshold per feature, composed
+with a Min background field) drive the local element size down to
+``target_size/refine_factor`` near model features — reinforcement/pile lines, crack /
+notch tips, and thin material zones — growing smoothly back to ``target_size`` away
+from them. With ``refine_factor=None`` (the default) NO size field is created and the
+mesh is byte-identical to the historical output.
+
+This guard asserts the contract on tiny, hand-checkable fixtures (no corpus files):
+
+  1. INVARIANCE (byte-identical OFF). ``refine_factor=None`` produces a mesh whose
+     node / element arrays are byte-identical to omitting the argument entirely, twice.
+
+  2. REFINE NEAR A LINE. On a 10x10 square with one interior reinforcement line,
+     ``refine_factor`` makes the mean element edge NEAR the line materially smaller
+     than the target size, while elements FAR from the line stay near the target size
+     (refinement is local, not global).
+
+  3. DETERMINISM. The refined mesh is bit-identical when built twice from the same
+     inputs (gmsh is seeded/ordered) — the regression locks depend on this.
+
+  4. FEATURE DETECTION. ``detect_crack_tips`` finds the tip of a V-notch and ignores
+     ordinary corners; ``detect_thin_zones`` flags a slender band as a whole-thin zone
+     sized to fit >= 3 elements across, and leaves a thick block alone.
+
+  5. VALIDATION. ``refine_factor <= 1`` and an unknown ``refine_features`` entry both
+     raise ValueError (they do not silently no-op).
+
+Run from the repo root:  PYTHONPATH=. python3 benchmarks/mesh_refine_guard.py
+Exits non-zero on any failure.
+"""
+import hashlib
+import sys
+
+import numpy as np
+
+from xslope.mesh import (build_mesh_from_polygons, detect_crack_tips,
+                         detect_thin_zones)
+
+SQUARE = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+REINF_LINE = [(2.0, 5.0), (8.0, 5.0)]     # interior, horizontal at y = 5
+
+
+def _digest(mesh):
+    h = hashlib.sha256()
+    for k in ("nodes", "elements", "element_types", "element_materials"):
+        h.update(np.ascontiguousarray(np.asarray(mesh[k])).tobytes())
+    return h.hexdigest()[:16]
+
+
+def _mean_edge(mesh):
+    """Mean tri edge length and element centroids (linear tri3 corners)."""
+    nodes, elems = mesh["nodes"], mesh["elements"]
+    sizes, cents = [], []
+    for e in elems:
+        pts = nodes[e[:3]]
+        sizes.append(np.mean([np.linalg.norm(pts[i] - pts[(i + 1) % 3]) for i in range(3)]))
+        cents.append(pts.mean(axis=0))
+    return np.array(sizes), np.array(cents)
+
+
+def _dist_to_line(cents, a, b):
+    a, b = np.array(a), np.array(b)
+    ab = b - a
+    out = []
+    for p in cents:
+        t = np.clip(np.dot(p - a, ab) / np.dot(ab, ab), 0.0, 1.0)
+        out.append(np.linalg.norm(p - (a + t * ab)))
+    return np.array(out)
+
+
+def main():
+    failures = []
+    ts = 1.0
+    poly = [{"coords": SQUARE, "mat_id": 0}]
+
+    # (1) INVARIANCE: refine_factor=None is byte-identical to omitting the argument.
+    m_omit = build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                      lines=[REINF_LINE])
+    m_none = build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                      lines=[REINF_LINE], refine_factor=None)
+    if _digest(m_omit) != _digest(m_none):
+        failures.append("refine_factor=None differs from omitting the argument")
+    else:
+        # and it is itself reproducible
+        m_omit2 = build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                           lines=[REINF_LINE])
+        if _digest(m_omit) != _digest(m_omit2):
+            failures.append("OFF mesh is not reproducible run-to-run")
+        else:
+            print(f"[invariance] refine_factor=None is byte-identical to OFF, twice "
+                  f"({_digest(m_omit)}, {len(m_omit['nodes'])} nodes)")
+
+    # (2) REFINE NEAR A LINE: local, not global.
+    factor = 4.0
+    m_ref = build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                     lines=[REINF_LINE], refine_factor=factor,
+                                     refine_features=["reinforcement"])
+    sizes, cents = _mean_edge(m_ref)
+    d = _dist_to_line(cents, REINF_LINE[0], REINF_LINE[1])
+    near = sizes[d < 0.5]
+    far = sizes[d > 4.0]
+    local = ts / factor
+    if near.size == 0 or far.size == 0:
+        failures.append("could not sample near/far element populations")
+    elif near.min() >= 0.5 * ts:
+        # the field drives the smallest near-line elements toward local = ts/factor
+        failures.append(f"no genuinely small elements near the line: min {near.min():.3f} "
+                        f"(target {ts}, local {local})")
+    elif far.mean() <= 1.5 * near.mean():
+        failures.append(f"far elements not coarse relative to near: far {far.mean():.3f} "
+                        f"vs near {near.mean():.3f} (refinement not local)")
+    else:
+        print(f"[refine] near-line min edge {near.min():.3f} / mean {near.mean():.3f} "
+              f"(local target {local}), far mean edge {far.mean():.3f} (target {ts}) — "
+              f"refinement is local")
+
+    # (3) DETERMINISM: refined mesh identical when rebuilt.
+    m_ref2 = build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                      lines=[REINF_LINE], refine_factor=factor,
+                                      refine_features=["reinforcement"])
+    if _digest(m_ref) != _digest(m_ref2):
+        failures.append(f"refined mesh not deterministic: {_digest(m_ref)} vs {_digest(m_ref2)}")
+    else:
+        print(f"[determinism] refined mesh reproducible ({_digest(m_ref)}, "
+              f"{len(m_ref['nodes'])} nodes vs {len(m_omit['nodes'])} OFF)")
+
+    # (4) FEATURE DETECTION (pure geometry, no gmsh).
+    # A square with a narrow V-notch cut into the top; the tip is (5, 6).
+    notch = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0),
+             (5.05, 10.0), (5.0, 6.0), (4.95, 10.0), (0.0, 10.0)]
+    tips = detect_crack_tips([notch])
+    if tips != [(5.0, 6.0)]:
+        failures.append(f"crack-tip detection wrong: {tips} (expected [(5.0, 6.0)])")
+    elif detect_crack_tips([SQUARE]):
+        failures.append("crack-tip detection false-positived on a plain square")
+    else:
+        print(f"[detect] V-notch tip found at {tips[0]}, plain corners ignored")
+
+    # A slender band (20 x 0.4) is whole-thin; a thick block (10 x 10) is not.
+    band = [(0.0, 0.0), (20.0, 0.0), (20.0, 0.4), (0.0, 0.4)]
+    zones = detect_thin_zones([band, SQUARE], target_size=1.0)
+    whole = [z for z in zones if z["kind"] == "whole" and z["poly_index"] == 0]
+    if not whole:
+        failures.append(f"thin band not flagged whole-thin: {zones}")
+    elif any(z["poly_index"] == 1 for z in zones):
+        failures.append("thick 10x10 block wrongly flagged thin")
+    elif not (0.10 <= whole[0]["size"] <= 0.15):   # 0.4/3 ~ 0.133
+        failures.append(f"thin-zone size {whole[0]['size']:.3f} not ~width/3")
+    else:
+        print(f"[detect] slender band -> whole-thin size {whole[0]['size']:.3f} "
+              f"(>= 3 across 0.4 m), thick block ignored")
+
+    # (5) VALIDATION: bad inputs raise, never silently no-op.
+    try:
+        build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                 lines=[REINF_LINE], refine_factor=1.0)
+        failures.append("refine_factor=1.0 did not raise")
+    except ValueError:
+        pass
+    try:
+        build_mesh_from_polygons(poly, target_size=ts, element_type="tri3",
+                                 lines=[REINF_LINE], refine_factor=3.0,
+                                 refine_features=["bogus"])
+        failures.append("unknown refine_features entry did not raise")
+    except ValueError:
+        print("[guard] refine_factor<=1 and unknown feature both rejected")
+
+    if failures:
+        print("\nFAILED:")
+        for f in failures:
+            print("  -", f)
+        return 1
+    print("\nOK: refinement is byte-identical OFF, refines locally near features, is "
+          "deterministic, detects V-notch tips and thin bands, and validates its inputs.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

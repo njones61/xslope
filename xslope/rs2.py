@@ -35,7 +35,10 @@ as a caveat rather than silently dropped: the SSR/strength-reduction settings
 (xslope's analog is the FEM ``solve_ssrm`` path — the LEM import records them as
 metadata, it does not fabricate an equivalent), strength models other than
 Mohr-Coulomb, finite-element pore-pressure fields and transient seepage, joints,
-liners, bolts/piles, field stress and distributed/line loads.
+liners, bolts/piles, field stress and line loads. Distributed loads DO cross:
+RS2's explicit ponded-water and normal distributed loads are priced into xslope
+distributed loads (see ``_distributed_loads_to_dloads``); only non-perpendicular
+ones are reported-not-imported.
 
 RS2 defines NO limit-equilibrium slip surface (its SSR result is a field), so an
 imported model arrives without a failure surface and must be given circles or a
@@ -508,8 +511,9 @@ def read_fez(path):
     Returns a dict with the model's version, its ``model description`` settings and
     the SSR settings pulled from them, the defined materials (name/model/c/phi/gamma),
     the geometry boundaries, the material-mesh seed triangles, the piezometric lines
-    and their per-material assignment, and counts of the features that will be
-    reported but not imported (joints, liners, bolts/piles, loads).
+    and their per-material assignment, the distributed loads (parsed for pricing into
+    dloads), and counts of the features that will be reported but not imported
+    (joints, liners, bolts/piles, line loads).
 
     Coordinates are as-authored; no unit conversion is applied here.
 

@@ -54,6 +54,7 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import polygonize, unary_union
 
 from .fileio import build_ground_surface_from_polygons
+from .water import _y_on
 
 
 # Unit weight of water, used to price pore pressure and to name the unit system.
@@ -354,6 +355,149 @@ def _count_block_children(lines, header, child_prefix):
     return sum(1 for i in range(s + 1, e) if lines[i].strip().startswith(child_prefix))
 
 
+def _kv_in(lines, start, end, key):
+    """First ``key: value`` value in [start, end), stripped, or None.
+
+    The colon anchors the key, so ``angle`` never matches ``angle_to_bound`` and
+    ``magnitude1`` never matches ``magnitude2``.
+    """
+    pat = re.compile(rf"\s*{re.escape(key)}:\s*(.*)$")
+    for k in range(start, end):
+        m = pat.match(lines[k])
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+def _parse_one_distributed_load(lines, start, end):
+    """Parse one ``distributed load K start:``..``end:`` sub-block into a dict.
+
+    Carries the applied vertices (the polyline the load sits on), the load name, and
+    the ``Dist Load Settings`` that decide how to price it: whether it is a
+    piezo-driven groundwater (ponded-water) load, its referenced piezo, its type and
+    angle (only a perpendicular ``normal`` maps onto xslope), and its magnitudes.
+    """
+    verts = []
+    for k in range(start, end):
+        if lines[k].strip() == "vertices start:":
+            verts, _ = _read_dpoint_array(lines, k)
+            break
+
+    def g(key):
+        return _kv_in(lines, start, end, key)
+
+    def gbool(key):
+        return (g(key) or "").strip().strip('"').lower() in ("yes", "true", "1", "on")
+
+    return {
+        "name": (g("strLoadName") or "").strip().strip('"'),
+        "vertices": verts,
+        "type": (g("type") or "normal").strip().strip('"').lower(),
+        "triangular": gbool("triangular"),
+        "angle": _fnum(g("angle")),
+        "angle_to_bound": _fnum(g("angle_to_bound")),
+        "flip_angle": gbool("flip angle"),
+        "magnitude1": _fnum(g("magnitude1"), 1.0),
+        "magnitude2": _fnum(g("magnitude2"), 1.0),
+        "is_groundwater": gbool("is_groundwater"),
+        "uses_piezos": gbool("usesPiezos"),
+        "uses_grids": gbool("usesGrids"),
+        "piezo_id": int(_fnum(g("piezoID"), 0)),
+        "grid_id": int(_fnum(g("gridID"), 0)),
+    }
+
+
+def _parse_distributed_loads(lines):
+    """The ``new distributed loads`` block as a list of load dicts (empty if absent).
+
+    Mirrors ``_parse_piezos``: the block is a count then one ``distributed load K
+    start:``/``end:`` sub-block each. RS2 stores ponded water HERE, as explicit
+    normal loads flagged ``is_groundwater``+``usesPiezos`` whose intensity is the
+    water pressure on the boundary they name — so unlike Slide2/SLOPE/W the water is
+    NOT synthesized from ground-vs-piezo; RS2's own load objects are authoritative
+    (its piezo convention is a whole-domain surface, which the generic synthesis
+    reads wrong). The pricing is done in ``fez_to_slope_data``; this only reads.
+    """
+    s, e = _block(lines, "new distributed loads start:")
+    if s < 0:
+        return []
+    loads = []
+    i = s + 1
+    while i < e:
+        m = re.match(r"\s*distributed load (\d+) start:", lines[i])
+        if not m:
+            i += 1
+            continue
+        end_tag = f"distributed load {m.group(1)} end:"
+        j = i + 1
+        while j < e and lines[j].strip() != end_tag:
+            j += 1
+        loads.append(_parse_one_distributed_load(lines, i, j))
+        i = j + 1
+    return loads
+
+
+def _distributed_loads_to_dloads(loads, piezos, gamma_water):
+    """Convert parsed RS2 distributed loads into xslope dload blocks.
+
+    Returns ``(dloads, report)``; each dload block is a list of ``{'X','Y','Normal'}``
+    along the loaded polyline, and ``report`` counts what happened.
+
+    * A **ponded-water load** (``is_groundwater``+``usesPiezos``) is priced at its OWN
+      vertices as the water pressure ``gamma_w * max(0, piezo_head(x) - y)`` via the
+      referenced piezo. This is deliberately NOT the ground-vs-piezo synthesis the
+      .gsz/Slide2 importers use: RS2's piezo is a whole-domain surface, so that
+      synthesis would invent a spurious plateau — RS2's own load object is authoritative.
+    * A **plain numeric normal load** imports directly, ``magnitude1`` -> ``magnitude2``
+      linearly along the segment.
+    * Anything **not perpendicular** — a shear/parallel ``type``, a nonzero angle, or a
+      grid-driven groundwater load with no readable piezo — is skipped and counted, since
+      xslope's distributed load carries only a normal (perpendicular) intensity.
+    """
+    dloads = []
+    report = {"water": 0, "plain": 0, "skipped": 0, "peak": 0.0}
+    for load in loads:
+        verts = load.get("vertices") or []
+        angled = (abs(load.get("angle", 0.0)) > 1e-9
+                  or abs(load.get("angle_to_bound", 0.0)) > 1e-9)
+        if len(verts) < 2 or load.get("type", "normal") != "normal" or angled:
+            report["skipped"] += 1
+            continue
+
+        pts = pl = None
+        if load.get("is_groundwater"):
+            if not load.get("uses_piezos"):
+                report["skipped"] += 1            # grid- or head-driven; no piezo to read
+                continue
+            pts = piezos.get(load.get("piezo_id", 0))
+            if not pts or len(pts) < 2:
+                report["skipped"] += 1
+                continue
+            pl = LineString(pts)
+
+        m1, m2 = load.get("magnitude1", 1.0), load.get("magnitude2", 1.0)
+        n = len(verts)
+        block = []
+        for idx, (x, y) in enumerate(verts):
+            mag = m1 + (m2 - m1) * (idx / (n - 1) if n > 1 else 0.0)
+            if pl is not None:
+                head = _y_on(pl, x)
+                if head is None:                  # x past the piezo's span: clamp to its end
+                    head = pts[0][1] if x < pts[0][0] else pts[-1][1]
+                normal = mag * gamma_water * max(0.0, head - y)
+            else:
+                normal = mag
+            block.append({"X": float(x), "Y": float(y), "Normal": float(normal)})
+
+        if not any(abs(p["Normal"]) > 1e-9 for p in block):
+            report["skipped"] += 1                # e.g. a segment that turns out to be dry
+            continue
+        dloads.append(block)
+        report["peak"] = max(report["peak"], max(abs(p["Normal"]) for p in block))
+        report["water" if pl is not None else "plain"] += 1
+    return dloads, report
+
+
 # --------------------------------------------------------------------------------------
 # Reader
 # --------------------------------------------------------------------------------------
@@ -416,6 +560,7 @@ def read_fez(path):
         "piezos": _parse_piezos(lines),
         "material_piezos": _parse_material_piezos(lines),
         "gw_type": gw_type,
+        "distributed_loads": _parse_distributed_loads(lines),
         "counts": {
             "distributed_loads": _count_block_children(
                 lines, "new distributed loads start:", "distributed load"),
@@ -620,6 +765,31 @@ def fez_to_slope_data(d):
             "limit-equilibrium search. xslope's analog is the FEM solve_ssrm path; "
             "these settings are recorded but no LEM search was created from them")
 
+    # --- distributed loads -> dloads ---------------------------------------------
+    # RS2 stores ponded water as explicit "Ponded Water Load" objects in this block,
+    # and previous imports counted them but dropped them (the silent-drop this fix
+    # closes). Convert them — and any plain numeric normal load — to xslope dloads;
+    # RS2's own load objects are authoritative (its piezo convention makes the generic
+    # ground-vs-piezo synthesis wrong here). See _distributed_loads_to_dloads.
+    dloads, dl_report = _distributed_loads_to_dloads(
+        d.get("distributed_loads", []), piezos, gamma_water)
+    if dl_report["water"]:
+        caveats.append(
+            f"{dl_report['water']} RS2 ponded-water load(s) were imported as distributed "
+            f"loads (the water pressure gamma_w*depth on the submerged boundary, up to "
+            f"{dl_report['peak']:.1f} at the deepest point) — RS2 stores these explicitly, "
+            f"so they are now carried, not dropped")
+    if dl_report["plain"]:
+        caveats.append(
+            f"{dl_report['plain']} distributed load(s) were imported directly from RS2 "
+            f"as normal pressure on the named boundary")
+    if dl_report["skipped"]:
+        caveats.append(
+            f"{dl_report['skipped']} distributed load(s) were NOT imported — a non-normal "
+            f"direction, an angled load, or a grid-driven groundwater load has no xslope "
+            f"equivalent (xslope's distributed load is perpendicular to the surface); add "
+            f"them by hand if needed. The factor of safety may differ")
+
     # --- things reported but not imported ----------------------------------------
     counts = d.get("counts", {})
     if counts.get("joint_networks"):
@@ -633,9 +803,8 @@ def fez_to_slope_data(d):
             f"structural support does not map onto xslope's reinforcement, and guessing "
             f"the force would be worse than omitting it; the factor of safety will be "
             f"lower than RS2's. Add reinforcement by hand if needed")
-    if counts.get("distributed_loads") or counts.get("line_loads"):
+    if counts.get("line_loads"):
         caveats.append(
-            f"{counts.get('distributed_loads', 0)} distributed and "
             f"{counts.get('line_loads', 0)} line load(s) are defined in RS2 but were NOT "
             f"imported — add them by hand; the factor of safety will differ")
 
@@ -690,7 +859,7 @@ def fez_to_slope_data(d):
         "circular": False,
         "circles": [],
         "non_circ": [],
-        "dloads": [],
+        "dloads": dloads,
         "dloads2": [],
         "reinforce_lines": [],
         "reinforcement_lines": [],

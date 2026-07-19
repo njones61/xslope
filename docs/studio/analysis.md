@@ -422,8 +422,10 @@ geometry:
 
 **File → Import RS2 (.fez)…** reads a Rocscience RS2 finite-element model. A `.fez` holds
 exactly one model, so the only prompt is the file picker; geometry, materials and water
-conditions import directly, and whatever RS2 defines that cannot cross (its SSR settings,
-joints, reinforcement, loads) comes back in the post-import notes dialog. RS2's stability
+conditions import directly — including RS2's distributed and ponded-water loads, which are
+converted to XSLOPE's perpendicular distributed loads — and whatever RS2 defines that cannot
+cross (its SSR settings, joints, reinforcement, line loads and non-normal loads) comes back
+in the post-import notes dialog. RS2's stability
 result is an SSR field rather than a slip surface, so the import never carries a failure
 surface — you define circles afterward.
 

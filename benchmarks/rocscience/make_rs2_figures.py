@@ -105,10 +105,21 @@ def _build(tag):
             target = float(target)
         lines, _nr, _np = extract_constraint_line_geometry(sd)
         polys = get_material_polygons(sd, reinf_lines=lines)
+        # Feature-aware mesh refinement, matching run_tests._refine_kwargs: a tag
+        # carrying refine_factor=N (and optional refine_features=a;b) must build the
+        # SAME refined mesh the lock was recorded on, or the figure would show the
+        # unrefined coarse mesh and a different FS.
+        refine_kw = {}
+        if tag.get('refine_factor') is not None:
+            refine_kw['refine_factor'] = float(tag['refine_factor'])
+            feats = tag.get('refine_features')
+            if feats:
+                refine_kw['refine_features'] = [s.strip() for s in str(feats).split(';')
+                                                if s.strip()]
         mesh = build_mesh_from_polygons(
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
-            point_constraints=extract_point_constraints(sd))
+            point_constraints=extract_point_constraints(sd), **refine_kw)
     return sd, build_fem_data(sd, mesh)
 
 

@@ -65,12 +65,13 @@ than the mechanics (RS2-9/23), which is a vendor modelling artifice with no repr
 target — those slopes are anchored by their LEM lock instead. The *blocked* rows are tracked against
 a named gap — there is no transient-seepage
 solver (RS2-67, RS2 Part IV VP102 cases 2/3), and some FE-seepage cases do not converge on the
-high-contrast tri6 mesh. A Part IV pair of USACE upstream-pool dams (VP65/66, and the safety-map dam
-VP42) is blocked on a different construct: their shared LEM files carry a flat piezometric *line* at
+high-contrast tri6 mesh. A Part IV pair of USACE upstream-pool dams (VP65/66) and the safety-map dam
+(VP42) share a different construct: their LEM files carry a flat piezometric *line* at
 the pool elevation across the whole domain, which is a valid LEM u-source on the upstream slip surface
 but as a full-field FEM pore pressure over-pressures the dry downstream c = 0 materials (uplift with
-no balancing water load) and yields the mesh at any strength — a proper seepage field, not a
-piezometric line, is what an SSRM of these dams needs. A related c = 0 limit shows up where the
+no balancing water load) — the pool dams never equilibrate, and VP42 equilibrates only onto a
+non-physical c = 0 downstream blowout at SSRM ≈ 0.66, far below its physical value; a proper seepage
+field, not a piezometric line, is what an SSRM of these dams needs. A related c = 0 limit shows up where the
 cohesionless skin simply keeps localizing on the fine mesh (VP69 reported at 1.576 vs RS2 1.94, the
 RS2-40 pattern). Everything
 else is built and regression-locked at its tagged mesh; the corpus is complete relative to what is
@@ -205,7 +206,7 @@ candidates.
 | 39 | Reinforced embankment, geosynthetic (Tandjiria 2002) | **built** | → [RS2-29](#rs2-29). RS2 SSR 0.97 / 1.42 / 1.22 / 1.39. |
 | 40 | Homogeneous, power curve, sensitivity (Perry 1993) | **built** | → [RS2-30](#rs2-30). RS2 SSR 0.97 vs Perry 0.98. |
 | 41 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | **built** | → [P4-VP41](#p4-vp41) (own SSRM build, 1.647). RS2 SSR 1.64 vs Bishop 1.66 / Janbu 1.60–1.67. |
-| 42 | Dam, safety-map example (Baker & Leshchinsky 2001) | *blocked* | The c = 0 granular fill under the reservoir pore-pressure field will not equilibrate in the FEM (the same c = 0 + water over-pressure that blocks the pool dams). On the LEM side XSLOPE reads ~13–19% below the tightly clustered references (Baker 1.91 / Slide 1.925 / SLOPE/W 1.934) — an unexplained program-to-program statics difference, not a weight convention and not the phreatic input (which matches the vendor model within ~0.2 m along the surface); see the re-adjudicated Slide2 [VP42](rocscience.md#vp42) section. RS2 SSR 1.84 lands near the published cluster. |
+| 42 | Dam, safety-map example (Baker & Leshchinsky 2001) | *reported, no lock* | On the LEM side XSLOPE now reproduces the tightly clustered references on all three reference surfaces (XSLOPE Spencer 1.926 / 1.882 / 1.939 vs Slide 1.925 / Baker 1.91 / SLOPE/W 1.934); see the Slide2 [VP42](rocscience.md#vp42) section. On the rebuilt file the FEM does equilibrate, but the flat piezometric *line* applied as a full-field FEM pore field over-pressures the dry downstream c = 0 granular fill (uplift with no balancing water load) and localizes a non-physical blowout at SSRM ≈ 0.66 — far below the physical mechanism, so no lock (the same c = 0 + water over-pressure construct as the pool dams). RS2 SSR 1.84 lands near the published cluster. |
 | 44 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | **built** | → [RS2-31](#rs2-31). RS2 SSR 0.96 / 1.5 / 0.93. |
 | 45 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | **built** | → [RS2-32](#rs2-32). RS2 SSR 2.65 / 2.78 / 2.63. |
 | 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | **built** | → [RS2-51](#rs2-51) (LEM, partial). RS2 SSR 1.22 vs Slide2 Spencer 1.293 / GLE 1.304. |

@@ -175,7 +175,7 @@ the 3D chapter is out of scope and not tracked here.
 | 2.22 | Cannon Dam #2 | covered | Same problem as [Rocscience #35](rocscience.md#vp35) — Hassan & Wolff (1999), the min-β ≠ min-FS benchmark. |
 | 2.23 | Li & Lumb – Reliability Index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx): deterministic Bishop 1.333, β_ln 2.263 vs H&W 1.334 / 2.336; GS reports minimum β 2.04 at FS 1.190 across surfaces. — [details](#gs-2-23) |
 | 2.24 | Tandjiria – Geosynthetic Reinforced Emb. | **built** | Same problem as [Rocscience #39](rocscience.md#vp39) — [vp039a-d](../files/rocscience/vp039a.xlsx). Also the reinforcement benchmark for the **importer**: on SLOPE/W's own circles the imported geosynthetic reproduces its FS to −0.27% (clay) and −0.64% (sand) — see [Importer verification](#importer-verification). — [details](#gs-2-24) |
-| 2.25 | Baker & Leshchinsky – Earth Dam | covered | Same problem as [Rocscience #42](rocscience.md#vp42) — B&L (2001) safety-map clay-core dam. SLOPE/W's own solved Spencer (1.934) lands on B&L 1.91 / Slide 1.925; XSLOPE's rigorous-statics Spencer (1.572) sits ~19% below: the documented open statics gap, now three-way. B&L Fig. 5(a) supplies the phreatic. — [details](#gs-2-25) |
+| 2.25 | Baker & Leshchinsky – Earth Dam | covered | Same problem as [Rocscience #42](rocscience.md#vp42) — B&L (2001) safety-map clay-core dam. On SLOPE/W's own solved circle XSLOPE's Spencer (1.939) matches SLOPE/W (1.934); on Slide's circle 1.926 vs Slide 1.925, and on Baker's surface 1.882 vs B&L 1.91 — the published cluster reproduced. B&L Fig. 5(a) supplies the phreatic. — [details](#gs-2-25) |
 | 2.26 | Baker – Planar Homogeneous | **built** | [gs2_26.xlsx](../files/geostudio/gs2_26.xlsx) — Spencer/Janbu 1.352 vs SLOPE/W 1.352 and Baker ≈1.35, essentially exact; the model pins the crest offset at 2.5 m, resolving the Rocscience #43 build's geometry ambiguity. — [details](#gs-2-26) |
 | 2.27 | Sheahan – Amherst Soil Nails | covered | Same problem as [Rocscience #47](rocscience.md#vp47) — [vp047.xlsx](../files/rocscience/vp047.xlsx), Sheahan & Ho (2003) Amherst test wall: Janbu 0.899 vs Slide 0.890 / Sheahan 0.887. The SLOPE/W model is a public download (see above). — [details](#gs-2-27) |
 | 2.28 | Sheahan – Clouterre Test Wall | covered | Same problem as [Rocscience #48](rocscience.md#vp48) — [vp048.xlsx](../files/rocscience/vp048.xlsx), Clouterre full-scale test wall, 7 nail rows. |
@@ -576,7 +576,8 @@ Baker & Leshchinsky (2001)'s safety-map clay-core dam: granular fill (c′ = 0, 
 to the downstream toe, and a 5-m cracked crest layer modeled as a dry tension crack. It
 shares the `vp042.xlsx` XSLOPE input with the Rocscience corpus, so the full geometry and
 inputs are deferred to the linked Rocscience detail — where this problem's
-**open statics gap** is documented in full.
+verification is documented in full. The XSLOPE input is tiled directly as the
+material-zone polygons of this model's own `.gsz` region set.
 
 **Input:** [vp042.xlsx](../files/rocscience/vp042.xlsx) · **Rocscience detail:** [VP42](rocscience.md#vp42)
 
@@ -584,25 +585,22 @@ inputs are deferred to the linked Rocscience detail — where this problem's
 
 | Method | XSLOPE (rigorous statics) | SLOPE/W (own solve) | Reference |
 |---|---|---|---|
-| Spencer, Slide's critical circle | 1.572 | 1.934 | Slide 1.925 |
-| Spencer, Baker's surface | 1.792 | — | Baker & Leshchinsky (2001) 1.91 |
+| Spencer, Slide's critical circle | 1.926 | — | Slide 1.925 |
+| Spencer, SLOPE/W's own circle | 1.939 | 1.934 | — |
+| Spencer, Baker's surface | 1.882 | — | Baker & Leshchinsky (2001) 1.91 |
 
-SLOPE/W's own solved critical Spencer (1.934, read from the `.gsz`) lands squarely on the
-published Baker & Leshchinsky (1.91) and Slide (1.925) values, while XSLOPE
-reads ~13–19% lower (1.572 / 1.792). Per the re-adjudicated [VP42](rocscience.md#vp42)
-section: the published side uses the same total-unit-weight + phreatic-pore-pressure
-convention XSLOPE uses (confirmed verbatim from B&L 2001 and by inspection of this
-model's own materials), so the gap is not a weight convention. Its cause is not isolated:
-the reservoir-load statics are exact against a buoyant-weight oracle, and XSLOPE's phreatic
-matches this model's own piezometric line to within ~0.2 m along the failure surface, yet
-XSLOPE still reads ~13–19% low — an unexplained program-to-program statics difference over
-the submerged toe. SLOPE/W's
-own 1.934 makes three tightly clustered references against XSLOPE's outlier value;
-the XSLOPE value is regression-locked as VP42. The B&L (2001) paper — held
-in the reference library — supplies the phreatic geometry the vendor manuals leave
-unlabeled (its Fig. 5(a)) and reports the dam's global minimum Fmin = 1.91 by Spencer's
-method, computed with total unit weight and pore pressure taken from the vertical distance
-to the phreatic surface.
+XSLOPE reproduces the tightly clustered published references on all three surfaces. On
+SLOPE/W's own solved critical circle (read from the `.gsz`) the two programs agree to
+within 0.005 in Spencer FS on the identical surface, geometry, and water, with XSLOPE's
+total sliding-mass weight ≈ 56,020 against SLOPE/W's 56,127. Both sides use total unit
+weight + phreatic pore pressure (confirmed verbatim from B&L 2001 and by inspection of
+this model's own materials); the reservoir-load statics are exact against a buoyant-weight
+oracle, and XSLOPE's phreatic matches this model's own piezometric line to within ~0.2 m
+along the failure surface. The XSLOPE values are regression-locked as VP42. The B&L (2001)
+paper — held in the reference library — supplies the phreatic geometry the vendor manuals
+leave unlabeled (its Fig. 5(a)) and reports the dam's global minimum Fmin = 1.91 by
+Spencer's method, computed with total unit weight and pore pressure taken from the vertical
+distance to the phreatic surface.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.25; Baker & Leshchinsky (2001).
 

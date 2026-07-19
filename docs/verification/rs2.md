@@ -149,64 +149,68 @@ manual (© 2021) and the newest of the four. It is not a fresh set of problems s
 RS2 shear-strength-reduction **re-verification of 52 Slide2 verification problems** (numbered
 by their Slide2 VP id, #1–#102), run against the reference literature and Slide2's own LEM.
 It is the authoritative source of most of the "RS2 SSRM x.xx" numbers already cited in the
-Part I–III rows. Cataloged here so the corpus tracks it; the **new** rows (no existing corpus
-counterpart) are tranche-2+ build candidates. Values are the manual's published RS2 SSR and
-its reference/Slide2 figures (representative case where a problem has several).
+Part I–III rows. Cataloged here so the corpus tracks it, in the same table format as
+Parts I–III above. The **XSLOPE file / results** column carries a consistent cross-reference:
+a piggyback → RS2-N section that already runs the SSRM comparison, a dedicated Part IV
+build section below (VP2 / VP64 / VP67), or a *new* / *planned* marker — followed by the
+manual's published RS2 SSR and its reference/Slide2 figures (representative case where a
+problem has several). The **new** rows (no existing corpus counterpart) are tranche-2+ build
+candidates.
 
-| Pt4 VP | Problem | RS2 SSR | Reference / Slide2 | Corpus |
-|---:|---|---|---|---|
-| 1 | Slope, homogeneous (ACADS 1a) | 0.98 | ref 1.00 [Giam] | [RS2-1](#rs2-1) |
-| 2 | Slope, homogeneous, tension crack (ACADS 1b) | 1.63 | ref 1.65 [Giam] | [P4-VP2](#p4-vp2) (SSRM) |
-| 3 | Slope, 3 materials (ACADS 1c) | 1.34 | ref 1.39 | [RS2-2](#rs2-2) |
-| 4 | Slope, 3 materials, seismic (ACADS 1d) | 0.95 | ref 1.00 | [RS2-3](#rs2-3) |
-| 5 | Dam, 4 materials (ACADS 2a) | — | ref 1.95 | [RS2-4](#rs2-4) |
-| 6 | Dam, 4 materials, predefined surface (ACADS 2b) | 2.15 | ref 2.29 | *new* |
-| 7 | Slope, 2 materials, weak layer (ACADS 3a) | 1.24 | ref 1.24–1.27 | [RS2-5](#rs2-5) |
-| 9 | Weak layer, water table, load (ACADS 4) | 0.76 | ref 0.78 | [RS2-6](#rs2-6) |
-| 10 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | 1.46 | ref 1.53 | [RS2-7](#rs2-7) |
-| 14 | Slope, homogeneous (Arai & Tagyo 1) | 1.37–1.39 | — | [RS2-10](#rs2-10) |
-| 15 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | 0.41 | Kim/Greco 0.39–0.44 | [RS2-11](#rs2-11) |
-| 16 | Slope, homogeneous, water table (Arai & Tagyo 3) | 1.09 | — | [RS2-12](#rs2-12) |
-| 17 | Slope, homogeneous (Yamagami & Ueta) | 1.32 | — | [RS2-13](#rs2-13) |
-| 19 | Slope, 4 materials (Greco ex. 4) | 1.38 | Greco/Spencer 1.40–1.42 | [RS2-15](#rs2-15) |
-| 21 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | 1.98 / 1.68 / 1.77 | — | [RS2-17](#rs2-17) |
-| 22 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | 1.26 / 0.99 / 1.15 | — | [RS2-18](#rs2-18) |
-| 24 | Slope, 3 materials (Low 1989) | 1.42 | Low 1.44 | [RS2-19](#rs2-19) |
-| 25 | Bearing-capacity slope (Prandtl / Chen & Shao) | 1.01 | Chen & Shao 1.05 | [RS2-20](#rs2-20) |
-| 26 | Bearing-capacity prism (Prandtl II) | 1.00 | theory 1.0 | [RS2-21](#rs2-21) |
-| 32 | Reinforced embankment, 7 materials (Borges 2002) | 1.24 / 1.21 / 0.98 | Borges 1.25 / 1.19 / 0.99 | [RS2-24](#rs2-24) |
-| 38 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | 1.56 / 1.46 / 1.32 | — | RS2-28 *(planned)* |
-| 39 | Reinforced embankment, geosynthetic (Tandjiria 2002) | 0.97 / 1.42 / 1.22 / 1.39 | — | [RS2-29](#rs2-29) |
-| 40 | Homogeneous, power curve, sensitivity (Perry 1993) | 0.97 | Perry 0.98 | [RS2-30](#rs2-30) |
-| 41 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | 1.64 | Bishop 1.66 / Janbu 1.60–1.67 | *new* |
-| 42 | Dam, safety-map example (Baker & Leshchinsky 2001) | 1.84 | Spencer non-circular 1.91 | *new* |
-| 44 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | 0.96 / 1.5 / 0.93 | — | [RS2-31](#rs2-31) |
-| 45 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | 2.65 / 2.78 / 2.63 | — | [RS2-32](#rs2-32) |
-| 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | 1.22 | Slide2 Spencer 1.293 / GLE 1.304 | [RS2-51](#rs2-51) (LEM, partial) |
-| 56 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | 1.26 | 8-program 1.02–1.32 | [RS2-33](#rs2-33) |
-| 57 | Layered, TC (Pockoski & Duncan slope 3) | 1.32 | 8-program ~1.40 | *new* |
-| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | 0.98 | GOLD-NAIL 0.91, UTEXAS4 1.02 | *new* |
-| 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | 1.34 / 1.45 | Baker 1.35 / 1.48 | [RS2-34](#rs2-34) |
-| 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | 0.96 | — | [RS2-68](#rs2-68) |
-| 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | 0.99 | — | [RS2-68](#rs2-68) |
-| 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | 2.37 | Spencer 2.44 [USACE] | [P4-VP64](#p4-vp64) (SSRM 2.331) |
-| 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | 2.60 | ref 2.71 | *new* |
-| 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | 2.22 | ref 2.30 | *new* |
-| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | 1.33 | ref 1.33 | [P4-VP67](#p4-vp67) (SSRM 1.076 unconstrained / 1.303 SSR-exclusion vs 1.33) |
-| 68 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | 1.17 | ref 1.33 | *new* |
-| 69 | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | 1.94 | ref 2.01 | *new* |
-| 70 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | 1.58 | Spencer 1.60, ref 1.60 | *new* |
-| 71 | Homogeneous, FE seepage (Duncan & Wright Fig 6.37) | 1.11 / 1.12 | Spencer 1.13 / 1.14 | [RS2-36](#rs2-36) |
-| 72 | Embankment dam, 4 materials, FE seepage (D&W Fig 6.39) | 1.00–1.49 | Spencer 1.16–1.63 | [RS2-37](#rs2-37) |
-| 74 | Cohesionless embankment on clay (D&W Fig 7.12) | 1.17 | Spencer 1.20 | RS2-38 *(planned)* |
-| 75 | James Bay dyke, 4 materials (D&W Fig 7.16) | 1.19 | circ 1.45 / non-circ 1.17 | [RS2-42](#rs2-42) |
-| 76 | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | 0.97 / 0.98 | ref 1.08–1.19 | [RS2-40](#rs2-40) |
-| 78 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | 1.04–1.07 | Spencer 1.12–1.20 | [RS2-47](#rs2-47) |
-| 79 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | 1.41 / 1.45 | ref 1.40 / 1.44 | RS2-39/41/43 *(planned)* |
-| 81 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | 1.23 / 1.15 | ref 1.21 / 1.15 | RS2-39/41/43 *(planned)* |
-| 82 | Earth embankment, water table (D&W Fig 14.20-a) | 1.50 | Spencer 1.54 | [RS2-44](#rs2-44) |
-| 83 | Embankment wall (D&W Fig 14.20-b) | 1.29 / 1.30 | Spencer 1.28 / 1.33 | [RS2-45](#rs2-45) |
-| 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | 2.43 | Spencer 2.46, ref 2.43 | *new* (cf. RS2-67) |
+| # | Problem | Status | XSLOPE file / results |
+|---:|---|---|---|
+| 1 | Slope, homogeneous (ACADS 1a) | **built** | → [RS2-1](#rs2-1). RS2 SSR 0.98 vs ref 1.00 [Giam]. |
+| 2 | Slope, homogeneous, tension crack (ACADS 1b) | **built** | → [P4-VP2](#p4-vp2) (own SSRM build). RS2 SSR 1.63 vs ref 1.65 [Giam]. |
+| 3 | Slope, 3 materials (ACADS 1c) | **built** | → [RS2-2](#rs2-2). RS2 SSR 1.34 vs ref 1.39. |
+| 4 | Slope, 3 materials, seismic (ACADS 1d) | **built** | → [RS2-3](#rs2-3). RS2 SSR 0.95 vs ref 1.00. |
+| 5 | Dam, 4 materials (ACADS 2a) | **built** | → [RS2-4](#rs2-4). RS2 SSR —; ref 1.95. |
+| 6 | Dam, 4 materials, predefined surface (ACADS 2b) | *new* | RS2 SSR 2.15 vs ref 2.29. |
+| 7 | Slope, 2 materials, weak layer (ACADS 3a) | **built** | → [RS2-5](#rs2-5). RS2 SSR 1.24 vs ref 1.24–1.27. |
+| 9 | Weak layer, water table, load (ACADS 4) | **built** | → [RS2-6](#rs2-6). RS2 SSR 0.76 vs ref 0.78. |
+| 10 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | **built** | → [RS2-7](#rs2-7). RS2 SSR 1.46 vs ref 1.53. |
+| 14 | Slope, homogeneous (Arai & Tagyo 1) | **built** | → [RS2-10](#rs2-10). RS2 SSR 1.37–1.39. |
+| 15 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | **built** | → [RS2-11](#rs2-11). RS2 SSR 0.41 vs Kim/Greco 0.39–0.44. |
+| 16 | Slope, homogeneous, water table (Arai & Tagyo 3) | **built** | → [RS2-12](#rs2-12). RS2 SSR 1.09. |
+| 17 | Slope, homogeneous (Yamagami & Ueta) | **built** | → [RS2-13](#rs2-13). RS2 SSR 1.32. |
+| 19 | Slope, 4 materials (Greco ex. 4) | **built** | → [RS2-15](#rs2-15). RS2 SSR 1.38 vs Greco/Spencer 1.40–1.42. |
+| 21 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | **built** | → [RS2-17](#rs2-17). RS2 SSR 1.98 / 1.68 / 1.77. |
+| 22 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | **built** | → [RS2-18](#rs2-18). RS2 SSR 1.26 / 0.99 / 1.15. |
+| 24 | Slope, 3 materials (Low 1989) | **built** | → [RS2-19](#rs2-19). RS2 SSR 1.42 vs Low 1.44. |
+| 25 | Bearing-capacity slope (Prandtl / Chen & Shao) | **built** | → [RS2-20](#rs2-20). RS2 SSR 1.01 vs Chen & Shao 1.05. |
+| 26 | Bearing-capacity prism (Prandtl II) | **built** | → [RS2-21](#rs2-21). RS2 SSR 1.00 vs theory 1.0. |
+| 32 | Reinforced embankment, 7 materials (Borges 2002) | **built** | → [RS2-24](#rs2-24). RS2 SSR 1.24 / 1.21 / 0.98 vs Borges 1.25 / 1.19 / 0.99. |
+| 38 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | *planned* | → RS2-28 *(planned)*. RS2 SSR 1.56 / 1.46 / 1.32. |
+| 39 | Reinforced embankment, geosynthetic (Tandjiria 2002) | **built** | → [RS2-29](#rs2-29). RS2 SSR 0.97 / 1.42 / 1.22 / 1.39. |
+| 40 | Homogeneous, power curve, sensitivity (Perry 1993) | **built** | → [RS2-30](#rs2-30). RS2 SSR 0.97 vs Perry 0.98. |
+| 41 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | *new* | RS2 SSR 1.64 vs Bishop 1.66 / Janbu 1.60–1.67. |
+| 42 | Dam, safety-map example (Baker & Leshchinsky 2001) | *new* | RS2 SSR 1.84 vs Spencer non-circular 1.91. |
+| 44 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | **built** | → [RS2-31](#rs2-31). RS2 SSR 0.96 / 1.5 / 0.93. |
+| 45 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | **built** | → [RS2-32](#rs2-32). RS2 SSR 2.65 / 2.78 / 2.63. |
+| 51 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | **built** | → [RS2-51](#rs2-51) (LEM, partial). RS2 SSR 1.22 vs Slide2 Spencer 1.293 / GLE 1.304. |
+| 56 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | **built** | → [RS2-33](#rs2-33). RS2 SSR 1.26 vs 8-program 1.02–1.32. |
+| 57 | Layered, TC (Pockoski & Duncan slope 3) | *new* | RS2 SSR 1.32 vs 8-program ~1.40. |
+| 60 | Soil-nailed wall (Pockoski & Duncan slope 7) | *new* | RS2 SSR 0.98 vs GOLD-NAIL 0.91, UTEXAS4 1.02. |
+| 61 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | **built** | → [RS2-34](#rs2-34). RS2 SSR 1.34 / 1.45 vs Baker 1.35 / 1.48. |
+| 62 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | **built** | → [RS2-68](#rs2-68). RS2 SSR 0.96. |
+| 63 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | **built** | → [RS2-68](#rs2-68). RS2 SSR 0.99. |
+| 64 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | **built** | → [P4-VP64](#p4-vp64) (own SSRM build, 2.331). RS2 SSR 2.37 vs Spencer 2.44 [USACE]. |
+| 65 | Embankment, water table, ponded (USACE 2003 Fig 4-2) | *new* | RS2 SSR 2.60 vs ref 2.71. |
+| 66 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | *new* | RS2 SSR 2.22 vs ref 2.30. |
+| 67 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | **built** | → [P4-VP67](#p4-vp67) (own SSRM build, 1.076 unconstrained / 1.303 SSR-exclusion). RS2 SSR 1.33 vs ref 1.33. |
+| 68 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | *new* | RS2 SSR 1.17 vs ref 1.33. |
+| 69 | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | *new* | RS2 SSR 1.94 vs ref 2.01. |
+| 70 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | *new* | RS2 SSR 1.58 vs Spencer 1.60, ref 1.60. |
+| 71 | Homogeneous, FE seepage (Duncan & Wright Fig 6.37) | **built** | → [RS2-36](#rs2-36). RS2 SSR 1.11 / 1.12 vs Spencer 1.13 / 1.14. |
+| 72 | Embankment dam, 4 materials, FE seepage (D&W Fig 6.39) | **built** | → [RS2-37](#rs2-37). RS2 SSR 1.00–1.49 vs Spencer 1.16–1.63. |
+| 74 | Cohesionless embankment on clay (D&W Fig 7.12) | *planned* | → RS2-38 *(planned)*. RS2 SSR 1.17 vs Spencer 1.20. |
+| 75 | James Bay dyke, 4 materials (D&W Fig 7.16) | **built** | → [RS2-42](#rs2-42). RS2 SSR 1.19 vs circ 1.45 / non-circ 1.17. |
+| 76 | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | **built** | → [RS2-40](#rs2-40). RS2 SSR 0.97 / 0.98 vs ref 1.08–1.19. |
+| 78 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | **built** | → [RS2-47](#rs2-47). RS2 SSR 1.04–1.07 vs Spencer 1.12–1.20. |
+| 79 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | *planned* | → RS2-39/41/43 *(planned)*. RS2 SSR 1.41 / 1.45 vs ref 1.40 / 1.44. |
+| 81 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | *planned* | → RS2-39/41/43 *(planned)*. RS2 SSR 1.23 / 1.15 vs ref 1.21 / 1.15. |
+| 82 | Earth embankment, water table (D&W Fig 14.20-a) | **built** | → [RS2-44](#rs2-44). RS2 SSR 1.50 vs Spencer 1.54. |
+| 83 | Embankment wall (D&W Fig 14.20-b) | **built** | → [RS2-45](#rs2-45). RS2 SSR 1.29 / 1.30 vs Spencer 1.28 / 1.33. |
+| 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | *new* | RS2 SSR 2.43 vs Spencer 2.46, ref 2.43. (cf. RS2-67.) |
 
 **Part 4 in one line:** 52 problems cataloged — 35 already in the corpus as RS2-1…47 rows,
 VP2 (ACADS 1b) now carrying its own [Part IV SSRM build](#p4-vp2) on the shared file (SSRM
@@ -562,7 +566,11 @@ cross-check is still open. The water-table case awaits the VP21 case-3 input fil
 <!-- test: file=../files/rocscience/vp021a.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.6, f_max=2.5, max_iter=16000, benchmark=RS2-17 -->
 <!-- test: file=../files/rocscience/vp021b.xlsx, type=fem_ssrm, expected_fs=1.692, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.2, f_max=2.2, max_iter=16000, benchmark=RS2-17b -->
 
+**Dry case (vp021a)**
+
 ![RS2-17: dry case (vp021a) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-17.png)
+
+**r<sub>u</sub> = 0.25 case (vp021b)**
 
 ![RS2-17b: r<sub>u</sub> = 0.25 case (vp021b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-17b.png)
 
@@ -588,7 +596,11 @@ cross-check as [#17](#rs2-17); water-table case likewise pending.
 <!-- test: file=../files/rocscience/vp022a.xlsx, type=fem_ssrm, expected_fs=1.312, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, benchmark=RS2-18 -->
 <!-- test: file=../files/rocscience/vp022b.xlsx, type=fem_ssrm, expected_fs=1.042, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=16000, benchmark=RS2-18b -->
 
+**Dry case (vp022a)**
+
 ![RS2-18: dry case (vp022a) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-18.png)
+
+**r<sub>u</sub> = 0.25 case (vp022b)**
 
 ![RS2-18b: r<sub>u</sub> = 0.25 case (vp022b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-18b.png)
 
@@ -736,7 +748,11 @@ RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 <!-- test: file=../files/rocscience/vp032a.xlsx, type=fem_ssrm, expected_fs=0.905, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=16000, benchmark=RS2-24a -->
 <!-- test: file=../files/rocscience/vp032c.xlsx, type=fem_ssrm, expected_fs=0.946, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=0.7, f_max=1.4, max_iter=16000, benchmark=RS2-24b -->
 
+**H = 7 case (vp032a) — partly-restrained cohesionless face skin**
+
 ![RS2-24a: H = 7 case (vp032a, SSRM 0.905, partly-restrained face skin) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24a.png)
+
+**H = 8.75 case (vp032c) — toe/foundation mechanism**
 
 ![RS2-24b: H = 8.75 case (vp032c, SSRM 0.946) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24b.png)
 
@@ -880,9 +896,15 @@ fit is RS2's internal approximation.
 <!-- test: file=../files/rocscience/vp044c.xlsx, type=fem_ssrm, expected_fs=0.931, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.6, f_max=1.4, max_iter=16000, benchmark=RS2-31b -->
 <!-- test: file=../files/rocscience/vp044a.xlsx, type=fem_ssrm, expected_fs=0.921, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=1.6, max_iter=16000, benchmark=RS2-31c -->
 
+**Mohr-Coulomb case (vp044b)**
+
 ![RS2-31a: Mohr-Coulomb case (vp044b, SSRM 1.529) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31a.png)
 
+**Mohr-Coulomb case (vp044c)**
+
 ![RS2-31b: Mohr-Coulomb case (vp044c, SSRM 0.931) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31b.png)
+
+**Power-curve case (vp044a)**
 
 ![RS2-31c: power-curve case (vp044a, SSRM 0.921) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31c.png)
 
@@ -914,7 +936,11 @@ is the outlier of the three.
 <!-- test: file=../files/rocscience/vp045a.xlsx, type=fem_ssrm, expected_fs=2.790, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=2.3, f_max=3.4, max_iter=16000, benchmark=RS2-32 -->
 <!-- test: file=../files/rocscience/vp045b.xlsx, type=fem_ssrm, expected_fs=2.623, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.8, f_max=3.6, max_iter=16000, benchmark=RS2-32b -->
 
+**Mohr-Coulomb case (vp045a)**
+
 ![RS2-32: Mohr-Coulomb case (vp045a, SSRM 2.790) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-32.png)
+
+**Power-curve case (vp045b)**
 
 ![RS2-32b: power-curve case (vp045b, SSRM 2.623) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-32b.png)
 
@@ -953,7 +979,11 @@ Slide2 counterpart: [VP61](rocscience.md#vp61). Built, both halves.
 <!-- test: file=../files/rocscience/vp061b.xlsx, type=fem_ssrm, expected_fs=1.345, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=RS2-34 -->
 <!-- test: file=../files/rocscience/vp061a.xlsx, type=fem_ssrm, expected_fs=1.478, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.0, f_max=2.2, max_iter=16000, benchmark=RS2-34b -->
 
+**Mohr-Coulomb case (vp061b)**
+
 ![RS2-34: Mohr-Coulomb case (vp061b, SSRM 1.345) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34.png)
+
+**Power-curve case (vp061a)**
 
 ![RS2-34b: power-curve case (vp061a, SSRM 1.478) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34b.png)
 
@@ -977,7 +1007,11 @@ The seep case runs on tri6 sidecars.
 <!-- test: file=../files/rocscience/vp071a.xlsx, type=fem_ssrm, expected_fs=1.097, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=16000, benchmark=RS2-36a -->
 <!-- test: file=../files/rocscience/vp071b.xlsx, type=fem_ssrm, expected_fs=1.111, element_type=tri6, target_size=4.4, tolerance=0.01, f_min=0.7, f_max=1.6, max_iter=16000, benchmark=RS2-36b -->
 
+**FE-seepage case (vp071a)**
+
 ![RS2-36a: FE-seepage case (vp071a) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-36a.png)
+
+**Piezometric-line case (vp071b)**
 
 ![RS2-36b: piezometric-line case (vp071b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-36b.png)
 
@@ -1077,7 +1111,11 @@ still reads +4.7% and keeps its caveat).
 <!-- test: file=../files/rocscience/vp083a.xlsx, type=fem_ssrm, expected_fs=1.314, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, benchmark=RS2-45a -->
 <!-- test: file=../files/rocscience/vp083b.xlsx, type=fem_ssrm, expected_fs=1.314, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, benchmark=RS2-45b -->
 
+**Case a (vp083a)**
+
 ![RS2-45a: vp083a (SSRM 1.314) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-45a.png)
+
+**Case b (vp083b)**
 
 ![RS2-45b: vp083b (SSRM 1.314) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-45b.png)
 
@@ -1101,11 +1139,19 @@ Slide2 counterpart: [VP84](rocscience.md#vp84).
 <!-- test: file=../files/rocscience/vp084c.xlsx, type=fem_ssrm, expected_fs=1.057, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.5, max_iter=16000, benchmark=RS2-46c -->
 <!-- test: file=../files/rocscience/vp084d.xlsx, type=fem_ssrm, expected_fs=1.145, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.7, f_max=1.7, max_iter=16000, benchmark=RS2-46d -->
 
+**Case a (vp084a)**
+
 ![RS2-46a: vp084a (SSRM 0.787) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46a.png)
+
+**Case b (vp084b)**
 
 ![RS2-46b: vp084b (SSRM 0.929) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46b.png)
 
+**Case c (vp084c)**
+
 ![RS2-46c: vp084c (SSRM 1.029) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46c.png)
+
+**Case d (vp084d)**
 
 ![RS2-46d: vp084d (SSRM 1.145) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46d.png)
 
@@ -1229,7 +1275,11 @@ New corpus files (no Slide2 counterpart). Built: all five cases run.
 <!-- test: file=../files/rocscience/rs2_56a.xlsx, type=fem_ssrm, expected_fs=0.664, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.32, f_max=1.12, max_iter=16000, benchmark=RS2-56a -->
 <!-- test: file=../files/rocscience/rs2_56b.xlsx, type=fem_ssrm, expected_fs=2.096, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.79, f_max=2.59, max_iter=16000, benchmark=RS2-56b -->
 
+**Case 2 — weakest of the five (rs2_56a)**
+
 ![RS2-56a: case 2, (γ, c, φ) = (18, 5, 10), the weakest of the five (SSRM 0.664) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-56a.png)
+
+**Case 5 — strongest of the five (rs2_56b)**
 
 ![RS2-56b: case 5, (γ, c, φ) = (24, 20, 30), the strongest of the five (SSRM 2.096) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-56b.png)
 
@@ -1250,7 +1300,11 @@ New corpus files. Built: all six cases run.
 <!-- test: file=../files/rocscience/rs2_57a.xlsx, type=fem_ssrm, expected_fs=0.440, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.89, max_iter=16000, benchmark=RS2-57a -->
 <!-- test: file=../files/rocscience/rs2_57b.xlsx, type=fem_ssrm, expected_fs=1.389, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.07, f_max=1.87, max_iter=16000, benchmark=RS2-57b -->
 
+**Case 1 — weakest of the six (rs2_57a)**
+
 ![RS2-57a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.440) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57a.png)
+
+**Case 6 — strongest of the six (rs2_57b)**
 
 ![RS2-57b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.389) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57b.png)
 
@@ -1272,7 +1326,11 @@ New corpus files. Built (5 of 6).
 <!-- test: file=../files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.328, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=16000, benchmark=RS2-58a -->
 <!-- test: file=../files/rocscience/rs2_58b.xlsx, type=fem_ssrm, expected_fs=1.029, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.71, f_max=1.51, max_iter=16000, benchmark=RS2-58b -->
 
+**Case 1 — weakest of the six (rs2_58a)**
+
 ![RS2-58a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.328) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58a.png)
+
+**Case 6 — strongest of the six (rs2_58b)**
 
 ![RS2-58b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.029) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58b.png)
 
@@ -1489,6 +1547,8 @@ mechanism in c = 5/φ = 30 is genuinely stiffer in XSLOPE's SSRM than in RS2's, 
 <!-- test: file=../files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.437, num_slices=40, entry_range=42;54, exit_range=23;32, tangent_depth=16;22, benchmark=RS2-61-case3 -->
 <!-- test: file=../files/rocscience/rs2_61a.xlsx, type=fem_ssrm, expected_fs=1.398, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.0, max_iter=16000, ssr_zone=8.516;12.255;8.686;6.779;21.55;8.975;28.407;13.412;31.455;18.522;32.3046;20.2236;28.228;21.032;26.57;17.894;22.043;13.995;8.516;12.255, benchmark=RS2-61-case2 -->
 
+**Case 2 — deep toe-to-crest, constrained SSRM (rs2_61a)**
+
 ![RS2-61: local and global minima (Cheng et al. 2007), Case 2 (deep toe-to-crest), constrained SSRM 1.398 vs RS2 SSR 1.36 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-61-case2.png)
 
 ### RS2-62: Three-layered slope with a soft band (Cheng et al. 2007) {#rs2-62}
@@ -1523,6 +1583,8 @@ Analysis III geometry is locked; it is the representative case for the family. T
 regression anchor at the tagged 0.3 m mesh, not a converged value.
 
 <!-- test: file=../files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.843, element_type=tri6, target_size=0.3, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=16000, benchmark=RS2-62c -->
+
+**Analysis III — 12 m domain, ψ = 0 (rs2_62c)**
 
 ![RS2-62: three-layered slope with a soft band (Cheng et al. 2007), Analysis III (12 m domain, ψ = 0, SSRM 0.843) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism riding the soft band](images/RS2-62c.png)
 
@@ -1701,13 +1763,23 @@ are the head-to-head matches.
 <!-- test: file=../files/rocscience/rs2_64g.xlsx, type=fem_ssrm, expected_fs=1.674, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.5, max_iter=16000, ssr_zone=6.726;7.086;5.442;5.549;6.703;3.353;8.58;0.973;12.299;-1.186;15.538;-1.726;19.497;-1.846;22.991;0.615;19.668;1.926;17.788;0.352;12.322;1.445;9.131;3.675;6.726;7.086, benchmark=RS2-64g -->
 <!-- test: file=../files/rocscience/rs2_64k.xlsx, type=fem_ssrm, expected_fs=1.403, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=2.2, max_iter=16000, ssr_zone=3.413;5.74;2.387;4.091;3.413;2.113;5.538;0.391;9.604;-1.404;12.242;-1.404;14.0932;-0.511713;14.0932;1.014;11.839;1.014;10.593;0.465;8.175;1.454;5.831;2.699;4.45466;4.16031;3.413;5.74, benchmark=RS2-64k -->
 
+**Case 1 — Slope 1 short-term Original (rs2_64a)**
+
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 1 (Slope 1 short-term Original), SSRM 5.196 vs RS2 SSR 5.14 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the deep rotational mechanism coinciding with RS2's pinned Search-Area surface](images/RS2-64a.png)
+
+**Case 2 — Slope 1 short-term Failed (rs2_64b)**
 
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 2 (Slope 1 short-term Failed), constrained SSRM 6.701 vs the Teoman/Slide2 Bishop reference 6.67/6.64 (RS2's own SSR 6.10 sits ~9% below its Bishop column) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64b.png)
 
+**Case 4 — Slope 2 short-term Failed (rs2_64d)**
+
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 4 (Slope 2 short-term Failed), constrained SSRM 5.398 vs the Teoman/Slide2 Bishop reference 5.32 (RS2's own SSR 4.95 sits ~9% below its Bishop column) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64d.png)
 
+**Case 7 — Slope 1 long-term Original (rs2_64g)**
+
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 7 (Slope 1 long-term Original), constrained SSRM 1.674 vs RS2 SSR 1.70 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64g.png)
+
+**Case 11 — Slope 3 long-term Original (rs2_64k)**
 
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 11 (Slope 3 long-term Original), constrained SSRM 1.403 vs RS2 SSR 1.46 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64k.png)
 
@@ -1793,7 +1865,11 @@ of this page.
 <!-- test: file=../files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.044, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66d -->
 <!-- test: file=../files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.056, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, benchmark=RS2-66e -->
 
+**Thinnest soft band — h₁ = 2 m (rs2_66a)**
+
 ![RS2-66: embankment basal stability (Nakamura et al. 2008), thinnest (h₁ = 2 m, SSRM 1.081) and thickest (h₁ = 10 m, SSRM 1.056) soft-band cases — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-66a.png)
+
+**Thickest soft band — h₁ = 10 m (rs2_66e)**
 
 ![RS2-66 (h₁ = 10 m)](images/RS2-66e.png)
 
@@ -1856,7 +1932,11 @@ recorded as regression anchors at the values XSLOPE's circular search actually r
 <!-- test: file=../files/rocscience/rs2_68c.xlsx, type=critical_kc, method=bishop, expected_kc=0.169, k_min=0.11, k_max=0.20, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-bishop -->
 <!-- test: file=../files/rocscience/rs2_68c.xlsx, type=critical_kc, method=spencer, expected_kc=0.167, k_min=0.11, k_max=0.20, kc_tol=0.01, num_slices=40, benchmark=RS2-68c-spencer -->
 
+**Case 2 — dry homogeneous slope (rs2_68b)**
+
 ![RS2-68: seismically loaded slopes (Loukidis et al. 2003), Case 2 dry homogeneous — inputs with the pseudo-static arrow at k꜀ = 0.433 (left) and the Spencer critical seismic surface, a broad arc dipping below the toe, FS = 1.00 (right)](images/rs2_68b.png)
+
+**Case 3 — three-layer, band-riding slope (rs2_68c)**
 
 ![RS2-68 Case 3 three-layer — inputs (left) and the Spencer critical surface at k꜀ = 0.167 riding the weak φ = 15° middle band, FS = 1.00 (right)](images/rs2_68c.png)
 
@@ -1986,7 +2066,11 @@ exclusion redirected the mechanism away from the deep foundation.
 <!-- test: file=../files/rocscience/vp067.xlsx, type=fem_ssrm, expected_fs=1.076, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=RS2-P4-VP67 -->
 <!-- test: file=../files/rocscience/vp067c.xlsx, type=fem_ssrm, expected_fs=1.303, element_type=tri6, target_size=8.0, tolerance=0.02, f_min=1.2, f_max=1.5, max_iter=16000, ssr_exclude=Foundation lower, benchmark=RS2-P4-VP67c -->
 
+**Unconstrained critical SRF (vp067)**
+
 ![RS2 Part IV VP67: USACE F-5 embankment on soft foundation (end of construction), unconstrained SSRM 1.076 riding the foundation/bedrock contact vs the specified-circle SSR 1.33 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP67.png)
+
+**SSR Exclusion Area below El. 81 (vp067c)**
 
 ![RS2 Part IV VP67c: the same embankment with an SSR Exclusion Area below El. 81, SSRM 1.303 on the toe-circle family matching RS2's constrained SSR 1.33 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP67c.png)
 

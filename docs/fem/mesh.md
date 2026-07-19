@@ -383,6 +383,40 @@ The system supports both geometric size fields based on distance from boundaries
 
 Transition smoothing algorithms ensure that changes in element size occur gradually throughout the mesh, avoiding the numerical problems associated with abrupt size variations. These algorithms use exponential or polynomial functions to create smooth transitions between regions of different target element sizes. The smoothing process maintains mesh quality while achieving the desired refinement patterns.
 
+## Feature-Aware Auto Refinement
+
+Many slope models concentrate their numerically demanding behaviour in a handful of small geometric features — the load transfer along a reinforcement or pile line, the stress singularity at a crack or wall tip, and the failure kinematics inside a thin soft band. Resolving these features by refining the whole domain is wasteful: the element count grows everywhere while only a small fraction of the mesh needed the extra resolution. Feature-aware auto refinement addresses this directly by shrinking elements only where a feature is present and letting them grow smoothly back to the target size elsewhere.
+
+The capability is exposed through a single optional argument to `build_mesh_from_polygons()`:
+
+```python
+# Refine near features: local element size = target_size / refine_factor
+mesh = build_mesh_from_polygons(
+    polygons=polygons,
+    target_size=1.0,
+    element_type='tri6',
+    lines=reinforcement_lines,
+    refine_factor=3.0,                       # None (default) = OFF, unchanged mesh
+    refine_features=['reinforcement', 'cracks', 'thin_zones'],  # None = all four
+)
+```
+
+`refine_factor` sets the local element size at features to `target_size / refine_factor`. The default, `None`, turns the feature off entirely: **no size field is created and the generated mesh is byte-identical to the historical output.** This default-off stance is deliberate — every existing regression lock and every previously built corpus mesh is unaffected, so the option can be adopted incrementally, model by model, without disturbing established results. The optional `refine_features` list selects which feature classes participate, drawn from `{'reinforcement', 'piles', 'cracks', 'thin_zones'}`; omitting it (or passing `None`) enables all four.
+
+### Feature Classes
+
+The features are detected automatically from the model definition — there are no coordinates to enter by hand:
+
+- **Reinforcement and pile lines.** The 1D `lines` already embedded in the mesh are refined with a distance-based band, so elements are finest along each polyline and coarsen away from it. Reinforcement and pile lines are treated identically at the mesher (both arrive as embedded polylines).
+- **Crack and notch tips.** A boundary vertex where two edges meet at a very sharp interior angle is a re-entrant spike — the V-notch idiom that the seepage sheet-pile and clay-blanket samples use to model a wall crack (a ground surface that dips straight to the wall tip and back up, leaving a narrow slit). The tip is the deepest vertex of that notch. Tips receive the strongest refinement, twice the base factor, to resolve the `r^-1/2` singularity that governs convergence there.
+- **Thin material zones.** A material polygon whose local width is too small to fit at least three elements at the target size — a soft band is the canonical case — is refined to fit three across. Because such a band is often inclined, the refinement follows the polygon's own surface rather than an axis-aligned box, so an inclined band is resolved exactly without over-refining its neighbours.
+
+### Implementation and Determinism
+
+Refinement is implemented with Gmsh's native size fields rather than by editing the geometry. Each feature contributes a `Distance` + `Threshold` pair (a band that ramps from the local size up to the target size at a controlled growth ratio), or, for a whole-thin zone, a size restricted to the feature's surface. All contributions are composed with a `Min` field installed as the background mesh, so the smallest requested size wins at every point while the far field stays at the target size. The internal band radius, growth ratio, crack-tip strength and thin-zone element count are corpus-tuned constants and are not part of the public surface.
+
+The detection functions `detect_crack_tips()` and `detect_thin_zones()` are pure-geometry and deterministic, and Gmsh generates the same mesh from the same inputs on repeat builds, so refined meshes are reproducible and safe to regression-lock. A guard, `benchmarks/mesh_refine_guard.py`, asserts the byte-identical-off invariant, local refinement near a line, determinism, feature detection, and input validation on tiny hand-checkable fixtures.
+
 ### Handling Mixed Element Types
 
 Certain geometric configurations require the use of mixed element types within a single mesh, particularly when combining one-dimensional reinforcement elements with two-dimensional soil elements. The system handles these mixed configurations through careful coordination between different element generation algorithms and proper management of shared nodes and edges.

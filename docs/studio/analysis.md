@@ -176,6 +176,13 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Element type** — `tri3`, `tri6`, `quad4`, `quad8`, or `quad9`.
 - **Target size** — entered directly, or auto-sized as the slope width divided by a
   number of divisions.
+- **Refine near features** — off by default. When checked, elements shrink near model
+  features (reinforcement/pile lines, crack tips, thin material zones) and grow back to
+  the target size away from them; the **Refinement factor** spinbox (default 3.0) sets
+  the local size to *target size ÷ factor*. Leaving it off builds exactly the mesh
+  earlier versions did. Refinement is detected automatically from the geometry — there
+  is nothing to place by hand. (Selecting individual feature classes is available in the
+  Python API via `refine_features`; the dialog refines near all of them.)
 
 The mesh is built on a background thread (it includes reinforcement and pile
 constraint lines, so it serves FEM too), shown in a **Mesh** tab, and written to a

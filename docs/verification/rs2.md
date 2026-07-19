@@ -126,7 +126,7 @@ independently verifiable.
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
-| 35 | Submerged slope | *planned* | Slide2 [VP64](rocscience.md#vp64) family. |
+| 35 | Submerged slope (D&W Fig 6.27) | **built** (covered) | → [P4-VP70](#p4-vp70) (own SSRM build, [vp070a](../files/rocscience/vp070a.xlsx), 1.594). The same Duncan & Wright (2005) Fig 6.27 submerged slope as Slide2 [VP70](rocscience.md#vp70); the Part II manual body cites Slide2 VP70 (the earlier "VP64 family" label was a mislabel, confirmed against native `.fez` #035: c′ = 100 psf, φ = 20°, γ = 128 pcf). Part II RS2 SSR 1.64 / Part IV RS2 SSR 1.58 bracket XSLOPE SSRM 1.594 and the D&W referee 1.60. |
 | [36](#rs2-36) | Seepage analysis, homogeneous slope (D&W Fig 6.37) | **built** (both cases) | [vp071a](../files/rocscience/vp071a.xlsx) / [b](../files/rocscience/vp071b.xlsx). SSRM 1.097 on the FE-seepage model and 1.111 on the piezo approximation vs RS2 SSRM 1.12 / 1.12; referee 1.138/1.141; XSLOPE LEM locks 1.132. |
 | [37](#rs2-37) | Embankment with layered foundation (D&W Fig 6.39) | *reported, no lock* | RS2's SSRM is the artesian downstream-toe slide (0.95 in its table, 1.1 in its own convergence graph); XSLOPE's SSRM finds the deep mechanism at 1.31. |
 | [38](#rs2-38) | Cohesionless embankment on saturated clay foundation | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). Sand on saturated clay (D&W Fig 7.12). SSRM 1.168 vs RS2 SSR 1.17 (Part 4) / 1.21 (Part 2), Slide2 non-circular 1.18. |
@@ -2471,7 +2471,10 @@ below the references. ψ = 0.
 
 Slide2/LEM counterpart: [VP70](rocscience.md#vp70). RS2 Part IV (Table 70.2/70.3) re-runs this
 submerged slope by shear-strength reduction. The point of the problem is that the factor of safety is
-independent of pool depth (30 ft vs 60 ft above the crest); RS2 reports SSR 1.58 for both.
+independent of pool depth (30 ft vs 60 ft above the crest); RS2 reports SSR 1.58 for both. This build
+also covers **RS2 Part II §35** ("Submerged slope"), which is the identical Duncan & Wright Fig 6.27
+model (native `.fez` #035: c′ = 100 psf, φ = 20°, γ = 128 pcf) — Part II reports RS2 SSR 1.64 for it,
+so the two RS2 manuals bracket XSLOPE's 1.594 (1.58 / 1.64) around the D&W referee 1.60.
 
 **Input files:** [vp070a.xlsx](../files/rocscience/vp070a.xlsx) (pool 30 ft above crest)
 

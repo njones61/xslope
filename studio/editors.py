@@ -375,10 +375,12 @@ class _HelpStrip(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.NoFrame)
-        # Subtle separation from the editing area: a single top hairline, dim text.
+        # Separation from the editing area: a single top hairline. Strong blue
+        # text (Norm: make it pop) — distinct from the red/blue header-legend
+        # colors, readable on light and dark palettes.
         self.setStyleSheet(
             "_HelpStrip { border-top: 1px solid palette(mid); }"
-            "_HelpStrip QLabel { color: palette(placeholder-text); }")
+            "_HelpStrip QLabel { color: #1a56b0; }")
         lay = QHBoxLayout(self)
         lay.setContentsMargins(8, 4, 8, 4)
         lay.setSpacing(0)

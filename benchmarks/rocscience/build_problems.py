@@ -2970,15 +2970,36 @@ def vp042():
     reservoir el. 30 on the RIGHT face, dry 5-m cracked layer at the crest
     (tcrack_depth=5). Geometry fully labeled in Slide's Figure 42.1, including
     all six vertices of the diamond core: base (110,0)-(130,0), waist (88,16)/
-    (152,18), top (110,49)-(130,49). The fill wraps UNDER the core's lower
-    flanks, so the stack uses a second fill layer below the core (partial-span
-    profile lines, sample-8 style). Phreatic line traced from the figure by
-    labeled-anchor calibration (the jump top reproduces the labeled (88,16), the
-    left end lands at the toe, the right run at the stated el. 30): tailwater
-    (0,1.5) rising to (88,7.2), a jump across the core's left face to (88,16),
-    through the core to the reservoir at (145,30). Slide: circular (80x80 grid)
-    Spencer 1.925; noncircular (random + optimization) 1.877; Baker 1.91 on the
-    labeled Figure 42.2 surface, which is stored here as non_circ."""
+    (152,18), top (110,49)-(130,49).
+
+    The section is tiled directly as material-zone polygons (the SLOPE/W .gsz
+    region set, "Baker and Leshchinsky - Earth Dam"), NOT as profile lines. The
+    profile-line stack drew the granular shell's lower-right boundary as a single
+    chord from the toe (265,0) to the right waist (152,18), which cut off the
+    downstream toe wedge (152,18)-(152,0)-(265,0): that triangle carried no
+    material and was excised from the domain, starving every reservoir-side
+    failure surface of resisting weight. The explicit five-zone tiling closes it:
+
+      - hard base:  (0,0)-(265,0)-(265,-10)-(0,-10)
+      - clay core:  the upper diamond, waist line (88,16)-(152,18) up to the top
+                    (110,49)-(130,49)
+      - granular below core: the lower diamond, waist line down to the base
+                    (110,0)-(130,0) (the fill wraps under the core's lower flanks)
+      - granular shell, LEFT face: outer face (0,0)-(110,54), left half of the
+                    crest cap, down the diamond's left flank to the base
+      - granular shell, RIGHT face: right half of the cap, outer face
+                    (130,54)-(265,0) to the toe, and the reclaimed toe wedge, up
+                    the diamond's right flank
+
+    Phreatic line traced from the figure by labeled-anchor calibration (the jump
+    top reproduces the labeled (88,16), the left end lands at the toe, the right
+    run at the stated el. 30): tailwater (0,1.5) rising to (88,7.2), a jump across
+    the core's left face to (88,16), through the core to the reservoir at (145,30).
+    Slide: circular (80x80 grid) Spencer 1.925; noncircular (random +
+    optimization) 1.877; Baker 1.91 on the labeled Figure 42.2 surface, which is
+    stored here as non_circ. With the toe wedge restored, XSLOPE reproduces the
+    published cluster on all three reference surfaces (see the corpus page)."""
+    from shapely.geometry import Polygon
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     fill = dict(base); fill.update(name='Granular fill', c=0.0, phi=40.0, gamma=21.5,
@@ -2989,13 +3010,25 @@ def vp042():
     hard = dict(base); hard.update(name='Hard base', c=200.0, phi=45.0, gamma=24.0,
                                    gamma_sat=24.0, option='mc', u='piezo')
     sd['materials'] = [fill, core, fill2, hard]
-    sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(0.0, 0.0), (110.0, 54.0), (130.0, 54.0), (265.0, 0.0)]},
-        {'mat_id': 1, 'coords': [(88.0, 16.0), (110.0, 49.0), (130.0, 49.0), (152.0, 18.0)]},
-        {'mat_id': 2, 'coords': [(88.0, 16.0), (110.0, 0.0), (130.0, 0.0), (152.0, 18.0)]},
-        {'mat_id': 3, 'coords': [(0.0, 0.0), (265.0, 0.0)]},
+    # Profile input is replaced by explicit material-zone polygons: the shell is
+    # split into left/right faces (meeting on the crest centerline x=120 through
+    # the cap), the diamond into upper clay core + lower granular fill.
+    sd['profile_lines'] = []
+    sd.pop('max_depth', None)
+    sd['polygons'] = [
+        {'polygon': Polygon([(0.0, 0.0), (265.0, 0.0), (265.0, -10.0), (0.0, -10.0)]),
+         'mat_id': 3},                                             # hard base
+        {'polygon': Polygon([(88.0, 16.0), (110.0, 49.0), (130.0, 49.0), (152.0, 18.0)]),
+         'mat_id': 1},                                             # clay core (upper diamond)
+        {'polygon': Polygon([(88.0, 16.0), (110.0, 0.0), (130.0, 0.0), (152.0, 18.0)]),
+         'mat_id': 2},                                             # granular below core (lower diamond)
+        {'polygon': Polygon([(0.0, 0.0), (110.0, 54.0), (120.0, 54.0), (120.0, 49.0),
+                             (110.0, 49.0), (88.0, 16.0), (110.0, 0.0)]),
+         'mat_id': 0},                                             # granular shell, left face
+        {'polygon': Polygon([(120.0, 54.0), (130.0, 54.0), (265.0, 0.0), (130.0, 0.0),
+                             (152.0, 18.0), (130.0, 49.0), (120.0, 49.0)]),
+         'mat_id': 0},                                             # granular shell, right face (incl. toe wedge)
     ]
-    sd['max_depth'] = -10.0
     sd['gamma_water'] = 9.81
     sd['tcrack_depth'] = 5.0
     sd['tcrack_water'] = 0.0
@@ -3007,15 +3040,13 @@ def vp042():
                      {'X': 265.0, 'Y': 0.0, 'Normal': 9.81 * 30.0}]]
     sd['circular'] = True
     # circles[0] = Slide's printed critical (safety-map global minimum, Figure
-    # 42.3 info box). XSLOPE reads Spencer 1.572 here vs the published cluster
-    # (Slide 1.925, Baker 1.91, SLOPE/W-own 1.934). The gap is NOT a weight
-    # convention: B&L (2001, p.142) state total unit weight + pore pressure from
-    # the phreatic surface, and the SLOPE/W .gsz carries total weights + a piezo
-    # line within ~1-2 m of this one (no buoyant weights). On SLOPE/W's OWN
-    # critical circle (234.9,207.1,R=204.4) XSLOPE reads 1.691 vs SLOPE/W 1.934
-    # on the identical surface; every XSLOPE method sits low. The residual is the
-    # large reservoir (ponded-water) load statics, not a buoyant shortcut. See
-    # the corpus page.
+    # 42.3 info box). With the downstream toe wedge restored (see the tiling
+    # above) XSLOPE reads Spencer 1.926 here, matching Slide's 1.925 and the
+    # published cluster (Baker 1.91, SLOPE/W-own 1.934). On SLOPE/W's OWN critical
+    # circle (234.89,207.07,R=204.36) XSLOPE reads Spencer 1.939 vs SLOPE/W 1.934
+    # on the identical surface, with total sliding-mass weight ~56,020 vs SLOPE/W's
+    # 56,127. B&L (2001, p.142) and the .gsz both use total unit weight + explicit
+    # pore pressure from the phreatic surface (no buoyant weights).
     sd['circles'] = [{'Xo': 233.762, 'Yo': 188.495, 'Depth': 188.495 - 187.195, 'R': 187.195}]
     # Baker's noncircular surface, fully labeled in Figure 42.2
     # Slide prints its endpoints pulled slightly inside the ground, and the top

@@ -329,6 +329,8 @@ reproduces the published curve **almost exactly**:
 
 Flowrate 1.639×10⁻⁶ m³/s per m (locked with the total-head field).
 
+![gw006b: mesh and solved heads (9:1 anisotropy)](images/gw006b.png)
+
 **Case 3 — isotropic dam with a low-permeability core and the horizontal drain.** A
 rectangular central core (x ∈ [24, 28], y ∈ [0, 10], read from the vendor mesh's material-2
 footprint) with saturated k = 10⁻⁹ m/s — 100× lower than the 10⁻⁷ shell — is tiled into the
@@ -349,6 +351,8 @@ profile shape and sits at the high end of the published scatter:
 tracks the shape and sits above both up high — the same +0.5 m free-surface family as case 1.
 Locked at XSLOPE's own values.*
 
+![gw006c: mesh and solved heads (low-k core)](images/gw006c.png)
+
 **Case 5 — isotropic dam with a downstream seepage face (no drain).** The horizontal toe
 drain is replaced by the "unknown boundary condition": the crest and the whole downstream
 slope are a seepage face where the phreatic surface may daylight (vendor seepage-face nodes
@@ -364,6 +368,8 @@ the published curve **almost exactly**:
 | 8 | 0.50 | ≈0.55 |
 
 Flowrate 1.686×10⁻⁷ m³/s per m (locked with the total-head field).
+
+![gw006e: mesh and solved heads (seepage face)](images/gw006e.png)
 
 *Case 4 (steady-state infiltration, a 10⁻⁸ m/s flux over the whole dam surface) stays
 deferred — the same flux-BC / exit-face convergence gap tracked elsewhere in this corpus.*

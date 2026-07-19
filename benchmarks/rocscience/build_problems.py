@@ -1418,6 +1418,62 @@ def vp032a():
     return 'vp032a.xlsx'
 
 
+def vp032a_skin():
+    """RS2-24a WITH the vendor's elastic face-skin, for the constrained-SSRM
+    head-to-head against RS2's published SSR 1.15.
+
+    Geometrically and materially IDENTICAL to vp032a (same seven soil zones,
+    same geosynthetic, same circle) EXCEPT the ~0.75-1 m strip inboard of the
+    39.1 deg embankment face is carved into its OWN two zones -- 'Upper
+    embankment (elastic skin)' / 'Lower embankment (elastic skin)' -- carrying
+    the SAME c/phi/gamma as the embankment fills they duplicate. The strip
+    follows the RS2 vendor .fez (#024_01) internal boundary 9,
+    (-9.5,7)->(-2.214,1)->(-2.093,0.9)->(-1,0), inboard of the true face
+    (-8.61,7)->(-1.23,1)->(-1.107,0.9)->(0,0); it meshes to 10 upper + 4 lower
+    elements, matching the vendor's own element bboxes. In RS2 those elements
+    are assigned duplicate materials 8/9 ("embankment lower/upper elastic")
+    with 'Plasticity Specifications: Non' -- purely elastic, no Apply_SSR field
+    -- so the SRF sweep can never fail the cohesionless face skin and the
+    mechanism is forced onto the deep reinforced surface (RS2's locked 1.15).
+
+    The split is INERT to a normal MC solve (skin = embankment soil); its only
+    purpose is to give the runner two named zones to pass to elastic_materials,
+    mirroring vp067c's ssr_exclude construction. E/nu come from the elastic
+    classifier (same soil type as the embankment -> identical). vp032a.xlsx and
+    its 0.905 unconstrained lock are untouched. Do NOT edit vp032a.xlsx."""
+    from shapely.geometry import Polygon
+    from xslope.mesh import get_material_polygons
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = _vp032_slope_data(1)
+    # base soil zones from the profile representation (before adding skin mats)
+    base = get_material_polygons(sd)
+    # two elastic-skin duplicates of the embankment fills (identical properties)
+    upper = dict(sd['materials'][0]); upper['name'] = 'Upper embankment (elastic skin)'
+    lower = dict(sd['materials'][1]); lower['name'] = 'Lower embankment (elastic skin)'
+    sd['materials'] = list(sd['materials']) + [upper, lower]
+    # carve the face skin out of the two embankment zones; add it as mats 7/8
+    upper_skin = Polygon([(-8.61, 7.0), (-9.5, 7.0), (-2.214, 1.0), (-1.23, 1.0)])
+    lower_skin = Polygon([(-1.23, 1.0), (-1.107, 0.9), (0.0, 0.0), (-1.0, 0.0),
+                          (-2.093, 0.9), (-2.214, 1.0)])
+    polys = []
+    for p in base:
+        poly = Polygon(p['coords'])
+        if p['mat_id'] == 0:
+            poly = poly.difference(upper_skin)
+        elif p['mat_id'] == 1:
+            poly = poly.difference(lower_skin)
+        polys.append({'polygon': poly, 'mat_id': p['mat_id']})
+    polys.append({'polygon': upper_skin, 'mat_id': 7})
+    polys.append({'polygon': lower_skin, 'mat_id': 8})
+    sd['polygons'] = polys
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
+    sd['circles'] = [{'Xo': -4.8, 'Yo': 8.0, 'Depth': 8.0 - 21.83, 'R': 21.83}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a_skin.xlsx'))
+    return 'vp032a_skin.xlsx'
+
+
 def vp032b():
     """Slide #32 case 1 (H=7), circle B (printed: (-3.8, 15) R 31.47):
     Bishop/Spencer 1.216 vs Slide2 1.22 / Borges & Cardoso 1.19."""
@@ -4332,7 +4388,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

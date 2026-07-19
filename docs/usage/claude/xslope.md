@@ -764,20 +764,25 @@ Method notes:
 `FS`, `Xo`, `Yo`, `Depth` (tangent elevation), plus `slices`, `failure_surface`,
 `solver_result`. There is no `R` key — compute `R = Yo - Depth`.
 
-### Sensitivity & design studies
+### Parametric studies (sensitivity, design, back-analysis)
 
-Four engine entry points in `xslope.sensitivity`, all sharing one parameter grammar:
-`sensitivity()` sweeps one input and reports the OUTPUT per point; `design()` sweeps one
-input to find the value where the output meets a target; `tornado()` /
-`tornado_from_sweeps()` rank several parameters by output swing; and `list_params()`
-enumerates every sweepable parameter so you never guess a ref. All four take a `mode`
-(`'lem'` default → output = FS; `'fem'` → output = FS from a full SSRM solve; `'seep'` →
-output = total discharge q) — see **Engine modes: FEM and seepage** below.
+`xslope.sensitivity` groups three related studies under one **Parametric** umbrella, all
+sharing one parameter grammar. **Sensitivity**: `sensitivity()` sweeps one input and reports
+the OUTPUT per point; the sweeps feed a family of plots (below). **Design**: `design()`
+sweeps one input to find the value where the output meets a target. **Back-analysis**:
+`back_analysis()` is `design()` with `target_fs=1.0`, framed to back-calculate the parameter
+value consistent with an observed failure. `list_params()` enumerates every sweepable
+parameter so you never guess a ref. These take a `mode` (`'lem'` default → output = FS;
+`'fem'` → output = FS from a full SSRM solve; `'seep'` → output = total discharge q) — see
+**Engine modes: FEM and seepage** below.
 
 ```python
-from xslope.sensitivity import (sensitivity, design, tornado,
-                                tornado_from_sweeps, list_params)
-from xslope.plot import plot_sensitivity, plot_tornado
+from xslope.sensitivity import (sensitivity, design, back_analysis, tornado,
+                                tornado_from_sweeps, list_params,
+                                scaled_sensitivity, variance_contribution,
+                                mc_rank_correlation)
+from xslope.plot import (plot_sensitivity, plot_tornado, plot_scaled_sensitivity,
+                        plot_spider, plot_variance_pareto, plot_mc_rank_correlation)
 
 ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
                       methods=("bishop",), search=True)   # res['df'] is tidy long-format
@@ -898,6 +903,47 @@ plot_tornado(result, save_png=True)
 For a straight low/high tornado without full curves, call
 `tornado(slope_data, picks, rel_range=0.25, method="bishop")` instead (it returns the same
 `result` dict `plot_tornado` consumes).
+
+#### Sensitivity plots beyond the tornado
+
+Four more views ship alongside the tornado; all take `(success, result)` and pair with a
+`plot_*`. The first three are LOCAL/deterministic; the last two need reliability sigmas.
+
+```python
+# Scaled-sensitivity bars — one bar per parameter, made comparable across units. The
+# derivative is a central difference at ±1%; scaling is 'elasticity' (∂F/∂p·p/F, default),
+# 'per_1pct' (ΔFS per 1%), or 'per_sigma' (ΔFS per σ; σ params only).
+ok, r = scaled_sensitivity(slope_data, ["mat:Clay:c", "mat:Clay:phi"], method="bishop")
+plot_scaled_sensitivity(r, scaling="elasticity")
+
+# Spider — FS vs each parameter on one normalized (% of base) axis; reuses the sweeps dict.
+plot_spider(sweeps)          # sweeps = {ref: sensitivity(...)[1]['df'], ...}
+
+# Variance-contribution Pareto — each σ parameter's share of Var(FS), reusing the
+# Taylor-series reliability (needs sigmas). Sorted descending + cumulative line.
+ok, r = variance_contribution(slope_data, method="bishop")
+plot_variance_pareto(r)
+
+# Monte Carlo rank correlation — Spearman(input, FS) from a reliability_mc sample; a GLOBAL
+# measure (whole distribution), complementary to the local scaled bars (needs sigmas).
+ok, r = mc_rank_correlation(slope_data, method="bishop", n_samples=10000)
+plot_mc_rank_correlation(r)
+```
+
+`variance_contribution` and `mc_rank_correlation` reuse `xslope.advanced`'s reliability
+machinery — do not reimplement the statistics. Read the local scaled bars and the global MC
+rank together; they can disagree, and the disagreement is informative.
+
+#### Back-analysis: back-calculate the value at FS = 1
+
+```python
+ok, res = back_analysis(slope_data, "mat:Soil:c", low=1.0, high=6.0, steps=11)  # target 1.0
+print(res["message"])        # "Back-analysis: mat:Soil:c = 3.25 gives FS = 1 (...)"
+print(res["crossing"])       # the back-calculated value; res['study'] == 'back_analysis'
+```
+
+Same fields and the same never-extrapolate honesty as `design()` — if FS = 1.0 is not
+reached in the range, `bracketed` is False and `extend` says which way to widen it.
 
 ---
 

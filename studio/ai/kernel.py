@@ -77,7 +77,20 @@ class PythonKernel:
           engine: 'lem' (output = FS, default), 'fem' (FS via SSRM — MINUTES per
           step, needs a mesh), 'seep' (total discharge q — needs a mesh; target is a
           q). The engine-driven counterpart to ``sensitivity`` — no callback needed,
-          just a parameter ref or dict spec.
+          just a parameter ref or dict spec. This is the **Design** mode of the
+          Parametric study family; ``parametric_design`` is the same function under
+          the umbrella name.
+
+        The Parametric study family (all share the ``list_params`` parameter refs):
+
+        - ``parametric_sweep(params=None, plot='scaled', ...)`` — multi-parameter
+          sensitivity that renders one plot-family view: ``plot`` in
+          {'tornado', 'scaled', 'spider', 'variance', 'rank'} (with ``scaling`` for
+          the scaled bars). The one call that reaches every plot type.
+        - ``parametric_design(...)`` — alias of ``design_sweep`` (target-FS sweep).
+        - ``parametric_back_analysis(param, low, high, target_fs=1.0, ...)`` — forensic
+          back-analysis: the value that makes the slope limiting (FS = 1.0), i.e.
+          ``design_sweep`` framed for a failure investigation.
         """
         doc = self._doc
 
@@ -326,9 +339,149 @@ class PythonKernel:
                                  fig=plt.figure(figsize=(8, 5)))
             return res
 
+        def parametric_back_analysis(param, low, high, steps=11, target_fs=1.0,
+                                     mode="lem", method="spencer", search=True,
+                                     num_slices=40, fem_opts=None, seep_opts=None,
+                                     plot=True, slope_data=None):
+            """Forensic back-analysis: vary ONE parameter and find the value that makes
+            the slope limiting (FS = 1.0 by default) — the Back-Analysis mode of the
+            Parametric study family.
+
+            A slide has occurred, so FS at failure is known to be 1.0 and the unknown
+            is a strength / pore-pressure / loading parameter; this inverts the problem
+            to the value CONSISTENT WITH the observed failure. Mechanically it is
+            `parametric_design` with `target_fs=1.0`, so all arguments and the returned
+            result dict match `design_sweep` (`crossing` is the back-calculated value).
+            Thin wrapper over `xslope.sensitivity.back_analysis`.
+            """
+            from xslope.sensitivity import back_analysis as _back
+            from xslope.plot import plot_sensitivity
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            if mode in ("fem", "seep") and sd.get("mesh") is None:
+                raise RuntimeError(f"mode='{mode}' needs a mesh in slope_data['mesh'].")
+            ok, res = _back(sd, param, low, high, steps=steps, target_fs=target_fs,
+                            mode=mode, method=method, search=search,
+                            num_slices=num_slices, fem_opts=fem_opts, seep_opts=seep_opts)
+            if not ok:
+                raise RuntimeError(res)
+            print(res["message"])
+            if not res["bracketed"]:
+                out = res.get("output", "FS")
+                lo, hi = res["fs_range"]
+                print(f"  (not bracketed — {out} spans [{lo:.3g}, {hi:.3g}]; extend "
+                      f"the range {res['extend']} to reach {out} = {target_fs:g})")
+            if plot:
+                plot_sensitivity(res["df"], target_fs=res["target_fs"],
+                                 fig=plt.figure(figsize=(8, 5)))
+            return res
+
+        def parametric_sweep(params=None, plot="scaled", scaling="elasticity",
+                             mode="lem", method="spencer", rel_range=0.25, n=7,
+                             num_slices=40, search=True, n_samples=None,
+                             fem_opts=None, seep_opts=None, plot_fig=True,
+                             slope_data=None):
+            """Parametric SENSITIVITY across several parameters at once, rendering one
+            of the plot-family views — the multi-parameter 'sweep call' of the
+            Parametric study family (its single-parameter siblings are `design_sweep` /
+            `parametric_design` and `parametric_back_analysis`).
+
+            `params` is a list of parameter refs (any form `list_params` /
+            `design_sweep` accept); None auto-selects every material strength/weight
+            parameter in the model. `plot` picks the view — every plot type in the
+            family is reachable from this one call:
+              'tornado'  — FS swing per parameter between its ±`rel_range` bounds
+                           (Duncan tornado; `plot_tornado`).
+              'scaled'   — scaled-sensitivity bars (`plot_scaled_sensitivity`), with
+                           `scaling` one of 'elasticity' (default, ∂F/∂p·p/F),
+                           'per_1pct' (ΔFS per 1%), 'per_sigma' (ΔFS per σ; σ params
+                           only). The derivative is a central difference at ±1%.
+              'spider'   — FS vs each parameter over ±`rel_range`, `n` points, on a
+                           normalized % x-axis (`plot_spider`).
+              'variance' — variance-contribution Pareto (`plot_variance_pareto`);
+                           needs σ; reuses the Taylor-series reliability machinery.
+              'rank'     — Monte Carlo Spearman rank correlation with FS
+                           (`plot_mc_rank_correlation`); needs σ; `n_samples` sizes the
+                           campaign (default 10000). A GLOBAL measure, complementary to
+                           the LOCAL 'scaled' bars.
+
+            `mode` selects the engine ('lem' default / 'fem' / 'seep'), exactly as in
+            `design_sweep`. Renders ONE figure and returns the underlying engine result
+            dict (a tornado result, a scaled/variance/rank result, or `{'sweeps': ...}`
+            for the spider). Does NOT modify the project.
+            """
+            from xslope.sensitivity import (sensitivity as _sens, tornado_from_sweeps,
+                                            scaled_sensitivity, variance_contribution,
+                                            mc_rank_correlation, list_params as _lp)
+            from xslope import plot as _plot
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            if params is None:
+                params = [e["ref"] for e in _lp(sd, mode="seep" if mode == "seep"
+                                                else "lem")
+                          if e.get("value") is not None
+                          and e["kind"] in ("mat", "seep")]
+            if isinstance(params, (str, dict, tuple)):
+                params = [params]
+            if mode in ("fem", "seep") and sd.get("mesh") is None:
+                raise RuntimeError(f"mode='{mode}' needs a mesh in slope_data['mesh'].")
+
+            def newfig():
+                return plt.figure(figsize=(8, 5)) if plot_fig else None
+
+            if plot == "variance":
+                ok, res = variance_contribution(sd, method=method, search=search)
+                if not ok:
+                    raise RuntimeError(res)
+                if plot_fig:
+                    _plot.plot_variance_pareto(res, fig=newfig())
+                return res
+            if plot == "rank":
+                kw = {"n_samples": int(n_samples)} if n_samples else {}
+                ok, res = mc_rank_correlation(sd, method=method, search=search,
+                                              num_slices=num_slices, **kw)
+                if not ok:
+                    raise RuntimeError(res)
+                if plot_fig:
+                    _plot.plot_mc_rank_correlation(res, fig=newfig())
+                return res
+            if plot == "scaled":
+                ok, res = scaled_sensitivity(sd, params, method=method, mode=mode,
+                                             search=search, num_slices=num_slices,
+                                             fem_opts=fem_opts, seep_opts=seep_opts)
+                if not ok:
+                    raise RuntimeError(res)
+                if plot_fig:
+                    _plot.plot_scaled_sensitivity(res, scaling=scaling, fig=newfig())
+                return res
+            # tornado / spider both need the full per-parameter sweeps
+            sweeps = {}
+            for ref in params:
+                ok, res = _sens(sd, param=ref, rel_range=rel_range, n=n, mode=mode,
+                                methods=(method,), search=search, num_slices=num_slices,
+                                fem_opts=fem_opts, seep_opts=seep_opts)
+                if not ok:
+                    raise RuntimeError(f"{ref}: {res}")
+                sweeps[res["param"]] = res["df"]
+            if plot == "spider":
+                if plot_fig:
+                    _plot.plot_spider(sweeps, fig=newfig())
+                return {"sweeps": sweeps}
+            tor = tornado_from_sweeps(sweeps, method=method)
+            if plot_fig:
+                _plot.plot_tornado(tor, fig=newfig())
+            return tor
+
+        # Preferred names under the Parametric umbrella; `design_sweep` is kept as a
+        # back-compatible alias (older skill recipes and saved snippets call it).
+        parametric_design = design_sweep
+
         return {"run_lem": run_lem, "resync_geometry": resync_geometry,
                 "sensitivity": sensitivity, "list_params": list_params,
-                "design_sweep": design_sweep}
+                "design_sweep": design_sweep,
+                "parametric_sweep": parametric_sweep,
+                "parametric_design": parametric_design,
+                "parametric_back_analysis": parametric_back_analysis}
 
     @staticmethod
     def _normalize(code):

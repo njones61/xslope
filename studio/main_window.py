@@ -191,6 +191,23 @@ class SweepCanvas(MplCanvas):
         from xslope.plot import plot_tornado
         self._draw(lambda fig: plot_tornado(result, fig=fig), dxf=False)
 
+    def render_scaled(self, result, scaling="elasticity"):
+        from xslope.plot import plot_scaled_sensitivity
+        self._draw(lambda fig: plot_scaled_sensitivity(result, scaling=scaling,
+                                                       fig=fig), dxf=False)
+
+    def render_spider(self, sweeps):
+        from xslope.plot import plot_spider
+        self._draw(lambda fig: plot_spider(sweeps, fig=fig), dxf=False)
+
+    def render_variance(self, result):
+        from xslope.plot import plot_variance_pareto
+        self._draw(lambda fig: plot_variance_pareto(result, fig=fig), dxf=False)
+
+    def render_rank(self, result):
+        from xslope.plot import plot_mc_rank_correlation
+        self._draw(lambda fig: plot_mc_rank_correlation(result, fig=fig), dxf=False)
+
     def render_curve(self, df, target_fs=None):
         from xslope.plot import plot_sensitivity
         self._draw(lambda fig: plot_sensitivity(df, target_fs=target_fs, fig=fig),
@@ -530,7 +547,7 @@ class MainWindow(QMainWindow):
                                 enabled=False, triggered=self.save)
         self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
         self.act_run = QAction("Run &LEM…", self, enabled=False, triggered=self.run_current)
-        self.act_sensitivity = QAction("Sensitivity / &Design…", self, enabled=False,
+        self.act_sensitivity = QAction("&Parametric…", self, enabled=False,
                                        triggered=self.run_sensitivity)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
@@ -598,8 +615,8 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_build_mesh)
         tb.addAction(self.act_run)
-        # Sensitivity / Design lives on the toolbar too (Norm's ask); the action's
-        # existing mode-visibility (LEM-only) hides the button in other modes.
+        # The Parametric study lives on the toolbar too (Norm's ask); the action's
+        # existing mode-visibility hides the button where it does not apply.
         tb.addAction(self.act_sensitivity)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
@@ -1192,7 +1209,7 @@ class MainWindow(QMainWindow):
                 or self._fem_runner is not None or self._sens_runner is not None
                 or self._mesh_busy)
         has_mesh = open_ and self.doc.slope_data.get("mesh") is not None
-        # Sensitivity / design has a version for every mode (LEM: FS; FEM: FS via
+        # The Parametric study has a version for every mode (LEM: FS; FEM: FS via
         # SSRM; Seep: discharge q). Always visible; the FEM/Seep sweeps run on the
         # mesh, so gate those on a built mesh exactly like Run.
         self.act_sensitivity.setVisible(True)
@@ -1932,17 +1949,22 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_sens_opts[self._mode] = opts
-        if opts["mode"] == "design" and not opts.get("param"):
+        study = opts["mode"]
+        if study in ("design", "back_analysis") and not opts.get("param"):
             QMessageBox.warning(self, "Nothing to sweep",
                                 "Pick a material and property to sweep.")
             return
-        if opts["mode"] == "sensitivity" and not opts.get("params"):
+        # The variance / MC-rank plots use every σ-carrying material, so an empty
+        # table is fine for them; the tornado / scaled / spider plots need a table.
+        if (study == "sensitivity" and not opts.get("params")
+                and opts.get("plot_type", "tornado") in ("tornado", "scaled", "spider")):
             QMessageBox.warning(self, "Nothing to sweep",
                                 "Add at least one parameter to the table.")
             return
         self.act_sensitivity.setEnabled(False)
         self.act_run.setEnabled(False)
-        verb = "Design sweep" if opts["mode"] == "design" else "Sensitivity sweep"
+        verb = {"design": "Design sweep", "back_analysis": "Back-analysis"}.get(
+            study, "Sensitivity sweep")
         self.statusBar().showMessage(f"{verb} — {opts['method']} …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -1962,21 +1984,35 @@ class MainWindow(QMainWindow):
             self._show_design()
             if self.design_canvas is not None:
                 self.view_tabs.setCurrentWidget(self.design_canvas)
+            verb = ("Back-analysis" if bundle.get("study") == "back_analysis"
+                    else "Design")
             if bundle.get("bracketed"):
                 self.statusBar().showMessage(
-                    f"Design — {bundle.get('output', 'FS')} = "
+                    f"{verb} — {bundle.get('output', 'FS')} = "
                     f"{bundle['target_fs']:g} at "
                     f"{bundle['param'].split(':')[-1]} = {bundle['crossing']:.4g}")
             else:
-                self.statusBar().showMessage(bundle.get("message", "Design done."))
+                self.statusBar().showMessage(bundle.get("message", f"{verb} done."))
         else:
             self.doc.results["sensitivity"] = bundle
             self._show_sensitivity()
             if self.sens_canvas is not None:
                 self.view_tabs.setCurrentWidget(self.sens_canvas)
-            n = len(bundle.get("sweeps", {}))
-            self.statusBar().showMessage(
-                f"Sensitivity — {n} parameter(s); click a tornado bar for its curve.")
+            pt = bundle.get("plot_type", "tornado")
+            msg = {
+                "tornado": (f"Sensitivity — {len(bundle.get('sweeps', {}))} "
+                            f"parameter(s); double-click a tornado bar for its curve."),
+                "scaled": (f"Scaled sensitivity — "
+                           f"{len(bundle.get('scaled', {}).get('bars', []))} "
+                           f"parameter(s), {bundle.get('scaling', 'elasticity')}."),
+                "spider": (f"Spider — {len(bundle.get('sweeps', {}))} parameter(s)."),
+                "variance": (f"Variance contribution — "
+                             f"{len(bundle.get('variance', {}).get('bars', []))} "
+                             f"uncertain parameter(s)."),
+                "rank": (f"Monte Carlo rank correlation — "
+                         f"{bundle.get('rank', {}).get('n_valid')} valid samples."),
+            }.get(pt, "Sensitivity done.")
+            self.statusBar().showMessage(msg)
 
     def _on_sens_failed(self, message):
         QMessageBox.warning(self, "Sweep failed", message)
@@ -2023,20 +2059,36 @@ class MainWindow(QMainWindow):
         if self.sens_canvas is None:
             self.sens_canvas = SweepCanvas(self)
             self.view_tabs.addTab(self.sens_canvas, "Sensitivity")
-            # Double-click a bar to open that parameter's FS-vs-value curve.
-            self.sens_canvas.set_pick_enabled(True)
-            self.sens_canvas._hint_label.setText(
-                "(double-click a bar to see its FS curve)")
+            # Double-click a bar to open that parameter's FS-vs-value curve (tornado
+            # only; enabled per-render below).
             self.sens_canvas.picked.connect(self._on_tornado_pick)
+        # Click-through is a tornado affordance; disable it for the other plots.
+        bundle = self.doc.results.get("sensitivity") or {}
+        tornado_like = bundle.get("plot_type", "tornado") == "tornado"
+        self.sens_canvas.set_pick_enabled(tornado_like)
+        self.sens_canvas._hint_label.setText(
+            "(double-click a bar to see its FS curve)" if tornado_like else "")
         self._rerender_sensitivity()
 
     def _rerender_sensitivity(self):
         bundle = self.doc.results.get("sensitivity")
-        if bundle and self.sens_canvas is not None:
-            try:
+        if not bundle or self.sens_canvas is None:
+            return
+        pt = bundle.get("plot_type", "tornado")
+        try:
+            if pt == "scaled":
+                self.sens_canvas.render_scaled(
+                    bundle["scaled"], scaling=bundle.get("scaling", "elasticity"))
+            elif pt == "spider":
+                self.sens_canvas.render_spider(bundle["sweeps"])
+            elif pt == "variance":
+                self.sens_canvas.render_variance(bundle["variance"])
+            elif pt == "rank":
+                self.sens_canvas.render_rank(bundle["rank"])
+            else:
                 self.sens_canvas.render_tornado(bundle["tornado"])
-            except Exception:
-                traceback.print_exc()
+        except Exception:
+            traceback.print_exc()
 
     def _on_tornado_pick(self, x, y, _tol):
         """Map a double-clicked tornado bar (its y row) to a parameter and show

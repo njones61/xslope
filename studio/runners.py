@@ -415,17 +415,24 @@ class LemRunner(QThread):
 
 
 class SensitivityRunner(QThread):
-    """Runs a sensitivity / design study off the GUI thread.
+    """Runs a Parametric study (sensitivity / design / back-analysis) off the GUI
+    thread.
 
-    A sweep is N sequential LEM solves (no multiprocessing). Progress is reported
-    per solve and the run cancels cooperatively (each engine sweep is passed a
+    A sweep is N sequential solves (no multiprocessing). Progress is reported per
+    solve and the run cancels cooperatively (each engine sweep is passed a
     ``cancel_check``; an in-flight solve finishes, then the sweep stops at the next
-    point). A thin caller of ``xslope.sensitivity``:
+    point). A thin caller of ``xslope.sensitivity``, keyed on ``opts['mode']`` and
+    (for sensitivity) ``opts['plot_type']``:
 
-      * design mode  -> ``design()``  -> bundle {'kind':'design', df, crossing, …}
-      * sensitivity  -> ``sensitivity()`` per parameter (full FS-vs-value curves,
-        for click-through) + ``tornado_from_sweeps()`` -> bundle
-        {'kind':'sensitivity', sweeps, tornado, method}.
+      * design         -> ``design()``        -> bundle {'kind':'design', …}
+      * back_analysis  -> ``back_analysis()``  -> bundle {'kind':'design',
+                          'study':'back_analysis', …}
+      * sensitivity, plot_type tornado/spider -> per-parameter ``sensitivity()``
+                          sweeps (+ ``tornado_from_sweeps()`` for the tornado)
+      * sensitivity, plot_type scaled   -> ``scaled_sensitivity()``
+      * sensitivity, plot_type variance -> ``variance_contribution()``
+      * sensitivity, plot_type rank     -> ``mc_rank_correlation()``
+        -> bundle {'kind':'sensitivity', 'plot_type': …, <payload>, method}.
     """
 
     succeeded = Signal(object)
@@ -445,7 +452,7 @@ class SensitivityRunner(QThread):
     def run(self):
         from xslope.search import AnalysisCancelled
         try:
-            if self._opts.get("mode") == "design":
+            if self._opts.get("mode") in ("design", "back_analysis"):
                 self._run_design()
             else:
                 self._run_sensitivity()
@@ -457,9 +464,12 @@ class SensitivityRunner(QThread):
             self.failed.emit("Sweep failed — see the Log pane for details.")
 
     def _run_design(self):
-        from xslope.sensitivity import design
+        from xslope.sensitivity import design, back_analysis
         o = self._opts
         emode = o.get("engine_mode", "lem")
+        is_back = o.get("mode") == "back_analysis"
+        study = "Back-analysis" if is_back else "Design sweep"
+        fn = back_analysis if is_back else design
         total = int(o["steps"]) + 1        # points + base
 
         def cb(done, _t, label):
@@ -468,25 +478,44 @@ class SensitivityRunner(QThread):
         out = "q" if emode == "seep" else "FS"
         engine_tag = {"lem": o.get("method", "spencer"), "fem": "SSRM",
                       "seep": f"BC {o.get('seep_opts', {}).get('bc', 1)}"}.get(emode, emode)
-        print(f"Design sweep ({emode}): {o['param']} from {o['low']:g} to "
+        print(f"{study} ({emode}): {o['param']} from {o['low']:g} to "
               f"{o['high']:g} in {o['steps']} steps, target {out} = "
               f"{o['target_fs']:g} ({engine_tag})…")
-        ok, res = design(self._sd, param=o["param"], low=o["low"], high=o["high"],
-                         steps=o["steps"], target_fs=o["target_fs"], mode=emode,
-                         method=o.get("method", "spencer"),
-                         search=o.get("search", True),
-                         num_slices=o.get("num_slices", 40),
-                         fem_opts=o.get("fem_opts"), seep_opts=o.get("seep_opts"),
-                         progress_callback=cb, cancel_check=self._cancel.is_set)
+        ok, res = fn(self._sd, param=o["param"], low=o["low"], high=o["high"],
+                     steps=o["steps"], target_fs=o["target_fs"], mode=emode,
+                     method=o.get("method", "spencer"),
+                     search=o.get("search", True),
+                     num_slices=o.get("num_slices", 40),
+                     fem_opts=o.get("fem_opts"), seep_opts=o.get("seep_opts"),
+                     progress_callback=cb, cancel_check=self._cancel.is_set)
         if not ok:
             self.failed.emit(str(res))
             return
         print(res["message"])
-        self.succeeded.emit({"kind": "design", **res})
+        # kind stays 'design' — the result canvas renders both the same way; the
+        # 'study' field (set by back_analysis) drives the title/status wording.
+        self.succeeded.emit({"kind": "design",
+                             "study": res.get("study", "design"), **res})
 
     def _run_sensitivity(self):
+        o = self._opts
+        plot_type = o.get("plot_type", "tornado")
+        # The variance Pareto and MC rank plots are their own engine runs (they use
+        # every sigma-carrying material, not the parameter table).
+        if plot_type == "variance":
+            self._run_variance()
+            return
+        if plot_type == "rank":
+            self._run_rank()
+            return
+        self._run_local(plot_type)
+
+    def _run_local(self, plot_type):
+        """Tornado / spider (full per-parameter sweeps) or scaled bars (central
+        differences at +/-1%)."""
         import numpy as np
-        from xslope.sensitivity import sensitivity, tornado_from_sweeps
+        from xslope.sensitivity import (sensitivity, tornado_from_sweeps,
+                                        scaled_sensitivity)
         o = self._opts
         emode = o.get("engine_mode", "lem")
         specs = o["params"]
@@ -495,16 +524,37 @@ class SensitivityRunner(QThread):
             return
         n = int(o["n"])
         method = o.get("method", "spencer")
-        # display method label for the tornado axis/title (an LEM method only
-        # makes sense in LEM mode; FEM/Seep carry their own quantity label)
         disp_method = {"lem": method, "fem": "SSRM", "seep": ""}.get(emode, method)
 
-        def n_points(spec):
-            if spec.get("values") is not None:
-                return len(spec["values"])
-            return n
+        if plot_type == "scaled":
+            count = [0]
 
-        total = sum(n_points(s) + 1 for s in specs)   # +1 base per parameter
+            def cb(done, total, label):
+                count[0] += 1
+                self.progress.emit(count[0], max(len(specs) * 3, 1), str(label))
+
+            print(f"Scaled sensitivity ({emode}): {len(specs)} parameter(s), "
+                  f"central differences at ±1% ({o.get('scaling', 'elasticity')})…")
+            ok, res = scaled_sensitivity(
+                self._sd, [s["ref"] for s in specs], method=method, mode=emode,
+                search=o.get("search", True), num_slices=o.get("num_slices", 40),
+                fem_opts=o.get("fem_opts"), seep_opts=o.get("seep_opts"),
+                progress_callback=cb, cancel_check=self._cancel.is_set)
+            if not ok:
+                self.failed.emit(str(res))
+                return
+            print(f"Scaled sensitivity done — {len(res['bars'])} parameter(s).")
+            self.succeeded.emit({"kind": "sensitivity", "plot_type": "scaled",
+                                 "scaled": res, "scaling": o.get("scaling",
+                                                                 "elasticity"),
+                                 "method": disp_method})
+            return
+
+        # tornado / spider: full per-parameter FS-vs-value sweeps
+        def n_points(spec):
+            return len(spec["values"]) if spec.get("values") is not None else n
+
+        total = sum(n_points(s) + 1 for s in specs)
         count = [0]
 
         def cb(_done, _t, label):
@@ -516,11 +566,9 @@ class SensitivityRunner(QThread):
             ref = spec["ref"]
             if spec.get("low") is not None and spec.get("high") is not None:
                 values = list(np.linspace(spec["low"], spec["high"], n))
-                rel = 0.5
-                tag = f"±σ [{spec['low']:g}, {spec['high']:g}]"
+                rel, tag = 0.5, f"±σ [{spec['low']:g}, {spec['high']:g}]"
             else:
-                values = None
-                rel = spec.get("rel_range", 0.2)
+                values, rel = None, spec.get("rel_range", 0.2)
                 tag = f"±{rel * 100:g}%"
             print(f"[{i + 1}/{len(specs)}] Sweeping {ref} {tag} ({emode})…")
             ok, res = sensitivity(self._sd, param=ref, values=values, rel_range=rel,
@@ -543,5 +591,51 @@ class SensitivityRunner(QThread):
         tornado = tornado_from_sweeps(sweeps, base_fs=base_fs, method=disp_method)
         print(f"Sensitivity done — {len(sweeps)} parameter(s), base {out} = "
               f"{base_fs:.3g}." if base_fs is not None else "Sensitivity done.")
-        self.succeeded.emit({"kind": "sensitivity", "sweeps": sweeps,
-                             "tornado": tornado, "method": disp_method})
+        self.succeeded.emit({"kind": "sensitivity", "plot_type": plot_type,
+                             "sweeps": sweeps, "tornado": tornado,
+                             "method": disp_method})
+
+    def _run_variance(self):
+        from xslope.sensitivity import variance_contribution
+        o = self._opts
+        method = o.get("method", "spencer")
+
+        def cb(done, total, label):
+            self.progress.emit(int(done or 0), int(total or 0), str(label))
+
+        print(f"Variance contribution ({method}): Taylor-series reliability over "
+              f"every σ-carrying material…")
+        ok, res = variance_contribution(self._sd, method=method,
+                                        search=o.get("search", True),
+                                        progress_callback=cb,
+                                        cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(res))
+            return
+        print(f"Variance contribution done — {len(res['bars'])} parameter(s), "
+              f"σ_F = {res.get('sigma_F'):.3g}.")
+        self.succeeded.emit({"kind": "sensitivity", "plot_type": "variance",
+                             "variance": res, "method": method})
+
+    def _run_rank(self):
+        from xslope.sensitivity import mc_rank_correlation
+        o = self._opts
+        method = o.get("method", "bishop")
+        n_samples = int(o.get("mc_samples", 5000))
+
+        def cb(done, total, label):
+            self.progress.emit(int(done or 0), int(total or 0), str(label))
+
+        print(f"Monte Carlo rank correlation ({method}): {n_samples} samples…")
+        ok, res = mc_rank_correlation(self._sd, method=method, n_samples=n_samples,
+                                      search=o.get("search", True),
+                                      num_slices=o.get("num_slices", 40),
+                                      progress_callback=cb,
+                                      cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(res))
+            return
+        print(f"Monte Carlo rank correlation done — {res.get('n_valid')} valid "
+              f"of {res.get('n_samples')} samples.")
+        self.succeeded.emit({"kind": "sensitivity", "plot_type": "rank",
+                             "rank": res, "method": method})

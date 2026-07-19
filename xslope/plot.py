@@ -3591,3 +3591,268 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
     if save_png:
         fig.savefig('tornado.png', dpi=dpi, bbox_inches='tight')
     return fig
+
+
+# ---------------------------------------------------------------------------
+# Parametric-study plots (the tornado's companions): scaled-sensitivity bars,
+# a variance-contribution Pareto, a spider plot, and Monte Carlo rank bars.
+# ---------------------------------------------------------------------------
+
+# Sign colors shared by the scaled bars and the rank bars: FS RISES with the
+# parameter (stabilizing) vs FALLS. Matplotlib tab:green / tab:red, so they read
+# as the same family as the rest of the palette.
+_SIGN_POS_COLOR = '#2ca02c'   # FS increases with the parameter
+_SIGN_NEG_COLOR = '#d62728'   # FS decreases with the parameter
+
+# Scaled-sensitivity y-axis labels per scaling key.
+_SCALED_META = {
+    'elasticity': ('elasticity', 'FS elasticity  |∂F/∂p · p/F|'),
+    'per_1pct':   ('per_1pct',   '|ΔFS| per 1% change in parameter'),
+    'per_sigma':  ('per_sigma',  '|ΔFS| per 1σ change in parameter'),
+}
+
+
+def _param_short_label(bar_or_ref):
+    """Compact parameter label for a bar/curve. Prefers an explicit 'label' the
+    engine set (e.g. 'Soil · phi'), else derives one from the canonical ref."""
+    if isinstance(bar_or_ref, dict):
+        if bar_or_ref.get('label'):
+            return bar_or_ref['label']
+        ref = str(bar_or_ref.get('param', ''))
+    else:
+        ref = str(bar_or_ref)
+    parts = ref.split(':')
+    if len(parts) == 3:
+        return f"{parts[1]} · {parts[2]}"
+    return parts[-1] or ref
+
+
+def _sign_legend(ax, output='FS'):
+    """Two proxy handles explaining the bar colors (sign of the response)."""
+    from matplotlib.patches import Patch
+    up = Patch(facecolor=_SIGN_POS_COLOR, label=f'{output} increases with parameter')
+    dn = Patch(facecolor=_SIGN_NEG_COLOR, label=f'{output} decreases with parameter')
+    ax.legend(handles=[up, dn], fontsize=8, loc='best')
+
+
+def plot_scaled_sensitivity(result, scaling='elasticity', figsize=(8, 5),
+                            save_png=False, dpi=300, fig=None, style=None):
+    """Scaled-sensitivity bars from ``scaled_sensitivity()`` — a vertical bar per
+    parameter whose HEIGHT is the magnitude of the (scaled) local sensitivity and
+    whose COLOR is the sign of the response (green: FS rises with the parameter;
+    red: FS falls). Made comparable across parameters with different units.
+
+    ``scaling`` picks which of the three coefficients the height shows:
+      * ``'elasticity'`` (default) — dimensionless ∂F/∂p·p/F.
+      * ``'per_1pct'``  — ΔFS for a 1% change in the parameter.
+      * ``'per_sigma'`` — ΔFS for a one-σ change (only parameters carrying a σ are
+        drawn; the others have no per-σ coefficient).
+
+    The derivative behind every scaling is a central difference at ±1% (relative)
+    about the base case (see ``scaled_sensitivity``). Bars are sorted by magnitude,
+    largest at the left.
+    """
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+    key, ylabel = _SCALED_META.get(scaling, _SCALED_META['elasticity'])
+    output = result.get('output', 'FS')
+    bars = [b for b in result.get('bars', []) if b.get(key) is not None]
+    bars.sort(key=lambda b: abs(b[key]), reverse=True)
+    if not bars:
+        ax.text(0.5, 0.5, f"No parameters carry a '{scaling}' coefficient.",
+                ha='center', va='center', transform=ax.transAxes)
+        ax.set_axis_off()
+        return fig
+    heights = [abs(b[key]) for b in bars]
+    colors = [_SIGN_POS_COLOR if b[key] >= 0 else _SIGN_NEG_COLOR for b in bars]
+    labels = [_param_short_label(b) for b in bars]
+    x = range(len(bars))
+    ax.bar(x, heights, color=colors, alpha=0.85, width=0.6)
+    for xi, h in zip(x, heights):
+        ax.annotate(f'{h:.3g}', (xi, h), textcoords='offset points',
+                    xytext=(0, 3), ha='center', va='bottom', fontsize=8)
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels, rotation=20, ha='right')
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(0, max(heights) * 1.18)
+    scal_word = {'elasticity': 'elasticity', 'per_1pct': 'per 1%',
+                 'per_sigma': 'per σ'}.get(scaling, scaling)
+    fbase = result.get('fs_base')
+    sub = f"   (base {output} = {fbase:.3g})" if fbase is not None else ""
+    ax.set_title(f'Scaled sensitivity — {scal_word}{sub}')
+    _sign_legend(ax, output=output)
+    ax.grid(True, axis='y', alpha=0.4)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig(f'scaled_sensitivity_{scaling}.png', dpi=dpi, bbox_inches='tight')
+    return fig
+
+
+def plot_variance_pareto(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
+                         style=None):
+    """Variance-contribution Pareto from ``variance_contribution()``: each uncertain
+    parameter's share of Var(FS) as a descending bar, with the cumulative share as
+    an overlaid line — the standard way to read *which* uncertainties actually drive
+    the reliability. Bars are labelled '% of FS variance'; the terms are the
+    Taylor-series (dF/dp·σ_p)² contributions, so they sum to 100%.
+    """
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+    bars = list(result.get('bars', []))
+    if not bars:
+        ax.text(0.5, 0.5, "No uncertain parameters (no σ set).",
+                ha='center', va='center', transform=ax.transAxes)
+        ax.set_axis_off()
+        return fig
+    pct = [b['pct'] for b in bars]
+    cum = [b['cumulative'] for b in bars]
+    labels = [_param_short_label(b) for b in bars]
+    x = list(range(len(bars)))
+    ax.bar(x, pct, color='C0', alpha=0.8, width=0.6, label='% of Var(FS)')
+    for xi, p in zip(x, pct):
+        ax.annotate(f'{p:.1f}%', (xi, p), textcoords='offset points',
+                    xytext=(0, 3), ha='center', va='bottom', fontsize=8)
+    ax2 = ax.twinx()
+    ax2.plot(x, cum, color=_SIGN_NEG_COLOR, marker='o', lw=1.5, label='cumulative')
+    ax2.set_ylim(0, 105)
+    ax2.set_ylabel('Cumulative %')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=20, ha='right')
+    ax.set_ylabel('% of FS variance')
+    ax.set_ylim(0, max(pct) * 1.18 if pct else 1)
+    sig = result.get('sigma_F')
+    cov = result.get('COV_F')
+    bits = []
+    if sig is not None:
+        bits.append(f'σ_F = {sig:.3g}')
+    if cov is not None:
+        bits.append(f'COV_F = {cov:.3g}')
+    sub = ('   (' + ', '.join(bits) + ')') if bits else ''
+    ax.set_title(f'Variance contribution to FS (Taylor series){sub}')
+    ax.grid(True, axis='y', alpha=0.4)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig('variance_pareto.png', dpi=dpi, bbox_inches='tight')
+    return fig
+
+
+def plot_spider(sweeps, x_mode='pct', figsize=(8, 5), save_png=False, dpi=300,
+                fig=None, style=None, target_fs=None):
+    """Spider (radial-style) plot: FS versus each parameter swept across its range,
+    all curves sharing one normalized x-axis so a family of parameters can be read
+    on a single chart. One labelled curve per parameter, a black base-case marker at
+    the origin (the unperturbed model), and an FS = 1 guide.
+
+    ``sweeps`` is a ``{ref: DataFrame}`` mapping of ``sensitivity()`` sweeps (or a
+    result dict carrying a ``'sweeps'`` key). ``x_mode='pct'`` (default) plots the
+    percent change of each parameter from its base value; ``'value'`` plots the raw
+    swept value (only sensible when the parameters share units).
+    """
+    if isinstance(sweeps, dict) and 'sweeps' in sweeps:
+        sweeps = sweeps['sweeps']
+    items = list(sweeps.items()) if isinstance(sweeps, dict) else list(sweeps)
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+    base_fs = None
+    output = 'FS'
+    output_label = 'Factor of Safety'
+    for ref, df in items:
+        if df is None or len(df) == 0:
+            continue
+        if 'output' in df.columns:
+            output = df['output'].iloc[0]
+            output_label = df['output_label'].iloc[0]
+        base_row = df.loc[df['is_base'] & df['success']]
+        if base_fs is None and len(base_row):
+            base_fs = float(base_row['fs'].iloc[0])
+        pts = df.loc[~df['is_base'] & df['success']].sort_values('value')
+        if pts.empty:
+            continue
+        if x_mode == 'pct':
+            if 'rel' in pts.columns and pts['rel'].notna().all():
+                xv = (pts['rel'].to_numpy(dtype=float) - 1.0) * 100.0
+            elif len(base_row):
+                bv = float(base_row['value'].iloc[0])
+                xv = (pts['value'].to_numpy(dtype=float) / bv - 1.0) * 100.0 \
+                    if bv else pts['value'].to_numpy(dtype=float)
+            else:
+                xv = pts['value'].to_numpy(dtype=float)
+        else:
+            xv = pts['value'].to_numpy(dtype=float)
+        ax.plot(xv, pts['fs'], marker='o', ms=4, label=_param_short_label(ref))
+    if base_fs is not None:
+        bx = 0.0 if x_mode == 'pct' else np.nan
+        if np.isfinite(bx):
+            ax.plot(bx, base_fs, 's', color='k', ms=9, zorder=6,
+                    label=f'base case ({output} = {base_fs:.3g})')
+    if output == 'FS':
+        ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
+    if target_fs is not None:
+        ax.axhline(target_fs, color='gray', linestyle='--', linewidth=0.8,
+                   label=f'{output} = {target_fs:g}')
+    ax.set_xlabel('Change from base case (%)' if x_mode == 'pct'
+                  else 'Parameter value')
+    ax.set_ylabel(output_label)
+    ax.set_title(f'Spider: {output} vs each parameter')
+    ax.legend(fontsize=8, ncol=2 if len(items) > 6 else 1)
+    ax.grid(True, alpha=0.4)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig('spider.png', dpi=dpi, bbox_inches='tight')
+    return fig
+
+
+def plot_mc_rank_correlation(result, figsize=(8, 5), save_png=False, dpi=300,
+                             fig=None, style=None):
+    """Monte Carlo rank-correlation bars from ``mc_rank_correlation()``: the Spearman
+    correlation between each sampled input and FS, one horizontal bar per parameter,
+    signed (green +, red −) and sorted by magnitude with the strongest on top.
+
+    This is a GLOBAL sensitivity measure — it ranks parameters over the whole
+    sampled distribution, so it captures a parameter's spread and any nonlinearity —
+    and is meant to be read alongside the LOCAL scaled-sensitivity bars, which are a
+    derivative at the base case. The two can disagree, and the disagreement is
+    informative.
+    """
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+    bars = [b for b in result.get('bars', [])
+            if b.get('rho') is not None and np.isfinite(b['rho'])]
+    # barh draws index 0 at the bottom, so sort ascending -> strongest on top.
+    bars = sorted(bars, key=lambda b: abs(b['rho']))
+    if not bars:
+        ax.text(0.5, 0.5, "No admissible Monte Carlo correlations.",
+                ha='center', va='center', transform=ax.transAxes)
+        ax.set_axis_off()
+        return fig
+    y = list(range(len(bars)))
+    vals = [b['rho'] for b in bars]
+    colors = [_SIGN_POS_COLOR if v >= 0 else _SIGN_NEG_COLOR for v in vals]
+    ax.barh(y, vals, color=colors, alpha=0.85, height=0.6)
+    for yi, v in zip(y, vals):
+        ax.annotate(f'{v:+.2f}', (v, yi), textcoords='offset points',
+                    xytext=(6 if v >= 0 else -6, 0),
+                    ha='left' if v >= 0 else 'right', va='center', fontsize=8)
+    ax.axvline(0.0, color='k', linewidth=0.8)
+    ax.set_xlim(-1.05, 1.05)
+    ax.set_yticks(y)
+    ax.set_yticklabels([_param_short_label(b) for b in bars])
+    ax.set_xlabel('Spearman rank correlation with FS')
+    n_valid = result.get('n_valid')
+    n_samples = result.get('n_samples')
+    sub = (f'   ({n_valid}/{n_samples} valid samples)'
+           if n_valid is not None and n_samples is not None else '')
+    ax.set_title(f'Monte Carlo rank correlation — global sensitivity{sub}')
+    ax.grid(True, axis='x', alpha=0.4)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig('mc_rank_correlation.png', dpi=dpi, bbox_inches='tight')
+    return fig

@@ -619,17 +619,25 @@ class RunLemDialog(QDialog):
 
 
 class SensitivityDialog(QDialog):
-    """Options for a sensitivity / design study (one dialog, two modes).
+    """Options for a Parametric study (one dialog, three modes).
 
-    Sensitivity mode sweeps several parameters, each +/- a percent about its
-    current value (per-row overridable, with a one-click sigma-range preset that
-    reuses the reliability sigma_* columns) — the result is a tornado diagram.
-    Design mode sweeps ONE parameter across explicit From/To bounds in N steps and
-    finds where FS meets a target. The sweepable set is any numeric material
-    property plus the global k_seismic; geometry design stays in main_design.py.
+    - **Sensitivity** sweeps several parameters, each +/- a percent about its
+      current value (per-row overridable, with a one-click sigma-range preset that
+      reuses the reliability sigma_* columns). A **Plot type** selector chooses the
+      view: a tornado (default), scaled-sensitivity bars (elasticity / per-1% /
+      per-sigma), a spider plot, a variance-contribution Pareto, or Monte Carlo
+      rank-correlation bars — the last two only when the model carries sigmas.
+    - **Design** sweeps ONE parameter across explicit From/To bounds in N steps and
+      finds where the output meets a target (FS = 1.5 by default).
+    - **Back-Analysis** is the same single-parameter sweep framed as a failure
+      investigation: FS = 1.0 is known, so it back-calculates the parameter value
+      consistent with the observed slide.
 
-    A thin caller of ``xslope.sensitivity``: ``options()`` returns plain
-    dicts/lists the runner forwards straight to ``design()`` / ``sensitivity()``.
+    The sweepable set is any numeric material property plus the global k_seismic;
+    geometry design stays in main_design.py. A thin caller of ``xslope.sensitivity``:
+    ``options()`` returns plain dicts/lists the runner forwards straight to
+    ``design()`` / ``back_analysis()`` / ``sensitivity()`` and the plot data
+    functions.
     """
 
     _GLOBAL_LABEL = "k_seismic (global)"
@@ -645,9 +653,9 @@ class SensitivityDialog(QDialog):
         self.app_mode = app_mode if app_mode in self._OUTPUT else "lem"
         out_short, out_long, target_label = self._OUTPUT[self.app_mode]
         self._out_short = out_short
-        titles = {"lem": "Sensitivity / Design study (LEM)",
-                  "fem": "Sensitivity / Design study (FEM · SSRM)",
-                  "seep": "Sensitivity / Design study (Seepage)"}
+        titles = {"lem": "Parametric study (LEM)",
+                  "fem": "Parametric study (FEM · SSRM)",
+                  "seep": "Parametric study (Seepage)"}
         self.setWindowTitle(titles[self.app_mode])
         defaults = defaults or {}
         slope_data = slope_data or {}
@@ -655,6 +663,13 @@ class SensitivityDialog(QDialog):
         from xslope.sensitivity import list_params
         self._params = list_params(slope_data, mode=self.app_mode)
         self._by_ref = {e["ref"]: e for e in self._params}
+        # Sigma-gated plots (variance Pareto, MC rank, per-sigma scaling) are only
+        # offered when the model carries at least one reliability standard deviation.
+        self._has_sigma = any(e.get("sigma") for e in self._params)
+        # Remembered so a Design<->Back-Analysis switch can restore the design target.
+        self._design_target_default = float(
+            defaults.get("target_fs", 1.5 if self.app_mode != "seep" else 1e-5))
+        self._prev_mode = None
         # Group parameters for the picker's first combo: materials by name, plus
         # the pseudo-groups globals ('__global__') and seep boundary heads
         # ('__seep_bc__'). First-appearance order preserved.
@@ -675,8 +690,11 @@ class SensitivityDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        self.mode = self._combo([("sensitivity", "Sensitivity (tornado)"),
-                                 (f"design", f"Design ({out_short} vs one parameter)")],
+        ba_label = ("Back-Analysis (FS = 1)" if self.app_mode != "seep"
+                    else f"Back-Analysis (target {out_short})")
+        self.mode = self._combo([("sensitivity", "Sensitivity (tornado + plots)"),
+                                 ("design", f"Design ({out_short} target)"),
+                                 ("back_analysis", ba_label)],
                                 defaults.get("mode", "sensitivity"))
         form.addRow("Mode", self.mode)
 
@@ -740,6 +758,7 @@ class SensitivityDialog(QDialog):
         layout.addWidget(bb)
 
         self.mode.currentIndexChanged.connect(self._on_mode_changed)
+        self.plot_type.currentIndexChanged.connect(self._on_plot_type_changed)
         self._on_material_changed()                 # populate property combo
         # Restore a remembered sensitivity table (from the previous run this session).
         for spec in defaults.get("_remember_params", []):
@@ -747,8 +766,9 @@ class SensitivityDialog(QDialog):
             if e is not None:
                 self._add_row(e, pct=spec.get("pct", self.pct.value()),
                               use_sigma=spec.get("use_sigma", False))
+        self._on_plot_type_changed()
         self._on_mode_changed()
-        self.resize(560, 600)
+        self.resize(560, 620)
 
     # --- engine-specific solver rows ----------------------------------------
     def _build_fem_solver_rows(self, form, defaults):
@@ -796,10 +816,54 @@ class SensitivityDialog(QDialog):
         form.addRow("", note)
 
     # --- page builders ------------------------------------------------------
+    def _plot_type_items(self):
+        """Plot-type menu, sigma-gated: the variance Pareto and MC rank plots need
+        reliability sigmas, so they appear only when the model carries one."""
+        items = [("tornado", "Tornado (FS swing per parameter)"),
+                 ("scaled", "Scaled-sensitivity bars"),
+                 ("spider", "Spider (FS vs each parameter)")]
+        # Variance Pareto and MC rank reuse the LEM Taylor-series / Monte-Carlo
+        # reliability, so they are offered only for an LEM study that carries sigmas.
+        if self._has_sigma and self.app_mode == "lem":
+            items += [("variance", "Variance Pareto (σ)"),
+                      ("rank", "Monte Carlo rank correlation (σ)")]
+        return items
+
+    def _scaling_items(self):
+        items = [("elasticity", "Elasticity (∂F/∂p · p/F)"),
+                 ("per_1pct", "Per 1% change")]
+        if self._has_sigma:
+            items.append(("per_sigma", "Per σ"))
+        return items
+
     def _build_sens_page(self, defaults):
         page = QWidget()
         v = QVBoxLayout(page)
         v.setContentsMargins(0, 0, 0, 0)
+
+        # Plot-type selector: the view the sweep produces. Scaled bars expose a
+        # scaling sub-choice; the MC rank plot exposes a sample count.
+        pt = QHBoxLayout()
+        pt.addWidget(QLabel("Plot type"))
+        self.plot_type = self._combo(self._plot_type_items(),
+                                     defaults.get("plot_type", "tornado"))
+        pt.addWidget(self.plot_type)
+        pt.addSpacing(10)
+        self._scaling_label = QLabel("Scaling")
+        pt.addWidget(self._scaling_label)
+        self.scaling = self._combo(self._scaling_items(),
+                                   defaults.get("scaling", "elasticity"))
+        pt.addWidget(self.scaling)
+        pt.addSpacing(10)
+        self._mc_label = QLabel("MC samples")
+        pt.addWidget(self._mc_label)
+        self.mc_samples = QSpinBox()
+        self.mc_samples.setRange(200, 200000)
+        self.mc_samples.setSingleStep(1000)
+        self.mc_samples.setValue(int(defaults.get("mc_samples", 5000)))
+        pt.addWidget(self.mc_samples)
+        pt.addStretch(1)
+        v.addLayout(pt)
 
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Default ±%"))
@@ -912,19 +976,63 @@ class SensitivityDialog(QDialog):
         self.d_to.setValue(hi)
 
     def _on_mode_changed(self):
-        design = self.mode.currentData() == "design"
-        self.stack.setCurrentIndex(1 if design else 0)
+        m = self.mode.currentData()
+        single = m in ("design", "back_analysis")
+        self.stack.setCurrentIndex(1 if single else 0)
+        # Seed the target on an actual transition into a mode; FS = 1.0 is the
+        # convention for a back-analysis, the design default otherwise. Seep sweeps
+        # target a discharge q, so leave their target alone.
+        if self.app_mode != "seep":
+            if m == "back_analysis" and self._prev_mode != "back_analysis":
+                self.d_target.setValue(1.0)
+            elif m == "design" and self._prev_mode == "back_analysis":
+                self.d_target.setValue(self._design_target_default)
+        self._prev_mode = m
         q = self._out_short
-        if design:
+        if m == "back_analysis":
+            self.note.setText(
+                "Back-Analysis: a failure occurred, so the factor of safety at "
+                "failure is known to be 1.0. Sweep the one parameter above and read "
+                "off the value consistent with the observed slide (the back-calculated "
+                f"value at {q} = 1). Widen [From, To] if the curve never reaches it.")
+        elif m == "design":
             self.note.setText(
                 f"Design: sweeps the one parameter above across [From, To] and "
                 f"annotates where {q} meets the target (interpolated). If it never "
                 f"crosses, the plot says which way to widen the range.")
         else:
-            self.note.setText(
-                f"Sensitivity: add parameters, each swept ±% about its value (or "
-                f"click σ for a ±σ range). The result is a tornado; click a bar to "
-                f"see that parameter's {q}-vs-value curve.")
+            self._on_plot_type_changed()
+
+    def _on_plot_type_changed(self):
+        """Toggle the scaling / MC-sample controls and the sensitivity note to match
+        the selected plot type (no effect while a single-parameter mode is active)."""
+        pt = self.plot_type.currentData()
+        scaled = pt == "scaled"
+        rank = pt == "rank"
+        for w in (self._scaling_label, self.scaling):
+            w.setVisible(scaled)
+        for w in (self._mc_label, self.mc_samples):
+            w.setVisible(rank)
+        if self.mode.currentData() != "sensitivity":
+            return
+        q = self._out_short
+        notes = {
+            "tornado": (f"Tornado: each table parameter swept ±% about its value "
+                        f"(or ±σ); bars show the {q} swing, widest on top. Double-click "
+                        f"a bar for that parameter's curve."),
+            "scaled": ("Scaled-sensitivity bars: one bar per table parameter, height = "
+                       "the chosen scaling of ∂F/∂p (central difference at ±1%), color = "
+                       "sign. Elasticity is unitless and comparable across parameters."),
+            "spider": (f"Spider: {q} vs each table parameter over its ±% range, on one "
+                       f"normalized axis (% change from base), with a base-case marker."),
+            "variance": ("Variance Pareto: each uncertain parameter's share of Var(FS) "
+                         "from the Taylor-series reliability, sorted with a cumulative "
+                         "line. Uses every σ-carrying material (the table is ignored)."),
+            "rank": ("Monte Carlo rank correlation: Spearman correlation of each sampled "
+                     "input with FS — a GLOBAL measure. Uses every σ-carrying material "
+                     "(the table is ignored); can take a while at high sample counts."),
+        }
+        self.note.setText(notes.get(pt, ""))
 
     # --- sensitivity table --------------------------------------------------
     def _on_add_clicked(self):
@@ -1001,7 +1109,7 @@ class SensitivityDialog(QDialog):
         elif self.app_mode == "seep":
             common["seep_opts"] = {"bc": self.seep_bc.currentData(),
                                    "tol": self.seep_tol.value()}
-        if common["mode"] == "design":
+        if common["mode"] in ("design", "back_analysis"):
             common.update({
                 "param": self.prop.currentData(),
                 "low": self.d_from.value(),
@@ -1023,6 +1131,10 @@ class SensitivityDialog(QDialog):
                                    "use_sigma": bool(use_sigma)})
             common.update({"params": specs, "n": self.n_points.value(),
                            "default_pct": self.pct.value(),
+                           # plot-type selection for the sensitivity view
+                           "plot_type": self.plot_type.currentData(),
+                           "scaling": self.scaling.currentData(),
+                           "mc_samples": self.mc_samples.value(),
                            # remembered table for the next session
                            "_remember_params": remembered})
         return common

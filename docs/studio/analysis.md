@@ -74,31 +74,39 @@ reliability run) can be **cancelled** from the status bar.
 
 ---
 
-## Sensitivity / Design study
+## Parametric study
 
-A second entry point sits beside Run — **Sensitivity / Design…** — on both the **Run menu**
+A second entry point sits beside Run — **Parametric…** — on both the **Run menu**
 and the main **toolbar**, in all three modes (LEM, Seepage, FEM). It is available whenever
 a model is open — in Seepage and FEM mode it additionally needs a built mesh, exactly like
 Run — and is disabled while another analysis is running. Every version of it drives the
 same sweep engine as the library — see
-[Sensitivity Analysis](../lem/sensitivity.md) for the engine, and the
+[Parametric Studies](../lem/sensitivity.md) for the engine, and the
 [`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
 
-One dialog covers two study modes, chosen by its **Mode** selector. In **LEM** three
-controls are shared by both: **Method** (any of the seven LEM methods), **Number of
-slices**, and a **Parameter** picker — a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a
-**Property** dropdown listing that material's option-aware sweepable fields (both drawn from
-the engine's `list_params`). A **Re-search the critical surface at each step** checkbox
-applies to both modes: on by default — the honest setting, since the critical surface moves
-as the parameter changes — and off re-solves the entered surface only (much faster, but right
-only for that prescribed surface).
+One dialog covers three study modes, chosen by its **Mode** selector — **Sensitivity**,
+**Design**, and **Back-Analysis**. In **LEM** three controls are shared by all of them:
+**Method** (any of the seven LEM methods), **Number of slices**, and a **Parameter** picker —
+a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a **Property**
+dropdown listing that material's option-aware sweepable fields (both drawn from the engine's
+`list_params`). A **Re-search the critical surface at each step** checkbox applies throughout:
+on by default — the honest setting, since the critical surface moves as the parameter changes
+— and off re-solves the entered surface only (much faster, but right only for that prescribed
+surface).
 
-**Sensitivity (tornado)** sweeps several parameters and ranks them:
+**Sensitivity** sweeps several parameters and visualizes how FS responds. A **Plot type**
+selector chooses the view — a **tornado** (the default), **scaled-sensitivity bars** (with a
+**Scaling** sub-choice: elasticity, per-1%, or per-σ), a **spider** plot, and — only when the
+model carries reliability standard deviations — a **variance Pareto** and a **Monte Carlo rank
+correlation** (with an **MC samples** count). The tornado, scaled, and spider plots sweep the
+parameters listed in the table; the variance and rank plots instead use every σ-carrying
+material automatically. The plots themselves are shown, with worked examples, on the
+[Parametric Studies](../lem/sensitivity.md#sensitivity-plots) engine page.
 
 ![Sensitivity dialog](images/analysis_sensitivity_dialog.png)
 
 - A **Default ±%** and a **Points** count (points per parameter's FS-vs-value curve; the
-  tornado itself uses only the curve's two endpoints).
+  tornado uses only the curve's two endpoints, the spider draws the whole curve).
 - **Add parameter** appends the currently picked material/property to the table. Each row
   shows the parameter reference, an editable **±%** overriding the default for that row, a
   **σ** button, and a remove (✕) button.
@@ -107,13 +115,18 @@ only for that prescribed surface).
   [reliability analysis](../lem/reliability.md) uses — so a sweep can mirror a reliability
   input band with one click. The button is disabled for a property that carries no `sigma_*`.
 
-**Design (FS vs one parameter)** sweeps the one picked parameter toward a target FS:
+**Design** sweeps the one picked parameter toward a target FS:
 
 ![Design dialog](images/analysis_sensitivity_dialog_design.png)
 
 - **From** / **To** bound the swept value (seeded to ±50% of the current value the first time
   you pick a property), **Steps** sets the number of solves, and **Target FS** is the factor
   of safety to locate.
+
+**Back-Analysis** is the same single-parameter sweep as Design, framed for a failure
+investigation: because a slide has occurred, the target defaults to **FS = 1.0**, and the
+result is read as the parameter value consistent with the observed failure (the
+back-calculated strength, most commonly). The controls are identical to Design.
 
 ### Running and cancelling
 
@@ -125,44 +138,54 @@ sweep stops and the app is left consistent, with no partial result stored.
 
 ### Results
 
-**Sensitivity** opens a **Sensitivity** tab with the tornado diagram — one horizontal bar per
-parameter, widest on top, with the base-case FS drawn as a labelled vertical reference line:
+**Sensitivity** opens a **Sensitivity** tab with the selected plot. For the default
+**tornado** — one horizontal bar per parameter, widest on top, with the base-case FS drawn as
+a labelled vertical reference line:
 
 ![Sensitivity tornado](images/analysis_sensitivity_tornado.png)
 
-**Double-click a bar** to open a companion **Sensitivity · Curve** tab showing that
-parameter's full FS-vs-value curve (the base case marked, and any critical-surface jump drawn
-as an open circle):
+On the tornado, **double-click a bar** to open a companion **Sensitivity · Curve** tab
+showing that parameter's full FS-vs-value curve (the base case marked, and any
+critical-surface jump drawn as an open circle):
 
 ![Per-parameter FS curve](images/analysis_sensitivity_curve.png)
 
+The other plot types render into the same **Sensitivity** tab — the scaled-sensitivity bars,
+the spider plot, the variance-contribution Pareto, and the Monte Carlo rank-correlation bars
+(the [Parametric Studies](../lem/sensitivity.md#sensitivity-plots) page shows each with a
+worked example). The double-click click-through is a tornado affordance; the other plots do
+not offer it.
+
 **Design** opens a **Design** tab with the FS-vs-value curve, the FS = 1 and target-FS guide
 lines, and — when the target is bracketed — the interpolated crossing marked with a green
-diamond and annotated *property = value for FS = target*:
+diamond and annotated *property = value for FS = target* (a **Back-Analysis** run renders the
+same tab, with the target at FS = 1.0):
 
 ![Design curve with crossing](images/analysis_sensitivity_design_curve.png)
 
 When the swept range never reaches the target, the result is honest about it: no crossing is
 drawn, and an amber note reports the FS span and which way to widen the range — the GUI face
 of the engine's
-[never-extrapolate discipline](../lem/sensitivity.md#design-studies-finding-the-value-that-hits-a-target-fs):
+[never-extrapolate discipline](../lem/sensitivity.md#design-mode-finding-the-value-that-hits-a-target-fs):
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
 
 !!! note "A sweep for each mode"
-    The Sensitivity / Design dialog has a version for every mode. In **LEM** it sweeps the
+    The Parametric dialog has a version for every mode. In **LEM** it sweeps the
     limit-equilibrium analyses (output: factor of safety). In **FEM** each swept point is a
     full SSRM solve (output: factor of safety) — expect minutes per step, so it runs in the
     background and is cancellable. In **Seepage** the output is the **total discharge q**
-    through the section. FEM and seepage sweeps run on the mesh, so build one first.
+    through the section. FEM and seepage sweeps run on the mesh, so build one first. The
+    variance Pareto and Monte Carlo rank plots reuse the LEM Taylor-series and Monte-Carlo
+    reliability, so they are offered only for an LEM study that carries sigmas.
 
 The dialog's solver rows follow the app mode: in **FEM** they become the SSRM knobs
 (`F_min` / `F_max`, tolerance, failure criterion), and in **Seepage** they become the BC
 set and convergence tolerance, with the design target a discharge **q** rather than an FS:
 
-![Sensitivity / Design dialog in FEM mode](images/analysis_sensitivity_dialog_fem.png)
+![Parametric dialog in FEM mode](images/analysis_sensitivity_dialog_fem.png)
 
-![Sensitivity / Design dialog in Seepage mode](images/analysis_sensitivity_dialog_seep.png)
+![Parametric dialog in Seepage mode](images/analysis_sensitivity_dialog_seep.png)
 
 ---
 

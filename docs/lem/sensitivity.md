@@ -1,9 +1,23 @@
-# Sensitivity Analysis
+# Parametric Studies
 
-Vary one input over a range and report how the factor of safety moves. This is the
-geotechnical staple — Duncan & Wright present exactly these charts (FS vs parameter, and
-tornado diagrams comparing several parameters at their low/high bounds) — and half of
-slope-stability judgment is knowing *which* parameter matters on a given slope.
+Vary the inputs and watch the answer move. XSLOPE groups three closely related studies
+under one **Parametric** umbrella — one Studio button, one API family, one parameter
+grammar:
+
+- **Sensitivity** — sweep one or more parameters and see how the factor of safety
+  responds. The results feed a family of plots: a tornado, scaled-sensitivity bars, a
+  spider plot, and — when the model carries standard deviations — a variance-contribution
+  Pareto and a Monte Carlo rank-correlation chart.
+- **[Design](#design-mode-finding-the-value-that-hits-a-target-fs)** — sweep one
+  parameter across an explicit range and find the value at which FS meets a target
+  (FS = 1.5, say).
+- **[Back-Analysis](#back-analysis-mode)** — the same single-parameter sweep framed as a
+  failure investigation: a slide has occurred, so FS = 1.0 is known, and the study
+  back-calculates the parameter value consistent with the observed failure.
+
+This is the geotechnical staple — Duncan & Wright present exactly these charts (FS vs
+parameter, and tornado diagrams comparing several parameters at their low/high bounds) —
+and half of slope-stability judgment is knowing *which* parameter matters on a given slope.
 
 Sensitivity is deliberately distinct from [reliability analysis](reliability.md): the
 Taylor-series method perturbs parameters by ±σ to estimate the *distribution* of FS,
@@ -19,7 +33,7 @@ them independently would be meaningless.
 Sweeps are configured entirely through the API — sensitivity describes an analysis you
 run, not a property of the model, so nothing is added to the Excel input template. The same
 engine drives the point-and-click
-[Sensitivity / Design study dialog in Studio](../studio/analysis.md#sensitivity-design-study)
+[Parametric study dialog in Studio](../studio/analysis.md#parametric-study)
 and the recipes in the [`/xslope` Claude Code skill](../usage/claude/index.md), so a study
 set up one way reads the same the others.
 
@@ -181,7 +195,113 @@ validates the modified model at every point (polygon validity, ground surface pr
 precisely because setters may be user-written: a broken edit becomes a `success=False`
 row naming what broke, never a silently inconsistent answer.
 
-## Design studies: finding the value that hits a target FS
+## Sensitivity plots
+
+A sweep across several parameters feeds a family of views. Which one to read depends on the
+question: *which parameter matters most* (tornado, scaled bars), *how the answer moves across
+the range* (spider), or *where the uncertainty comes from* (variance Pareto, Monte Carlo
+rank). Each is a function in `xslope.plot`; all are reachable from the Studio **Parametric**
+dialog's plot-type selector and from the assistant's `parametric_sweep` call. The
+[tornado](#tornado-diagrams) — the most common — is covered in its own section below.
+
+### Scaled-sensitivity bars
+
+`scaled_sensitivity()` estimates the local derivative $\partial F/\partial p$ for each
+parameter with a **central difference at ±1%** (relative) about the base case, then reports
+it under three scalings so parameters with different units compare on one axis. `plot_scaled_sensitivity()`
+draws one vertical bar per parameter — height is the magnitude, color the sign (green: FS
+*rises* with the parameter; red: FS *falls*):
+
+- **`elasticity`** (the default) — the dimensionless $\dfrac{\partial F}{\partial p}\cdot\dfrac{p}{F}$,
+  i.e. the percent change in FS per percent change in the parameter.
+- **`per_1pct`** — the change in FS for a 1% change in the parameter.
+- **`per_sigma`** — the change in FS for a one-σ change (offered only for parameters that
+  carry a standard deviation).
+
+```python
+from xslope.sensitivity import scaled_sensitivity
+from xslope.plot import plot_scaled_sensitivity
+
+ok, result = scaled_sensitivity(slope_data,
+                                ["mat:Soil:c", "mat:Soil:phi", "mat:Soil:gamma"],
+                                method="bishop")
+plot_scaled_sensitivity(result, scaling="elasticity")
+```
+
+![Scaled-sensitivity bars](images/parametric_scaled.png){width=800}
+
+For the ACADS sample the friction angle dominates on the elasticity scaling — a percent
+change in φ moves FS several times more than a percent change in c or γ. The estimator (the
+central-difference derivative and each scaling) is documented in the `scaled_sensitivity`
+docstring.
+
+### Spider plot
+
+`plot_spider()` overlays every parameter's FS-vs-value curve on one **normalized** x-axis
+(percent change from the base value), with a black base-case marker at the origin and an
+FS = 1 guide. The steepness of each line *is* its sensitivity, and a curving line reveals
+nonlinearity a single tornado bar would hide. It reuses the per-parameter sweeps you already
+ran:
+
+```python
+from xslope.sensitivity import sensitivity
+from xslope.plot import plot_spider
+
+sweeps = {ref: sensitivity(slope_data, param=ref, rel_range=0.3, n=7,
+                           methods=("bishop",))[1]["df"]
+          for ref in ("mat:Soil:c", "mat:Soil:phi", "mat:Soil:gamma")}
+plot_spider(sweeps)
+```
+
+![Spider plot](images/parametric_spider.png){width=800}
+
+### Variance-contribution Pareto
+
+When the model carries standard deviations, `variance_contribution()` asks *which
+uncertainties actually drive the scatter in FS*. It reuses the Taylor-series
+[reliability](reliability.md) machinery — each parameter's variance term is
+$\left(\dfrac{\partial F}{\partial p}\,\sigma_p\right)^2$, exactly the $(\Delta F/2)^2$ the
+TSPM already computes — normalizes each to a percent of $\mathrm{Var}(F)$, and
+`plot_variance_pareto()` draws them descending with a cumulative line:
+
+```python
+from xslope.sensitivity import variance_contribution
+from xslope.plot import plot_variance_pareto
+
+ok, result = variance_contribution(slope_data, method="bishop")
+plot_variance_pareto(result)
+```
+
+![Variance-contribution Pareto](images/parametric_variance.png){width=800}
+
+Note how this reorders the parameters versus the elasticity bars: c and φ contribute almost
+equally to $\mathrm{Var}(F)$ even though φ has the larger elasticity, because c's standard
+deviation is a much larger fraction of its mean. A scaled bar answers *how strong is the
+response*; the Pareto answers *how much does this parameter's uncertainty matter* — the
+per-σ scaling above is the bridge between the two.
+
+### Monte Carlo rank correlation
+
+`mc_rank_correlation()` runs a Monte Carlo [reliability](reliability.md) campaign and computes
+the **Spearman rank correlation** between each sampled input and the resulting FS.
+`plot_mc_rank_correlation()` draws them signed and sorted:
+
+```python
+from xslope.sensitivity import mc_rank_correlation
+from xslope.plot import plot_mc_rank_correlation
+
+ok, result = mc_rank_correlation(slope_data, method="bishop", n_samples=10000)
+plot_mc_rank_correlation(result)
+```
+
+![Monte Carlo rank correlation](images/parametric_mc_rank.png){width=800}
+
+This is a **global** sensitivity measure: unlike the scaled bars — a derivative *at the base
+case* — it ranks parameters over the whole sampled distribution, so it captures a
+parameter's spread and any nonlinearity in its effect. The local and global measures can
+disagree, and the disagreement is itself informative; read the two together.
+
+## Design mode: finding the value that hits a target FS
 
 Where a sweep asks *how much does FS move*, a **design study** asks the inverse — *what value
 of this parameter gives FS = 1.5?* `design()` runs a fixed number of evenly spaced solves
@@ -252,6 +372,35 @@ Extend the range above 9 to bracket it.
 
 Here `result['bracketed']` is `False`, `result['crossing']` is `None`, and `result['extend']`
 is `'above 9'`.
+
+## Back-Analysis mode
+
+Back-analysis is the same single-parameter sweep as design, inverted for a *failure
+investigation*. A slide has already occurred, so the factor of safety at the moment of
+failure is known to be exactly 1.0; the unknown is a strength (or pore-pressure, or loading)
+parameter, and the study back-calculates the value **consistent with the observed failure** —
+the mobilized shear strength implied by the slide, most commonly. `back_analysis()` is
+`design()` with `target_fs` defaulting to 1.0 and the result worded for the forensic reading:
+
+```python
+from xslope.sensitivity import back_analysis
+
+success, result = back_analysis(
+    slope_data,
+    param="mat:Soil:c",          # the strength parameter to back-calculate
+    low=1.0, high=6.0, steps=11, # sweep the plausible range...
+    # target_fs=1.0,             # ...to the known failure condition (the default)
+    method="bishop",
+)
+print(result['message'])
+# Back-analysis: mat:Soil:c = 3.25 gives FS = 1 (the value consistent with the
+# observed failure).
+```
+
+`result['crossing']` is the back-calculated value; `result['study']` is `'back_analysis'`;
+every other field carries the same meaning as `design()`. The same *never-extrapolate*
+discipline applies — if the swept range never reaches FS = 1.0, `bracketed` is `False` and
+`extend` says which way to widen it, rather than guessing a value past the last solve.
 
 ## Tornado diagrams
 

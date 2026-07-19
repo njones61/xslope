@@ -27,8 +27,9 @@ import time
 import numpy as np
 import pandas as pd
 
-__all__ = ['sensitivity', 'tornado', 'design', 'set_param', 'resolve_param',
-           'list_params', 'tornado_from_sweeps']
+__all__ = ['sensitivity', 'tornado', 'design', 'back_analysis', 'set_param',
+           'resolve_param', 'list_params', 'tornado_from_sweeps',
+           'scaled_sensitivity', 'variance_contribution', 'mc_rank_correlation']
 
 
 # ---------------------------------------------------------------------------
@@ -867,6 +868,260 @@ def design(slope_data, param, low, high, steps=11, target_fs=1.5,
                   'mode': mode, 'output': res.get('output', 'FS'),
                   'output_label': res.get('output_label', 'Factor of Safety'),
                   'base_value': res['base_value'], 'runtime': res['runtime']}
+
+
+def back_analysis(slope_data, param, low, high, steps=11, target_fs=1.0,
+                  mode='lem', analysis=None, method='spencer', search=True,
+                  num_slices=40, fem_opts=None, seep_opts=None,
+                  progress_callback=None, cancel_check=None, debug_level=0):
+    """Forensic back-analysis: find the parameter value that makes the slope
+    limiting (FS = 1.0 by default).
+
+    This is :func:`design` framed for a failure investigation. A slide has
+    occurred, so the factor of safety at the time of failure is known to be 1.0;
+    the unknown is a strength (or pore-pressure, or loading) parameter, and the
+    back-analysis inverts the problem — *what value of this parameter is
+    consistent with the observed failure?* The mechanics are identical to a design
+    sweep; only the target and the interpretation differ, so this is a thin wrapper
+    over :func:`design` with ``target_fs`` defaulting to 1.0.
+
+    The returned ``crossing`` is the **back-calculated** value (e.g. the mobilized
+    shear strength implied by the failure). ``bracketed`` False means the swept
+    range never reaches FS = 1.0 — widen it per ``extend``. All other fields carry
+    the same meaning as :func:`design`; ``result['study']`` is set to
+    ``'back_analysis'`` so a caller can label the plot accordingly.
+    """
+    ok, res = design(slope_data, param, low, high, steps=steps, target_fs=target_fs,
+                     mode=mode, analysis=analysis, method=method, search=search,
+                     num_slices=num_slices, fem_opts=fem_opts, seep_opts=seep_opts,
+                     progress_callback=progress_callback, cancel_check=cancel_check,
+                     debug_level=debug_level)
+    if not ok:
+        return False, res
+    res['study'] = 'back_analysis'
+    out = res.get('output', 'FS')
+    if res.get('bracketed') and res.get('crossing') is not None:
+        res['message'] = (f"Back-analysis: {res['param']} = {res['crossing']:.4g} "
+                          f"gives {out} = {target_fs:g} (the value consistent with "
+                          f"the observed failure).")
+    return True, res
+
+
+# ---------------------------------------------------------------------------
+# Scaled sensitivity, variance contribution, and rank correlation
+#
+# These three feed the Parametric-study plot family alongside the tornado and the
+# per-parameter spider. The first is a LOCAL measure (a derivative at the base
+# case); the last two are its statistical cousins that reuse the reliability
+# machinery in advanced.py rather than reimplementing it.
+# ---------------------------------------------------------------------------
+
+def _sigma_by_ref(slope_data, mode):
+    """Map every sweepable ref to its reliability sigma (or None), from list_params —
+    so the per-sigma scaling and any sigma-gated plot know which refs carry one."""
+    out = {}
+    try:
+        for e in list_params(slope_data, mode='seep' if mode == 'seep' else 'lem'):
+            out[e['ref']] = e.get('sigma')
+    except Exception:                                     # noqa: BLE001
+        pass
+    return out
+
+
+def scaled_sensitivity(slope_data, params, method='spencer', search=True,
+                       num_slices=40, mode='lem', rel_step=0.01, fem_opts=None,
+                       seep_opts=None, progress_callback=None, cancel_check=None):
+    """Local scaled-sensitivity coefficients — the vertical-bar cousin of the
+    tornado, made comparable across parameters with different units.
+
+    For each parameter *p* with base value *p0* and base output *F0*, the derivative
+    dF/dp is estimated with a CENTRAL DIFFERENCE at +/- ``rel_step`` (relative,
+    default 1%)::
+
+        dF/dp  ~=  [ F(p0*(1+h)) - F(p0*(1-h)) ] / (2*h*p0),   h = rel_step
+
+    and three scalings are reported so bars of different-unit parameters can be
+    compared on one axis:
+
+      * ``elasticity``  = (dF/dp) * (p0/F0)   — dimensionless; the percent change in
+        F per percent change in p. The DEFAULT the plot shows.
+      * ``per_1pct``    = (dF/dp) * (0.01*p0) — the change in F for a 1% change in p.
+      * ``per_sigma``   = (dF/dp) * sigma_p   — the change in F for a one-sigma change
+        in p; present only where the model carries sigma_p (reliability columns).
+
+    A parameter whose base value is 0 or undefined has no relative step and is
+    skipped (recorded in ``result['skipped']``) rather than dividing by zero.
+
+    Returns (success, result). ``result['bars']`` is a list of dicts (one per
+    analyzable parameter), each carrying every scaling, ``dfdp``, ``sign``
+    (+1 if F rises with p, -1 if it falls), ``sigma`` and ``base_value``, sorted by
+    ``|elasticity|`` descending. Also: ``fs_base``, ``rel_step``, ``method``,
+    ``mode``, ``output``/``output_label``, and ``has_sigma``.
+    """
+    params = [params] if isinstance(params, (str, dict, tuple)) else list(params)
+    sigma_by_ref = _sigma_by_ref(slope_data, mode)
+    h = float(rel_step)
+    bars, skipped, fs_base = [], [], None
+    for ref in params:
+        try:
+            canonical, _, base_value = resolve_param(slope_data, ref)
+        except (ValueError, KeyError) as e:
+            return False, str(e)
+        if not np.isfinite(base_value) or base_value == 0:
+            skipped.append({'param': canonical, 'reason':
+                            'base value is 0 or undefined — no relative step'})
+            continue
+        lo, hi = base_value * (1 - h), base_value * (1 + h)
+        ok, res = sensitivity(slope_data, param=ref, values=[lo, hi], mode=mode,
+                              methods=(method,), search=search, num_slices=num_slices,
+                              fem_opts=fem_opts, seep_opts=seep_opts,
+                              progress_callback=progress_callback,
+                              cancel_check=cancel_check)
+        if not ok:
+            return False, res
+        df = res['df']
+        b = df.loc[df['is_base'] & df['success'], 'fs']
+        f0 = float(b.iloc[0]) if len(b) else np.nan
+        swept = df.loc[~df['is_base'] & df['success']].sort_values('value')
+        if len(swept) < 2 or not np.isfinite(f0) or f0 == 0:
+            skipped.append({'param': canonical, 'reason':
+                            'base or perturbed solve failed — no derivative'})
+            continue
+        if fs_base is None:
+            fs_base = f0
+        f_minus = float(swept['fs'].iloc[0])
+        f_plus = float(swept['fs'].iloc[-1])
+        dfdp = (f_plus - f_minus) / (hi - lo)
+        sigma = sigma_by_ref.get(canonical)
+        bars.append({
+            'param': canonical, 'base_value': base_value, 'fs_base': f0,
+            'dfdp': dfdp, 'elasticity': dfdp * base_value / f0,
+            'per_1pct': dfdp * 0.01 * base_value,
+            'per_sigma': (dfdp * sigma if sigma else None),
+            'sigma': (float(sigma) if sigma else None),
+            'sign': 1 if dfdp >= 0 else -1,
+        })
+    bars.sort(key=lambda d: abs(d['elasticity']), reverse=True)
+    output, output_label = _OUTPUT_BY_MODE.get(mode, _OUTPUT_BY_MODE['lem'])
+    return True, {'bars': bars, 'skipped': skipped, 'fs_base': fs_base,
+                  'method': method, 'mode': mode, 'rel_step': h,
+                  'output': output, 'output_label': output_label,
+                  'has_sigma': any(b.get('per_sigma') is not None for b in bars)}
+
+
+def variance_contribution(slope_data, method='spencer', circular=True, rapid=False,
+                          search=True, progress_callback=None, cancel_check=None,
+                          fs_tol=None, tol=None, max_iter=None, composite=False,
+                          seed='circles'):
+    """Per-parameter contribution to Var(FS), reusing the Taylor-series reliability
+    machinery in :func:`xslope.advanced.reliability` (not reimplemented).
+
+    The TSPM writes sigma_F^2 = SUM_i (delta_F_i / 2)^2, where delta_F_i is the
+    F+ minus F- swing when parameter *i* moves by +/- sigma. Each term is exactly
+    that parameter's variance contribution (dF/dp * sigma_p)^2; this function runs
+    the reliability analysis, extracts those terms, normalizes each to a percent of
+    the total variance, sorts them descending and accumulates them — the input to a
+    variance-contribution Pareto. Requires the model to carry standard deviations
+    (reliability's own precondition).
+
+    Returns (success, result). ``result['bars']`` is one dict per uncertain
+    parameter (``label``, ``param``, ``variance``, ``pct`` = % of Var(FS),
+    ``cumulative`` = running % after sorting, ``delta_F``, ``sigma``), plus
+    ``sigma_F``, ``F_MLV``, ``COV_F`` and ``method``.
+    """
+    from .advanced import reliability
+    ok, res = reliability(slope_data, method, rapid=rapid, circular=circular,
+                          debug_level=-1, search=search,
+                          progress_callback=progress_callback, cancel_check=cancel_check,
+                          fs_tol=fs_tol, tol=tol, max_iter=max_iter,
+                          composite=composite, seed=seed)
+    if not ok:
+        return False, res
+    bars = []
+    for p in res.get('param_info', []):
+        dF = p.get('delta_F')
+        if dF is None:
+            continue
+        bars.append({
+            'param': f"mat:{p['material_name']}:{p['param']}",
+            'material_id': p['material_id'], 'field': p['param'],
+            'label': f"{p['material_name']} · {p['param']}",
+            'variance': (dF / 2.0) ** 2, 'delta_F': dF, 'sigma': p['std'],
+        })
+    total = sum(b['variance'] for b in bars)
+    for b in bars:
+        b['pct'] = 100.0 * b['variance'] / total if total else 0.0
+    bars.sort(key=lambda b: b['variance'], reverse=True)
+    cum = 0.0
+    for b in bars:
+        cum += b['pct']
+        b['cumulative'] = cum
+    return True, {'bars': bars, 'sigma_F': res.get('sigma_F'),
+                  'F_MLV': res.get('F_MLV'), 'COV_F': res.get('COV_F'),
+                  'method': method}
+
+
+def mc_rank_correlation(slope_data, method='bishop', n_samples=None, rng_seed=None,
+                        distribution='normal', circular=True, rapid=False,
+                        search=True, num_slices=40, progress_callback=None,
+                        cancel_check=None):
+    """Spearman rank correlation between each sampled input and FS, from a Monte
+    Carlo reliability run (:func:`xslope.advanced.reliability_mc`).
+
+    Where :func:`scaled_sensitivity` is a LOCAL measure (a derivative at the base
+    case), this is a GLOBAL one: it ranks parameters by how strongly they drive FS
+    across the whole sampled distribution, capturing nonlinearity and the parameter's
+    own spread. The two answer different questions and are meant to be read together.
+
+    A single reliability_mc campaign is run; its per-realization input matrix
+    (``param_samples``) and FS vector (``fs_samples``) are correlated
+    parameter-by-parameter with :func:`scipy.stats.spearmanr` over the admissible
+    realizations. Requires standard deviations (reliability_mc's precondition) and,
+    at 10^4 default samples, is the most expensive plot in the family.
+
+    Returns (success, result). ``result['bars']`` is one dict per parameter
+    (``label``, ``param``, ``rho`` in [-1, 1], ``sign``, ``sigma``), sorted by
+    ``|rho|`` descending, plus ``method``, ``n_valid``, ``n_samples`` and
+    ``distribution``.
+    """
+    from .advanced import reliability_mc
+    kw = {}
+    if n_samples is not None:
+        kw['n_samples'] = int(n_samples)
+    if rng_seed is not None:
+        kw['rng_seed'] = int(rng_seed)
+    ok, res = reliability_mc(slope_data, method, circular=circular, rapid=rapid,
+                             distribution=distribution, search=search,
+                             num_slices=num_slices, progress_callback=progress_callback,
+                             cancel_check=cancel_check, debug_level=-1, **kw)
+    if not ok:
+        return False, res
+    from scipy.stats import spearmanr
+    samples = np.asarray(res.get('param_samples'), dtype=float)
+    fs = np.asarray(res.get('fs_samples'), dtype=float)
+    param_info = res.get('param_info', [])
+    valid = np.isfinite(fs)
+    fs_v = fs[valid]
+    X = samples[valid] if samples.ndim == 2 else samples.reshape(len(fs), -1)[valid]
+    bars = []
+    for j, p in enumerate(param_info):
+        col = X[:, j] if X.size else np.array([])
+        if fs_v.size < 3 or col.size == 0 or float(np.std(col)) == 0.0:
+            rho = float('nan')
+        else:
+            rho = float(spearmanr(col, fs_v).correlation)
+        bars.append({
+            'param': f"mat:{p['material_name']}:{p['param']}",
+            'material_id': p['material_id'], 'field': p['param'],
+            'label': f"{p['material_name']} · {p['param']}",
+            'rho': rho, 'sign': 1 if (np.isfinite(rho) and rho >= 0) else -1,
+            'sigma': p['std'],
+        })
+    bars.sort(key=lambda b: abs(b['rho']) if np.isfinite(b['rho']) else -1.0,
+              reverse=True)
+    return True, {'bars': bars, 'method': method, 'n_valid': res.get('n_valid'),
+                  'n_samples': res.get('n_samples'),
+                  'distribution': res.get('distribution')}
 
 
 def _list_seep_params(slope_data):

@@ -997,8 +997,10 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         reliability-index conventions (``beta_normal`` = (mean-1)/sigma_F,
         ``beta_ln`` = lognormal from the sample moments), the empirical probability
         of failure ``pf_empirical`` (fraction of realizations with FS<1), the
-        distribution-fitted ``pf_normal`` / ``pf_lognormal``, and the raw
-        ``fs_samples``.
+        distribution-fitted ``pf_normal`` / ``pf_lognormal``, the raw ``fs_samples``,
+        and the sampled input matrix ``param_samples`` (n_samples x n_params, column
+        order matching ``param_info``) so a global-sensitivity measure such as a
+        Spearman rank correlation of each input against FS can reuse the same draws.
     """
     from .search import circular_search, noncircular_search, _check_cancel
     from .slice import generate_slices
@@ -1192,6 +1194,11 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         'distribution': distribution,
         'param_info': param_info,
         'fs_samples': fs_vals,
+        # The sampled input matrix (n_samples x n_params), column j is param_info[j].
+        # Carried so a global-sensitivity measure (e.g. Spearman rank correlation of
+        # each input against FS — see sensitivity.mc_rank_correlation) can be computed
+        # from the same realizations, without re-sampling.
+        'param_samples': sample_matrix,
     }
 
     print(f"\nMonte Carlo reliability analysis completed in "

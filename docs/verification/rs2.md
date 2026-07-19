@@ -63,7 +63,7 @@ embankments (RS2-8/9), whose printed grids are construction-induced pressures wi
 behind them; and cases whose *published* SSRM value depends on a "can't fail" elastic region rather
 than the mechanics (RS2-9/23), which is a vendor modelling artifice with no reproducible physics
 target — those slopes are anchored by their LEM lock instead. The *blocked* rows are tracked against
-a named feature gap — the FEM has no r<sub>u</sub> option yet (RS2-27) and no transient-seepage
+a named gap — RS2-27's FEM r<sub>u</sub> run is still owed (the solver gained r<sub>u</sub> support after the row was recorded) and there is no transient-seepage
 solver (RS2-67), and some FE-seepage cases do not converge on the high-contrast tri6 mesh. Everything
 else is built and regression-locked at its tagged mesh; the corpus is complete relative to what is
 independently verifiable.
@@ -100,7 +100,7 @@ independently verifiable.
 | [24](#rs2-24) | Layered slope with geosynthetic reinforcement | **built** | [vp032a](../files/rocscience/vp032a.xlsx) / [vp032c](../files/rocscience/vp032c.xlsx). With the vendor geotextile stiffness (EA = 2×10⁵ kN/m), SSRM 0.905 (H=7: the c=0 face skin, partly restrained — RS2's 1.15 is the deep reinforced mechanism, reached via its can't-fail skin zone) and 0.946 (H=8.75, toe/foundation mechanism, −0.4% vs RS2 0.95). |
 | [25](#rs2-25) | Syncrude tailings dyke (El-Ramly et al. 2003) | **built** (caveat) | [vp033.xlsx](../files/rocscience/vp033.xlsx). SSRM 1.19 vs RS2 SSRM 1.29, Slide2 Bishop 1.305, El-Ramly 1.31. |
 | [26](#rs2-26) | Clarence Cannon dam (Wolff & Harr 1987) | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). SSRM 2.24 vs RS2 SSRM 2.29 (−2.1%); Slide2 GLE 2.333 / Spencer 2.383, W&H 2.36, XSLOPE LEM M-P 2.384. |
-| [27](#rs2-27) | Homogeneous slope, pore pressure by r<sub>u</sub> | *blocked* | The FEM has no r<sub>u</sub> option (task, with RS2 #14); RS2's own text cites Slide2 [VP36](rocscience.md#vp36) (Li & Lumb), not VP21. |
+| [27](#rs2-27) | Homogeneous slope, pore pressure by r<sub>u</sub> | *blocked* | Recorded before the FEM gained r<sub>u</sub> support (now present, and locked on RS2-14/17b/18b); the SSRM run for this problem is still owed. RS2's own text cites Slide2 [VP36](rocscience.md#vp36) (Li & Lumb), not VP21. |
 | 28 | FE analysis with groundwater and stress | *planned* | Slide2 VP38 family. |
 | [29](#rs2-29) | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | **built** (sand case) | [vp039c.xlsx](../files/rocscience/vp039c.xlsx). SSRM 1.181 vs RS2 SSRM 1.25, Spencer 1.209, Tandjiria 1.219 (a shallow compound mechanism through the c=0 fill face and soft-clay toe). The clay case is final — *no lock possible*, its FS is governed by a water-filled tension crack, an LEM construct with no continuum counterpart (see the section). |
 | [30](#rs2-30) | Homogeneous slope, power-curve strength (Perry 1993) | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). SSRM 0.898 vs RS2 SRF 0.91 (−1.3%); Slide2 Janbu 0.944, Perry 0.98. |
@@ -825,7 +825,7 @@ model it is locked against.
 
 ### RS2-27: Homogeneous slope, pore pressure by r<sub>u</sub> {#rs2-27}
 
-Slide2 counterpart: [VP36](rocscience.md#vp36). *Blocked*: the FEM has no r<sub>u</sub> option
+Slide2 counterpart: [VP36](rocscience.md#vp36). *Blocked (stale reason)*: recorded when the FEM had no r<sub>u</sub> option
 (task, with RS2 [#14](#rs2-14)); RS2's own text cites Slide2 [VP36](rocscience.md#vp36)
 (Li & Lumb), not VP21. No published/XSLOPE FS pair to tabulate.
 

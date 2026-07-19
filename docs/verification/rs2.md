@@ -227,7 +227,7 @@ candidates.
 | 74 | Cohesionless embankment on clay (D&W Fig 7.12) | **built** | → [RS2-38](#rs2-38) (SSRM 1.168). RS2 SSR 1.17 vs Spencer 1.20. |
 | 75 | James Bay dyke, 4 materials (D&W Fig 7.16) | **built** | → [RS2-42](#rs2-42). RS2 SSR 1.19 vs circ 1.45 / non-circ 1.17. |
 | 76 | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | **built** | → [RS2-40](#rs2-40). RS2 SSR 0.97 / 0.98 vs ref 1.08–1.19. |
-| 78 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | **built** | → [RS2-47](#rs2-47). RS2 SSR 1.04–1.07 vs Spencer 1.12–1.20. |
+| 78 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | **built** | → [RS2-47](#rs2-47) (all three: 30/46.5/60 ft). SSRM 1.077 / 1.061 / 1.061 vs RS2 SSR 1.03 / 1.02 / 1.02; D&W 1.12–1.14. |
 | 79 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | **built** | → [RS2-41](#rs2-39) (infinite 1.430 / deep 1.419). RS2 SSR 1.41 / 1.45 vs ref 1.40 / 1.44. |
 | 81 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | **built** (caveat) | → [RS2-43](#rs2-39) (infinite 1.097, c=0 skin ~5% low). RS2 SSR 1.23 / 1.15 vs ref 1.21 / 1.15. |
 | 82 | Earth embankment, water table (D&W Fig 14.20-a) | **built** | → [RS2-44](#rs2-44). RS2 SSR 1.50 vs Spencer 1.54. |
@@ -1304,21 +1304,45 @@ Slide2 counterpart: [VP84](rocscience.md#vp84).
 
 ### RS2-47: Purely cohesive slope, varying thickness (D&W Fig 14.3) {#rs2-47}
 
-Slide2 counterpart: [VP78](rocscience.md#vp78). Built for the 30-ft case.
+Slide2 counterpart: [VP78](rocscience.md#vp78). All three foundation-thickness variants built.
 
-**Input files:** [vp078.xlsx](../files/rocscience/vp078.xlsx)
+**Input files:** [vp078.xlsx](../files/rocscience/vp078.xlsx) (30 ft) ·
+[vp078b.xlsx](../files/rocscience/vp078b.xlsx) (46.5 ft) ·
+[vp078c.xlsx](../files/rocscience/vp078c.xlsx) (60 ft)
+
+A pure-cohesive slope (c = 1000 psf, φ = 0, γ = 100 pcf), 50-ft face at 1:0.8, over a firm-based
+foundation of varying thickness. D&W Fig 14.3 plots FS against that thickness; RS2 re-runs the
+30 / 46.5 / 60 ft cases by strength reduction. The three geometries are RS2's own external boundary
+read verbatim from the vendor `.fez` (`#047_01/02/03`): the firm base stays at y = 0 and the
+foundation *surface* is raised, so the base sits progressively deeper below the toe.
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM (30-ft case) | 1.08 | RS2 SSRM 1.03 |
+| SSRM (30-ft foundation, vp078) | 1.077 | RS2 SSR 1.03 |
+| SSRM (46.5-ft foundation, vp078b) | 1.061 | RS2 SSR 1.02 |
+| SSRM (60-ft foundation, vp078c) | 1.061 | RS2 SSR 1.02 |
 
-*Cross-bearings: D&W referee 1.124–1.135.*
+*Cross-bearings (30-ft case): D&W referee 1.124–1.135 (toe circle) / 1.139–1.141 (base tangent).*
 
-The 46.5- and 60-ft variants (RS2 1.02 / 1.02) need deepened-base builds and are deferred.
+XSLOPE tracks RS2's slight decrease-then-plateau with depth (1.077 → 1.061 → 1.061, against RS2's
+1.03 → 1.02 → 1.02) at a consistent **+4–5 %** offset, and on the 30-ft case sits *between* the two
+published anchors — above RS2's 1.03 and below D&W's 1.124–1.141. Although the RS2 manual's VP78
+write-up notes that "to force RS2 to iterate for SRF associated with a failure surface passing
+through the toe of the slope, a SSR Exclusion Area was used" (the technique reproduced for
+[RS2-P4-VP67](#p4-vp67)), the **shared vendor `#047` files carry no such polygon** — a single
+Mohr-Coulomb material with `Apply_SSR` on, no SSR search area — so all three run as a plain
+unconstrained SSRM, faithful to what the shared files actually specify. Each is regression-locked
+at its XSLOPE value (4.0 m tri6 mesh).
 
 <!-- test: file=../files/rocscience/vp078.xlsx, type=fem_ssrm, expected_fs=1.077, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, benchmark=RS2-47 -->
+<!-- test: file=../files/rocscience/vp078b.xlsx, type=fem_ssrm, expected_fs=1.061, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, benchmark=RS2-47b -->
+<!-- test: file=../files/rocscience/vp078c.xlsx, type=fem_ssrm, expected_fs=1.061, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, benchmark=RS2-47c -->
 
 ![RS2-47: 30-ft case (vp078) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-47.png)
+
+![RS2-47b: 46.5-ft foundation (vp078b), SSRM 1.061 vs RS2 SSR 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47b.png)
+
+![RS2-47c: 60-ft foundation (vp078c), SSRM 1.061 vs RS2 SSR 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47c.png)
 
 ### RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004) {#rs2-48}
 

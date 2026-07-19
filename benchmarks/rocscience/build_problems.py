@@ -3181,6 +3181,47 @@ def vp078():
     return 'vp078.xlsx'
 
 
+def _vp078_variant(ground, left_x, crest_x_r, out):
+    """Duncan & Wright Fig 14.3 pure-cohesive slope with a DEEPER foundation.
+    Same 50-ft 1:0.8 slope and material (c=1000 psf, phi=0, gamma=100 pcf); the
+    firm base stays at y=0 and the foundation surface is RAISED so the base sits
+    a greater depth below the toe. Geometry is RS2's own external boundary read
+    verbatim from the vendor .fez (#047_02 H=46.5 ft, #047_03 H=60 ft): base
+    y=0, toe-flat at the foundation-top elevation, 1:0.8 face over 40 ft, crest
+    flat to the right edge."""
+    sd = load_slope_data(ACADS_1A)
+    m = sd['materials'][0]
+    m.update(name='Material 1', c=1000.0, phi=0.0, gamma=100.0, option='mc', u='none')
+    sd['materials'] = [m]
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': ground}]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 62.4
+    sd['circular'] = True
+    # base-tangent seed circle (SSRM-only benchmark; the circle is not exercised
+    # by fem_ssrm, kept only so the LEM sheet is well formed)
+    crest_y = ground[-1][1]
+    R = crest_y + 30.0
+    sd['circles'] = [{'Xo': 105.0, 'Yo': R, 'Depth': 0.0, 'R': R}]
+    sd['non_circ'] = []
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, out))
+    return out
+
+
+def vp078b():
+    """D&W Fig 14.3, 46.5-ft foundation (RS2 #047_02). Base y=0, toe-flat y=46.5,
+    face (90,46.5)->(130,96.5), crest to x=240. RS2 SSR 1.02."""
+    return _vp078_variant([(0.0, 46.5), (90.0, 46.5), (130.0, 96.5), (240.0, 96.5)],
+                          0.0, 240.0, 'vp078b.xlsx')
+
+
+def vp078c():
+    """D&W Fig 14.3, 60-ft foundation (RS2 #047_03). Base y=0, toe-flat y=60,
+    face (90,60)->(130,110), crest to x=270; domain extended left to x=-10 (RS2's
+    own external boundary). RS2 SSR 1.02."""
+    return _vp078_variant([(-10.0, 60.0), (90.0, 60.0), (130.0, 110.0), (270.0, 110.0)],
+                          -10.0, 270.0, 'vp078c.xlsx')
+
+
 def vp079():
     """Slide #79 / Duncan & Wright (2005) Fig. 14.4: cohesionless embankment
     (c=0, phi=30, gamma=120) on a phi=0 foundation (c=450 psf, 20 ft thick).
@@ -4388,7 +4429,7 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

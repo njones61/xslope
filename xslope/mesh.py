@@ -244,12 +244,22 @@ def make_polygons_conforming(polygon_coords, tol=1e-8, debug=False):
 # the public surface — only refine_factor and refine_features are.
 # ---------------------------------------------------------------------------
 
+# The DEFAULT feature set (refine_features=None). 'interfaces' is deliberately NOT
+# here: it needs per-material hydraulic conductivity (material_k), which only a
+# seepage problem carries, and material boundaries are ubiquitous — refining every
+# high-contrast interface on an ordinary mechanical/SSRM mesh would balloon the node
+# count for boundaries that are not the difficulty. It is opt-in via refine_features.
 _REFINE_FEATURES = ('reinforcement', 'piles', 'cracks', 'thin_zones')
+# Opt-in feature classes: valid in refine_features but never in the default set.
+_REFINE_FEATURES_OPTIN = ('interfaces',)
+# Every accepted refine_features entry (default + opt-in).
+_REFINE_FEATURES_ALL = _REFINE_FEATURES + _REFINE_FEATURES_OPTIN
 _REFINE_GROWTH_RATIO = 1.3      # element-to-element size growth away from a feature
 _REFINE_BAND_ELEMS = 2.0        # full-refinement band radius = 2 local element widths
 _REFINE_CRACK_TIP_MULT = 2.0    # crack tips refine 2x stronger than the base factor
 _REFINE_THIN_MIN_ELEMS = 3      # fit >= 3 elements across a thin zone's local width
 _REFINE_CRACK_ANGLE_DEG = 30.0  # a polygon vertex sharper than this is a notch/crack tip
+_REFINE_INTERFACE_CONTRAST = 100.0  # refine a material interface at >= this k1 ratio
 
 
 def _refine_threshold_band(gmsh, in_field, size_min, size_max):
@@ -376,9 +386,74 @@ def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_EL
     return whole + boxes
 
 
+def _k_of(material_k, region_id):
+    """Look up a region's major hydraulic conductivity from ``material_k`` (a mapping
+    region_id -> k1, or a sequence indexed by region_id). Returns None when the region
+    has no entry (dict miss or out-of-range index) so the caller can skip it."""
+    if material_k is None:
+        return None
+    try:
+        if isinstance(material_k, dict):
+            return material_k.get(region_id)
+        return material_k[region_id]
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
+def detect_interface_edges(polygon_coords, region_ids, material_k,
+                           contrast_thresh=_REFINE_INTERFACE_CONTRAST):
+    """Detect material-boundary edges across which the hydraulic conductivity contrast
+    is at least ``contrast_thresh`` (default 100x) — the seepage-critical interfaces
+    where a sharp permeability jump (a clay core in a pervious shell, an impermeable
+    cutoff) forces a steep head gradient the mesh must resolve to converge.
+
+    Pure geometry + adjacency: a segment shared by two material polygons is a boundary;
+    its k1 ratio (``max/min`` of the two sides' ``material_k``) decides whether it is
+    high-contrast. ``material_k`` maps ``region_id`` (the value in ``region_ids``, one
+    per polygon) to k1 (a dict) or is a sequence indexed by region_id. Edges whose
+    either side has no k1 entry, or a non-positive k1, are skipped.
+
+    Returns a de-duplicated, sorted list of ``((x1,y1),(x2,y2))`` coordinate-pair edges
+    with each endpoint rounded to 9 decimals and the pair in canonical (sorted) order,
+    so downstream field construction is deterministic.
+    """
+    if material_k is None or not region_ids:
+        return []
+    edge_regions = {}
+    for idx, poly in enumerate(polygon_coords):
+        if idx >= len(region_ids):
+            break
+        rid = region_ids[idx]
+        pts = remove_duplicate_endpoint(list(poly))
+        n = len(pts)
+        if n < 3:
+            continue
+        for i in range(n):
+            a = pts[i]
+            b = pts[(i + 1) % n]
+            ka = (round(a[0], 9), round(a[1], 9))
+            kb = (round(b[0], 9), round(b[1], 9))
+            if ka == kb:
+                continue
+            key = (ka, kb) if ka <= kb else (kb, ka)
+            edge_regions.setdefault(key, set()).add(rid)
+    out = []
+    for key, regions in edge_regions.items():
+        if len(regions) != 2:
+            continue          # unshared boundary or (degenerate) 3+ regions on an edge
+        ks = [_k_of(material_k, r) for r in regions]
+        if any(k is None or k <= 0 for k in ks):
+            continue
+        if max(ks) / min(ks) >= contrast_thresh:
+            out.append(key)
+    out.sort()
+    return out
+
+
 def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
                               polygon_coords, line_curve_tags, point_map,
-                              surface_tags_by_polygon, debug=False):
+                              surface_tags_by_polygon, debug=False,
+                              region_ids=None, material_k=None, edge_map=None):
     """Install gmsh native size fields for feature-aware refinement as the background
     mesh: a Distance+Threshold band per line/crack feature and a surface-restricted
     (or boxed) size per thin zone, all composed with a Min field. Only called when
@@ -395,6 +470,27 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
         gmsh.model.mesh.field.setNumbers(fd, "CurvesList", sorted(line_curve_tags))
         gmsh.model.mesh.field.setNumber(fd, "Sampling", 200)
         fields.append(_refine_threshold_band(gmsh, fd, base_min, target_size))
+
+    # High-contrast material interfaces (seepage-specific, opt-in): a shared boundary
+    # whose two sides differ in k1 by >= _REFINE_INTERFACE_CONTRAST forces a steep head
+    # gradient the mesh must resolve. Same Distance+Threshold band as the line features,
+    # over the shared boundary curves — the detector works in coordinates, so map each
+    # detected edge back to its geo curve tag through the (rounded) point map + edge map.
+    if 'interfaces' in refine_set and material_k is not None and edge_map is not None:
+        rp = {(round(x, 9), round(y, 9)): tag for (x, y), tag in point_map.items()}
+        interface_curves = []
+        for (a, b) in detect_interface_edges(polygon_coords, region_ids, material_k):
+            ta, tb = rp.get(a), rp.get(b)
+            if ta is None or tb is None:
+                continue
+            lt = edge_map.get((min(ta, tb), max(ta, tb)))
+            if lt is not None:
+                interface_curves.append(lt)
+        if interface_curves:
+            fd = gmsh.model.mesh.field.add("Distance")
+            gmsh.model.mesh.field.setNumbers(fd, "CurvesList", sorted(set(interface_curves)))
+            gmsh.model.mesh.field.setNumber(fd, "Sampling", 200)
+            fields.append(_refine_threshold_band(gmsh, fd, base_min, target_size))
 
     # Crack / notch tips: strongest refinement (base factor x _REFINE_CRACK_TIP_MULT).
     if 'cracks' in refine_set:
@@ -617,7 +713,7 @@ def _remesh_with_occ_fragment(polygon_coords, region_ids, lines, target_size,
     return mesh
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -640,8 +736,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                       gmsh native size fields, growing smoothly back to target_size away from
                       them. Crack tips refine twice as strongly.
         refine_features: Optional list selecting which feature classes to refine near, from
-                      {'reinforcement','piles','cracks','thin_zones'}. None = all four. Ignored
-                      when refine_factor is None.
+                      {'reinforcement','piles','cracks','thin_zones','interfaces'}. None =
+                      the default four (NOT 'interfaces', which is seepage-specific and opt-in).
+                      Ignored when refine_factor is None.
+        material_k   : Optional mapping region_id -> major hydraulic conductivity k1 (a dict, or
+                      a sequence indexed by region_id). Only consulted when 'interfaces' is in
+                      refine_features: material boundaries whose two sides differ in k1 by >= 100x
+                      get the same Distance+Threshold band as the line features. Ignored otherwise.
 
     Returns:
         mesh dict containing:
@@ -672,14 +773,15 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                 "refine_factor must be > 1.0 (local size = target_size/refine_factor); "
                 f"got {refine_factor!r}. Use None to disable refinement.")
         if refine_features is None:
+            # Default set excludes the opt-in 'interfaces' (seepage-specific).
             refine_set = set(_REFINE_FEATURES)
         else:
             refine_set = set(refine_features)
-            unknown = refine_set - set(_REFINE_FEATURES)
+            unknown = refine_set - set(_REFINE_FEATURES_ALL)
             if unknown:
                 raise ValueError(
                     f"refine_features contains unknown entries {sorted(unknown)}; "
-                    f"valid options are {sorted(_REFINE_FEATURES)}")
+                    f"valid options are {sorted(_REFINE_FEATURES_ALL)}")
     else:
         refine_set = set()
 
@@ -1287,7 +1389,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         all_line_curve_tags = [t for info in line_data for t in info['line_tags']]
         _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
                                   polygon_coords, all_line_curve_tags, point_map,
-                                  surface_tags_by_polygon, debug=debug)
+                                  surface_tags_by_polygon, debug=debug,
+                                  region_ids=region_ids, material_k=material_k,
+                                  edge_map=edge_map)
 
     # Generate mesh
     gmsh.model.mesh.generate(2)

@@ -28,6 +28,13 @@ This guard asserts the contract on tiny, hand-checkable fixtures (no corpus file
   5. VALIDATION. ``refine_factor <= 1`` and an unknown ``refine_features`` entry both
      raise ValueError (they do not silently no-op).
 
+  7. HIGH-CONTRAST INTERFACES (opt-in, seepage-specific). ``detect_interface_edges``
+     flags a material boundary whose two sides differ in k1 by >= 100x and ignores a
+     below-threshold jump; ``refine_features=['interfaces']`` + ``material_k`` refines
+     locally on that boundary, deterministically. It is OFF the default set (a factor
+     with ``refine_features`` omitted is byte-identical to OFF on a plain two-material
+     block) and no-ops when ``material_k`` is not supplied.
+
 Run from the repo root:  PYTHONPATH=. python3 benchmarks/mesh_refine_guard.py
 Exits non-zero on any failure.
 """
@@ -38,10 +45,17 @@ import sys
 import numpy as np
 
 from xslope.mesh import (build_mesh_from_polygons, detect_crack_tips,
-                         detect_thin_zones)
+                         detect_thin_zones, detect_interface_edges)
 
 SQUARE = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
 REINF_LINE = [(2.0, 5.0), (8.0, 5.0)]     # interior, horizontal at y = 5
+
+# Two stacked material zones sharing a horizontal boundary at y = 5. The lower zone
+# (region 0) is ~100x less permeable than the upper (region 1) — a clay core / pervious
+# shell in miniature. 'interfaces' refinement must concentrate on that shared edge only.
+IFACE_LOW = [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0)]     # region 0, low k
+IFACE_HIGH = [(0.0, 5.0), (10.0, 5.0), (10.0, 10.0), (0.0, 10.0)]  # region 1, high k
+IFACE_K = {0: 1.0e-7, 1: 1.0e-5}          # exactly 100x contrast across y = 5
 
 # Wall-rooted, inclined, long constraint line — a VP60 soil nail in miniature. Rooted
 # on the left vertical face at (0, 20), diving in at 15 deg for 16 units. The geo-kernel
@@ -211,6 +225,67 @@ def main():
         print(f"[conform] wall-rooted inclined nail conforms (0 orphan 1D nodes, "
               f"{len(m_wall['nodes'])} nodes, deterministic {_digest(m_wall)}); "
               f"interior line still conforms")
+
+    # (7) HIGH-CONTRAST MATERIAL INTERFACES (opt-in, seepage-specific). The pure
+    # detector flags a >= 100x k-jump boundary and ignores a below-threshold one and
+    # the outer edges. With 'interfaces' selected + material_k, refinement concentrates
+    # on the shared boundary (near-interface elements materially smaller than far),
+    # deterministically. It is NOT in the default set: a factor with refine_features
+    # omitted must leave this two-material toy byte-identical to OFF (no line / crack /
+    # thin feature here), and selecting 'interfaces' without material_k must no-op.
+    iface_polys = [{"coords": IFACE_LOW, "mat_id": 0}, {"coords": IFACE_HIGH, "mat_id": 1}]
+    region_ids = [0, 1]
+    edges = detect_interface_edges([IFACE_LOW, IFACE_HIGH], region_ids, IFACE_K)
+    edges_below = detect_interface_edges([IFACE_LOW, IFACE_HIGH], region_ids,
+                                         {0: 1.0e-6, 1: 1.0e-5})   # only 10x
+    if edges != [((0.0, 5.0), (10.0, 5.0))]:
+        failures.append(f"interface detection wrong: {edges} "
+                        f"(expected the single shared edge at y=5)")
+    elif edges_below:
+        failures.append(f"interface detector fired on a 10x (< 100x) contrast: {edges_below}")
+    else:
+        m_iface_off = build_mesh_from_polygons(iface_polys, target_size=ts,
+                                               element_type="tri3")
+        # default set (no 'interfaces') + a factor: byte-identical to OFF on this toy
+        m_iface_def = build_mesh_from_polygons(iface_polys, target_size=ts,
+                                               element_type="tri3", refine_factor=4.0)
+        # 'interfaces' selected but no material_k: nothing to refine -> OFF
+        m_iface_nok = build_mesh_from_polygons(iface_polys, target_size=ts,
+                                               element_type="tri3", refine_factor=4.0,
+                                               refine_features=["interfaces"])
+        m_iface = build_mesh_from_polygons(iface_polys, target_size=ts, element_type="tri3",
+                                           refine_factor=4.0, refine_features=["interfaces"],
+                                           material_k=IFACE_K)
+        m_iface2 = build_mesh_from_polygons(iface_polys, target_size=ts, element_type="tri3",
+                                            refine_factor=4.0, refine_features=["interfaces"],
+                                            material_k=IFACE_K)
+        if _digest(m_iface_def) != _digest(m_iface_off):
+            failures.append("'interfaces' leaked into the default feature set "
+                            "(refine_features omitted changed the two-material mesh)")
+        elif _digest(m_iface_nok) != _digest(m_iface_off):
+            failures.append("'interfaces' without material_k did not no-op to OFF")
+        elif _digest(m_iface) != _digest(m_iface2):
+            failures.append(f"interface-refined mesh not deterministic: "
+                            f"{_digest(m_iface)} vs {_digest(m_iface2)}")
+        else:
+            sizes, cents = _mean_edge(m_iface)
+            d = np.abs(cents[:, 1] - 5.0)          # distance to the interface at y = 5
+            near = sizes[d < 0.5]
+            far = sizes[d > 4.0]
+            local = ts / 4.0
+            if near.size == 0 or far.size == 0:
+                failures.append("interface: could not sample near/far element populations")
+            elif near.min() >= 0.5 * ts:
+                failures.append(f"interface: no genuinely small elements near the boundary: "
+                                f"min {near.min():.3f} (target {ts}, local {local})")
+            elif far.mean() <= 1.5 * near.mean():
+                failures.append(f"interface: far elements not coarse relative to near: "
+                                f"far {far.mean():.3f} vs near {near.mean():.3f} (not local)")
+            else:
+                print(f"[interface] >=100x k-jump edge detected (10x ignored); near-boundary "
+                      f"min edge {near.min():.3f} / mean {near.mean():.3f} (local {local}), "
+                      f"far mean {far.mean():.3f} (target {ts}) — local, deterministic, opt-in "
+                      f"(off the default set, no-ops without material_k)")
 
     if failures:
         print("\nFAILED:")

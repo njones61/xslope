@@ -67,6 +67,7 @@
   vertical-align: top;
   overflow-wrap: break-word;
   word-wrap: break-word;
+  white-space: normal !important; /* the RTD theme sets nowrap on td — without this, fixed cells clip */
 }
 
 /* Col 1: problem # - narrow and centered */

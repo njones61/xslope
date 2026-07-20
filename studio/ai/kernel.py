@@ -76,10 +76,11 @@ class PythonKernel:
           output-vs-parameter plot with the target highlighted. ``mode`` picks the
           engine: 'lem' (output = FS, default), 'fem' (FS via SSRM — MINUTES per
           step, needs a mesh), 'seep' (total discharge q — needs a mesh; target is a
-          q). The engine-driven counterpart to ``sensitivity`` — no callback needed,
-          just a parameter ref or dict spec. This is the **Design** mode of the
-          Parametric study family; ``parametric_design`` is the same function under
-          the umbrella name.
+          q). The engine-driven counterpart to ``sensitivity`` — a parameter ref or
+          dict spec, or (exclusive with it) the same ``modify=``/``label=`` callable
+          escape hatch ``sensitivity`` takes for geometry. This is the **Design**
+          mode of the Parametric study family; ``parametric_design`` is the same
+          function under the umbrella name.
 
         The Parametric study family (all share the ``list_params`` parameter refs):
 
@@ -269,9 +270,10 @@ class PythonKernel:
                 print(f"  {p['ref']:<30} = {val}{sig}")
             return params
 
-        def design_sweep(param, low, high, steps=11, target_fs=1.5, mode="lem",
-                         method="spencer", search=True, num_slices=40,
-                         fem_opts=None, seep_opts=None, plot=True, slope_data=None):
+        def design_sweep(param=None, low=None, high=None, steps=11, target_fs=1.5,
+                         mode="lem", method="spencer", search=True, num_slices=40,
+                         fem_opts=None, seep_opts=None, modify=None, label=None,
+                         plot=True, slope_data=None):
             """Design sweep: vary ONE parameter from `low` to `high` and find the
             value at which the OUTPUT meets `target_fs` — the deterministic-design
             staple ("vary the undrained strength between X and Y, plot FS vs Su,
@@ -284,6 +286,15 @@ class PythonKernel:
             material index), or the LLM-friendly dict {'material': name_or_index,
             'property': field} / {'global': field} / {'seep_bc': {'set': 1,
             'head_index': 0}}. Run `list_params(mode=...)` first to discover the refs.
+
+            For anything that is NOT a single stored scalar — geometry above all (a
+            slope angle, a berm width) — the design engine also takes the same
+            `modify=` callable escape hatch as `sensitivity`: pass a Python
+            `(slope_data, value) -> slope_data` function plus a `label` INSTEAD of
+            `param` (exactly one of the two per call). Because a snippet defines the
+            callable in Python, it crosses into this call directly (just like the
+            `apply=` callable of `sensitivity`); the data-driven `param` references
+            remain the natural form for a plain data-in/data-out request.
 
             `mode` selects the engine that evaluates each step and hence the OUTPUT
             quantity the sweep targets (`target_fs` names the target VALUE of that
@@ -331,10 +342,10 @@ class PythonKernel:
                     f"{'SSRM' if mode == 'fem' else 'seepage'} solver, which needs a "
                     "mesh in slope_data['mesh'] — build a mesh first (Studio: the "
                     "Mesh toolbar/menu, or xslope.mesh.build_mesh_from_polygons).")
-            ok, res = _design(sd, param, low, high, steps=steps, target_fs=target_fs,
-                              mode=mode, method=method, search=search,
-                              num_slices=num_slices, fem_opts=fem_opts,
-                              seep_opts=seep_opts)
+            ok, res = _design(sd, param=param, low=low, high=high, steps=steps,
+                              target_fs=target_fs, mode=mode, method=method,
+                              search=search, num_slices=num_slices, fem_opts=fem_opts,
+                              seep_opts=seep_opts, modify=modify, label=label)
             if not ok:
                 raise RuntimeError(res)
             out = res.get("output", "FS")
@@ -348,9 +359,10 @@ class PythonKernel:
                                  fig=plt.figure(figsize=(8, 5)))
             return res
 
-        def parametric_back_analysis(param, low, high, steps=11, target_fs=1.0,
-                                     mode="lem", method="spencer", search=True,
-                                     num_slices=40, fem_opts=None, seep_opts=None,
+        def parametric_back_analysis(param=None, low=None, high=None, steps=11,
+                                     target_fs=1.0, mode="lem", method="spencer",
+                                     search=True, num_slices=40, fem_opts=None,
+                                     seep_opts=None, modify=None, label=None,
                                      plot=True, slope_data=None):
             """Forensic back-analysis: vary ONE parameter and find the value that makes
             the slope limiting (FS = 1.0 by default) — the Back-Analysis mode of the
@@ -361,7 +373,10 @@ class PythonKernel:
             to the value CONSISTENT WITH the observed failure. Mechanically it is
             `parametric_design` with `target_fs=1.0`, so all arguments and the returned
             result dict match `design_sweep` (`crossing` is the back-calculated value).
-            Thin wrapper over `xslope.sensitivity.back_analysis`.
+            Thin wrapper over `xslope.sensitivity.back_analysis`. It inherits the same
+            `modify=`/`label=` callable escape hatch as `design_sweep` (exclusive with
+            `param`), for back-calculating a non-scalar unknown — a water-table
+            elevation, say.
             """
             from xslope.sensitivity import back_analysis as _back
             from xslope.plot import plot_sensitivity
@@ -369,9 +384,10 @@ class PythonKernel:
             sd = doc.slope_data if slope_data is None else slope_data
             if mode in ("fem", "seep") and sd.get("mesh") is None:
                 raise RuntimeError(f"mode='{mode}' needs a mesh in slope_data['mesh'].")
-            ok, res = _back(sd, param, low, high, steps=steps, target_fs=target_fs,
-                            mode=mode, method=method, search=search,
-                            num_slices=num_slices, fem_opts=fem_opts, seep_opts=seep_opts)
+            ok, res = _back(sd, param=param, low=low, high=high, steps=steps,
+                            target_fs=target_fs, mode=mode, method=method,
+                            search=search, num_slices=num_slices, fem_opts=fem_opts,
+                            seep_opts=seep_opts, modify=modify, label=label)
             if not ok:
                 raise RuntimeError(res)
             print(res["message"])

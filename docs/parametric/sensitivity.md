@@ -106,8 +106,9 @@ row naming what broke, never a silently inconsistent answer.
 A sweep across several parameters feeds a family of views. Which one to read depends on the
 question: *which parameter matters most* (tornado, scaled bars), *how the answer moves across
 the range* (spider), or *where the uncertainty comes from* (variance Pareto, Monte Carlo
-rank). Each is a function in `xslope.plot`; all are reachable from the Studio **Parametric**
-dialog's plot-type selector and from the assistant's `parametric_sweep` call. The
+rank). Each is a function in `xslope.plot`; all are reachable from the
+[Studio **Parametric** dialog](../studio/analysis.md#parametric-study)'s plot-type selector
+and from the assistant's `parametric_sweep` call. The
 [tornado](#tornado-diagrams) — the most common — is covered in its own section below.
 
 ### Tornado diagrams

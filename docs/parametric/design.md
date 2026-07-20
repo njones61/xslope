@@ -12,6 +12,9 @@ parameter grammar as [Sensitivity](sensitivity.md) — see
 and targets the **total discharge q** instead — `target_fs` and the crossing/bracketing logic
 below apply identically, just against q rather than FS.
 
+In XSLOPE Studio this runs behind the **Parametric…** button (its Design mode) — see
+[Studio: Parametric study](../studio/analysis.md#parametric-study) for the dialog.
+
 ## Running a design study
 
 ```python
@@ -47,6 +50,56 @@ plot_sensitivity(result['df'], target_fs=result['target_fs'])
 `design()` also takes `progress_callback` and `cancel_check` hooks (a per-point progress
 callback and a cooperative cancel), which is how Studio streams a progress bar and a Cancel
 button over a background sweep; a plain data-in/data-out call leaves both `None`.
+
+## Sweeping anything else: `modify=`
+
+`design()` shares the sensitivity engine's escape hatch, so the quantity you design need not
+be a single stored scalar. When it is **geometry** — a slope angle, a berm width — pass a
+callable in place of a parameter reference: `modify` is a `(slope_data, value) -> slope_data`
+setter and `label` names the swept axis, and the two are mutually exclusive with `param`
+(exactly one per call). `low`/`high`/`steps` sweep the callable's value the same way, and the
+crossing, bracketing, and `extend`/`direction` reporting are identical. The callable owns
+whatever consistency its edit requires — here, rebuilding the material polygons and ground
+surface after it moves a profile point, since slice weights come from the polygons, not the
+raw profile lines:
+
+```python
+import math
+from shapely.geometry import Polygon
+from xslope.fileio import build_ground_surface_from_polygons
+from xslope.mesh import build_polygons
+
+def set_slope_angle(sd, beta_deg):
+    """Rotate the slope face about the toe to beta_deg, then rebuild the polygon
+    geometry (see the Slope Design page for this rebuild pattern)."""
+    prof = sd['profile_lines'][0]['coords']
+    x_toe, y_toe = prof[1]
+    _, y_top = prof[2]
+    prof[2] = (x_toe + (y_top - y_toe) / math.tan(math.radians(beta_deg)), y_top)
+    polys = [{'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+             for p in build_polygons(slope_data={'profile_lines': sd['profile_lines'],
+                                                 'max_depth': sd.get('max_depth')})]
+    sd['polygons'] = polys
+    sd['ground_surface'], sd['domain_polygon'] = build_ground_surface_from_polygons(polys)
+    return sd
+
+success, result = design(
+    slope_data, modify=set_slope_angle, label="slope angle (deg)",
+    low=12, high=25, steps=8,        # flatten the face from 25° toward 12°...
+    target_fs=1.5, method="bishop",  # ...and find the angle that reaches FS = 1.5
+)
+print(result['message'])
+# FS = 1.5 at slope angle (deg) = 16.74 (interpolated between solves).
+```
+
+On the shipped ACADS slope this brackets the target — FS climbs from about 1.04 at 25° to
+2.02 at 12° as the face flattens, crossing FS = 1.5 at a slope angle of **16.74°**. A
+built-in `param` reference and a `modify=` callable are **one code path** — every reference
+resolves internally to exactly the setter signature `modify=` takes — so the answer is
+identical whichever way you name the swept axis, and the engine validates the modified model
+at each step (polygon validity, ground surface present) precisely because a setter may be
+user-written: a broken edit becomes an honest `success=False` sweep point, never a silently
+inconsistent crossing.
 
 ## Honest about misses
 

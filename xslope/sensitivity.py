@@ -322,6 +322,31 @@ def set_param(slope_data, ref, value):
     return setter(slope_data, value)
 
 
+def _resolve_sweep_spec(slope_data, param, modify, label):
+    """Resolve the exclusive ``param`` / ``modify`` sweep contract into a single
+    ``(canonical, setter, base_value)`` triple — the ONE code path a built-in
+    reference and a user setter both travel, shared by sensitivity() and design()
+    (so the docs' promise that "built-in references and modify= callables are one
+    code path" holds for both, not by duplication but by this common resolver).
+
+    Exactly one of:
+      * ``param`` — a validated "kind:name:field" reference, resolved (and validated
+        against THIS model) by resolve_param to a ``(slope_data, value) -> slope_data``
+        setter with a numeric base value; or
+      * ``modify`` — a user callable of that same signature, which requires ``label``
+        (the swept axis's name); its base value is NaN (there is no stored scalar).
+
+    Raises ValueError on any contract violation or invalid reference, so a caller
+    returns a clean ``(False, message)`` rather than crashing."""
+    if (param is None) == (modify is None):
+        raise ValueError("Provide exactly one of param= or modify=.")
+    if modify is not None and not label:
+        raise ValueError("modify= requires label= (the df's param string).")
+    if param is not None:
+        return resolve_param(slope_data, param)
+    return str(label), modify, float('nan')
+
+
 # ---------------------------------------------------------------------------
 # The sweep engine
 # ---------------------------------------------------------------------------
@@ -542,19 +567,12 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
     if mode in ('fem', 'seep') and slope_data.get('mesh') is None:
         return False, (f"mode='{mode}' needs a finite-element mesh in "
                        f"slope_data['mesh'] — build one before sweeping.")
-    if (param is None) == (modify is None):
-        return False, "Provide exactly one of param= or modify=."
-    if modify is not None and not label:
-        return False, "modify= requires label= (the df's param string)."
-
     t0 = time.perf_counter()
-    if param is not None:
-        try:
-            canonical, setter, base_value = resolve_param(slope_data, param)
-        except (ValueError, KeyError) as e:
-            return False, str(e)
-    else:
-        canonical, setter, base_value = str(label), modify, np.nan
+    try:
+        canonical, setter, base_value = _resolve_sweep_spec(
+            slope_data, param, modify, label)
+    except (ValueError, KeyError) as e:
+        return False, str(e)
 
     if values is None:
         if not np.isfinite(base_value) or base_value == 0:
@@ -748,12 +766,12 @@ def _target_crossings(values, fs, target):
     return uniq
 
 
-def design(slope_data, param, low, high, steps=11, target_fs=1.5,
+def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
            mode='lem', analysis=None, method='spencer', search=True, num_slices=40,
-           fem_opts=None, seep_opts=None,
+           fem_opts=None, seep_opts=None, modify=None, label=None,
            progress_callback=None, cancel_check=None, debug_level=0):
-    """Design sweep: vary ONE parameter from ``low`` to ``high`` and find the value
-    at which the output quantity meets ``target_fs``.
+    """Design sweep: vary ONE input from ``low`` to ``high`` and find the value at
+    which the output quantity meets ``target_fs``.
 
     The deterministic-design staple — "vary the undrained strength between X and Y
     and find where FS = 1.5". Runs ``steps`` evenly spaced solves across
@@ -764,12 +782,24 @@ def design(slope_data, param, low, high, steps=11, target_fs=1.5,
     widen the range. In mode='seep' the swept quantity is total discharge q and
     ``target_fs`` is the target q; the crossing logic is identical.
 
-    Parameters:
+    The swept axis is named exactly the way sensitivity() names it — exclusively
+    either ``param`` OR ``modify`` (they share one resolver, ``_resolve_sweep_spec``,
+    so a built-in reference and a user setter are one code path here too):
+
         param: parameter reference — a "kind:name:field" string (e.g. "mat:Clay:c",
             "global:k_seismic"), a (kind, name, field) tuple (name may be a 1-based
             material index), or a dict {'material': name|index, 'property': field}
             / {'global': field}. See resolve_param for the full grammar.
-        low, high: inclusive bounds of the swept parameter value.
+        modify: a user callable ``(slope_data, value) -> slope_data`` (exclusive with
+            param; requires ``label``) — the escape hatch for designing anything that
+            is not a single stored scalar, geometry above all (a slope angle, a berm
+            width; see main_design.set_slope_angle for the archetype). low/high/steps
+            sweep the callable's VALUE axis identically, and the crossing/bracketing/
+            extend semantics are unchanged; a callable that leaves the model invalid
+            at a point becomes an honest ``success=False`` sweep point, never a
+            silently inconsistent crossing.
+        label: the swept-axis name when ``modify`` is used (the df's ``param`` string).
+        low, high: inclusive bounds of the swept value (required).
         steps: number of solves across [low, high] (>= 2).
         target_fs: the design output value to locate (default 1.5 — a factor of
             safety in mode lem/fem, a discharge q in mode seep).
@@ -805,10 +835,15 @@ def design(slope_data, param, low, high, steps=11, target_fs=1.5,
     """
     if analysis is not None:
         mode = analysis
+    if low is None or high is None:
+        return False, "design() requires low= and high= (the swept-value bounds)."
     if int(steps) < 2:
         return False, "steps must be >= 2."
     values = np.linspace(float(low), float(high), int(steps))
-    ok, res = sensitivity(slope_data, param=param, values=values, mode=mode,
+    # param vs modify is validated by sensitivity() via the shared _resolve_sweep_spec,
+    # so design and sensitivity enforce the identical exclusive contract (one path).
+    ok, res = sensitivity(slope_data, param=param, modify=modify, label=label,
+                          values=values, mode=mode,
                           methods=(method,), search=search, num_slices=num_slices,
                           fem_opts=fem_opts, seep_opts=seep_opts,
                           progress_callback=progress_callback,
@@ -870,9 +905,9 @@ def design(slope_data, param, low, high, steps=11, target_fs=1.5,
                   'base_value': res['base_value'], 'runtime': res['runtime']}
 
 
-def back_analysis(slope_data, param, low, high, steps=11, target_fs=1.0,
+def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.0,
                   mode='lem', analysis=None, method='spencer', search=True,
-                  num_slices=40, fem_opts=None, seep_opts=None,
+                  num_slices=40, fem_opts=None, seep_opts=None, modify=None, label=None,
                   progress_callback=None, cancel_check=None, debug_level=0):
     """Forensic back-analysis: find the parameter value that makes the slope
     limiting (FS = 1.0 by default).
@@ -890,10 +925,17 @@ def back_analysis(slope_data, param, low, high, steps=11, target_fs=1.0,
     range never reaches FS = 1.0 — widen it per ``extend``. All other fields carry
     the same meaning as :func:`design`; ``result['study']`` is set to
     ``'back_analysis'`` so a caller can label the plot accordingly.
+
+    Being a thin wrapper over :func:`design`, back-analysis **inherits the same
+    exclusive** ``param`` **/** ``modify`` **contract** unchanged: pass a
+    ``(slope_data, value) -> slope_data`` callable plus ``label`` to back-calculate
+    anything that is not a stored scalar (a water-table elevation, say — sweep the
+    phreatic surface and find the level consistent with the observed failure).
     """
-    ok, res = design(slope_data, param, low, high, steps=steps, target_fs=target_fs,
-                     mode=mode, analysis=analysis, method=method, search=search,
-                     num_slices=num_slices, fem_opts=fem_opts, seep_opts=seep_opts,
+    ok, res = design(slope_data, param=param, low=low, high=high, steps=steps,
+                     target_fs=target_fs, mode=mode, analysis=analysis, method=method,
+                     search=search, num_slices=num_slices, fem_opts=fem_opts,
+                     seep_opts=seep_opts, modify=modify, label=label,
                      progress_callback=progress_callback, cancel_check=cancel_check,
                      debug_level=debug_level)
     if not ok:

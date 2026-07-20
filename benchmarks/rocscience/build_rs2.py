@@ -463,6 +463,89 @@ def rs2_66e():
     return 'rs2_66e.xlsx'
 
 
+# ======================================================================================
+# RS2 #67 (Part III) — Stability of an earth dam under steady & transient unsaturated
+# seepage, after Huang, M. & Jia, C-Q. (2009), "Strength reduction FEM in stability
+# analysis of soil slopes subjected to transient unsaturated seepage."
+#
+# A HOMOGENEOUS earth dam (single Mohr-Coulomb material, Table 1: c = 13.8 kPa,
+# phi = 37 deg, gamma = 18.2 kN/m3, E = 1e5 kPa, nu = 0.3), ~28 m tall on a ~191 m base,
+# ~1V:3H upstream / ~1V:2.4H downstream with toe berms at el 6.66 / 6.86. The manual runs
+# six SSR stages: Case 1 dry, Case 2 steady downstream, Case 3 (90 h after rapid drawdown)
+# downstream + upstream, Case 4 (1500 h) downstream + upstream.
+#
+# XSLOPE has NO transient-seepage solver, so the drawdown pore-pressure fields are not
+# solved — they are IMPORTED from RS2's own computed '.fea' nodal pore-pressure blocks
+# through the u='seep' seep-solution path. benchmarks/rocscience/rs2_transient_seep.py
+# reads a vendor computed '.fea' and writes the '*_mesh.json' / '*_seep.csv' sidecars
+# (RS2's own mesh + RS2's own snapshot u), which are committed corpus artifacts like the
+# vp077a_* seep sidecars. This verifies the SSR-under-transient-u MECHANICS; the transient
+# seepage SOLUTION itself is RS2's, imported, not XSLOPE's.
+#
+# Only the stages whose vendor computed '.fea' carries a recoverable pore-pressure field
+# are built: dry (01, u = 0 everywhere -> u='none'), 90 h downstream (03) and 90 h upstream
+# (04) (each carries a full nodal block). The steady (02) and 1500 h (05/06) computed files
+# carry NEITHER a nodal block NOR a phreatic-line geometry (empty gwgrid, zero material
+# piezos), so those stages cannot be reconstructed from the snapshot and stay blocked
+# (see rs2.md). The RS2 nodal field for each snapshot is EXACTLY hydrostatic below a
+# 14-point phreatic surface (residual < 1e-3 kPa at every node) — RS2 represents each
+# transient snapshot as a water-table position, not a spatially complex field.
+#
+# The 8-vertex dam outline is transcribed from the vendor mesh free-edge boundary and
+# hard-coded so the '.xlsx' rebuilds without the vendor files; the circle is an inert
+# placeholder (SSRM only). Case 3 downstream (03) runs an UNCONSTRAINED SSR (downstream is
+# the weaker face); Case 3 upstream (04) confines strength reduction to RS2's upstream SSR
+# Search Area (rectangle x in [-6.96, 102.32]) via the tag's ssr_zone, so the mechanism is
+# the upstream face — the two stages share the same snapshot field and geometry.
+# ======================================================================================
+
+_RS2_67_DAM = [(0.256, 6.663), (0.266, 0.091), (191.582, 0.091), (191.582, 6.86),
+               (157.459, 6.86), (107.161, 28.162), (99.272, 28.162), (33.787, 6.663)]
+
+
+def _rs2_67_slope_data(u='none'):
+    """One RS2 #67 stage: the homogeneous dam with pore-pressure option ``u`` ('none'
+    for the dry case, 'seep' for a snapshot whose nodal field is imported through the
+    committed '*_mesh.json' / '*_seep.csv' sidecars)."""
+    return _poly_slope_data(
+        polygons=[(0, _RS2_67_DAM)],
+        materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
+                        E=1.0e5, nu=0.3, u=u)],
+        circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
+        max_depth=0.0)
+
+
+def rs2_67a():
+    """RS2 #67 Case 1 — dry dam (no free water surface), u='none'. Published: RS2 SSR
+    2.48 | Slide2 Bishop 2.45 / Janbu 2.32 / Spencer 2.44 / GLE-MP 2.42 | ref LEM 2.43 /
+    FEM 2.50."""
+    sd = _rs2_67_slope_data(u='none')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_67a.xlsx'))
+    return 'rs2_67a.xlsx'
+
+
+def rs2_67c():
+    """RS2 #67 Case 3 downstream — free surface 90 h after rapid drawdown. Pore pressure
+    IMPORTED from the vendor '#067_03 (90h).fea' nodal field via u='seep'
+    (rs2_67c_mesh.json / rs2_67c_seep.csv). Unconstrained SSR — downstream is the weaker
+    face. Published: RS2 SSR 1.83 | Slide2 Bishop 1.77 / Janbu 1.68 / Spencer 1.88 /
+    GLE-MP 1.85 | ref LEM 1.92 / FEM 2.08."""
+    sd = _rs2_67_slope_data(u='seep')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_67c.xlsx'))
+    return 'rs2_67c.xlsx'
+
+
+def rs2_67d():
+    """RS2 #67 Case 3 upstream — same 90 h snapshot field as rs2_67c; the tag confines
+    the SSR to RS2's upstream Search Area (rectangle x in [-6.96, 102.32]) so the critical
+    mechanism is the upstream face. Pore pressure IMPORTED from '#067_04 (90h).fea'
+    (rs2_67d_mesh.json / rs2_67d_seep.csv). Published: RS2 SSR 2.04 | Slide2 Bishop 1.99 /
+    Janbu 1.89 / Spencer 2.07 / GLE-MP 2.06 | ref LEM 2.03."""
+    sd = _rs2_67_slope_data(u='seep')
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_67d.xlsx'))
+    return 'rs2_67d.xlsx'
+
+
 _RS2_62_SOILS = [
     dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
     dict(name='Soil 2 (soft band)', c=0.0, phi=25.0, gamma=19.0, gamma_sat=19.0,
@@ -1077,6 +1160,7 @@ if __name__ == '__main__':
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
+               rs2_67a, rs2_67c, rs2_67d,
                rs2_68a, rs2_68b, rs2_68c,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,

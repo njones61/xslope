@@ -3600,7 +3600,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                       'submerged_oracle', 'gsat_pair', 'seep_head'):
+                       'submerged_oracle', 'no_void', 'gsat_pair', 'seep_head'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:

@@ -887,7 +887,8 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
 
 
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
-                    composite=False, right_facing=None):
+                    composite=False, right_facing=None,
+                    suction_phi_b=None, suction_cap=None):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -907,6 +908,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             surface-asymmetry rule for a flat arc). A bool forces the facing and
             wins over any auto-detection; it also accepts an in-memory
             ``slope_data['right_facing']`` key (the kwarg takes precedence).
+        suction_phi_b (dict or None, optional): Opt-in matric-suction strength
+            (Fredlund extended Mohr-Coulomb), LEM only. Maps ``{material name:
+            phi_b degrees}``. For a slice whose base material is named in the dict,
+            the base matric suction ``s = max(0, -u)`` (from the UNCLAMPED pore
+            pressure: a piezometric line's hydrostatic negative head above the
+            line, or an unsaturated seepage solution's negative u) contributes an
+            apparent cohesion ``c_suction = s * tan(phi_b)``. This realises
+            ``tau = c' + (sigma - u_a) tan(phi') + (u_a - u_w) tan(phi_b)`` with
+            ``u_a = 0``: the effective-normal term keeps u clamped at 0 (water-only,
+            numerically safe) while suction is carried entirely as apparent cohesion.
+            Default None => c_suction = 0.0 for every slice, bit-identical to the
+            clamped baseline.
+        suction_cap (float or None, optional): Optional upper bound (stress units)
+            on the suction ``s`` before it is converted to apparent cohesion, so a
+            deep piezometric surface cannot grow unbounded hydrostatic suction.
+            Default None = uncapped. Ignored when ``suction_phi_b`` is None.
 
     Returns:
         tuple:
@@ -941,6 +958,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     k_seismic = slope_data['k_seismic']
     dloads = slope_data["dloads"]
     dloads2 = slope_data.get("dloads2", [])
+
+    # Opt-in matric-suction strength (Fredlund extended Mohr-Coulomb). Warn on a
+    # phi_b keyed to a material name that does not exist, so a typo silently
+    # produces zero suction rather than an error.
+    if suction_phi_b:
+        _mat_names = {m.get('name') for m in materials}
+        for _nm in suction_phi_b:
+            if _nm not in _mat_names:
+                warnings.warn(
+                    f"suction_phi_b names material '{_nm}', which is not in the model "
+                    f"(materials: {sorted(n for n in _mat_names if n)}). No suction "
+                    "strength will be applied for it.")
 
     # Warn once if seep pore pressure is selected but seep data is missing
     has_seep_materials = any(m["u"] == "seep" for m in materials)
@@ -1765,6 +1794,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         hw2 = 0
         u = 0
         u2 = 0
+        # Signed base pore pressure BEFORE the u >= 0 clamp. Stays 0 unless the
+        # pore-pressure source produces a negative (suction) value; consumed only
+        # by the opt-in apparent-cohesion suction option, never by the effective-
+        # normal term (which always sees the clamped u below).
+        u_unclamped = 0.0
         # Determine pore pressure method from material property
         mat_u = materials[base_material_idx]['u'] if base_material_idx is not None else 'none'
         if mat_u == 'none':
@@ -1777,6 +1811,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 hw2 = piezo_y2 - y_cb
             u = hw * gamma_w if not np.isnan(piezo_y) else 0
             u2 = hw2 * gamma_w if not np.isnan(piezo_y2) else 0
+            # Signed head to the piezometric line: negative above the line, where
+            # its magnitude is the hydrostatic matric suction. No phreatic cos^2
+            # correction (that models steady parallel seepage below the line).
+            if not np.isnan(piezo_y):
+                u_unclamped = (piezo_y - y_cb) * gamma_w
             # Lines declared Type='phreatic' on the piezo sheet get the
             # phreatic-inclination correction (XSTABL / Slide "Hu: auto"):
             # for steady seepage roughly parallel to an inclined phreatic
@@ -1817,6 +1856,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                         "seepage mesh and was assigned u = 0. Check that the mesh "
                         "spans the full depth of the failure surface (a value of 0 "
                         "below the phreatic surface over-predicts the factor of safety).")
+                # Unsaturated seepage solutions carry negative u (suction) above the
+                # water table; keep the signed value for the suction option before
+                # clamping the effective-normal pore pressure at 0.
+                u_unclamped = u_val
                 u = max(0.0, u_val)
             else:
                 u = 0
@@ -1969,6 +2012,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 d = 0       # not used in rapid drawdown, but must be defined
                 psi = 0     # not used in rapid drawdown, but must be defined
 
+        # Apparent cohesion from matric suction (Fredlund extended Mohr-Coulomb),
+        # opt-in. For a base material named in suction_phi_b, convert the base
+        # suction s = max(0, -u_unclamped) into an apparent cohesion
+        # c_suction = s * tan(phi_b), optionally capping s at suction_cap. The
+        # solvers add this to c in the resisting term c*dl; the effective-normal
+        # term keeps the clamped u, so this is exactly the (u_a - u_w) tan(phi_b)
+        # term with u_a = 0. Default (suction_phi_b None) => 0.0, bit-identical.
+        c_suction = 0.0
+        if suction_phi_b and base_material_idx is not None:
+            phi_b_deg = suction_phi_b.get(materials[base_material_idx]['name'])
+            if phi_b_deg:
+                s = max(0.0, -u_unclamped)
+                if suction_cap is not None:
+                    s = min(s, suction_cap)
+                c_suction = s * tan(radians(phi_b_deg))
+
         # Prepare slice data with conditional circle parameters
         slice_data = {
             'slice #': i + 1, # Slice numbering starts at 1
@@ -2031,6 +2090,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'u2': u2,   # pore pressure at x_c for second piezometric line (rapid drawdown)
             'mat': base_material_idx + 1 if base_material_idx is not None else None,  # index of the base material (1-indexed)
             'c': c,      # cohesion of the base material
+            'c_suction': c_suction,  # apparent cohesion from matric suction (0.0 unless suction_phi_b opt-in)
             'phi': phi,
             'pow_flag': pow_flag,  # power-curve strength: iterate tangent (c,phi) on sigma'_n
             'pow_a': (materials[base_material_idx]['pow_a'] if pow_flag else 0.0),

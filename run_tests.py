@@ -3282,6 +3282,29 @@ def run_submerged_oracle_test(test):
     return 0.0, None
 
 
+def run_suction_guard_test(test):
+    """Matric-suction apparent-cohesion guard (benchmarks/suction_guard.py).
+
+    A simple homogeneous slope with a piezo line well below the surface, so the
+    upper failure surface carries matric suction. Freezes the opt-in Fredlund
+    extended-Mohr-Coulomb option: OFF (None / phi_b=0) is bit-identical to the
+    clamped baseline, phi_b>0 strictly raises FS, suction_cap gives baseline <
+    capped < uncapped, and c_suction = max(0, gamma_w*(y_base - y_piezo))*tan(phi_b)
+    exactly. Returns (0.0, None) on pass, else (None, message). File-less: builds
+    on xslope_acads_simple.xlsx."""
+    import importlib
+    bench = str(Path(__file__).parent / 'benchmarks')
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    mod = importlib.import_module('suction_guard')
+    if not os.path.exists(mod._BASE_XLSX):
+        return 0.0, None                      # engine-only clone without the docs file
+    failures = mod.check()
+    if failures:
+        return None, "matric suction: " + "; ".join(failures[:4])
+    return 0.0, None
+
+
 def run_no_void_test(test):
     """Corpus material-tiling void guard (benchmarks/void_guard.py).
 
@@ -3536,6 +3559,8 @@ def run_test(test):
         return run_submerged_oracle_test(test)
     if test_type == 'no_void':
         return run_no_void_test(test)
+    if test_type == 'suction_guard':
+        return run_suction_guard_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -3600,7 +3625,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                       'submerged_oracle', 'no_void', 'gsat_pair', 'seep_head'):
+                       'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -3830,6 +3855,13 @@ def main():
         tests.append({'type': 'no_void',
                       'file': 'corpus material-tiling void audit',
                       'method': '-', 'source': 'no_void'})
+        # Matric-suction apparent-cohesion guard: the opt-in Fredlund extended
+        # Mohr-Coulomb option is off-by-default bit-identical, raises FS for
+        # phi_b>0, respects suction_cap, and prices c_suction exactly. File-less
+        # (builds on xslope_acads_simple).
+        tests.append({'type': 'suction_guard',
+                      'file': 'matric-suction apparent-cohesion guard',
+                      'method': '-', 'source': 'suction_guard'})
 
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.

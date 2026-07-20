@@ -23,6 +23,24 @@ from tabulate import tabulate
 from .advanced import rapid_drawdown
 from .hoekbrown import hb_tangent
 
+
+def _c_eff(slice_df):
+    """Effective (apparent) cohesion per slice: base cohesion ``c`` plus the
+    matric-suction apparent cohesion ``c_suction`` when present.
+
+    ``c_suction`` is written by ``generate_slices`` only for the opt-in Fredlund
+    extended Mohr-Coulomb suction option, and is 0.0 on every slice otherwise.
+    Because IEEE-754 addition of 0.0 is exact, ``c + c_suction`` is bit-identical
+    to ``c`` when the option is off, so every solver stays invariant by default.
+    The column is absent from pre-suction DataFrames, in which case the base
+    cohesion array is returned unchanged.
+    """
+    c = slice_df['c'].values
+    if 'c_suction' in slice_df.columns:
+        return c + slice_df['c_suction'].values
+    return c
+
+
 def solve_selected(method_name, slice_df, rapid=False):
     """
     Executes a specified limit equilibrium solution method and displays results.
@@ -212,7 +230,7 @@ def oms(slice_df, debug=False):
     # 2) Pull arrays directly from slice_df
     alpha_deg = slice_df['alpha'].values    # αᵢ in degrees
     phi_deg   = slice_df['phi'].values      # φᵢ in degrees
-    c     = slice_df['c'].values        # cᵢ
+    c     = _c_eff(slice_df)            # cᵢ (+ apparent cohesion from matric suction, if any)
     W     = slice_df['w'].values        # Wᵢ
     u     = slice_df['u'].values        # uᵢ (pore‐force per unit length)
     dl     = slice_df['dl'].values       # Δℓᵢ
@@ -429,7 +447,7 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     # Load input arrays
     alpha = np.radians(slice_df['alpha'].values)
     phi   = np.radians(slice_df['phi'].values)
-    c     = slice_df['c'].values
+    c     = _c_eff(slice_df)
     W     = slice_df['w'].values
     u     = slice_df['u'].values
     dl    = slice_df['dl'].values
@@ -616,7 +634,7 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     # Load input arrays
     alpha = np.radians(slice_df['alpha'].values)
     phi = np.radians(slice_df['phi'].values)
-    c = slice_df['c'].values
+    c = _c_eff(slice_df)
     W = slice_df['w'].values
     u = slice_df['u'].values
     dl = slice_df['dl'].values
@@ -980,7 +998,7 @@ def _mp_extract(slice_df, right_facing):
     g = lambda col: slice_df[col].values.astype(float)
     A = dict(
         alpha=np.radians(slice_df['alpha'].values), phi=np.radians(slice_df['phi'].values),
-        c=g('c'), w=g('w'), u=g('u'), dl=g('dl'), D=g('dload'),
+        c=_c_eff(slice_df).astype(float), w=g('w'), u=g('u'), dl=g('dl'), D=g('dload'),
         beta=np.radians(slice_df['beta'].values), kw=g('kw'), V=g('t'), P=g('p'),
         H_pile=g('h_pile') if 'h_pile' in slice_df.columns else np.zeros(n),
         theta_p=g('theta_p') if 'theta_p' in slice_df.columns else np.zeros(n),
@@ -1159,7 +1177,7 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
     # extract and convert to radians
     alpha   = np.radians(slice_df['alpha'].values)
     phi     = np.radians(slice_df['phi'].values)
-    c       = slice_df['c'].values
+    c       = _c_eff(slice_df)
     w       = slice_df['w'].values
     u       = slice_df['u'].values
     dl      = slice_df['dl'].values
@@ -1458,7 +1476,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
     alpha = np.radians(slice_df['alpha'].values)  # slice base inclination, degrees
     phi   = np.radians(slice_df['phi'].values)  # slice friction angle, degrees  
-    c     = slice_df['c'].values  # cohesion
+    c     = _c_eff(slice_df)  # cohesion (+ apparent cohesion from matric suction, if any)
     dx    = slice_df['dx'].values  # slice width
     dl    = slice_df['dl'].values  # slice base length
     W     = slice_df['w'].values  # slice weight

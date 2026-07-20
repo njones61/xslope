@@ -819,6 +819,94 @@ def run_sensitivity_test(test):
     return checks[0][1], None
 
 
+def run_design_callable_test(test):
+    """Guard the design()/back_analysis() ``modify=`` callable path that was brought
+    to the same exclusive contract as sensitivity() (docs/parametric/design.md).
+
+    Two deterministic checks, file-less beyond loading the shipped ACADS sample:
+
+    (a) Hand-computable crossing. On a FIXED circle (search=False) solved with the
+        Ordinary Method of Slices, FS is EXACTLY linear in cohesion c — the OMS
+        numerator's cohesion term is c·Σ(ΔL) and the denominator is c-independent —
+        so a ``modify=`` callable that sets c and asks where FS = 1.35 has a crossing
+        the linear closed form pins to machine precision. Asserts design() reports
+        that locked crossing, that it equals the closed-form value, and bracketed.
+
+    (b) param-vs-equivalent-callable equivalence. The identical sweep expressed as
+        ``param='mat:Soil:c'`` and as a ``modify=`` callable setting the same field
+        must be byte-identical — same crossing, same fs_range, same per-point FS —
+        proving both travel the one shared ``_resolve_sweep_spec`` setter path. Also
+        confirms back_analysis() inherits the callable path (it wraps design()).
+
+    Returns (0.0, None) on success, else (None, message)."""
+    import io
+    import contextlib
+    import numpy as np
+    from xslope.fileio import load_slope_data
+    from xslope.sensitivity import design, back_analysis
+
+    sd = load_slope_data('docs/lem/files/xslope_acads_simple.xlsx')
+
+    def set_c(s, val):
+        # modify= receives an already-copied slope_data (materials are deep-copied
+        # by the engine before the setter runs), so mutate-and-return is correct and
+        # matches exactly what param='mat:Soil:c' does.
+        s['materials'][0]['c'] = val
+        return s
+
+    kw = dict(low=1.0, high=9.0, steps=5, target_fs=1.35, method='oms', search=False)
+    with contextlib.redirect_stdout(io.StringIO()):
+        okp, rp = design(sd, param='mat:Soil:c', **kw)
+        okm, rm = design(sd, modify=set_c, label='cohesion c', **kw)
+    if not okp:
+        return None, f"design(param=) failed: {rp}"
+    if not okm:
+        return None, f"design(modify=) failed: {rm}"
+
+    problems = []
+    expected = 4.6351587374          # locked OMS/fixed-surface crossing of FS = 1.35
+
+    # (a) hand-computable crossing on the callable path
+    if not rm['bracketed']:
+        problems.append("modify sweep did not bracket FS = 1.35")
+    if rm['crossing'] is None or abs(rm['crossing'] - expected) > 1e-6:
+        problems.append(f"modify crossing {rm['crossing']} != expected {expected}")
+    sw = rm['df'].loc[~rm['df']['is_base']].sort_values('value')
+    v = sw['value'].to_numpy(dtype=float)
+    f = sw['fs'].to_numpy(dtype=float)
+    B = (f[-1] - f[0]) / (v[-1] - v[0])
+    A = f[0] - B * v[0]
+    if np.max(np.abs(f - (A + B * v))) > 1e-9:
+        problems.append("OMS fixed-surface FS is not linear in c (test premise broken)")
+    c_closed = (1.35 - A) / B
+    if rm['crossing'] is not None and abs(rm['crossing'] - c_closed) > 1e-9:
+        problems.append(f"crossing {rm['crossing']} != closed-form {c_closed}")
+
+    # (b) param == callable, byte-for-byte (the shared setter path)
+    if rp['crossing'] is None or abs(rp['crossing'] - rm['crossing']) > 1e-9:
+        problems.append(f"param crossing {rp['crossing']} != modify crossing {rm['crossing']}")
+    if rp['bracketed'] != rm['bracketed'] or rp['fs_range'] != rm['fs_range']:
+        problems.append("param/modify bracketed or fs_range differ")
+    fp = rp['df'].loc[~rp['df']['is_base']].sort_values('value')['fs'].to_numpy(dtype=float)
+    fm = rm['df'].loc[~rm['df']['is_base']].sort_values('value')['fs'].to_numpy(dtype=float)
+    if fp.shape != fm.shape or np.max(np.abs(fp - fm)) > 1e-12:
+        problems.append("param/modify per-point FS differ")
+
+    # back_analysis() inherits the callable path (thin wrapper over design())
+    with contextlib.redirect_stdout(io.StringIO()):
+        okb, rb = back_analysis(sd, modify=set_c, label='cohesion c',
+                                low=1.0, high=9.0, steps=5, target_fs=1.35,
+                                method='oms', search=False)
+    if not okb or rb.get('study') != 'back_analysis':
+        problems.append("back_analysis did not inherit modify= / the study flag")
+    elif rb['crossing'] is None or abs(rb['crossing'] - expected) > 1e-6:
+        problems.append(f"back_analysis crossing {rb.get('crossing')} != {expected}")
+
+    if problems:
+        return None, "; ".join(problems[:6])
+    return 0.0, None
+
+
 def run_reliability_test(test):
     """Run a single reliability analysis, returning the lognormal reliability index beta."""
     from xslope.fileio import load_slope_data
@@ -2799,6 +2887,70 @@ def run_gsz_import_test(test):
         if back['k_seismic'] != sd2['k_seismic']:
             problems.append(f"export round-trip k_seismic {back['k_seismic']}")
 
+        # v16/v17 material features across the export round-trip. The one SLOPE/W can
+        # carry is 'elastic', as its impenetrable Bedrock model: an elastic material must
+        # survive export -> import as elastic. t_cut, phi_b and s_cap have no SLOPE/W
+        # material encoding — they must be REPORTED and dropped, never silently written
+        # (an invented tag would fail the schema conformance check above) and never
+        # corrupt the file. This is the guard the mission asks for: elastic + phi_b
+        # materials survive the trip with the mapped semantics.
+        from shapely.geometry import Polygon as _Poly
+        from xslope.geostudio import _blank_material as _gm
+        from xslope.fileio import build_ground_surface_from_polygons as _bg
+
+        def _mk(name, **kw):
+            m = _gm(name); m.update(kw); return m
+        feat_polys = [
+            {"polygon": _Poly([(0, 0), (40, 0), (40, 6), (0, 6)]), "mat_id": 0},
+            {"polygon": _Poly([(0, 6), (40, 6), (40, 16), (20, 16), (0, 10)]), "mat_id": 1},
+        ]
+        _gs, _dom = _bg(feat_polys)
+        feat_sd = dict(sd2)
+        feat_sd.update(
+            polygons=feat_polys, domain_polygon=_dom, ground_surface=_gs, piezo_line=[],
+            circles=[], non_circ=[], circular=False, dloads=[],
+            materials=[_mk("bedrock", option="elastic", gamma=22.0),
+                       _mk("silt", option="mc", gamma=18.0, c=6.0, phi=27.0,
+                           phi_b=15.0, t_cut=8.0, s_cap=50.0)])
+        feat_out = os.path.join(td, "features.gsz")
+        fcav = export_gsz(feat_sd, feat_out, analysis_name="features")
+        # SlopeModel written: the elastic material is Bedrock, the soil is MohrCoulomb.
+        froot = _ET.fromstring(_zip.ZipFile(feat_out).read(
+            _zip.ZipFile(feat_out).namelist()[0]))
+        models = [e.text for e in froot.findall("./Materials/Material/SlopeModel")]
+        if models != ["Bedrock", "MohrCoulomb"]:
+            problems.append(f"elastic did not export as Bedrock: SlopeModel={models}")
+        # No invented tags (t_cut/phi_b are dropped, not written).
+        femit = set()
+        def _walk2(e, p=""):
+            q = f"{p}/{e.tag}"; femit.add(q)
+            for a in e.attrib:
+                femit.add(f"{q}@{a}")
+            for c in e:
+                _walk2(c, q)
+        _walk2(froot)
+        if sorted(femit - GSZ_SCHEMA_PATHS):
+            problems.append("feature export wrote tag(s) GeoStudio does not use: "
+                            + ", ".join(sorted(femit - GSZ_SCHEMA_PATHS)[:3]))
+        # The dropped features must be reported, not silent.
+        if not any("elastic" in c and "Bedrock" in c for c in fcav):
+            problems.append("elastic -> Bedrock export was not reported as a caveat")
+        if not any("t_cut" in c for c in fcav):
+            problems.append("dropped t_cut was not reported on export")
+        if not any("phi_b" in c or "suction" in c.lower() for c in fcav):
+            problems.append("dropped phi_b/s_cap was not reported on export")
+        # Re-import: the elastic material comes back elastic (and reported so).
+        fback, fbcav = gsz_to_slope_data(read_gsz(feat_out), 1)
+        fmats = {m["name"]: m for m in fback["materials"]}
+        if fmats.get("bedrock", {}).get("option") != "elastic":
+            problems.append("Bedrock did not re-import as elastic across the round-trip")
+        if round(fmats.get("bedrock", {}).get("gamma", 0), 3) != 22.0:
+            problems.append("the elastic material's unit weight was lost")
+        if fmats.get("silt", {}).get("option") != "mc":
+            problems.append("the ordinary soil did not survive the feature round-trip")
+        if not any("Bedrock" in c and "elastic" in c for c in fbcav):
+            problems.append("Bedrock -> elastic re-import was not reported")
+
     if problems:
         return None, "GeoStudio import: " + "; ".join(problems[:5])
     return 0.0, None
@@ -2826,8 +2978,8 @@ model description:
   design_selection: 0
 
 material types:
-  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 withru: 0
-  soil2 = type: 0 water: 1 wtable: 1 c: 25 phi: 32 uw: 20 hutype: 0 withru: 0
+  soil1 = type: 0 water: 1 wtable: 1 c: 5 phi: 30 uw: 19 hutype: 0 withru: 0 phib: 15
+  soil2 = type: 5 water: 1 wtable: 1 c: 25 phi: 32 uw: 20 hutype: 0 withru: 0
 
 vertices:
   1 x: 0  y: 0
@@ -2901,7 +3053,8 @@ def run_slide2_import_test(test):
 
         sd, caveats = slide2_to_slope_data(d)
 
-        # Two materials, two zones, strengths intact.
+        # Two materials, two zones. soil1 is Mohr-Coulomb (with a phi_b); soil2 is Slide2's
+        # Infinite Strength type, which must import as an ELASTIC (impenetrable) material.
         mats = sd["materials"]
         if len(mats) != 2:
             problems.append(f"{len(mats)} materials, expected 2")
@@ -2911,11 +3064,26 @@ def run_slide2_import_test(test):
                 problems.append(f"soil1 came across as c={mats[0]['c']} phi="
                                 f"{mats[0]['phi']} gamma={mats[0]['gamma']}, "
                                 f"expected 5/30/19")
-            if (round(mats[1]["c"], 3), round(mats[1]["phi"], 3),
-                    round(mats[1]["gamma"], 3)) != (25.0, 32.0, 20.0):
-                problems.append(f"soil2 came across as c={mats[1]['c']} phi="
-                                f"{mats[1]['phi']} gamma={mats[1]['gamma']}, "
-                                f"expected 25/32/20")
+            if mats[0].get("option") != "mc":
+                problems.append(f"soil1 option={mats[0].get('option')!r}, expected 'mc'")
+            # v17: a Slide2 unsaturated friction angle maps to phi_b (encoding unverified).
+            if mats[0].get("phi_b") != 15.0:
+                problems.append(f"soil1 phi_b={mats[0].get('phi_b')!r}, expected 15.0")
+            # soil2 type 5 -> elastic, unit weight kept, no invented strength.
+            if mats[1].get("option") != "elastic":
+                problems.append(f"soil2 option={mats[1].get('option')!r}, expected "
+                                f"'elastic' (Slide2 Infinite Strength did not map)")
+            if round(mats[1].get("gamma", 0), 3) != 20.0:
+                problems.append(f"soil2 gamma={mats[1].get('gamma')}, expected 20 "
+                                f"(the elastic material lost its unit weight)")
+        # The mappings must be reported, and the elastic material must NOT be flagged as
+        # zero-strength.
+        if not any("Infinite Strength" in c and "soil2" in c for c in caveats):
+            problems.append("Slide2 Infinite Strength -> elastic was not reported")
+        if not any("unsaturated" in c.lower() and "soil1" in c for c in caveats):
+            problems.append("the Slide2 phi_b import was not reported")
+        if any("NO STRENGTH" in c and "soil2" in c for c in caveats):
+            problems.append("the elastic material was wrongly flagged as zero-strength")
         if len(sd["polygons"]) != 2:
             problems.append(f"{len(sd['polygons'])} polygons, expected 2 (the "
                             f"triangular cells did not union per material)")
@@ -3026,14 +3194,13 @@ material 1: soilA
  Elastic Properties: LinearElastic
   nu: 0.3 E: 50000
  Plasticity Specifications: MohrCoulomb
-  C: 5 phi: 30 dil: 0 T: 5 Cr: 5 phir: 30 Tr: 5 Apply_SSR: 1
+  C: 5 phi: 30 dil: 0 T: 5 Cr: 5 phir: 30 Tr: 5 Apply_SSR: 1 Phi_b: 12 Air_Entry: 5 UseUnsaturated: 1
 material 2: soilB
  solid properties:
   rhoS: 2 rhoF: 1 porosity: 0.5
  Elastic Properties: LinearElastic
   nu: 0.3 E: 50000
- Plasticity Specifications: MohrCoulomb
-  C: 25 phi: 32 dil: 0 T: 25 Cr: 25 phir: 32 Tr: 25 Apply_SSR: 1
+ Plasticity Specifications: Non
 
 material properties:
 soilA
@@ -3243,7 +3410,8 @@ def run_rs2_import_test(test):
 
         sd, caveats = fez_to_slope_data(d)
 
-        # Two materials, two zones, strengths intact.
+        # Two materials, two zones. soilA is Mohr-Coulomb; soilB is RS2's 'Non', which
+        # must import as an ELASTIC (impenetrable) material, not a zero-strength soil.
         mats = sd["materials"]
         if len(mats) != 2:
             problems.append(f"{len(mats)} materials, expected 2")
@@ -3253,11 +3421,37 @@ def run_rs2_import_test(test):
                 problems.append(f"soilA came across as c={mats[0]['c']} phi="
                                 f"{mats[0]['phi']} gamma={mats[0]['gamma']}, "
                                 f"expected 5/30/19")
-            if (round(mats[1]["c"], 3), round(mats[1]["phi"], 3),
-                    round(mats[1]["gamma"], 3)) != (25.0, 32.0, 20.0):
-                problems.append(f"soilB came across as c={mats[1]['c']} phi="
-                                f"{mats[1]['phi']} gamma={mats[1]['gamma']}, "
-                                f"expected 25/32/20")
+            if mats[0].get("option") != "mc":
+                problems.append(f"soilA option={mats[0].get('option')!r}, expected 'mc'")
+            # v16: RS2's per-material T (5) is a Rankine tension cutoff = xslope's t_cut.
+            if mats[0].get("t_cut") != 5.0:
+                problems.append(f"soilA t_cut={mats[0].get('t_cut')!r}, expected 5.0 "
+                                f"(RS2's per-material T did not map to t_cut)")
+            # v17: RS2's Phi_b (12) with UseUnsaturated on must import as phi_b.
+            if mats[0].get("phi_b") != 12.0:
+                problems.append(f"soilA phi_b={mats[0].get('phi_b')!r}, expected 12.0 "
+                                f"(RS2 unsaturated Phi_b did not map)")
+            # soilB is 'Non' -> elastic, with its unit weight kept and no invented c/phi.
+            if mats[1].get("option") != "elastic":
+                problems.append(f"soilB option={mats[1].get('option')!r}, expected "
+                                f"'elastic' (RS2's 'Non' did not map to elastic)")
+            if round(mats[1].get("gamma", 0), 3) != 20.0:
+                problems.append(f"soilB gamma={mats[1].get('gamma')}, expected 20 "
+                                f"(the elastic material lost its unit weight)")
+            if mats[1].get("t_cut") is not None:
+                problems.append("the elastic soilB was given a t_cut, which is meaningless")
+        # The elastic material must NOT trip the zero-strength warning, and the mapping
+        # notes must all be reported (caveat discipline, never silent).
+        if any("NO STRENGTH" in c and "soilB" in c for c in caveats):
+            problems.append("the elastic material was wrongly flagged as zero-strength")
+        if not any("elastic" in c and "soilB" in c for c in caveats):
+            problems.append("the 'Non' -> elastic mapping was not reported as a caveat")
+        if not any("unsaturated" in c.lower() and "soilA" in c for c in caveats):
+            problems.append("the RS2 unsaturated (phi_b) import was not reported")
+        if not any("brittle" in c.lower() or "residual" in c.lower() for c in caveats):
+            problems.append("RS2's residual/brittle tensile Tr was not reported")
+        if not any("tensilestrength_SRF" in c or "reduced tensile" in c for c in caveats):
+            problems.append("the RS2 tensilestrength_SRF run flag was not reported")
         if len(sd["polygons"]) != 2:
             problems.append(f"{len(sd['polygons'])} polygons, expected 2 (the external "
                             f"boundary did not polygonise into two zones)")
@@ -3674,6 +3868,8 @@ def run_test(test):
         return run_reliability_mc_test(test)
     elif test_type == 'design_search':
         return run_design_test(test)
+    elif test_type == 'design_callable':
+        return run_design_callable_test(test)
     elif test_type == 'critical_kc':
         return run_critical_kc_test(test)
     elif test_type == 'sensitivity':
@@ -3702,7 +3898,8 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                       'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head'):
+                       'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
+                       'design_callable'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -3804,6 +4001,12 @@ def main():
         # docs/parametric/ as three pages; scan all of them for tags.
         for parametric_md in sorted(Path('docs/parametric').glob('*.md')):
             tests.extend(parse_test_tags(parametric_md))
+        # File-less unit guard for the design()/back_analysis() modify= callable
+        # path: param-vs-equivalent-callable equivalence plus a hand-computable
+        # (OMS fixed-surface) crossing. A callable cannot be written in a doc tag,
+        # so this check is registered directly rather than parsed from markdown.
+        tests.append({'type': 'design_callable', 'file': 'design modify= (unit)',
+                      'method': '-', 'source': 'design_callable'})
 
     if run_fem:
         fem_samples = Path('docs/fem/samples.md')

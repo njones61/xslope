@@ -26,6 +26,7 @@ shared [References](references.md) page.
 <!-- test: file=../files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.686e-07, tolerance=0.05, benchmark=GW6e-q -->
 <!-- test: file=../files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.337;26:2:8.348;26:4:8.386;26:6:8.446, tolerance=0.05, benchmark=GW6e-h -->
 <!-- test: file=../files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
+<!-- test: file=../files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2885e-06, tolerance=0.05, benchmark=GW9b-q -->
 <!-- test: file=../files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
 <!-- test: file=../files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
 <!-- test: file=../files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.087e-02, tolerance=0.05, benchmark=GW13-q -->
@@ -79,7 +80,7 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 | [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (4 of 5 cases) | [gw006a](../files/rocscience_gw/gw006a.xlsx) (isotropic) / [gw006b](../files/rocscience_gw/gw006b.xlsx) (9:1 anisotropy) / [gw006c](../files/rocscience_gw/gw006c.xlsx) (core) / [gw006e](../files/rocscience_gw/gw006e.xlsx) (seepage face). Fredlund & Rahardjo saturated–unsaturated dam, five cases sharing the same 12 m dam. The pressure-head profile along line 1-1 is a chart-only target (no tabulated value), so XSLOPE's own flowrate + total-head field are locked. Cases 2 and 5 reproduce the Slide/F&R curve almost exactly; cases 1 and 3 sit ~0.3–0.5 m high (the free-surface family, mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3). Case 4 (steady infiltration) remains deferred on the flux-BC exit-face convergence. |
 | [7](#gw7) | Seepage within layered slope | **built** (caveat) | [gw007.xlsx](../files/rocscience_gw/gw007.xlsx). Rulon & Freeze layered slope: 2.1×10⁻⁴ m/s infiltration on the crest — above the fine-sand ks — perches a water table on the fine lens and daylights as a slope-face spring. XSLOPE reproduces the stated water table (exits at el 0.30 at the toe) and the perched zone; Q = q·L = 1.68×10⁻⁴ locked. Every published target (Fig 7.4/7.7/7.8) is a chart curve with no tabulated value, so — as the methodology note allows for GW6/GW7 — only the flowrate is locked, with a head regression guarding the field. |
 | [8](#gw8) | Flow through ditch-drained soils | **built** (discrepancy) | [gw008.xlsx](../files/rocscience_gw/gw008.xlsx). Gureghian (1981) ditch-drained aquifer — the corpus' exercise of the [specified-flux boundary](#flux-crosscheck), since the problem is driven entirely by rainfall infiltration on the top surface. The flux boundary itself is verified exactly (total inflow = *q*·*L*; the confined response matches the closed form to six figures). **The published contours cannot be reproduced from the manual's printed inputs**: the recharge mound comes out ≈10× too small, and two independent hand calculations confirm the printed numbers cannot produce the published figure. Only the flowrate is locked. |
-| [9](#gw9) | Seepage through dam | **built** (dam 1 of 2) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx). Bowles homogeneous dam via Chapuis et al. (2001): Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2 (drain) needs the source paper — its k-function and reservoir level are chart-only and the published Q implies a k two decades below the chart. |
+| [9](#gw9) | Seepage through dam | **built** (both dams) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx) (dam 1) · [gw009b.xlsx](../files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain). Bowles' dams via Chapuis et al. (2001). Dam 1: Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2: Q = 4.29×10⁻⁶ m³/(s·m) vs Slide / SEEP/W 4.23×10⁻⁶ / Bowles flow net 3.8×10⁻⁶ — all per second. Bowles (1984) Fig E9-2b pins the body k at 2.0×10⁻⁷ m/s, resolving a one-decade exponent slip in the Chapuis Fig 5 caption (2.0×10⁻⁶) and a min-vs-second units mislabel in the published flowrate. |
 | [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](../files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |
 | [11](#gw11) | Earth/rock-fill dam, Gardner permeability function | **built** (case 1 of 2, discrepancy) | [gw011.xlsx](../files/rocscience_gw/gw011.xlsx). Zhang et al. (2001) homogeneous dam with the Gardner law (`unsat=gard`, *a* = 0.15, *n* = 6 as published). The free-surface **release point comes out at el. 17.8 ± 0.15 against Slide 19.40 / ABAQUS 19.64 — about 1.6 m low**, and the cause is not the conductivity model: the real Gardner law reproduces what van Genuchten and linear-front stand-ins gave (17.4). Mesh refinement (1.3k → 14.6k nodes) and the kr floor (1e-4 → 1e-8) both leave it unmoved. This is the one exit-face problem in the panel where XSLOPE releases low — the [SEEP2D cross-check](#seep2d-crosscheck) puts it on the same release point as SEEP2D everywhere else. Only the flowrate is locked; the release point is reported, not locked. Case 2 (zoned dam with foundation and toe drain) is not built. |
 | [12](#gw12) | Seepage from a trapezoidal ditch into a deep drainage layer | **built** | [gw012.xlsx](../files/rocscience_gw/gw012.xlsx). Vedernikov: Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) / theory 4.0×10⁻⁴; flow-bulb half-width ≈42 vs Slide 41 / theory 40. |
@@ -208,7 +209,8 @@ parabola underestimates entry-face flow.
 
 ### GW9: Seepage through dam {#gw9}
 
-**Input files:** [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx)
+**Input files:** [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx) (dam 1) ·
+[gw009b.xlsx](../files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain)
 
 Bowles' homogeneous dam, the flow-net textbook example re-solved numerically by Chapuis,
 Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 upstream,
@@ -220,47 +222,46 @@ Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 ups
 |---|---|---|---|---|
 | Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ | 1.37×10⁻³ | 1.10–1.28×10⁻³ |
 
-**Dam 2 — Bowles' example 9.5b, "dam with an impervious core"** (Slide manual §9.2,
-Fig 9.5; Chapuis et al. 2001, Fig 5) — is **not locked**: its published flowrate is
-inconsistent, by nearly three decades, with the body conductivity the same sources state.
+**Dam 2 — Bowles' dam with a toe drain** (Bowles 1984, Example 9-2 / Fig E9-2b, p. 248;
+Slide manual §9.2, Fig 9.5; Chapuis et al. 2001, Fig 5). Base 190 m; crest 10 m wide at
+el. 45; symmetric 2:1 faces (upstream and downstream horizontal runs 90 m each); reservoir
+head 40 m. A coarse toe drain (ks = 1.0×10⁻⁴ m/s) fills the downstream-toe triangle
+(100, 0)–(190, 0)–(145, 22.5) — base 90 m, apex at mid-height of the downstream slope. The
+body's saturated conductivity is ks = 2.0×10⁻⁷ m/s, carrying the dam-1 unsaturated k(u) curve.
 
-*Inputs.* Base 190 m; crest 10 m wide at el. 45; symmetric 2:1 faces (upstream and
-downstream horizontal runs 90 m each); reservoir head 40 m (Slide Fig 9.5, all dimensions
-printed). A coarse toe drain fills the downstream-toe triangle (100, 0)–(190, 0)–(145, 22.5)
-— base 90 m, apex at mid-height of the downstream slope. The body is called "impervious" at
-saturated k = 2.0×10⁻⁶ m/s and the drain at k = 1.0×10⁻⁴ m/s (Chapuis Fig 5 caption); the
-shared unsaturated k(u) curve is Chapuis Fig 3, whose *k(dam)* branch actually plateaus at
-6.67×10⁻⁶ m/s — the dam-1 material, a decade above the caption. Published Q agrees across
-three sources: Bowles' flow net 3.8×10⁻⁶, and both Chapuis's SEEP/W (2328 elements) and
-Slide 4.23×10⁻⁶ m³/(min·m).
+| | XSLOPE | Slide | SEEP/W (2328 el.) | Bowles (flow net) |
+|---|---|---|---|---|
+| Q, m³/(s·m) | 4.29×10⁻⁶ | 4.23×10⁻⁶ | 4.23×10⁻⁶ | 3.8×10⁻⁶ |
 
-*The two-decade gap, resolved.* XSLOPE reproduces dam 1's published Q to 0.1%, so the solver
-is calibrated; run on dam 2 with the paper's own body k it gives a flowrate two to three
-decades too high:
+XSLOPE matches the two numerical benchmarks to 1.4% and Bowles' flow net to its graphical
+accuracy. Note the units: dam 2 is worked per **second** (Bowles solves it in cm/s), where
+dam 1 was per minute.
 
-| Dam-2 body k (m/s) | XSLOPE Q, m³/(min·m) | ÷ published 4.23×10⁻⁶ |
-|---|---|---|
-| 2.0×10⁻⁶ (Fig 5 caption) | 2.38×10⁻³ | 560× (2.75 decades high) |
-| 6.67×10⁻⁶ (Fig 3 plot) | 6.95×10⁻³ | 1640× (3.2 decades high) |
-| 3.5×10⁻⁹ (back-fit) | 4.2×10⁻⁶ | 1.0× |
+*Provenance.* The body conductivity comes straight from Bowles (1984), Example 9-2, Fig E9-2b:
+the figure prints k = 2×10⁻⁵ cm/s = 2.0×10⁻⁷ m/s, and its flow net (n_f/n_d = 1.9/4) gives
+q = k·h·n_f/n_d = 2.0×10⁻⁷ × 40 × 0.475 = 3.8×10⁻⁶ m³/(s·m) as an independent hand-check.
+(Bowles' printed answer, 3.8×10⁻² m³/(s·m), applies the cm→m factor the wrong way in that same
+line; the conductivity, head, and flow net are unambiguous.) Two errata in the secondary
+sources are resolved by the figure:
 
-The published flowrate is reproduced only at a body k of ≈3.5×10⁻⁹ m/s — about 2.75 decades
-below the stated 2.0×10⁻⁶ and 3.3 below the plotted 6.67×10⁻⁶. Casagrande's toe-drain flow
-net reads the same: Bowles' own 3.8×10⁻⁶ m³/(min·m) requires k on the order of 10⁻⁸ m/s. The
-likely explanation is that Bowles' 9.5b uses a genuinely impervious core (k ≈ 10⁻⁸–10⁻⁹ m/s,
-as the name says) and the "2.0×10⁻⁶" printed in Chapuis's Fig 5 caption is an exponent typo
-— all three published Q's agree because they used the low core k, and only the caption/chart
-values are off (the Slide manual's own Fig 9.6 chart draws the earth-dam curve near 2×10⁻⁷,
-midway between). The true core conductivity cannot be confirmed without Bowles (1984), and
-matching it by lowering k three decades would be tuning rather than verification — so dam 2
-stays unlocked.
+- **Body k.** The 2.0×10⁻⁶ m/s in the Chapuis et al. (2001) Fig 5 caption is one decade high —
+  a −6/−7 exponent slip. Bowles' value is 2.0×10⁻⁷ m/s, and the Slide manual's own Fig 9.6
+  chart draws the earth-dam curve at ≈2×10⁻⁷.
+- **Flowrate units.** The published Q, tabulated as m³/(min·m) beside dam 1, is actually
+  m³/(s·m). Bowles 3.8×10⁻⁶ and Chapuis's SEEP/W and Slide 4.23×10⁻⁶ are all per second, and
+  agree because all three used k ≈ 2×10⁻⁷ m/s.
 
-*Vendor check.* The RS2 Groundwater Verification set ships only `groundwater #009_01.fez`,
-which is dam 1 (one groundwater material, k(u) saturating at 6.67×10⁻⁶ m/s, no drain); it
-carries no dam-2 model. The Slide manual points dam 2 to `Groundwater#09_2.sli`, which is not
-in the distributed model set — so no vendor model resolves the core conductivity either.
+Run at the caption's 2.0×10⁻⁶ m/s, XSLOPE returns 3.97×10⁻⁵ m³/(s·m) — an order of magnitude
+above the published value (Q is nearly linear in k), the exponent slip made visible. The lock
+uses XSLOPE's own Q at Bowles' conductivity, 4.29×10⁻⁶ m³/(s·m).
+
+*Vendor check.* The RS2 Groundwater Verification set ships only `groundwater #009_01.fez`
+(dam 1, no drain); the Slide manual's `Groundwater#09_2.sli` is not in the distributed model
+set. Neither is needed — Bowles (1984) fixes the conductivity directly.
 
 ![gw009a: mesh and solved heads](images/gw009a.png)
+
+![gw009b: mesh and solved heads](images/gw009b.png)
 
 ### GW10: Steady unconfined flow, van Genuchten permeability {#gw10}
 

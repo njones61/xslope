@@ -209,10 +209,10 @@ def gw009a():
     head 18.5; ks = 6.67e-6 m/s with the manual's printed 8-point k-function
     fit by Mualem-van Genuchten (vg_a=0.2835, vg_n=2.765, log-space, max
     deviation ~1.5x mid-range). Q = 1.379e-3 m3/(min*m) vs Slide 1.378e-3,
-    SEEP/W fine-mesh 1.37e-3, Bowles' flow nets 1.10-1.28e-3. Dam 2 (with
-    drain) is not built: its k-function and reservoir level are chart-only
-    and the published Q implies a k two decades below the chart - needs
-    Chapuis et al. (2001), CGJ 38:1113."""
+    SEEP/W fine-mesh 1.37e-3, Bowles' flow nets 1.10-1.28e-3 (Bowles 1984,
+    Example 9-2 / Fig E9-2a: direct 11.01e-4, flow-net 12.8e-4, k = 4e-4 m/min
+    = 6.67e-6 m/s). Dam 2 (the toe-drain variant, Bowles Fig E9-2b) is
+    gw009b()."""
     sd = _base_sd(k1=6.67e-6)
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0,
@@ -232,6 +232,50 @@ def gw009a():
     return 'gw009a.xlsx'
 
 
+def gw009b():
+    """GW#9 dam 2: Bowles' dam with a toe drain (Bowles 1984, Physical and
+    Geotechnical Properties of Soils, 2nd ed., Example 9-2 / Fig E9-2b, p.248).
+    40 m dam, 10 m crest, symmetric 2:1 faces (base 190 m, crest at el 45 per
+    the Slide manual Fig 9.5 / Chapuis et al. 2001 Fig 5), reservoir head 40; a
+    coarse toe drain fills the downstream-toe triangle (100,0)-(190,0)-
+    (145,22.5). Body ks = 2e-7 m/s (Bowles prints k = 2e-5 cm/s on Fig E9-2b);
+    drain ks = 1e-4 m/s; the body's unsaturated k(u) is the dam-1 Mualem-vG
+    curve (vg_a=0.2835, vg_n=2.765).
+
+    Q = 4.29e-6 m3/(s*m) vs Bowles' flow net 3.8e-6 (Fig E9-2b hand-check
+    k*h*n_f/n_d = 2e-7 * 40 * 1.9/4) and Chapuis SEEP/W (2328 el) / Slide
+    4.23e-6 - all three per SECOND per metre. Two published errata, resolved by
+    the source: (1) the Chapuis Fig 5 caption's body k = 2.0e-6 m/s is a
+    one-decade exponent slip (Bowles is 2e-7; the Slide Fig 9.6 chart draws
+    ~2e-7); (2) the published Q, tabulated as m3/(min*m) beside dam 1, is
+    m3/(s*m) in Bowles' own units line. The k=2e-6 caption over-reads Q by ~10x
+    (linear in k); see the GW9 section."""
+    from shapely.geometry import Polygon
+    sd = _base_sd(k1=2e-7)
+    body = sd['materials'][0]
+    body.update(name='Dam fill', c=10.0, phi=30.0, k1=2e-7, k2=2e-7, alpha=0.0,
+                kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2835, vg_n=2.765)
+    drain = dict(body)
+    drain.update(name='Toe drain', k1=1e-4, k2=1e-4)
+    sd['materials'] = [body, drain]                 # mat 0 = body, mat 1 = drain
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon(
+            [(0.0, 0.0), (90.0, 45.0), (100.0, 45.0), (145.0, 22.5),
+             (100.0, 0.0)])},
+        {'mat_id': 1, 'polygon': Polygon(
+            [(100.0, 0.0), (145.0, 22.5), (190.0, 0.0)])},
+    ]
+    sd['max_depth'] = None
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 40.0, 'coords': [(0.0, 0.0), (80.0, 40.0)]}],
+        # toe drain daylights on the lower downstream slope; the whole
+        # downstream face is the exit (seepage) face - flow concentrates in the
+        # high-k drain, so the drain-only and full-slope faces give the same Q.
+        'exit_face': [(100.0, 45.0), (145.0, 22.5), (190.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw009b.xlsx'))
+    return 'gw009b.xlsx'
 
 
 def gw010():
@@ -514,5 +558,5 @@ def gw008():
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for fn in (gw001, gw002, gw003, gw004, gw006a, gw006b, gw006c, gw006e,
-               gw007, gw008, gw009a, gw010, gw011, gw012, gw013):
+               gw007, gw008, gw009a, gw009b, gw010, gw011, gw012, gw013):
         print(fn())

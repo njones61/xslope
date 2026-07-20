@@ -10,7 +10,9 @@ files under ``docs/usage/sample_sheets/``:
 
   * ``sheets_mat.xlsx``   — a materials table exercising every strength option
     (mc / cp / pow / hb), plus gamma_sat, the ru pore option, both unsaturated
-    laws (lf and van Genuchten), a couple of standard deviations, and stiffness.
+    laws (lf and van Genuchten), a couple of standard deviations, stiffness, and
+    the v17 matric-suction pair phi_b/s_cap on the one material where they're
+    live (mc + u=piezo).
     Written cell-by-cell into a fresh template via :func:`mat_header_cols` +
     :func:`write_cells_to_xlsx`, so N/A cells stay *blank* (matching how the
     conditional formatting greys them) rather than the ``0`` that a full
@@ -50,12 +52,22 @@ OUT_DIR = os.path.join(REPO_ROOT, "docs", "usage", "sample_sheets")
 # Rankine cap on Embankment, the RS2 VP2-style T=0 "no tension" idiom on the
 # phi=0 Soft Clay (cp) envelope (see the dependency-matrix note in the docs),
 # and blank (today's unbounded-tension default) on the rest.
+#
+# phi_b/s_cap (v17) show on Embankment: mc + u=piezo is exactly the combination
+# where the columns are active (mc/pow/hb strength with a signed u source) AND
+# the piezo-cap caution applies (a piezometric line's hydrostatic suction above
+# the line is unbounded, so s_cap is load-bearing there, unlike u=seep's
+# self-bounded field). Every other showcase material leaves phi_b/s_cap blank —
+# cp/elastic are dependency-inert (greyed) and Rockfill/Weathered Rock/Drain Sand
+# don't carry a piezo/seep u option, so the columns would grey there too.
 MAT_SHOWCASE = [
     # Embankment fill — Mohr-Coulomb, moist+saturated unit weights, a Kc=1
-    # rapid-drawdown envelope (d, psi), a Rankine tension cutoff, and two
-    # reliability std deviations.
+    # rapid-drawdown envelope (d, psi), a Rankine tension cutoff, a matric-
+    # suction friction angle capped at 1000 (stress units), and two reliability
+    # std deviations.
     {"name": "Embankment", "g": 125, "gsat": 128, "option": "mc",
-     "c": 50, "f": 32, "d": 300, "psi": 20, "tcut": 20, "u": "piezo",
+     "c": 50, "f": 32, "d": 300, "psi": 20, "phib": 15, "scap": 1000,
+     "tcut": 20, "u": "piezo",
      "s(c)": 15, "s(f)": 3,
      "k1": 5e-5, "k2": 5e-5, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
      "E": 30000, "nu": 0.33},

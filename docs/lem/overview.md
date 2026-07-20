@@ -163,6 +163,46 @@ distribution up front.
 A note on all of them: XSLOPE always uses the *explicit* water-force formulation, never buoyant unit weights. Total
 unit weights are used for the slice weights and the pore pressure enters separately through $u$.
 
+### Matric suction (apparent cohesion above the water table)
+
+By default XSLOPE clamps pore pressure to $u = \max(0, u)$ before pricing strength, so any suction above the water
+table — a piezometric line's negative hydrostatic head, or the negative pressures in an unsaturated seepage
+solution — is discarded. This is the conservative default most slope-stability packages ship with: it is safe for
+the great majority of slopes, where any suction credit is small next to the target factor of safety.
+
+**Opt-in Fredlund apparent cohesion.** Where matric suction is a first-order effect — an unsaturated cut slope, for
+instance ([VP38](../verification/rocscience.md#vp38)) — a per-material unsaturated friction angle $\phi^b$ turns
+the suction credit back on, following the Fredlund extended Mohr-Coulomb criterion:
+
+> $\tau = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
+
+With $u_a = 0$, the last term is $s\tan\phi^b$, where $s = \max(0,\,-u_w)$ is the (unclamped) suction — an
+apparent cohesion added on top of $c'$. The effective-normal term still uses the ordinary clamped $u$, so nothing
+about the $N'$/interslice-force machinery changes; only the resisting-side cohesion picks up the extra term.
+$\phi^b$ defaults to off (no material carries it), which is bit-identical to every pre-v17 result.
+
+**Setting it up.** The **mat** sheet carries this per material as of template version 17 — see
+[phi_b / s_cap](../usage/input_template.md#worksheet-mat) in the input template docs for the columns, the
+dependency on strength option and pore-pressure source, and the caution about capping suction on a piezometric
+line. Loading a file with `phi_b` set auto-wires the suction credit into every solve; no extra code is needed.
+
+**Scripted / advanced use.** `generate_slices()` also accepts the underlying run options directly, for callers
+building `slope_data` in memory or overriding the file:
+
+```python
+success, result = generate_slices(
+    slope_data, circle=circle,
+    suction_phi_b={"Cut soil": 15},   # {material name: phi_b in degrees}
+    suction_cap=70.0,                 # stress units; a scalar caps every named material alike,
+)                                     # or pass a {"Cut soil": 70.0, ...} dict to cap per material
+```
+
+An explicit `suction_phi_b` always **overrides** the file — the same precedence `t_cut` uses — so a script can
+turn the credit on for a file with no `phi_b` column, force it off with `suction_phi_b={}` on a file that does
+carry one, or override a template value for a sensitivity study, all without touching the input file. Passing
+`suction_phi_b=None` (the default) auto-wires from whatever the mat sheet's `phi_b`/`s_cap` columns specify,
+which is `None` (off) on a pre-v17 file.
+
 ## Developed Shear Strength
 
 When applying the limit equilibrium method, we often utilize what is called the "developed shear strength". The main equation:

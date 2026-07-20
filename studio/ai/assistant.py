@@ -140,8 +140,9 @@ the canvas re-renders automatically.
   cannot fail; ignores every strength key below, uses only gamma/gsat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
   cutoff, stress units; None/blank = no cutoff (pre-v16 default), 0 = no tension; FEM only,
-  LEM ignores it), phi_b, s_cap (v17 matric-suction apparent cohesion, LEM only — Fredlund
-  extended MC; phi_b = unsaturated friction angle phi^b in degrees, None/blank = no suction
+  LEM ignores it), phi_b, s_cap (v17 matric-suction apparent cohesion, LEM & FEM — Fredlund
+  extended MC (in the FEM/SSRM the suction term is reduced by F alongside tan phi');
+  phi_b = unsaturated friction angle phi^b in degrees, None/blank = no suction
   credit (default); s_cap = cap on the credited suction, stress units, None/blank = uncapped.
   Active only for option in {mc,pow,hb} with u in {piezo,seep}; leave both None for cp/elastic
   or u in {none,ru}. CAUTION: with u='piezo' the hydrostatic suction above the line is

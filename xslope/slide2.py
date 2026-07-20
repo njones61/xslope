@@ -62,6 +62,11 @@ from .water import ponded_water_dload
 # anisotropic (Generalized Anisotropic, Sarma), 18 = SHANSEP (Staged Embankment),
 # 1 = Mohr-Coulomb with a tensile-strength cutoff (Tensile Strength tutorial).
 _MC_TYPE = 0
+# Type 5 is Slide2's Infinite Strength (impenetrable) material, the exact analog of
+# xslope's v16 'elastic' option; type 1 is Mohr-Coulomb WITH a tension cutoff, whose
+# c/phi map but whose cutoff value has no verified live-file encoding.
+_INFINITE_TYPE = 5
+_TENSILE_TYPE = 1
 _TYPE_NAMES = {
     1: "Mohr-Coulomb with a tensile-strength cutoff",
     2: "undrained (phi = 0)",
@@ -71,6 +76,12 @@ _TYPE_NAMES = {
     16: "generalized anisotropic (function-based)",
     18: "SHANSEP",
 }
+# Candidate Slide2 material keys for the unsaturated friction angle phi^b. Slide2's
+# Unsaturated Shear Strength is a per-material property (not a strength type), and no
+# live .sli was available to pin the exact token — these are read defensively and, when
+# one is present, mapped to phi_b and flagged as encoding-unverified. A type-0 Mohr-
+# Coulomb material carries none of them, so the path is inert on ordinary files.
+_PHI_B_KEYS = ("phib", "phi_b", "unsatphi")
 
 # Slide2 water-pressure method (model description "water:"). Only 'hu' — a
 # hydrostatic pressure below a water table — maps onto xslope's piezometric line.
@@ -351,6 +362,9 @@ def _blank_material(name):
     return {
         "name": str(name), "gamma": 0.0, "gamma_sat": None, "option": "", "c": 0.0,
         "phi": 0.0, "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0, "u": "none", "ru": 0.0,
+        # v16 tensile cutoff and v17 matric-suction strength (None = unset, the pre-
+        # v16/v17 default), mirroring load_slope_data's material shape.
+        "t_cut": None, "phi_b": None, "s_cap": None,
         "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
         "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
         "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
@@ -385,6 +399,19 @@ def _strength(props):
     gamma = _fnum(props.get("uw", 0.0))
     if tcode == _MC_TYPE:
         return c, phi, gamma, tcode, None
+    if tcode == _INFINITE_TYPE:
+        # Impenetrable: handled as an elastic material by the caller, no strength note.
+        return c, phi, gamma, tcode, None
+    if tcode == _TENSILE_TYPE:
+        # A Mohr-Coulomb material WITH a tension cutoff. The c and phi map cleanly; the
+        # cutoff itself does not — xslope's t_cut is FEM-only and the Slide2 tension-
+        # cutoff value has no encoding verified against a live file, so it is reported
+        # rather than mapped to a possibly-wrong number.
+        return c, phi, gamma, tcode, (
+            "uses Slide2's Mohr-Coulomb-with-tension-cutoff model — c and phi came "
+            "across, but the tensile-strength value was NOT imported (xslope's t_cut is "
+            "FEM-only and the Slide2 cutoff encoding is not verified against a live "
+            "file); set t_cut by hand if you need the cutoff")
     label = _TYPE_NAMES.get(tcode, f"strength type {tcode}")
     return c, phi, gamma, tcode, (
         f"material uses Slide2's {label} model, which xslope does not have — "
@@ -451,13 +478,39 @@ def slide2_to_slope_data(d, scenario=None):
         if note:
             caveats.append(f"material '{name}': " + note)
         mat = _blank_material(name)
-        mat.update(option="mc", gamma=gamma, c=c, phi=phi)
+        if tcode == _INFINITE_TYPE:
+            # Slide2's Infinite Strength material -> xslope's elastic (impenetrable)
+            # option: it cannot fail and a slip surface cannot enter it. The strength
+            # inputs are meaningless on it, so only the unit weight comes across.
+            mat.update(option="elastic", gamma=gamma)
+            caveats.append(
+                f"material '{name}' is Slide2's Infinite Strength (impenetrable) "
+                f"material — imported as an elastic material: it cannot fail and a slip "
+                f"surface cannot cut through it")
+        else:
+            mat.update(option="mc", gamma=gamma, c=c, phi=phi)
+
+        # Unsaturated shear strength: Slide2 credits a phi^b for negative pore pressure.
+        # No live .sli was available to pin the exact material token, so a small set of
+        # candidate keys is read defensively; when one is present it maps to phi_b and is
+        # flagged as an unverified encoding (s_cap is left unset — Slide2's air-entry /
+        # threshold parameterisation is not xslope's suction cap).
+        phi_b = next((_fnum(props[k]) for k in _PHI_B_KEYS
+                      if k in props and _fnum(props[k]) > 0), None)
+        if phi_b is not None:
+            mat["phi_b"] = phi_b
+            caveats.append(
+                f"material '{name}' carries a Slide2 unsaturated friction angle "
+                f"(phi_b = {phi_b:g}) — imported as phi_b, but the Slide2 encoding is not "
+                f"verified against a live file and s_cap (the suction cap) was left "
+                f"unset; check it before solving")
+
         mat["_props"] = props        # kept for the water pass, dropped before return
         materials.append(mat)
         if not gamma:
             caveats.append(f"material '{name}' has no unit weight in the file — set "
                            f"gamma before solving")
-        if not c and not phi:
+        if tcode != _INFINITE_TYPE and not c and not phi:
             caveats.append(
                 f"material '{name}' came across with NO STRENGTH (c = 0, phi = 0) — set "
                 f"its strength before solving or the factor of safety is meaningless")

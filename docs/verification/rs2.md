@@ -113,7 +113,7 @@ independently verifiable.
 | [25](#rs2-25) | Syncrude tailings dyke (El-Ramly et al. 2003) | **built** (caveat) | [vp033.xlsx](../files/rocscience/vp033.xlsx). SSRM 1.19 vs RS2 SSRM 1.29, Slide2 Bishop 1.305, El-Ramly 1.31. |
 | [26](#rs2-26) | Clarence Cannon dam (Wolff & Harr 1987) | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). SSRM 2.24 vs RS2 SSRM 2.29 (−2.1%); Slide2 GLE 2.333 / Spencer 2.383, W&H 2.36, XSLOPE LEM M-P 2.384. |
 | [27](#rs2-27) | Homogeneous slope, pore pressure by r<sub>u</sub> | **built** (caveat) | [vp036.xlsx](../files/rocscience/vp036.xlsx). Li & Lumb r<sub>u</sub> = 0.2 slope. SSRM 1.344 at the 1.0 m regression lock vs RS2 SSRM 1.31, Slide2 Bishop 1.339, Hassan & Wolff 1.334; mesh-sensitive like RS2-14. |
-| 28 | FE analysis with groundwater and stress | *planned* | Slide2 VP38 family. |
+| [28](#rs2-28) | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | **built** (blocked) | [rs2_28a](../files/rocscience/rs2_28a.xlsx) / [b](../files/rocscience/rs2_28b.xlsx) / [c](../files/rocscience/rs2_28c.xlsx). Slide2 [VP38](rocscience.md#vp38). RS2 SSR 1.64 / 1.55 / 1.41 (manual Part 1 §28 — *not* the "1.56/1.46/1.32" quoted elsewhere). Blocked: the vendor `.fea` ships suction OFF (`UseUnsaturated: 0`, `Phi_b: 0`), crediting it instead through effective stress at φ′; and the ≈200 kPa far-field-head pore pressure prevents the viscoplastic SSRM from converging at any F. See the section. |
 | [29](#rs2-29) | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | **built** (sand case) | [vp039c.xlsx](../files/rocscience/vp039c.xlsx). SSRM 1.181 vs RS2 SSRM 1.25, Spencer 1.209, Tandjiria 1.219 (a shallow compound mechanism through the c=0 fill face and soft-clay toe). The clay case is final — *no lock possible*, its FS is governed by a water-filled tension crack, an LEM construct with no continuum counterpart (see the section). |
 | [30](#rs2-30) | Homogeneous slope, power-curve strength (Perry 1993) | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). SSRM 0.898 vs RS2 SRF 0.91 (−1.3%); Slide2 Janbu 0.944, Perry 0.98. |
 | [31](#rs2-31) | M-C vs power curve (Baker 2003 ex. 1) | **built** (all three halves) | [vp044a](../files/rocscience/vp044a.xlsx) / [b](../files/rocscience/vp044b.xlsx) / [c](../files/rocscience/vp044c.xlsx). M-C SSRM 1.529 / 0.931 vs RS2 1.53 / 0.98; power-curve SSRM 0.921. |
@@ -205,7 +205,7 @@ candidates.
 | 25 | Bearing-capacity slope (Prandtl / Chen & Shao) | **built** | → [RS2-20](#rs2-20). RS2 SSR 1.01 vs Chen & Shao 1.05. |
 | 26 | Bearing-capacity prism (Prandtl II) | **built** | → [RS2-21](#rs2-21). RS2 SSR 1.00 vs theory 1.0. |
 | 32 | Reinforced embankment, 7 materials (Borges 2002) | **built** | → [RS2-24](#rs2-24). RS2 SSR 1.24 / 1.21 / 0.98 vs Borges 1.25 / 1.19 / 0.99. |
-| 38 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | *planned* | → RS2-28 *(planned)*. RS2 SSR 1.56 / 1.46 / 1.32. |
+| 38 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | **built** (blocked) | → [RS2-28](#rs2-28). RS2 SSR 1.64 / 1.55 / 1.41 (manual Part 1 §28). Blocked — vendor `.fea` ships suction OFF; ≈200 kPa seepage pore pressure prevents SSRM convergence. |
 | 39 | Reinforced embankment, geosynthetic (Tandjiria 2002) | **built** | → [RS2-29](#rs2-29). RS2 SSR 0.97 / 1.42 / 1.22 / 1.39. |
 | 40 | Homogeneous, power curve, sensitivity (Perry 1993) | **built** | → [RS2-30](#rs2-30). RS2 SSR 0.97 vs Perry 0.98. |
 | 41 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | **built** | → [P4-VP41](#p4-vp41) (own SSRM build, 1.647). RS2 SSR 1.64 vs Bishop 1.66 / Janbu 1.60–1.67. |
@@ -255,7 +255,7 @@ El. 81 lifts the mechanism onto the toe circle at 1.303, a head-to-head with RS2
 SSR 1.33, and VP6 (ACADS 2b Talbingo) now carrying a [Part IV SSRM build](#p4-vp6) confined to
 RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.145 vs RS2 SSR 2.15)
 alongside the [VP6](rocscience.md#vp6) LEM lock, 2 mapping to corpus rows (RS2-68 Loukidis — now
-**built**; RS2-28/38/39-41-43 — still planned), and **≈12 genuinely new** candidates: the rest of
+**built**; RS2-28/38 now **built (blocked)**; RS2-39-41-43 — still planned), and **≈12 genuinely new** candidates: the rest of
 the USACE 2003 embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and
 soil-nail wall (VP57, VP60),
 Zhu's 12-method slope (VP51), the Baker/Jiang power-curve and Baker–Leshchinsky safety-map
@@ -894,6 +894,55 @@ honest reading is a value between roughly 1.29 and 1.39, straddling all three re
 <!-- test: file=../files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.344, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, benchmark=RS2-27 -->
 
 ![RS2-27: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-27.png)
+
+### RS2-28: Excavated slope with FE groundwater and matric suction (Ng & Shi 1998) {#rs2-28}
+
+Slide2 counterpart: [VP38](rocscience.md#vp38). A 28° Hong Kong cut (24 m soil over 6 m
+bedrock); a steady unsaturated FE groundwater analysis at three far-field heads (H = 61 /
+62 / 63 m) supplies both the positive and the negative (matric-suction) pore pressures, and
+the SSR reduces strength to failure. Material (manual Table 1): c′ = 10 kPa, φ′ = 38°,
+φ_b = 15°, γ = 16 kN/m³.
+
+**Input files:** [rs2_28a.xlsx](../files/rocscience/rs2_28a.xlsx) /
+[b](../files/rocscience/rs2_28b.xlsx) / [c](../files/rocscience/rs2_28c.xlsx) — geometry
+from the vendor `.fea` external boundary; XSLOPE's own steady unsaturated Gardner seepage
+supplies u (the [VP38](rocscience.md#vp38) pattern; the vendor result file is empty, so no
+solved field can be imported). The domain is split into a Mohr-Coulomb corridor near the cut
+('Cut soil', carrying φ_b) and an elastic outer zone ('Elastic outer'), reproducing the
+vendor `.fea` material partition (`rock1` Mohr-Coulomb / `rock2` `Plasticity: None`).
+
+| H | RS2 (SSR) | Slide2 | Ng & Shi (1998) |
+|---|---|---|---|
+| 61 m | 1.64 | 1.616 | 1.636 |
+| 62 m | 1.55 | 1.535 | 1.527 |
+| 63 m | 1.41 | 1.399 | 1.436 |
+
+*Published values are from the RS2 *Slope Stability Verification Manual, Part 1*, §28
+(Table 2). The manual's §38-derived cross-reference elsewhere quoting "1.56 / 1.46 / 1.32"
+does not match this table.*
+
+**Status — blocked.** Two independent obstacles, documented rather than tuned away:
+
+1. **Suction basis.** All three vendor `.fea` models carry the plasticity line
+   `C: 10 phi: 38 … Phi_b: 0 Air_Entry: 0 UseUnsaturated: 0` with `negative_pp_cutoff: 0`.
+   RS2 therefore does **not** credit suction through the reduced-φ_b apparent-cohesion form;
+   it retains the negative pore pressure in the effective stress at the full φ′ = 38° (i.e.
+   φ_b = φ′), reduced by the SRF. The manual's Table 1 instead documents Ng & Shi's φ_b = 15°,
+   which the Slide2 limit-equilibrium result uses. The two routes bracket the published
+   spread (RS2's φ′ = 38° credit sits just above the φ_b = 15° Slide2 values). XSLOPE's FEM
+   suction option is the apparent-cohesion form; the manual's φ_b = 15° is baked into the
+   corridor material, so the reproduction targets the Ng & Shi / Slide2 basis, not RS2's
+   effective-stress-at-φ′ basis.
+
+2. **FEM convergence.** The far-field head drives a large positive pore pressure through the
+   saturated foundation (up to ≈ 200 kPa). XSLOPE's viscoplastic solver does not reach the
+   Dawson per-node force equilibrium at any strength-reduction factor (it fails to converge
+   even at F = 0.10, i.e. 10× strength), in either pore-pressure formulation and with or
+   without the elastic corridor — the water body load / submerged-boundary effective tension
+   dominates the residual, so the SSRM cannot bracket a critical F. This is a solver
+   limitation for extreme seepage loading, not a strength result. The cases are shipped built
+   (geometry, seepage sidecars, material partition) as the basis for a future lock once the
+   solver handles this loading.
 
 ### RS2-29: Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) {#rs2-29}
 

@@ -1155,6 +1155,128 @@ def rs2_64l_split():
     return 'rs2_64l_split.xlsx'
 
 
+# ======================================================================================
+# RS2 #28 (Part 1) — Finite Element Analysis with Groundwater and Stress, after
+#   Ng, C.W.W. & Shi, Q. (1998), "A numerical investigation of the stability of
+#   unsaturated soil slopes subjected to transient seepage."  (Slide2 counterpart VP38.)
+#
+# A 28-deg Hong Kong cut (24 m soil over 6 m bedrock). A steady-state UNSATURATED FE
+# groundwater analysis supplies BOTH the positive and the negative (matric-suction)
+# pore pressures; the negative pressure above the water table raises the Mohr-Coulomb
+# shear strength. RS2's SSR then reduces the strength to failure.
+#
+# HOW RS2 CREDITS SUCTION (verbatim from the vendor '.fea', all three heights):
+#   material rock1 = MohrCoulomb C:10 phi:38 T:10 Phi_b:0 Air_Entry:0 UseUnsaturated:0,
+#   global negative_pp_cutoff:0 (m_neg_pp_cutoff_check: no). So RS2 does NOT use the
+#   reduced-phi_b apparent-cohesion form — it RETAINS the negative pore pressure in the
+#   effective stress at the FULL friction angle phi'=38 (equivalent to Fredlund phi_b =
+#   phi'), reduced by the SRF along with tan(phi'). The manual's Table 1 documents the
+#   SOURCE criterion (Ng & Shi) as the modified MC with phi_b = 15 deg:
+#       tau = c' + (sigma_n - u_a) tan(phi') + (u_a - u_w) tan(phi_b).
+#   Cross-vendor: SIGMA/W's SRS likewise credits suction through the SRF-reduced
+#   effective stress (no separate phi_b term). => the suction contribution is REDUCED
+#   by F, which is how solve_ssrm's suction option treats it.
+#
+# XSLOPE reproduction: the apparent-cohesion form (solve_ssrm suction_phi_b), keeping
+# the effective-normal u clamped exactly as elsewhere and reducing the apparent
+# cohesion s*tan(phi_b) by the trial F. phi_b = 15 (the manual's documented value, also
+# the committed VP38 LEM value) — NOT tuned. Geometry and the seepage BCs are VP38's
+# (the vendor '.fea' external boundary; the p2mrv results file is EMPTY, so no vendor
+# nodal field exists to import — OUR steady unsaturated Gardner seepage supplies u, the
+# VP38 pattern). SSR is confined to the cut region (the vendor '.fea' rock1/rock2 split:
+# rock1 MC near the cut, rock2 elastic outside) via the tag's ssr_zone = the rock1
+# element hull read from the '.fea'. phi_b=15 is baked into the material (v17 column) so
+# build_fem_data auto-wires it; the tag may still pass suction_phi_b to override.
+#
+# Published RS2(SSR): H=61m 1.64 | H=62m 1.55 | H=63m 1.41  (RS2 manual Part 1, #28)
+#   Slide2 1.616/1.535/1.399 ; Ng & Shi (1998) 1.636/1.527/1.436.
+# ======================================================================================
+
+# rock1 (SSR / plastic) region hull, read from the vendor '.fea' element-material split
+# (materialID 1 = MohrCoulomb near the cut; the rest is materialID 2 = elastic 'Non').
+# Its top edge lies exactly on the ground surface (the cut face); the rest of the domain
+# is the elastic outer zone. XSLOPE reproduces RS2's split as two materials — the MC
+# corridor 'Cut soil' inside the hull, an elastic 'Elastic outer' outside — run with
+# solve_ssrm(elastic_materials=['Elastic outer']). Confining the plasticity to the cut
+# is ESSENTIAL: the far-field head drives a large positive pore pressure through the
+# saturated foundation, which yields the whole domain if it is left plastic (RS2 makes
+# it elastic for exactly this reason — manual: "an elastic (infinite strength) material
+# outside this region").
+_RS2_28_CORRIDOR = [(72.34, 33.24), (72.34, 57.35), (57.06, 49.31),
+                    (26.26, 32.95), (26.26, 8.56)]
+_RS2_28_PHI_B = 15.0            # manual Table 1 (Ng & Shi) — documented, not tuned
+_RS2_28_ELASTIC = 'Elastic outer'
+
+
+def _rs2_28_slope_data(head):
+    """One RS2 #28 case at right-side total head ``head`` (m). Reuses the committed VP38
+    geometry + unsaturated Gardner seepage BCs, split into a Mohr-Coulomb corridor near
+    the cut ('Cut soil', carrying phi_b) and an elastic outer zone ('Elastic outer',
+    identical seepage/elastic props, made pure-elastic at solve time). Seepage runs on
+    both (same k), so the pore-pressure field is identical to the single-material case."""
+    import build_vp038 as _vp38
+    from shapely.geometry import Polygon
+    from shapely import set_precision
+    sd = _vp38._slope_data(head)
+    soil = sd['materials'][0]
+    soil['phi_b'] = _RS2_28_PHI_B        # matric-suction strength angle (apparent cohesion)
+    soil['s_cap'] = None                  # unsaturated FE field self-bounds the suction
+    # Elastic outer: identical seepage + weight, no suction (elastic never yields).
+    outer = dict(soil)
+    outer['name'] = _RS2_28_ELASTIC
+    outer['phi_b'] = None
+    # Split the domain: corridor (hull ∩ domain) vs the elastic outer (domain − corridor).
+    # Snapping the corridor to a 0.01 grid (set_precision) before the difference removes
+    # the zero-width spike the raw difference leaves where the corridor's top edge
+    # retraces the ground surface — that collinear touch-point stays valid in memory but
+    # fails the polygon-sheet round-trip validity check after the coordinates are rounded.
+    dom = sd['domain_polygon']
+    corr = set_precision(Polygon(_RS2_28_CORRIDOR).intersection(dom), 0.01)
+    rest = dom.difference(corr)
+    pieces = list(rest.geoms) if rest.geom_type == 'MultiPolygon' else [rest]
+    pieces = [p for p in pieces if p.area > 1e-6 * dom.area]
+    sd['materials'] = [soil, outer]
+    sd['polygons'] = ([{'mat_id': 0, 'polygon': corr}]
+                      + [{'mat_id': 1, 'polygon': p} for p in pieces])
+    assign_elastic_props(sd['materials'])
+    return sd
+
+
+def _build_rs2_28(stem, head):
+    """Write the '.xlsx' plus the seepage sidecars (mesh + nodal u), the VP38 way."""
+    from pathlib import Path
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             export_mesh_to_json)
+    from xslope.seep import (build_seep_data, run_seepage_analysis,
+                             export_seep_solution)
+    path = os.path.join(OUT, f'{stem}.xlsx')
+    _write_xlsx(_rs2_28_slope_data(head), path)
+    sd = load_slope_data(path)
+    polygons = get_material_polygons(sd)
+    mesh = build_mesh_from_polygons(polygons, 97.89 / 70.0, 'tri6')
+    p = Path(path)
+    export_mesh_to_json(mesh, str(p.parent / f'{p.stem}_mesh.json'))
+    seep = build_seep_data(mesh, sd)
+    sol = run_seepage_analysis(seep, tol=1e-5, max_iter=600)
+    export_seep_solution(seep, sol, str(p.parent / f'{p.stem}_seep.csv'))
+    return f'{stem}.xlsx'
+
+
+def rs2_28a():
+    """RS2 #28, H=61 m (right-side total head). Published RS2 SSR 1.64."""
+    return _build_rs2_28('rs2_28a', 61.0)
+
+
+def rs2_28b():
+    """RS2 #28, H=62 m. Published RS2 SSR 1.55."""
+    return _build_rs2_28('rs2_28b', 62.0)
+
+
+def rs2_28c():
+    """RS2 #28, H=63 m. Published RS2 SSR 1.41."""
+    return _build_rs2_28('rs2_28c', 63.0)
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
@@ -1164,5 +1286,6 @@ if __name__ == '__main__':
                rs2_68a, rs2_68b, rs2_68c,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,
-               rs2_64h_split, rs2_64l_split):
+               rs2_64h_split, rs2_64l_split,
+               rs2_28a, rs2_28b, rs2_28c):
         print(fn())

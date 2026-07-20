@@ -496,8 +496,12 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         contourf = ax.tricontourf(triang, contour_data, levels=contour_levels, cmap=cmap, vmin=vmin, vmax=vmax, alpha=alpha)
         contourf.set_gid('CONTOUR_FILL')
 
-    # Solid lines for contours
-    _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k", linewidths=0.5)
+    # Solid lines for contours. linestyles is pinned solid so the equipotentials
+    # read as a crisp flow net regardless of sign (matplotlib would otherwise dash
+    # any negative level via rcParam contour.negative_linestyle — e.g. for signed
+    # variables like pore pressure).
+    _cs = ax.tricontour(triang, contour_data, levels=contour_levels, colors="k",
+                        linewidths=0.5, linestyles="solid")
     _cs.set_gid('HEAD_CONTOURS')
 
     # Phreatic surface (pressure head = 0)
@@ -620,7 +624,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         if has_phreatic:
             title += " with Phreatic Surface"
         if flowrate is not None:
-            title += f" — Total Flowrate: {flowrate:.3f}"
+            # Fixed 3-decimal for O(0.1)+ flowrates (keeps the mesh-vs-exact
+            # deviation legible, e.g. 5.029); fall back to 3 significant figures
+            # for smaller magnitudes so tiny flows never collapse to "0.000".
+            q_str = f"{flowrate:.3f}" if abs(flowrate) >= 0.1 else f"{flowrate:.3g}"
+            title += f" — Total Flowrate: {q_str}"
     else:
         title = f"{variable_label} Contours"
     if show_title:
@@ -639,14 +647,21 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     from .plot import _legend_below
     mat_names = seep_data.get("material_names", [])
     leg_handles = []
-    for mat in materials:
-        nm = mat_names[mat - 1] if (mat_names and mat <= len(mat_names)) else f"Material {mat}"
-        leg_handles.append(mpatches.Patch(facecolor=mat_to_color[mat], alpha=0.6,
-                                          edgecolor="none", label=nm))
+    # Material swatches belong in the legend only when the material zone color is
+    # what the fill actually shows (fill_contours=False). With fill_contours=True the
+    # fill IS the variable field (its key is the colorbar), so a material-colored
+    # swatch would name a color the eye can't find on the plot — the legend must
+    # describe what is drawn.
+    if element_materials is not None and not fill_contours:
+        for mat in materials:
+            nm = mat_names[mat - 1] if (mat_names and mat <= len(mat_names)) else f"Material {mat}"
+            leg_handles.append(mpatches.Patch(facecolor=mat_to_color[mat], alpha=0.6,
+                                              edgecolor="none", label=nm))
     if has_phreatic:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=2.0, label="Phreatic surface"))
+    # Sentence case (capitalize() → "Total head contour") to match "Flow line".
     leg_handles.append(plt.Line2D([0], [0], color="black", lw=0.5,
-                                  label=f"{variable_label} contour"))
+                                  label=f"{variable_label.capitalize()} contour"))
     if plot_flowlines and phi is not None:
         leg_handles.append(plt.Line2D([0], [0], color="blue", lw=0.7, label="Flow line"))
     if vectors:

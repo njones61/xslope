@@ -66,8 +66,12 @@ def seep_case(xlsx, img_prefix, target_size, base_mat=1, phreatic=True):
         mesh = build_mesh_from_polygons(polys, target_size=target_size, element_type="tri6")
         seep = build_seep_data(mesh, sd, seep_bc=1)
         sol = run_seepage_analysis(seep, tol=1e-8)
+    # mesh=False: these are flow-net figures — element edges muddy the head fill
+    # and chop the equipotential/flow lines into a dashed look (same convention as
+    # benchmarks/rocscience/make_gw_figures.py).
     capture(f"docs/seep/images/{img_prefix}_solution.png", plot_seep_solution,
-            seep, sol, base_mat=base_mat, levels=20, fill_contours=True, phreatic=phreatic)
+            seep, sol, base_mat=base_mat, levels=20, fill_contours=True,
+            phreatic=phreatic, mesh=False)
     print(f"  {img_prefix}: q = {sol['flowrate']:.4f}")
 
 

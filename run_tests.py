@@ -993,16 +993,17 @@ _EDITOR_MANAGED_KEYS = {
 }
 
 
-def _editor_full_material(name, option, u, unsat, t_cut=4.0):
+def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=30.0):
     """A material with EVERY loader-produced key set to a distinct non-default
     value, so a dropped key is caught; option/u/unsat carry the enum value under
     test. Together the fixture's rows exercise every accepted option (mc/cp/pow/hb/
-    elastic), u (none/piezo/seep/ru) and unsat (lf/vg/gard) value, and the v16
-    t_cut column (a distinct non-None value, so a dropped t_cut is caught)."""
+    elastic), u (none/piezo/seep/ru) and unsat (lf/vg/gard) value, the v16 t_cut
+    column, and the v17 matric-suction pair phi_b/s_cap (distinct non-None values,
+    so a dropped key is caught; the elastic row carries None for all three)."""
     return {
         "name": name, "gamma": 120.0, "gamma_sat": 125.0, "option": option,
         "c": 100.0, "phi": 30.0, "cp": 0.5, "r_elev": 12.0, "d": 3.0, "psi": 5.0,
-        "t_cut": t_cut,
+        "t_cut": t_cut, "phi_b": phi_b, "s_cap": s_cap,
         "pow_a": 1.1, "pow_b": 0.9, "pow_c": 2.0, "pow_d": 4.0,
         "u": u, "ru": 0.35,
         "sigma_gamma": 1.0, "sigma_c": 2.0, "sigma_phi": 3.0, "sigma_cp": 0.1,
@@ -1033,7 +1034,8 @@ def _editor_fixture():
         # editor round-trip locks both the new 'elastic' option-combo entry and a
         # None t_cut surviving unchanged (the combo would corrupt 'elastic' if it
         # weren't a choice; a dropped/zeroed t_cut would be caught by the mc rows).
-        _editor_full_material("m-elastic-none-lf", "elastic", "none", "lf", t_cut=None),
+        _editor_full_material("m-elastic-none-lf", "elastic", "none", "lf",
+                              t_cut=None, phi_b=None, s_cap=None),
     ]
 
     def pile(x1, y1, x2, y2, appl="active"):

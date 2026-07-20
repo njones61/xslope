@@ -498,6 +498,14 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     
     # Process pore pressures
     u = np.zeros(n_nodes)
+    # Signed nodal pore pressure for the opt-in matric-suction option: identical to
+    # u below the water table, but NOT clamped above it, so the negative (suction)
+    # part of an unsaturated seepage field survives (the effective-normal u keeps its
+    # own clamp). None unless a seep field carries suction — mirrors the LEM fix in
+    # fd7344b, where interpolate_at_point gained signed=True. Consumed only by the
+    # suction machinery in solve_fem (gated on suction_phi_b), so it is inert by
+    # default.
+    u_signed = None
     sigma_v = None          # nodal vertical soil stress (ru option only)
     piezo_line_coords = None
 
@@ -544,6 +552,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             seep_u = slope_data["seep_u"]
             if isinstance(seep_u, np.ndarray) and len(seep_u) == n_nodes:
                 u = np.maximum(0.0, seep_u)
+                # Keep the raw signed field for the suction option (see u_signed
+                # above). max(0, signed) == u, so the effective normal is unchanged.
+                u_signed = np.asarray(seep_u, dtype=float)
             else:
                 n_seep = len(seep_u) if hasattr(seep_u, "__len__") else "?"
                 warnings.warn(
@@ -1363,6 +1374,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "hb_s_by_elem": hb_s_by_elem,
         "hb_a_by_elem": hb_a_by_elem,
         "u": u,
+        "u_signed": u_signed,  # raw (un-clamped) nodal seep field for the suction option; None if no seep suction
         "sigma_v": sigma_v,  # nodal vertical soil stress (ru option; else None)
         "ru_by_mat": np.array([float(m.get("ru", 0.0) or 0.0) for m in materials]),
         "elements_1d": elements_1d,
@@ -2212,10 +2224,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 u_gp_signed = [[0.0] * len(elem_gp_data[e])
                                for e in range(n_elements)]
         else:  # seep: nodal seepage field, un-clamped (carries suction above WT)
+            # Read the RAW signed nodal field (build_fem_data clamps fem_data['u']
+            # for the effective normal; 'u_signed' preserves the suction). Falls back
+            # to the clamped field only if no signed field was stored (then s = 0).
+            u_nodes_signed = fem_data.get("u_signed")
+            if u_nodes_signed is None:
+                u_nodes_signed = u_nodes
+            u_nodes_signed = np.asarray(u_nodes_signed, dtype=float)
             for elem_idx in range(n_elements):
                 elem_type = element_types[elem_idx]
                 elem_nodes_idx = elements[elem_idx][:elem_type]
-                u_elem_nodes = u_nodes[elem_nodes_idx]
+                u_elem_nodes = u_nodes_signed[elem_nodes_idx]
                 gp_list = [float(gp_data['N'] @ u_elem_nodes)
                            for gp_data in elem_gp_data[elem_idx]]
                 u_gp_signed.append(gp_list)

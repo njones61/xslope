@@ -64,13 +64,13 @@ from .water import _y_on
 _GAMMA_W_METRIC = 9.81       # kN/m3   (RFCunits "Metric kPa")
 _GAMMA_W_IMPERIAL = 62.4     # lb/ft3  (RFCunits "Imperial psf")
 
-# RS2 plasticity model that maps 1:1 onto xslope's Mohr-Coulomb. Everything else
-# is imported with whatever c/phi it carries and flagged, the same discipline
-# geostudio.py and slide2.py use. "Non" is RS2's word for an elastic material with
-# no failure criterion — it has no strength at all.
+# RS2 plasticity model that maps 1:1 onto xslope's Mohr-Coulomb. "Non" (no failure
+# criterion) maps 1:1 onto xslope's v16 'elastic' option and is handled separately;
+# every other model is imported with whatever c/phi it carries and flagged, the same
+# discipline geostudio.py and slide2.py use.
 _MC_MODEL = "MohrCoulomb"
+_ELASTIC_MODEL = "Non"
 _MODEL_NAMES = {
-    "Non": "elastic (no failure criterion)",
     "GeneralizedHoekBrown": "generalized Hoek-Brown",
     "DruckerPrager": "Drucker-Prager",
     "PowerCurve": "power-curve (nonlinear) strength",
@@ -234,11 +234,24 @@ def _parse_material_mesh_seeds(lines):
 
 
 def _parse_material_types(lines):
-    """The defined materials: ``[{'name','model','c','phi'}, ...]``, 1-based order.
+    """The defined materials, 1-based order. Each entry is a dict with the strength
+    model and the fields off its ``Plasticity Specifications`` line.
 
     Read from the labelled ``material types:`` section (``material N: name`` /
-    ``Plasticity Specifications: MODEL`` / ``C: c phi: phi``). Unit weight is NOT
-    here — it is filled in from ``material properties:`` by the caller.
+    ``Plasticity Specifications: MODEL`` / ``C: c phi: p dil: d T: t ... Phi_b: pb
+    Air_Entry: ae UseUnsaturated: uu``). Unit weight is NOT here — it is filled in
+    from ``material properties:`` by the caller. Beyond c/phi we also carry:
+
+      ``t_cut``   RS2's per-material tensile strength ``T`` (a Rankine cap on the
+                  major principal stress), which is exactly xslope's t_cut; ``None``
+                  when the line has no ``T`` (e.g. an elastic 'Non' material).
+      ``tr``      the RESIDUAL tensile strength ``Tr`` (brittle/post-peak drop). xslope
+                  has no brittle-failure model, so the caller reports it rather than
+                  mapping it.
+      ``phi_b``, ``air_entry``, ``use_unsat`` — the unsaturated (Fredlund) fields.
+                  ``use_unsat`` (RS2's ``UseUnsaturated`` flag) is what makes ``phi_b``
+                  active; without it RS2 ignores the angle, so the caller only maps
+                  ``phi_b`` when the flag is on.
     """
     s = _find(lines, "material types:")
     if s < 0:
@@ -255,7 +268,8 @@ def _parse_material_types(lines):
         m = re.match(r"material\s+(\d+):\s*(.*)$", ln.strip())
         if m:
             cur = {"num": int(m.group(1)), "name": m.group(2).strip() or f"material {m.group(1)}",
-                   "model": "", "c": 0.0, "phi": 0.0}
+                   "model": "", "c": 0.0, "phi": 0.0, "t_cut": None, "tr": None,
+                   "phi_b": None, "air_entry": None, "use_unsat": None}
             mats.append(cur)
             continue
         if cur is None:
@@ -264,10 +278,24 @@ def _parse_material_types(lines):
         if m:
             cur["model"] = m.group(1)
             continue
-        m = re.match(r"C:\s*(\S+)\s+phi:\s*(\S+)", ln.strip())
-        if m:
-            cur["c"] = _fnum(m.group(1))
-            cur["phi"] = _fnum(m.group(2))
+        # The strength-parameter line (only present for a failure-criterion model —
+        # a 'Non'/elastic material has none). It is a flat run of ``Key: value``
+        # tokens; parse them all so T, Tr and the unsaturated fields come across too.
+        stripped = ln.strip()
+        if stripped.startswith("C:"):
+            params = {k: v for k, v in re.findall(r"(\w+):\s*(-?[\d.eE+]+)", stripped)}
+            cur["c"] = _fnum(params.get("C"))
+            cur["phi"] = _fnum(params.get("phi"))
+            if "T" in params:
+                cur["t_cut"] = _fnum(params["T"])
+            if "Tr" in params:
+                cur["tr"] = _fnum(params["Tr"])
+            if "Phi_b" in params:
+                cur["phi_b"] = _fnum(params["Phi_b"])
+            if "Air_Entry" in params:
+                cur["air_entry"] = _fnum(params["Air_Entry"])
+            if "UseUnsaturated" in params:
+                cur["use_unsat"] = _fnum(params["UseUnsaturated"])
     return mats
 
 
@@ -587,6 +615,9 @@ def _blank_material(name):
     return {
         "name": str(name), "gamma": 0.0, "gamma_sat": None, "option": "", "c": 0.0,
         "phi": 0.0, "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0, "u": "none", "ru": 0.0,
+        # v16 tensile cutoff and v17 matric-suction strength (None = unset, the pre-
+        # v16/v17 default), mirroring load_slope_data's material shape.
+        "t_cut": None, "phi_b": None, "s_cap": None,
         "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
         "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
         "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
@@ -705,6 +736,24 @@ def fez_to_slope_data(d):
             continue
         model = src.get("model") or ""
         c, phi, gamma = src["c"], src["phi"], src["gamma"]
+
+        # 'Non' is RS2's elastic material: no failure criterion at all. xslope's v16
+        # 'elastic' option is the exact analog — an impenetrable zone the LEM cannot
+        # cut and the FEM holds out of plasticity. Map it straight across rather than
+        # forcing a Mohr-Coulomb with c = phi = 0 (which would be a liquid, not a rock).
+        is_elastic = (model == _ELASTIC_MODEL)
+        if is_elastic:
+            mat.update(option="elastic", gamma=gamma)
+            materials.append(mat)
+            if not gamma:
+                caveats.append(f"material '{name}' has no unit weight in the file — set "
+                               f"gamma before solving")
+            caveats.append(
+                f"material '{name}' is RS2's 'Non' (no failure criterion) — imported as "
+                f"an elastic (impenetrable) material: it cannot fail and a slip surface "
+                f"cannot cut through it")
+            continue
+
         if model and model != _MC_MODEL:
             label = _MODEL_NAMES.get(model, f"the {model} model")
             caveats.append(
@@ -712,6 +761,31 @@ def fez_to_slope_data(d):
                 f"imported as Mohr-Coulomb with c = {c:g}, phi = {phi:g}, which is NOT "
                 f"the same strength; check it before solving")
         mat.update(option="mc", gamma=gamma, c=c, phi=phi)
+
+        # v16 tensile cutoff: RS2's per-material T is a Rankine cap on the major
+        # principal stress — the same quantity as xslope's t_cut. Carry it (FEM only;
+        # the LEM ignores it, the same as a natively authored t_cut).
+        if src.get("t_cut") is not None:
+            mat["t_cut"] = src["t_cut"]
+
+        # v17 matric-suction strength: RS2's Phi_b is credited ONLY when its
+        # UseUnsaturated flag is on; without the flag RS2 ignores the angle, so mapping
+        # it would invent suction strength the RS2 run never used. When the flag is on
+        # the mapping is unambiguous (phi_b -> phi_b). RS2's Air_Entry parameterises a
+        # different (SWCC threshold) envelope than xslope's s_cap, so it is reported,
+        # not silently mapped, and s_cap is left unset.
+        if src.get("use_unsat"):
+            if src.get("phi_b"):
+                mat["phi_b"] = src["phi_b"]
+            ae = src.get("air_entry")
+            caveats.append(
+                f"material '{name}' has RS2 unsaturated shear strength on "
+                f"(phi_b = {src.get('phi_b') or 0:g}"
+                + (f", Air_Entry = {ae:g}" if ae else "")
+                + f"): phi_b was imported, but RS2's air-entry value has no xslope analog "
+                f"(xslope caps credited suction with s_cap instead) — s_cap left unset, "
+                f"set it if the suction needs a ceiling")
+
         materials.append(mat)
         if not gamma:
             caveats.append(f"material '{name}' has no unit weight in the file — set "
@@ -720,6 +794,15 @@ def fez_to_slope_data(d):
             caveats.append(
                 f"material '{name}' came across with NO STRENGTH (c = 0, phi = 0) — set "
                 f"its strength before solving or the factor of safety is meaningless")
+
+        # Brittle failure: RS2's residual tensile Tr (a post-peak drop to a lower
+        # tension limit) has no xslope analog. Report it rather than pretend the peak
+        # cutoff is the whole story.
+        if src.get("tr"):
+            caveats.append(
+                f"material '{name}' has an RS2 residual/brittle tensile strength "
+                f"(Tr = {src['tr']:g}), a post-peak strength drop xslope does not "
+                f"model — only the peak strength was imported")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 
@@ -768,6 +851,16 @@ def fez_to_slope_data(d):
             + ". Its critical SRF is the factor of safety, found by an FE run — not a "
             "limit-equilibrium search. xslope's analog is the FEM solve_ssrm path; "
             "these settings are recorded but no LEM search was created from them")
+        # tensilestrength_SRF is a run option: whether RS2 also reduces the tensile
+        # strength alongside c and tan(phi) during the SSR search. xslope's solve_ssrm
+        # reduces the shear strength only, so a per-material t_cut it imported is held
+        # fixed through the search — worth flagging when the RS2 run reduced it too.
+        if _fnum(srf.get("tensilestrength_SRF", 0)):
+            caveats.append(
+                "the RS2 SSR run also reduced tensile strength by the strength-reduction "
+                "factor (tensilestrength_SRF is on); xslope's solve_ssrm reduces only the "
+                "shear strength and holds any imported t_cut fixed, so a tension-driven "
+                "critical SRF may differ")
 
     # --- distributed loads -> dloads ---------------------------------------------
     # RS2 stores ponded water as explicit "Ponded Water Load" objects in this block,

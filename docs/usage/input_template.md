@@ -105,7 +105,7 @@ the horizontal scale.
 
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
-The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the matric-suction pair phi_b/s_cap, the tensile cutoff, and the FEM properties E and ν, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability and the unsaturated-flow model, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
+The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, the FEM properties E and ν, the pore-pressure option, and the matric-suction pair phi_b/s_cap, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability and the unsaturated-flow model, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -120,14 +120,14 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
   elevation — see the formula below.
 - **d**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **phi_b** ($\phi^b$): Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
-  below.
-- **s_cap**: maximum credited suction (stress units), added in template version 17 — see below.
 - **t_cut**: tensile-strength cutoff, added in template version 16 — see below.
 - **E**: Young's modulus (FEM only).
 - **ν**: Poisson's ratio (FEM only).
 - **u**: pore pressure option
 - **$r_u$**: pore pressure ratio (u = `ru`) — see below.
+- **phi_b** ($\phi^b$): Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
+  below.
+- **s_cap**: maximum credited suction (stress units), added in template version 17 — see below.
 - **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — see the formula below.
 - **hb_sci**, **hb_gsi**, **hb_mi**, **hb_d** (option = `hb`): generalized Hoek-Brown parameters — see the
   formula below.
@@ -245,9 +245,9 @@ the Fredlund extended Mohr-Coulomb criterion:
 >>$\tau = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b   \qquad (6)$
 
 With the pore-air pressure $u_a = 0$ (the standard slope-stability idealization), the last term reduces to
-$s\tan\phi^b$, where $s = \max(0,\, -u_w)$ is the suction at the slice base — an **apparent cohesion** added to
-the resisting side of the effective-stress envelope. Below the water table $u_w \geq 0$, so $s = 0$ and the term
-vanishes; the material behaves exactly as it always has.
+$s\tan\phi^b$, where $s = \max(0,\, -u_w)$ is the suction at the point being evaluated (the slice base in the LEM,
+a Gauss point in the FEM) — an **apparent cohesion** added to the resisting side of the effective-stress envelope.
+Below the water table $u_w \geq 0$, so $s = 0$ and the term vanishes; the material behaves exactly as it always has.
 
 - **phi_b** ($\phi^b$): the unsaturated friction angle. **Blank** (the default): no suction strength — exactly
   today's behavior, bit-identical FS. A positive value turns the credit on.
@@ -274,10 +274,13 @@ construction), so the columns stay inert there even on an `mc`/`pow`/`hb` materi
     s_cap** when using `phi_b` with `u = piezo`. With `u = seep`, the finite-element field is self-bounded by the
     unsaturated flow physics, so a cap there is a useful backstop rather than a hard requirement.
 
-phi_b/s_cap feed the same suction term the LEM solvers already price into the effective cohesion — see
-[Pore pressures](../lem/overview.md#pore-pressures) for the run-option (`generate_slices` kwarg) path this
-auto-wires, and [VP38](../verification/rocscience.md#vp38) for a worked seepage-to-suction example. **LEM only**
-— the FEM does not read `phi_b`/`s_cap`.
+Both the limit-equilibrium and the finite-element solvers read `phi_b`/`s_cap` and credit the same apparent
+cohesion — the red header marks the pair **LEM & FEM**. See
+[Matric suction](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the LEM overview for
+the effective-cohesion form and the `generate_slices` run-option (kwarg) path this auto-wires,
+[Matric suction](../fem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the FEM overview for
+how the finite-element solve credits it (reducing the term by the strength-reduction factor $F$ alongside $c'$ and
+$\tan\phi'$ in an SSRM run), and [VP38](../verification/rocscience.md#vp38) for a worked seepage-to-suction example.
 
 **Variability** (for reliability analysis):
 

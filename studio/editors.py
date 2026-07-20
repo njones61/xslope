@@ -1601,7 +1601,7 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
-            "t_cut": None, "E": 0.0, "nu": 0.0}
+            "t_cut": None, "phi_b": None, "s_cap": None, "E": 0.0, "nu": 0.0}
 
 
 # --------------------------------------------------------------------------- #
@@ -1625,21 +1625,39 @@ _MAT_OPTION_FIELDS = {"mc": ["c", "phi"], "cp": ["c", "cp", "r_elev"],
 _MAT_ALL_OPTION_FIELDS = ["c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c",
                           "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d"]
 
+# v17: the matric-suction pair phi_b/s_cap (green LEM block) is read only for an
+# effective-stress strength option (mc/pow/hb) paired with a signed-u pore-pressure
+# model (piezo or seep). It is inert — and grayed, mirroring the mat-sheet CF on
+# cols L:M — for cp (total-stress Su already embodies field suction), for elastic
+# (no strength at all), and whenever u delivers no signed pressure (none/ru/blank:
+# ru is a positive ratio by construction, none/blank carry no suction).
+_MAT_SUCTION_DIM = frozenset(["phi_b", "s_cap"])
+
 # v16: an option=elastic material cannot fail — the mat sheet grays every strength
-# column, t_cut, the dilation pair, u/ru and the strength standard deviations for
-# such a row (CF ranges F..L, O..P, Z..AD on $E="elastic"). g/gsat, E/ν, s(γ) and
-# the seepage block stay live. The editor mirrors that: these keys read-only/gray
-# on both views when the row's option is elastic.
+# column, t_cut, the dilation pair, the matric-suction pair, u/ru and the strength
+# standard deviations for such a row (CF ranges F..N, Q..R, AB..AF on $E="elastic").
+# g/gsat, E/ν, s(γ) and the seepage block stay live. The editor mirrors that: these
+# keys read-only/gray on both views when the row's option is elastic.
 _MAT_ELASTIC_DIM = frozenset(
-    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "t_cut", "u", "ru",
+    _MAT_ALL_OPTION_FIELDS + ["d", "psi", "phi_b", "s_cap", "t_cut", "u", "ru",
                               "sigma_c", "sigma_phi", "sigma_cp",
                               "sigma_d", "sigma_psi"])
 
 
 def _mat_dim_keys(row):
-    """Field keys to gray for a material row — the elastic inert set, else none."""
+    """Field keys to gray for a material row.
+
+    An elastic row grays its whole inert set. Otherwise the only option-coupled
+    graying is the matric-suction pair phi_b/s_cap, which is inert for a total-stress
+    strength option (cp) or a pore-pressure model that delivers no signed u — i.e. u
+    not in {piezo, seep} — mirroring the template's L:M conditional formatting."""
     opt = str(row.get("option", "") or "").strip().lower()
-    return _MAT_ELASTIC_DIM if opt == "elastic" else frozenset()
+    if opt == "elastic":
+        return _MAT_ELASTIC_DIM
+    u = str(row.get("u", "") or "").strip().lower()
+    if opt == "cp" or u not in ("piezo", "seep"):
+        return _MAT_SUCTION_DIM
+    return frozenset()
 
 
 # Unsaturated model -> its curve params. gard reuses vg's a/n columns (fileio.py).
@@ -1935,6 +1953,10 @@ class _MaterialListView(QWidget):
         gv.addSpacing(4)
         gv.addWidget(self._pair(self._cell("d", "d", sigma=True, label_w=52),
                                 self._cell("ψ", "psi", sigma=True, label_w=18)))
+        # v17: matric-suction pair (file order phi_b, s_cap), beside d/ψ. Always shown,
+        # grayed when inert (cp/elastic, or u not signed) by _update_suction_disable.
+        gv.addWidget(self._pair(self._cell("φ_b", "phi_b", label_w=52),
+                                self._cell("s_cap", "s_cap", label_w=44)))
         # v16: tensile cutoff (file order t_cut, E, nu), then the elastic E/ν pair.
         gv.addWidget(self._cell("t_cut", "t_cut", label_w=52))
         gv.addWidget(self._pair(self._cell("E", "E", label_w=18),
@@ -2059,6 +2081,7 @@ class _MaterialListView(QWidget):
             self._update_unsat_visibility()
             self._update_sigma_visibility()
             self._update_elastic_disable()
+            self._update_suction_disable()
             self._refresh_plots()
         else:
             self._clear_plots()
@@ -2095,6 +2118,20 @@ class _MaterialListView(QWidget):
                 w.setEnabled(not elastic)
         self._u_cell.setEnabled(not elastic)
 
+    def _update_suction_disable(self):
+        """Gray the matric-suction pair phi_b/s_cap when it is inert (mirrors the
+        mat-sheet CF on cols L:M): grayed for cp (total-stress Su already embodies
+        field suction) or elastic (no strength), and whenever u delivers no signed
+        pressure (u not in {piezo, seep}). Reuses the table view's dim rule so the two
+        views stay a single source of truth. Depends on both the option and u combos,
+        so it is re-run whenever either changes as well as on load."""
+        dim = _mat_dim_keys({"option": self._opt_combo.currentText(),
+                             "u": self._u_combo.currentText()})
+        for key in ("phi_b", "s_cap"):
+            w = self._cell_widgets.get(key)
+            if w is not None:
+                w.setEnabled(key not in dim)
+
     def _update_u_visibility(self):
         self._cell_widgets["ru"].setVisible(
             self._u_combo.currentText().strip().lower() == "ru")
@@ -2128,11 +2165,13 @@ class _MaterialListView(QWidget):
         self._commit()
         self._update_option_visibility()
         self._update_elastic_disable()
+        self._update_suction_disable()       # option gates the suction pair too
         self._plot_timer.start()
 
     def _on_u_changed(self):
         self._commit()
         self._update_u_visibility()          # u affects neither plot; no refresh
+        self._update_suction_disable()       # u gates the matric-suction pair
 
     def _on_unsat_changed(self):
         self._commit()
@@ -2205,6 +2244,13 @@ MATERIALS_HELP = {
     "r_elev": "Reference elevation; at or above it the strength equals c (cp option).",
     "d": "Rapid-drawdown R-envelope cohesion intercept (LEM rapid-drawdown only).",
     "psi": "Rapid-drawdown R-envelope friction angle (LEM rapid-drawdown only).",
+    "phi_b": ("Fredlund unsaturated friction angle φ_b, degrees — credits matric-"
+              "suction strength above the water line (mc/pow/hb, LEM). Blank = no "
+              "suction strength (the default). Caution: with u=piezo hydrostatic "
+              "suction is unbounded — set s_cap; with u=seep the FE field self-bounds."),
+    "s_cap": ("Cap on credited matric suction, stress units; blank = uncapped. "
+              "Essential with u=piezo (suction grows unbounded above the line); a "
+              "backstop with u=seep, where the FE field self-bounds. Paired with phi_b."),
     "t_cut": ("Tensile cutoff (Rankine). Blank = no cutoff; 0 = no tension. "
               "FEM only. Caution: in reinforced fills, T=0 may prevent "
               "equilibrium; leave blank or use a small nonzero value."),
@@ -2461,11 +2507,12 @@ class MaterialsDialog(QDialog):
 
 class MaterialsEditor(CategoryEditor):
     label = "Materials"
-    # Columns mirror the v16 'mat' worksheet IN FILE ORDER: name, g, gsat, option,
-    # c, f, c/p, r-elev, d, psi, t_cut, E, nu, u, ru, pow_a..pow_d,
+    # Columns mirror the v17 'mat' worksheet IN FILE ORDER: name, g, gsat, option,
+    # c, f, c/p, r-elev, d, psi, phi_b, s_cap, t_cut, E, nu, u, ru, pow_a..pow_d,
     # hb_sci/hb_gsi/hb_mi/hb_d, s(g), s(c), s(f), s(c/p), s(d), s(psi), k1, k2,
-    # alpha, unsat, kr0, h0, a(vg_a), n(vg_n).  v16 inserted t_cut (col L) and moved
-    # E/nu (cols M/N) up beside the strength values, with u/ru following.
+    # alpha, unsat, kr0, h0, a(vg_a), n(vg_n).  v16 inserted t_cut and moved E/nu up
+    # beside the strength values, with u/ru following; v17 inserted the matric-suction
+    # pair phi_b/s_cap (cols L/M) between psi and t_cut (LEM-only green block).
     # `applies` tags mirror the template's analysis usage (input_template.md):
     # the strength block (g, gsat, option, c, f, c/p, r-elev, the pow_* power-curve
     # and hb_* Hoek-Brown envelope parameters, u, ru) is shared by LEM+FEM; d/psi
@@ -2487,6 +2534,11 @@ class MaterialsEditor(CategoryEditor):
         Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
+        # v17: matric-suction pair (file order phi_b, s_cap; LEM-only, green block).
+        # optfloat so a blank cell stays None — phi_b None = no suction strength (the
+        # default, exactly the pre-v17 behavior); s_cap None = uncapped suction.
+        Field("phi_b", "phi_b", "optfloat", usage="lem", tooltip=MATERIALS_HELP["phi_b"]),
+        Field("s_cap", "s_cap", "optfloat", usage="lem", tooltip=MATERIALS_HELP["s_cap"]),
         # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),

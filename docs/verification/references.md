@@ -183,7 +183,7 @@ Engineers).
   p. 851. [doi:10.1201/9780203885284-c107](https://doi.org/10.1201/9780203885284-c107). *(End page not fully verified.)*
 - Ng, C.W.W. & Shi, Q. (1998). A numerical investigation of the stability of
   unsaturated soil slopes subjected to transient seepage. *Computers and
-  Geotechnics* 22(1), 1–28. [doi:10.1016/S0266-352X(97)00036-0](https://doi.org/10.1016/S0266-352X(97)00036-0). *(Pages not fully verified.)*
+  Geotechnics* 22(1), 1–28. [doi:10.1016/S0266-352X(97)00036-0](https://doi.org/10.1016/S0266-352X(97)00036-0).
 - Perry, J. (1994). A technique for defining non-linear shear strength
   envelopes, and their incorporation in a slope stability method of analysis.
   *Quarterly Journal of Engineering Geology* 27(3), 231–241.
@@ -246,9 +246,9 @@ Engineers).
   distribution on stability of embankments. *Geotextiles and Geomembranes*
   20(6), 423–443. [doi:10.1016/S0266-1144(02)00015-8](https://doi.org/10.1016/S0266-1144(02)00015-8). *(Cited in the corpus as "Tandjiria (2002)".)*
 - Teoman, M.B., Topal, T. & Işık, N.S. (2004). Assessment of slope stability
-  along a proposed highway (Ankara clay, E90). *Environmental Geology*.
-  [doi:10.1007/s00254-003-0954-3](https://doi.org/10.1007/s00254-003-0954-3). *(Cited
-  in the RS2 manual as "Topal & Isik (2004)"; volume/pages not fully verified.)*
+  along a proposed highway (Ankara clay, E90). *Environmental Geology* 45,
+  963–977. [doi:10.1007/s00254-003-0954-3](https://doi.org/10.1007/s00254-003-0954-3). *(Cited
+  in the RS2 manual as "Topal & Isik (2004)".)*
 - Tracy, F.T. *SEEP2D* (steady-state finite-element seepage program). U.S. Army
   Engineer Waterways Experiment Station, Vicksburg, MS.
 - Tzenkov, A. (2008). Stability analysis of the Padina tailings dam, as cited in

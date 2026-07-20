@@ -253,12 +253,44 @@ def run_lem_test(test):
     exit_range = _bounds('exit_range', 2)
     tangent_depth = _bounds('tangent_depth', 2)
 
+    # Optional matric-suction apparent-cohesion run options (opt-in Fredlund
+    # extended Mohr-Coulomb). `suction_phi_b` is "Name:deg;Name2:deg" — a per-
+    # material suction-strength angle φᵇ; `suction_cap` is one number (stress
+    # units) bounding the suction before it becomes apparent cohesion. Absent →
+    # None (the clamped baseline, unchanged). Threaded through generate_slices on
+    # the direct-surface test types; the search types would need the angle carried
+    # through the search itself, so a suction tag on them is rejected rather than
+    # silently dropped.
+    def _suction_phi_b():
+        raw = test.get('suction_phi_b')
+        if raw is None or str(raw).strip() == '':
+            return None
+        out = {}
+        for tok in str(raw).split(';'):
+            tok = tok.strip()
+            if not tok:
+                continue
+            name, sep, deg = tok.rpartition(':')
+            if not sep or not name.strip() or deg.strip() == '':
+                raise ValueError(f"suction_phi_b entry {tok!r} must be 'Name:degrees'")
+            out[name.strip()] = float(deg)
+        return out or None
+    suction_phi_b = _suction_phi_b()
+    _sc = test.get('suction_cap')
+    suction_cap = float(_sc) if _sc is not None and str(_sc).strip() != '' else None
+    if (suction_phi_b or suction_cap is not None) and test_type in (
+            'circular_search', 'noncircular_search'):
+        return None, ("suction_phi_b/suction_cap are supported on single_circle and "
+                      "single_noncirc tests only (the search path does not thread "
+                      "the suction-strength angle)")
+
     slope_data = load_slope_data(file_path)
 
     if test_type == 'single_circle':
         circle = slope_data['circles'][0]
         success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
-                                          composite=composite, right_facing=right_facing)
+                                          composite=composite, right_facing=right_facing,
+                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result
@@ -290,7 +322,8 @@ def run_lem_test(test):
         # Evaluate the file's specified non-circular surface as-is (no search) —
         # the "predefined slip surface" form of the verification problems.
         success, result = generate_slices(slope_data, non_circ=slope_data['non_circ'],
-                                          num_slices=num_slices, right_facing=right_facing)
+                                          num_slices=num_slices, right_facing=right_facing,
+                                          suction_phi_b=suction_phi_b, suction_cap=suction_cap)
         if not success:
             return None, f"generate_slices failed: {result}"
         slice_df, failure_surface = result

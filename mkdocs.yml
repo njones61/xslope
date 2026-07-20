@@ -87,7 +87,6 @@ nav:
     - Rocscience Groundwater Corpus: verification/rocscience_groundwater.md
     - Rocscience RS2 (SSR) Corpus: verification/rs2.md
     - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
-    - PLAXIS LE (SVSLOPE) Corpus: verification/plaxis_le.md
     - References: verification/references.md
   - API:
     - Advanced: api/advanced.md

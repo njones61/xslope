@@ -28,7 +28,6 @@ suite (`run_tests.py`).
 | [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual — 12 built, remainder feature-gated |
 | [Rocscience RS2 (SSR) Corpus](rs2.md) | The RS2 shear-strength-reduction manual — Parts I–III (68 problems) and the Part IV Slide2-import set (52), the corpus's FEM/SSRM backbone |
 | [GeoStudio (SLOPE/W) Corpus](geostudio.md) | The 47-problem SLOPE/W verification manual, cross-referenced |
-| [PLAXIS LE (SVSLOPE) Corpus](plaxis_le.md) | The ~105-problem SVSLOPE verification manual — *not planned* (sufficient cross-bearings exist) |
 
 ---
 

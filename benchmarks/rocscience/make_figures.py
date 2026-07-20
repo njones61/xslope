@@ -81,6 +81,9 @@ CASES = [
     ('vp034', 'noncirc', 'spencer'),
     ('vp035', 'csearch', 'bishop'),
     ('vp037', 'circle', 'bishop'),
+    ('vp038a', 'circle', 'bishop'),
+    ('vp038b', 'circle', 'bishop'),
+    ('vp038c', 'circle', 'bishop'),
     ('vp039a', 'circle', 'spencer'),
     ('vp039b', 'circle', 'spencer'),
     ('vp039c', 'circle', 'spencer'),
@@ -179,14 +182,25 @@ CASES = [
 ]
 
 
-def _solve_case(sd, kind, method):
+# Opt-in matric-suction apparent-cohesion angle phi_b per file (extended
+# Mohr-Coulomb), for the unsaturated-seepage cases whose published FS credits
+# suction — the figure must solve the SAME way the lock does. Empty for every
+# other file, so no existing figure changes.
+SUCTION = {
+    'vp038a': {'Cut soil': 15.0},
+    'vp038b': {'Cut soil': 15.0},
+    'vp038c': {'Cut soil': 15.0},
+}
+
+
+def _solve_case(sd, kind, method, suction_phi_b=None):
     """Return (slice_df, failure_surface, results) for the representative surface."""
     fn = getattr(solve, method)
     if kind in ('circle', 'rapid_circle'):
         # VP22's circle dips below the model base: it is a composite surface.
         composite = sd['circles'][0]['Depth'] < sd['domain_polygon'].bounds[1]
         ok, res = generate_slices(sd, circle=sd['circles'][0], num_slices=60,
-                                  composite=composite)
+                                  composite=composite, suction_phi_b=suction_phi_b)
         if not ok:
             raise RuntimeError(res)
         df, fs = res
@@ -225,7 +239,7 @@ def make_figure(stem, kind, method, src=None, panel_size=(8.0, 5.0), dpi=150):
     base = SRC if src is None else os.path.join(os.path.dirname(__file__), '..', '..', 'docs', src, 'files')
     sd = load_slope_data(os.path.join(base, f'{stem}.xlsx'))
     with contextlib.redirect_stdout(io.StringIO()):
-        df, fs, results = _solve_case(sd, kind, method)
+        df, fs, results = _solve_case(sd, kind, method, suction_phi_b=SUCTION.get(stem))
 
     paths = []
     for which in ('inputs', 'solution'):

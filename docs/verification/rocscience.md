@@ -56,6 +56,9 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=../files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.353, tolerance=0.03, benchmark=VP35-beta -->
 <!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
 <!-- test: file=../files/rocscience/vp037.xlsx, type=single_circle, num_slices=60, fs_bishop=0.764, fs_spencer=0.764, benchmark=VP37 -->
+<!-- test: file=../files/rocscience/vp038a.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.612, benchmark=VP38-h61 -->
+<!-- test: file=../files/rocscience/vp038b.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.533, benchmark=VP38-h62 -->
+<!-- test: file=../files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.413, benchmark=VP38-h63 -->
 <!-- test: file=../files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
 <!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
 <!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.761, tolerance=0.02, expected_pf=0.219, pf_tol=0.02, benchmark=VP28a-mc -->
@@ -225,7 +228,7 @@ corpus is complete relative to what is independently verifiable.
 | [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](../files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the benchmark where the minimum-reliability-index surface is not the minimum-FS surface, reproduced by procedure. Also [SLOPE/W §2.22](geostudio.md) — same problem in the GeoStudio corpus. |
 | [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, r<sub>u</sub>=0.2). Also [SLOPE/W §2.23](geostudio.md) — same problem in the GeoStudio corpus. |
 | [37](#vp37) | Slope, homogenous, distributed load, back analysis of required support force and length | **built** (base slope) | [vp037.xlsx](../files/rocscience/vp037.xlsx). XSTABL v5 reference manual (Sharma 1996) §3.8 "Reinforcement Example" after Koerner (1991): a 12 m, 45° cohesionless slope (φ=36°, γ=20 kN/m³, printed on XSTABL's Fig. 3.15 — the Slide2 manual omits them) under a 40 kN/m² crest surcharge. On Slide's printed critical circle, Bishop 0.764 = Slide 0.764 (XSTABL Fcrit 0.734), and a toe-focus, 2 m-minimum-depth search finds that circle unaided. The required support-force back-analysis (part a, target FS 1.5) is documented in the section but not locked: xslope's concentrated-support-force credit differs from XSTABL's, so the required load does not reproduce the published 351 kN / 345 kN exactly. Part (b), the minimum reinforced-zone length, needs variable-length material zones and stays feature-gated. |
-| 38 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | *blocked* (seep→suction delivery) | Ng & Shi (1998) Hong Kong cut: FE steady-state seepage produces matric suction (negative pore pressure) above the water table, and the stability uses the extended Mohr-Coulomb criterion with a *distinct* suction-strength angle φᵇ = 15° (τ = c′ + (σ − uₐ)tan φ′ + (uₐ − u_w)tan φᵇ); soil c′ = 10 kPa, φ′ = 38°, γ = 16 kN/m³. Published Bishop FS for right-side head H = 61/62/63 m: Slide 1.621 / 1.538 / 1.407, Ng & Shi 1.636 / 1.527 / 1.436. **Strength side** (closed): `generate_slices(suction_phi_b={material: φᵇ}, suction_cap=…)` prices the *unclamped* base suction s = max(0, −u) as an apparent cohesion c_suction = s·tan φᵇ added to the resisting c·Δℓ term while the effective-normal term keeps u clamped at 0 — algebraically Slide2's extended Mohr-Coulomb with uₐ = 0. **Seepage side** (now reconstructed): the vendor `.fez` carries no *solved* field (initial pore pressure all zero, `.p2mrv` empty), but the seepage *model* is fully specified in the `.slw` — geometry, the total-head boundaries (H = 61/62/63 on the right/uphill face and 6 on the toe face, no-flow crest and base), and the unsaturated k-function (an 11-point custom curve, mapped onto xslope's Gardner form a≈7.5, n≈2.9; van Genuchten moves FS < 0.005, so the mapping is not the sensitivity) — and xslope's own steady unsaturated FE solve reconstructs it, giving a *bounded* negative-u field (max ≈ 60–70 kPa on the trial surfaces, unlike a deep piezo line's unbounded hydrostatic suction, so no `suction_cap` is needed). **What blocks the lock** is the *delivery*: the u='seep' pore-pressure interpolation supplies the clamped (≥ 0) effective-normal pressure, so the φᵇ term is fed zero suction and the shipped FS collapses to the no-suction baseline (≈ 1.36–1.49); with signed seep delivery (bench experiment) the reconstructed model reproduces the *direction* (FS falls as H rises) but only brackets the published band — the credited suction, and hence FS, is sensitive to which critical circle the search selects — so the case is not locked. |
+| [38](#vp38) | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | **built** | [vp038a](../files/rocscience/vp038a.xlsx)/[b](../files/rocscience/vp038b.xlsx)/[c](../files/rocscience/vp038c.xlsx). Ng & Shi (1998) Hong Kong cut: xslope's own steady unsaturated FE seepage supplies the negative (matric-suction) pore pressures above the water table, and the extended Mohr-Coulomb strength (φᵇ = 15°) is priced as an apparent cohesion on the unsaturated slices. On Slide's printed H = 61 critical circle, Bishop 1.612 / 1.533 / 1.413 for right-side head H = 61/62/63 m vs Slide 1.621 / 1.538 / 1.407 (Ng & Shi 1.636 / 1.527 / 1.436) — within 0.6%. See the [section](#vp38) for the seepage→suction chain and the free-search note. |
 | [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](../files/rocscience/vp039a.xlsx)/[b](../files/rocscience/vp039b.xlsx)/[c](../files/rocscience/vp039c.xlsx)/[d](../files/rocscience/vp039d.xlsx). Tandjiria (2002): the geosynthetic force required to restore FS=1.35 on a half-embankment, as clay and as sand fill (noncircular cases not locked — see section). Also [SLOPE/W §2.24](geostudio.md) — same problem in the GeoStudio corpus. |
 | [40](#vp40) | Slope, homogenous, sensitivity analysis | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). Perry (1993) power-curve strength slope on the specified surface — the corpus's first sensitivity benchmark, sweeping the A and b parameters through `sensitivity()`. |
 | [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with r<sub>u</sub>=0.3 — exercises the `pow` and `ru` options together. |
@@ -306,7 +309,7 @@ corpus is complete relative to what is independently verifiable.
 
 ## Problem details
 
-Each built problem below shows the XSLOPE inputs (with coordinate labels) beside a representative solved surface. The build scripts live in `benchmarks/rocscience/build_problems.py`; the figures are regenerated by `benchmarks/rocscience/make_figures.py`.
+Each built problem below shows the XSLOPE inputs (with coordinate labels) beside a representative solved surface. The build scripts live in `benchmarks/rocscience/build_problems.py` (the FE-seepage problem #38, which solves its own steady unsaturated field and writes the `_mesh.json` / `_seep.csv` sidecars, has its own builder `benchmarks/rocscience/build_vp038.py`); the figures are regenerated by `benchmarks/rocscience/make_figures.py`.
 
 ### VP1: Slope, homogeneous (ACADS 1(a)) {#vp1}
 
@@ -1177,6 +1180,40 @@ Slide #37 reproduces the "Reinforcement Example" of the XSTABL v5 reference manu
 **Reinforced-zone length (part b)** — the minimum length of an elevated-friction zone (φ_reinf = 56.04°) that holds FS = 1.5, published as Slide 7.6 m / XSTABL 7.5 m — needs a variable-length material zone and stays feature-gated.
 
 ![vp037: inputs and representative solution](images/vp037.png)
+
+### VP38: Excavated slope, FE groundwater seepage, matric suction {#vp38}
+
+Slide #38 reproduces Ng & Shi (1998), a 28° cut slope in Hong Kong: a homogeneous soil (24 m over a 6 m bedrock band) in which the steady groundwater regime leaves the upper part of the cut **unsaturated**, and the negative pore water pressure there (matric suction) raises the shear strength. The stability is a conventional Bishop analysis on the FE seepage field, with the strength above the water table given by the extended (Fredlund) Mohr-Coulomb criterion:
+
+$$\tau = c' + (\sigma_n - u_a)\tan\varphi' + (u_a - u_w)\tan\varphi^{\,b}$$
+
+The last term is an **apparent cohesion** from suction: with the pore-air pressure $u_a = 0$, it is $(-u_w)\tan\varphi^{\,b}$ on any slice whose base sits above the water table. Material (Table 38.1): $c' = 10$ kPa, $\varphi' = 38°$, $\varphi^{\,b} = 15°$, $\gamma = 16$ kN/m³.
+
+**Input files:** [vp038a](../files/rocscience/vp038a.xlsx) / [vp038b](../files/rocscience/vp038b.xlsx) / [vp038c](../files/rocscience/vp038c.xlsx) (right-side head $H = 61 / 62 / 63$ m), each with its `_mesh.json` / `_seep.csv` seepage sidecars.
+
+**The seepage (our own FE solve).** Geometry is read from the vendor RS2 mesh's external boundary — ground surface (0.13, 19.15)–(40.74, 40.6)–(50.95, 40.6)–(57.06, 49.31)–(97.89, 70.78), the domain closing down the right edge and along an impermeable base to the toe. XSLOPE solves the steady **unsaturated** field itself (`u='seep'`): constant total head $H$ on the right (uphill) side, head 6 m on the left (toe) side, the ground surface a seepage/exit face, base and the far edges no-flow. The soil's relative permeability is Ng (1998)'s measured $k$-function, cast as a Gardner curve $k_r(\psi) = 1/(1 + a\,|\psi|^n)$ with $a = 7.479$, $n = 2.908$ (a log-space fit to the RS2 `.slw` curve, $k_s = 4.19$ m/day) — SWCC data, not a fitted knob (a van Genuchten cast of the same curve moves the factor of safety by < 0.005). The solved field carries a **bounded** matric suction above the water table (max ≈ 60–70 kPa on the trial surface, unlike a deep piezometric line's unbounded hydrostatic suction), so no suction cap is required.
+
+**The suction (our strength delivery).** On the direct-surface tests the tag sets `suction_phi_b = {Cut soil: 15}`. `generate_slices` reads the signed seepage pressure at each slice base; where it is negative it prices the suction $s = \max(0, -u_w)$ into an apparent cohesion $c_\text{suction} = s\tan\varphi^{\,b}$, added to the resisting $c\,\Delta\ell$ term, while the effective-normal term keeps $u$ clamped at 0 — exactly the extended Mohr-Coulomb term with $u_a = 0$. Below the water table the slice sees positive $u$ and no suction credit, as it should.
+
+**Slide's critical surface.** Slide prints its $H = 61$ critical circle (Fig. 38.2): Bishop FS 1.621, center (47.490, 56.311), radius 16.087, endpoints (50.953, 40.601)–(63.120, 52.500) — a shallow circle entirely in the upper, unsaturated part of the cut, where the suction credit lives. Only $H = 61$ has a figure; the critical geometry is head-invariant to that precision (the head boundary changes the pore field, not the slope), so all three cases carry this circle and are evaluated on it as a specified surface.
+
+**Results** (Bishop simplified, on Slide's printed circle, `num_slices=60`):
+
+| $H$ (m) | XSLOPE | Slide | Ng & Shi (1998) |
+|---|---|---|---|
+| 61 | 1.612 | 1.621 | 1.636 |
+| 62 | 1.533 | 1.538 | 1.527 |
+| 63 | 1.413 | 1.407 | 1.436 |
+
+XSLOPE reproduces the published Bishop values within 0.6% and tracks the physics: the factor of safety falls as the right-side head rises (more saturation, less suction). Turning the suction credit off drops all three to ≈ 1.35–1.41, confirming the apparent cohesion — not the effective-normal pressure — carries the difference from the published band.
+
+**Free search.** The verification locks the specified surface, which is immune to the search-selection question. For the record, a free search *with* the suction credit does not land on Slide's shallow circle: it localizes to a somewhat deeper circle a few percent below the published value (H = 61: ≈ 1.57 vs 1.621), because a deeper surface trades away some suction credit for a longer saturated base. Slide's reported minimum is the shallow suction circle; the specified-surface comparison isolates the seepage-plus-suction physics from that difference in which circle each search selects.
+
+![vp038a (H = 61 m): inputs and solution on Slide's critical circle](images/vp038a.png)
+
+![vp038b (H = 62 m): inputs and solution](images/vp038b.png)
+
+![vp038c (H = 63 m): inputs and solution](images/vp038c.png)
 
 ### VP39: Reinforced embankment, (2) materials, tension crack, geosynthetic {#vp39}
 

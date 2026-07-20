@@ -253,12 +253,14 @@ slope_data['materials'] = [
         #     the reinforcement, not the soil) — leave None or use a small nonzero value there.
         't_cut': None,
         # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
-        #     cohesion, LEM only (generate_slices' suction_phi_b/suction_cap kwargs auto-wire
-        #     from these two columns; an explicit kwarg overrides the file). phi_b = the
-        #     unsaturated friction angle phi^b (degrees); None/blank = no suction strength
-        #     credited — the default, exactly pre-v17 behavior. s_cap = the maximum credited
-        #     suction (stress units), a cap on the base suction s before it converts to
-        #     apparent cohesion c_suction = s*tan(phi_b); None/blank = uncapped.
+        #     cohesion, read by BOTH solvers (LEM via generate_slices' suction_phi_b/
+        #     suction_cap kwargs; FEM/SSRM via solve_fem/solve_ssrm's same-named kwargs) —
+        #     auto-wired from these two columns, an explicit kwarg overrides the file. In the
+        #     SSRM the suction term is reduced by the strength-reduction factor F alongside c'
+        #     and tan(phi'). phi_b = the unsaturated friction angle phi^b (degrees); None/blank
+        #     = no suction strength credited — the default, exactly pre-v17 behavior. s_cap =
+        #     the maximum credited suction (stress units), a cap on the base suction s before it
+        #     converts to apparent cohesion c_suction = min(s, s_cap)*tan(phi_b); None/blank = uncapped.
         #     Dependency: active (read) only for option in {mc, pow, hb} combined with
         #     u in {piezo, seep} — a signed pore-pressure source the suction can be derived
         #     from. Inert for option='cp' (Su already embodies field suction — do not also set
@@ -297,7 +299,8 @@ Common strength setups:
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
   any mc/cp/pow/hb material; leave `t_cut=None` for the pre-v16 unbounded-tension default.
 - **Unsaturated apparent cohesion (matric suction):** add `phi_b=<deg>` to an mc/pow/hb
-  material with `u='piezo'` or `u='seep'`; set `s_cap=<stress value>` too — mandatory in
+  material with `u='piezo'` or `u='seep'` (read by both the LEM and FEM/SSRM solvers; the
+  SSRM reduces the suction term by F alongside c' and tan(phi')); set `s_cap=<stress value>` too — mandatory in
   practice with `u='piezo'` since the hydrostatic suction above the line grows unbounded with
   height, optional (self-bounding) with `u='seep'`. Leave `phi_b=None` for the pre-v17 default
   (no suction credit). Do not set `phi_b` on a `cp` material (Su already embodies field

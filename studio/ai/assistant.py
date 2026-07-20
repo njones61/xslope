@@ -140,10 +140,17 @@ the canvas re-renders automatically.
   cannot fail; ignores every strength key below, uses only gamma/gsat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
   cutoff, stress units; None/blank = no cutoff (pre-v16 default), 0 = no tension; FEM only,
-  LEM ignores it), u ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if
-  unused), k1, k2, alpha, kr0, h0 (seepage), E, nu (FEM; also the sole mechanical properties
-  when option='elastic'). Minimal MC example:
-  {'name':'Clay','gamma':130.0,'option':'mc','c':400.0,'phi':0.0,'t_cut':None,'u':'none',
+  LEM ignores it), phi_b, s_cap (v17 matric-suction apparent cohesion, LEM only — Fredlund
+  extended MC; phi_b = unsaturated friction angle phi^b in degrees, None/blank = no suction
+  credit (default); s_cap = cap on the credited suction, stress units, None/blank = uncapped.
+  Active only for option in {mc,pow,hb} with u in {piezo,seep}; leave both None for cp/elastic
+  or u in {none,ru}. CAUTION: with u='piezo' the hydrostatic suction above the line is
+  unbounded, so s_cap is essential; with u='seep' the FE field self-bounds it), u
+  ('none'|'piezo'|'seep'), sigma_gamma/c/phi/cp/d/psi (stddevs, 0 if unused), k1, k2, alpha,
+  kr0, h0 (seepage), E, nu (FEM; also the sole mechanical properties when option='elastic').
+  Minimal MC example:
+  {'name':'Clay','gamma':130.0,'option':'mc','c':400.0,'phi':0.0,'t_cut':None,
+   'phi_b':None,'s_cap':None,'u':'none',
    'cp':0.0,'r_elev':0.0,'d':0,'psi':0,'sigma_gamma':0.0,'sigma_c':0.0,
    'sigma_phi':0.0,'sigma_cp':0.0,'sigma_d':0.0,'sigma_psi':0.0,'k1':0.0,'k2':0.0,
    'alpha':0.0,'kr0':0.0,'h0':0.0,'E':0.0,'nu':0.0}

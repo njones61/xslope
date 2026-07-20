@@ -46,7 +46,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - For partially saturated problems: the unsaturated model per material — `unsat="lf"` (linear front, default) with kr0/h0, `unsat="vg"` (van Genuchten) with vg_a/vg_n, or `unsat="gard"` (Gardner power form) reusing the same vg_a/vg_n pair
 
    **Required for reliability:**
-   - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns Y-AD). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
+   - Standard deviations for at least one material property (sigma_gamma, sigma_c, sigma_phi, or sigma_cp in mat sheet columns AA-AF). If the user requests reliability analysis but provides no standard deviations, stop and ask — do not run the analysis.
 
    **Required for FEM:**
    - Young's modulus (E) and Poisson's ratio (nu) for every material (also the sole mechanical
@@ -238,9 +238,9 @@ slope_data['materials'] = [
         # --- option='elastic' only (v16): infinite strength, cannot fail. FEM holds it out of
         #     plasticity entirely; LEM treats it as impenetrable (a failure surface may not
         #     cross it). Uses gamma/gsat/E/nu + seepage columns only — every strength key above
-        #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut) is ignored (loader warns if any is set).
-        #     Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength", SLOPE/W
-        #     "Bedrock (Impenetrable)".
+        #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is ignored (loader warns if
+        #     any is set). Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength",
+        #     SLOPE/W "Bedrock (Impenetrable)".
         # --- rapid drawdown only (Kc=1 envelope) ---
         'd':     0.0,            # cohesion intercept
         'psi':   0.0,            # friction angle
@@ -252,6 +252,23 @@ slope_data['materials'] = [
         #     reinforced fill, t_cut=0 can block continuum equilibrium (the tension belongs to
         #     the reinforcement, not the soil) — leave None or use a small nonzero value there.
         't_cut': None,
+        # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
+        #     cohesion, LEM only (generate_slices' suction_phi_b/suction_cap kwargs auto-wire
+        #     from these two columns; an explicit kwarg overrides the file). phi_b = the
+        #     unsaturated friction angle phi^b (degrees); None/blank = no suction strength
+        #     credited — the default, exactly pre-v17 behavior. s_cap = the maximum credited
+        #     suction (stress units), a cap on the base suction s before it converts to
+        #     apparent cohesion c_suction = s*tan(phi_b); None/blank = uncapped.
+        #     Dependency: active (read) only for option in {mc, pow, hb} combined with
+        #     u in {piezo, seep} — a signed pore-pressure source the suction can be derived
+        #     from. Inert for option='cp' (Su already embodies field suction — do not also set
+        #     phi_b there) and option='elastic' (cannot fail); also inert, by construction, for
+        #     u='none' or u='ru' (no signed u to read a suction from). CAUTION: with u='piezo'
+        #     the hydrostatic suction above the line is UNBOUNDED with depth, so s_cap is
+        #     essential to avoid an unrealistic apparent cohesion; with u='seep' the FE
+        #     unsaturated field self-bounds the suction, so s_cap there is a backstop, not a
+        #     strict requirement.
+        'phi_b': None, 's_cap': None,
         # --- seepage ---
         'k1':    0.5, 'k2': 0.2, 'alpha': 0.0,   # conductivities + tensor angle
         'unsat': 'lf',           # unsaturated model: 'lf' (linear front, default),
@@ -279,6 +296,12 @@ Common strength setups:
   key is ignored, and the LEM search treats the zone as impenetrable.
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
   any mc/cp/pow/hb material; leave `t_cut=None` for the pre-v16 unbounded-tension default.
+- **Unsaturated apparent cohesion (matric suction):** add `phi_b=<deg>` to an mc/pow/hb
+  material with `u='piezo'` or `u='seep'`; set `s_cap=<stress value>` too — mandatory in
+  practice with `u='piezo'` since the hydrostatic suction above the line grows unbounded with
+  height, optional (self-bounding) with `u='seep'`. Leave `phi_b=None` for the pre-v17 default
+  (no suction credit). Do not set `phi_b` on a `cp` material (Su already embodies field
+  suction) or on `elastic` (cannot fail).
 
 #### Geometry — `profile_lines` OR `polygons` (mutually exclusive)
 

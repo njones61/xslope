@@ -1335,6 +1335,21 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "elastic_materials": [
             m["name"] for m in materials
             if str(m.get("option", "")).strip().lower() == "elastic"],
+        # v17 template-carried matric-suction strength (Fredlund extended MC),
+        # off by default. phi_b (deg) is the unsaturated friction angle that turns
+        # matric suction into apparent cohesion in the FEM yield; s_cap (stress
+        # units) bounds the credited suction. Blank -> None on the material, mapped
+        # here to phi_b = 0 (no suction credit, bit-identical to pre-v17) and
+        # s_cap = inf (uncapped). solve_fem / solve_ssrm read these when their
+        # suction_phi_b / suction_cap kwargs are left None (an explicit kwarg
+        # overrides; pass {} to force suction off regardless of the file). See the
+        # suction machinery in solve_fem for how they enter the MC strength.
+        "phi_b_by_mat": np.array([
+            float(m["phi_b"]) if m.get("phi_b") is not None else 0.0
+            for m in materials]),
+        "s_cap_by_mat": np.array([
+            float(m["s_cap"]) if m.get("s_cap") is not None else np.inf
+            for m in materials]),
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
         "pow_flag_by_elem": pow_flag_by_elem,  # power-curve elements (tangent-linearized in the VP loop)
@@ -1502,12 +1517,65 @@ def _bond_slip_caps(fem_data, bond_slip):
 # - 8-node quadrilateral elements with reduced integration
 # - No plastic stiffness reduction
 
+def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_materials):
+    """Resolve the opt-in matric-suction strength inputs to per-element arrays,
+    mirroring the LEM (slice.generate_slices) auto-wire + kwarg-override semantics.
+
+    Returns ``(tanphib_by_elem, scap_by_elem, active)`` where ``tanphib_by_elem``
+    is ``tan(phi_b)`` per element (0.0 where a material has no suction angle),
+    ``scap_by_elem`` is the per-element suction cap (``inf`` = uncapped), and
+    ``active`` is True iff any element carries a positive phi_b (the fast-path
+    gate: when False the caller skips ALL suction machinery, so a default run is
+    bit-identical to the pre-suction solver).
+
+    ``suction_phi_b`` (name -> deg dict) and ``suction_cap`` (scalar or name ->
+    cap dict) default to None = read the v17 template values carried on fem_data
+    (``phi_b_by_mat`` / ``s_cap_by_mat``); an explicit kwarg wins over the file,
+    and an empty dict forces suction off regardless of the file. A phi_b keyed to
+    an unknown material name warns (a typo yields zero suction, not an error) —
+    the same policy as the LEM.
+    """
+    names = list(fem_data.get("material_names", []))
+    n_mat = len(names)
+    # phi_b per material (degrees): explicit dict, else the file's phi_b_by_mat.
+    if suction_phi_b is None:
+        phib_by_mat = np.asarray(
+            fem_data.get("phi_b_by_mat", np.zeros(n_mat)), dtype=float)
+    else:
+        phib_by_mat = np.zeros(n_mat)
+        for nm, deg in suction_phi_b.items():
+            if nm in names:
+                phib_by_mat[names.index(nm)] = float(deg) if deg else 0.0
+            else:
+                warnings.warn(
+                    f"suction_phi_b names material '{nm}', which is not in the "
+                    f"model (materials: {names}). No suction strength applied for it.")
+    # suction cap per material (stress units): scalar (one cap for all), name-dict,
+    # else the file's s_cap_by_mat. inf = uncapped.
+    if suction_cap is None:
+        scap_by_mat = np.asarray(
+            fem_data.get("s_cap_by_mat", np.full(n_mat, np.inf)), dtype=float)
+    elif isinstance(suction_cap, dict):
+        scap_by_mat = np.full(n_mat, np.inf)
+        for nm, cap in suction_cap.items():
+            if nm in names and cap is not None:
+                scap_by_mat[names.index(nm)] = float(cap)
+    else:
+        scap_by_mat = np.full(n_mat, float(suction_cap))
+    tanphib_by_mat = np.tan(np.radians(phib_by_mat))
+    tanphib_by_elem = tanphib_by_mat[element_materials - 1]
+    scap_by_elem = scap_by_mat[element_materials - 1]
+    active = bool(np.any(tanphib_by_elem > 0.0))
+    return tanphib_by_elem, scap_by_elem, active
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
-              elastic_mask=None, bond_slip=None):
+              elastic_mask=None, bond_slip=None,
+              suction_phi_b=None, suction_cap=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1663,6 +1731,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             line label (str), a 1-based line id (int), or '*' (all reinforcement
             lines); an unknown reference raises ValueError. None (default) = the
             end-ramp path, bit-identical. See _bond_slip_caps.
+        suction_phi_b (dict or None): OPT-IN matric-suction strength, {material
+            name: phi_b degrees}. Turns the signed (un-clamped) pore pressure's
+            negative part s = max(0, -u) into an apparent cohesion s*tan(phi_b),
+            reduced by the trial F, added to c' in the MC yield; the effective-
+            normal u stays clamped exactly as today. None (default) auto-wires from
+            the v17 template (fem_data['phi_b_by_mat']); an explicit dict overrides,
+            {} forces off. Off => bit-identical to the pre-suction solver. See
+            _resolve_suction_by_elem and the suction note after the reduction block.
+        suction_cap (float, dict, or None): Cap on the credited suction s before it
+            becomes apparent cohesion (scalar or {name: cap}); None auto-wires from
+            fem_data['s_cap_by_mat'] (inf = uncapped). Ignored when phi_b is 0.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1782,9 +1861,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     elastic_by_elem = (np.asarray(elastic_mask, dtype=bool)
                        if elastic_mask is not None else None)
 
+    # Opt-in matric-suction strength (Fredlund extended Mohr-Coulomb). Resolve the
+    # per-element unsaturated friction angle tan(phi_b) and suction cap once. When
+    # no material carries phi_b (the default), suction_active is False and EVERY
+    # suction branch below is skipped, so the solve is bit-identical to the
+    # pre-suction path. Above the water table the pore pressure is negative (matric
+    # suction); the SIGNED field (built alongside the clamped u_gp) converts that
+    # suction to an apparent cohesion s*tan(phi_b) added to c in the MC yield, while
+    # the effective-normal pore pressure stays clamped at 0 exactly as today. The
+    # apparent cohesion is REDUCED by the trial F alongside c and tan(phi): both RS2
+    # and SIGMA/W credit suction through the (SRF-reduced) frictional strength on the
+    # suction-elevated effective stress, so the suction contribution scales with 1/F
+    # — matching the LEM, where c_suction sits inside the FS-divided numerator. (This
+    # differs from the Rankine tension cutoff, which tension_srf leaves un-reduced.)
+    suction_tanphib_by_elem, suction_scap_by_elem, suction_active = \
+        _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_materials)
+
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
         print(f"  phi: {phi_by_elem[0]:.1f} -> {np.degrees(phi_reduced[0]):.1f}")
+        if suction_active:
+            _nsuc = int(np.count_nonzero(suction_tanphib_by_elem > 0.0))
+            print(f"  matric suction: phi_b>0 on {_nsuc}/{n_elements} elements "
+                  f"(apparent cohesion reduced by F)")
 
     # Extract 1D truss element data
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
@@ -2075,11 +2174,64 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         for elem_idx in range(n_elements):
             u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
 
+    # Signed pore-pressure field at each Gauss point for the opt-in matric-suction
+    # option (built ONLY when suction is active, so default runs are byte-untouched).
+    # Unlike u_gp above it is NOT clamped at 0: an unsaturated seepage solution or a
+    # piezometric line carries NEGATIVE pore pressure (matric suction) above the
+    # water table. Only the negative part is consumed downstream (s = max(0,
+    # -u_signed)); the effective-normal term keeps the CLAMPED u_gp exactly as today,
+    # so the effective normal is unchanged (max(0, signed) == max(0, clamped)).
+    u_gp_signed = None
+    if suction_active and pp_option in ("piezo", "seep"):
+        u_gp_signed = []
+        if pp_option == "piezo":
+            piezo_line_coords = fem_data.get("piezo_line_coords", None)
+            gamma_water = fem_data.get("gamma_water", 9.81)
+            if piezo_line_coords:
+                px = np.array([p[0] for p in piezo_line_coords], dtype=float)
+                py = np.array([p[1] for p in piezo_line_coords], dtype=float)
+                order = np.argsort(px)
+                px, py = px[order], py[order]
+                _phreatic = bool(fem_data.get('piezo_phreatic', False))
+                for elem_idx in range(n_elements):
+                    elem_type = element_types[elem_idx]
+                    elem_nodes_idx = elements[elem_idx][:elem_type]
+                    elem_coords = nodes[elem_nodes_idx]
+                    gp_list = []
+                    for gp_data in elem_gp_data[elem_idx]:
+                        N = gp_data['N']
+                        x_gp = N @ elem_coords[:, 0]
+                        y_gp = N @ elem_coords[:, 1]
+                        piezo_elev = float(np.interp(x_gp, px, py))
+                        u_val = gamma_water * (piezo_elev - y_gp)
+                        if _phreatic and u_val > 0.0:
+                            u_val *= float(_piezo_cos2(x_gp, px, py))
+                        gp_list.append(u_val)
+                    u_gp_signed.append(gp_list)
+            else:
+                u_gp_signed = [[0.0] * len(elem_gp_data[e])
+                               for e in range(n_elements)]
+        else:  # seep: nodal seepage field, un-clamped (carries suction above WT)
+            for elem_idx in range(n_elements):
+                elem_type = element_types[elem_idx]
+                elem_nodes_idx = elements[elem_idx][:elem_type]
+                u_elem_nodes = u_nodes[elem_nodes_idx]
+                gp_list = [float(gp_data['N'] @ u_elem_nodes)
+                           for gp_data in elem_gp_data[elem_idx]]
+                u_gp_signed.append(gp_list)
+
     if debug_level >= 1 and pp_option != "none":
         all_u = [u_gp[e][g] for e in range(n_elements) for g in range(len(u_gp[e]))]
         max_u = max(all_u) if all_u else 0.0
         n_nonzero = sum(1 for v in all_u if v > 0.0)
         print(f"  Pore pressure ({pp_option}): max u_gp = {max_u:.3f}, {n_nonzero}/{len(all_u)} GPs with u > 0")
+        if u_gp_signed is not None:
+            all_s = [max(0.0, -u_gp_signed[e][g]) for e in range(n_elements)
+                     for g in range(len(u_gp_signed[e]))]
+            max_s = max(all_s) if all_s else 0.0
+            n_suc = sum(1 for v in all_s if v > 0.0)
+            print(f"  Matric suction (signed field): max s = {max_s:.3f}, "
+                  f"{n_suc}/{len(all_s)} GPs with suction > 0")
 
     # ---- Step 6c: Flatten Gauss-point data into per-element-type groups for
     # vectorized iteration (the per-GP Python loop dominated runtime; batched
@@ -2109,6 +2261,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
         grp['has_cap'] = bool(np.isfinite(grp['t_cap']).any())
+        if suction_active:
+            # Per-GP matric-suction parameters. tan(phi_b) turns suction into
+            # apparent cohesion; scap bounds it; Finv = 1/F reduces the apparent
+            # cohesion by the trial F (see the suction note above). c_suc_r is
+            # rebuilt from the stage's signed field inside the stage loop.
+            grp['tanphib'] = np.array([suction_tanphib_by_elem[e] for e, g in _pairs])
+            grp['scap'] = np.array([suction_scap_by_elem[e] for e, g in _pairs])
+            grp['Finv'] = 1.0 / grp['F']
         if elastic_by_elem is not None:
             _em = np.array([elastic_by_elem[e] for e, g in _pairs])
             if _em.any():
@@ -2274,12 +2434,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # (dam built, then reservoir filled) and avoids the spurious effective-
     # tension zone produced by one-shot gravity+water elastic loading.
     water_present = bool(np.any(bc_type == 4)) or pp_option != "none"
+    # Per-stage SIGNED pore-pressure field for the suction option: dry in stage 1
+    # (no suction credited before the water is applied), the full signed field in
+    # stage 2. None when suction is inactive or the pp source carries no suction.
+    _sig_dry = ([[0.0] * len(g) for g in u_gp]
+                if (suction_active and u_gp_signed is not None) else None)
     if staged and water_present:
         u_gp_dry = [[0.0] * len(g) for g in u_gp]
-        stage_list = [(F_grav_pure, u_gp_dry, 'stage 1: gravity (dry)'),
-                      (F_gravity, u_gp, 'stage 2: + water loads and pore pressures')]
+        stage_list = [(F_grav_pure, u_gp_dry, _sig_dry, 'stage 1: gravity (dry)'),
+                      (F_gravity, u_gp, u_gp_signed, 'stage 2: + water loads and pore pressures')]
     else:
-        stage_list = [(F_gravity, u_gp, None)]
+        stage_list = [(F_gravity, u_gp, u_gp_signed, None)]
 
     total_iterations = 0
     u = np.zeros(n_dof)
@@ -2287,13 +2452,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     iteration = 0
     unbalanced_force_ratio = 0.0
 
-    for stage_idx, (base_loads, u_gp_active, stage_label) in enumerate(stage_list):
+    for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
         if debug_level >= 1 and stage_label is not None:
             print(f"  {stage_label}")
 
         # flatten this stage's per-GP pore pressures into the groups
         for grp in gp_groups:
             grp['u_gp'] = np.array([u_gp_active[e][g] for e, g in grp['pairs']])
+            if suction_active:
+                # Matric-suction apparent cohesion for this stage: s = max(0,
+                # -u_signed) capped at scap, times tan(phi_b), reduced by the trial
+                # F (Finv = 1/F). Independent of the effective-normal u_gp (which is
+                # still clamped and — under 'effective' — moved to the load vector
+                # below); this reads the SIGNED field so the suction above the water
+                # table is not lost to the clamp. Rebuilt each stage so the dry
+                # stage credits no suction.
+                if u_gp_signed_active is not None:
+                    u_sgn = np.array([u_gp_signed_active[e][g] for e, g in grp['pairs']])
+                    s_suc = np.minimum(np.maximum(-u_sgn, 0.0), grp['scap'])
+                    grp['c_suc_r'] = grp['tanphib'] * s_suc * grp['Finv']
+                else:
+                    grp['c_suc_r'] = np.zeros(len(grp['pairs']))
 
         if pp_formulation == 'effective':
             # Effective-stress formulation: equilibrium of sigma_total =
@@ -2438,9 +2617,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 theta = np.arcsin(sine) / 3.0
                 snth, csth = np.sin(theta), np.cos(theta)
                 sq3 = np.sqrt(3.0)
+                # Cohesion in the MC envelope: the F-reduced c', plus the opt-in
+                # matric-suction apparent cohesion c_suc_r (already reduced by F).
+                # When suction is inactive the key is absent and c_env is exactly
+                # grp['c_r'] (bit-identical to the pre-suction yield).
+                _c_suc = grp.get('c_suc_r')
+                c_env = grp['c_r'] if _c_suc is None else grp['c_r'] + _c_suc
                 f = (sigm * grp['snph']
                      + dsbar * (csth / sq3 - snth * grp['snph'] / 3.0)
-                     - grp['c_r'] * grp['csph'])
+                     - c_env * grp['csph'])
 
                 m = (f > 0) & (dsbar > 1e-20)
                 if grp.get('has_elastic'):
@@ -2986,6 +3171,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     _sn = _sn_new
                     break
                 _sn = _sn_new
+        # Add the matric-suction apparent cohesion (reduced by F) to the reported
+        # tangent cohesion so the reported yield function matches the envelope the
+        # VP loop actually solved. Gated on suction_active -> default runs untouched.
+        if (suction_active and u_gp_signed is not None
+                and suction_tanphib_by_elem[elem_idx] > 0.0):
+            _s_suc = np.minimum(np.maximum(-np.asarray(u_gp_signed[elem_idx]), 0.0),
+                                suction_scap_by_elem[elem_idx])
+            _c_rep = _c_rep + (suction_tanphib_by_elem[elem_idx]
+                               * float(_s_suc.mean()) / F_by_elem[elem_idx])
         f_yield = mc_yield_invariants(sigm, dsbar, theta, _c_rep, _phi_rep)
         yield_function_out[elem_idx] = f_yield
         plastic_elements[elem_idx] = f_yield > 1e-8
@@ -3771,7 +3965,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
                tension_cutoff_by_material=None, tension_srf=False,
-               elastic_materials=None, bond_slip=None):
+               elastic_materials=None, bond_slip=None,
+               suction_phi_b=None, suction_cap=None):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -3894,6 +4089,23 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             overburden), still capped by t_max. line_key is a line label (str),
             1-based id (int), or '*' (all lines); unknown references raise ValueError.
             None (default) = the end-ramp path, bit-identical. See solve_fem.
+        suction_phi_b (dict or None): OPT-IN matric-suction strength (Fredlund
+            extended Mohr-Coulomb), {material name: phi_b degrees}, threaded
+            unchanged to every solve_fem trial. Above the water table the pore
+            pressure is negative (matric suction); for a material named here the
+            suction s = max(0, -u) becomes an apparent cohesion s*tan(phi_b) added
+            to c' in the MC yield, REDUCED by the trial F alongside c'/tan(phi').
+            The effective-normal pore pressure stays clamped at 0 exactly as today.
+            None (default) auto-wires from the v17 template phi_b column; an explicit
+            dict overrides the file; {} forces suction off. Off by default =>
+            bit-identical to the pre-suction solver. Both RS2 (Verification #28,
+            Ng & Shi 1998) and SIGMA/W credit suction through the SRF-reduced
+            frictional strength, hence the /F reduction here.
+        suction_cap (float, dict, or None): Upper bound on the credited suction s
+            (stress units) before it becomes apparent cohesion — one scalar for
+            every material or a {name: cap} dict. None (default) auto-wires from the
+            v17 template s_cap column (uncapped where blank). Ignored when
+            suction_phi_b resolves empty.
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, etc.
@@ -4041,7 +4253,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip)
+            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -4054,7 +4267,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip)
+            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -4065,7 +4279,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             cancel_check=cancel_check, progress_callback=progress_callback,
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip)
+            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -4093,7 +4308,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
-                 bond_slip=None):
+                 bond_slip=None, suction_phi_b=None, suction_cap=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -4146,6 +4361,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          tension_cap_by_elem=tension_cap_by_elem,
                          tension_srf=tension_srf, elastic_mask=elastic_mask,
                          bond_slip=bond_slip,
+                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          progress_callback=_fem_progress(step, prefix))
 
     F_left = F_min
@@ -4321,7 +4537,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
-                 bond_slip=None):
+                 bond_slip=None, suction_phi_b=None, suction_cap=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -4391,6 +4607,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         tension_cap_by_elem=tension_cap_by_elem,
                         tension_srf=tension_srf, elastic_mask=elastic_mask,
                         bond_slip=bond_slip,
+                        suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks

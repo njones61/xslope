@@ -583,6 +583,24 @@ def run_fem_test(test):
                 pass
             bs[key] = (float(c), float(phi), float(perim))
         kwargs['bond_slip'] = bs
+    # Matric-suction strength (Fredlund extended MC), opt-in. suction_phi_b is a
+    # per-material angle list "Name:deg;Name2:deg" (semicolon-separated, since tags
+    # split on commas); suction_cap is one number (stress units) bounding the credited
+    # suction. Absent => auto-wired from the file's v17 phi_b/s_cap (off if blank). The
+    # apparent cohesion s*tan(phi_b) above the water table is reduced by the trial F.
+    if 'suction_phi_b' in test and str(test['suction_phi_b']).strip():
+        sp = {}
+        for tok in str(test['suction_phi_b']).split(';'):
+            tok = tok.strip()
+            if not tok:
+                continue
+            name, sep, deg = tok.rpartition(':')
+            if not sep or not name.strip() or deg.strip() == '':
+                return None, f"suction_phi_b entry {tok!r} must be 'Name:degrees'"
+            sp[name.strip()] = float(deg)
+        kwargs['suction_phi_b'] = sp or None
+    if 'suction_cap' in test and str(test['suction_cap']).strip():
+        kwargs['suction_cap'] = float(test['suction_cap'])
     result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
                         debug_level=0, **kwargs)
 
@@ -3352,7 +3370,13 @@ def run_suction_guard_test(test):
     mod = importlib.import_module('suction_guard')
     if not os.path.exists(mod._BASE_XLSX):
         return 0.0, None                      # engine-only clone without the docs file
+    # LEM piezo strength + seep u-source delivery + v17 file auto-wiring, plus the
+    # FEM/SSRM branch (off-by-default bit-identical, phi_b engages above the WT, the
+    # apparent cohesion reduced by the trial F — the RS2/SIGMA-W SRF treatment).
     failures = mod.check()
+    failures += mod.check_seep()
+    failures += mod.check_autowire()
+    failures += mod.check_fem()
     if failures:
         return None, "matric suction: " + "; ".join(failures[:4])
     return 0.0, None

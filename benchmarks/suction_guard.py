@@ -415,6 +415,161 @@ def check_autowire():
     return failures
 
 
+# === FEM / SSRM branch: matric suction in the viscoplastic Mohr-Coulomb solver ===
+# The LEM branches above prove the strength side for the slice solvers. This branch
+# proves the SAME Fredlund apparent cohesion in the FEM (solve_fem / solve_ssrm):
+# the signed pore-pressure field feeds s*tan(phi_b) into the MC yield above the water
+# table, REDUCED by the trial F alongside c'/tan(phi') (the RS2 / SIGMA/W treatment —
+# both credit suction through the SRF-reduced frictional strength, not as a held-
+# constant term like the Rankine tension cutoff). Fast: single solve_fem calls on a
+# coarse mesh, no SSRM bisection. Freezes three invariants:
+#
+#   FEM-1  OFF is bit-identical: suction_phi_b=None and phi_b=0 reproduce the
+#          pre-suction solve EXACTLY (displacements, stresses, plastic set) — the
+#          default-off invariance the fem_ssrm corpus locks rely on.
+#   FEM-2  phi_b > 0 engages ABOVE the water table: at a fixed F it removes yielding
+#          Gauss points, and every element it strengthens sits above the WT (where
+#          the signed field is suction, u < 0) — none below it.
+#   FEM-3  SRF reduction is frozen: with the suction capped uniform (piezo line far
+#          below the whole mesh, small cap), the reduced apparent cohesion
+#          cap*tan(phi_b)/F is EXACTLY reproduced by baking cap*tan(phi_b) into c'
+#          with phi_b=0 at the same F. Bit-identical iff the suction term is divided
+#          by F; a held-constant (un-reduced) term breaks this.
+FEM_PHI_B = 25.0
+FEM_CAP = 8.0                # stress units, below the peak suction so the cap bites
+FEM_F = 1.4                  # fixed trial F: the OFF slope yields here, suction stabilizes it
+FEM_TARGET = 4.0             # mesh element size (small mesh; the guard stays fast)
+
+
+def _fem_slope_data(base, piezo_y, phi_b=None, s_cap=None, extra_c=0.0):
+    """A homogeneous FEM slope (same geometry as the LEM guard) with a piezo line at
+    ``piezo_y``. phi_b / s_cap go on the material (auto-wired by build_fem_data);
+    extra_c bumps c' for the FEM-3 equivalence baseline."""
+    m = dict(base["materials"][0])
+    m.update(name=MAT_NAME, c=5.0 + extra_c, phi=30.0, gamma=20.0, gamma_sat=20.0,
+             option="mc", u="piezo", ru=0.0, E=30000.0, nu=0.33,
+             phi_b=phi_b, s_cap=s_cap)
+    polys = [{"polygon": Polygon(_SOIL_POLY), "mat_id": 0}]
+    gs, dom = build_ground_surface_from_polygons(polys)
+    sd = dict(base)
+    sd["materials"] = [m]
+    sd["polygons"] = polys
+    sd["ground_surface"] = gs
+    sd["domain_polygon"] = dom
+    sd["piezo_line"] = [(-50.0, piezo_y), (400.0, piezo_y)]
+    sd["piezo_line2"] = []
+    sd["piezo_phreatic"] = False
+    sd["dloads"] = []
+    sd["dloads2"] = []
+    sd["circular"] = True
+    sd["circles"] = [_CIRCLE]
+    sd["non_circ"] = []
+    sd["reinforce_lines"] = []
+    sd["reinforcement_lines"] = []
+    sd["pile_lines"] = []
+    sd["line_loads"] = []
+    sd["k_seismic"] = 0.0
+    sd["tcrack_depth"] = 0.0
+    sd["tcrack_water"] = 0.0
+    sd["max_depth"] = None
+    sd["mesh"] = None
+    sd.pop("_water_table_profile", None)
+    return sd
+
+
+def _fem_solution(sd, F, **ssrm_kw):
+    """Mesh + build_fem_data + a single solve_fem at F. Returns (fem_data, solution)."""
+    from xslope.mesh import build_mesh_from_polygons
+    from xslope.fem import build_fem_data, solve_fem
+    polys = [{"coords": list(p["polygon"].exterior.coords)[:-1], "mat_id": p["mat_id"]}
+             for p in sd["polygons"]]
+    mesh = build_mesh_from_polygons(polys, target_size=FEM_TARGET, element_type="tri6")
+    fem_data = build_fem_data(sd, mesh)
+    sol = solve_fem(fem_data, F=F, debug_level=0, max_iterations=2000, **ssrm_kw)
+    return fem_data, sol
+
+
+def check_fem():
+    """Guard the FEM/SSRM matric-suction path. Returns a list of failure strings."""
+    failures = []
+    base = _base()
+
+    # --- FEM-1 + FEM-2: piezo line at y=6 (below the crest, above the toe bench) ---
+    fd_off, sol_off = _fem_solution(_fem_slope_data(base, 6.0), FEM_F)
+    fd_none, sol_none = _fem_solution(_fem_slope_data(base, 6.0), FEM_F,
+                                      suction_phi_b=None)
+    fd_zero, sol_zero = _fem_solution(_fem_slope_data(base, 6.0), FEM_F,
+                                      suction_phi_b={MAT_NAME: 0.0})
+    fd_on, sol_on = _fem_solution(_fem_slope_data(base, 6.0, phi_b=FEM_PHI_B), FEM_F)
+
+    # (FEM-1) OFF bit-identical: displacements, stresses and the plastic set.
+    for label, sol in (("suction_phi_b=None", sol_none), ("phi_b=0", sol_zero)):
+        dd = float(np.max(np.abs(sol["displacements"] - sol_off["displacements"])))
+        ds = float(np.max(np.abs(sol["stresses"] - sol_off["stresses"])))
+        if dd != 0.0 or ds != 0.0:
+            failures.append(f"fem: {label} changed the solve (max|du|={dd:.3e}, "
+                            f"max|dsig|={ds:.3e}); default-off must be bit-identical")
+        if not np.array_equal(sol["plastic_elements"], sol_off["plastic_elements"]):
+            failures.append(f"fem: {label} changed the plastic set; default-off must "
+                            f"be bit-identical")
+
+    # (FEM-2a) phi_b>0 net-strengthens: with the OFF slope yielding at this F, the
+    # suction apparent cohesion above the water table reduces the yielding set.
+    plastic_off = sol_off["plastic_elements"]
+    plastic_on = sol_on["plastic_elements"]
+    n_off, n_on = int(plastic_off.sum()), int(plastic_on.sum())
+    if n_off == 0:
+        failures.append(f"fem: the OFF slope did not yield at F={FEM_F} — the FEM-2 "
+                        f"strengthening check is vacuous (raise F or refine the mesh)")
+    elif not (n_on < n_off):
+        failures.append(f"fem: phi_b={FEM_PHI_B} did not reduce yielding at F={FEM_F} "
+                        f"(plastic ON={n_on} >= OFF={n_off}); suction must add strength")
+
+    # (FEM-2b) suction is credited ONLY where the pore pressure is negative (above the
+    # water table). With the piezo line drawn ABOVE the whole slope (fully saturated,
+    # u >= 0 everywhere) the signed field has no suction, so a phi_b run is
+    # BIT-IDENTICAL to OFF — proof the credit engages above the WT and nowhere else.
+    _, sol_sat_off = _fem_solution(_fem_slope_data(base, 35.0), FEM_F)
+    _, sol_sat_on = _fem_solution(_fem_slope_data(base, 35.0, phi_b=FEM_PHI_B), FEM_F)
+    dd = float(np.max(np.abs(sol_sat_on["displacements"] - sol_sat_off["displacements"])))
+    ds = float(np.max(np.abs(sol_sat_on["stresses"] - sol_sat_off["stresses"])))
+    if dd != 0.0 or ds != 0.0:
+        failures.append(f"fem: with the water table above the whole slope (no suction), "
+                        f"phi_b={FEM_PHI_B} changed the solve (max|du|={dd:.3e}, "
+                        f"max|dsig|={ds:.3e}) — suction must engage only above the WT")
+
+    # --- FEM-3: SRF reduction frozen via the capped-uniform equivalence ---
+    # Piezo line far below the whole mesh -> every Gauss point is above the WT with
+    # suction s = gamma_w*(y - piezo_y) >> cap, so c_suction = cap*tan(phi_b) UNIFORMLY.
+    # Reduced by F that is (cap*tan(phi_b))/F on every element; baking cap*tan(phi_b)
+    # into c' with phi_b=0 gives the SAME reduced cohesion (c'+cap*tan(phi_b))/F only
+    # if the suction term is divided by F. Bit-identical <=> the /F reduction holds.
+    extra = FEM_CAP * math.tan(math.radians(FEM_PHI_B))
+    fd_a, sol_a = _fem_solution(
+        _fem_slope_data(base, -1000.0, phi_b=FEM_PHI_B, s_cap=FEM_CAP), FEM_F)
+    fd_b, sol_b = _fem_solution(
+        _fem_slope_data(base, -1000.0, extra_c=extra), FEM_F)
+    dd = float(np.max(np.abs(sol_a["displacements"] - sol_b["displacements"])))
+    ds = float(np.max(np.abs(sol_a["stresses"] - sol_b["stresses"])))
+    if dd > 1e-9 or ds > 1e-6:
+        failures.append(
+            f"fem SRF freeze: capped suction cap*tan(phi_b)/F did not match baking "
+            f"cap*tan(phi_b) into c' at the same F (max|du|={dd:.3e}, max|dsig|={ds:.3e}) "
+            f"— the suction apparent cohesion must be reduced by F like c'/tan(phi')")
+    # The equivalence is only meaningful if the baked-in cohesion is nonzero AND run A
+    # actually differs from the no-suction run (else A==B is trivial). Cross-check that
+    # capping produced a strictly weaker slope than the deep-WT uncapped run.
+    _, sol_uncapped = _fem_solution(
+        _fem_slope_data(base, -1000.0, phi_b=FEM_PHI_B), FEM_F)
+    if extra <= 0.0:
+        failures.append("fem SRF freeze: setup produced zero apparent cohesion (vacuous)")
+    elif np.array_equal(sol_a["displacements"], sol_uncapped["displacements"]):
+        failures.append("fem SRF freeze: the suction cap did not bite (capped run equals "
+                        "uncapped) — cap must be below the peak suction for the freeze")
+
+    return failures
+
+
 def main():
     if not os.path.exists(_BASE_XLSX):
         print(f"SKIP: base template not found ({_BASE_XLSX})")
@@ -422,6 +577,7 @@ def main():
     failures = check()
     failures += check_seep()
     failures += check_autowire()
+    failures += check_fem()
     if failures:
         print("FAILED:")
         for f in failures:
@@ -440,6 +596,11 @@ def main():
           "answer (c_suction and FS bit-for-bit); the default path (no phi_b) stays "
           "off-by-default bit-identical; an explicit kwarg overrides the file; and the "
           "per-material suction_cap dict matches the scalar cap.")
+    print("OK: the FEM/SSRM path carries the same suction — off-by-default bit-identical "
+          "(suction_phi_b=None and phi_b=0 reproduce the pre-suction solve exactly); "
+          "phi_b>0 relieves yielding ONLY above the water table and creates none; and the "
+          "apparent cohesion is reduced by the trial F (capped cap*tan(phi_b)/F reproduces "
+          "baking cap*tan(phi_b) into c' at the same F) — the RS2 / SIGMA/W SRF treatment.")
     return 0
 
 

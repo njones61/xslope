@@ -1266,14 +1266,19 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
-# === v16 backward-compatibility guard ==================================== #
-# The v16 mat-sheet reshuffle moved E/nu (to columns M/N) and inserted t_cut (L).
-# The loader keys every material column BY NAME, so a pre-v16 file — where E/nu sit
-# wherever they did and there is no t_cut column — must still load to exactly the
-# same slope_data, save for the new t_cut key (None, i.e. no cutoff). Two REAL
-# pre-v16 corpus files are frozen here, materials key-by-key, captured from the
-# loader BEFORE the v16 change. A regression that hardcodes a column position, or
-# breaks the by-name E/nu lookup, would read E/nu back as 0.0 and trip this.
+# === v16/v17 backward-compatibility guard ================================ #
+# The v16 mat-sheet reshuffle moved E/nu (to columns M/N) and inserted t_cut (L);
+# v17 then inserted the matric-suction pair phi_b/s_cap (cols L/M, shifting t_cut to
+# N). The loader keys every material column BY NAME, so an OLDER file — where E/nu
+# sit wherever they did and the newer columns are simply absent — must still load to
+# exactly the same slope_data, save for the new-key defaults (t_cut/phi_b/s_cap all
+# None: no cutoff, no suction strength, uncapped). REAL corpus files are frozen here,
+# materials key-by-key, captured from the loader BEFORE the change:
+#   - two PRE-v16 files (no t_cut column): the v16 reshuffle proof.
+#   - one V16-ERA file (t_cut column present, no phi_b/s_cap): the v17 insert proof,
+#     that adding phi_b/s_cap (cols L/M) is transparent to a v16 file.
+# A regression that hardcodes a column position, or breaks the by-name E/nu lookup,
+# would read E/nu back as 0.0 and trip this.
 _V16_BACKCOMPAT_EXPECTED = {
     # docs/files/rocscience/vp039c.xlsx — v13 FEM file (E/nu present; E at old col AF)
     'docs/files/rocscience/vp039c.xlsx': [
@@ -1287,21 +1292,33 @@ _V16_BACKCOMPAT_EXPECTED = {
         {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 100.0, 'psi': 19.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
+    # docs/files/rocscience/vp042.xlsx — v16-era LEM file (t_cut column present, all
+    # blank; no phi_b/s_cap columns). Captured pre-v17. Proves inserting phi_b/s_cap
+    # at cols L/M is transparent: E/nu (now at N.. after the v17 shift) still read by
+    # name, and phi_b/s_cap default to None.
+    'docs/files/rocscience/vp042.xlsx': [
+        {'name': 'Granular fill', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Clay core', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 20.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 32000.0, 'nu': 0.4, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Granular fill (below core)', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Hard base', 'gamma': 24.0, 'gamma_sat': 24.0, 'option': 'mc', 'c': 200.0, 'phi': 45.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 125000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+    ],
 }
 
 
 def run_v16_backcompat_test(test):
-    """A pre-v16 file loads to the same materials as before v16, plus t_cut=None.
+    """An older file loads to the same materials as before, plus the new-key defaults.
 
-    Loads two frozen pre-v16 corpus files and asserts, key-by-key, that every
-    material matches its captured baseline once the new t_cut key (which must be
-    None — no cutoff) is set aside, and that no material is 'elastic'. This is the
-    load-side proof that the column reshuffle is transparent to old files.
+    Loads the frozen pre-v16 and v16-era corpus files and asserts, key-by-key, that
+    every material matches its captured baseline once the newer keys are set aside —
+    t_cut (v16), phi_b and s_cap (v17), which must all be None (no cutoff, no suction
+    strength, uncapped) — and that no material is 'elastic'. This is the load-side
+    proof that the column inserts/reshuffles are transparent to old files.
 
     Returns (0.0, None) on success, or (None, message) naming the divergences.
     """
     from xslope.fileio import load_slope_data
     problems = []
+    _NEW_KEYS = ("t_cut", "phi_b", "s_cap")
     for fp, expected in _V16_BACKCOMPAT_EXPECTED.items():
         if not os.path.exists(fp):
             problems.append(f"{fp}: file missing")
@@ -1312,13 +1329,14 @@ def run_v16_backcompat_test(test):
             problems.append(f"{fp}: {len(mats)} materials, expected {len(expected)}")
             continue
         for i, (m, exp) in enumerate(zip(mats, expected)):
-            if "t_cut" not in m:
-                problems.append(f"{fp}[{i}]: missing new t_cut key")
-            elif m.get("t_cut") is not None:
-                problems.append(f"{fp}[{i}].t_cut: {m.get('t_cut')!r}, expected None")
+            for nk in _NEW_KEYS:
+                if nk not in m:
+                    problems.append(f"{fp}[{i}]: missing new {nk} key")
+                elif m.get(nk) is not None:
+                    problems.append(f"{fp}[{i}].{nk}: {m.get(nk)!r}, expected None")
             if str(m.get("option", "")).strip().lower() == "elastic":
                 problems.append(f"{fp}[{i}]: unexpectedly 'elastic'")
-            stripped = {k: v for k, v in m.items() if k != "t_cut"}
+            stripped = {k: v for k, v in m.items() if k not in _NEW_KEYS}
             problems += _roundtrip_diff(exp, stripped, f"{os.path.basename(fp)}[{i}]")
     if problems:
         return None, "v16 back-compat mismatch: " + "; ".join(problems[:6])

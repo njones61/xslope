@@ -370,7 +370,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 16
+SUPPORTED_TEMPLATE_VERSION = 17
 
 
 def _read_seep_bc_sheet(seep_df, sheet_name):
@@ -733,6 +733,21 @@ def load_slope_data(filepath):
         _tcut_num = pd.to_numeric(row.get('tcut'), errors='coerce')
         t_cut_val = float(_tcut_num) if pd.notna(_tcut_num) else None
 
+        # Matric-suction strength (v17). Two LEM-only columns for the Fredlund
+        # extended Mohr-Coulomb apparent cohesion (xslope.slice generate_slices):
+        #   phi_b -- the unsaturated friction angle phi^b (degrees). BLANK -> None:
+        #     no suction strength credited, exactly the pre-v17 behavior (the default).
+        #   s_cap -- the maximum credited suction (stress units), a cap on the base
+        #     suction s before it becomes apparent cohesion. BLANK -> None: uncapped.
+        # Read by header name ('phi_b' normalizes to 'phib', 's_cap' to 'scap'), so a
+        # pre-v17 sheet without the columns loads as None for both. Caution: with
+        # u=piezo the hydrostatic suction above the line is unbounded, so s_cap is
+        # essential there; with u=seep the FE field self-bounds and s_cap is a backstop.
+        _phib_num = pd.to_numeric(row.get('phib'), errors='coerce')
+        phi_b_val = float(_phib_num) if pd.notna(_phib_num) else None
+        _scap_num = pd.to_numeric(row.get('scap'), errors='coerce')
+        s_cap_val = float(_scap_num) if pd.notna(_scap_num) else None
+
         # --- load-time validation warnings (v16) ---
         if option_val == 'elastic':
             # (b) elastic materials ignore every strength input (they cannot fail);
@@ -772,6 +787,10 @@ def load_slope_data(filepath):
             "psi": _num(row.get('psi', 0)) if pd.notna(row.get('psi')) else 0,
             # v16: tensile-strength cutoff. None = blank (no cutoff); FEM-only.
             "t_cut": t_cut_val,
+            # v17: matric-suction strength (LEM only, Fredlund extended MC).
+            # phi_b None = no suction strength (default); s_cap None = uncapped.
+            "phi_b": phi_b_val,
+            "s_cap": s_cap_val,
             "pow_a": pow_a_val,
             "pow_b": pow_b_val,
             "pow_c": pow_c_val,
@@ -1504,7 +1523,8 @@ MAT_NUM_HEADERS = [
 # Optional numerics: written only when set (None must stay a blank cell -- e.g.
 # a blank gsat means "fall back to gamma", which 0.0 would not; a blank t_cut
 # means "no cutoff", which 0.0 -- "no tension" -- would not).
-MAT_OPT_NUM_HEADERS = [('gamma_sat', 'gsat'), ('t_cut', 't_cut')]
+MAT_OPT_NUM_HEADERS = [('gamma_sat', 'gsat'), ('t_cut', 't_cut'),
+                       ('phi_b', 'phi_b'), ('s_cap', 's_cap')]
 MAT_STR_HEADERS = [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]
 
 # The 'mat' header row is located by scanning for its sentinel cells rather than

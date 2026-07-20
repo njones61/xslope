@@ -56,7 +56,7 @@ choice is not cosmetic, which is why XSLOPE makes you make it rather than guessi
 | Region→material assignment (per analysis) | `mat_id` |
 | Mohr-Coulomb materials (`CohesionPrime`, `PhiPrime`) | `option='mc'` with c′, φ′ |
 | **Undrained materials** (`UndrainedPhiZero`, strength in `Cohesion`) | `option='mc'` with c = Su, φ = 0 |
-| **Bedrock** (impenetrable) | **Excluded from the domain** — see below |
+| **Bedrock** (impenetrable) | `option='elastic'` — an impenetrable material, see below |
 | Material colour | The zone colour in Studio |
 | Piezometric surface + `MaterialUsesPiezs` | Piezo line, on the materials that use it |
 | **Water above the ground surface** | **A distributed load** — see below |
@@ -71,12 +71,24 @@ choice is not cosmetic, which is why XSLOPE makes you make it rather than guessi
 
 The ground surface and domain are derived from the zones, as for any polygon-based model.
 
-!!! info "Bedrock becomes geometry, not a material"
-    GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE has no
-    such material: its impenetrable boundary is the **domain** itself. So bedrock regions
-    are *excluded* from the imported model, and the domain floor lands on the top of the
-    bedrock. That reproduces SLOPE/W exactly. Importing bedrock as ordinary soil would let
-    trial surfaces cut straight through it.
+!!! info "Bedrock becomes an elastic material"
+    GeoStudio's **Bedrock** is impenetrable — slip surfaces cannot enter it. XSLOPE's
+    **`elastic`** option is the exact analog: an impenetrable zone that cannot fail and
+    that a slip surface may ride along but never cut into. So a bedrock region is imported
+    as an elastic material, keeping its unit weight; its c and φ are dropped because it
+    cannot fail. That reproduces SLOPE/W exactly, and the material round-trips back to
+    Bedrock on export. Importing bedrock as ordinary soil would let trial surfaces cut
+    straight through it.
+
+!!! info "Matric suction is reported, not converted"
+    SLOPE/W parameterises unsaturated (negative pore-pressure) shear strength as a
+    **suction ceiling on the piezometric surface** (`CapSuction` / `MaxSuction`), not as a
+    per-material φᵇ. That is a threshold on the pore pressure, semantically different from
+    XSLOPE's Fredlund `phi_b` / `s_cap` apparent-cohesion pair, so the import **reports it
+    rather than converting it** — set `phi_b` (and `s_cap`) by hand if you need unsaturated
+    strength credited. On **export**, `phi_b`/`s_cap` (and the FEM-only tensile cutoff
+    `t_cut`) have no SLOPE/W material encoding, so they are dropped and reported — never
+    written as an invented tag that would corrupt the file.
 
 !!! info "Ponded water is synthesised"
     GeoStudio stores no ponded-water object: where the water rises **above** the ground
@@ -222,9 +234,11 @@ written as fill whose *depth* reproduces the pressure exactly.
     which is written. Re-creating it as a surcharge would count the water twice. Export
     says so explicitly when it happens.
 
-A `.gsz` still cannot carry everything XSLOPE models. Failure surfaces, piles and
-non-Mohr-Coulomb strengths are **not written**, and each is reported as a caveat so you
-know what to re-create on the GeoStudio side.
+A `.gsz` still cannot carry everything XSLOPE models. An **elastic** material *is* written
+— as GeoStudio's impenetrable **Bedrock** — but failure surfaces, piles, other
+non-Mohr-Coulomb strengths (c/φ, power curve, Hoek-Brown), and the v16/v17 material
+features `t_cut`, `phi_b` and `s_cap` are **not written**. Each omission is reported as a
+caveat so you know what to re-create on the GeoStudio side.
 
 !!! warning "A seepage field cannot be exported"
     If the model's pore pressure is a finite-element **seepage field**, the exported

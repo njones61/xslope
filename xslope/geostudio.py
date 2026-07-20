@@ -330,13 +330,24 @@ def read_gsz(path):
         # geometry <Points> table. Reading them against the geometry is silent nonsense:
         # in one verification model it produced a water table that doubled back on
         # itself, and pore pressures low enough to lift the factor of safety by 10%.
+        # SLOPE/W parameterises unsaturated (negative pore-pressure) shear strength on
+        # the piezometric surface, not the material: CapSuction (whether to limit the
+        # suction magnitude) and MaxSuction (the ceiling). This is a threshold model on
+        # the pore pressure, NOT xslope's phi_b/s_cap apparent-cohesion pair, so the
+        # importer reports it rather than converting it — the values are kept here so it
+        # can say what SLOPE/W was set to.
         piezo = {}
+        suction = None
         for ps in entry.findall("./PiezometricSurfaces/PiezometricSurface"):
             pid = _text(ps, "ID")
             if pid is None:
                 continue
             ids = [int(dp.text) for dp in ps.findall("./DataPoints/DataPoint") if dp.text]
             piezo[int(pid)] = [local[i] for i in ids if i in local]
+            cap = (_text(ps, "CapSuction", "") or "").lower() == "true"
+            mx = _num(ps, "MaxSuction", None)
+            if cap or mx:
+                suction = {"cap": cap, "max": mx}
 
         tc = entry.find("TensionCrack")
         tcrack = None
@@ -394,6 +405,7 @@ def read_gsz(path):
             "k_seismic_v": float(kv) if kv else 0.0,
             "material_piezo": uses,          # material ID -> piezometric surface ID
             "piezo": piezo,                  # piezometric surface ID -> [(x, y), ...]
+            "suction": suction,              # {'cap','max'} unsaturated-strength setting
             "points": local,
             "tcrack": tcrack,
             "surcharges": surcharges,
@@ -695,6 +707,9 @@ def _blank_material(name):
     return {
         "name": str(name), "gamma": 0.0, "gamma_sat": None, "option": "", "c": 0.0,
         "phi": 0.0, "cp": 0.0, "r_elev": 0.0, "d": 0, "psi": 0, "u": "none", "ru": 0.0,
+        # v16 tensile cutoff and v17 matric-suction strength (None = unset, the pre-
+        # v16/v17 default), mirroring load_slope_data's material shape.
+        "t_cut": None, "phi_b": None, "s_cap": None,
         "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
         "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
         "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
@@ -818,28 +833,14 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     gamma_water = water.get("gamma_water", _GAMMA_W_METRIC)
     units = _detect_units(gamma_water, gsz.get("unit_system"))
 
-    # GeoStudio's Bedrock is IMPENETRABLE: slip surfaces cannot enter it. xslope has no
-    # such material — its impenetrable boundary is the domain itself. So drop bedrock
-    # regions from the model and let the domain floor land on their top surface, which
-    # reproduces SLOPE/W's behaviour exactly. Importing them as ordinary soil would let
-    # trial surfaces cut straight through the bedrock.
+    # GeoStudio's Bedrock is IMPENETRABLE: slip surfaces cannot enter it. xslope's v16
+    # 'elastic' option is the exact analog — an impenetrable zone the LEM cannot cut and
+    # the FEM holds out of plasticity — so a Bedrock material is imported as elastic and
+    # its region KEPT (earlier imports dropped the region and floored the domain at the
+    # bedrock top; keeping it as elastic reproduces SLOPE/W just as faithfully and lets
+    # the material round-trip). Importing it as ordinary soil would let trial surfaces
+    # cut straight through the bedrock.
     bedrock = {mid for mid, m in gsz["materials"].items() if m["model"] == "Bedrock"}
-    dropped_bedrock = sorted({gsz["materials"][m]["name"]
-                              for m in assign.values() if m in bedrock})
-    if dropped_bedrock:
-        keep = {r: m for r, m in assign.items() if m not in bedrock}
-        if keep:
-            assign = keep
-            caveats.append(
-                f"region(s) of {', '.join(repr(b) for b in dropped_bedrock)} are "
-                f"GeoStudio's impenetrable Bedrock — excluded from the model, so the "
-                f"domain now ends at the top of the bedrock. That is how xslope makes a "
-                f"boundary impenetrable, and it matches SLOPE/W: slip surfaces cannot "
-                f"enter it")
-        else:
-            caveats.append(
-                f"every region in this analysis is Bedrock — imported as ordinary soil, "
-                f"because excluding it would leave no model at all")
 
     # Import only the materials this analysis actually uses, renumbered 0-based.
     used = sorted(set(assign.values()))
@@ -851,10 +852,39 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             raise ValueError(f"This analysis references material {mid}, which the "
                              f"file does not define.")
         mat = _blank_material(src["name"])
+        if mid in bedrock:
+            # Impenetrable Bedrock -> elastic. Keep the unit weight (an elastic zone
+            # still has weight); its c/phi are meaningless because it cannot fail.
+            mat.update(option="elastic", gamma=src["gamma"])
+            caveats.append(
+                f"material '{src['name']}' is GeoStudio's impenetrable Bedrock — "
+                f"imported as an elastic material: it cannot fail and a slip surface "
+                f"cannot cut through it, which matches SLOPE/W")
+            materials.append(mat)
+            if not mat["gamma"]:
+                caveats.append(f"material '{src['name']}' has no unit weight in the "
+                               f"file — set gamma before solving")
+            continue
         c, phi, note = _strength(src)
         if note:
             caveats.append(note)
         mat.update(option="mc", gamma=src["gamma"], c=c, phi=phi)
+
+        # v17 matric-suction strength. SLOPE/W's own unsaturated model is a threshold on
+        # the piezometric surface (CapSuction/MaxSuction), reported below — not a per-
+        # material phi_b. A few SLOPE/W builds DO write a material <PhiB>, so read it if
+        # present (none appears in the reference files, so this path is format-doc-only).
+        phib = src["strength"].get("PhiB")
+        if phib is not None:
+            try:
+                mat["phi_b"] = float(phib)
+                caveats.append(
+                    f"material '{src['name']}' carries a GeoStudio unsaturated friction "
+                    f"angle (phi_b = {float(phib):g}) — imported as phi_b; s_cap left "
+                    f"unset")
+            except (TypeError, ValueError):
+                pass
+
         if not mat["gamma"]:
             caveats.append(f"material '{src['name']}' has no unit weight in the "
                            f"file — set gamma before solving")
@@ -864,6 +894,12 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 f"phi = 0) — it will behave as a liquid; set its strength before "
                 f"solving or the factor of safety will be meaningless")
         materials.append(mat)
+
+    if used and all(mid in bedrock for mid in used):
+        caveats.append(
+            "every material in this analysis is impenetrable Bedrock (imported as "
+            "elastic) — none can fail, so give the model at least one ordinary soil "
+            "before solving or no slip surface is possible")
 
     polygons = []
     for region_id, mid in sorted(assign.items()):
@@ -930,6 +966,22 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"THE FACTOR OF SAFETY WILL BE WRONG: pore pressure comes from SLOPE/W's "
             f"'{option}' option, which xslope cannot read — imported as zero. Set a "
             f"piezo line, ru, or a seepage solution before solving")
+
+    # SLOPE/W's unsaturated shear-strength setting rides on the piezometric surface as
+    # a suction ceiling (CapSuction/MaxSuction), NOT as a per-material phi_b. It is a
+    # threshold on negative pore pressure, semantically different from xslope's Fredlund
+    # phi_b/s_cap apparent-cohesion pair, so it is reported rather than converted: mapping
+    # a suction cap onto s_cap without a phi_b would credit no strength at all, and
+    # guessing a phi_b would invent one the file never set.
+    suction = stab.get("suction")
+    if suction and (suction.get("cap") or suction.get("max")):
+        mx = suction.get("max")
+        caveats.append(
+            "GeoStudio limits the negative pore-pressure (suction) "
+            + (f"to a maximum of {mx:g}" if mx else "with CapSuction on")
+            + " for shear strength. That is SLOPE/W's threshold model, not xslope's "
+            "phi_b/s_cap apparent-cohesion pair — it was NOT converted; set phi_b (and "
+            "s_cap) by hand if you want unsaturated strength credited")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 
@@ -1231,10 +1283,11 @@ def gsz_style(gsz, analysis_id=None):
     if analysis_id is None:
         analysis_id = gsz["analyses"][0]["id"] if gsz["analyses"] else None
     assign = gsz["contexts"].get(analysis_id, {})
-    bedrock = {mid for mid, m in gsz["materials"].items() if m["model"] == "Bedrock"}
 
     # Same ordering rule gsz_to_slope_data uses, so mat_id lines up with the polygons.
-    used = sorted({m for m in assign.values() if m not in bedrock})
+    # Bedrock is now KEPT (imported as an elastic material), so it is included here too;
+    # excluding it would shift every later material's colour by one.
+    used = sorted(set(assign.values()))
     colors = {}
     for i, mid in enumerate(used):
         rgb = _parse_rgb(gsz["materials"][mid].get("color"))
@@ -1700,12 +1753,37 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             f"pore pressure from {', '.join(repr(u) for u in other_u)} is not written "
             f"— GeoStudio will open the model with no pore pressure from that source")
 
-    non_mc = sorted({(m.get("option") or "") for m in materials} - {"mc", ""})
+    # 'elastic' HAS a SLOPE/W equivalent — the impenetrable Bedrock model, written below
+    # — so it is not among the models that have no equivalent. Every other non-MC option
+    # (c/phi, power curve, Hoek-Brown) is written with its c/phi and flagged.
+    elastic_names = [m.get("name") or "?" for m in materials
+                     if (m.get("option") or "") == "elastic"]
+    if elastic_names:
+        caveats.append(
+            f"elastic material(s) {', '.join(repr(n) for n in elastic_names)} were "
+            f"written as GeoStudio's impenetrable Bedrock — a slip surface cannot enter "
+            f"them, which is xslope's elastic behaviour")
+    non_mc = sorted({(m.get("option") or "") for m in materials} - {"mc", "elastic", ""})
     if non_mc:
         caveats.append(
             f"strength model(s) {', '.join(repr(o) for o in non_mc)} have no SLOPE/W "
             f"equivalent — those materials are written with their c and phi, which for "
             f"a non-Mohr-Coulomb model is not the same strength")
+
+    # v16/v17 material features SLOPE/W has no place for. They must NOT corrupt the file
+    # (a .gsz material has no phi_b tag, and its TensileStrength is a LEM tension limit,
+    # not xslope's FEM Rankine cut), so they are dropped from the export and reported.
+    if any(m.get("t_cut") is not None for m in materials):
+        caveats.append(
+            "a tensile-strength cutoff (t_cut) is set on one or more materials — it was "
+            "NOT written: xslope's t_cut is an FEM Rankine cap, which SLOPE/W's LEM has "
+            "no equivalent for")
+    if any(m.get("phi_b") is not None or m.get("s_cap") is not None for m in materials):
+        caveats.append(
+            "matric-suction shear strength (phi_b / s_cap) is set on one or more "
+            "materials — it was NOT written: SLOPE/W parameterises unsaturated strength "
+            "as a suction ceiling on the piezometric surface, not a per-material phi_b, "
+            "so re-create it in GeoStudio if you need it")
 
     for key, label in [("circles", "failure circles"), ("non_circ", "non-circular surface"),
                        ("pile_lines", "piles")]:
@@ -1897,10 +1975,15 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
         # Shaped exactly like one GeoStudio writes. The Missing="true" placeholders are
         # how it records "this parameter is not set" -- they are part of a well-formed
         # StressStrain block, not noise, and it writes them on every material.
+        # An xslope 'elastic' material is written as GeoStudio's Bedrock (Impenetrable)
+        # model — the exact reverse of the Bedrock -> elastic import mapping. Its unit
+        # weight and (harmless) c/phi ride along in the same StressStrain block, exactly
+        # as a real Bedrock material carries them.
+        slope_model = "Bedrock" if (m.get("option") or "") == "elastic" else "MohrCoulomb"
         L.append(
             f'    <Material><ID>{i}</ID><Color>RGB=({r8},{g8},{b8})</Color>'
             f'<Name>{_xml_escape(m.get("name") or f"material {i}")}</Name>'
-            f'<SlopeModel>MohrCoulomb</SlopeModel>'
+            f'<SlopeModel>{slope_model}</SlopeModel>'
             f'<StressModel>MohrCoulomb</StressModel>'
             f'<StressStrain>'
             f'<JointEffectiveCohesion Missing="true" />'

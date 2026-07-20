@@ -25,7 +25,7 @@ suite (`run_tests.py`).
 | [FE Slope Stability (SSRM)](ssrm.md) | Strength-reduction benchmarks |
 | [Rocscience Slide2 Corpus](rocscience.md) | The 111-problem Slide2 verification manual, problem by problem |
 | [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual — 12 built, remainder feature-gated |
-| [Rocscience RS2 (SSR) Corpus](rs2.md) | The RS2 shear-strength-reduction manual — Parts I–III (68 problems) and the Part IV Slide2-import set (52), the corpus's FEM/SSRM backbone |
+| [Rocscience RS2 (SSRM) Corpus](rs2.md) | The RS2 shear-strength-reduction manual — Parts I–III (68 problems) and the Part IV Slide2-import set (52), the corpus's FEM/SSRM backbone |
 | [GeoStudio (SLOPE/W) Corpus](geostudio.md) | The 47-problem SLOPE/W verification manual, cross-referenced |
 
 ---

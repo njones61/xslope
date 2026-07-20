@@ -344,8 +344,7 @@ methods land within ~1% of SLOPE/W's Morgenstern-Price value (1.261): Spencer at
 Engineers reads modestly
 high here, consistent with ground-parallel side-force inclinations on a surface
 with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
-[Force Equilibrium Methods](../lem/force_eq.md)). This benchmark also appears on the
-[Verification](../verification/lem.md) page.
+[Force Equilibrium Methods](../lem/force_eq.md)).
 
 **Sources:** GeoStudio [SLOPE/W Verification Manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf),
 sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.

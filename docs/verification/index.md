@@ -21,7 +21,6 @@ suite (`run_tests.py`).
 
 | Page | Scope |
 |---|---|
-| [Limit Equilibrium](lem.md) | Analytical anchors and published LEM cross-checks |
 | [FE Seepage](seep.md) | Confined/unconfined flow benchmarks and analytical anchors |
 | [FE Slope Stability (SSRM)](ssrm.md) | Strength-reduction benchmarks |
 | [Rocscience Slide2 Corpus](rocscience.md) | The 111-problem Slide2 verification manual, problem by problem |

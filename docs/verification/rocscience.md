@@ -346,8 +346,7 @@ slices, each method searched independently):
 
 All rigorous methods fall within the ACADS accepted band; OMS reads low, as
 expected for the legacy method (its conservative bias on this class of problem
-is why it is reported for completeness only). This benchmark also appears on
-the [Verification](../verification/lem.md) page.
+is why it is reported for completeness only).
 
 **Sources:** Donald, I.B. & Giam, P. (1989), *Soil slope stability programs
 review*, ACADS, Melbourne; Giam, P. & Donald, I.B. (1992); GeoStudio
@@ -505,9 +504,6 @@ Results for all six methods (automated critical-circle search, 50 slices):
 | Lowe & Karafiath | 1.438 | 1.451 | -0.9% |
 | Spencer | 1.401 | 1.451 | -3.4% |
 | Morgenstern-Price | 1.400 | 1.451 | -3.5% |
-
-This benchmark also appears on the
-[Verification](../verification/lem.md) page.
 
 **Source:** Arai, K. & Tagyo, K. (1985). Determination of noncircular slip
 surface giving the minimum factor of safety in slope stability analysis.

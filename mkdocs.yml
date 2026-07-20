@@ -80,7 +80,6 @@ nav:
     - Sample Problems: fem/samples.md
   - Verification:
     - Overview: verification/index.md
-    - Limit Equilibrium: verification/lem.md
     - FE Seepage: verification/seep.md
     - FE Slope Stability (SSRM): verification/ssrm.md
     - Rocscience Slide2 Corpus: verification/rocscience.md

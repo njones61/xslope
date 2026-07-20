@@ -3624,6 +3624,28 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
     return fig
 
 
+def _bar_chart_height_in(n_bars, per_bar_in=0.5, margin_in=1.4, min_in=2.4,
+                         max_in=None):
+    """Content-proportionate figure height for a categorical bar chart (tornado,
+    and similarly-shaped sweep plots): a fixed allowance per bar (row pitch) plus
+    fixed margins for the title/axis labels/legend, so a 4-bar chart stays
+    compact and a 20-bar chart grows naturally.
+
+    This is deliberately independent of any *viewport* height a caller (Studio's
+    MplCanvas) might otherwise stretch the figure to: a sparse categorical bar
+    chart isn't a dense drawing like a slope cross-section, so filling an
+    arbitrary window height balloons the bars (in pixels) far past the fixed
+    point-size of their labels — wrong proportions at any capture size. Width
+    still follows the caller's figsize/figure (Studio still fits it to the
+    viewport); only height is content-driven, here and in Studio alike.
+    """
+    h = margin_in + max(int(n_bars), 1) * per_bar_in
+    h = max(h, min_in)
+    if max_in is not None:
+        h = min(h, max_in)
+    return h
+
+
 def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
                  style=None, widest_on_top=True):
     """Duncan-style tornado diagram from tornado(): horizontal bars of the output
@@ -3633,6 +3655,13 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
     The swept quantity follows result['output'] / result['output_label'] — a
     factor of safety for an LEM/FEM tornado, total discharge q for a seepage one
     (absent keys default to FS, so an old result plots as before).
+
+    The figure HEIGHT is content-proportionate (see ``_bar_chart_height_in``) —
+    a fixed allowance per bar plus fixed margins — not stretched to fill an
+    arbitrary figsize/viewport height, so bar thickness stays in normal
+    proportion to the tick/annotation text no matter how tall the window is.
+    Width still follows ``figsize`` (standalone) or the caller's figure
+    (Studio: the viewport width).
 
     Parameters:
         result: the dict from tornado() (carries 'df', 'base_fs', 'method', and
@@ -3646,11 +3675,9 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
     output_label = result.get('output_label', 'Factor of Safety')
     # FS reads best fixed-point; a tiny discharge q needs significant figures.
     vfmt = (lambda x: f'{x:.2f}') if output == 'FS' else (lambda x: f'{x:.3g}')
-    if fig is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        ax = fig.add_subplot(111)
 
+    # Build the bar list FIRST — both branches below need the bar count to size
+    # the figure height content-proportionately.
     bars = []
     for param, g in df.loc[~df['is_base']].groupby('param'):
         ok = g.loc[g['success']].sort_values('value')
@@ -3660,16 +3687,32 @@ def plot_tornado(result, figsize=(8, 5), save_png=False, dpi=300, fig=None,
         bars.append((param, lo_fs, hi_fs, abs(hi_fs - lo_fs)))
     bars.sort(key=lambda b: b[3], reverse=not widest_on_top)  # barh draws k=0 at the bottom
 
+    height_in = _bar_chart_height_in(len(bars))
+    if fig is None:
+        fig, ax = plt.subplots(figsize=(figsize[0], height_in))
+    else:
+        ax = fig.add_subplot(111)
+        w_in, _ = fig.get_size_inches()
+        fig.set_size_inches(w_in, height_in, forward=False)
+
+    # Fat bars, tight row pitch — a categorical bar chart should read as mostly
+    # bars, not gaps.
+    bar_height = 0.78
     for k, (param, lo_fs, hi_fs, _span) in enumerate(bars):
         left, width = min(lo_fs, hi_fs), abs(hi_fs - lo_fs)
-        ax.barh(k, width, left=left, height=0.55, color='C0', alpha=0.75)
+        ax.barh(k, width, left=left, height=bar_height, color='C0', alpha=0.75)
         ax.annotate(vfmt(lo_fs), (lo_fs, k), textcoords='offset points',
                     xytext=(-6, 0), ha='right', va='center', fontsize=8)
         ax.annotate(vfmt(hi_fs), (hi_fs, k), textcoords='offset points',
                     xytext=(6, 0), ha='left', va='center', fontsize=8)
     ax.set_yticks(range(len(bars)))
     ax.set_yticklabels([b[0] for b in bars])
-    # Explicit limits, not margins(): the Studio canvas re-fits axes after render,
+    # Snug y-limits (not the default ~5% margins()) so the axis band is mostly
+    # bars, matching the fattened bar_height above.
+    if bars:
+        pad = (1 - bar_height) / 2 + 0.1
+        ax.set_ylim(-0.5 - pad, len(bars) - 0.5 + pad)
+    # Explicit x limits, not margins(): the Studio canvas re-fits axes after render,
     # which drops margin padding and lets the widest bar's low/high value labels
     # collide with the tick labels at the spine. Fixed limits survive the re-fit.
     if bars:

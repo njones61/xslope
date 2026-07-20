@@ -120,6 +120,12 @@ class MplCanvas(QWidget):
         self.view.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.view.setBackgroundBrush(Qt.white)
+        # Top-left, not Qt's default centered: a figure with a content-driven
+        # height shorter than the viewport (e.g. a categorical bar chart — see
+        # plot_tornado's _bar_chart_height_in) should sit at the top with empty
+        # canvas below, like a document, rather than floating centered. A no-op
+        # whenever the scene fills the viewport (every dense/geometry plot).
+        self.view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         # Never show scrollbars. The figure is sized to the viewport and fit 1:1, so
         # a scrollbar only ever appears transiently (rounding/settle) — and when it
         # does it steals ~16px of viewport, shrinking it, which forces a re-raster at

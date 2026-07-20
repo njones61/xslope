@@ -181,6 +181,62 @@ one-sided, over-strong yield surface that inflates the factor of safety.
     value of 1.15. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce the paper's
     Table 1 exactly.
 
+### Matric suction (apparent cohesion above the water table)
+
+By default the finite-element solver clamps pore pressure to $u = \max(0, u)$ at every Gauss point before the yield
+check (the "suction is conservatively ignored" behavior described under
+[Pore Pressure Options](#pore-pressure-options)), so the negative pore pressures that exist above the water table
+add no strength. Where matric suction is a first-order effect — an unsaturated cut slope, for instance — a
+per-material unsaturated friction angle $\phi^b$ turns that credit on, using the same Fredlund extended
+Mohr-Coulomb criterion the
+[limit-equilibrium solver uses](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table):
+
+>>$\tau_f = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
+
+With the pore-air pressure $u_a = 0$ (the standard slope-stability idealization), the last term becomes an
+**apparent cohesion**
+
+>>$c_{suction} = \min(s,\; s_{cap})\,\tan\phi^b, \qquad s = \max(0,\; -u_w)$
+
+where $s$ is the suction — the magnitude of the negative pore pressure — at the Gauss point, and $s_{cap}$ is an
+optional ceiling on the credited suction. This apparent cohesion is added to the effective cohesion $c'$ in the
+Mohr-Coulomb yield function. The effective-normal-stress term keeps the ordinary clamped $u \ge 0$, so the
+effective stress at the Gauss point is unchanged and only the cohesive intercept of the yield surface picks up the
+extra strength. Below the water table $u_w \ge 0$, so $s = 0$ and the term vanishes — the material yields exactly
+as it always has.
+
+The suction is drawn from the material's own pore-pressure source and is credited only for the effective-stress
+strength options (`mc`, `pow`, `hb`) combined with a signed pore-pressure source, `u = piezo` or `u = seep` — the
+only sources that carry a negative pressure above the water table. It is inert (and the columns are greyed on the
+mat sheet) for `cp` and `elastic` materials and for the `none` and `ru` sources, exactly as in the
+limit-equilibrium solver.
+
+**Reduction under strength reduction.** In an SSRM solve the apparent cohesion is reduced by the trial
+strength-reduction factor $F$ alongside $c'$ and $\tan\phi'$:
+
+>>$c_{suction,\,r} = \dfrac{\min(s,\; s_{cap})\,\tan\phi^b}{F}$
+
+so the suction credit scales as $1/F$ and enters the reduced envelope on the same footing as the effective
+cohesion (compare $c_r = c'/F$ and $\tan\phi_r = \tan\phi'/F$ in the [SSRM methodology](#methodology)). This mirrors
+the limit-equilibrium treatment, where the suction term sits inside the $F$-divided numerator of the developed
+strength. It also distinguishes the suction term from the
+[Rankine tension cutoff](#elastic-plastic-behavior-viscoplastic-algorithm), which caps a stress and is therefore
+**not** reduced by $F$.
+
+**Off by default.** $\phi^b$ is blank for every material unless it is set, so no suction strength is credited and
+the solve is identical to the pre-suction solver. The feature is controlled by the same two material columns as the
+limit-equilibrium solver — `phi_b` and `s_cap` on the
+[mat worksheet](../usage/input_template.md#worksheet-mat) — and is auto-wired into `solve_fem()` and `solve_ssrm()`
+from the template. Their `suction_phi_b` / `suction_cap` arguments override the file the same way
+`elastic_materials` and the tensile cutoff are, so a script can turn the credit on, force it off, or override a cap
+without editing the input file.
+
+!!! warning "Cap the suction on a piezometric source"
+    A piezometric line's hydrostatic head grows negative without bound above the line, so the higher a Gauss point
+    sits above it the larger the (unphysical) suction and the larger the credited apparent cohesion. **Always set
+    `s_cap`** when using `phi_b` with `u = piezo`. With `u = seep` the finite-element seepage field is self-bounded
+    by the unsaturated-flow physics, so a cap there is a useful backstop rather than a hard requirement.
+
 ## Finite Element Formulation
 
 ### Discretization
@@ -748,13 +804,13 @@ Pore pressures reduce the effective stress in the soil, which in turn reduces th
 
 >>$u = \gamma_w (z_{piezo} - z)$
 
-where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of the piezometric surface directly above the point, and $z$ is the elevation of the point. For points above the piezometric surface, $u = 0$ (suction is conservatively ignored).
+where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of the piezometric surface directly above the point, and $z$ is the elevation of the point. For points above the piezometric surface, $u = 0$ for the effective-stress yield check (suction is not credited by default; set `phi_b` to add it as apparent cohesion — see [Matric suction](#matric-suction-apparent-cohesion-above-the-water-table)).
 
 **Seepage Solution** (`u = "seep"`): Pore pressures are obtained from a prior finite element seepage analysis performed with the `seep.py` module. The seepage analysis solves the groundwater flow equation on a triangular mesh, producing pore pressure values at all nodes:
 
 >>$u = \gamma_w (h - z)$
 
-where $h$ is the hydraulic head from the seepage solution and $z$ is the elevation coordinate. These nodal pore pressures are stored in the slope data and transferred to the structural mesh during `build_fem_data()`. Negative pore pressures (suction above the phreatic surface) are clamped to zero.
+where $h$ is the hydraulic head from the seepage solution and $z$ is the elevation coordinate. These nodal pore pressures are stored in the slope data and transferred to the structural mesh during `build_fem_data()`. Negative pore pressures (suction above the phreatic surface) are clamped to zero for the effective-stress yield check; the raw signed field is retained so that the optional [matric-suction](#matric-suction-apparent-cohesion-above-the-water-table) strength can credit that suction as apparent cohesion when `phi_b` is set.
 
 For both the piezometric and seepage options, pore pressures are precomputed at each Gauss point during `build_fem_data()` using the element shape functions to interpolate from nodal values (seep) or by computing the physical coordinates of each Gauss point and projecting onto the piezometric surface (piezo). These precomputed values are then used directly in the effective stress yield check during the viscoplastic iteration, avoiding repeated interpolation at each iteration step.
 

@@ -186,6 +186,10 @@ $\phi^b$ defaults to off (no material carries it), which is bit-identical to eve
 dependency on strength option and pore-pressure source, and the caution about capping suction on a piezometric
 line. Loading a file with `phi_b` set auto-wires the suction credit into every solve; no extra code is needed.
 
+The **finite-element solver reads the same two columns** and credits the identical apparent cohesion; in an SSRM
+run the suction term is reduced by the strength-reduction factor alongside $c'$ and $\tan\phi'$. See
+[Matric suction](../fem/overview.md#matric-suction-apparent-cohesion-above-the-water-table) in the FEM overview.
+
 **Scripted / advanced use.** `generate_slices()` also accepts the underlying run options directly, for callers
 building `slope_data` in memory or overriding the file:
 

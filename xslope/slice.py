@@ -910,7 +910,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             ``slope_data['right_facing']`` key (the kwarg takes precedence).
         suction_phi_b (dict or None, optional): Opt-in matric-suction strength
             (Fredlund extended Mohr-Coulomb), LEM only. Maps ``{material name:
-            phi_b degrees}``. For a slice whose base material is named in the dict,
+            phi_b degrees}``. Default None auto-wires from the materials' template
+            (v17) ``phi_b`` values; an explicit dict overrides the file, and an empty
+            dict forces suction off. For a slice whose base material is named in the dict,
             the base matric suction ``s = max(0, -u)`` (from the UNCLAMPED pore
             pressure: a piezometric line's hydrostatic negative head above the
             line, or an unsaturated seepage solution's negative u) contributes an
@@ -920,10 +922,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             numerically safe) while suction is carried entirely as apparent cohesion.
             Default None => c_suction = 0.0 for every slice, bit-identical to the
             clamped baseline.
-        suction_cap (float or None, optional): Optional upper bound (stress units)
-            on the suction ``s`` before it is converted to apparent cohesion, so a
-            deep piezometric surface cannot grow unbounded hydrostatic suction.
-            Default None = uncapped. Ignored when ``suction_phi_b`` is None.
+        suction_cap (float, dict, or None, optional): Optional upper bound (stress
+            units) on the suction ``s`` before it is converted to apparent cohesion,
+            so a deep piezometric surface cannot grow unbounded hydrostatic suction.
+            A scalar caps every material identically; a dict ``{material name: cap}``
+            caps per material (a material absent from the dict is uncapped). Default
+            None auto-wires from the materials' template (v17) ``s_cap`` values (an
+            explicit value overrides the file). Ignored when ``suction_phi_b`` is None.
 
     Returns:
         tuple:
@@ -958,6 +963,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     k_seismic = slope_data['k_seismic']
     dloads = slope_data["dloads"]
     dloads2 = slope_data.get("dloads2", [])
+
+    # Auto-wire the per-material matric-suction parameters from the template (v17)
+    # when the caller passes no explicit kwarg -- t_cut override semantics: an
+    # explicit kwarg WINS over the file. load_slope_data carries phi_b/s_cap on each
+    # material dict; a material with phi_b set contributes suction strength, capped
+    # at its own s_cap. When no material carries phi_b the derived dict is empty ->
+    # None, bit-identical to the pre-v17 default-off path. (None means "unset, read
+    # the file"; pass an empty dict to force suction off regardless of the file.)
+    if suction_phi_b is None:
+        _file_phi_b = {m.get('name'): m.get('phi_b') for m in materials
+                       if m.get('phi_b') is not None}
+        suction_phi_b = _file_phi_b or None
+    if suction_cap is None:
+        _file_cap = {m.get('name'): m.get('s_cap') for m in materials
+                     if m.get('s_cap') is not None}
+        suction_cap = _file_cap or None
 
     # Opt-in matric-suction strength (Fredlund extended Mohr-Coulomb). Warn on a
     # phi_b keyed to a material name that does not exist, so a typo silently
@@ -2027,11 +2048,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         # term with u_a = 0. Default (suction_phi_b None) => 0.0, bit-identical.
         c_suction = 0.0
         if suction_phi_b and base_material_idx is not None:
-            phi_b_deg = suction_phi_b.get(materials[base_material_idx]['name'])
+            _bm_name = materials[base_material_idx]['name']
+            phi_b_deg = suction_phi_b.get(_bm_name)
             if phi_b_deg:
                 s = max(0.0, -u_unclamped)
+                # suction_cap may be a single scalar (one cap for every material) or
+                # a per-material dict {name: cap}; a material absent from the dict --
+                # or paired with None -- is uncapped.
                 if suction_cap is not None:
-                    s = min(s, suction_cap)
+                    _cap = (suction_cap.get(_bm_name)
+                            if isinstance(suction_cap, dict) else suction_cap)
+                    if _cap is not None:
+                        s = min(s, _cap)
                 c_suction = s * tan(radians(phi_b_deg))
 
         # Prepare slice data with conditional circle parameters

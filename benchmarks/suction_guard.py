@@ -351,12 +351,77 @@ def check_seep():
     return failures
 
 
+# === v17 auto-wiring branch: file-carried phi_b/s_cap == explicit kwargs =========
+# load_slope_data (v17) carries phi_b/s_cap on each material dict. generate_slices
+# auto-wires them into the suction_phi_b / suction_cap options when the caller passes
+# no explicit kwarg (t_cut override semantics: an explicit kwarg wins). This guard
+# freezes that equivalence -- the whole point of the template column is that opening
+# a file with phi_b=20 must give EXACTLY the answer the corpus locks got by passing
+# suction_phi_b={name:20} as a tag -- plus the default-off and override paths, and the
+# per-material suction_cap DICT path (the template is per-material; the old kwarg was a
+# single scalar, so the dict path is new and must match the scalar for one material).
+def check_autowire():
+    """Return failures for the v17 file-carried auto-wiring equivalence."""
+    failures = []
+    base = _base()
+    sd = _slope_data(base)   # material carries phi_b=None, s_cap=None (loader default)
+
+    # (A) Default path (no phi_b in the file) is off-by-default bit-identical: no
+    # kwargs derives an empty dict -> None, so every c_suction is exactly 0.0.
+    df_default = _slices(sd)
+    if not (df_default["c_suction"] == 0.0).all():
+        failures.append("autowire: a material with no phi_b produced nonzero c_suction "
+                        "(default path is not bit-identical to pre-v17)")
+
+    # (B) File-carried == kwarg-driven, bit-for-bit. Put phi_b/s_cap on the material
+    # dict (the load_slope_data path) and pass NO kwargs; compare to leaving them off
+    # the dict and passing the identical values as explicit kwargs.
+    sd_file = _slope_data(base)
+    sd_file["materials"][0]["phi_b"] = PHI_B
+    sd_file["materials"][0]["s_cap"] = SUCTION_CAP
+    df_file = _slices(sd_file)                                    # auto-wired from file
+    df_kwarg = _slices(sd, suction_phi_b={MAT_NAME: PHI_B}, suction_cap=SUCTION_CAP)
+    dcs = float((df_file["c_suction"] - df_kwarg["c_suction"]).abs().max())
+    if dcs != 0.0:
+        failures.append(f"autowire: file-carried c_suction != kwarg-driven "
+                        f"(max |delta| = {dcs:.3e}, must be exactly 0)")
+    if _fs(df_file) != _fs(df_kwarg):
+        failures.append(f"autowire: file-carried FS != kwarg-driven FS "
+                        f"({_fs(df_file)} vs {_fs(df_kwarg)})")
+
+    # (C) An explicit kwarg OVERRIDES the file (t_cut semantics): a file phi_b=PHI_B
+    # with an explicit empty suction_phi_b forces suction off.
+    df_override = _slices(sd_file, suction_phi_b={})
+    if not (df_override["c_suction"] == 0.0).all():
+        failures.append("autowire: an explicit empty suction_phi_b did not override "
+                        "the file's phi_b (kwarg must win)")
+
+    # (D) The per-material suction_cap DICT path equals the scalar for a single
+    # material -- the minimal extension that lets the per-material template column work.
+    df_cap_scalar = _slices(sd, suction_phi_b={MAT_NAME: PHI_B}, suction_cap=SUCTION_CAP)
+    df_cap_dict = _slices(sd, suction_phi_b={MAT_NAME: PHI_B},
+                          suction_cap={MAT_NAME: SUCTION_CAP})
+    dcap = float((df_cap_scalar["c_suction"] - df_cap_dict["c_suction"]).abs().max())
+    if dcap != 0.0:
+        failures.append(f"autowire: per-material suction_cap dict != scalar cap "
+                        f"(max |delta| = {dcap:.3e}, must be exactly 0)")
+    # A material ABSENT from the cap dict is uncapped (matches suction_cap=None).
+    df_cap_none = _slices(sd, suction_phi_b={MAT_NAME: PHI_B}, suction_cap={})
+    df_uncapped = _slices(sd, suction_phi_b={MAT_NAME: PHI_B})
+    if float((df_cap_none["c_suction"] - df_uncapped["c_suction"]).abs().max()) != 0.0:
+        failures.append("autowire: a material absent from the suction_cap dict was not "
+                        "left uncapped")
+
+    return failures
+
+
 def main():
     if not os.path.exists(_BASE_XLSX):
         print(f"SKIP: base template not found ({_BASE_XLSX})")
         return 0
     failures = check()
     failures += check_seep()
+    failures += check_autowire()
     if failures:
         print("FAILED:")
         for f in failures:
@@ -371,6 +436,10 @@ def main():
           "the clamped read returns 0 there), matches max(0, gamma_w*(y_base - y_wt))"
           "*tan(phi_b) on every slice while the effective-normal u keeps its own "
           "clamp, and is off-by-default bit-identical.")
+    print("OK: v17 file-carried phi_b/s_cap auto-wire to EXACTLY the explicit-kwarg "
+          "answer (c_suction and FS bit-for-bit); the default path (no phi_b) stays "
+          "off-by-default bit-identical; an explicit kwarg overrides the file; and the "
+          "per-material suction_cap dict matches the scalar cap.")
     return 0
 
 

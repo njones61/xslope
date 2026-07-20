@@ -29,7 +29,7 @@ def build_acads_simple():
     new_file(dst, TEMPLATE)
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(9, 1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none")
+    u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none")
     prof = {'B2': 20}  # base elevation
     prof.update(profile_line_cells(1, 1, [(20, 25), (30, 25), (50, 35), (70, 35)]))
     u['profile'] = prof
@@ -55,8 +55,8 @@ def build_acads_weak_layer():
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
     mat = {}
-    mat.update(material_cells(9, 1, "Soil 1", 18.84, "mc", c=28.5, phi=20.0, u="piezo"))
-    mat.update(material_cells(10, 2, "Weak Layer", 18.84, "mc", c=0.0, phi=10.0, u="piezo"))
+    mat.update(material_cells(1, "Soil 1", 18.84, "mc", c=28.5, phi=20.0, u="piezo"))
+    mat.update(material_cells(2, "Weak Layer", 18.84, "mc", c=0.0, phi=10.0, u="piezo"))
     u['mat'] = mat
     prof = {'B2': 20}
     prof.update(profile_line_cells(1, 1, [(20, 27.75), (43, 27.75), (67.5, 40), (84, 40)]))
@@ -90,7 +90,7 @@ def build_arai_tagyo():
     new_file(dst, TEMPLATE)
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(9, 1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none")
+    u['mat'] = material_cells(1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none")
     prof = {'B2': 0}
     prof.update(profile_line_cells(1, 1, [(0, 15), (18, 15), (48, 35), (66, 35)]))
     u['profile'] = prof

@@ -203,20 +203,60 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0):
     return {'D8': gamma_w, 'D9': tcrack_depth, 'D10': tcrack_water, 'D11': seismic}
 
 
-def material_cells(row, mat_num, name, gamma, option, c, phi, u,
-                   k1=None, k2=None, alpha=None, kr0=None, h0=None, E=None, nu=None):
-    cells = {
-        cell_ref(row, 1): mat_num, cell_ref(row, 2): name,
-        cell_ref(row, 3): gamma, cell_ref(row, 4): option,
-        cell_ref(row, 5): c, cell_ref(row, 6): phi, cell_ref(row, 11): u,
-    }
-    if k1 is not None: cells[cell_ref(row, 18)] = k1
-    if k2 is not None: cells[cell_ref(row, 19)] = k2
-    if alpha is not None: cells[cell_ref(row, 20)] = alpha
-    if kr0 is not None: cells[cell_ref(row, 21)] = kr0
-    if h0 is not None: cells[cell_ref(row, 22)] = h0
-    if E is not None: cells[cell_ref(row, 23)] = E
-    if nu is not None: cells[cell_ref(row, 24)] = nu
+_MAT_HEADER_CACHE = {}
+
+
+def _mat_header(template):
+    """(header_row, {stripped_header: col}) for ``template``'s 'mat' sheet, cached per
+    path. Delegates to fileio.mat_header_cols so the benchmark writer resolves columns
+    exactly as load_slope_data reads them back — see material_cells."""
+    from xslope.fileio import mat_header_cols
+    key = os.path.abspath(template)
+    if key not in _MAT_HEADER_CACHE:
+        _MAT_HEADER_CACHE[key] = mat_header_cols(template)
+    return _MAT_HEADER_CACHE[key]
+
+
+def material_cells(mat_num, name, gamma, option, c, phi, u,
+                   k1=None, k2=None, alpha=None, kr0=None, h0=None, E=None, nu=None,
+                   phi_b=None, s_cap=None, t_cut=None,
+                   template="docs/inputs/input_template.xlsx"):
+    """Cells for one 'mat' sheet material row, located BY HEADER NAME.
+
+    The mat-sheet header row AND its column order have both shifted across template
+    versions (v11 inserted unsat/vg_a/vg_n; v16 t_cut/E/nu; v17 relocated phi_b/s_cap
+    to Q:R, right of ru), so every field is placed through fileio.mat_header_cols() —
+    the same name->column map load_slope_data reads back — never by hardcoded index.
+    The data row is the located header row + ``mat_num`` (mat_num is 1-based). Header
+    lookup is underscore-insensitive, matching the loader ('phi_b' -> 'phib' etc.)."""
+    header_row, cols = _mat_header(template)
+    row = header_row + mat_num
+    cells = {}
+
+    def put(header, val):
+        if val is None:
+            return
+        col = cols.get(header.replace('_', ''))
+        if col is not None:
+            cells[cell_ref(row, col)] = val
+
+    put('mat', mat_num)
+    put('name', name)
+    put('g', gamma)
+    put('option', option)
+    put('c', c)
+    put('f', phi)          # phi's mat-sheet header is 'f'
+    put('u', u)
+    put('k1', k1)
+    put('k2', k2)
+    put('alpha', alpha)
+    put('kr0', kr0)
+    put('h0', h0)
+    put('E', E)
+    put('nu', nu)
+    put('phi_b', phi_b)    # v17 matric-suction pair (LEM & FEM), now at cols Q:R
+    put('s_cap', s_cap)
+    put('t_cut', t_cut)
     return cells
 
 

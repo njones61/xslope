@@ -49,7 +49,7 @@ def build_confined_radial():
             [(0.0, R1)] + list(reversed(inner))[1:])
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(9, 1, "Soil", 20.0, "mc", c=0.0, phi=30.0, u="seep",
+    u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=0.0, phi=30.0, u="seep",
                               k1=1.0, k2=1.0, alpha=0.0)
     u['polygon'] = polygon_cells(1, 1, ring)
     u['profile'] = {'B2': 0}
@@ -95,7 +95,7 @@ def build_sheetpile(s_over_T=0.5):
     s = s_over_T * T_SP
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(9, 1, "Sand", 20.0, "mc", c=0.0, phi=30.0, u="seep",
+    u['mat'] = material_cells(1, "Sand", 20.0, "mc", c=0.0, phi=30.0, u="seep",
                               k1=1.0, k2=1.0, alpha=0.0, kr0=0.01, h0=-1.0)
     # ground surface with V-notch for the wall (same idiom as the clay-blanket
     # sample: profile dips to the wall tip and back up, leaving a crack)

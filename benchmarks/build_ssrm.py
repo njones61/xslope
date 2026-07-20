@@ -53,7 +53,7 @@ def _build(dst, wet):
     new_file(dst, TEMPLATE)
     u = {}
     u['main'] = main_cells(gamma_w=GAMMA_W)
-    u['mat'] = material_cells(9, 1, "Embankment", 18.2, "mc", c=13.8, phi=37.0,
+    u['mat'] = material_cells(1, "Embankment", 18.2, "mc", c=13.8, phi=37.0,
                               u=("piezo" if wet else "none"),
                               E=1.0e5, nu=0.3)
     prof = {'B2': 0}              # base of foundation at y = 0
@@ -89,7 +89,7 @@ def build_griffiths6_seep():
     new_file(dst, TEMPLATE)
     u = {}
     u['main'] = main_cells(gamma_w=GAMMA_W)
-    u['mat'] = material_cells(9, 1, "Embankment", 18.2, "mc", c=13.8, phi=37.0,
+    u['mat'] = material_cells(1, "Embankment", 18.2, "mc", c=13.8, phi=37.0,
                               u="seep", k1=1.0, k2=1.0, alpha=0.0,
                               kr0=0.01, h0=-1.0, E=1.0e5, nu=0.3)
     prof = {'B2': 0}

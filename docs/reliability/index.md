@@ -11,6 +11,14 @@ where:
 
 In reliability analysis, we consider the uncertainties in the parameters that affect the stability of the slope. These uncertainties can arise from various sources, such as variations in soil properties, loading conditions, and environmental factors. By incorporating these uncertainties into our analysis, we can obtain a more comprehensive understanding of the slope's stability. The **xslope** package provides a function to calculate the reliability of a slope using the limit equilibrium method. This function takes into account the uncertainties in the soil properties ($\gamma$, $c$, $\phi$, etc.) and provides a probability of failure (Pf) and reliability (R) for the slope. It can be used with any of the limit equilibrium methods implemented in the package, such as Bishop's method, Janbu's method, or Spencer's method. It can also be combined with a rapid drawdown analysis.
 
+!!! tip "Run reliability interactively"
+    In XSLOPE Studio this lives behind the **Reliability…** button, beside
+    **Parametric…** on the Run menu and toolbar: pick the Taylor series or Monte
+    Carlo engine, review the standard deviations pulled from the mat sheet, and view
+    the results in a dedicated tab — the perturbation-surface plot for the Taylor
+    series, the FS histogram for Monte Carlo. See
+    [Studio → Running Analyses](../studio/analysis.md#reliability-analysis).
+
 ## The reliability family
 
 All of the methods described in this section are reached through a single front door:

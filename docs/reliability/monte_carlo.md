@@ -58,6 +58,39 @@ limit-equilibrium solve but not with the finite-element SSRM, so FEM reliability
 stays on the Taylor series (1 + 2N solves — see
 [Reliability Analysis (FEM)](fem.md)).
 
+### Worked example: VP34 (Clarence Cannon Dam)
+
+**VP34** is the corpus case Monte Carlo was added for: Wolff & Harr (1987)'s Phase I
+fill has $\phi = 6.34° \pm 7.87°$, a coefficient of variation of 124%. The Taylor
+series cannot evaluate $F(\phi - \sigma)$ — MLV $-\sigma$ is negative — and
+`reliability()` declines the input; `reliability_mc` handles it by truncating the
+negative draws at $\phi = 0$, the same physical floor the published Monte Carlo
+estimates apply (see [When to use Monte Carlo versus the Taylor
+series](index.md#when-to-use-monte-carlo-versus-the-taylor-series)):
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.advanced import reliability_mc
+from xslope.plot import plot_reliability_histogram
+
+slope_data = load_slope_data("vp034.xlsx")
+success, result = reliability_mc(slope_data, "spencer", circular=False,
+                                  search=False, n_samples=10000, num_slices=40)
+plot_reliability_histogram(result)
+```
+
+![Monte Carlo FS distribution — VP34 Phase I fill, COV(phi) = 124%](images/reliability_mc_vp034.png){width=800}
+
+The distribution is strongly right-skewed, the signature of a large-COV input pushed
+through a nonlinear factor-of-safety response: mean FS = 2.542, $\sigma_F$ = 0.809,
+and an empirical probability of failure of 1.94% (9,874 of the 10,000 draws
+converged to a valid Spencer solution; the rest are excluded rather than counted as
+failures). That lands inside the 0.36%–6.2% band spanned by the three published
+estimates for this problem — a case the Taylor series simply has no number for (see
+[VP34](../verification/rocscience.md#vp34) for the full comparison). This is the same
+plot XSLOPE Studio renders on the **Reliability · MC** result tab — see
+[Reliability analysis](../studio/analysis.md#reliability-analysis).
+
 ## Surface treatment
 
 The slip surface is a **decision variable, not a random variable** — its geometry is

@@ -32,3 +32,31 @@ The strength parameters that are perturbed depend on each material's strength mo
 The Monte Carlo campaign is called the same way through `reliability_mc`, which reads the identical MLV and standard-deviation inputs and adds only the sampling controls (`n_samples`, `distribution`, `rng_seed`). It is a limit-equilibrium path only, for the compute reason discussed in [Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope).
 
 One of the arguments to the function is `method`, which specifies the limit equilibrium method to be used for the analysis. The available methods are 'bishop', 'janbu', and 'spencer'. The function will return the probability of failure ($P_f$) and reliability ($R$) of the slope. Either a circular or non-circular slope can be analyzed. If a circular slope is analyzed, care should be taken to select a set of starting circles in the circles table of the input file to ensure that the automated search finds the global minimum factor of safety for each analysis. It is good practice to include a circle that touches the bottom each material zone and perhaps a circle that passes through the toe of the slope.
+
+## Visualizing the perturbation surfaces
+
+`plot_reliability_results()` draws the $F_{MLV}$ surface together with every
+$F_i^+$/$F_i^-$ perturbation surface from step 2 above, so the effect of each
+$\pm\sigma_i$ swing is visible in the geometry, not just the factor of safety. It
+takes the `slope_data` and the `result` dict `reliability_taylor` returns:
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.advanced import reliability_taylor
+from xslope.plot import plot_reliability_results
+
+slope_data = load_slope_data("vp036.xlsx")
+success, result = reliability_taylor(slope_data, "bishop")
+plot_reliability_results(slope_data, result)
+```
+
+![Taylor-series perturbation surfaces — VP36](images/reliability_taylor_vp036.png){width=800}
+
+**VP36** (Li & Lumb 1987 / Hassan & Wolff 1999) is a homogeneous slope with standard
+deviations on $\gamma$, $c$ and $\phi$. With `search=True` (the default) the critical
+surface is re-searched at each of the $2N=6$ perturbed states, so the red $F_{MLV}$
+surface and the six blue/green $F^+$/$F^-$ surfaces fan out slightly rather than
+coincide — visible confirmation that the search, not only the factor of safety,
+shifts under each $\pm\sigma$ perturbation. XSLOPE Studio renders this same plot on
+the **LEM · Reliability** result tab — see
+[Reliability analysis](../studio/analysis.md#reliability-analysis).

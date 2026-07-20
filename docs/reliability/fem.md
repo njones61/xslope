@@ -125,7 +125,10 @@ however, is set internally to the tight reliability default (not the dialog's
 single-run *Tolerance* field — see [Numerical precision](#numerical-precision-and-reproducibility)).
 The FEM Results view shows the deformation at the most-likely values, the
 reliability summary appears in a dialog and the status bar, and the full
-per-parameter ΔF table is written to the Log pane.
+per-parameter ΔF table is written to the Log pane. See
+[Reliability analysis](../studio/analysis.md#reliability-analysis) for the dialog and
+the engine comparison shared with the [Taylor series](taylor.md) and
+[Monte Carlo](monte_carlo.md) pages.
 
 From Python:
 

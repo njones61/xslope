@@ -105,7 +105,13 @@ MAT_SHOWCASE = [
 
 
 def build_mat(out_path):
-    template = default_template_path()
+    # Source the master template the docs page links for download
+    # (docs/inputs/input_template.xlsx), NOT the bundled package copy from
+    # default_template_path(). The two can lag each other between a master edit and
+    # the next resource sync; sourcing the documented master keeps the rendered mat
+    # images matching the template a reader actually downloads. Cells are written by
+    # header NAME below (mat_header_cols), so this is layout-order independent.
+    template = os.path.join(REPO_ROOT, "docs", "inputs", "input_template.xlsx")
     import shutil
     shutil.copy(template, out_path)
     header_row, cols = mat_header_cols(out_path)

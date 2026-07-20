@@ -3446,7 +3446,7 @@ def _build_spatial_grid(nodes, elements, element_types):
     return grid
 
 
-def interpolate_at_point(nodes, elements, element_types, values, point, return_found=False):
+def interpolate_at_point(nodes, elements, element_types, values, point, return_found=False, signed=False):
     """
     Interpolate values at a given point using the mesh.
 
@@ -3458,6 +3458,13 @@ def interpolate_at_point(nodes, elements, element_types, values, point, return_f
         point: tuple (x, y) coordinates of the point to interpolate at
         return_found: if True, return (value, found) so callers can distinguish a
             genuine interpolated zero from a point that fell outside the mesh
+        signed: if False (default) the interpolated value is clamped at 0.0 on the
+            historical assumption that pore pressure cannot be negative -- every
+            existing caller relies on this. Pass signed=True to receive the raw
+            interpolated value INCLUDING negative pressures; an unsaturated seepage
+            field carries genuine matric suction (u < 0) above the water table, and
+            the caller is then responsible for its own clamping where an
+            effective-normal pore pressure is required.
 
     Returns:
         float: Interpolated value at the point, or 0.0 if point not found
@@ -3785,8 +3792,9 @@ def interpolate_at_point(nodes, elements, element_types, values, point, return_f
     else:
         return (0.0, False) if return_found else 0.0  # Unknown element type
 
-    # Return zero if interpolated value is negative (pore pressure cannot be negative)
-    result = max(0.0, interpolated_value)
+    # Clamp negative interpolated values to zero (pore pressure cannot be negative)
+    # unless the caller explicitly opts into the signed field via signed=True.
+    result = interpolated_value if signed else max(0.0, interpolated_value)
     return (result, True) if return_found else result
 
 

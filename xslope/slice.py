@@ -1840,7 +1840,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 mesh = slope_data['mesh']
                 seep_u = slope_data['seep_u']
 
-                # Interpolate pore pressure at the slice center base point
+                # Interpolate pore pressure at the slice center base point.
+                # signed=True delivers the RAW field including negative (suction)
+                # values above the water table; this branch then applies its OWN
+                # clamp for the effective-normal u, mirroring the piezo branch.
                 point = (x_c, y_cb)
                 u_val, found = interpolate_at_point(
                     mesh['nodes'],
@@ -1848,7 +1851,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     mesh['element_types'],
                     seep_u,
                     point,
-                    return_found=True
+                    return_found=True,
+                    signed=True
                 )
                 if not found:
                     warnings.warn(
@@ -1858,7 +1862,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                         "below the phreatic surface over-predicts the factor of safety).")
                 # Unsaturated seepage solutions carry negative u (suction) above the
                 # water table; keep the signed value for the suction option before
-                # clamping the effective-normal pore pressure at 0.
+                # clamping the effective-normal pore pressure at 0. max(0, signed)
+                # is identical to the old max(0, clamped), so the effective-normal
+                # u is byte-unchanged for every non-suction caller.
                 u_unclamped = u_val
                 u = max(0.0, u_val)
             else:

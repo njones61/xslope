@@ -41,11 +41,14 @@ import os
 import sys
 import warnings
 
+import numpy as np
+
 warnings.filterwarnings("ignore")
 
 from shapely.geometry import Polygon
 
 from xslope.fileio import load_slope_data, build_ground_surface_from_polygons
+from xslope.mesh import interpolate_at_point
 from xslope.slice import generate_slices
 from xslope.solve import oms, bishop, janbu, spencer
 
@@ -190,11 +193,170 @@ def check():
     return failures
 
 
+# === SEEP branch: matric suction delivered from a seepage u-field ===============
+# The piezo guard above proves the strength side for a hand-drawn piezo line. This
+# second guard proves the SAME apparent cohesion is delivered when the base pore
+# pressure comes from a SEEPAGE solution (material u='seep'), which reads the mesh
+# via interpolate_at_point. That read must hand the SIGNED field to the suction
+# option (negative u = matric suction above the water table); if it clamps at 0
+# first, the seep u-source can never raise suction and c_suction stays 0 for every
+# slice. Regression target for exactly that latent clamp.
+#
+# The fixture puts a HYDROSTATIC field u(x, y) = gamma_w*(y_wt - y) onto a synthetic
+# triangular mesh. On linear triangles that field interpolates EXACTLY, so the seep
+# u-source must reproduce the piezo u-source (piezo line at y_wt) slice-for-slice:
+# same c_suction, same FS. gamma_sat is left unset so the gamma/gamma_sat weight
+# split (a different mesh consumer) stays out of the comparison.
+Y_WT_SEEP = 6.0              # water table elevation for the synthetic seep field
+                            # (matched to the piezo guard's _PIEZO y so the two
+                            # u-sources are directly comparable)
+
+
+def _synthetic_hydrostatic_mesh(y_wt, gamma_w, x0=-5.0, x1=125.0, y0=-5.0, y1=46.0,
+                                 nx=54, ny=22):
+    """A structured triangular mesh over [x0,x1] x [y0,y1] carrying the exact
+    hydrostatic field u = gamma_w*(y_wt - y) at every node (negative above y_wt).
+    Returns (mesh_dict, seep_u) in the format generate_slices expects."""
+    xs = np.linspace(x0, x1, nx)
+    ys = np.linspace(y0, y1, ny)
+    XX, YY = np.meshgrid(xs, ys)                      # (ny, nx)
+    nodes = np.column_stack([XX.ravel(), YY.ravel()])  # row-major: idx = j*nx + i
+    elements = []
+    for j in range(ny - 1):
+        for i in range(nx - 1):
+            a = j * nx + i
+            b = j * nx + (i + 1)
+            c = (j + 1) * nx + i
+            d = (j + 1) * nx + (i + 1)
+            elements.append([a, b, d])                 # lower triangle
+            elements.append([a, d, c])                 # upper triangle
+    n_elem = len(elements)
+    elem_arr = np.zeros((n_elem, 9), dtype=int)
+    elem_arr[:, :3] = np.asarray(elements, dtype=int)
+    element_types = np.full(n_elem, 3, dtype=int)
+    mesh = {"nodes": nodes, "elements": elem_arr, "element_types": element_types}
+    seep_u = gamma_w * (y_wt - nodes[:, 1])            # signed: < 0 above y_wt
+    return mesh, seep_u
+
+
+def _seep_slope_data(base):
+    """The piezo guard's slope, but the u-source is the synthetic seepage mesh."""
+    m = dict(base["materials"][0])
+    m.update(name=MAT_NAME, c=5.0, phi=30.0, gamma=20.0, gamma_sat=None,
+             option="mc", u="seep", ru=0.0)
+    polys = [{"polygon": Polygon(_SOIL_POLY), "mat_id": 0}]
+    gs, dom = build_ground_surface_from_polygons(polys)
+    mesh, seep_u = _synthetic_hydrostatic_mesh(Y_WT_SEEP, GW)
+    sd = dict(base)
+    sd["materials"] = [m]
+    sd["polygons"] = polys
+    sd["ground_surface"] = gs
+    sd["domain_polygon"] = dom
+    sd["piezo_line"] = []
+    sd["piezo_line2"] = []
+    sd["piezo_phreatic"] = False
+    sd["dloads"] = []
+    sd["dloads2"] = []
+    sd["circular"] = True
+    sd["circles"] = [_CIRCLE]
+    sd["non_circ"] = []
+    sd["reinforce_lines"] = []
+    sd["reinforcement_lines"] = []
+    sd["pile_lines"] = []
+    sd["line_loads"] = []
+    sd["k_seismic"] = 0.0
+    sd["tcrack_depth"] = 0.0
+    sd["tcrack_water"] = 0.0
+    sd["mesh"] = mesh
+    sd["seep_u"] = seep_u
+    sd.pop("_water_table_profile", None)
+    return sd
+
+
+def check_seep():
+    """Guard the seep-u-source -> matric-suction delivery. Returns failures list."""
+    failures = []
+    base = _base()
+    sd = _seep_slope_data(base)
+
+    df_off = _slices(sd)                                     # default (None)
+    df_on = _slices(sd, suction_phi_b={MAT_NAME: PHI_B})     # phi_b = 20
+
+    # The seep u-source must actually raise suction on the slices above y_wt --
+    # this is exactly what the pre-fix clamp defeated (c_suction == 0 everywhere).
+    n_susc = int((df_on["c_suction"] > 0).sum())
+    if n_susc == 0:
+        failures.append("seep: no slice carries matric suction from the seep u-source "
+                        "(the interpolated field was clamped at 0 before reaching the "
+                        "suction option) -- the seep->suction delivery is broken")
+        return failures
+
+    # OFF is bit-identical for the seep source too.
+    if not (df_off["c_suction"] == 0.0).all():
+        failures.append("seep: suction_phi_b=None left a nonzero c_suction")
+    fs_off = _fs(df_off)
+    fs_on = _fs(df_on)
+    for method in ("oms", "bishop", "janbu", "spencer"):
+        if fs_off[method] is None or fs_on[method] is None:
+            failures.append(f"seep/{method}: solve failed")
+            continue
+        if not (fs_on[method] > fs_off[method]):
+            failures.append(f"seep/{method}: phi_b did not raise FS from the seep "
+                            f"u-source (on={fs_on[method]:.6f} <= off={fs_off[method]:.6f})")
+
+    # Hand-check on the largest-suction slice: the field is exactly hydrostatic, so
+    # the SIGNED interpolation equals gamma_w*(y_wt - y_base), and c_suction must be
+    # max(0, gamma_w*(y_base - y_wt)) * tan(phi_b). Also confirm the CLAMPED read
+    # (the old default) would have returned 0 there -- i.e. the sign is load-bearing.
+    row = df_on.loc[df_on["c_suction"].idxmax()]
+    x_c, y_base = float(row["x_c"]), float(row["y_cb"])
+    mesh, seep_u = _synthetic_hydrostatic_mesh(Y_WT_SEEP, GW)
+    u_signed = interpolate_at_point(mesh["nodes"], mesh["elements"],
+                                    mesh["element_types"], seep_u, (x_c, y_base),
+                                    signed=True)
+    u_clamped = interpolate_at_point(mesh["nodes"], mesh["elements"],
+                                     mesh["element_types"], seep_u, (x_c, y_base))
+    s_expected = max(0.0, GW * (y_base - Y_WT_SEEP))
+    c_expected = s_expected * math.tan(math.radians(PHI_B))
+    c_got = float(row["c_suction"])
+    if abs(u_signed - GW * (Y_WT_SEEP - y_base)) > 1e-6:
+        failures.append(f"seep: signed interpolation {u_signed:.6f} != hydrostatic "
+                        f"{GW*(Y_WT_SEEP - y_base):.6f} at the check slice")
+    if u_clamped != 0.0:
+        failures.append(f"seep: clamped read at the suction slice was {u_clamped:.6f}, "
+                        f"expected 0 -- the sign carries the suction, so signed=True "
+                        f"is what makes c_suction nonzero")
+    if abs(c_got - c_expected) > 1e-6:
+        failures.append(f"seep hand-check: c_suction={c_got:.6f} != "
+                        f"max(0, gamma_w*(y_base - y_wt))*tan(phi_b)={c_expected:.6f} "
+                        f"(y_base={y_base:.3f}, y_wt={Y_WT_SEEP})")
+
+    # Full per-slice check against the exact hydrostatic field. The single field
+    # feeds BOTH terms and both must be right on every slice:
+    #   effective-normal u = max(0, gamma_w*(y_wt - y_base))  (clamped, saturated only)
+    #   c_suction         = max(0, gamma_w*(y_base - y_wt)) * tan(phi_b)  (signed)
+    tanb = math.tan(math.radians(PHI_B))
+    yb = df_on["y_cb"].to_numpy()
+    u_exp = np.maximum(0.0, GW * (Y_WT_SEEP - yb))
+    cs_exp = np.maximum(0.0, GW * (yb - Y_WT_SEEP)) * tanb
+    du_all = float(np.max(np.abs(df_on["u"].to_numpy() - u_exp)))
+    dcs_all = float(np.max(np.abs(df_on["c_suction"].to_numpy() - cs_exp)))
+    if du_all > 1e-6:
+        failures.append(f"seep per-slice: effective-normal u off by {du_all:.2e} from "
+                        f"max(0, gamma_w*(y_wt - y_base)) -- the caller's own clamp is wrong")
+    if dcs_all > 1e-6:
+        failures.append(f"seep per-slice: c_suction off by {dcs_all:.2e} from "
+                        f"max(0, gamma_w*(y_base - y_wt))*tan(phi_b) on some slice")
+
+    return failures
+
+
 def main():
     if not os.path.exists(_BASE_XLSX):
         print(f"SKIP: base template not found ({_BASE_XLSX})")
         return 0
     failures = check()
+    failures += check_seep()
     if failures:
         print("FAILED:")
         for f in failures:
@@ -203,7 +365,12 @@ def main():
     print("OK: matric-suction apparent cohesion is off-by-default bit-identical "
           "(None and phi_b=0), strictly raises FS for phi_b>0, respects suction_cap "
           "(baseline < capped < uncapped), and c_suction = max(0, gamma_w*(y_base - "
-          "y_piezo))*tan(phi_b) exactly — OMS, Bishop, Janbu, Spencer.")
+          "y_piezo))*tan(phi_b) exactly — OMS, Bishop, Janbu, Spencer.\n"
+          "OK: the SEEP u-source delivers the same suction — a hydrostatic seepage "
+          "field raises c_suction on the slices above the water table (signed read; "
+          "the clamped read returns 0 there), matches max(0, gamma_w*(y_base - y_wt))"
+          "*tan(phi_b) on every slice while the effective-normal u keeps its own "
+          "clamp, and is off-by-default bit-identical.")
     return 0
 
 

@@ -60,3 +60,79 @@ coincide — visible confirmation that the search, not only the factor of safety
 shifts under each $\pm\sigma$ perturbation. XSLOPE Studio renders this same plot on
 the **LEM · Reliability** result tab — see
 [Reliability analysis](../studio/analysis.md#reliability-analysis).
+
+## Console summary
+
+`reliability()` prints a running summary as it works through the critical-surface
+search, each parameter's $F^+$/$F^-$ perturbation searches, and the final
+statistics — pass `debug_level=1` to see it. Below is that summary for the same
+VP36 run behind the plot above (`reliability(slope_data, "bishop", debug_level=1)`).
+The per-iteration search progress is elided for length; everything else,
+including the tabulated $\Delta F$ breakdown and the summary statistics, is
+printed verbatim:
+
+```text
+=== RELIABILITY ANALYSIS ===
+Method: bishop
+Rapid drawdown: False
+Circular search: True
+Performing circular search...
+  ... (search iterations) ...
+[✅ converged] Iter=9, FS=1.3334 (ΔFS<0.0005) at (x=3.92, y=19.55, depth=4.96), elapsed time=1.73 seconds
+Critical factor of safety (F_MLV): 1.3334
+Found 3 parameters with standard deviations:
+  Material 1: gamma = 18.000 ± σ=0.900
+  Material 1: c = 18.000 ± σ=3.600
+  Material 1: phi = 30.000 ± σ=3.000
+
+Processing parameter 1/3: Material 1, gamma
+  ... (search iterations) ...
+[✅ converged] Iter=13, FS=1.2993 (ΔFS<0.0005) at (x=3.97, y=19.47, depth=4.96), elapsed time=2.15 seconds
+  ... (search iterations) ...
+[✅ converged] Iter=9, FS=1.3710 (ΔFS<0.0005) at (x=3.88, y=19.92, depth=4.96), elapsed time=1.78 seconds
+  F+ = 1.2993, F- = 1.3710, ΔF = 0.0717
+
+Processing parameter 2/3: Material 1, c
+  ... (search iterations) ...
+[✅ converged] Iter=15, FS=1.4752 (ΔFS<0.0005) at (x=3.88, y=20.16, depth=4.96), elapsed time=2.35 seconds
+  ... (search iterations) ...
+[✅ converged] Iter=10, FS=1.1886 (ΔFS<0.0005) at (x=3.31, y=19.74, depth=4.90), elapsed time=1.87 seconds
+  F+ = 1.4752, F- = 1.1886, ΔF = 0.2867
+
+Processing parameter 3/3: Material 1, phi
+  ... (search iterations) ...
+[✅ converged] Iter=16, FS=1.4098 (ΔFS<0.0005) at (x=3.84, y=19.43, depth=4.95), elapsed time=2.66 seconds
+  ... (search iterations) ...
+[✅ converged] Iter=10, FS=1.2602 (ΔFS<0.0005) at (x=3.88, y=20.04, depth=4.96), elapsed time=1.74 seconds
+  F+ = 1.4098, F- = 1.2602, ΔF = 0.1496
+
+σ_F = 0.1656
+COV_F = 0.1242
+β_ln = 2.2635
+Reliability = 98.82%
+Probability of failure = 1.18%
+
+=== RELIABILITY ANALYSIS RESULTS ===
++-------------+-------+-----+---------+---------+-------+-------+-------+
+| Parameter   |  MLV  |  σ  |  MLV+σ  |  MLV-σ  |  F+   |  F-   |  ΔF   |
++=============+=======+=====+=========+=========+=======+=======+=======+
+| Mat 1 gamma |  18   | 0.9 |  18.9   |  17.1   | 1.299 | 1.371 | 0.072 |
++-------------+-------+-----+---------+---------+-------+-------+-------+
+| Mat 1 c     |  18   | 3.6 |  21.6   |  14.4   | 1.475 | 1.189 | 0.287 |
++-------------+-------+-----+---------+---------+-------+-------+-------+
+| Mat 1 phi   |  30   |  3  |   33    |   27    | 1.41  | 1.26  | 0.15  |
++-------------+-------+-----+---------+---------+-------+-------+-------+
+
+Summary Statistics:
+F_MLV: 1.333
+σ_F: 0.166
+COV_F: 0.124
+β_ln: 2.263
+Reliability: 98.82%
+Probability of failure: 1.18%
+
+Reliability analysis completed in 14.29 seconds.
+```
+
+$F_{MLV}$ = 1.333 and $\beta_{ln}$ = 2.263 match the values quoted for VP36 in the
+[verification corpus](../verification/rocscience.md#vp36).

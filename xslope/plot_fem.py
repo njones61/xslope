@@ -30,16 +30,25 @@ from .plot import adaptive_colorbar_ticks
 _DENSE_TANGLE_EDGE_PX = 9.0
 
 
-def _fs_title(base, F, fs=None):
+def _fs_title(base, F, fs=None, at_failure=False):
     """Result-panel title that keeps the SSRM factor of safety and the rendered
     viscoplastic state unambiguous.
 
-    The field is rendered at the LAST CONVERGED strength-reduction factor
-    (``solution['F']``); the reported factor of safety is the SSRM bracket midpoint
-    (``result['FS']``), which at a wide tolerance can round differently. When both
-    are known and differ at two-decimal display, the title names both; otherwise it
-    keeps the simple ``F = X.XX`` form (or just ``base`` when no F is available).
+    Normal (converged) panels are rendered at the LAST CONVERGED strength-reduction
+    factor (``solution['F']``); the reported factor of safety is the SSRM bracket
+    midpoint (``result['FS']``), which at a wide tolerance can round differently. When
+    both are known and differ at two-decimal display, the title names both; otherwise
+    it keeps the simple ``F = X.XX`` form (or just ``base`` when no F is available).
+
+    ``at_failure`` marks a panel rendering the UNCONVERGED at-failure field (captured
+    a margin beyond critical). It leads with the factor of safety and, when the trial
+    F rounds differently, discloses it as the "unconverged trial F" rather than a "last
+    converged F".
     """
+    if at_failure and fs is not None:
+        if F is None or f"{fs:.2f}" == f"{F:.2f}":
+            return f"{base}  FS = {fs:.2f}"
+        return f"{base}  FS = {fs:.2f} (unconverged trial F = {F:.2f})"
     if F is None:
         return base
     if fs is None or f"{fs:.2f}" == f"{F:.2f}":
@@ -508,7 +517,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
-                    mesh_on_fields=False, fs=None):
+                    mesh_on_fields=False, fs=None, failure_solution=None,
+                    show_original='outline', deformed_color='k', deform_scale=None):
     """
     Plot FEM results with various visualization options.
 
@@ -555,6 +565,21 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             field was rendered at (solution['F']), the panel titles name both — e.g.
             "FS = 0.45 (rendered at last converged F = 0.43)". When omitted or equal
             at two decimals, titles keep the simple "F = X.XX" form.
+        failure_solution: Optional at-failure (unconverged) solve_fem field captured by
+            solve_ssrm (result['failure_solution']). When given, the deformation and
+            displacement-vector panels render it — the runaway rotational mechanism
+            Griffiths & Lane plot — instead of the sub-critical last-converged
+            settlement, and the deformation title reads "…at Failure" leading with FS.
+            None (default) falls back to ``solution`` for those panels.
+        show_original: Original-mesh reference on the deformation panel — a tri-state
+            passed to plot_deformed_mesh: 'outline' (default) a dashed light boundary
+            outline at every density, 'mesh' the full light-gray grid (outline when
+            dense), False none.
+        deformed_color: Deformed-grid color on the deformation panel (default 'k'
+            paper black; 'blue' for the former house style).
+        deform_scale: Explicit deformation multiplier. None (default) auto-computes
+            it so the rendered field's max displacement is ``deform_percent`` of the
+            mesh height; a value overrides the auto-computation.
     """
 
     nodes = fem_data["nodes"]
@@ -568,6 +593,17 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     if fs is not None:
         solution = {**solution, "_ssrm_fs": fs}
 
+    # The deformation and displacement-vector panels render the AT-FAILURE (unconverged)
+    # mechanism when solve_ssrm captured it; the shear-strain and other field panels
+    # stay on the passed (last-converged) solution. Mark the field _at_failure and carry
+    # the factor of safety so the deformation title leads with FS and names the trial F.
+    if failure_solution is not None:
+        deform_field = {**failure_solution, "_at_failure": True}
+        if fs is not None:
+            deform_field["_ssrm_fs"] = fs
+    else:
+        deform_field = solution
+
     # Accept a single string or a list of strings
     if isinstance(plot_type, str):
         plot_types = [plot_type.strip().lower()]
@@ -580,17 +616,22 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if pt not in valid_types:
             raise ValueError(f"Unknown plot_type: '{pt}'. Valid types: {valid_types}")
     
-    # Auto-calculate deformation scale so max displacement is deform_percent of mesh height
-    # Use VP displacement if available (matches what plot_deformed_mesh will plot)
-    disp_elastic = solution.get("displacements_elastic", None)
-    disp_for_scale = displacements - disp_elastic if disp_elastic is not None else displacements
-    u_arr, v_arr = _extract_uv(disp_for_scale, fem_data)
-    max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
-    mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-    if max_disp > 1e-30:
-        deform_scale = max(1.0, (mesh_height * deform_percent / 100) / max_disp)
-    else:
-        deform_scale = 1.0
+    # Auto-calculate deformation scale so max displacement is deform_percent of the mesh
+    # height, measured on the field the deformation panel actually renders (the at-
+    # failure field when present) so the exaggeration is honest. An explicit deform_scale
+    # kwarg overrides. Use VP displacement if available (matches plot_deformed_mesh).
+    if deform_scale is None:
+        df_disp = deform_field.get("displacements", np.zeros(2 * len(nodes)))
+        df_disp_elastic = deform_field.get("displacements_elastic", None)
+        disp_for_scale = (df_disp - df_disp_elastic
+                          if df_disp_elastic is not None else df_disp)
+        u_arr, v_arr = _extract_uv(disp_for_scale, fem_data)
+        max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
+        mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+        if max_disp > 1e-30:
+            deform_scale = max(1.0, (mesh_height * deform_percent / 100) / max_disp)
+        else:
+            deform_scale = 1.0
     
     # Create subplots based on number of plot types.
     n_plots = len(plot_types)
@@ -729,15 +770,18 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             plot_displacement_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'displace_vector':
-            plot_displacement_vectors(ax, fem_data, solution, show_mesh, show_reinforcement,
+            plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                                     plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
                                     displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors,
                                     single_panel=defer_panel_cbar)
         elif pt == 'deformation':
-            plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
-                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
-                             single_panel=defer_panel_cbar)
+            plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
+                             show_original=show_original, deformed_color=deformed_color,
+                             show_reinforcement=show_reinforcement,
+                             cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
+                             label_elements=label_elements, single_panel=defer_panel_cbar,
+                             at_failure=(failure_solution is not None))
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1067,7 +1111,10 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
 
     F = solution.get("F", None)
     title = 'Viscoplastic Displacement Vectors' if disp_elastic is not None else 'Displacement Vectors'
-    title = _fs_title(title, F, solution.get("_ssrm_fs"))
+    # at_failure when the panel is drawing the captured unconverged field (routed here
+    # by plot_fem_results): discloses the trial F honestly instead of "last converged".
+    title = _fs_title(title, F, solution.get("_ssrm_fs"),
+                      at_failure=solution.get("_at_failure", False))
     ax.set_title(title, fontsize=12, pad=15)
 
 
@@ -1171,16 +1218,39 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
     ax.set_title('von Mises Stress (Red outline = Yielding/Plastic Elements)')
 
 
-def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True, show_reinforcement=True,
-                       cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, single_panel=False):
+def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
+                       show_original='outline', deformed_color='k', show_reinforcement=True,
+                       cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
+                       single_panel=False, at_failure=False, show_mesh=None):
     """
     Plot deformed mesh overlay on original mesh.
 
-    Shows the original mesh in light gray and the deformed mesh in blue.
-    Uses VP displacement (total - elastic) when available to show the failure
-    mechanism rather than gravity settlement. The deform_scale parameter
-    amplifies the displacements for visibility.
+    Draws the deformed mesh in ``deformed_color`` (default paper black 'k') over an
+    original-mesh reference governed by ``show_original``. Uses VP displacement
+    (total - elastic) when available to show the failure mechanism rather than gravity
+    settlement. The deform_scale parameter amplifies the displacements for visibility.
+
+    Parameters:
+        deform_scale: Displacement multiplier for visibility.
+        show_original: Original (undeformed) reference — a tri-state:
+            'outline' (default) draws a light DASHED boundary outline only, at every
+                mesh density (Griffiths & Lane convention; Norm's Variant E look);
+            'mesh' draws the full light-gray original grid, collapsing to the dashed
+                outline when the mesh is dense enough that two grids would tangle;
+            False/None draws no original reference.
+        deformed_color: Color of the deformed grid (default 'k'; pass 'blue' for the
+            former house style).
+        at_failure: When True the title reads "…at Failure" and leads with the SSRM
+            factor of safety (the field is the unconverged at-failure state).
+        show_mesh: Legacy boolean alias for ``show_original`` (True→'mesh',
+            False→off); prefer ``show_original``. None (default) leaves show_original
+            in effect.
     """
+    # Legacy alias: an explicit show_mesh bool maps onto the tri-state so older
+    # callers keep working (True == the former full-grid-or-outline behavior).
+    if show_mesh is not None:
+        show_original = 'mesh' if show_mesh else False
+
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
@@ -1198,14 +1268,9 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     nodes_deformed = nodes + deform_scale * np.column_stack([u, v])
     
     # Mesh-line hierarchy with a device-pixel floor so nothing renders sub-pixel
-    # (which smears each line into an antialiased haze). Deformed (blue) is the story:
-    # crisp, full opacity, at the floored adaptive width. Original (gray) is the
-    # reference: SAME floored width, light and semi-transparent — one clear treatment,
-    # never stacked thin + faint. When the mesh is dense enough that two full
-    # interleaved grids tangle (median rendered edge below a few device px), collapse
-    # the original to its domain boundary outline (the Griffiths & Lane convention:
-    # the deformed grid carries the deformation, the outline marks the undeformed
-    # extent).
+    # (which smears each line into an antialiased haze). The deformed grid is the
+    # story: crisp, full opacity, at the floored adaptive width, in deformed_color.
+    # The original is a light reference governed by show_original (below).
     floor_pt = _mesh_pixel_floor_pt(ax)
     lw = _adaptive_mesh_linewidth(ax, fem_data, floor_pt)
     _, n_across = _mesh_edge_stats(fem_data)
@@ -1214,17 +1279,28 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     fem_data_deformed = fem_data.copy()
     fem_data_deformed["nodes"] = nodes_deformed
 
-    # Plot original mesh (full grid, or boundary outline when dense)
-    if show_mesh:
+    # Original (undeformed) reference — tri-state show_original:
+    #   'mesh'    : full light-gray grid, collapsing to the dashed boundary outline
+    #               when the mesh is dense enough that two interleaved grids tangle
+    #               (median rendered edge below a few device px).
+    #   'outline' : the dashed light boundary outline ONLY, at every density — the
+    #               Griffiths & Lane convention (the deformed grid carries the
+    #               deformation, the outline marks the undeformed extent). Default.
+    #   False/None: no original reference.
+    if show_original == 'mesh':
         if tangle:
-            _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6,
-                                   linewidth=lw, label='Original (outline)')
+            _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6, linewidth=lw,
+                                   linestyle='--', label='Original (outline)')
         else:
             plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5,
                             linewidth=lw, label='Original')
+    elif show_original:      # 'outline' (default; any truthy value that isn't 'mesh')
+        _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.7,
+                               linewidth=max(lw, floor_pt), linestyle='--',
+                               label='Original (outline)')
 
     # Plot deformed mesh
-    plot_mesh_lines(ax, fem_data_deformed, color='blue', alpha=1.0,
+    plot_mesh_lines(ax, fem_data_deformed, color=deformed_color, alpha=1.0,
                     linewidth=lw, label='Deformed')
     
     # Plot reinforcement in both original and deformed configurations
@@ -1256,9 +1332,14 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     # When used as a standalone plot, matplotlib will auto-scale appropriately
     F = solution.get("F", None)
     disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
+    if at_failure:
+        disp_label += ' at Failure'
     scale_str = f'{deform_scale:.0f}' if deform_scale >= 10 else f'{deform_scale:.1f}'
-    title = f'{disp_label} (Scale = {scale_str}x)'
-    title = _fs_title(title, F, solution.get("_ssrm_fs"))
+    base = f'{disp_label} (Scale = {scale_str}x)'
+    # The at-failure field is the UNCONVERGED state, solved a margin beyond critical to
+    # develop the mechanism; _fs_title(at_failure=...) leads with FS and discloses the
+    # trial F when it rounds differently.
+    title = _fs_title(base, F, solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
 
 
@@ -1408,15 +1489,17 @@ def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=None, labe
         ax.add_collection(lc)
 
 
-def _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6, linewidth=1.0, label=None):
+def _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6, linewidth=1.0,
+                           linestyle='-', label=None):
     """Draw only the mesh's outer boundary (domain outline), no interior element
-    edges — the dense-mesh stand-in for the original grid so it never tangles with
-    the deformed grid drawn on top."""
+    edges — the stand-in for the original grid so it never tangles with the deformed
+    grid drawn on top. ``linestyle`` defaults to solid; the deformation panel passes
+    '--' for the dashed undeformed-extent outline (Griffiths & Lane convention)."""
     nodes = fem_data["nodes"]
     segs = [[nodes[a], nodes[b]] for a, b in _get_mesh_boundary(fem_data)]
     if segs:
         lc = LineCollection(segs, colors=color, alpha=alpha, linewidths=linewidth,
-                            label=label, gid='MESH')
+                            linestyles=linestyle, label=label, gid='MESH')
         ax.add_collection(lc)
 
 

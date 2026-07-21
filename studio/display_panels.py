@@ -587,14 +587,17 @@ class FemResultsDisplayPanel(QWidget):
 
     def options(self):
         # One universal "Element edges" toggle drives the mesh overlay in every
-        # plot type: show_mesh for the contour/deformation plots, plot_elements
-        # for the vector plot.
+        # plot type: show_mesh for the deformation plot (grid is the content),
+        # mesh_on_fields for the filled-field contour plots (shear_strain / stress /
+        # strain / displace_mag / yield — edges are opt-in there so the fill reads
+        # clean), and plot_elements for the vector plot.
         edges = self.element_edges.isChecked()
         return {
             "plot_type": self.plot_type.currentData(),
             "cmap": self.cmap.currentData(),
             "deform_percent": self.deform_percent.value(),
             "show_mesh": edges,
+            "mesh_on_fields": edges,
             "plot_elements": edges,
             "show_reinforcement": self.show_reinforcement.isChecked(),
             "label_elements": self.label_elements.isChecked(),

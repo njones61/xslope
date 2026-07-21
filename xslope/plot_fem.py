@@ -437,7 +437,8 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
-                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None):
+                    scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
+                    mesh_on_fields=False):
     """
     Plot FEM results with various visualization options.
 
@@ -453,7 +454,18 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             'shear_strain' - viscoplastic max shear strain contours
             'yield' - Mohr-Coulomb yield function contours
         deform_percent: Target deformation as percentage of mesh height (default 15).
-        show_mesh: Show mesh lines
+        show_mesh: Show mesh lines where the mesh IS the content — the deformation
+            panel's original-vs-deformed grid (and the displace_vector panel's edge
+            context). It does NOT overlay edges on the filled-field contour panels
+            (shear_strain / stress / strain / displace_mag / yield); those edges
+            muddy the fill the way they did the seepage flow nets, so they are opt-in
+            via ``mesh_on_fields`` instead. This keeps the default three-panel figure
+            (deformation / shear_strain / displace_vector) clean: the deformation
+            grid stays, the shear-strain band reads uncluttered.
+        mesh_on_fields: Overlay light element edges on the filled-field contour
+            panels (shear_strain / stress / strain / displace_mag / yield). Off by
+            default (the fill is the content); turn on to inspect element boundaries
+            against the field.
         show_reinforcement: Show reinforcement elements
         figsize: Figure size (width, height)
         label_elements: Show element ID labels at centroids
@@ -602,8 +614,12 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if cbar_shrink is not None:
             cb_shrink = cbar_shrink
 
+        # Filled-field contour panels take ``mesh_on_fields`` (opt-in edge overlay,
+        # default off) so the fill reads clean; the deformation panel keeps
+        # ``show_mesh`` because there the grid IS the content, and displace_vector
+        # keeps it for its edge/boundary context.
         if pt == 'displace_mag':
-            plot_displacement_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+            plot_displacement_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'displace_vector':
             plot_displacement_vectors(ax, fem_data, solution, show_mesh, show_reinforcement,
@@ -616,19 +632,19 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                              single_panel=single)
         elif pt == 'stress':
-            plot_stress_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+            plot_stress_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'strain':
-            plot_strain_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+            plot_strain_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'shear_strain':
             single_mappable = plot_shear_strain_contours(
-                ax, fem_data, solution, show_mesh, show_reinforcement,
+                ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                 cmap=cmap, single_panel=single)
             single_cbar_label = 'VP Max Shear Strain'
         elif pt == 'yield':
-            plot_yield_function_contours(ax, fem_data, solution, show_mesh, show_reinforcement,
+            plot_yield_function_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                         cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
 
         # Set consistent axis limits for all plots (including single plots)
@@ -1606,7 +1622,11 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
         values_list.append(np.clip(yield_function[i], vmin, vmax))
     
     if patches_list:
-        p = PatchCollection(patches_list, alpha=0.9, edgecolors='gray', linewidths=0.3)
+        # Element edges are baked into the patch collection; gate them on show_mesh
+        # (the caller's mesh_on_fields opt-in) so the yield field reads clean by
+        # default like the other filled-field panels.
+        p = PatchCollection(patches_list, alpha=0.9,
+                            edgecolors='gray' if show_mesh else 'none', linewidths=0.3)
         p.set_array(np.array(values_list))
         p.set_cmap(cmap_yield)
         p.set_clim(vmin, vmax)

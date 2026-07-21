@@ -310,6 +310,7 @@ class MplCanvas(QWidget):
             cbar_shrink=opts.get("cbar_shrink"),
             deform_percent=opts.get("deform_percent", 15),
             show_mesh=opts.get("show_mesh", True),
+            mesh_on_fields=opts.get("mesh_on_fields", False),
             show_reinforcement=opts.get("show_reinforcement", True),
             label_elements=opts.get("label_elements", False),
             plot_boundary=opts.get("plot_boundary", True),

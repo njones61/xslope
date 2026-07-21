@@ -218,6 +218,133 @@ def build_griffiths4_r2():
     return build_griffiths4(2.0, "r2")
 
 
+# ---------------------------------------------------------------------------
+# Example 3: undrained clay slope with a THIN WEAK LAYER (Fig. 6)
+# ---------------------------------------------------------------------------
+# The outer profile is Example 4's (H = 50 ft, D = 2): crest platform (0,100)-
+# (100,100), 2:1 face to the toe (200,50), 2H runout to (300,50), firm base y=0.
+# A thin weaker band (cu2) runs parallel to the slope face, flattens horizontally
+# through the foundation, and outcrops at 45 deg beyond the toe.
+#
+# THE GEOMETRY IS MEASURED OFF FIG. 6 (a schematic — the band THICKNESS is never
+# dimensioned in the paper). It was read at 600 dpi by scaling from the labelled
+# H-fractions, which close exactly:
+#   * Crest (top surface y=100): the band's lower boundary daylights at x=0.6H=30,
+#     its upper boundary at x=0.8H=40  (0.6H + 0.2H + 1.2H = 2H, the crest platform).
+#   * Sloped reach: both boundaries run parallel to the 2:1 face.
+#   * Horizontal foundation reach: the band top sits 0.4H below the runout surface
+#     (y=30) and the band bottom 0.4H above the firm base (y=20), a 0.2H=10 ft gap
+#     (0.4H + 0.2H + 0.4H = H, runout-surface-to-base).
+#   * Outcrop: both boundaries kick UP at 45 deg (1:1) beyond the toe; the upper
+#     daylights at x=260 (toe + 1.2H), the lower at x=270 (right edge - 0.6H)
+#     (1.2H + 0.2H + 0.6H = 2H, the runout).
+# DECLARED GOVERNING THICKNESS: 0.2H = 10 ft in the horizontal foundation reach
+# (the clearly-dimensioned 0.4H/0.2H/0.4H stack), tapering to ~0.1H perpendicular
+# where the band parallels the face and fanning to meet the ground at the two
+# daylights. The band is bounded by two measured polylines; a THICK multiplier
+# scales both boundaries about the band centreline for the thickness-sensitivity
+# variant (thick=0.5 halves the band everywhere).
+#
+# Measured boundary polylines (thick = 1.0), y increasing upward, H = 50:
+#   upper (nearer the face):  (40,100) (180,30) (240,30) (260,50)
+#   lower (deeper):           (30,100) (190,20) (240,20) (270,50)
+# centreline = vertex-wise midpoint; each boundary vertex is scaled toward it by
+# `thick`.
+_G3_U = [(40.0, 100.0), (180.0, 30.0), (240.0, 30.0), (260.0, 50.0)]
+_G3_L = [(30.0, 100.0), (190.0, 20.0), (240.0, 20.0), (270.0, 50.0)]
+_G3_C = [((u[0] + l[0]) / 2.0, (u[1] + l[1]) / 2.0) for u, l in zip(_G3_U, _G3_L)]
+
+
+def _g3_boundaries(thick):
+    """Return (upper, lower) weak-layer boundary polylines scaled by `thick`
+    about the centreline (thick=1.0 is the measured band, 0.5 is half-thickness)."""
+    up = [(c[0] + thick * (u[0] - c[0]), c[1] + thick * (u[1] - c[1]))
+          for u, c in zip(_G3_U, _G3_C)]
+    lo = [(c[0] + thick * (l[0] - c[0]), c[1] + thick * (l[1] - c[1]))
+          for l, c in zip(_G3_L, _G3_C)]
+    return up, lo
+
+
+def build_griffiths3(ratio, tag, thick=1.0):
+    """Griffiths & Lane (1999) Example 3 (Fig. 6): an undrained (phi_u = 0) clay
+    slope on a foundation layer (D = 2) containing a THIN WEAK LAYER. The
+    surrounding clay is held at cu1/gamma-H = 0.25; the thin layer strength cu2 is
+    varied, and the behaviour is governed by the ratio cu2/cu1.
+
+    Same outer geometry, units and elastic-props convention as Example 4 (H = 50 ft,
+    gamma = 125 pcf, cu1 = 1562.5 psf, phi_u = 0; E/nu by soil type). The domain is
+    tiled by THREE explicit polygons so the thin band is its own material region:
+      1. cu1 outer wedge  — between the slope face and the band's upper boundary
+      2. cu2 thin layer   — the band itself
+      3. cu1 inner body   — everything below the band's lower boundary
+    Regions 1 and 3 share material cu1; region 2 is cu2. The weak-layer boundaries
+    are traced off Fig. 6 (see module header); `thick` scales the band thickness for
+    the sensitivity variant.
+
+    Published (Griffiths & Lane, Fig. 7, FE points, all GRAPHICAL): FOS = 1.47 at
+    cu2/cu1 = 1 (Taylor 1937, circular base failure). The curve holds a base-circle
+    plateau (~1.4-1.47) for cu2/cu1 > 0.6, then falls roughly linearly once
+    cu2/cu1 < 0.6 as a non-circular mechanism follows the weak layer: 0.8->~1.45,
+    0.6->~1.40 (transition), 0.5->~1.25, 0.4->~1.05, 0.2->~0.60. The mechanism flips
+    from a base circle (Fig. 8a, cu2/cu1=1) to a layer-following two-wedge slide
+    (Fig. 8c, cu2/cu1=0.2). At cu2/cu1 = 1 the band is the same material as its
+    surroundings, so the model is materially identical to Example 4 r1 (homogeneous
+    D = 2) and the anchor should land near its 1.441 (mesh-only difference)."""
+    dst = f"{OUTDIR}/xslope_griffiths3_{tag}.xlsx"
+    new_file(dst, TEMPLATE)
+    cu1 = 1562.5
+    cu2 = ratio * cu1
+    from benchmarks.rocscience.elastic_props import classify
+    _, E1, nu1 = classify({'option': 'mc', 'c': cu1, 'phi': 0.0}, imperial=True)
+    _, E2, nu2 = classify({'option': 'mc', 'c': cu2, 'phi': 0.0}, imperial=True)
+
+    up, lo = _g3_boundaries(thick)
+
+    u = {}
+    u['main'] = main_cells(gamma_w=62.4)
+    mat = material_cells(1, "Surrounding clay", 125.0, "mc", c=cu1, phi=0.0,
+                         u="none", E=E1, nu=nu1)
+    mat.update(material_cells(2, "Thin weak layer", 125.0, "mc", c=cu2, phi=0.0,
+                              u="none", E=E2, nu=nu2))
+    u['mat'] = mat
+
+    # 1. cu1 outer wedge: crest surface -> face -> runout -> back up the upper band edge
+    outer = [up[0], (100.0, 100.0), (200.0, 50.0), up[3], up[2], up[1], up[0]]
+    # 2. cu2 thin weak layer band (upper edge forward, lower edge back)
+    band = [up[0], up[1], up[2], up[3], lo[3], lo[2], lo[1], lo[0], up[0]]
+    # 3. cu1 inner body: outer domain -> runout -> up the lower band edge -> crest
+    inner = [(0.0, 100.0), (0.0, 0.0), (300.0, 0.0), (300.0, 50.0),
+             lo[3], lo[2], lo[1], lo[0], (0.0, 100.0)]
+    poly = polygon_cells(1, 1, outer)
+    poly.update(polygon_cells(2, 2, band))
+    poly.update(polygon_cells(3, 1, inner))
+    u['polygon'] = poly
+
+    # placeholder circle (loader requires one; FEM/SSRM ignores it) — base circle
+    u['circles'] = circle_cells(1, 150.0, 90.0, option="Depth", depth=0.0)
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst)
+    return dst
+
+
+# Example-3 sweep stations (cu2/cu1, tag), read off Fig. 7: the anchor at 1.0, the
+# base-circle plateau (0.8), the transition (0.6), and the falling weak-layer
+# regime (0.5, 0.4, 0.2). Gated quad8 runs at the anchor (1.0) and the clearest
+# weak-layer mechanism (0.2, Fig. 8c); coarse tri6 at the rest.
+GRIFFITHS3_STATIONS = [
+    (1.0, "r1"), (0.8, "r0p8"), (0.6, "r0p6"),
+    (0.5, "r0p5"), (0.4, "r0p4"), (0.2, "r0p2"),
+]
+
+
+def build_griffiths3_all():
+    files = [build_griffiths3(r, tag) for r, tag in GRIFFITHS3_STATIONS]
+    # thickness-sensitivity variant: half-thickness band at the representative
+    # weak ratio (cu2/cu1 = 0.2), same everything else.
+    files.append(build_griffiths3(0.2, "r0p2_thin", thick=0.5))
+    return files
+
+
 def build_griffiths5(l_over_h, tag):
     """Griffiths & Lane (1999) Example 5 (Figs 12-15): the Example-1 homogeneous
     2:1 slope with a HORIZONTAL free surface at depth L below the crest, swept over
@@ -313,6 +440,7 @@ def build_griffiths6_dry():
 
 if __name__ == "__main__":
     build_griffiths2()
+    build_griffiths3_all()
     build_griffiths4_r1()
     build_griffiths4_r2()
     build_griffiths5_all()

@@ -143,6 +143,157 @@ result. XSLOPE's default search is not misled: left free, it finds the toe.
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.366, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.702, tolerance=0.02 -->
 
+### Griffiths & Lane (1999) Example 3 — Undrained Clay Slope with a Thin Weak Layer {#verification-griffiths3}
+
+This is Example 3 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
+(their Fig. 6): an **undrained** ($\phi_u = 0$) clay slope on a foundation layer
+($D = 2$) that contains a **thin layer of weaker clay**. The surrounding clay is held
+at $c_{u1}/\gamma H = 0.25$; the thin-layer strength $c_{u2}$ is varied, and the
+behaviour is governed by the ratio $c_{u2}/c_{u1}$. The weak layer runs parallel to the
+slope face through the slope body, turns horizontal through the foundation, and outcrops
+at 45 degrees beyond the toe — Griffiths & Lane liken it to a thin weak liner in a
+landfill. The lesson of the example is that lowering $c_{u2}$ eventually switches the
+failure from a circular base slide to a non-circular slide that **follows the weak
+layer**, and a limit-equilibrium search that assumes a circle would badly overestimate
+the factor of safety once that switch has occurred.
+
+The outer geometry, units and elastic constants are Example 4's: $H = 50$ ft,
+$\gamma = 125$ pcf, $c_{u1} = 1562.5$ psf ($c_{u1}/\gamma H = 0.25$), $\phi_u = 0$, with
+the firm base a full $2H$ below the crest ($D = 2$). $E$ and $\nu$ are the
+[FEM Overview](../fem/overview.md) soil-type values (surrounding clay = Medium Clay,
+$E = 668{,}300$ psf, $\nu = 0.40$; the weakest thin layer at $c_{u2}/c_{u1} = 0.2$
+classifies Soft Clay, $E = 167{,}100$ psf, $\nu = 0.45$). As everywhere in the SSRM the
+factor of safety is independent of the elastic constants.
+
+| Property | Value |
+|---|---|
+| Surrounding clay, $c_{u1}$ | 1562.5 psf ($c_{u1}/\gamma H = 0.25$) |
+| Thin-layer strength, $c_{u2}$ | $c_{u2}/c_{u1} \times c_{u1}$ (ratio varied) |
+| Friction angle, $\phi_u$ | 0 degrees |
+| Unit weight, $\gamma$ | 125 pcf |
+| Slope | 2:1, $H = 50$ ft (crest $y = 100$, toe $(200, 50)$, firm base $y = 0$) |
+| Geometry | $2H$ crest platform, 2:1 face, $2H$ runout, $D = 2$ |
+
+**The weak-layer geometry is measured from Fig. 6, which is a schematic — the layer
+thickness is never dimensioned in the paper.** Following the labelled $H$-fractions
+(read off the figure at 600 dpi), which close exactly, the band is placed as follows
+($H = 50$, $y$ upward):
+
+- **Crest.** The band daylights at the top surface between $x = 0.6H = 30$ (its deeper,
+  lower boundary) and $x = 0.8H = 40$ (its upper boundary nearer the face); the crest
+  platform closes as $0.6H + 0.2H + 1.2H = 2H$.
+- **Slope reach.** Both boundaries run parallel to the 2:1 face.
+- **Foundation reach.** The band flattens horizontally, its top $0.4H$ below the runout
+  surface ($y = 30$) and its bottom $0.4H$ above the firm base ($y = 20$), a $0.2H = 10$ ft
+  gap ($0.4H + 0.2H + 0.4H = H$).
+- **Outcrop.** Both boundaries kick up at 45 degrees (1:1) beyond the toe, the upper
+  daylighting at $x = 260$ (toe $+\,1.2H$) and the lower at $x = 270$ (right edge
+  $-\,0.6H$); the runout closes as $1.2H + 0.2H + 0.6H = 2H$.
+
+**Declared governing thickness: $0.2H = 10$ ft** in the horizontal foundation reach (the
+one clearly-dimensioned span), tapering to roughly $0.1H$ perpendicular where the band
+parallels the face and fanning out to meet the ground at the two daylights. The domain
+is tiled by **three explicit polygons** so the band is its own material region: a
+surrounding-clay wedge between the band and the slope face, the $c_{u2}$ band itself, and
+the surrounding-clay body below the band. A thickness-sensitivity variant (below) halves
+the band to show how much this undimensioned assumption matters.
+
+Excel input files, one per station:
+[$c_{u2}/c_{u1} = 1.0$](../fem/files/xslope_griffiths3_r1.xlsx),
+[$0.8$](../fem/files/xslope_griffiths3_r0p8.xlsx),
+[$0.6$](../fem/files/xslope_griffiths3_r0p6.xlsx),
+[$0.5$](../fem/files/xslope_griffiths3_r0p5.xlsx),
+[$0.4$](../fem/files/xslope_griffiths3_r0p4.xlsx),
+[$0.2$](../fem/files/xslope_griffiths3_r0p2.xlsx);
+plus the half-thickness variant
+[$0.2$ (thin band)](../fem/files/xslope_griffiths3_r0p2_thin.xlsx).
+
+Inputs plotted with the XSLOPE plot_inputs() function — the surrounding clay (blue) and
+the thin weak layer (orange) tracing the measured path of Fig. 6:
+
+![griffiths3_inputs.png](../fem/images/griffiths3_inputs.png){width=1000}
+
+FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rollers
+(circles) on the sides; the mesh conforms to the thin band as its own zone:
+
+![griffiths3_mesh.png](../fem/images/griffiths3_mesh.png){width=1000}
+
+**The sweep.** The XSLOPE SSRM factor of safety, computed across the six ratios,
+reproduces the Fig. 7 curve — a base-circle plateau for $c_{u2}/c_{u1} \gtrsim 0.6$ and a
+roughly linear fall below it as the weak-layer mechanism takes over. The coarse-tri6
+sweep tracks the shape; the two gated quad8 points and the Taylor anchor are overlaid:
+
+![griffiths3_sweep.png](../fem/images/griffiths3_sweep.png){width=700}
+
+| $c_{u2}/c_{u1}$ | XSLOPE SSRM (coarse tri6) | quad8 (gated) | Griffiths & Lane Fig. 7 (FE) |
+|---|---|---|---|
+| 1.0 | 1.45 | **1.44** | 1.47 (Taylor 1937, base circle) |
+| 0.8 | 1.42 | — | ~1.45 |
+| 0.6 | 1.37 | — | ~1.40 (transition) |
+| 0.5 | 1.20 | — | ~1.25 |
+| 0.4 | 0.97 | — | ~1.05 |
+| 0.2 | 0.49 | **0.45** | ~0.60 |
+
+All XSLOPE numbers are computed; every Fig. 7 value is **graphical** (read from the
+paper's plotted FE points), and the weak-layer geometry that produces them is the
+measured, schematic band declared above — so the falling-regime rows carry wide,
+figure-read tolerances. The curve matches Fig. 7 in the three features that matter: the
+**plateau** holds near the Taylor base-circle value while $c_{u2}/c_{u1} \gtrsim 0.6$
+(the thin layer is too strong to matter), the **transition** sits at
+$c_{u2}/c_{u1} \approx 0.6$ exactly where Griffiths & Lane place it, and below it the
+factor of safety **falls roughly linearly** toward the weak-layer strength. The XSLOPE
+points sit a few percent below the graphical FE curve in the falling regime — part the
+strict-true-equilibrium offset seen throughout these examples, part the undimensioned
+band geometry — but the shape and the transition are reproduced.
+
+**The two mechanisms (Fig. 8).** The gated quad8 solutions bracket the mechanism change.
+At $c_{u2}/c_{u1} = 1$ the band is the same clay as its surroundings, so the failure is
+an essentially **circular base slide** tangent to the firm base — Taylor's mechanism and
+Griffiths & Lane's Fig. 8(a):
+
+![griffiths3_r1_results.png](../fem/images/griffiths3_r1_results.png){width=1000}
+
+At $c_{u2}/c_{u1} = 0.2$ the shear strain concentrates into a narrow band that **follows
+the weak layer** — down parallel to the face, along the horizontal foundation reach, and
+kicking up to daylight beyond the toe — a highly concentrated non-circular slide, exactly
+Griffiths & Lane's Fig. 8(c):
+
+![griffiths3_r0p2_results.png](../fem/images/griffiths3_r0p2_results.png){width=1000}
+
+**Cross-check against Example 4.** At $c_{u2}/c_{u1} = 1$ the thin layer carries the same
+strength as the surrounding clay, so the model is materially identical to the homogeneous
+$D = 2$ slope of [Example 4](#verification-griffiths4) at its ratio-1 station. The gated
+quad8 SSRM returns **FS = 1.44**, landing on Example 4 r1's 1.441 to within 0.001 (the
+only difference is the extra mesh boundaries where the band sits) and a few percent below
+Taylor's 1.47 — the same base-circle limit.
+
+**Thickness sensitivity.** Because the layer thickness is undimensioned, the band was
+also halved (to $\approx 0.1H$ in the foundation reach) and re-run at the representative
+weak ratio $c_{u2}/c_{u1} = 0.2$. The coarse-tri6 factor of safety moves from **0.49**
+(measured band) to **0.51** (half band) — about 4%. The weak-ratio result is governed by
+$c_{u2}$ times the length of the failure path, which barely changes with band thickness,
+so the undimensioned thickness does **not** swamp the comparison with Fig. 7; the ~20%
+gap to the graphical 0.60 is a genuine model-vs-figure difference, not an artefact of the
+thickness guess.
+
+<!-- Gated quad8 SSRM locks (benchmark=SSRM-G3): the anchor (cu2=cu1, base circle) tight
+     on the observed value; the weak ratio (cu2/cu1=0.2, layer-following) figure-read with
+     a wide tolerance, since both the ~0.6 published FE point and the schematic band geometry
+     are read off the figures. -->
+<!-- test: file=../fem/files/xslope_griffiths3_r1.xlsx, type=fem_ssrm, expected_fs=1.4406, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G3 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.45, element_type=quad8, target_size=3.5, tolerance=0.05, f_min=0.3, f_max=1.0, max_iter=16000, benchmark=SSRM-G3 -->
+<!-- Coarse tri6 quick SSRM (ungated, wide figure-read tolerance): the Fig. 7 sweep — the
+     base-circle plateau (>=0.6), the transition at ~0.6, and the roughly linear fall as the
+     weak-layer mechanism takes over. -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p8.xlsx, type=fem_ssrm, expected_fs=1.42, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p6.xlsx, type=fem_ssrm, expected_fs=1.37, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.7, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p5.xlsx, type=fem_ssrm, expected_fs=1.20, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.8, f_max=1.6, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p4.xlsx, type=fem_ssrm, expected_fs=0.97, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.6, f_max=1.4, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.49, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000 -->
+<!-- Thickness sensitivity: half-thickness band at cu2/cu1=0.2 barely moves the FS (0.49 -> 0.51),
+     confirming the weak-ratio result is set by cu2 x path length, not the undimensioned band thickness. -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p2_thin.xlsx, type=fem_ssrm, expected_fs=0.51, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000 -->
+
 ### Griffiths & Lane (1999) Example 4 — Undrained Clay Slope over a Weak Foundation {#verification-griffiths4}
 
 This is Example 4 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)

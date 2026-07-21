@@ -112,6 +112,55 @@ def build_griffiths6_seep():
     return dst
 
 
+def build_griffiths1():
+    """Griffiths & Lane (1999) Example 1 (Fig. 2): the homogeneous 2:1 slope, the
+    root case the later examples build on. English units carried through the whole
+    G&L set: H = 50 ft, gamma = 125 pcf, c' = 312.5 psf (c'/gamma-H = 0.05),
+    phi' = 20 deg, gamma_w = 62.4 pcf. The firm base sits at the toe elevation
+    (D = 1), so no runout is modelled (a y = 0 sliver cannot affect a toe
+    mechanism). quad8 SSRM at target_size 3.5 (SSRM-1 settings).
+
+    Geometry (Fig. 1 dimensions): crest platform (0,50)-(60,50), 2:1 face to the
+    toe (160,0), firm base at y = 0. The section is a single material described by
+    a profile line; get_material_polygons derives the domain from it and the max
+    depth. Placeholder starting circle over the slope face (the loader requires one;
+    FEM/SSRM ignores it).
+
+    Elastic constants are the paper's printed nominal values (Griffiths & Lane 1999,
+    p.390 -- "in the absence of meaningful data for E' and nu', they can be given
+    nominal values (e.g. E' = 10^5 kN/m^2 and nu' = 0.3)"), which the paper applies
+    throughout. Converted to English units: E' = 1e5 kPa = 2.0885e6 psf, nu' = 0.3.
+    SSRM FS is E-invariant, so this does not move the locked factor of safety; it
+    sets the displacement scale to the paper's basis.
+
+    Published (Griffiths & Lane, Table 1): FE FOS ~= 1.4 at c'/gamma-H = 0.05,
+    phi' = 20 deg; Bishop & Morgenstern (1960) chart gives 1.380. XSLOPE's strict
+    true-equilibrium quad8 lock reads FS = 1.35 with the displacement-vs-F upturn at
+    F ~= 1.40, bracketing both.
+    """
+    dst = f"{OUTDIR}/xslope_griffiths1.xlsx"
+    new_file(dst, TEMPLATE)
+    ground = [(0.0, 50.0), (60.0, 50.0), (160.0, 0.0)]
+    # Elastic constants: the paper's printed nominal values (Griffiths & Lane 1999,
+    # p.390 -- E' = 10^5 kN/m^2, nu' = 0.3), converted to English units:
+    # E' = 1e5 kPa = 2.0885e6 psf. SSRM FS is E-invariant; this only sets the
+    # displacement scale to the paper's basis.
+    E = 2.0885e6
+    nu = 0.3
+    u = {}
+    u['main'] = main_cells(gamma_w=62.4)
+    u['mat'] = material_cells(1, "soil", 125.0, "mc", c=312.5, phi=20.0,
+                              u="none", E=E, nu=nu)
+    prof = {'B2': 0.0}              # firm base at y = 0 (D = 1, base at toe level)
+    prof.update(profile_line_cells(1, 1, ground))
+    u['profile'] = prof
+    # placeholder circle (loader requires one; FEM/SSRM ignores it)
+    u['circles'] = circle_cells(1, 120.0, 80.0, option="Depth", depth=0.0)
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst)
+    return dst
+
+
 def build_griffiths2():
     """Griffiths & Lane (1999) Example 2 (Fig. 5): the Example-1 homogeneous
     2:1 slope WITH a foundation layer of the SAME material, thickness H/2 (so
@@ -445,6 +494,7 @@ def build_griffiths6_dry():
 
 
 if __name__ == "__main__":
+    build_griffiths1()
     build_griffiths2()
     build_griffiths3_all()
     build_griffiths4_r1()

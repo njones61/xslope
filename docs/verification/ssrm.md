@@ -253,6 +253,17 @@ Griffiths & Lane's Fig. 8(a):
 
 ![griffiths3_r1_results.png](../fem/images/griffiths3_r1_results.png){width=1000}
 
+Both results figures render the **last converged viscoplastic state** — the lower edge of
+the final bisection bracket — rather than the bracket midpoint that is reported as the
+factor of safety, so the $F$ printed on a figure sits at or below its reported FS by no
+more than the bracketing tolerance. On the tight-tolerance locks used throughout this page
+(tolerance 0.01) the two agree to the printed digits, including the $c_{u2}/c_{u1} = 1$
+figure above; on this example's wide, figure-read weak-ratio tolerance (0.05) the
+difference shows — the gated-quad8 $c_{u2}/c_{u1} = 0.2$ figure below is rendered at
+$F = 0.43$, just below its reported **FS = 0.45** (the 0.4531 bracket midpoint). Both
+mechanism figures show the gated quad8 solutions, not the coarser tri6 sweep — whose
+$c_{u2}/c_{u1} = 0.2$ station reads 0.49 in the table above.
+
 At $c_{u2}/c_{u1} = 0.2$ the shear strain concentrates into a narrow band that **follows
 the weak layer** — down parallel to the face, along the horizontal foundation reach, and
 kicking up to daylight beyond the toe — a highly concentrated non-circular slide, exactly
@@ -271,10 +282,19 @@ Taylor's 1.47 — the same base-circle limit.
 also halved (to $\approx 0.1H$ in the foundation reach) and re-run at the representative
 weak ratio $c_{u2}/c_{u1} = 0.2$. The coarse-tri6 factor of safety moves from **0.49**
 (measured band) to **0.51** (half band) — about 4%. The weak-ratio result is governed by
-$c_{u2}$ times the length of the failure path, which barely changes with band thickness,
-so the undimensioned thickness does **not** swamp the comparison with Fig. 7; the ~20%
-gap to the graphical 0.60 is a genuine model-vs-figure difference, not an artefact of the
-thickness guess.
+$c_{u2}$ times the length of the failure path, which barely changes with band **thickness**
+— so the thickness guess is exonerated: it accounts for only the ~4% swing above. The
+remaining ~20% gap to the graphically-read ~0.60 is **unresolved**, but it sits within the
+combined envelope of three effects that were never removed. First, and the dominant
+candidate, the band **path** is as figure-read as its thickness — the crest daylight
+positions, the horizontal-reach elevation, and the 45-degree outcrop location were all
+measured off the schematic Fig. 6 and never varied — and by the same $c_{u2} \times$
+path-length scaling an error in that path maps roughly one-to-one into the factor of
+safety. Second, the strict-true-equilibrium offset documented across Examples 1, 2 and 4
+(−2 to −5%) applies here as well. Third, reading the ~0.60 point off Fig. 7 is itself good
+to only about ±0.05 — roughly ±8% at that level. Because none of the three was tested
+away, the gap cannot be called a genuine model-versus-figure difference; it is reported as
+an uncertainty bounded by these declared, still-untested figure-read assumptions.
 
 <!-- Gated quad8 SSRM locks (benchmark=SSRM-G3): the anchor (cu2=cu1, base circle) tight
      on the observed value; the weak ratio (cu2/cu1=0.2, layer-following) figure-read with

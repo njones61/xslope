@@ -366,11 +366,12 @@ boundary is the toe elevation, which is also the ground surface of the runout.
 The domain is tiled by two explicit material polygons — the slope body $c_{u1}$ and the
 foundation $c_{u2}$ — because the layer boundary coincides with the runout surface, so a
 profile-line stack would leave a zero-thickness $c_{u1}$ sliver over the runout. Elastic
-constants are assigned by soil type from the [FEM Overview](../fem/overview.md) table:
-$c_{u1} = 1562.5$ psf classifies Medium Clay ($E = 668{,}300$ psf, $\nu = 0.40$), and the
-$c_{u2} = 3125$ psf foundation at ratio 2 classifies Stiff Clay ($E = 2{,}610{,}700$ psf,
-$\nu = 0.30$). The SSRM factor of safety is independent of the elastic constants; they only
-set the displacement scale.
+constants are Griffiths & Lane's printed nominal values (their p.390: "in the absence of
+meaningful data for $E'$ and $\nu'$, they can be given nominal values, e.g.
+$E' = 10^5$ kN/m$^2$ and $\nu' = 0.3$"), which the paper applies throughout — carried here
+to both materials and converted to English units: $E' = 1\times10^5$ kPa $= 2{,}088{,}500$
+psf, $\nu' = 0.3$. The SSRM factor of safety is independent of the elastic constants; they
+only set the displacement scale.
 
 Two bracket cases are built: **$c_{u2}/c_{u1} = 1$** (the foundation is as weak as the
 slope) and **$c_{u2}/c_{u1} = 2$** (the foundation is firmly stronger). Griffiths & Lane's

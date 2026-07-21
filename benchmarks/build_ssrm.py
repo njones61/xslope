@@ -170,11 +170,13 @@ def build_griffiths4(ratio, tag):
 
     Undrained strength: cu1/gamma-H = 0.25 -> cu1 = 0.25 x 125 x 50 = 1562.5 psf,
     phi = 0 (option 'mc', u = 'none' — the established uniform-Su pattern). The
-    foundation strength is cu2 = ratio x cu1. E and nu are the elastic_props.py
-    soil-type values (imperial): cu1 = 1562.5 psf classifies Medium Clay
-    (E = 668300 psf, nu = 0.40); cu2 at ratio 2 = 3125 psf classifies Stiff Clay
-    (E = 2610700 psf, nu = 0.30). SSRM FS is E-invariant; the elastic constants
-    only set the displacement scale.
+    foundation strength is cu2 = ratio x cu1. Elastic constants are the paper's
+    printed nominal values (Griffiths & Lane 1999, p.390: "in the absence of
+    meaningful data for E' and nu', they can be given nominal values (e.g.
+    E' = 10^5 kN/m^2 and nu' = 0.3)"), which the paper applies throughout; carried
+    to both materials here and converted to English units: E' = 1e5 kPa =
+    2.0885e6 psf, nu' = 0.3. SSRM FS is E-invariant; the elastic constants only set
+    the displacement scale.
 
     Published anchors (Taylor 1937, quoted by G&L Fig. 10): FOS = 1.47 at
     cu2/cu1 = 1 (a deep BASE circle) and FOS = 2.10 at cu2 >> cu1 (a shallow TOE
@@ -186,16 +188,20 @@ def build_griffiths4(ratio, tag):
     new_file(dst, TEMPLATE)
     cu1 = 1562.5
     cu2 = ratio * cu1
-    # elastic_props.py soil-type classification (imperial), per material strength
-    from benchmarks.rocscience.elastic_props import classify
-    _, E1, nu1 = classify({'option': 'mc', 'c': cu1, 'phi': 0.0}, imperial=True)
-    _, E2, nu2 = classify({'option': 'mc', 'c': cu2, 'phi': 0.0}, imperial=True)
+    # Elastic constants: the paper's printed nominal values (Griffiths & Lane 1999,
+    # p.390 — "in the absence of meaningful data for E' and nu', they can be given
+    # nominal values (e.g. E' = 10^5 kN/m^2 and nu' = 0.3)"), which the paper applies
+    # throughout. Carried to BOTH materials and converted to English units:
+    # E' = 1e5 kPa = 2.0885e6 psf, nu' = 0.3. SSRM FS is E-invariant, so this does not
+    # move the locked factor of safety; it sets the displacement scale to the paper's basis.
+    E = 2.0885e6
+    nu = 0.3
     u = {}
     u['main'] = main_cells(gamma_w=62.4)
     mat = material_cells(1, "Slope clay", 125.0, "mc", c=cu1, phi=0.0,
-                         u="none", E=E1, nu=nu1)
+                         u="none", E=E, nu=nu)
     mat.update(material_cells(2, "Foundation clay", 125.0, "mc", c=cu2, phi=0.0,
-                              u="none", E=E2, nu=nu2))
+                              u="none", E=E, nu=nu))
     u['mat'] = mat
     poly = polygon_cells(1, 1, [(0.0, 100.0), (100.0, 100.0), (200.0, 50.0),
                                 (0.0, 50.0), (0.0, 100.0)])

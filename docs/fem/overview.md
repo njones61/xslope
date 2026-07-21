@@ -656,9 +656,11 @@ The key parameters of `solve_ssrm()` are:
 >- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed). **Do not lower it to make a model converge.** The force-equilibrium residual is the *increment* of the viscoplastic body load and is proportional to $\Delta t$, so shrinking `dt_scale` shrinks the residual without making the slope any more stable — a failing state can be pushed under the absolute `force_tol` and reported as converged, inflating the factor of safety.<br>
 >- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>
 >- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 3000): Passed through to `solve_fem()` for each trial.
+>- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 3000): Passed through to `solve_fem()` for each trial.<br>
+>- **`capture_failure_state`** (default `True`): After the bracket resolves, take one extra solve just beyond the critical strength — with the displacement backstop and the early divergence-exit turned off and a generous iteration ceiling — so the unconverged viscoplastic field develops the **at-failure mechanism** (the rotational collapse: crest settlement, toe heave). This is the deformed state the classic finite-element slope-stability figures show, in contrast to the last *converged* trial, which is sub-critical and reads as diffuse settlement. The captured field is returned as `failure_solution`. It is purely a post-processing extra: the factor of safety, the bracket, and `last_solution` are unaffected, so turning it off leaves results unchanged. Leave it on for the plotting path; the reliability and sensitivity analyses turn it off because they read only the factor of safety over many runs and never draw the field.<br>
+>- **`capture_margin`** (default 0.15): The proportional strength margin above the critical factor of safety at which the failure state is captured — the solve runs at $F = \text{FS} \times (1 + \text{capture\_margin})$, floored at the failed edge of the bracket. A margin is needed because the bisection resolves the failed edge to within `tolerance` of critical, where the collapse develops too slowly to become visible in a finite number of iterations; a modest margin puts the solve into the fully-developed-mechanism regime. Lower it toward ~0.05 to stay nearer the critical strength, or raise it for a bolder slip band.
 
-The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. The `last_solution` can be passed directly to `plot_fem_results()` for visualization of the failure mechanism at the critical state.
+The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. When `capture_failure_state` is on it also contains `failure_solution`, the at-failure (unconverged) field. Passing `last_solution` to `plot_fem_results()` shows the near-critical converged state; passing `failure_solution` (via the `failure_solution` argument, below) shows the developed collapse mechanism.
 
 ### SSR Exclusion Zones
 
@@ -820,7 +822,7 @@ The `plot_fem_results()` function provides a flexible interface for visualizing 
 
 | Plot Type | Description |
 |-----------|-------------|
-| `deformation` | Deformed mesh overlay on the original mesh. The original mesh is shown in light gray and the deformed shape in blue. Viscoplastic displacements (total minus elastic) are used when available, so the plot shows the failure mechanism rather than gravity settlement. The `deform_scale` parameter amplifies displacements for visibility and is auto-calculated by default so the maximum deformation is approximately 10% of the mesh height. |
+| `deformation` | Deformed mesh overlay on the original mesh. The deformed shape is drawn in black over a dashed light outline of the original (undeformed) extent. Viscoplastic displacements (total minus elastic) are used when available, so the plot shows the failure mechanism rather than gravity settlement. When a captured at-failure field is supplied (see `failure_solution` below) the panel draws the developed collapse mechanism and its title reads "…at Failure"; otherwise it draws the supplied solution. The displacement multiplier is auto-calculated by default so the maximum deformation is approximately `deform_percent` of the mesh height, measured on the field actually drawn. |
 | `shear_strain` | Viscoplastic maximum shear strain contours. This is the most important plot for identifying the failure mechanism — high shear strain concentrations reveal the failure surface without any prior assumption about its shape or location. Falls back to total shear strain if viscoplastic data is not available. |
 | `displace_vector` | Displacement vectors at corner nodes. Like the deformed mesh plot, viscoplastic displacements are used when available to show the failure mechanism. Vectors below a threshold fraction of the maximum displacement are hidden to reduce clutter. |
 | `displace_mag` | Displacement magnitude contours using the viridis colormap. Shows total displacement magnitude at each node as filled contours. |
@@ -838,18 +840,27 @@ The top subplot shows the deformed mesh at the last converged solution, the midd
 
 Additional options control the appearance of all plot types:
 
-- `show_mesh` — show or hide mesh lines (default: `True`)
+- `show_mesh` — show or hide mesh lines on the contour and vector panels (default: `True`)
 - `show_reinforcement` — show or hide reinforcement and pile elements (default: `True`)
 - `label_elements` — show element ID labels at centroids (default: `False`)
 - `figsize` — figure size as `(width, height)` in inches (default: `(12, 8)`)
 - `save_png` — save the figure to a PNG file (default: `False`)
 - `dpi` — resolution for saved PNG (default: `300`)
 
-A typical call for an SSRM analysis uses the default plot types:
+The deformation panel has three dedicated controls:
+
+- `failure_solution` — the at-failure field captured by `solve_ssrm()` (`result['failure_solution']`). When supplied, the deformation and displacement-vector panels draw this developed collapse mechanism instead of the near-critical converged state, and the deformation title reads "…at Failure", leading with the factor of safety. Omit it (default `None`) to draw the supplied solution.
+- `show_original` — the original-mesh reference on the deformation panel: `'outline'` (default) a dashed light boundary outline at every mesh density, `'mesh'` the full light-gray grid (which collapses to the outline when the mesh is too dense to read as two overlaid grids), or `False` for none.
+- `deformed_color` — color of the deformed grid (default `'k'`, black; use `'blue'` for the earlier style).
+- `deform_scale` — an explicit displacement multiplier. Leave as `None` (default) to auto-size from `deform_percent`, or pass a value to set the exaggeration factor directly.
+
+A typical call for an SSRM analysis uses the default plot types and passes the captured at-failure field so the deformation and vector panels show the collapse mechanism:
 
 ```python
 plot_fem_results(fem_data, result['last_solution'],
                  plot_type=['deformation', 'shear_strain', 'displace_vector'],
+                 fs=result['FS'],
+                 failure_solution=result.get('failure_solution'),
                  save_png=True)
 ```
 

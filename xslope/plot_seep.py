@@ -700,7 +700,19 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         from matplotlib.colors import Normalize
         sm = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
         cbar = fig.colorbar(sm, cax=cax, label=variable_label)
-        cbar.locator = MaxNLocator(nbins=10, steps=[1, 2, 5])
+        # Tick density adapts to the colorbar's drawn height so the labels never
+        # stack: allow at most one tick per ~1.8 label-heights of available axis (a
+        # legibility margin, not an aspect-specific constant — aspect enters only
+        # through the measured height). A short/wide domain thins to a few readable
+        # ticks; a tall bar keeps finer labeling. Previously a fixed nbins=10 crammed
+        # a tick per contour level (11 labels) onto a bar barely an inch tall.
+        from matplotlib.font_manager import FontProperties
+        label_pts = FontProperties(size=plt.rcParams["ytick.labelsize"]).get_size_in_points()
+        cax_h_pts = ch * fig.get_figheight() * 72.0
+        max_ticks = max(2, int(cax_h_pts // (1.8 * label_pts)))
+        # steps=[2,5,10] restricts ticks to nice integers/round values (no 2.5-style
+        # half steps); the nbins bound above is what holds off single-unit density.
+        cbar.locator = MaxNLocator(nbins=max_ticks, steps=[2, 5, 10])
         cbar.update_ticks()
 
 

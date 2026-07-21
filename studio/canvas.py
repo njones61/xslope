@@ -318,6 +318,7 @@ class MplCanvas(QWidget):
             plot_elements=opts.get("plot_elements", False),
             scale_vectors=opts.get("scale_vectors", True),
             displacement_tolerance=opts.get("displacement_tolerance", 0.5),
+            fs=opts.get("fs"),
             legend_ncol=opts.get("legend_ncol", "auto"), legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), fig=fig))
 
     def render_axes(self, plot_fn, dxf=False):

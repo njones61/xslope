@@ -22,6 +22,24 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
+from .plot import adaptive_colorbar_ticks
+
+
+def _fs_title(base, F, fs=None):
+    """Result-panel title that keeps the SSRM factor of safety and the rendered
+    viscoplastic state unambiguous.
+
+    The field is rendered at the LAST CONVERGED strength-reduction factor
+    (``solution['F']``); the reported factor of safety is the SSRM bracket midpoint
+    (``result['FS']``), which at a wide tolerance can round differently. When both
+    are known and differ at two-decimal display, the title names both; otherwise it
+    keeps the simple ``F = X.XX`` form (or just ``base`` when no F is available).
+    """
+    if F is None:
+        return base
+    if fs is None or f"{fs:.2f}" == f"{F:.2f}":
+        return f"{base}  F={F:.2f}"
+    return f"{base}  FS = {fs:.2f} (rendered at last converged F = {F:.2f})"
 
 
 def _extract_uv(disp, fem_data):
@@ -438,7 +456,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
-                    mesh_on_fields=False):
+                    mesh_on_fields=False, fs=None):
     """
     Plot FEM results with various visualization options.
 
@@ -480,13 +498,24 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             None keeps the automatic size (depends on the number of panels).
         save_png: Save figure to PNG file
         dpi: Resolution for saved PNG
+        fs: Optional SSRM factor of safety (the bracket-midpoint result['FS']). When
+            given and it differs at display rounding from the last-converged F the
+            field was rendered at (solution['F']), the panel titles name both — e.g.
+            "FS = 0.45 (rendered at last converged F = 0.43)". When omitted or equal
+            at two decimals, titles keep the simple "F = X.XX" form.
     """
-    
+
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
     displacements = solution.get("displacements", np.zeros(2 * len(nodes)))
-    
+
+    # Carry the SSRM factor of safety into the solution the panels see, so titles can
+    # name BOTH it and the last-converged F the field was rendered at. Shallow copy:
+    # shares the arrays, never mutates the caller's dict (result['last_solution']).
+    if fs is not None:
+        solution = {**solution, "_ssrm_fs": fs}
+
     # Accept a single string or a list of strings
     if isinstance(plot_type, str):
         plot_types = [plot_type.strip().lower()]
@@ -670,6 +699,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             fig.tight_layout()
         except Exception:
             pass
+        # Height-adaptive, round-valued ticks (after layout, so the cax has its
+        # final drawn height) — the full-height cax carries them cleanly.
+        if single_mappable is not None:
+            adaptive_colorbar_ticks(fig, cbar)
 
     # Place deformation legend in the dedicated legend row
     if has_deform_legend and legend_ax is not None and show_legend:
@@ -738,8 +771,9 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
                            levels=20, cmap='viridis', alpha=0.8)
         
         # Colorbar
-        cbar = ax.figure.colorbar(tcf, ax=ax, shrink=cbar_shrink)
+        cbar = ax.figure.colorbar(tcf, ax=ax)
         cbar.set_label('Displacement Magnitude', rotation=270, labelpad=cbar_labelpad)
+        adaptive_colorbar_ticks(ax.figure, cbar)
     
     # Plot mesh
     if show_mesh:
@@ -924,8 +958,7 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
 
     F = solution.get("F", None)
     title = 'Viscoplastic Displacement Vectors' if disp_elastic is not None else 'Displacement Vectors'
-    if F is not None:
-        title += f'  F={F:.2f}'
+    title = _fs_title(title, F, solution.get("_ssrm_fs"))
     ax.set_title(title, fontsize=12, pad=15)
 
 
@@ -987,8 +1020,9 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         ax.add_collection(p)
         
         # Colorbar
-        cbar = ax.figure.colorbar(p, ax=ax, shrink=cbar_shrink)
+        cbar = ax.figure.colorbar(p, ax=ax)
         cbar.set_label('von Mises Stress', rotation=270, labelpad=cbar_labelpad)
+        adaptive_colorbar_ticks(ax.figure, cbar)
     
     # Highlight plastic elements with thick boundary
     if np.any(plastic_elements):
@@ -1094,8 +1128,7 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     disp_label = 'Viscoplastic Deformation' if disp_elastic is not None else 'Mesh Deformation'
     scale_str = f'{deform_scale:.0f}' if deform_scale >= 10 else f'{deform_scale:.1f}'
     title = f'{disp_label} (Scale = {scale_str}x)'
-    if F is not None:
-        title += f'  F={F:.2f}'
+    title = _fs_title(title, F, solution.get("_ssrm_fs"))
     ax.set_title(title, fontsize=12, pad=15)
 
 
@@ -1549,8 +1582,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     F = solution.get("F", None)
     title = 'Viscoplastic Shear Strain'
-    if F is not None:
-        title += f'  F={F:.2f}'
+    title = _fs_title(title, F, solution.get("_ssrm_fs"))
     ax.set_title(title, fontsize=12, pad=15)
     return mappable
 
@@ -1780,8 +1812,9 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
         # Create colorbar using a ScalarMappable
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        cbar = ax.figure.colorbar(sm, ax=ax, shrink=cbar_shrink, pad=0.05)
+        cbar = ax.figure.colorbar(sm, ax=ax, pad=0.05)
         cbar.set_label(label, rotation=270, labelpad=cbar_labelpad)
+        adaptive_colorbar_ticks(ax.figure, cbar)
     else:
         # Uniform values - just color all elements the same
         for i, elem in enumerate(elements):
@@ -1907,10 +1940,13 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
         cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
         mappable = cs
 
-        # Add colorbar (unless the caller will place it itself — single-panel case)
+        # Add colorbar (unless the caller will place it itself — single-panel case).
+        # Full frame-height bar (constrained-layout native: no shrink) with
+        # height-adaptive, round-valued ticks so the labels never stack.
         if draw_cbar:
-            cbar = ax.figure.colorbar(cs, ax=ax, shrink=cbar_shrink, pad=0.02)
+            cbar = ax.figure.colorbar(cs, ax=ax, pad=0.02)
             cbar.set_label(label, rotation=270, labelpad=20)
+            adaptive_colorbar_ticks(ax.figure, cbar)
     else:
         # Uniform values - just color all elements the same
         uniform_color = plt.get_cmap(colormap)(0.5)

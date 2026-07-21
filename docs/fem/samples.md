@@ -286,7 +286,23 @@ contribution directly.
 
 ---
 
-The remaining problems are **verification benchmarks**: published or
-analytically-anchored cases used to validate the FEM-SSRM implementation.
-Each is locked into the automated regression suite. See also the
-[Verification](../verification/index.md) page.
+**An homage to Griffiths & Lane (1999).** XSLOPE's finite-element slope-stability
+solver was built on the methodology of
+[Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387), "Slope
+stability analysis by finite elements" (*Géotechnique* 49(3), 387–403) — a
+plane-strain elasto-plastic (Mohr–Coulomb) formulation solved by viscoplastic
+**strength reduction**, with the factor of safety located by the
+**non-convergence criterion**. In tribute to that lineage, the verification set
+now reproduces **all six** of the paper's worked examples:
+
+- [Example 1 — homogeneous slope](../verification/ssrm.md#verification-griffiths1)
+- [Example 2 — foundation layer, the false base circle](../verification/ssrm.md#verification-griffiths2)
+- [Example 3 — undrained clay with a thin weak layer](../verification/ssrm.md#verification-griffiths3) — figure-read Fig. 7 sweep and the two-mechanism showcase
+- [Example 4 — undrained clay over a weak foundation](../verification/ssrm.md#verification-griffiths4) — the base→toe mechanism flip
+- [Example 5 — "slow" drawdown sweep](../verification/ssrm.md#verification-griffiths5) — a pore-pressure and reservoir-load showcase
+- [Example 6 — two-sided earth dam](../verification/ssrm.md#verification-griffiths6)
+
+Each is documented in full — geometry, mesh, factor of safety, and the locked
+regression tags — on the [FE Slope Stability (SSRM)](../verification/ssrm.md)
+verification page, which also carries the two-tier
+[Verification](../verification/index.md) overview.

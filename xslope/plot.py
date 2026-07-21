@@ -2061,6 +2061,36 @@ _LEGEND_FONTSIZE = 8
 _LEGEND_PACK = dict(columnspacing=1.2, handlelength=1.6, handletextpad=0.5)
 
 
+def adaptive_colorbar_ticks(fig, cbar, steps=(2, 5, 10), min_ticks=2,
+                            label_heights=1.8):
+    """Thin a vertical colorbar's ticks to its DRAWN height so labels never stack.
+
+    Allow at most one tick per ``label_heights`` label-heights of the colorbar's
+    rendered height (a legibility margin; the aspect enters only through the measured
+    height, not any per-figure constant), with ``steps=(2, 5, 10)`` restricting the
+    tick VALUES to nice integers/round decimals. A short/wide bar thins to a few
+    readable ticks; a full-height bar keeps finer labeling. Shared by the FEM result
+    plots and the seepage flow nets (originally the plot_seep sheetpile fix,
+    a35e308), so both get uncrowded, round-valued colorbars from one rule.
+
+    Measures the colorbar axes' window extent after a draw, so it works for a
+    make_axes_locatable cax, a constrained-layout colorbar, and a manually placed
+    fractional-height cax alike.
+    """
+    from matplotlib.ticker import MaxNLocator
+    from matplotlib.font_manager import FontProperties
+    try:
+        fig.canvas.draw()
+        h_px = cbar.ax.get_window_extent().height
+    except Exception:
+        return                                  # no renderer: leave default ticks
+    h_pts = h_px * 72.0 / float(fig.dpi)
+    label_pts = FontProperties(size=plt.rcParams["ytick.labelsize"]).get_size_in_points()
+    max_ticks = max(min_ticks, int(h_pts // (label_heights * label_pts)))
+    cbar.locator = MaxNLocator(nbins=max_ticks, steps=list(steps))
+    cbar.update_ticks()
+
+
 def _fit_legend_ncol(ax, fig, handles, labels, anchor):
     """Choose a legend column count: the fewest rows whose balanced columns fit.
 

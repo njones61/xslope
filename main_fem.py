@@ -69,7 +69,8 @@ elif analysis_type == "ssrm":
         print_pile_summary(fem_data, result['last_solution'])
         print_detailed_element_summary(fem_data, result['last_solution'])
         plot_fem_results(fem_data, result['last_solution'],
-                         plot_type=['shear_strain'], deform_percent=deform_percent, save_png=True)
+                         plot_type=['shear_strain'], deform_percent=deform_percent,
+                         fs=result.get('FS'), save_png=True)
         export_fem_solution(fem_data, result['last_solution'], input_path.parent / input_path.stem)
     else:
         print(f"SSRM failed: {result.get('error', 'Unknown error')}")

@@ -2077,7 +2077,7 @@ def adaptive_colorbar_ticks(fig, cbar, steps=(2, 5, 10), min_ticks=2,
     make_axes_locatable cax, a constrained-layout colorbar, and a manually placed
     fractional-height cax alike.
     """
-    from matplotlib.ticker import MaxNLocator
+    from matplotlib.ticker import MaxNLocator, ScalarFormatter
     from matplotlib.font_manager import FontProperties
     try:
         fig.canvas.draw()
@@ -2088,6 +2088,15 @@ def adaptive_colorbar_ticks(fig, cbar, steps=(2, 5, 10), min_ticks=2,
     label_pts = FontProperties(size=plt.rcParams["ytick.labelsize"]).get_size_in_points()
     max_ticks = max(min_ticks, int(h_pts // (label_heights * label_pts)))
     cbar.locator = MaxNLocator(nbins=max_ticks, steps=list(steps))
+    # Short labels for near-zero ranges: factor a shared power out of the tick
+    # labels (a "×10⁻⁴" header) instead of stacking seven-decimal strings, which
+    # smear at panel size — the tiny viscoplastic strain fields (e.g. RS2-32b,
+    # max ~1e-4) are the motivating case. Applied via cbar.formatter (update_ticks
+    # re-applies it; setting the axis formatter directly would be clobbered). A
+    # no-op for normal ranges, so it is safe to apply unconditionally.
+    fmt = ScalarFormatter(useMathText=True)
+    fmt.set_powerlimits((-3, 4))                # offset only outside 1e-3..1e4
+    cbar.formatter = fmt
     cbar.update_ticks()
 
 

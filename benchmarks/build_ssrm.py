@@ -29,7 +29,7 @@ Run from the repo root:  PYTHONPATH=. python3 benchmarks/build_ssrm.py
 from benchmarks._xlsx_writer import (
     new_file, write_cells_to_xlsx,
     main_cells, material_cells, profile_line_cells, piezo_cells, dload_cells,
-    circle_cells,
+    circle_cells, polygon_cells,
 )
 
 TEMPLATE = "docs/inputs/input_template.xlsx"
@@ -151,6 +151,73 @@ def build_griffiths2():
     return dst
 
 
+def build_griffiths4(ratio, tag):
+    """Griffiths & Lane (1999) Example 4 (Fig. 9): an undrained (phi_u = 0) clay
+    slope over a WEAK foundation layer. Two clean, uniform-Su layers — the slope
+    body (cu1) and the foundation (cu2) — with the strength ratio cu2/cu1 varied.
+
+    Geometry is Fig. 9's, English units carried from Examples 1-2 (H = 50 ft,
+    gamma = 125 pcf): D = 2 (firm base 2H = 100 ft below the crest), a 2H = 100 ft
+    crest platform, a 2:1 face dropping H = 50 ft to the toe, and a 2H = 100 ft
+    runout past the toe. The foundation layer is H = 50 ft thick; its top (y = 50)
+    is the toe elevation and the cu1/cu2 material boundary, which is also the ground
+    surface of the runout. The section is tiled by two explicit polygons (the
+    boundary coincides with the runout surface, so a profile-line stack would leave
+    a zero-thickness cu1 sliver over the runout):
+
+      cu1 slope body:  (0,100)-(100,100)-(200,50)-(0,50)
+      cu2 foundation:  (0,50)-(300,50)-(300,0)-(0,0)
+
+    Undrained strength: cu1/gamma-H = 0.25 -> cu1 = 0.25 x 125 x 50 = 1562.5 psf,
+    phi = 0 (option 'mc', u = 'none' — the established uniform-Su pattern). The
+    foundation strength is cu2 = ratio x cu1. E and nu are the elastic_props.py
+    soil-type values (imperial): cu1 = 1562.5 psf classifies Medium Clay
+    (E = 668300 psf, nu = 0.40); cu2 at ratio 2 = 3125 psf classifies Stiff Clay
+    (E = 2610700 psf, nu = 0.30). SSRM FS is E-invariant; the elastic constants
+    only set the displacement scale.
+
+    Published anchors (Taylor 1937, quoted by G&L Fig. 10): FOS = 1.47 at
+    cu2/cu1 = 1 (a deep BASE circle) and FOS = 2.10 at cu2 >> cu1 (a shallow TOE
+    circle). G&L's FE curve flattens to the toe-circle plateau at cu2/cu1 ~ 1.5;
+    the mechanism flips from base (Fig. 11a) to toe (Fig. 11c) across that
+    transition. The two bracket ratios (1 and 2) sit firmly on the base-circle and
+    toe-circle plateaus respectively (Fig. 10 confirmed)."""
+    dst = f"{OUTDIR}/xslope_griffiths4_{tag}.xlsx"
+    new_file(dst, TEMPLATE)
+    cu1 = 1562.5
+    cu2 = ratio * cu1
+    # elastic_props.py soil-type classification (imperial), per material strength
+    from benchmarks.rocscience.elastic_props import classify
+    _, E1, nu1 = classify({'option': 'mc', 'c': cu1, 'phi': 0.0}, imperial=True)
+    _, E2, nu2 = classify({'option': 'mc', 'c': cu2, 'phi': 0.0}, imperial=True)
+    u = {}
+    u['main'] = main_cells(gamma_w=62.4)
+    mat = material_cells(1, "Slope clay", 125.0, "mc", c=cu1, phi=0.0,
+                         u="none", E=E1, nu=nu1)
+    mat.update(material_cells(2, "Foundation clay", 125.0, "mc", c=cu2, phi=0.0,
+                              u="none", E=E2, nu=nu2))
+    u['mat'] = mat
+    poly = polygon_cells(1, 1, [(0.0, 100.0), (100.0, 100.0), (200.0, 50.0),
+                                (0.0, 50.0), (0.0, 100.0)])
+    poly.update(polygon_cells(2, 2, [(0.0, 50.0), (300.0, 50.0), (300.0, 0.0),
+                                     (0.0, 0.0), (0.0, 50.0)]))
+    u['polygon'] = poly
+    # placeholder circle (loader requires one; FEM/SSRM ignores it, and the LEM
+    # companion runs seed='grid'). A base circle over the slope, tangent to y = 0.
+    u['circles'] = circle_cells(1, 150.0, 90.0, option="Depth", depth=0.0)
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst)
+    return dst
+
+
+def build_griffiths4_r1():
+    return build_griffiths4(1.0, "r1")
+
+
+def build_griffiths4_r2():
+    return build_griffiths4(2.0, "r2")
+
+
 def build_griffiths6_full():
     return _build(f"{OUTDIR}/xslope_griffiths6_full.xlsx", wet=True)
 
@@ -161,6 +228,8 @@ def build_griffiths6_dry():
 
 if __name__ == "__main__":
     build_griffiths2()
+    build_griffiths4_r1()
+    build_griffiths4_r2()
     build_griffiths6_full()
     build_griffiths6_dry()
     build_griffiths6_seep()

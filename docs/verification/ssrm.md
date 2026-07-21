@@ -91,9 +91,15 @@ the foundation is added.
 | Cohesion, $c'$ | 312.5 psf |
 | Friction angle, $\phi'$ | 20 degrees |
 | Unit weight, $\gamma$ | 125 pcf |
-| Young's modulus, $E$ | 700,000 psf |
-| Poisson's ratio, $\nu$ | 0.3 |
+| Young's modulus, $E'$ | 2,088,500 psf |
+| Poisson's ratio, $\nu'$ | 0.3 |
 | Foundation | $H/2$ = 25 ft of the same soil below the toe ($D = 1.5$) |
+
+The elastic constants are Griffiths & Lane's printed nominal values (their p.390:
+"in the absence of meaningful data for $E'$ and $\nu'$, they can be given nominal values,
+e.g. $E' = 10^5$ kN/m$^2$ and $\nu' = 0.3$") — the same values used in Example 1, carried
+here and converted to English units: $E' = 1\times10^5$ kPa $= 2{,}088{,}500$ psf,
+$\nu' = 0.3$. As everywhere in the SSRM the factor of safety is independent of them.
 
 The dimensionless strength is again $c'/\gamma H = 0.05$ with $\phi' = 20°$. The domain uses
 the printed dimensions of Fig. 1 — a $1.2\,H$ (60 ft) crest platform, the 2:1 face, and a

@@ -166,8 +166,10 @@ def build_griffiths2():
     2:1 slope WITH a foundation layer of the SAME material, thickness H/2 (so
     the firm base sits at depth D = 1.5 H below the crest). English units, all
     Example-1 conventions carried over: H = 50 ft, gamma = 125 pcf, c' = 312.5
-    psf (c'/gamma-H = 0.05), phi' = 20 deg, E = 700000 psf, nu = 0.3, gamma_w =
-    62.4 pcf. quad8 SSRM at target_size 3.5 (SSRM-1 settings).
+    psf (c'/gamma-H = 0.05), phi' = 20 deg, gamma_w = 62.4 pcf. Elastic constants
+    are the paper's printed nominal values (Griffiths & Lane 1999, p.390: E' = 10^5
+    kN/m^2 = 2.0885e6 psf, nu' = 0.3), same as Example 1. quad8 SSRM at target_size
+    3.5 (SSRM-1 settings).
 
     Domain uses the PRINTED Fig. 1 dimensions — 1.2 H crest platform (60 ft),
     2:1 face (toe at x = 160), 2 H runout past the toe (to x = 260) — with the
@@ -187,8 +189,12 @@ def build_griffiths2():
     ground = [(0.0, H), (60.0, H), (160.0, 0.0), (260.0, 0.0)]
     u = {}
     u['main'] = main_cells(gamma_w=62.4)
+    # Elastic constants: the paper's printed nominal values (Griffiths & Lane 1999,
+    # p.390 — E' = 10^5 kN/m^2, nu' = 0.3), converted to English units:
+    # E' = 1e5 kPa = 2.0885e6 psf. SSRM FS is E-invariant; this only sets the
+    # displacement scale to the paper's basis.
     u['mat'] = material_cells(1, "soil", 125.0, "mc", c=312.5, phi=20.0,
-                              u="none", E=7.0e5, nu=0.3)
+                              u="none", E=2.0885e6, nu=0.3)
     prof = {'B2': -H / 2.0}          # firm base at y = -25 (H/2 foundation)
     prof.update(profile_line_cells(1, 1, ground))
     u['profile'] = prof

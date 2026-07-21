@@ -191,6 +191,52 @@ class RunFemDialog(QDialog):
         form.addRow("SSR exclusions", _ssr_row)
         self._refresh_ssr_label()
 
+        # At-failure mechanism capture (see solve_ssrm's capture_failure_state):
+        # once the bracket resolves, re-solve ONCE just beyond critical F with the
+        # displacement cap off so the unconverged field develops the failure
+        # MECHANISM the deformation/vector figures render, instead of the diffuse
+        # settlement of the last converged trial. On by default (the figure path);
+        # turning it off skips the extra solve. FS/the bracket are unaffected either way.
+        self.capture_failure_state = QCheckBox("Capture failure-state mechanism")
+        self.capture_failure_state.setChecked(
+            bool(defaults.get("capture_failure_state", True)))
+        self.capture_failure_state.setToolTip(
+            "After the bracket resolves, re-solve once just beyond critical F "
+            "(cap and early-exit off) so the unconverged viscoplastic field "
+            "develops the failure mechanism for the deformation/displacement-"
+            "vector figures. Off skips this extra solve; FS and the bracket are "
+            "unaffected either way.")
+        form.addRow("", self.capture_failure_state)
+
+        self.capture_margin = QDoubleSpinBox()
+        self.capture_margin.setDecimals(2)
+        self.capture_margin.setRange(0.02, 0.5)
+        self.capture_margin.setSingleStep(0.01)
+        self.capture_margin.setValue(float(defaults.get("capture_margin", 0.15)))
+        self.capture_margin.setToolTip(
+            "How far beyond the critical F the mechanism snapshot is solved "
+            "(fraction of FS).")
+        form.addRow("Capture margin", self.capture_margin)
+
+        # Iteration budget for the capture solve. Off (unchecked) mirrors
+        # solve_ssrm's own default: max(max_iterations, 3000).
+        self.capture_iter_on = QCheckBox("Set capture iteration budget")
+        self.capture_iter_on.setChecked(
+            defaults.get("capture_max_iterations") is not None)
+        self.capture_iter_on.setToolTip(
+            "Override the iteration ceiling for the failure-state capture solve. "
+            "Left off, the budget is automatic: max(max iterations, 3000).")
+        form.addRow("", self.capture_iter_on)
+
+        self.capture_max_iterations = QSpinBox()
+        self.capture_max_iterations.setRange(100, 100000)
+        self.capture_max_iterations.setSingleStep(100)
+        self.capture_max_iterations.setValue(
+            int(defaults.get("capture_max_iterations") or 3000))
+        self.capture_max_iterations.setToolTip(
+            "Iteration ceiling for the failure-state capture solve.")
+        form.addRow("Capture max iterations", self.capture_max_iterations)
+
         layout.addLayout(form)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -201,6 +247,8 @@ class RunFemDialog(QDialog):
 
         self.analysis.currentIndexChanged.connect(self._sync_enabled)
         self.min_slip_on.toggled.connect(self._sync_enabled)
+        self.capture_failure_state.toggled.connect(self._sync_enabled)
+        self.capture_iter_on.toggled.connect(self._sync_enabled)
         self._sync_enabled()
 
     def _sync_enabled(self):
@@ -217,6 +265,13 @@ class RunFemDialog(QDialog):
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())
         # SSR exclusions apply to the SSRM criterion only.
         self.ssr_exclude_btn.setEnabled(a == "ssrm" and bool(self._material_names))
+        # At-failure mechanism capture is an SSRM-only extra (a single trial has
+        # no bracket to capture beyond).
+        self.capture_failure_state.setEnabled(not single)
+        cap_on = (not single) and self.capture_failure_state.isChecked()
+        self.capture_margin.setEnabled(cap_on)
+        self.capture_iter_on.setEnabled(cap_on)
+        self.capture_max_iterations.setEnabled(cap_on and self.capture_iter_on.isChecked())
 
     def _refresh_ssr_label(self):
         if self._ssr_exclude:
@@ -243,6 +298,10 @@ class RunFemDialog(QDialog):
                                if self.min_slip_on.isChecked()
                                and self.min_slip_depth.value() > 0 else None),
             "ssr_exclude": list(self._ssr_exclude) or None,
+            "capture_failure_state": self.capture_failure_state.isChecked(),
+            "capture_margin": self.capture_margin.value(),
+            "capture_max_iterations": (self.capture_max_iterations.value()
+                                       if self.capture_iter_on.isChecked() else None),
         }
 
 

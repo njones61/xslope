@@ -518,7 +518,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     plot_nodes=False, plot_elements=False, plot_boundary=True, displacement_tolerance=0.5,
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
-                    show_original='outline', deformed_color='k', deform_scale=None):
+                    show_original='outline', deformed_color='k', deform_scale=None,
+                    strain_state='failure'):
     """
     Plot FEM results with various visualization options.
 
@@ -571,6 +572,14 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             Griffiths & Lane plot — instead of the sub-critical last-converged
             settlement, and the deformation title reads "…at Failure" leading with FS.
             None (default) falls back to ``solution`` for those panels.
+        strain_state: Which field the filled-contour panels (displace_mag / stress /
+            strain / shear_strain / yield) render, when ``failure_solution`` is given.
+            'failure' (default) puts them on the SAME at-failure field as the
+            deformation and displace_vector panels, so a multi-panel results figure
+            never mixes states (the strain band and the displacement mechanism trace
+            the same failure surface). 'converged' keeps them on the last-converged
+            ``solution`` instead. With no ``failure_solution``, both selections are
+            identical (there's only one field to render).
         show_original: Original-mesh reference on the deformation panel — a tri-state
             passed to plot_deformed_mesh: 'outline' (default) a dashed light boundary
             outline at every density, 'mesh' the full light-gray grid (outline when
@@ -594,15 +603,23 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         solution = {**solution, "_ssrm_fs": fs}
 
     # The deformation and displacement-vector panels render the AT-FAILURE (unconverged)
-    # mechanism when solve_ssrm captured it; the shear-strain and other field panels
-    # stay on the passed (last-converged) solution. Mark the field _at_failure and carry
-    # the factor of safety so the deformation title leads with FS and names the trial F.
+    # mechanism when solve_ssrm captured it. Mark the field _at_failure and carry the
+    # factor of safety so the deformation/vector titles lead with FS and name the trial F.
     if failure_solution is not None:
         deform_field = {**failure_solution, "_at_failure": True}
         if fs is not None:
             deform_field["_ssrm_fs"] = fs
     else:
         deform_field = solution
+
+    # The filled-contour panels (displace_mag / stress / strain / shear_strain / yield)
+    # default (strain_state='failure') to the SAME field as deformation/displace_vector,
+    # so a multi-panel results figure never mixes states — the strain band and the
+    # displacement mechanism trace the same failure surface instead of two different
+    # solves. strain_state='converged' opts back into the last-converged ``solution``.
+    # With no failure_solution, deform_field already IS solution, so both selections
+    # render identically (nothing to opt out of).
+    contour_field = deform_field if strain_state == 'failure' else solution
 
     # Accept a single string or a list of strings
     if isinstance(plot_type, str):
@@ -767,7 +784,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # ``show_mesh`` because there the grid IS the content, and displace_vector
         # keeps it for its edge/boundary context.
         if pt == 'displace_mag':
-            plot_displacement_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
+            plot_displacement_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'displace_vector':
             plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
@@ -783,19 +800,19 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              label_elements=label_elements, single_panel=defer_panel_cbar,
                              at_failure=(failure_solution is not None))
         elif pt == 'stress':
-            plot_stress_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
+            plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'strain':
-            plot_strain_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
+            plot_strain_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'shear_strain':
             single_mappable, reinf_cbar_specs = plot_shear_strain_contours(
-                ax, fem_data, solution, mesh_on_fields, show_reinforcement,
+                ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                 cmap=cmap, single_panel=defer_panel_cbar)
             single_cbar_label = 'VP Max Shear Strain'
         elif pt == 'yield':
-            plot_yield_function_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
+            plot_yield_function_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                         cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
 
         # Set consistent axis limits for all plots (including single plots)
@@ -941,7 +958,10 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    ax.set_title('Displacement Magnitude Contours')
+    title = 'Displacement Magnitude Contours'
+    if solution.get("_at_failure", False):
+        title += ' at Failure'
+    ax.set_title(title)
 
 
 def _get_mesh_boundary(fem_data):
@@ -1215,7 +1235,10 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         _add_element_labels(ax, fem_data)
     
     ax.set_aspect('equal')
-    ax.set_title('von Mises Stress (Red outline = Yielding/Plastic Elements)')
+    title = 'von Mises Stress (Red outline = Yielding/Plastic Elements)'
+    if solution.get("_at_failure", False):
+        title += ' at Failure'
+    ax.set_title(title)
 
 
 def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
@@ -1907,8 +1930,14 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
             ax, fem_data, solution, draw_cbar=not single_panel)
 
     F = solution.get("F", None)
+    at_failure = solution.get("_at_failure", False)
     title = 'Viscoplastic Shear Strain'
-    title = _fs_title(title, F, solution.get("_ssrm_fs"))
+    if at_failure:
+        title += ' at Failure'
+    # at_failure when plot_fem_results routed this panel onto the at-failure field
+    # (strain_state='failure', the default): leads with FS and discloses the trial F,
+    # matching the deformation/displace_vector panels so the figure tells one story.
+    title = _fs_title(title, F, solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs
 
@@ -2077,7 +2106,10 @@ def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_re
         plot_reinforcement_lines(ax, fem_data, solution)
     
     # Add title indicating yield state
-    ax.set_title('Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)', fontsize=12, pad=15)
+    title = 'Yield Function (Red: F>0 Yielding/Plastic, Blue: F<0 Elastic)'
+    if solution.get("_at_failure", False):
+        title += ' at Failure'
+    ax.set_title(title, fontsize=12, pad=15)
     
     # Add statistics to the plot
     n_yielding = np.sum(yield_function > 0)

@@ -525,6 +525,20 @@ class FemResultsDisplayPanel(QWidget):
         # (No "Colorbar size" control: the colorbar now tracks the plot height
         # automatically via make_axes_locatable, so there's nothing to tune.)
 
+        # Shear-strain-only: which field the contour renders when an at-failure
+        # (unconverged) field was captured by SSRM. "Failure" (default) matches the
+        # deformation and displacement-vector panels so all three tell one story;
+        # "Converged" opts back into the last-converged solution. A no-op when no
+        # at-failure field exists (nothing to opt out of).
+        self.strain_state = QComboBox()
+        for key, label in (("failure", "At failure"), ("converged", "Last converged")):
+            self.strain_state.addItem(label, key)
+        self.strain_state.setToolTip(
+            "Field rendered by the shear-strain contour when SSRM captured an "
+            "at-failure (unconverged) mechanism:\n"
+            "At failure — matches the deformation/displacement-vector panels (default).\n"
+            "Last converged — the sub-critical converged solution instead.")
+
         # Universal control, but with a per-plot-type default (and per-type memory
         # of the user's choice): off for the contour/vector plots (keep them
         # clean), on for the deformation plot (the undeformed reference).
@@ -556,6 +570,7 @@ class FemResultsDisplayPanel(QWidget):
 
         form.addRow("Plot type", self.plot_type)
         form.addRow("Color ramp", self.cmap)
+        form.addRow("Field state", self.strain_state)
         form.addRow("Deform", self.deform_percent)
         form.addRow("Displ. ×", self.deform_scale)
         form.addRow("Original mesh", self.show_original)
@@ -571,6 +586,7 @@ class FemResultsDisplayPanel(QWidget):
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)
+        self.strain_state.currentIndexChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
         self.deform_scale.valueChanged.connect(self._emit)
         self.show_original.currentIndexChanged.connect(self._emit)
@@ -608,9 +624,11 @@ class FemResultsDisplayPanel(QWidget):
         # Vector-only controls.
         for w in self._vector_widgets:
             w.setEnabled(pt == "displace_vector")
-        # Color ramp: shear-strain only. Deformation-only controls: percent, explicit
-        # multiplier, original-mesh tri-state, and deformed-grid color.
+        # Color ramp + field state: shear-strain only. Deformation-only controls:
+        # percent, explicit multiplier, original-mesh tri-state, and deformed-grid
+        # color.
         self.cmap.setEnabled(pt == "shear_strain")
+        self.strain_state.setEnabled(pt == "shear_strain")
         for w in (self.deform_percent, self.deform_scale,
                   self.show_original, self.deformed_color):
             w.setEnabled(pt == "deformation")
@@ -629,6 +647,7 @@ class FemResultsDisplayPanel(QWidget):
         return {
             "plot_type": self.plot_type.currentData(),
             "cmap": self.cmap.currentData(),
+            "strain_state": self.strain_state.currentData(),
             "deform_percent": self.deform_percent.value(),
             "deform_scale": None if scale <= 0 else scale,
             "show_original": False if orig == "off" else orig,

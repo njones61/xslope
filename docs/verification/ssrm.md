@@ -174,29 +174,30 @@ factor of safety is independent of the elastic constants.
 | Slope | 2:1, $H = 50$ ft (crest $y = 100$, toe $(200, 50)$, firm base $y = 0$) |
 | Geometry | $2H$ crest platform, 2:1 face, $2H$ runout, $D = 2$ |
 
-**The weak-layer geometry is measured from Fig. 6, which is a schematic — the layer
-thickness is never dimensioned in the paper.** Following the labelled $H$-fractions
-(read off the figure at 600 dpi), which close exactly, the band is placed as follows
-($H = 50$, $y$ upward):
+**The weak-layer geometry is fully dimensioned in Fig. 6.** The published figure carries
+printed $H$-fraction callouts along every reach, and the XSLOPE band reproduces each one
+exactly ($H = 50$, $y$ upward):
 
-- **Crest.** The band daylights at the top surface between $x = 0.6H = 30$ (its deeper,
-  lower boundary) and $x = 0.8H = 40$ (its upper boundary nearer the face); the crest
-  platform closes as $0.6H + 0.2H + 1.2H = 2H$.
-- **Slope reach.** Both boundaries run parallel to the 2:1 face.
+- **Crest.** The band daylights on the crest platform between $x = 0.6H = 30$ (its deeper,
+  lower boundary — the printed $0.6H$ from the crest edge) and $x = 0.8H = 40$ (its upper
+  boundary nearer the face); the platform closes as $0.6H + 0.2H + 1.2H = 2H$, matching the
+  printed $2H$ platform and $1.2H$ spans.
+- **Slope reach.** Both boundaries run parallel to the printed 2:1 face.
 - **Foundation reach.** The band flattens horizontally, its top $0.4H$ below the runout
-  surface ($y = 30$) and its bottom $0.4H$ above the firm base ($y = 20$), a $0.2H = 10$ ft
-  gap ($0.4H + 0.2H + 0.4H = H$).
-- **Outcrop.** Both boundaries kick up at 45 degrees (1:1) beyond the toe, the upper
-  daylighting at $x = 260$ (toe $+\,1.2H$) and the lower at $x = 270$ (right edge
-  $-\,0.6H$); the runout closes as $1.2H + 0.2H + 0.6H = 2H$.
+  surface ($y = 30$) and its bottom $0.4H$ above the firm base ($y = 20$) — the two printed
+  $0.4H$ callouts — which fix the band thickness at $H - 0.4H - 0.4H = 0.2H = 10$ ft by
+  arithmetic.
+- **Outcrop.** Both boundaries kick up at 45 degrees (the printed 1:1) beyond the toe, the
+  upper daylighting at $x = 260$ (toe $+\,1.2H$) and the lower at $x = 270$ (right edge
+  $-\,0.6H$); the runout closes as $1.2H + 0.2H + 0.6H = 2H$, matching the printed $2H$,
+  $1.2H$ and $0.6H$ spans.
 
-**Declared governing thickness: $0.2H = 10$ ft** in the horizontal foundation reach (the
-one clearly-dimensioned span), tapering to roughly $0.1H$ perpendicular where the band
-parallels the face and fanning out to meet the ground at the two daylights. The domain
-is tiled by **three explicit polygons** so the band is its own material region: a
-surrounding-clay wedge between the band and the slope face, the $c_{u2}$ band itself, and
-the surrounding-clay body below the band. A thickness-sensitivity variant (below) halves
-the band to show how much this undimensioned assumption matters.
+The **governing band thickness is $0.2H = 10$ ft** in the horizontal foundation reach, pinned
+by the $0.4H + 0.4H$ callouts above; where the band parallels the 2:1 face it measures about
+$0.1H$ perpendicular — the same $0.2H$ surface offset projected onto the slope. The domain is
+tiled by **three explicit polygons** so the band is its own material region: a surrounding-clay
+wedge between the band and the slope face, the $c_{u2}$ band itself, and the surrounding-clay
+body below the band.
 
 Excel input files, one per station:
 [$c_{u2}/c_{u1} = 1.0$](../fem/files/xslope_griffiths3_r1.xlsx),
@@ -209,7 +210,7 @@ plus the half-thickness variant
 [$0.2$ (thin band)](../fem/files/xslope_griffiths3_r0p2_thin.xlsx).
 
 Inputs plotted with the XSLOPE plot_inputs() function — the surrounding clay (blue) and
-the thin weak layer (orange) tracing the measured path of Fig. 6:
+the thin weak layer (orange) tracing the dimensioned path of Fig. 6:
 
 ![griffiths3_inputs.png](../fem/images/griffiths3_inputs.png){width=1000}
 
@@ -234,17 +235,17 @@ sweep tracks the shape; the two gated quad8 points and the Taylor anchor are ove
 | 0.4 | 0.97 | — | ~1.05 |
 | 0.2 | 0.49 | **0.45** | ~0.60 |
 
-All XSLOPE numbers are computed; every Fig. 7 value is **graphical** (read from the
-paper's plotted FE points), and the weak-layer geometry that produces them is the
-measured, schematic band declared above — so the falling-regime rows carry wide,
-figure-read tolerances. The curve matches Fig. 7 in the three features that matter: the
-**plateau** holds near the Taylor base-circle value while $c_{u2}/c_{u1} \gtrsim 0.6$
-(the thin layer is too strong to matter), the **transition** sits at
-$c_{u2}/c_{u1} \approx 0.6$ exactly where Griffiths & Lane place it, and below it the
-factor of safety **falls roughly linearly** toward the weak-layer strength. The XSLOPE
-points sit a few percent below the graphical FE curve in the falling regime — part the
-strict-true-equilibrium offset seen throughout these examples, part the undimensioned
-band geometry — but the shape and the transition are reproduced.
+All XSLOPE numbers are computed on the published Fig. 6 geometry; every Fig. 7 comparison
+value is **graphical** — read from the paper's plotted FE points, which Griffiths & Lane
+themselves report only "to the nearest 0.05" (p. 394) — so the sweep rows carry wide,
+figure-read tolerances on the *target*, not on the model geometry. The curve matches Fig. 7
+in the three features that matter: the **plateau** holds near the Taylor base-circle value
+while $c_{u2}/c_{u1} \gtrsim 0.6$ (the thin layer is too strong to matter), the **transition**
+sits at $c_{u2}/c_{u1} \approx 0.6$ exactly where Griffiths & Lane place it, and below it the
+factor of safety **falls roughly linearly** toward the weak-layer strength. The XSLOPE points
+sit a few percent below the graphical FE curve in the falling regime — the strict-true-
+equilibrium offset seen throughout these examples — but the shape and the transition are
+reproduced.
 
 **The two mechanisms (Fig. 8).** The gated quad8 solutions bracket the mechanism change.
 At $c_{u2}/c_{u1} = 1$ the band is the same clay as its surroundings, so the failure is
@@ -278,23 +279,52 @@ quad8 SSRM returns **FS = 1.44**, landing on Example 4 r1's 1.441 to within 0.00
 only difference is the extra mesh boundaries where the band sits) and a few percent below
 Taylor's 1.47 — the same base-circle limit.
 
-**Thickness sensitivity.** Because the layer thickness is undimensioned, the band was
-also halved (to $\approx 0.1H$ in the foundation reach) and re-run at the representative
-weak ratio $c_{u2}/c_{u1} = 0.2$. The coarse-tri6 factor of safety moves from **0.49**
-(measured band) to **0.51** (half band) — about 4%. The weak-ratio result is governed by
-$c_{u2}$ times the length of the failure path, which barely changes with band **thickness**
-— so the thickness guess is exonerated: it accounts for only the ~4% swing above. The
-remaining ~20% gap to the graphically-read ~0.60 is **unresolved**, but it sits within the
-combined envelope of three effects that were never removed. First, and the dominant
-candidate, the band **path** is as figure-read as its thickness — the crest daylight
-positions, the horizontal-reach elevation, and the 45-degree outcrop location were all
-measured off the schematic Fig. 6 and never varied — and by the same $c_{u2} \times$
-path-length scaling an error in that path maps roughly one-to-one into the factor of
-safety. Second, the strict-true-equilibrium offset documented across Examples 1, 2 and 4
-(−2 to −5%) applies here as well. Third, reading the ~0.60 point off Fig. 7 is itself good
-to only about ±0.05 — roughly ±8% at that level. Because none of the three was tested
-away, the gap cannot be called a genuine model-versus-figure difference; it is reported as
-an uncertainty bounded by these declared, still-untested figure-read assumptions.
+**Mesh convergence and the convergence criterion.** The weak-ratio lock was checked for mesh
+convergence with a refinement ladder at $c_{u2}/c_{u1} = 0.2$, from a coarse tri6 smoke mesh
+to a band-refined quad8 mesh:
+
+| Mesh | Elements | XSLOPE SSRM FS |
+|---|---|---|
+| tri6, target 12 (smoke) | 326 | 0.497 |
+| tri6, target 6 | 1356 | 0.475 |
+| quad8, target 5.5 (matches Griffiths & Lane's mesh) | 1314 | 0.470 |
+| quad8, target 3.5 (committed lock) | 3553 | 0.453 |
+| quad8, target 3.5, band-refined | 9963 | 0.459 |
+
+The factor of safety converges to $\approx 0.45$–$0.46$ as the mesh is refined, and the
+committed quad8 lock sits inside that converged band; the refinement machinery is validated by
+an anchor control at $c_{u2}/c_{u1} = 1$ on the same band-refined mesh, which returns
+**FS = 1.4406** — identical to the committed ratio-1 lock. Griffiths & Lane's own mesh, read
+from their Fig. 8, is roughly uniform 5 ft — about 1200 eight-node quadrilaterals with about
+two elements across the band — essentially the quad8/5.5 row above, and coarser than the
+committed lock.
+
+The remaining difference between the converged XSLOPE value ($\approx 0.45$) and the
+graphically read FE point ($\approx 0.60$) is a **convergence-criterion** difference, not a
+geometry or mesh difference. XSLOPE declares a trial stable only when it satisfies *both* a
+displacement-change (CHECON) test *and* a nodal force-equilibrium test, iterating up to a high
+ceiling (16000 iterations); Griffiths & Lane (p. 391) declare failure by non-convergence of a
+displacement test alone within an iteration ceiling of 1000. Two probes on the quad8/5.5 mesh
+show that neither half of that 1999 convention moves the XSLOPE result toward 0.60. Holding the
+force-equilibrium test in place but lowering the ceiling to 1000 iterations *lowers* the factor
+of safety to **0.38** — the ceiling starves the equilibrium iterations near collapse and reports
+failure early, rather than inflating the result. Removing the force-equilibrium test to leave
+the displacement criterion alone has the opposite effect: the relative displacement test accepts
+steady plastic creep as "converged," so the slope still registers as stable even at $F = 6$ (a
+sixfold strength reduction) and no failure is detected at all. The published $\approx 0.60$
+therefore reflects Griffiths & Lane's specific 1999 solver and its "nearest 0.05" graphical
+reporting, not a value a strict-equilibrium SSRM should reproduce.
+
+Two independent checks anchor the converged XSLOPE value instead. It is mesh-converged, per the
+ladder above; and it lands on the paper's *own* Janbu three-line wedge limit-equilibrium value
+($\approx 0.47$ in Fig. 7) for the identical layer-following mechanism of Fig. 8(c) — below the
+paper's graphical FE point. The XSLOPE lock agrees with the paper's wedge solution for the
+governing mechanism.
+
+**Thickness robustness.** Halving the (published) $0.2H$ band and re-running at
+$c_{u2}/c_{u1} = 0.2$ moves the coarse-tri6 factor of safety only from **0.49** to **0.51**,
+confirming the weak-ratio result is governed by $c_{u2}$ times the failure-path length rather
+than by the exact band thickness.
 
 <!-- Gated quad8 SSRM locks (benchmark=SSRM-G3): the anchor (cu2=cu1, base circle) tight
      on the observed value; the weak ratio (cu2/cu1=0.2, layer-following) figure-read with

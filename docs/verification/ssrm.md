@@ -71,6 +71,78 @@ This benchmark also appears on the
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=1.9, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.5, f_max=0.9, max_iter=4000 -->
 
+### Griffiths & Lane (1999) Example 2 — Homogeneous Slope with a Foundation Layer {#verification-griffiths2}
+
+This is Example 2 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
+(their Fig. 5): the Example 1 slope with a foundation layer of the **same soil** added
+beneath it, thickness $H/2$, so the firm base now sits at depth $D = 1.5\,H$ below the
+crest. Every material property and the slope geometry are unchanged from Example 1 — only
+the foundation is added.
+
+| Property | Value |
+|----------|-------|
+| Cohesion, $c'$ | 312.5 psf |
+| Friction angle, $\phi'$ | 20 degrees |
+| Unit weight, $\gamma$ | 125 pcf |
+| Young's modulus, $E$ | 700,000 psf |
+| Poisson's ratio, $\nu$ | 0.3 |
+| Foundation | $H/2$ = 25 ft of the same soil below the toe ($D = 1.5$) |
+
+The dimensionless strength is again $c'/\gamma H = 0.05$ with $\phi' = 20°$. The domain uses
+the printed dimensions of Fig. 1 — a $1.2\,H$ (60 ft) crest platform, the 2:1 face, and a
+$2\,H$ (100 ft) runout past the toe — with the $H/2$ foundation from the Example 2 text
+($D = 1.5$). (Example 1 as modelled here omits the runout because with the base at toe
+level a mechanism cannot reach it; with a foundation beneath the toe the runout gives any
+deeper surface room to form.)
+
+Excel input file: [xslope_griffiths2.xlsx](../fem/files/xslope_griffiths2.xlsx)
+
+Inputs plotted with the XSLOPE plot_inputs() function:
+
+![griffiths2_inputs.png](../fem/images/griffiths2_inputs.png){width=1000}
+
+FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rollers
+(circles) on the sides:
+
+![griffiths2_mesh.png](../fem/images/griffiths2_mesh.png){width=1000}
+
+SSRM results. The computed factor of safety is **FS = 1.33** under XSLOPE's strict
+true-equilibrium convergence criterion, with the displacement upturn at **F ≈ 1.4** — the
+same value as Example 1 (there FS = 1.35), confirming Griffiths & Lane's central point:
+adding the foundation layer does **not** change the factor of safety, because the critical
+mechanism stays a toe failure. Griffiths & Lane report FE FOS ≈ 1.4, unchanged from
+Example 1. The plots below show the solution at the developed failure state. The middle
+panel — the viscoplastic shear-strain concentration — is the key image: the shear band
+runs from the crest and **exits at the toe** (x = 160, y = 0), staying well above the
+foundation base at y = −25. The mechanism finds the toe on its own, with no assumption
+about the slip surface.
+
+![griffiths2_results.png](../fem/images/griffiths2_results.png){width=1000}
+
+**The false base circle.** This example is Griffiths & Lane's signature demonstration that
+finite elements find the true mechanism where a limit-equilibrium search can be misled. For
+this slope-plus-foundation, the Bishop & Morgenstern (1960) base-circle charts give
+FOS = 1.752, and a proprietary slip-circle program returned FOS = 1.7 when its failure
+circle was forced tangent to the base of the foundation — both well above the true value.
+Cousins' (1978) toe-circle charts, on the other hand, agree with the FE result at 1.4. The
+lesson is that a limit-equilibrium method requires the user to steer the search onto the
+correct family of surfaces; assume a base circle and the answer is 25% unconservative.
+
+XSLOPE's own limit-equilibrium search reproduces both sides of this exactly. An
+unconstrained global circular search (Spencer, grid seed) settles on a **toe circle** —
+critical centre (143.3, 114.1), lowest point y = −1.2, just below the toe and far above the
+foundation base — at **FS = 1.37**, agreeing with the SSRM result and with Cousins' toe
+charts. When the same search is confined to circles tangent to the foundation base (the
+assumption behind the chart value), it returns **FS = 1.70** — the paper's false base-circle
+result. XSLOPE's default search is not misled: left free, it finds the toe.
+
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G2 -->
+<!-- Coarse tri6 quick SSRM (ungated): confirms the foundation layer leaves the toe-failure FS unchanged. -->
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
+<!-- LEM teaching point: the unconstrained global search finds the TOE circle (true mechanism, ~1.37); forcing tangency to the foundation base reproduces the paper's false base circle (~1.70). -->
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.366, tolerance=0.02 -->
+<!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.702, tolerance=0.02 -->
+
 ### Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
 The second SSRM verification benchmark, from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387), *Géotechnique* 49(3),

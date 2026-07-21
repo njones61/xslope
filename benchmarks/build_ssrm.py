@@ -112,6 +112,45 @@ def build_griffiths6_seep():
     return dst
 
 
+def build_griffiths2():
+    """Griffiths & Lane (1999) Example 2 (Fig. 5): the Example-1 homogeneous
+    2:1 slope WITH a foundation layer of the SAME material, thickness H/2 (so
+    the firm base sits at depth D = 1.5 H below the crest). English units, all
+    Example-1 conventions carried over: H = 50 ft, gamma = 125 pcf, c' = 312.5
+    psf (c'/gamma-H = 0.05), phi' = 20 deg, E = 700000 psf, nu = 0.3, gamma_w =
+    62.4 pcf. quad8 SSRM at target_size 3.5 (SSRM-1 settings).
+
+    Domain uses the PRINTED Fig. 1 dimensions — 1.2 H crest platform (60 ft),
+    2:1 face (toe at x = 160), 2 H runout past the toe (to x = 260) — with the
+    H/2 = 25 ft foundation from the Example-2 text (D = 1.5). Example 1 as built
+    here omitted the runout because with the base at toe level (D = 1) it is a
+    y = 0 sliver that cannot affect a toe mechanism; with a foundation below the
+    toe the runout gives any deeper mechanism lateral room, so it is restored.
+
+    Published (paper text, p. 393-394): FE FOS ~= 1.4, unchanged from Example 1
+    because the mechanism stays a toe failure; Bishop & Morgenstern (1960)
+    base-circle charts give 1.752 and a proprietary slip-circle program forced
+    tangent to the base of the foundation returned a false 1.7, while Cousins
+    (1978) toe-circle charts agree with 1.4."""
+    dst = f"{OUTDIR}/xslope_griffiths2.xlsx"
+    new_file(dst, TEMPLATE)
+    H = 50.0
+    ground = [(0.0, H), (60.0, H), (160.0, 0.0), (260.0, 0.0)]
+    u = {}
+    u['main'] = main_cells(gamma_w=62.4)
+    u['mat'] = material_cells(1, "soil", 125.0, "mc", c=312.5, phi=20.0,
+                              u="none", E=7.0e5, nu=0.3)
+    prof = {'B2': -H / 2.0}          # firm base at y = -25 (H/2 foundation)
+    prof.update(profile_line_cells(1, 1, ground))
+    u['profile'] = prof
+    # placeholder circle (loader requires one; FEM/SSRM ignores it) — a toe
+    # circle over the slope face, tangent into the foundation
+    u['circles'] = circle_cells(1, 150.0, 70.0, option="Depth", depth=-H / 2.0)
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst)
+    return dst
+
+
 def build_griffiths6_full():
     return _build(f"{OUTDIR}/xslope_griffiths6_full.xlsx", wet=True)
 
@@ -121,6 +160,7 @@ def build_griffiths6_dry():
 
 
 if __name__ == "__main__":
+    build_griffiths2()
     build_griffiths6_full()
     build_griffiths6_dry()
     build_griffiths6_seep()
